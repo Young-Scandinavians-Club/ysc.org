@@ -1,8 +1,11 @@
 defmodule YscWeb.Emails.MembershipPaymentConfirmation do
   @moduledoc """
-  Email template for first-time membership payment confirmation.
+  Email template for first-time membership payment receipt.
 
-  Notifies users when their first membership payment succeeds and their membership is active.
+  Sent when the first membership payment succeeds (`invoice.payment_succeeded`),
+  including after ACH Direct Debit settles (which can take several days).
+  Membership access and the “you're active” email are handled at activation time;
+  this message confirms the payment amount and date.
   """
   use MjmlEEx,
     mjml_template: "templates/membership_payment_confirmation.mjml.eex",
@@ -16,7 +19,7 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
   end
 
   def get_subject() do
-    "Welcome to YSC – Your Membership is Active! 🎉"
+    "Your YSC Membership Payment Receipt"
   end
 
   def prepare_email_data(

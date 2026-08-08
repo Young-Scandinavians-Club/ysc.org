@@ -103,6 +103,91 @@ defmodule Ysc.Avatars do
   end
 
   @doc """
+  Deletes an avatar owned by the given user, along with its S3 objects.
+
+  Verifies the avatar belongs to the user before deleting. If it's the
+  user's current avatar, `current_avatar_id` is cleared automatically by the
+  `on_delete: :nilify_all` foreign key.
+
+  S3 cleanup is performed by an Oban job enqueued in the same transaction as
+  the database delete, so a transient S3 failure retries via Oban's backoff
+  instead of silently leaving the object accessible.
+  """
+  def delete_avatar(%User{} = user, avatar_id) do
+    case from(a in Avatar, where: a.id == ^avatar_id and a.user_id == ^user.id)
+         |> Repo.one() do
+      nil ->
+        {:error, :not_found}
+
+      avatar ->
+        keys =
+          [
+            avatar.original_path,
+            avatar.thumb_path,
+            avatar.profile_path,
+            avatar.large_path
+          ]
+          |> Enum.map(&avatar_s3_key(&1, avatar.user_id))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.uniq()
+
+        Repo.transaction(fn ->
+          with {:ok, deleted} <- Repo.delete(avatar),
+               :ok <- enqueue_avatar_cleanup(deleted.id, keys) do
+            deleted
+          else
+            {:error, reason} -> Repo.rollback(reason)
+          end
+        end)
+    end
+  end
+
+  defp enqueue_avatar_cleanup(_avatar_id, []), do: :ok
+
+  defp enqueue_avatar_cleanup(avatar_id, keys) do
+    bucket = S3Config.avatars_bucket_name()
+
+    Enum.reduce_while(keys, :ok, fn key, :ok ->
+      %{"bucket" => bucket, "key" => key, "avatar_id" => avatar_id}
+      |> YscWeb.Workers.AvatarCleanupWorker.new()
+      |> Oban.insert()
+      |> case do
+        {:ok, _job} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  # Extracts and validates the S3 key from a stored avatar URL, scoped to the
+  # owning user's prefix. Mirrors `YscWeb.Workers.AvatarProcessor.resolve_original_s3_key/1`.
+  defp avatar_s3_key(nil, _user_id), do: nil
+
+  defp avatar_s3_key(url, user_id) when is_binary(url) do
+    bucket_prefix = S3Config.avatars_bucket_name() <> "/"
+    prefix = "#{user_id}/"
+
+    key =
+      url
+      |> then(&(URI.parse(&1).path || ""))
+      |> String.trim_leading("/")
+      |> URI.decode()
+
+    key =
+      if String.starts_with?(key, bucket_prefix) do
+        String.replace_prefix(key, bucket_prefix, "")
+      else
+        key
+      end
+
+    cond do
+      key == "" -> nil
+      not String.starts_with?(key, prefix) -> nil
+      String.contains?(key, "..") or String.contains?(key, <<0>>) -> nil
+      true -> key
+    end
+  end
+
+  @doc """
   Updates the processing state and paths on an avatar after processing.
   """
   def update_processed_avatar(%Avatar{} = avatar, attrs) do

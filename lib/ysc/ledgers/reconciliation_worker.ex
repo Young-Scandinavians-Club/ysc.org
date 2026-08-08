@@ -134,6 +134,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
     |> maybe_add_balance_alert(report)
     |> maybe_add_orphaned_alert(report)
     |> maybe_add_entity_alert(report)
+    |> maybe_add_payout_alert(report)
   end
 
   defp maybe_add_payment_alert(sections, report) do
@@ -227,6 +228,36 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
     else
       sections
     end
+  end
+
+  defp maybe_add_payout_alert(sections, report) do
+    payouts = Map.get(report.checks, :payouts)
+
+    if payouts && payouts.discrepancies_count > 0 do
+      payout_alert = """
+      **PAYOUT DISCREPANCIES**
+      - Total Discrepancies: #{payouts.discrepancies_count}
+      - Total Payouts: #{payouts.total_payouts}
+
+      Issues:
+      #{format_payout_issues(payouts.discrepancies)}
+
+      Fix: relink with `Ysc.Stripe.WebhookHandler.relink_payout_transactions/1`
+      (see docs/REPROCESS_PAYOUTS.md).
+      """
+
+      [payout_alert | sections]
+    else
+      sections
+    end
+  end
+
+  defp format_payout_issues(discrepancies) do
+    discrepancies
+    |> Enum.take(5)
+    |> Enum.map_join("\n", fn disc ->
+      "  - #{disc.stripe_payout_id}:\n    #{Enum.join(disc.issues, "\n    ")}"
+    end)
   end
 
   defp format_payment_issues(discrepancies) do

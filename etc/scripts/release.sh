@@ -16,14 +16,73 @@ usage() {
   echo "Usage: $0 [TAG]"
   echo ""
   echo "Creates a new release by:"
-  echo "  1. Updating the version in mix.exs"
-  echo "  2. Creating a git tag"
-  echo "  3. Committing and pushing the change and tag to main"
+  echo "  1. Reviewing commits and diffs since the previous release tag"
+  echo "  2. Updating the version in mix.exs"
+  echo "  3. Creating a git tag"
+  echo "  4. Committing and pushing the change and tag to main"
   echo ""
   echo "After push, CI deploys ysc-prod from etc/fly/fly-prod.toml (tag must be v*)."
   echo ""
   echo "TAG: Version tag (e.g. v1.0.0 or 1.0.0). If not provided, prompts (default: minor bump from highest v* tag)."
   exit 1
+}
+
+# Print commits and diffs that will ship in this release (previous v* tag..HEAD), then confirm.
+review_release_diff() {
+  local prev_tag="$1"
+  local range
+  local commit_count
+  local show_diff
+  local confirm
+
+  echo "${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
+  echo "${BOLD}                     Review changes for $GIT_TAG${RESET}"
+  echo "${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
+  echo ""
+
+  if [ -z "$prev_tag" ]; then
+    echo "${YELLOW}No previous v* tag — cannot bound a release range. Skipping diff review.${RESET}"
+    echo ""
+    read -rp "Proceed with release ${GIT_TAG}? [y/N] " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+      echo "${YELLOW}Aborted. No changes made.${RESET}"
+      exit 0
+    fi
+    echo ""
+    return 0
+  fi
+
+  range="${prev_tag}..HEAD"
+  commit_count="$(git rev-list --count "$range")"
+  echo "${TEAL}Range: ${BOLD}${range}${RESET} ${TEAL}(plus the version bump commit)${RESET}"
+  echo ""
+
+  if [ "$commit_count" -eq 0 ]; then
+    echo "${YELLOW}No commits since ${prev_tag}. This release would only contain the version bump.${RESET}"
+    echo ""
+  else
+    echo "${TEAL}Commits (${commit_count}):${RESET}"
+    git log --oneline --no-decorate "$range"
+    echo ""
+
+    echo "${TEAL}Diffstat:${RESET}"
+    git diff --stat "$range"
+    echo ""
+
+    read -rp "Show full diff? [y/N] " show_diff
+    if [[ "$show_diff" =~ ^[Yy]$ ]]; then
+      echo ""
+      git --no-pager diff "$range"
+      echo ""
+    fi
+  fi
+
+  read -rp "Proceed with release ${GIT_TAG}? [y/N] " confirm
+  if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "${YELLOW}Aborted. No changes made.${RESET}"
+    exit 0
+  fi
+  echo ""
 }
 
 # Highest existing v* tag by semver (e.g. v1.12.0 over v1.11.9). Empty if none.
@@ -136,6 +195,8 @@ if [ -n "$HIGHEST_TAG" ]; then
     exit 1
   fi
 fi
+
+review_release_diff "$HIGHEST_TAG"
 
 echo "${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"
 echo "${BOLD}                           Creating release $GIT_TAG${RESET}"

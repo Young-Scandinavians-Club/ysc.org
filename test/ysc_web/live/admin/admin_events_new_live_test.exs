@@ -71,6 +71,339 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "editor date picker" do
+    setup [:create_admin]
+
+    test "picking a date and closing the calendar persists start/end dates", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(10, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      old_end = DateTime.add(old_start, 1, :day)
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Date Edit Event",
+          start_date: old_start,
+          end_date: old_end,
+          start_time: ~T[18:00:00],
+          end_time: ~T[20:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      new_date = Date.add(Date.utc_today(), 3)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      assert has_element?(view, "#event_date_calendar")
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+    end
+
+    test "date change after validate auto-save still persists", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(10, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Date After Validate",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: DateTime.add(old_start, 1, :day),
+          start_time: ~T[18:00:00],
+          end_time: ~T[20:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#new_event_form")
+      |> render_change(%{
+        "event" => %{
+          "title" => "Date After Validate Updated",
+          "description" => "Summary text",
+          "start_date" => DateTime.to_iso8601(old_start),
+          "end_date" => DateTime.to_iso8601(DateTime.add(old_start, 1, :day)),
+          "start_time" => "18:00:00",
+          "end_time" => "20:00:00"
+        }
+      })
+
+      new_date = Date.add(Date.utc_today(), 4)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+    end
+
+    test "in-progress date pick survives a concurrent form validate", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(20, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Concurrent Validate",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: DateTime.add(old_start, 1, :day),
+          start_time: ~T[18:00:00],
+          end_time: ~T[20:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      new_date = Date.add(Date.utc_today(), 2)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      # Parent re-render while calendar is open (previously wiped the pick)
+      view
+      |> element("#new_event_form")
+      |> render_change(%{
+        "event" => %{
+          "title" => "Concurrent Validate",
+          "description" => "Summary text changed",
+          "start_date" => DateTime.to_iso8601(old_start),
+          "end_date" => DateTime.to_iso8601(DateTime.add(old_start, 1, :day)),
+          "start_time" => "18:00:00",
+          "end_time" => "20:00:00"
+        }
+      })
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+    end
+
+    test "can move an existing later date back to an earlier single day", %{
+      conn: conn,
+      admin: admin
+    } do
+      later =
+        Date.add(Date.utc_today(), 20)
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Move Earlier",
+          description: "Summary text",
+          start_date: later,
+          end_date: later,
+          start_time: ~T[18:31:00],
+          end_time: ~T[20:30:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      earlier = Date.utc_today()
+      earlier_iso = "#{Date.to_iso8601(earlier)}T00:00:00Z"
+      later_iso = "#{Date.to_iso8601(DateTime.to_date(later))}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      # Mimic clicking the currently selected day first (enters :set_end), then
+      # choosing an earlier day — previously those earlier days were disabled.
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{later_iso}"]|)
+      |> render_click()
+
+      assert has_element?(
+               view,
+               ~s|#event_date_calendar button[phx-value-date="#{earlier_iso}"]:not([disabled])|
+             )
+
+      view
+      |> element(
+        ~s|#event_date_calendar button[phx-value-date="#{earlier_iso}"]|
+      )
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == earlier
+      assert DateTime.to_date(reloaded.end_date) == earlier
+    end
+
+    test "single-day pick clears overnight end_time so the update can persist",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(15, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Overnight Event",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: DateTime.add(old_start, 1, :day),
+          start_time: ~T[18:00:00],
+          # Next-morning end time is valid across two days, invalid on one day
+          end_time: ~T[02:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      new_date = Date.add(Date.utc_today(), 5)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+      assert reloaded.start_time == ~T[18:00:00]
+      assert reloaded.end_time == nil
+    end
+
+    test "published event with stale publish_at can move start earlier", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        Date.utc_today()
+        |> Date.add(20)
+        |> then(&DateTime.new!(&1, ~T[18:31:00], "Etc/UTC"))
+
+      # Historical schedule still on the event after it was published.
+      publish_at =
+        Date.utc_today()
+        |> Date.add(12)
+        |> then(&DateTime.new!(&1, ~T[15:45:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Stale Publish At Event",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: old_start,
+          start_time: ~T[18:31:00],
+          end_time: ~T[20:30:00],
+          state: :published,
+          publish_at: publish_at
+        })
+
+      assert event.publish_at
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      # Move earlier than publish_at (same class of bug as Aug 7/8 on a
+      # published event that still has publish_at set).
+      new_date = Date.add(Date.utc_today(), 3)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+      assert reloaded.publish_at == publish_at
+    end
+  end
+
   describe "editor validate auto-save" do
     setup [:create_admin]
 
@@ -219,6 +552,19 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert has_element?(view, "#preview-event-update-btn")
     end
 
+    test "includes media library trigger for the update Trix editor", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      assert has_element?(
+               view,
+               ~s([data-trix-library-trigger="update[raw_body]"])
+             )
+    end
+
     test "shows event update in timeline after send", %{
       conn: conn,
       admin: admin
@@ -292,6 +638,76 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       view |> element("#preview-event-update-btn") |> render_click()
 
       refute has_element?(view, "#event-update-preview-modal")
+    end
+  end
+
+  describe "updates tab - SMS preview" do
+    setup [:create_admin]
+
+    test "shows SMS preview and segment warning when send_sms is checked", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      long_body = "<p>" <> String.duplicate("a", 200) <> "</p>"
+
+      render_click(view, "editor-update", %{
+        "field" => "update[raw_body]",
+        "value" => long_body
+      })
+
+      view
+      |> form("#event-update-form", %{
+        "update" => %{
+          "send_sms" => "true",
+          "title" => "Update",
+          "raw_body" => long_body
+        }
+      })
+      |> render_change()
+
+      assert has_element?(view, "#event-update-sms-preview")
+      assert has_element?(view, "#sms-recipient-count")
+      assert has_element?(view, "#event-update-sms-segment-warning")
+    end
+
+    test "hides SMS preview when send_sms is unchecked", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      render_click(view, "editor-update", %{
+        "field" => "update[raw_body]",
+        "value" => "<p>Short update</p>"
+      })
+
+      view
+      |> form("#event-update-form", %{
+        "update" => %{
+          "send_sms" => "true",
+          "title" => "Update",
+          "raw_body" => "<p>Short update</p>"
+        }
+      })
+      |> render_change()
+
+      assert has_element?(view, "#event-update-sms-preview")
+
+      view
+      |> form("#event-update-form", %{
+        "update" => %{
+          "send_sms" => "false",
+          "title" => "Update",
+          "raw_body" => "<p>Short update</p>"
+        }
+      })
+      |> render_change()
+
+      refute has_element?(view, "#event-update-sms-preview")
     end
   end
 

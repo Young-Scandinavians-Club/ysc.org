@@ -11,6 +11,7 @@ defmodule Ysc.Accounts.SmsCategories do
     "booking_checkin_reminder" => :account,
     # Event notifications (can be disabled via event_notifications_sms)
     "event_notification" => :event,
+    "event_update_notification" => :event,
     # Security notifications (should always be sent, bypassing notification preferences)
     "two_factor_verification" => :account,
     "email_changed" => :account,
@@ -65,20 +66,24 @@ defmodule Ysc.Accounts.SmsCategories do
   """
   @spec should_send_sms?(map(), String.t()) :: boolean()
   def should_send_sms?(user, template_name) when is_binary(template_name) do
-    # Security-critical templates (verification codes) should always be sent
-    # regardless of notification preferences
-    if template_name in @security_templates do
-      true
-    else
-      case get_category(template_name) do
-        :account ->
-          # Check if user has account SMS notifications enabled
-          Map.get(user, :account_notifications_sms, true)
+    if Ysc.Accounts.receives_outbound_comms?(user) do
+      # Security-critical templates (verification codes) should always be sent
+      # regardless of notification preferences
+      if template_name in @security_templates do
+        true
+      else
+        case get_category(template_name) do
+          :account ->
+            # Check if user has account SMS notifications enabled
+            Map.get(user, :account_notifications_sms, true)
 
-        :event ->
-          # Check if user has event SMS notifications enabled
-          Map.get(user, :event_notifications_sms, true)
+          :event ->
+            # Check if user has event SMS notifications enabled
+            Map.get(user, :event_notifications_sms, true)
+        end
       end
+    else
+      false
     end
   end
 

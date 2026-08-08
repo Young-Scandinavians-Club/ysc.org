@@ -289,6 +289,44 @@ defmodule Ysc.Tickets.BookingLockerTest do
                      1_000
     end
 
+    test "succeeds against an event with no max_attendees limit", %{
+      user: user,
+      tier: tier,
+      organizer: organizer
+    } do
+      {:ok, unlimited_event} =
+        Events.create_event(%{
+          title: "No cap event",
+          description: "unlimited attendees",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: nil,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, tier2} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 20,
+          event_id: unlimited_event.id
+        })
+
+      assert {:ok, _order} =
+               BookingLocker.atomic_booking(user.id, unlimited_event.id, %{
+                 tier2.id => 1
+               })
+
+      refute tier.id == tier2.id
+    end
+
     test "atomic_booking succeeds and creates order and tickets", %{
       user: user,
       event: event,
@@ -1068,6 +1106,48 @@ defmodule Ysc.Tickets.BookingLockerTest do
 
                  :ok
                end)
+    end
+
+    test "defaults opts to [] when called with 3 arguments", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      assert {:ok, :ok} =
+               Repo.transaction(fn ->
+                 assert :ok =
+                          BookingLocker.validate_fulfillment_capacity_in_transaction(
+                            user.id,
+                            event.id,
+                            %{tier.id => 1}
+                          )
+
+                 :ok
+               end)
+    end
+
+    test "skip_sale_guards with an unknown event returns event_not_found", %{
+      user: user,
+      tier: tier
+    } do
+      assert {:ok, {:error, :event_not_found}} =
+               Repo.transaction(fn ->
+                 BookingLocker.validate_fulfillment_capacity_in_transaction(
+                   user.id,
+                   Ecto.ULID.generate(),
+                   %{tier.id => 1},
+                   skip_sale_guards: true
+                 )
+               end)
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "builds a runnable Ecto query for CI query-plan diagnostics" do
+      query = BookingLocker.ci_query_explain_query()
+
+      assert %Ecto.Query{} = query
+      assert Repo.all(query) == []
     end
   end
 

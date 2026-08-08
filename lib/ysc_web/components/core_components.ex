@@ -288,7 +288,7 @@ defmodule YscWeb.CoreComponents do
 
   attr :rest, :global,
     include:
-      ~w(autocomplete name rel action enctype method novalidate target multipart phx-change phx-submit phx-target phx-auto-recover phx-hook phx-update class),
+      ~w(autocomplete name rel action enctype method novalidate target multipart onsubmit phx-change phx-submit phx-target phx-auto-recover phx-hook phx-update class),
     doc: "the arbitrary HTML attributes to apply to the form tag"
 
   slot :inner_block, required: true
@@ -373,7 +373,9 @@ defmodule YscWeb.CoreComponents do
   attr :patch, :string, default: nil
   attr :href, :string, default: nil
   attr :loading_text, :string, default: nil
-  attr :rest, :global, include: ~w(disabled form name value method rel replace)
+
+  attr :rest, :global,
+    include: ~w(disabled form name value method rel replace target)
 
   slot :inner_block, required: true
 
@@ -746,7 +748,7 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <div>
-      <label class="flex items-start gap-3 text-sm leading-6 text-zinc-600 cursor-pointer py-1">
+      <label class="flex items-center gap-3 text-sm leading-6 text-zinc-600 cursor-pointer py-1">
         <input type="hidden" name={@name} value="false" />
         <input
           type="checkbox"
@@ -754,7 +756,7 @@ defmodule YscWeb.CoreComponents do
           name={@name}
           value="true"
           checked={@checked}
-          class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+          class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
           {@rest}
         />
         <span class="flex-1">{@label}</span>
@@ -1258,6 +1260,16 @@ defmodule YscWeb.CoreComponents do
     doc: "Maximum nights allowed for the selected date range"
   )
 
+  attr(:min_nights, :integer,
+    default: 1,
+    doc: """
+    Minimum nights between start and end.
+    Booking calendars keep the default of 1 (checkout must be after check-in).
+    Pass 0 for admin event dates so a single calendar day is allowed, with an
+    optional later click to extend into a multi-day range.
+    """
+  )
+
   attr(:checkout_date_tooltips, :map,
     default: %{},
     doc: "Unavailable checkout dates keyed by ISO date when selecting check-out"
@@ -1292,6 +1304,7 @@ defmodule YscWeb.CoreComponents do
       seasons={@seasons}
       allow_saturdays={@allow_saturdays}
       max_nights={@max_nights}
+      min_nights={@min_nights}
     />
     <div :if={Phoenix.Component.used_input?(@start_date_field)}>
       <.error :for={msg <- @start_date_field.errors}>
@@ -3293,7 +3306,7 @@ defmodule YscWeb.CoreComponents do
   @account_settings_nav_keys [
     {:profile, "Profile", "hero-user"},
     {:membership, "Membership", "hero-heart"},
-    {:payments, "Bookings & Tickets", "hero-wallet"},
+    {:payments, "Bookings & Payments", "hero-wallet"},
     {:family, "Family", "hero-user-group"},
     {:security, "Security", "hero-shield-check"},
     {:notifications, "Notifications", "hero-bell-alert"}
@@ -4215,11 +4228,11 @@ defmodule YscWeb.CoreComponents do
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
-              </strong>, at which point you will no longer have access to the YSC membership features.
+              </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
-              </strong>, at which point you will no longer have access to the YSC membership features.
+              </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>
         </div>
@@ -4323,11 +4336,11 @@ defmodule YscWeb.CoreComponents do
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
-              </strong>. After that date, you will no longer have access to YSC membership features.
+              </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
-              </strong>. After that date, you will no longer have access to YSC membership features.
+              </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>
         </div>
@@ -4444,9 +4457,12 @@ defmodule YscWeb.CoreComponents do
   component, set `hero_mode: true` in your LiveView assigns to enable transparent
   navigation with white text.
 
+  Media is capped at 1920px and centered so ultrawide viewports do not stretch a
+  single asset edge-to-edge. Side gaps use the section background fill.
+
   ## Examples
 
-      <.hero image={~p"/images/hero-bg.jpg"} height="70vh">
+      <.hero image={~p"/images/hero-bg.webp"} height="70vh">
         <:title>Welcome to YSC</:title>
         <:subtitle>Your Scandinavian community in the Bay Area</:subtitle>
         <:cta>
@@ -4461,6 +4477,10 @@ defmodule YscWeb.CoreComponents do
   """
   attr :image, :string, default: nil, doc: "Path to the background image"
 
+  attr :image_srcset, :string,
+    default: nil,
+    doc: "Optional srcset for the background image"
+
   attr :video, :string,
     default: nil,
     doc: "Path to the background video (takes precedence over image)"
@@ -4468,6 +4488,14 @@ defmodule YscWeb.CoreComponents do
   attr :poster, :string,
     default: nil,
     doc: "Path to the poster image shown while video is loading"
+
+  attr :poster_srcset, :string,
+    default: nil,
+    doc: "Optional srcset for the poster image"
+
+  attr :sizes, :string,
+    default: "(max-width: 1920px) 100vw, 1920px",
+    doc: "sizes attribute for responsive hero images"
 
   attr :captions, :string,
     default: nil,
@@ -4496,78 +4524,107 @@ defmodule YscWeb.CoreComponents do
   slot :inner_block, doc: "Additional custom content"
 
   def hero(assigns) do
+    bleed_src = assigns.poster || assigns.image
+
+    bleed_srcset =
+      if assigns.poster, do: assigns.poster_srcset, else: assigns.image_srcset
+
+    assigns =
+      assigns
+      |> assign(:bleed_src, bleed_src)
+      |> assign(:bleed_srcset, bleed_srcset)
+
     ~H"""
     <section
       id="hero-section"
       phx-hook={@video && "HeroVideoControls"}
       class={[
-        "relative w-full flex items-center justify-center overflow-x-hidden overflow-y-auto hero-nav-overlap",
+        "relative w-full flex items-center justify-center overflow-x-hidden overflow-y-auto hero-nav-overlap bg-white",
         @video && "group",
-        !@video && "bg-cover bg-center bg-no-repeat",
         @class
       ]}
-      style={
-        if @video,
-          do: "min-height: #{@height};",
-          else: "background-image: url('#{@image}'); min-height: #{@height};"
-      }
+      style={"min-height: #{@height};"}
     >
-      <img
-        :if={@video && @poster}
-        src={@poster}
-        alt=""
-        aria-hidden="true"
-        class="absolute inset-0 w-full h-full object-cover"
-        fetchpriority="high"
-        loading="eager"
-      />
-      <%!-- No HTML autoplay: LiveView morphdom calls video.play() on autoplay
-           nodes without catching NotAllowedError (common on iOS Safari). Playback
-           is started by HeroVideoControls with a caught promise instead. --%>
-      <video
-        :if={@video}
-        id="hero-video"
-        muted
-        loop
-        playsinline
-        poster={@poster}
-        preload="auto"
-        class="absolute inset-0 w-full h-full object-cover"
-      >
-        <source src={@video} type="video/mp4" />
-        <track
-          kind="captions"
-          src={@captions || "/video/hero_captions.vtt"}
-          srclang="en"
-          label="English"
-        />
-      </video>
+      <div class="hero-media-stage">
+        <div :if={@bleed_src} class="hero-media-stage__bleed" aria-hidden="true">
+          <img
+            src={@bleed_src}
+            srcset={@bleed_srcset}
+            sizes="100vw"
+            alt=""
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <div class="hero-media-stage__inner">
+          <img
+            :if={@video && @poster}
+            src={@poster}
+            srcset={@poster_srcset}
+            sizes={@poster_srcset && @sizes}
+            alt=""
+            aria-hidden="true"
+            fetchpriority="high"
+            loading="eager"
+          />
+          <img
+            :if={!@video && @image}
+            src={@image}
+            srcset={@image_srcset}
+            sizes={@image_srcset && @sizes}
+            alt=""
+            aria-hidden="true"
+            fetchpriority="high"
+            loading="eager"
+          />
+          <%!-- No HTML autoplay: LiveView morphdom calls video.play() on autoplay
+               nodes without catching NotAllowedError (common on iOS Safari). Playback
+               is started by HeroVideoControls with a caught promise instead. --%>
+          <video
+            :if={@video}
+            id="hero-video"
+            muted
+            loop
+            playsinline
+            poster={@poster}
+            preload="auto"
+          >
+            <source src={@video} type="video/mp4" />
+            <track
+              kind="captions"
+              src={@captions || "/video/hero_captions.vtt"}
+              srclang="en"
+              label="English"
+            />
+          </video>
 
-      <%!-- Pause/play control: visible on hover (or always on touch) for performance --%>
-      <div
-        :if={@video}
-        class="absolute bottom-4 right-4 z-20 opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
-      >
-        <button
-          type="button"
-          data-hero-video-toggle
-          aria-label="Pause video"
-          class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
-        >
-          <span class="pause-icon inline-flex [.paused_&]:hidden">
-            <.icon name="hero-pause" class="w-6 h-6" />
-          </span>
-          <span class="play-icon hidden [.paused_&]:!inline-flex">
-            <.icon name="hero-play" class="w-6 h-6" />
-          </span>
-        </button>
+          <div
+            :if={@overlay}
+            class={["absolute inset-0 z-[1]", @overlay_opacity]}
+            aria-hidden="true"
+          />
+
+          <%!-- Pause/play control: visible on hover (or always on touch) for performance --%>
+          <div
+            :if={@video}
+            class="absolute bottom-4 right-4 z-20 opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
+          >
+            <button
+              type="button"
+              data-hero-video-toggle
+              aria-label="Pause video"
+              class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+            >
+              <span class="pause-icon inline-flex [.paused_&]:hidden">
+                <.icon name="hero-pause" class="w-6 h-6" />
+              </span>
+              <span class="play-icon hidden [.paused_&]:!inline-flex">
+                <.icon name="hero-play" class="w-6 h-6" />
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
-
-      <div
-        :if={@overlay}
-        class={["absolute inset-0 z-[1]", @overlay_opacity]}
-        aria-hidden="true"
-      />
 
       <div class="relative z-10 w-full min-w-0 max-w-screen-lg mx-auto px-5 sm:px-6 py-12 sm:py-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
         <h1

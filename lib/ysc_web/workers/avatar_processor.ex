@@ -188,22 +188,38 @@ defmodule YscWeb.Workers.AvatarProcessor do
     end
   end
 
+  # Fetches the object via its public URL with a plain HTTP GET instead of a
+  # signed ExAws.S3 GetObject request.
+  #
+  # Every avatar this worker downloads was uploaded through a presigned POST
+  # that sets ACL: public-read (see YscWeb.AvatarUpload), so an unsigned GET
+  # is sufficient and requires no credentials.
+  #
+  # This isn't a style choice: signed GET requests to the raw Tigris endpoint
+  # return 405 in this environment (verified directly against production —
+  # PUT, HEAD, and DELETE via ExAws all succeed with normal Tigris responses;
+  # GET, signed, consistently 405s with bare, non-Tigris-shaped response
+  # headers, on every bucket including this one). See
+  # YscWeb.Workers.EventPhotoUploadWorker.download_from_s3/2, which hit the
+  # exact same problem and the same fix.
   # sobelow_skip ["Traversal.FileModule"]
   defp download_original_from_s3!(key, dest_path) do
-    bucket = S3Config.avatars_bucket_name()
+    url = S3Config.object_url(key, S3Config.avatars_bucket_name())
+    opts = Keyword.merge([into: File.stream!(dest_path)], s3_req_opts())
 
-    case ExAws.S3.get_object(bucket, key) |> ExAws.request() do
-      {:ok, %{body: body}}
-      when is_binary(body) and byte_size(body) > 0 ->
-        File.write!(dest_path, body)
+    case Req.get(url, opts) do
+      {:ok, %{status: 200}} ->
+        :ok
 
-      {:ok, %{body: body}} ->
-        raise "Avatar S3 download returned empty body for key #{inspect(key)}, size #{inspect(byte_size(body || ""))}"
+      {:ok, %{status: status}} ->
+        raise "Avatar S3 download failed: HTTP #{status} for key #{inspect(key)}"
 
       {:error, reason} ->
         raise "Avatar S3 download failed: #{inspect(reason)} for key #{inspect(key)}"
     end
   end
+
+  defp s3_req_opts, do: Application.get_env(:ysc, :avatar_s3_req_opts, [])
 
   defp key_from_url(url) when is_binary(url) do
     path = URI.parse(url).path || ""

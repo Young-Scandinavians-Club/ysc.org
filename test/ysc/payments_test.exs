@@ -931,6 +931,101 @@ defmodule Ysc.PaymentsTest do
         Payments.set_default_payment_method(user, pm)
       end
     end
+
+    test "rejects a payment method owned by a different user" do
+      owner = user_fixture()
+      caller = user_fixture()
+
+      foreign_pm =
+        create_payment_method_fixture(%{user_id: owner.id, is_default: true})
+
+      caller_pm =
+        create_payment_method_fixture(%{user_id: caller.id, is_default: true})
+
+      assert {:error, :payment_method_not_owned_by_user} =
+               Payments.set_default_payment_method(caller, foreign_pm)
+
+      assert Payments.get_payment_method!(foreign_pm.id).is_default
+      assert Payments.get_default_payment_method(caller).id == caller_pm.id
+    end
+  end
+
+  describe "push_default_payment_method_to_stripe/2" do
+    test "updates the Stripe customer's invoice_settings.default_payment_method" do
+      user = user_fixture(%{stripe_id: "cus_push_test"})
+
+      pm =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_push_test"
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_test", params, _opts ->
+        assert params.invoice_settings.default_payment_method == "pm_push_test"
+        {:ok, %Stripe.Customer{id: "cus_push_test"}}
+      end)
+
+      assert :ok = Payments.push_default_payment_method_to_stripe(user, pm)
+    end
+
+    test "is a no-op when the user has no Stripe customer id" do
+      user = user_fixture()
+      pm = create_payment_method_fixture(%{user_id: user.id})
+
+      # No Stripe.CustomerMock expectation set: this must not call Stripe.
+      assert :ok = Payments.push_default_payment_method_to_stripe(user, pm)
+    end
+
+    test "logs and returns :ok when the Stripe call fails" do
+      user = user_fixture(%{stripe_id: "cus_push_fail"})
+      pm = create_payment_method_fixture(%{user_id: user.id})
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_fail", _params, _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message: "boom",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      assert :ok = Payments.push_default_payment_method_to_stripe(user, pm)
+    end
+  end
+
+  describe "upsert_and_set_default_payment_method_from_stripe/2 pushes to Stripe" do
+    test "pushes the new default payment method to the Stripe customer" do
+      user = user_fixture(%{stripe_id: "cus_upsert_push"})
+      pm_id = "pm_upsert_push_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_upsert_push",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4444",
+          exp_month: 6,
+          exp_year: 2031,
+          brand: "visa"
+        }
+      }
+
+      expect(Stripe.CustomerMock, :update, fn "cus_upsert_push",
+                                              params,
+                                              _opts ->
+        assert params.invoice_settings.default_payment_method == pm_id
+        {:ok, %Stripe.Customer{id: "cus_upsert_push"}}
+      end)
+
+      assert {:ok, _} =
+               Payments.upsert_and_set_default_payment_method_from_stripe(
+                 user,
+                 stripe_pm
+               )
+    end
   end
 
   describe "fix_missing_default_payment_methods/0" do
@@ -1173,6 +1268,245 @@ defmodule Ysc.PaymentsTest do
       end)
 
       assert {:ok, _} = Payments.sync_payment_methods_with_stripe(user)
+    end
+  end
+
+  describe "get_last_four/1 branches via Stripe upsert" do
+    test "prefers dynamic_last4 from card wallet over card.last4" do
+      user = user_fixture()
+      pm_id = "pm_dynamic_last4_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_dynamic",
+        type: "card",
+        card: %{
+          last4: "1111",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa",
+          wallet: %{type: "apple_pay", dynamic_last4: "9999"}
+        },
+        us_bank_account: nil
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.last_four == "9999"
+    end
+
+    test "extracts last four from top-level link payment method" do
+      user = user_fixture()
+      pm_id = "pm_link_last4_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_link_top",
+        type: "link",
+        card: nil,
+        us_bank_account: nil,
+        link: %{last4: "4321", email: "person@example.com"}
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.last_four == "4321"
+    end
+
+    test "extracts last four from top-level cashapp payment method" do
+      user = user_fixture()
+      pm_id = "pm_cashapp_last4_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_cashapp",
+        type: "cashapp",
+        card: nil,
+        us_bank_account: nil,
+        cashapp: %{last4: "6543"}
+      }
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert Ecto.Changeset.get_field(changeset, :last_four) == "6543"
+    end
+  end
+
+  describe "get_display_brand/1 branches via Stripe upsert" do
+    test "maps wallet types apple_pay, google_pay, and samsung_pay to display names" do
+      user = user_fixture()
+
+      for {wallet_type, expected_brand} <- [
+            {"apple_pay", "Apple Pay"},
+            {"google_pay", "Google Pay"},
+            {"samsung_pay", "Samsung Pay"}
+          ] do
+        pm_id = "pm_wallet_#{wallet_type}_#{System.unique_integer([:positive])}"
+
+        stripe_pm = %{
+          id: pm_id,
+          customer: "cus_wallet",
+          type: "card",
+          card: %{
+            last4: "1234",
+            exp_month: 12,
+            exp_year: 2030,
+            brand: "visa",
+            wallet: %{type: wallet_type}
+          },
+          us_bank_account: nil
+        }
+
+        assert {:ok, m} =
+                 Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+        assert m.display_brand == expected_brand
+      end
+    end
+
+    test "falls back to display_brand/brand for unrecognized wallet type" do
+      user = user_fixture()
+      pm_id = "pm_unknown_wallet_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_unknown_wallet",
+        type: "card",
+        card: %{
+          last4: "1234",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "mastercard",
+          display_brand: "mastercard",
+          wallet: %{type: "some_future_wallet"}
+        },
+        us_bank_account: nil
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.display_brand == "mastercard"
+    end
+
+    test "uses 'Link' brand for card with brand link and no wallet" do
+      user = user_fixture()
+      pm_id = "pm_card_brand_link_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_card_link",
+        type: "card",
+        card: %{last4: "1234", exp_month: 12, exp_year: 2030, brand: "link"},
+        us_bank_account: nil
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.display_brand == "Link"
+    end
+
+    test "uses card display_brand when present and not link" do
+      user = user_fixture()
+      pm_id = "pm_card_display_brand_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_card_display",
+        type: "card",
+        card: %{
+          last4: "1234",
+          exp_month: 12,
+          exp_year: 2030,
+          brand: "visa",
+          display_brand: "visa debit"
+        },
+        us_bank_account: nil
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.display_brand == "visa debit"
+    end
+
+    test "derives display brand from top-level link map email/country" do
+      user = user_fixture()
+      pm_id = "pm_link_map_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_link_display",
+        type: "link",
+        card: nil,
+        us_bank_account: nil,
+        link: %{country: "US"}
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.display_brand == "US"
+    end
+
+    test "maps top-level cashapp, paypal, klarna, affirm to expected display brands" do
+      user = user_fixture()
+
+      for {type, key, expected_brand} <- [
+            {"cashapp", :cashapp, "Cash App"},
+            {"paypal", :paypal, "PayPal"},
+            {"klarna", :klarna, "Klarna"},
+            {"affirm", :affirm, "Affirm"}
+          ] do
+        pm_id = "pm_#{type}_brand_#{System.unique_integer([:positive])}"
+
+        stripe_pm = %{
+          id: pm_id,
+          customer: "cus_#{type}",
+          type: type,
+          card: nil,
+          us_bank_account: nil
+        }
+
+        stripe_pm = Map.put(stripe_pm, key, %{some: "value"})
+
+        assert {:error, %Ecto.Changeset{} = changeset} =
+                 Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+        assert Ecto.Changeset.get_field(changeset, :display_brand) ==
+                 expected_brand
+      end
+    end
+  end
+
+  describe "stripe_payment_method_to_map/1 nested list conversion" do
+    test "converts list-valued fields when payload is a plain map" do
+      user = user_fixture()
+      pm_id = "pm_list_field_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %{
+        id: pm_id,
+        customer: "cus_list_field",
+        type: "card",
+        card: %{last4: "1234", exp_month: 12, exp_year: 2030, brand: "visa"},
+        us_bank_account: nil,
+        some_list_field: ["a", "b", %{nested: "c"}]
+      }
+
+      assert {:ok, m} =
+               Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert m.payload[:some_list_field] == ["a", "b", %{nested: "c"}]
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "returns a valid Ecto query usable for query-explain tooling" do
+      assert %Ecto.Query{} = Payments.ci_query_explain_query()
     end
   end
 

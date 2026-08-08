@@ -1619,10 +1619,14 @@ defmodule Ysc.Accounts do
 
   def update_user(user, params, %User{} = current_user) do
     with :ok <- Policy.authorize(:user_update, current_user, user) do
+      previous_user = user
       user = maybe_update_board_position_history(user, params)
 
       case user |> User.update_user_changeset(params) |> Repo.update() do
         {:ok, updated_user} ->
+          updated_user =
+            maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
+
           revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
@@ -1643,12 +1647,16 @@ defmodule Ysc.Accounts do
   """
   def update_user_with_address(user, params, %User{} = current_user) do
     with :ok <- Policy.authorize(:user_update, current_user, user) do
+      previous_user = user
       user = maybe_update_board_position_history(user, params)
 
       case user
            |> User.update_user_with_address_changeset(params)
            |> Repo.update() do
         {:ok, updated_user} ->
+          updated_user =
+            maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
+
           revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
@@ -1705,6 +1713,9 @@ defmodule Ysc.Accounts do
 
       case result do
         {:ok, updated_user} ->
+          updated_user =
+            maybe_stop_comms_on_deleted_transition(user, updated_user)
+
           revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
@@ -1729,6 +1740,60 @@ defmodule Ysc.Accounts do
   end
 
   defp revoke_sessions_if_blocked(_user), do: :ok
+
+  # When an account is soft-deleted, stop marketing/ops outbound channels:
+  # unsubscribe newsletter and disable event/SMS preference flags. Session
+  # revocation is handled separately by revoke_sessions_if_blocked/1.
+  defp maybe_stop_comms_on_deleted_transition(
+         %User{state: previous_state},
+         %User{state: :deleted} = user
+       )
+       when previous_state != :deleted do
+    stop_outbound_comms_for_deleted_user(user)
+  end
+
+  defp maybe_stop_comms_on_deleted_transition(_previous, user), do: user
+
+  defp stop_outbound_comms_for_deleted_user(%User{} = user) do
+    require Ysc.Logging
+
+    case Newsletter.unsubscribe(user.email) do
+      {:ok, _} ->
+        :ok
+
+      {:error, :not_found} ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Failed to unsubscribe deleted user from newsletter",
+          user_id: user.id,
+          extra: %{reason: inspect(reason)}
+        )
+    end
+
+    case user
+         |> User.notification_preferences_changeset(%{
+           event_notifications: false,
+           event_notifications_sms: false,
+           account_notifications_sms: false,
+           account_notifications: true
+         })
+         |> Repo.update() do
+      {:ok, updated_user} ->
+        invalidate_user_profile_cache(updated_user)
+        updated_user
+
+      {:error, changeset} ->
+        Ysc.Logging.warning(
+          "Failed to disable notification preferences for deleted user",
+          user_id: user.id,
+          extra: %{errors: inspect(changeset.errors)}
+        )
+
+        user
+    end
+  end
 
   defp maybe_update_board_position_history(user, params) do
     new_val =
@@ -1942,8 +2007,24 @@ defmodule Ysc.Accounts do
   end
 
   def update_default_payment_method(user, payment_method_id) do
-    payment_method = Ysc.Payments.get_payment_method!(payment_method_id)
-    Ysc.Payments.set_default_payment_method(user, payment_method)
+    case Ysc.Payments.get_user_payment_method(user, payment_method_id) do
+      nil ->
+        {:error, :payment_method_not_owned_by_user}
+
+      payment_method ->
+        case Ysc.Payments.set_default_payment_method(user, payment_method) do
+          {:ok, updated_user} = result ->
+            Ysc.Payments.push_default_payment_method_to_stripe(
+              updated_user,
+              payment_method
+            )
+
+            result
+
+          error ->
+            error
+        end
+    end
   end
 
   @doc """
@@ -2094,6 +2175,19 @@ defmodule Ysc.Accounts do
     do: state in [:pending_approval, :active]
 
   def login_allowed_state?(_), do: false
+
+  @doc """
+  Returns whether outbound email/SMS should be delivered for this user.
+
+  Soft-deleted accounts (`:deleted`) do not receive outbound comms.
+  When `state` is absent (bare preference maps in tests/callers), returns
+  `true` so preference-only checks keep working.
+  """
+  def receives_outbound_comms?(%User{state: :deleted}), do: false
+
+  def receives_outbound_comms?(%{state: :deleted}), do: false
+
+  def receives_outbound_comms?(_), do: true
 
   @doc """
   Deletes all session tokens for the given user.
@@ -2372,6 +2466,19 @@ defmodule Ysc.Accounts do
 
         base_multi =
           Ecto.Multi.new()
+          |> Ecto.Multi.run(:family_invite_guard, fn repo, _changes ->
+            if invite do
+              case Ysc.Accounts.FamilyInvites.validate_invite_acceptance(
+                     repo,
+                     invite
+                   ) do
+                :ok -> {:ok, :ok}
+                {:error, reason} -> {:error, reason}
+              end
+            else
+              {:ok, :ok}
+            end
+          end)
           |> Ecto.Multi.update(
             :user,
             User.approve_user_changeset(user, user_approval_attrs)
@@ -2433,8 +2540,8 @@ defmodule Ysc.Accounts do
 
             {:ok, application}
 
-          {:error, _, changeset, _} ->
-            {:error, changeset}
+          {:error, _failed_operation, failed_value, _changes} ->
+            {:error, failed_value}
         end
       end
     end
@@ -3265,6 +3372,22 @@ defmodule Ysc.Accounts do
 
   defp do_admin_link_user(primary_user, user_to_link, relationship) do
     Repo.transaction(fn ->
+      # Serialize with invite acceptance/linking, which locks the primary row.
+      from(u in User, where: u.id == ^primary_user.id, lock: "FOR UPDATE")
+      |> Repo.one!()
+
+      case relationship do
+        rel when rel in [:spouse, "spouse"] ->
+          if count_spouses(primary_user) >= 1 do
+            Repo.rollback(:max_spouses_reached)
+          end
+
+        _ ->
+          if count_sub_accounts_for_primary(primary_user.id) >= 10 do
+            Repo.rollback(:max_sub_accounts_reached)
+          end
+      end
+
       updated_user =
         user_to_link
         |> Ecto.Changeset.change(%{
@@ -3683,6 +3806,11 @@ defmodule Ysc.Accounts do
     end)
   end
 
+  # Below this, a YoY percent change is too noisy to be meaningful (e.g. a
+  # prior-period count of 1 turns any uptick into a four-or-five-digit swing)
+  # and is hidden in favor of the raw counts already shown alongside it.
+  @membership_joins_change_percent_min_baseline 5
+
   @doc """
   YTD comparison of **new membership joins** (not active headcount).
 
@@ -3690,7 +3818,9 @@ defmodule Ysc.Accounts do
 
   - had `lifetime_membership_awarded_at` fall in the half-open interval
     `[range_start, range_end)`, or
-  - had their **first** `Subscription` (by `inserted_at`) fall in that interval.
+  - had their **first** ever `Subscription` that reached a paid status
+    (i.e. excluding "incomplete"/"incomplete_expired" checkout attempts
+    that never converted) fall in that interval, by `inserted_at`.
 
   Used on the admin dashboard to compare this year-to-date with the same
   calendar-aligned span last year (Jan 1 through the same instant, shifted back one year).
@@ -3722,7 +3852,7 @@ defmodule Ysc.Accounts do
     prior_year_label = Integer.to_string(prior_year)
 
     change_percent =
-      if prior_count > 0 do
+      if prior_count >= @membership_joins_change_percent_min_baseline do
         round((current_count - prior_count) / prior_count * 100)
       else
         nil
@@ -3758,6 +3888,7 @@ defmodule Ysc.Accounts do
         on: s.user_id == u.id,
         where: is_nil(u.primary_user_id),
         where: u.state == :active,
+        where: s.stripe_status not in ["incomplete", "incomplete_expired"],
         group_by: u.id,
         select: %{user_id: u.id, first_at: min(s.inserted_at)}
       )
@@ -3898,6 +4029,20 @@ defmodule Ysc.Accounts do
         DateTime.truncate(DateTime.utc_now(), :second)
     )
     |> Repo.update()
+  end
+
+  @doc """
+  Returns true when a user's account originated from the WordPress migration
+  rather than the normal application → registration flow.
+
+  `register_user/1` sets `post_migration_onboarding_completed_at` immediately
+  for every native sign-up; WP-migrated users are inserted directly via
+  `User.registration_changeset/2` and are left with this field `nil`, so its
+  absence is a permanent (not just migration-window) marker of a migrated
+  account.
+  """
+  def wp_migrated?(%User{} = user) do
+    is_nil(user.post_migration_onboarding_completed_at)
   end
 
   @doc false

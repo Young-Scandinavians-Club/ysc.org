@@ -175,6 +175,89 @@ defmodule Ysc.BookingsTest do
       assert Enum.any?(bookings, &(&1.id == booking1.id))
     end
 
+    test "list_guests_staying_on_date/3 returns bookings staying overnight on date" do
+      user = user_fixture()
+      checkin = Date.utc_today() |> Date.add(30)
+      checkout = Date.add(checkin, 4)
+
+      staying =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :complete
+        })
+
+      _checkout_only =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: Date.add(checkin, -3),
+          checkout_date: checkin,
+          status: :complete
+        })
+
+      middle_night = Date.add(checkin, 2)
+
+      bookings =
+        Bookings.list_guests_staying_on_date(:clear_lake, middle_night,
+          preload: [:user]
+        )
+
+      assert Enum.any?(bookings, &(&1.id == staying.id))
+      refute Enum.any?(bookings, &(&1.checkout_date == middle_night))
+    end
+
+    test "list_guests_staying_on_date/3 excludes canceled and refunded by default" do
+      user = user_fixture()
+      checkin = Date.utc_today() |> Date.add(40)
+      checkout = Date.add(checkin, 3)
+
+      canceled =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :canceled
+        })
+
+      bookings = Bookings.list_guests_staying_on_date(:clear_lake, checkin)
+      refute Enum.any?(bookings, &(&1.id == canceled.id))
+    end
+
+    test "list_guests_staying_on_date/3 filters by statuses when provided" do
+      user = user_fixture()
+      checkin = Date.utc_today() |> Date.add(50)
+      checkout = Date.add(checkin, 3)
+
+      complete =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :complete
+        })
+
+      _hold =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :hold
+        })
+
+      bookings =
+        Bookings.list_guests_staying_on_date(:clear_lake, checkin,
+          statuses: [:complete]
+        )
+
+      assert Enum.map(bookings, & &1.id) == [complete.id]
+    end
+
     test "admin_property_dashboard_stats/0 aggregates per-property buckets in one query" do
       today =
         "America/Los_Angeles"
@@ -569,7 +652,8 @@ defmodule Ysc.BookingsTest do
               end_date
             )
           end,
-          pattern: ~r/FROM "bookings"/i
+          pattern: ~r/FROM "bookings"/i,
+          caller_pids: [self()]
         )
 
       assert queries_after >= 1
@@ -1358,6 +1442,28 @@ defmodule Ysc.BookingsTest do
 
       assert message =~ ref
     end
+
+    test "falls back to booking id in error messages when reference_id is blank" do
+      id = Ecto.ULID.generate()
+      booking = check_in_booking(%{status: :canceled, reference_id: "", id: id})
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ id
+    end
+
+    test "falls back to booking id in error messages when reference_id is nil" do
+      id = Ecto.ULID.generate()
+
+      booking =
+        check_in_booking(%{status: :canceled, reference_id: nil, id: id})
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ id
+    end
   end
 
   describe "ensure_user_may_book/1" do
@@ -1655,6 +1761,32 @@ defmodule Ysc.BookingsTest do
                start_date: ~D[2026-07-26],
                end_date: ~D[2026-07-26]
              }) == [~D[2026-07-26]]
+    end
+
+    test "stay_occupied_nights/2 returns [] for nil dates or non-positive ranges" do
+      assert Bookings.stay_occupied_nights(nil, ~D[2026-07-26]) == []
+      assert Bookings.stay_occupied_nights(~D[2026-07-26], nil) == []
+      assert Bookings.stay_occupied_nights(nil, nil) == []
+
+      assert Bookings.stay_occupied_nights(~D[2026-07-26], ~D[2026-07-26]) ==
+               []
+
+      assert Bookings.stay_occupied_nights(~D[2026-07-26], ~D[2026-07-24]) ==
+               []
+    end
+
+    test "blackout_occupied_nights/1 returns [] for missing keys or reversed range" do
+      assert Bookings.blackout_occupied_nights(%{}) == []
+
+      assert Bookings.blackout_occupied_nights(%{
+               start_date: nil,
+               end_date: nil
+             }) == []
+
+      assert Bookings.blackout_occupied_nights(%{
+               start_date: ~D[2026-07-29],
+               end_date: ~D[2026-07-26]
+             }) == []
     end
 
     test "get_overlapping_blackouts/3 returns overlapping blackouts" do
@@ -2007,9 +2139,12 @@ defmodule Ysc.BookingsTest do
       end
 
       {results, query_count} =
-        Ysc.QueryCounter.with_query_counter(fn ->
-          Bookings.search_bookings_by_last_name(last_name, :tahoe)
-        end)
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.search_bookings_by_last_name(last_name, :tahoe)
+          end,
+          caller_pids: [self()]
+        )
 
       assert length(results) == 3
 
@@ -4903,6 +5038,337 @@ defmodule Ysc.BookingsTest do
                  payment_intent,
                  booking_b
                )
+    end
+  end
+
+  describe "modification_hold_form_params/1 edge cases" do
+    test "returns nil when checkin/checkout values are not Date structs or strings" do
+      assert Bookings.modification_hold_form_params(%{
+               "checkin_date" => 12345,
+               "checkout_date" => "2026-01-01"
+             }) == nil
+    end
+
+    test "returns nil for non-map, non-Booking input" do
+      assert Bookings.modification_hold_form_params("not a map or booking") ==
+               nil
+
+      assert Bookings.modification_hold_form_params(nil) == nil
+    end
+
+    test "returns nil when a Booking's modification_hold_attrs is not a map" do
+      booking = %Booking{modification_hold_attrs: nil}
+      assert Bookings.modification_hold_form_params(booking) == nil
+    end
+  end
+
+  describe "prepare_modification/3 attribute parsing errors" do
+    setup do
+      user = user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id, status: :complete})
+        |> Ysc.Repo.preload([:rooms, :user])
+
+      %{user: user, booking: booking}
+    end
+
+    test "returns error when checkin_date string is not a valid date", %{
+      booking: booking
+    } do
+      assert {:error, :invalid_date} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => "not-a-date"
+               })
+    end
+
+    test "returns error when checkin_date is neither a Date nor a string", %{
+      booking: booking
+    } do
+      assert {:error, :invalid_date} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => 12345
+               })
+    end
+
+    test "returns error when guests_count string is not an integer", %{
+      booking: booking
+    } do
+      assert {:error, :invalid_guest_count} =
+               Bookings.prepare_modification(booking, %{
+                 "guests_count" => "abc"
+               })
+    end
+
+    test "returns error when children_count is a negative integer", %{
+      booking: booking
+    } do
+      assert {:error, :invalid_guest_count} =
+               Bookings.prepare_modification(booking, %{
+                 "children_count" => -5
+               })
+    end
+  end
+
+  describe "prepare_modification/3 delta clamping" do
+    test "clamps delta to zero when the modification lowers the total price" do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(state: :active)
+        |> Ysc.Repo.update!()
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(500, :USD),
+          booking_mode: :buyout,
+          price_unit: :buyout_fixed,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      checkin = tahoe_booking_dates(30) |> elem(0)
+      checkout = Date.add(checkin, 4)
+
+      assert {:ok, total, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 :buyout,
+                 guests_count: 4
+               )
+
+      assert {:ok, %Booking{} = booking} =
+               Ysc.Bookings.BookingLocker.create_admin_booking(
+                 %{
+                   user_id: user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   booking_mode: :buyout,
+                   guests_count: 4,
+                   total_price: total
+                 },
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      booking = Ysc.Repo.preload(booking, [:rooms, :user])
+
+      shorter_checkout = Date.add(checkin, 2)
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => Date.to_iso8601(checkin),
+                 "checkout_date" => Date.to_iso8601(shorter_checkout)
+               })
+
+      assert Money.equal?(preview.delta, Money.new(0, :USD))
+      assert Money.compare(preview.new_total, preview.previous_total) == :lt
+    end
+  end
+
+  describe "approve_pending_refund/4 pending refund status branches" do
+    defp pending_refund_fixture(status) do
+      user = user_fixture()
+      admin = user_fixture(%{role: :admin})
+      booking = booking_fixture(%{user_id: user.id})
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_status_branch_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: Money.new(2000, :USD),
+          admin_refund_amount:
+            if(status == :approved, do: Money.new(2000, :USD), else: nil),
+          status: status
+        })
+        |> Ysc.Repo.insert()
+
+      %{pending_refund: pr, payment: payment, admin: admin}
+    end
+
+    test "returns idempotently when the pending refund is already approved" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeRetrieveBlockedClient)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
+      %{pending_refund: pr, admin: admin} = pending_refund_fixture(:approved)
+
+      assert {:ok, updated, nil} =
+               Bookings.approve_pending_refund(
+                 pr,
+                 Money.new(2000, :USD),
+                 "notes",
+                 admin
+               )
+
+      assert updated.id == pr.id
+      assert updated.status == :approved
+    end
+
+    test "resumes finalizing a refund stuck in :processing status" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+
+      Application.put_env(
+        :ysc,
+        :stripe_client,
+        Ysc.StripeRefundApproveTestClient
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
+      %{pending_refund: pr, admin: admin} = pending_refund_fixture(:processing)
+
+      assert {:ok, updated, stripe_refund_id} =
+               Bookings.approve_pending_refund(
+                 pr,
+                 Money.new(2000, :USD),
+                 "notes",
+                 admin
+               )
+
+      assert updated.status == :approved
+      assert is_binary(stripe_refund_id)
+    end
+
+    test "returns an error when the pending refund is not awaiting approval" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeRetrieveBlockedClient)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
+      %{pending_refund: pr, admin: admin} = pending_refund_fixture(:rejected)
+
+      assert {:error,
+              {:refund_failed, "Pending refund is not awaiting approval"}} =
+               Bookings.approve_pending_refund(
+                 pr,
+                 Money.new(2000, :USD),
+                 "notes",
+                 admin
+               )
+    end
+  end
+
+  describe "create_stripe_refund/4 Stripe.Error propagation via modification refund" do
+    test "returns the underlying Stripe.Error when the internal refund lookup retrieve fails" do
+      user = user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent_id =
+        "pi_create_refund_stripe_error_#{System.unique_integer([:positive])}"
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: payment_intent_id,
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_stripe_error"
+      }
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error,
+         %Stripe.Error{
+           message: "resource missing",
+           code: "resource_missing",
+           source: :stripe
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:error, message} =
+                 Bookings.maybe_refund_unfulfilled_modification_payment(
+                   booking,
+                   payment_intent,
+                   :blackout_conflict
+                 )
+
+        assert message =~ "Failed to retrieve payment intent"
+        assert message =~ "resource missing"
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+  end
+
+  describe "ci_query_explain_* query builders" do
+    test "each helper builds a runnable Ecto query" do
+      assert %Ecto.Query{} = Bookings.ci_query_explain_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_conflicting_bookings_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_admin_property_dashboard_stats_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_list_upcoming_active_bookings_for_user_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_list_active_tahoe_bookings_for_family_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_list_active_clear_lake_bookings_for_user_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_list_guests_staying_on_date_query()
+    end
+
+    test "the admin property dashboard stats query executes against the database" do
+      assert is_list(
+               Ysc.Repo.all(
+                 Bookings.ci_query_explain_admin_property_dashboard_stats_query()
+               )
+             )
+    end
+
+    test "the conflicting bookings query executes against the database" do
+      assert is_list(
+               Ysc.Repo.all(
+                 Bookings.ci_query_explain_conflicting_bookings_query()
+               )
+             )
     end
   end
 

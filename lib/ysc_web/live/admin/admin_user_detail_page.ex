@@ -21,10 +21,19 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.ExpenseReports
   alias Ysc.Ledgers
   alias Ysc.Messages
+  alias Ysc.Newsletter
+  alias Ysc.Payments
   alias Ysc.Repo
   alias Ysc.Subscriptions
   alias Ysc.Tickets
-  alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers}
+  alias YscWeb.Authorization.Policy
+
+  alias YscWeb.{
+    Admin.DateTimeDisplay,
+    AdminBadgeHelpers,
+    PaymentMethodFormatter
+  }
+
   alias YscWeb.Workers.MembershipRenewalReminderWorker
 
   require Ysc.Logging
@@ -644,19 +653,47 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <.form
                   for={@entitlement_form}
                   id="grant-entitlement-form"
+                  phx-change="validate_entitlement_form"
                   phx-submit="grant_booking_entitlement"
                 >
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <.input
-                      field={@entitlement_form[:benefit_kind]}
-                      type="select"
-                      label="Benefit type"
-                      options={[
-                        {"Percent off stay", "percent_off"},
-                        {"Free nights (proportional)", "free_nights"},
-                        {"Fixed amount off", "fixed_amount_off"}
-                      ]}
-                    />
+                  <fieldset>
+                    <legend class="text-sm font-medium text-zinc-700 mb-2">
+                      Benefit type
+                    </legend>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <label
+                        :for={
+                          {value, title, description} <- [
+                            {"percent_off", "Percent off stay",
+                             "e.g. 50% off, capped at a max $ discount"},
+                            {"free_nights", "Free nights",
+                             "A number of nights covered for free"},
+                            {"fixed_amount_off", "Fixed amount off",
+                             "A flat $ discount off the stay"}
+                          ]
+                        }
+                        class={[
+                          "flex flex-col gap-0.5 rounded-md border p-3 cursor-pointer transition-colors",
+                          if(benefit_kind_value(@entitlement_form) == value,
+                            do: "border-zinc-800 bg-zinc-50 ring-1 ring-zinc-800",
+                            else: "border-zinc-200 hover:border-zinc-300"
+                          )
+                        ]}
+                      >
+                        <input
+                          type="radio"
+                          name="entitlement[benefit_kind]"
+                          value={value}
+                          checked={benefit_kind_value(@entitlement_form) == value}
+                          class="sr-only"
+                        />
+                        <span class="text-sm font-semibold text-zinc-800">{title}</span>
+                        <span class="text-xs text-zinc-500">{description}</span>
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                     <.input
                       field={@entitlement_form[:property]}
                       type="select"
@@ -668,35 +705,44 @@ defmodule YscWeb.AdminUserDetailsLive do
                       ]}
                     />
                     <.input
-                      field={@entitlement_form[:max_guests]}
-                      type="number"
-                      label="Max guests (optional)"
-                    />
-                    <.input
-                      field={@entitlement_form[:free_nights]}
-                      type="number"
-                      label="Free nights count"
-                    />
-                    <.input
-                      field={@entitlement_form[:percent_off]}
-                      type="text"
-                      label="Percent off (e.g. 50)"
-                    />
-                    <.input
-                      field={@entitlement_form[:buyout_max_discount]}
-                      type="text"
-                      label="Buyout max discount (USD)"
-                    />
-                    <.input
-                      field={@entitlement_form[:amount_off]}
-                      type="text"
-                      label="Fixed amount off (USD)"
-                    />
-                    <.input
                       field={@entitlement_form[:expires_on]}
                       type="date"
                       label="Expires (optional)"
                     />
+
+                    <%= if benefit_kind_value(@entitlement_form) == "free_nights" do %>
+                      <.input
+                        field={@entitlement_form[:free_nights]}
+                        type="number"
+                        label="Free nights count"
+                      />
+                      <.input
+                        field={@entitlement_form[:max_guests]}
+                        type="number"
+                        label="Max guests (optional)"
+                      />
+                    <% end %>
+
+                    <%= if benefit_kind_value(@entitlement_form) == "percent_off" do %>
+                      <.input
+                        field={@entitlement_form[:percent_off]}
+                        type="text"
+                        label="Percent off (e.g. 50)"
+                      />
+                      <.input
+                        field={@entitlement_form[:buyout_max_discount]}
+                        type="text"
+                        label="Buyout max discount (USD)"
+                      />
+                    <% end %>
+
+                    <%= if benefit_kind_value(@entitlement_form) == "fixed_amount_off" do %>
+                      <.input
+                        field={@entitlement_form[:amount_off]}
+                        type="text"
+                        label="Fixed amount off (USD)"
+                      />
+                    <% end %>
                   </div>
                   <.input
                     field={@entitlement_form[:internal_note]}
@@ -1356,6 +1402,32 @@ defmodule YscWeb.AdminUserDetailsLive do
                       </code>
                     <% end %>
                   </p>
+                  <p :if={@selected_user.stripe_id}>
+                    <span class="font-semibold">Stripe Customer ID:</span>
+                    <a
+                      href={"https://dashboard.stripe.com/customers/#{@selected_user.stripe_id}"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-xs bg-zinc-100 px-2 py-1 rounded font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
+                      title="View customer in Stripe Dashboard"
+                    >
+                      {@selected_user.stripe_id}
+                    </a>
+                  </p>
+                  <div>
+                    <p class="font-semibold mb-2">Auto-renewal payment method</p>
+                    <div
+                      :if={@default_payment_method}
+                      class="flex items-center p-4 bg-white border border-zinc-200 rounded-lg"
+                    >
+                      <.stored_payment_method_display payment_method={
+                        @default_payment_method
+                      } />
+                    </div>
+                    <p :if={!@default_payment_method} class="text-sm text-zinc-500">
+                      None on file
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1496,24 +1568,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
                           {if payment.payment_method do
-                            case payment.payment_method.type do
-                              "card" ->
-                                if payment.payment_method.last4 do
-                                  "Card ending in #{payment.payment_method.last4}"
-                                else
-                                  "Card"
-                                end
-
-                              "us_bank_account" ->
-                                if payment.payment_method.last4 do
-                                  "Bank ending in #{payment.payment_method.last4}"
-                                else
-                                  "Bank account"
-                                end
-
-                              _ ->
-                                "Payment method"
-                            end
+                            format_stored_payment_method(payment.payment_method)
                           else
                             "N/A"
                           end}
@@ -1652,6 +1707,226 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
 
         <div :if={@live_action == :notifications} class="max-w-full py-8 px-2">
+          <details
+            id="admin-user-notification-preferences"
+            class="group mb-8 rounded-lg border border-zinc-200 bg-white overflow-hidden"
+          >
+            <summary class="list-none cursor-pointer px-6 py-4 flex items-center justify-between gap-4 select-none transition-colors hover:bg-zinc-50 [&::-webkit-details-marker]:hidden">
+              <div>
+                <h2 class="text-lg font-semibold text-zinc-800">
+                  Notification preferences
+                </h2>
+                <p class="text-sm text-zinc-500 mt-1">
+                  View and update this user's email, SMS, and newsletter preferences.
+                </p>
+              </div>
+              <.icon
+                name="hero-chevron-down"
+                class="w-5 h-5 text-zinc-400 flex-shrink-0 transition-transform duration-200 group-open:-rotate-180"
+              />
+            </summary>
+            <div class="px-4 pt-2 pb-6 border-t border-zinc-200">
+              <.simple_form
+                for={@notification_form}
+                id="admin-notification-form"
+                phx-submit="update_admin_notifications"
+                phx-change="validate_admin_notifications"
+              >
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-zinc-200">
+                    <thead class="bg-zinc-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                        >
+                          Category
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                        >
+                          Email
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                        >
+                          SMS
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-zinc-200">
+                      <tr>
+                        <td class="px-6 py-4">
+                          <div>
+                            <div class="text-sm font-medium text-zinc-900">
+                              Newsletters
+                            </div>
+                            <div class="text-sm text-zinc-500 mt-1">
+                              Receive newsletter updates about YSC events, news, and community highlights.
+                            </div>
+                          </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          <div class="flex justify-center">
+                            <input
+                              type="hidden"
+                              name={
+                                @notification_form[:newsletter_notifications].name
+                              }
+                              value="false"
+                            />
+                            <input
+                              type="checkbox"
+                              id={@notification_form[:newsletter_notifications].id}
+                              name={
+                                @notification_form[:newsletter_notifications].name
+                              }
+                              value="true"
+                              checked={
+                                Phoenix.HTML.Form.normalize_value(
+                                  "checkbox",
+                                  @notification_form[:newsletter_notifications].value
+                                )
+                              }
+                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                            />
+                          </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                          <span class="text-sm text-zinc-400">—</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="px-6 py-4">
+                          <div>
+                            <div class="text-sm font-medium text-zinc-900">
+                              Event Updates
+                            </div>
+                            <div class="text-sm text-zinc-500 mt-1">
+                              Notifications when new events are published and reminders before events.
+                            </div>
+                          </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          <div class="flex justify-center">
+                            <input
+                              type="hidden"
+                              name={@notification_form[:event_notifications].name}
+                              value="false"
+                            />
+                            <input
+                              type="checkbox"
+                              id={@notification_form[:event_notifications].id}
+                              name={@notification_form[:event_notifications].name}
+                              value="true"
+                              checked={
+                                Phoenix.HTML.Form.normalize_value(
+                                  "checkbox",
+                                  @notification_form[:event_notifications].value
+                                )
+                              }
+                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                            />
+                          </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          <div class="flex justify-center">
+                            <input
+                              type="hidden"
+                              name={
+                                @notification_form[:event_notifications_sms].name
+                              }
+                              value="false"
+                            />
+                            <input
+                              type="checkbox"
+                              id={@notification_form[:event_notifications_sms].id}
+                              name={
+                                @notification_form[:event_notifications_sms].name
+                              }
+                              value="true"
+                              checked={
+                                Phoenix.HTML.Form.normalize_value(
+                                  "checkbox",
+                                  @notification_form[:event_notifications_sms].value
+                                )
+                              }
+                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td class="px-6 py-4">
+                          <div>
+                            <div class="text-sm font-medium text-zinc-900">
+                              Account Updates
+                            </div>
+                            <div class="text-sm text-zinc-500 mt-1">
+                              Important account-related notifications such as password changes and security alerts.
+                            </div>
+                          </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          <div class="flex justify-center">
+                            <input
+                              type="hidden"
+                              name={@notification_form[:account_notifications].name}
+                              value="true"
+                            />
+                            <input
+                              type="checkbox"
+                              id={@notification_form[:account_notifications].id}
+                              name={@notification_form[:account_notifications].name}
+                              value="true"
+                              checked={true}
+                              disabled
+                              class="rounded border-zinc-300 text-zinc-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0 opacity-50 cursor-not-allowed"
+                            />
+                          </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          <div class="flex justify-center">
+                            <input
+                              type="hidden"
+                              name={
+                                @notification_form[:account_notifications_sms].name
+                              }
+                              value="false"
+                            />
+                            <input
+                              type="checkbox"
+                              id={@notification_form[:account_notifications_sms].id}
+                              name={
+                                @notification_form[:account_notifications_sms].name
+                              }
+                              value="true"
+                              checked={
+                                Phoenix.HTML.Form.normalize_value(
+                                  "checkbox",
+                                  @notification_form[:account_notifications_sms].value
+                                )
+                              }
+                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <:actions>
+                  <div class="ml-auto pr-2">
+                    <.button phx-disable-with="Saving...">Save Preferences</.button>
+                  </div>
+                </:actions>
+              </.simple_form>
+            </div>
+          </details>
+
           <div class="flex flex-row flex-nowrap items-stretch gap-0">
             <div
               id="resizable-left-panel"
@@ -1671,7 +1946,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               }
             >
               <h2 class="text-xl font-semibold text-zinc-800 mb-4">
-                Notifications
+                Sent notifications
               </h2>
               <div class="w-full">
                 <.admin_table_skeleton
@@ -2332,6 +2607,55 @@ defmodule YscWeb.AdminUserDetailsLive do
         </.simple_form>
       </div>
     </.modal>
+
+    <.modal
+      :if={@pending_delete_params != nil}
+      id="confirm-delete-user-modal"
+      show={true}
+      on_cancel={JS.push("cancel_delete_user")}
+      max_width="max-w-lg"
+    >
+      <div class="space-y-4">
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <h2
+              id="confirm-delete-user-modal-title"
+              class="text-lg font-semibold text-zinc-900"
+            >
+              Delete this user?
+            </h2>
+            <p class="text-sm text-zinc-600 mt-1">
+              This will soft-delete the account, revoke their sessions, and stop
+              email, SMS, and newsletter communications. You can change the
+              account status later if needed.
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-row justify-end gap-3 pt-2">
+          <.button
+            type="button"
+            variant="outline"
+            color="zinc"
+            id="cancel-delete-user-button"
+            phx-click="cancel_delete_user"
+          >
+            Cancel
+          </.button>
+          <.button
+            type="button"
+            color="red"
+            id="confirm-delete-user-button"
+            phx-click="confirm_delete_user"
+            phx-disable-with="Deleting..."
+          >
+            Delete User
+          </.button>
+        </div>
+      </div>
+    </.modal>
     """
   end
 
@@ -2407,9 +2731,11 @@ defmodule YscWeb.AdminUserDetailsLive do
               |> maybe_open_booking_benefits(params)
 
             :notifications ->
-              user_email = socket.assigns.selected_user.email
+              selected_user = socket.assigns.selected_user
+              user_email = selected_user.email
 
               socket
+              |> assign_notification_form(selected_user)
               |> assign(:notifications_loading?, true)
               |> start_async(:load_notifications, fn ->
                 Messages.list_user_messages(user_id,
@@ -2640,6 +2966,10 @@ defmodule YscWeb.AdminUserDetailsLive do
     {:noreply, start_booking_entitlements_load(socket)}
   end
 
+  def handle_event("validate_entitlement_form", %{"entitlement" => p}, socket) do
+    {:noreply, assign(socket, :entitlement_form, to_form(p, as: :entitlement))}
+  end
+
   def handle_event("grant_booking_entitlement", %{"entitlement" => p}, socket) do
     user_id = socket.assigns.user_id
     admin_id = socket.assigns.current_user.id
@@ -2731,16 +3061,109 @@ defmodule YscWeb.AdminUserDetailsLive do
         application != nil &&
         application.review_outcome == :rejected
 
-    if activating_rejected_user? do
+    deleting_user? =
+      user_params["state"] == "deleted" && assigned.state != :deleted
+
+    cond do
+      activating_rejected_user? ->
+        {:noreply,
+         socket
+         |> assign(:pending_activation_params, user_params)
+         |> assign(
+           :override_rejection_form,
+           to_form(override_rejection_changeset(%{}), as: "override")
+         )}
+
+      deleting_user? ->
+        {:noreply, assign(socket, :pending_delete_params, user_params)}
+
+      true ->
+        do_save_user(socket, assigned, user_params, current_user)
+    end
+  end
+
+  def handle_event("confirm_delete_user", _params, socket) do
+    current_user = socket.assigns[:current_user]
+    assigned = socket.assigns[:selected_user]
+    pending_params = socket.assigns[:pending_delete_params]
+
+    if is_nil(pending_params) or not is_map(pending_params) or
+         map_size(pending_params) == 0 do
       {:noreply,
-       socket
-       |> assign(:pending_activation_params, user_params)
-       |> assign(
-         :override_rejection_form,
-         to_form(override_rejection_changeset(%{}), as: "override")
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "Pending profile changes are missing. Save again from the profile tab, then confirm delete.",
+         title: "Error"
        )}
     else
-      do_save_user(socket, assigned, user_params, current_user)
+      socket = assign(socket, :pending_delete_params, nil)
+      do_save_user(socket, assigned, pending_params, current_user)
+    end
+  end
+
+  def handle_event("cancel_delete_user", _params, socket) do
+    {:noreply, assign(socket, :pending_delete_params, nil)}
+  end
+
+  def handle_event(
+        "validate_admin_notifications",
+        %{"user" => user_params},
+        socket
+      ) do
+    selected_user = socket.assigns.selected_user
+
+    notification_form =
+      selected_user
+      |> Accounts.change_notification_preferences(user_params)
+      |> Map.put(:action, :validate)
+      |> to_form()
+
+    {:noreply, assign(socket, notification_form: notification_form)}
+  end
+
+  def handle_event(
+        "update_admin_notifications",
+        %{"user" => user_params},
+        socket
+      ) do
+    current_user = socket.assigns.current_user
+    selected_user = socket.assigns.selected_user
+    user_params = Map.put(user_params, "account_notifications", "true")
+
+    with :ok <- Policy.authorize(:user_update, current_user, selected_user),
+         {:ok, updated_user} <-
+           Accounts.update_notification_preferences(selected_user, user_params) do
+      newsletter_subscribed =
+        parse_newsletter_param(user_params["newsletter_notifications"])
+
+      Newsletter.sync_user_preference(updated_user,
+        newsletter_subscribed: newsletter_subscribed
+      )
+
+      notification_form =
+        updated_user
+        |> Accounts.change_notification_preferences(user_params)
+        |> to_form()
+
+      {:noreply,
+       socket
+       |> assign(:selected_user, updated_user)
+       |> assign(:notification_form, notification_form)
+       |> YscWeb.Flash.put_toast(
+         :info,
+         "Notification preferences updated.",
+         title: "Notifications"
+       )}
+    else
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, assign(socket, notification_form: to_form(changeset))}
+
+      {:error, _reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Not authorized.",
+           title: "Notifications"
+         )}
     end
   end
 
@@ -3865,6 +4288,20 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp real_stripe_subscription_id?(_), do: false
 
+  defp format_stored_payment_method(%{
+         type: type,
+         last_four: last_four,
+         display_brand: brand
+       }) do
+    PaymentMethodFormatter.format_payment_method_with_details(
+      type,
+      last_four,
+      brand
+    )
+  end
+
+  defp format_stored_payment_method(_), do: "Payment method"
+
   defp format_datetime_local(%DateTime{} = datetime) do
     # Convert UTC datetime to America/Los_Angeles for datetime-local input
     # datetime-local inputs expect a naive datetime string in local timezone
@@ -3907,7 +4344,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       user =
         Accounts.get_user!(selected_user.id, [
           :family_members,
-          {:primary_user, :current_avatar},
+          {:primary_user, [:current_avatar, :family_members]},
           {:sub_accounts, :current_avatar},
           :current_avatar
         ])
@@ -3919,7 +4356,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
       family_members =
         if primary_user do
-          case Accounts.get_user!(primary_user.id, [:family_members]).family_members do
+          case primary_user.family_members do
             %Ecto.Association.NotLoaded{} -> []
             members when is_list(members) -> members
             _ -> []
@@ -4049,7 +4486,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     selected_user =
       Accounts.get_user!(user_id, [
         :family_members,
-        {:primary_user, :current_avatar},
+        {:primary_user, [:current_avatar, :family_members]},
         {:sub_accounts, :current_avatar},
         :current_avatar
       ])
@@ -4072,11 +4509,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     # Otherwise, show family_members from the selected user
     family_members =
       if primary_user do
-        # Load primary user with family_members
-        primary_user_with_members =
-          Accounts.get_user!(primary_user.id, [:family_members])
-
-        case primary_user_with_members.family_members do
+        case primary_user.family_members do
           %Ecto.Association.NotLoaded{} -> []
           members when is_list(members) -> members
           _ -> []
@@ -4311,6 +4744,26 @@ defmodule YscWeb.AdminUserDetailsLive do
     )
   end
 
+  defp assign_notification_form(socket, user) do
+    effective_newsletter =
+      case Newsletter.get_subscriber_by_email(user.email) do
+        nil -> false
+        subscriber -> subscriber.subscribed
+      end
+
+    notification_form =
+      user
+      |> Accounts.change_notification_preferences(%{
+        "newsletter_notifications" => effective_newsletter
+      })
+      |> to_form()
+
+    assign(socket, :notification_form, notification_form)
+  end
+
+  defp parse_newsletter_param(value) when value in [true, "true", "1"], do: true
+  defp parse_newsletter_param(_), do: false
+
   defp format_changeset_errors(changeset) do
     YscWeb.FormHelpers.format_changeset_errors(changeset)
   end
@@ -4346,6 +4799,13 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp entitlement_form_defaults do
     to_form(Entitlements.entitlement_grant_default_params(), as: :entitlement)
+  end
+
+  defp benefit_kind_value(form) do
+    case form[:benefit_kind].value do
+      nil -> "percent_off"
+      value -> to_string(value)
+    end
   end
 
   defp format_entitlement_status(:active), do: "Active"
@@ -4396,6 +4856,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:selected_user_application, nil)
     |> assign(:active_subscription, nil)
     |> assign(:subscription_payments, [])
+    |> assign(:default_payment_method, nil)
     |> assign(:scheduled_downgrade_info, nil)
     |> assign(:has_lifetime_membership, false)
     |> assign(:membership_paused_by_board, nil)
@@ -4453,9 +4914,16 @@ defmodule YscWeb.AdminUserDetailsLive do
       to_form(note_changeset(%{category: "general"}), as: "note")
     )
     |> assign(:pending_activation_params, nil)
+    |> assign(:pending_delete_params, nil)
     |> assign(
       :override_rejection_form,
       to_form(override_rejection_changeset(%{}), as: "override")
+    )
+    |> assign(
+      :notification_form,
+      to_form(Accounts.change_notification_preferences(%Accounts.User{}),
+        as: "user"
+      )
     )
     |> assign(:booking_entitlements, [])
     |> assign(:booking_entitlements_loaded?, false)
@@ -4499,14 +4967,16 @@ defmodule YscWeb.AdminUserDetailsLive do
       has_lifetime,
       application,
       board_member,
-      {last_login_at, last_activity_at}
+      {last_login_at, last_activity_at},
+      default_payment_method
     ] =
       [
         fn -> fetch_subscription_data(selected_user) end,
         fn -> Accounts.has_lifetime_membership?(selected_user) end,
         fn -> fetch_application(id, current_user) end,
         fn -> Accounts.household_board_member(selected_user) end,
-        fn -> Accounts.get_user_login_activity_datetimes(selected_user) end
+        fn -> Accounts.get_user_login_activity_datetimes(selected_user) end,
+        fn -> Payments.get_default_payment_method(selected_user) end
       ]
       |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
       |> Enum.map(fn {:ok, result} -> result end)
@@ -4540,6 +5010,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:selected_user_application, application)
       |> assign(:active_subscription, active_subscription)
       |> assign(:subscription_payments, subscription_payments)
+      |> assign(:default_payment_method, default_payment_method)
       |> assign(:has_lifetime_membership, has_lifetime)
       |> assign(:membership_paused_by_board, board_member)
       |> assign(:membership_form, to_form(membership_cs, as: "membership"))

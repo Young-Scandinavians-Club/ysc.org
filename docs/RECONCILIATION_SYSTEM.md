@@ -53,6 +53,11 @@ The system performs the following checks:
 - **Bookings**: Revenue in ledger matches booking payment totals
 - **Events**: Revenue in ledger matches ticket payment totals
 
+#### 6. Payout Reconciliation
+- For each Stripe payout: `sum(linked payments) - sum(linked refunds) - fee_total == payout.amount`
+- Catches understated `fee_total` (e.g. missing Billing Usage / `stripe_fee` rows), incomplete linking, and amount drift
+- Residual fees (`fee_total` minus fees already booked on linked payments) must be booked on the payout's virtual payment (`Stripe payout fee for …`)
+
 ## Usage
 
 ### Manual Reconciliation

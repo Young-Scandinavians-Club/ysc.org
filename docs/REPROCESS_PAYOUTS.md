@@ -9,6 +9,12 @@ Payouts created before the BalanceTransaction API implementation may have:
 - Missing linked refunds
 - Missing or incorrect `fee_total` values
 
+Payouts processed before standalone Stripe fee support may also understate `fee_total`:
+per-charge processing fees were included, but balance transactions with
+`type: "stripe_fee"` (e.g. **Billing - Usage Fee**) were skipped. Those rows
+usually have `fee: 0` and the cost in `amount` (negative). Relinking recalculates
+`fee_total` as charge/refund BT `:fee` plus `abs(amount)` for fee-type BTs.
+
 ## Solution
 
 Use the `relink_payout_transactions` function to reprocess a payout using the new BalanceTransaction API method.
@@ -85,8 +91,22 @@ updated_payout = WebhookHandler.relink_payout_transactions(payout)
 3. **Skips Payout Transaction**: Automatically skips the payout balance transaction itself (type: "payout")
 4. **Links Payments**: Finds payments by payment_intent_id and links them to the payout
 5. **Links Refunds**: Finds refunds by external_refund_id and links them to the payout
-6. **Updates Fee Total**: Calculates and updates fee_total from balance transactions
-7. **Checks QuickBooks Sync**: If all conditions are met, enqueues QuickBooks sync
+6. **Updates Fee Total**: Calculates and updates `fee_total` from balance transactions
+   (per-charge `:fee` fields plus standalone `stripe_fee` / reporting category `fee`
+   amounts such as Billing Usage Fees)
+7. **Books Payout-Time Fees**: Posts standalone Stripe fees (usage/platform fees and
+   payout BT fees) to the internal ledger as debit `stripe_fees` / credit
+   `stripe_account` on the payout's virtual payment. Idempotent on re-run.
+   Per-charge processing fees are not re-booked (they were recorded at payment time).
+8. **Checks QuickBooks Sync**: If all conditions are met, enqueues QuickBooks sync
+
+### QuickBooks deposits already synced
+
+Relinking updates `fee_total` in our database and may enqueue a new QuickBooks
+sync when the payout is eligible. If a Deposit was already created in QuickBooks
+with an understated Stripe Fees line, correct that Deposit in QuickBooks manually
+(or follow your controlled re-sync policy). Do not assume an automatic overwrite
+of an existing QB Deposit.
 
 ## Finding Payouts That Need Reprocessing
 
@@ -191,6 +211,13 @@ If fee_total is still not set:
 - Check if the payout balance transaction has a fee
 - Verify balance transactions were fetched successfully
 - Check logs for fee calculation errors
+
+### Fee Total Missing Usage / Platform Fees
+If `fee_total` matches charge processing fees but is short of Stripe’s payout
+summary (e.g. missing a Billing - Usage Fee row):
+- Relink the payout so fee aggregation includes `stripe_fee` balance transactions
+- Compare Stripe payout Summary “Stripe fees” + charge Fees against `fee_total`
+- If QuickBooks already has a Deposit, adjust the Stripe Fees line there as needed
 
 ## Related Functions
 

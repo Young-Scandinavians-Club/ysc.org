@@ -521,7 +521,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       <section
         :if={@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh] bg-white"
       >
         <YscWeb.Components.ImageCarousel.image_carousel_hero_background
           wrapper_id="clear-lake-carousel-wrapper"
@@ -627,7 +627,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       do: "Guest",
                       else: "Guests"} • {if booking.booking_mode == :buyout,
                       do: "Entire cabin",
-                      else: "Group booking"}
+                      else: "Shared cabin"}
                   </p>
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
@@ -716,7 +716,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Group booking
+                            Shared cabin
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -810,7 +810,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Group bookings are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
+                      Shared cabin stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
                     </span>
                     <span
                       :if={
@@ -820,7 +820,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Reserving the whole cabin is not available for the selected dates. Try different dates or choose a group booking if that option is open.
+                      Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
                     </span>
                   </p>
                 </div>
@@ -1198,7 +1198,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
-                      Group booking
+                      Shared cabin
                     </div>
                   </div>
                   <!-- Sunday Morning Parking Tip -->
@@ -1666,7 +1666,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         to check availability and select your dates.
                       </li>
                       <li>
-                        Choose <strong>Group booking</strong>
+                        Choose <strong>Shared cabin</strong>
                         or <strong>Reserve the whole cabin</strong>
                         and enter your guest count.
                       </li>
@@ -2404,7 +2404,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh] bg-white"
       >
         <YscWeb.Components.ImageCarousel.image_carousel_hero_background
           wrapper_id="clear-lake-carousel-wrapper-nonuser"
@@ -3196,7 +3196,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp format_booking_error(:invalid_booking_mode),
     do:
-      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Group booking and Reserve the whole cabin."
+      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Shared cabin and Reserve the whole cabin."
 
   defp format_booking_error(:membership_required),
     do: YscWeb.BookingUserMessages.membership_required_plain_message()
@@ -3798,10 +3798,10 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     cond do
       booking_mode == :day && !day_booking_allowed ->
-        "Group bookings are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
+        "Shared cabin stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
 
       booking_mode == :buyout && !buyout_booking_allowed ->
-        "Reserving the whole cabin is not available for the selected dates. Try different dates or choose a group booking if that option is open."
+        "Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared cabin stay if that option is open."
 
       true ->
         nil
@@ -3923,18 +3923,26 @@ defmodule YscWeb.ClearLakeBookingLive do
     [
       %{
         src: ~p"/images/clear_lake/clear_lake_main.webp",
+        srcset:
+          "#{~p"/images/clear_lake/clear_lake_main-1280.webp"} 1280w, #{~p"/images/clear_lake/clear_lake_main-1500.webp"} 1500w",
         alt: "Clear Lake Cabin Exterior"
       },
       %{
         src: ~p"/images/history/clear_lake_from_above.webp",
+        srcset:
+          "#{~p"/images/history/clear_lake_from_above-1280.webp"} 1280w, #{~p"/images/history/clear_lake_from_above-1920.webp"} 1920w",
         alt: "Clear Lake Aerial View"
       },
       %{
         src: ~p"/images/clear_lake/clear_lake_dock.webp",
+        srcset:
+          "#{~p"/images/clear_lake/clear_lake_dock-1280.webp"} 1280w, #{~p"/images/clear_lake/clear_lake_dock-1920.webp"} 1920w, #{~p"/images/clear_lake/clear_lake_dock-2560.webp"} 2560w",
         alt: "Clear Lake Dock"
       },
       %{
         src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
+        srcset:
+          "#{~p"/images/clear_lake/clear_lake_dock_2-1280.webp"} 1280w, #{~p"/images/clear_lake/clear_lake_dock_2-1920.webp"} 1920w",
         alt: "Clear Lake Dock"
       },
       %{src: ~p"/images/clear_lake/clear_lake_sweep.webp", alt: "Clear Lake"},

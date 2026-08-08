@@ -9,7 +9,7 @@ defmodule YscWeb.EventDetailsLive do
   alias HtmlSanitizeEx.Scrubber
 
   alias Ysc.Events
-  alias Ysc.Events.EventPricingCache
+  alias Ysc.Events.{EventPricingCache, TicketTierHelpers}
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets.DonationDisplay
@@ -18,6 +18,46 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.Agendas
   alias YscWeb.DateDisplay
   alias YscWeb.SEO
+
+  attr :class, :string, default: "h-4 w-auto"
+
+  defp partiful_logo(assigns) do
+    ~H"""
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      version="1.2"
+      viewBox="0 0 204 46"
+      class={@class}
+    >
+      <path
+        style="fill:currentColor"
+        d="m98.3 14.5c-1.7-1.6-4.4-2.6-7.9-2.6-6.6 0-10.9 3.5-11.3 8.3v0.4l0.4 0.1 4.7 1 0.6 0.2v-0.9c0-1.4 0.4-2.4 1.2-2.9 0.9-0.6 2.2-1 4.1-1 2 0 3.3 0.3 4 1 0.7 0.5 1.1 1.5 1.1 3.2v0.8l-9.3 1q-1.5 0.1-2.9 0.6-1.4 0.4-2.4 1.2c-1.3 1-2 2.4-2 4.3 0 1.8 0.8 3.5 2.1 4.5 1.4 1.1 3.4 1.6 5.6 1.6 4.2 0 7.5-1.6 9.1-4.4v4h5.5v-13.6c0-2.7-0.8-5.1-2.6-6.8zm-5.1 15c-1.3 0.9-3.2 1.3-5.6 1.3-1.3 0-2.1-0.2-2.6-0.5-0.4-0.3-0.7-0.8-0.7-1.4q0.1-0.6 0.2-0.9 0.2-0.3 0.5-0.5c0.4-0.3 1.2-0.5 2.4-0.6l7.7-0.9c-0.1 1.6-0.8 2.7-1.9 3.5zm106.7-24.6h-5.2v30h5.8v-30zm-31.4 1.5l-0.1 0.3-1.5 4.5c0 0-1.2-2.2-4.4-2.2-1.4 0-2.2 0.3-2.6 0.9-0.4 0.5-0.6 1.2-0.5 2.4h7.8v5h-7.7v17.6h-5.8v-17.6h-3.2v-5h3.3c0.1-2.3 0.9-4.3 2.3-5.6 1.5-1.5 3.7-2.3 6.4-2.3 2.2 0 4.4 0.7 5.8 1.8zm18.4 5.9h-0.5v11.2c0 2.2-0.5 3.8-1.5 4.8-1 1.1-2.5 1.7-4.8 1.7-2.3 0-3.6-0.5-4.5-1.4-0.9-0.9-1.3-2.2-1.3-4.1v-12.2h-5.8v13.5c0 2.5 0.8 4.9 2.4 6.7 1.6 1.7 4 2.8 7.1 2.8 2.9 0 5.1-0.9 6.7-2.3 0.9-0.8 1.6-1.8 2.1-2.8v4.6h5.3v-22.5zm-63.8 7.5c0 1.3-0.2 2.6-0.7 3.6l-0.2 0.4h-5.6l0.3-0.8q0.4-1 0.4-2.3c0-1.4-0.3-2.3-0.8-2.8-0.6-0.6-1.5-0.9-3.1-0.9-1.7 0-2.8 0.4-3.5 1.3-0.7 0.8-1 2.1-1 4v12.5h-5.8v-22.5h5.4v3.7q0.6-1.2 1.7-2.2c1.3-1.2 3.1-1.9 5.4-1.9 2.6 0 4.5 0.9 5.7 2.4 1.3 1.5 1.8 3.4 1.8 5.5zm20.5-7.5h-0.5v22.5h5.7v-22.5zm4.8-7.1c-0.6-0.5-1.4-0.7-2.4-0.7-1 0-1.9 0.2-2.5 0.7-0.6 0.5-0.9 1.2-0.9 2 0 0.9 0.3 1.6 0.9 2.1 0.6 0.5 1.5 0.7 2.5 0.7 0.9 0 1.8-0.2 2.4-0.7 0.7-0.5 1-1.2 1-2.1q0-1.3-1-2zm-6.3 27.1l-0.2 0.2c-1.4 1.8-4 2.8-6.7 2.8-2.5 0-4.5-0.8-5.8-2.3-1.4-1.4-2.1-3.5-2.1-6.1v-9.6h-3.6v-5h3.6v-4.7h5.8v4.7h7.7v5h-7.7v9.7c0 1.1 0.3 1.8 0.7 2.3 0.5 0.4 1.2 0.7 2.3 0.7 1.8 0 3.2-0.6 3.9-1.9l0.6-1.1 0.4 1.2 1 3.8c0 0 0.1 0.3 0.1 0.3zm-67.6-17.1c-1.9-2.1-4.6-3.2-8.1-3.2-2.5 0-4.7 0.6-6.3 1.8-1 0.7-1.8 1.7-2.3 2.9v-4.3h-5.5v29.8h5.8v-11.4c0.5 1.1 1.3 1.9 2.2 2.6 1.6 1.3 3.7 1.9 6.2 1.9 3.5 0 6.2-1.1 8-3.2 1.9-2.1 2.8-5 2.8-8.5 0-3.4-0.9-6.3-2.8-8.4zm-16.4 8.4c0-2.2 0.6-3.7 1.7-4.7 1.2-1 2.9-1.6 5.1-1.6 2.3 0 3.8 0.5 4.9 1.4 1.1 0.9 1.7 2.5 1.7 4.9 0 2.5-0.6 4-1.7 5-1 0.9-2.7 1.3-4.9 1.3q-3.3 0-5-1.4c-1.1-1-1.8-2.5-1.8-4.5zm-48.6 18.9c4.3 0 7.6-4 7.6-7.8 0-2.3-1.2-3.2-1.2-4.9 0-1.4 0.9-1.9 1.7-1.9 1 0 2.1 0.8 4.5 0.8 5.6 0 13.6-4.4 13.6-11.8 0-7.9-9.1-12.6-17.7-12.6-7.1 0-14.7 2.9-14.7 7.9 0 5.4 8.8 5.6 8.8 9.7 0 4.4-9.9 5-9.9 12.6 0 4.2 3.1 8 7.3 8zm-1.9-5.5c-1.9 0-3.2-1.4-3.2-3.4 0-6.2 12.4-8.7 12.4-13.5 0-4.6-11-2.6-11-6.4 0-2.4 3.9-3 7-3 6.5 0 13.5 2.8 13.5 8.5 0 3.2-2.8 7-7.4 7-0.8 0-1.3-0.1-2.3-0.1-9.6 0-3.8 10.9-9 10.9z"
+      />
+    </svg>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :href, :string, required: true
+  attr :class, :string, default: "w-full py-4"
+  attr :logo_class, :string, default: "h-4 w-auto"
+  attr :icon_class, :string, default: "w-5 h-5"
+
+  defp partiful_rsvp_button(assigns) do
+    ~H"""
+    <.button
+      id={@id}
+      href={@href}
+      target="_blank"
+      rel="noopener noreferrer"
+      class={"flex items-center justify-center gap-2 #{@class}"}
+    >
+      <span class="uppercase tracking-widest">RSVP on</span>
+      <.partiful_logo class={@logo_class} />
+      <.icon name="hero-arrow-top-right-on-square" class={@icon_class} />
+    </.button>
+    """
+  end
 
   @impl true
   def render(assigns) do
@@ -72,22 +112,45 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="mb-4 p-4 bg-red-600 text-white rounded-xl shadow-lg">
                     <div class="flex items-center justify-center gap-3">
                       <.icon name="hero-x-circle-solid" class="w-5 h-5" />
-                      <p class="font-black text-base uppercase tracking-widest">
-                        This Event Has Been Cancelled
+                      <p class="font-semibold text-base">
+                        This event has been cancelled
                       </p>
                       <.icon name="hero-x-circle-solid" class="w-5 h-5" />
                     </div>
                   </div>
                 <% end %>
 
+                <% event_day_label =
+                  @event.state != :cancelled && DateDisplay.event_day_label(@event) %>
                 <div
                   :if={
-                    (@event.tickets_tbd && @event.state != :cancelled) ||
+                    event_day_label ||
+                      (@event.tickets_tbd && @event.state != :cancelled) ||
                       (@event.state != :cancelled && @async_data_loaded &&
                          @event_sold_out_for_user && !@event.tickets_tbd)
                   }
                   class="flex flex-wrap items-center gap-2 mb-4"
                 >
+                  <span
+                    :if={event_day_label == :today}
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400 animate-pulse"
+                  >
+                    <.icon
+                      name="hero-bolt-solid"
+                      class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                    />
+                    <span class="relative z-10">Happening Today</span>
+                  </span>
+                  <span
+                    :if={event_day_label == :tomorrow}
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-orange-600 sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400"
+                  >
+                    <.icon
+                      name="hero-calendar-solid"
+                      class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                    />
+                    <span class="relative z-10">Happening Tomorrow</span>
+                  </span>
                   <span
                     :if={@event.tickets_tbd && @event.state != :cancelled}
                     class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-blue-600 sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
@@ -387,8 +450,11 @@ defmodule YscWeb.EventDetailsLive do
                 <%= if !event_in_past?(@event) && @event.state != :cancelled do %>
                   <div class="mt-3 inline-flex items-center gap-2 bg-blue-50 px-2 py-1 rounded-full">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                    <span class="text-xs font-black text-blue-600 uppercase tracking-widest">
-                      Upcoming
+                    <span
+                      id="event-status-label"
+                      class="text-xs font-black text-blue-600 uppercase tracking-widest"
+                    >
+                      {if event_live?(@event), do: "Live", else: "Upcoming"}
                     </span>
                   </div>
                 <% end %>
@@ -452,6 +518,34 @@ defmodule YscWeb.EventDetailsLive do
                   </p>
                 </div>
               <% end %>
+            </div>
+
+            <%!-- Partiful RSVP --%>
+            <div
+              :if={@event.partiful_link not in [nil, ""]}
+              class="rounded-xl border border-zinc-100 bg-white p-6 sm:p-8"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
+                <div class="flex items-start gap-3 flex-1 min-w-0">
+                  <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <.icon name="hero-bolt" class="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-1">
+                      RSVP for real-time updates
+                    </p>
+                    <p class="text-zinc-600 text-sm font-medium leading-relaxed">
+                      This event's guest list and live updates live on Partiful. RSVP there to stay in the loop.
+                    </p>
+                  </div>
+                </div>
+                <.partiful_rsvp_button
+                  id="partiful-rsvp-spotlight"
+                  href={@event.partiful_link}
+                  class="flex-shrink-0 w-full sm:w-auto px-6 py-3.5"
+                  icon_class="w-4 h-4"
+                />
+              </div>
             </div>
 
             <%!-- Location Details --%>
@@ -640,7 +734,12 @@ defmodule YscWeb.EventDetailsLive do
                 <span class="w-8 h-px bg-zinc-200"></span> Details
               </h3>
               <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-normal leading-relaxed">
-                <div id="article-body" class="post-render" phx-hook="GLightboxHook">
+                <div
+                  id="article-body"
+                  class="post-render"
+                  phx-hook="GLightboxHook"
+                  phx-update="ignore"
+                >
                   {raw(event_body(@event))}
                 </div>
               </article>
@@ -980,32 +1079,11 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                     </div>
 
-                    <%= if @event.partiful_link not in [nil, ""] do %>
-                      <a
+                    <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
+                      <.partiful_rsvp_button
+                        id="partiful-rsvp-sidebar"
                         href={@event.partiful_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="block w-full"
-                      >
-                        <.button class="w-full py-4 flex items-center justify-center gap-2">
-                          <span class="uppercase tracking-widest">RSVP on</span>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            version="1.2"
-                            viewBox="0 0 204 46"
-                            class="h-4 w-auto"
-                          >
-                            <path
-                              style="fill:currentColor"
-                              d="m98.3 14.5c-1.7-1.6-4.4-2.6-7.9-2.6-6.6 0-10.9 3.5-11.3 8.3v0.4l0.4 0.1 4.7 1 0.6 0.2v-0.9c0-1.4 0.4-2.4 1.2-2.9 0.9-0.6 2.2-1 4.1-1 2 0 3.3 0.3 4 1 0.7 0.5 1.1 1.5 1.1 3.2v0.8l-9.3 1q-1.5 0.1-2.9 0.6-1.4 0.4-2.4 1.2c-1.3 1-2 2.4-2 4.3 0 1.8 0.8 3.5 2.1 4.5 1.4 1.1 3.4 1.6 5.6 1.6 4.2 0 7.5-1.6 9.1-4.4v4h5.5v-13.6c0-2.7-0.8-5.1-2.6-6.8zm-5.1 15c-1.3 0.9-3.2 1.3-5.6 1.3-1.3 0-2.1-0.2-2.6-0.5-0.4-0.3-0.7-0.8-0.7-1.4q0.1-0.6 0.2-0.9 0.2-0.3 0.5-0.5c0.4-0.3 1.2-0.5 2.4-0.6l7.7-0.9c-0.1 1.6-0.8 2.7-1.9 3.5zm106.7-24.6h-5.2v30h5.8v-30zm-31.4 1.5l-0.1 0.3-1.5 4.5c0 0-1.2-2.2-4.4-2.2-1.4 0-2.2 0.3-2.6 0.9-0.4 0.5-0.6 1.2-0.5 2.4h7.8v5h-7.7v17.6h-5.8v-17.6h-3.2v-5h3.3c0.1-2.3 0.9-4.3 2.3-5.6 1.5-1.5 3.7-2.3 6.4-2.3 2.2 0 4.4 0.7 5.8 1.8zm18.4 5.9h-0.5v11.2c0 2.2-0.5 3.8-1.5 4.8-1 1.1-2.5 1.7-4.8 1.7-2.3 0-3.6-0.5-4.5-1.4-0.9-0.9-1.3-2.2-1.3-4.1v-12.2h-5.8v13.5c0 2.5 0.8 4.9 2.4 6.7 1.6 1.7 4 2.8 7.1 2.8 2.9 0 5.1-0.9 6.7-2.3 0.9-0.8 1.6-1.8 2.1-2.8v4.6h5.3v-22.5zm-63.8 7.5c0 1.3-0.2 2.6-0.7 3.6l-0.2 0.4h-5.6l0.3-0.8q0.4-1 0.4-2.3c0-1.4-0.3-2.3-0.8-2.8-0.6-0.6-1.5-0.9-3.1-0.9-1.7 0-2.8 0.4-3.5 1.3-0.7 0.8-1 2.1-1 4v12.5h-5.8v-22.5h5.4v3.7q0.6-1.2 1.7-2.2c1.3-1.2 3.1-1.9 5.4-1.9 2.6 0 4.5 0.9 5.7 2.4 1.3 1.5 1.8 3.4 1.8 5.5zm20.5-7.5h-0.5v22.5h5.7v-22.5zm4.8-7.1c-0.6-0.5-1.4-0.7-2.4-0.7-1 0-1.9 0.2-2.5 0.7-0.6 0.5-0.9 1.2-0.9 2 0 0.9 0.3 1.6 0.9 2.1 0.6 0.5 1.5 0.7 2.5 0.7 0.9 0 1.8-0.2 2.4-0.7 0.7-0.5 1-1.2 1-2.1q0-1.3-1-2zm-6.3 27.1l-0.2 0.2c-1.4 1.8-4 2.8-6.7 2.8-2.5 0-4.5-0.8-5.8-2.3-1.4-1.4-2.1-3.5-2.1-6.1v-9.6h-3.6v-5h3.6v-4.7h5.8v4.7h7.7v5h-7.7v9.7c0 1.1 0.3 1.8 0.7 2.3 0.5 0.4 1.2 0.7 2.3 0.7 1.8 0 3.2-0.6 3.9-1.9l0.6-1.1 0.4 1.2 1 3.8c0 0 0.1 0.3 0.1 0.3zm-67.6-17.1c-1.9-2.1-4.6-3.2-8.1-3.2-2.5 0-4.7 0.6-6.3 1.8-1 0.7-1.8 1.7-2.3 2.9v-4.3h-5.5v29.8h5.8v-11.4c0.5 1.1 1.3 1.9 2.2 2.6 1.6 1.3 3.7 1.9 6.2 1.9 3.5 0 6.2-1.1 8-3.2 1.9-2.1 2.8-5 2.8-8.5 0-3.4-0.9-6.3-2.8-8.4zm-16.4 8.4c0-2.2 0.6-3.7 1.7-4.7 1.2-1 2.9-1.6 5.1-1.6 2.3 0 3.8 0.5 4.9 1.4 1.1 0.9 1.7 2.5 1.7 4.9 0 2.5-0.6 4-1.7 5-1 0.9-2.7 1.3-4.9 1.3q-3.3 0-5-1.4c-1.1-1-1.8-2.5-1.8-4.5zm-48.6 18.9c4.3 0 7.6-4 7.6-7.8 0-2.3-1.2-3.2-1.2-4.9 0-1.4 0.9-1.9 1.7-1.9 1 0 2.1 0.8 4.5 0.8 5.6 0 13.6-4.4 13.6-11.8 0-7.9-9.1-12.6-17.7-12.6-7.1 0-14.7 2.9-14.7 7.9 0 5.4 8.8 5.6 8.8 9.7 0 4.4-9.9 5-9.9 12.6 0 4.2 3.1 8 7.3 8zm-1.9-5.5c-1.9 0-3.2-1.4-3.2-3.4 0-6.2 12.4-8.7 12.4-13.5 0-4.6-11-2.6-11-6.4 0-2.4 3.9-3 7-3 6.5 0 13.5 2.8 13.5 8.5 0 3.2-2.8 7-7.4 7-0.8 0-1.3-0.1-2.3-0.1-9.6 0-3.8 10.9-9 10.9z"
-                            />
-                          </svg>
-                          <.icon
-                            name="hero-arrow-top-right-on-square"
-                            class="w-5 h-5"
-                          />
-                        </.button>
-                      </a>
+                      />
                     <% else %>
                       <%= if @has_ticket_tiers do %>
                         <%= if @event_sold_out_for_user do %>
@@ -1081,8 +1159,7 @@ defmodule YscWeb.EventDetailsLive do
                 <p
                   :if={
                     @current_user == nil && @has_ticket_tiers &&
-                      !event_in_past?(@event) &&
-                      @event.partiful_link in [nil, ""]
+                      !event_in_past?(@event)
                   }
                   class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
                 >
@@ -1157,32 +1234,13 @@ defmodule YscWeb.EventDetailsLive do
                   <%= if event_in_past?(@event) do %>
                     <!-- No action button for past events -->
                   <% else %>
-                    <%= if @event.partiful_link not in [nil, ""] do %>
-                      <a
+                    <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
+                      <.partiful_rsvp_button
+                        id="partiful-rsvp-mobile-bar"
                         href={@event.partiful_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="flex-shrink-0"
-                      >
-                        <.button class="px-8 py-3.5 flex items-center justify-center gap-2">
-                          <span class="uppercase tracking-widest">RSVP on</span>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            version="1.2"
-                            viewBox="0 0 204 46"
-                            class="h-4 w-auto"
-                          >
-                            <path
-                              style="fill:currentColor"
-                              d="m98.3 14.5c-1.7-1.6-4.4-2.6-7.9-2.6-6.6 0-10.9 3.5-11.3 8.3v0.4l0.4 0.1 4.7 1 0.6 0.2v-0.9c0-1.4 0.4-2.4 1.2-2.9 0.9-0.6 2.2-1 4.1-1 2 0 3.3 0.3 4 1 0.7 0.5 1.1 1.5 1.1 3.2v0.8l-9.3 1q-1.5 0.1-2.9 0.6-1.4 0.4-2.4 1.2c-1.3 1-2 2.4-2 4.3 0 1.8 0.8 3.5 2.1 4.5 1.4 1.1 3.4 1.6 5.6 1.6 4.2 0 7.5-1.6 9.1-4.4v4h5.5v-13.6c0-2.7-0.8-5.1-2.6-6.8zm-5.1 15c-1.3 0.9-3.2 1.3-5.6 1.3-1.3 0-2.1-0.2-2.6-0.5-0.4-0.3-0.7-0.8-0.7-1.4q0.1-0.6 0.2-0.9 0.2-0.3 0.5-0.5c0.4-0.3 1.2-0.5 2.4-0.6l7.7-0.9c-0.1 1.6-0.8 2.7-1.9 3.5zm106.7-24.6h-5.2v30h5.8v-30zm-31.4 1.5l-0.1 0.3-1.5 4.5c0 0-1.2-2.2-4.4-2.2-1.4 0-2.2 0.3-2.6 0.9-0.4 0.5-0.6 1.2-0.5 2.4h7.8v5h-7.7v17.6h-5.8v-17.6h-3.2v-5h3.3c0.1-2.3 0.9-4.3 2.3-5.6 1.5-1.5 3.7-2.3 6.4-2.3 2.2 0 4.4 0.7 5.8 1.8zm18.4 5.9h-0.5v11.2c0 2.2-0.5 3.8-1.5 4.8-1 1.1-2.5 1.7-4.8 1.7-2.3 0-3.6-0.5-4.5-1.4-0.9-0.9-1.3-2.2-1.3-4.1v-12.2h-5.8v13.5c0 2.5 0.8 4.9 2.4 6.7 1.6 1.7 4 2.8 7.1 2.8 2.9 0 5.1-0.9 6.7-2.3 0.9-0.8 1.6-1.8 2.1-2.8v4.6h5.3v-22.5zm-63.8 7.5c0 1.3-0.2 2.6-0.7 3.6l-0.2 0.4h-5.6l0.3-0.8q0.4-1 0.4-2.3c0-1.4-0.3-2.3-0.8-2.8-0.6-0.6-1.5-0.9-3.1-0.9-1.7 0-2.8 0.4-3.5 1.3-0.7 0.8-1 2.1-1 4v12.5h-5.8v-22.5h5.4v3.7q0.6-1.2 1.7-2.2c1.3-1.2 3.1-1.9 5.4-1.9 2.6 0 4.5 0.9 5.7 2.4 1.3 1.5 1.8 3.4 1.8 5.5zm20.5-7.5h-0.5v22.5h5.7v-22.5zm4.8-7.1c-0.6-0.5-1.4-0.7-2.4-0.7-1 0-1.9 0.2-2.5 0.7-0.6 0.5-0.9 1.2-0.9 2 0 0.9 0.3 1.6 0.9 2.1 0.6 0.5 1.5 0.7 2.5 0.7 0.9 0 1.8-0.2 2.4-0.7 0.7-0.5 1-1.2 1-2.1q0-1.3-1-2zm-6.3 27.1l-0.2 0.2c-1.4 1.8-4 2.8-6.7 2.8-2.5 0-4.5-0.8-5.8-2.3-1.4-1.4-2.1-3.5-2.1-6.1v-9.6h-3.6v-5h3.6v-4.7h5.8v4.7h7.7v5h-7.7v9.7c0 1.1 0.3 1.8 0.7 2.3 0.5 0.4 1.2 0.7 2.3 0.7 1.8 0 3.2-0.6 3.9-1.9l0.6-1.1 0.4 1.2 1 3.8c0 0 0.1 0.3 0.1 0.3zm-67.6-17.1c-1.9-2.1-4.6-3.2-8.1-3.2-2.5 0-4.7 0.6-6.3 1.8-1 0.7-1.8 1.7-2.3 2.9v-4.3h-5.5v29.8h5.8v-11.4c0.5 1.1 1.3 1.9 2.2 2.6 1.6 1.3 3.7 1.9 6.2 1.9 3.5 0 6.2-1.1 8-3.2 1.9-2.1 2.8-5 2.8-8.5 0-3.4-0.9-6.3-2.8-8.4zm-16.4 8.4c0-2.2 0.6-3.7 1.7-4.7 1.2-1 2.9-1.6 5.1-1.6 2.3 0 3.8 0.5 4.9 1.4 1.1 0.9 1.7 2.5 1.7 4.9 0 2.5-0.6 4-1.7 5-1 0.9-2.7 1.3-4.9 1.3q-3.3 0-5-1.4c-1.1-1-1.8-2.5-1.8-4.5zm-48.6 18.9c4.3 0 7.6-4 7.6-7.8 0-2.3-1.2-3.2-1.2-4.9 0-1.4 0.9-1.9 1.7-1.9 1 0 2.1 0.8 4.5 0.8 5.6 0 13.6-4.4 13.6-11.8 0-7.9-9.1-12.6-17.7-12.6-7.1 0-14.7 2.9-14.7 7.9 0 5.4 8.8 5.6 8.8 9.7 0 4.4-9.9 5-9.9 12.6 0 4.2 3.1 8 7.3 8zm-1.9-5.5c-1.9 0-3.2-1.4-3.2-3.4 0-6.2 12.4-8.7 12.4-13.5 0-4.6-11-2.6-11-6.4 0-2.4 3.9-3 7-3 6.5 0 13.5 2.8 13.5 8.5 0 3.2-2.8 7-7.4 7-0.8 0-1.3-0.1-2.3-0.1-9.6 0-3.8 10.9-9 10.9z"
-                            />
-                          </svg>
-                          <.icon
-                            name="hero-arrow-top-right-on-square"
-                            class="w-4 h-4"
-                          />
-                        </.button>
-                      </a>
+                        class="flex-shrink-0 px-8 py-3.5"
+                        icon_class="w-4 h-4"
+                      />
                     <% else %>
                       <%= if @current_user == nil && @has_ticket_tiers do %>
                         <.button
@@ -1328,9 +1386,13 @@ defmodule YscWeb.EventDetailsLive do
                         user_has_event_reservation
                       ) %>
                 <% is_on_sale =
-                  if is_donation, do: true, else: tier_on_sale?(ticket_tier) %>
+                  if is_donation,
+                    do: true,
+                    else: TicketTierHelpers.tier_on_sale?(ticket_tier) %>
                 <% is_sale_ended =
-                  if is_donation, do: false, else: tier_sale_ended?(ticket_tier) %>
+                  if is_donation,
+                    do: false,
+                    else: TicketTierHelpers.tier_sale_ended?(ticket_tier) %>
                 <% days_until_sale =
                   if is_donation, do: nil, else: days_until_sale_starts(ticket_tier) %>
                 <% is_pre_sale =
@@ -3798,7 +3860,7 @@ defmodule YscWeb.EventDetailsLive do
             max(0, total_qty - sold - reserved)
           end
 
-        on_sale = tier_on_sale?(tier)
+        on_sale = TicketTierHelpers.tier_on_sale?(tier)
 
         %{
           tier_id: tier.id,
@@ -6444,7 +6506,7 @@ defmodule YscWeb.EventDetailsLive do
               "You need an active, paid YSC membership to buy these tickets. Open Membership in your account menu to renew or activate, then try again."
 
             _ ->
-              "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening."
+              "We couldn't finish your ticket purchase. Please try again, or email info@ysc.org with the event name if this keeps happening."
           end
 
         {:noreply,
@@ -6465,7 +6527,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening.",
+           "We couldn't finish your ticket purchase. Please try again, or email info@ysc.org with the event name if this keeps happening.",
            title: "Tickets"
          )
          |> assign(:show_ticket_modal, false)}
@@ -6694,8 +6756,8 @@ defmodule YscWeb.EventDetailsLive do
     ticket_tiers
     |> Enum.sort_by(fn tier ->
       available = get_public_available_quantity(tier, reserved_counts_by_tier)
-      on_sale = tier_on_sale?(tier)
-      sale_ended = tier_sale_ended?(tier)
+      on_sale = TicketTierHelpers.tier_on_sale?(tier)
+      sale_ended = TicketTierHelpers.tier_sale_ended?(tier)
 
       cond do
         on_sale and tier_has_availability?(available) ->
@@ -6766,10 +6828,7 @@ defmodule YscWeb.EventDetailsLive do
   defp compute_event_at_capacity(event, ticket_tiers, availability_data) do
     # Filter out donation tiers - donations don't count toward "sold out" status
     non_donation_tiers =
-      Enum.filter(ticket_tiers, fn tier ->
-        tier_type = Map.get(tier, :type) || Map.get(tier, "type")
-        tier_type != "donation" && tier_type != :donation
-      end)
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     # If there are no non-donation tiers, event is not sold out
     if Enum.empty?(non_donation_tiers) do
@@ -6779,7 +6838,8 @@ defmodule YscWeb.EventDetailsLive do
       # We want to check tiers that are on sale OR have ended their sale
       relevant_tiers =
         Enum.filter(non_donation_tiers, fn tier ->
-          tier_on_sale?(tier) || tier_sale_ended?(tier)
+          TicketTierHelpers.tier_on_sale?(tier) ||
+            TicketTierHelpers.tier_sale_ended?(tier)
         end)
 
       # If there are no relevant tiers (all are pre-sale), check event capacity
@@ -7005,7 +7065,7 @@ defmodule YscWeb.EventDetailsLive do
 
   defp checkout_tiers_json(ticket_tiers) do
     ticket_tiers
-    |> Enum.reject(&donation_tier?/1)
+    |> Enum.reject(&TicketTierHelpers.donation_tier?/1)
     |> Enum.map(fn tier ->
       type =
         case tier.type do
@@ -7541,46 +7601,6 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp tier_on_sale?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    start_date =
-      Map.get(ticket_tier, :start_date) || Map.get(ticket_tier, "start_date")
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    # Check if sale has started
-    sale_started =
-      case start_date do
-        # No start date means sale has started
-        nil -> true
-        sd -> DateTime.compare(now, sd) != :lt
-      end
-
-    # Check if sale has ended
-    sale_ended =
-      case end_date do
-        # No end date means sale hasn't ended
-        nil -> false
-        ed -> DateTime.compare(now, ed) == :gt
-      end
-
-    sale_started && !sale_ended
-  end
-
-  defp tier_sale_ended?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    case end_date do
-      nil -> false
-      ed -> DateTime.compare(now, ed) == :gt
-    end
-  end
-
   defp days_until_sale_starts(ticket_tier) do
     case ticket_tier.start_date do
       nil ->
@@ -7612,8 +7632,8 @@ defmodule YscWeb.EventDetailsLive do
          reservations_by_tier,
          reserved_counts_by_tier
        ) do
-    if tier_on_sale?(ticket_tier) do
-      if donation_tier?(ticket_tier) do
+    if TicketTierHelpers.tier_on_sale?(ticket_tier) do
+      if TicketTierHelpers.donation_tier?(ticket_tier) do
         true
       else
         check_availability_cached(
@@ -7632,14 +7652,8 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp donation_tier?(ticket_tier) do
-    ticket_tier.type == "donation" || ticket_tier.type == :donation
-  end
-
-  defp donation_ticket?(%{ticket_tier: tier}), do: donation_tier?(tier)
-  defp donation_ticket?(_), do: false
-
-  defp event_tickets(tickets), do: Enum.reject(tickets, &donation_ticket?/1)
+  defp event_tickets(tickets),
+    do: Enum.reject(tickets, &TicketTierHelpers.donation_ticket?/1)
 
   defp check_availability_cached(
          availability,
@@ -7846,28 +7860,58 @@ defmodule YscWeb.EventDetailsLive do
     |> Enum.any?(fn {_tier_id, quantity} -> quantity > 0 end)
   end
 
-  defp event_in_past?(%{start_date: nil}), do: false
-
+  # True once the event's end cutoff has passed (matches Events upcoming/past
+  # listing): end date+time, else end of end date, else start date+time, else
+  # end of start date.
   defp event_in_past?(event) do
-    now = DateTime.utc_now()
-
-    event_datetime =
-      case {event.start_date, event.start_time} do
-        {%DateTime{} = date, %Time{} = time} ->
-          DateTime.new!(DateTime.to_date(date), time, "America/Los_Angeles")
-          |> DateTime.shift_zone!("Etc/UTC")
-
-        {%DateTime{} = date, nil} ->
-          date
-
-        _ ->
-          nil
-      end
-
-    case event_datetime do
+    case event_ends_at(event) do
       nil -> false
-      dt -> DateTime.compare(now, dt) == :gt
+      ends_at -> DateTime.compare(DateTime.utc_now(), ends_at) != :lt
     end
+  end
+
+  defp event_starts_at(event) do
+    case event_calendar_date(event.start_date) do
+      %Date{} = date ->
+        case event.start_time do
+          %Time{} = time -> pacific_event_datetime(date, time)
+          _ -> pacific_event_datetime(date, ~T[00:00:00])
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  # Cutoff used by Events list queries: prefer explicit end, then start, with a
+  # one-day grace when only a calendar date is set.
+  defp event_ends_at(event) do
+    cond do
+      event_calendar_date(event.end_date) && match?(%Time{}, event.end_time) ->
+        pacific_event_datetime(event.end_date, event.end_time)
+
+      end_day = event_calendar_date(event.end_date) ->
+        pacific_event_datetime(Date.add(end_day, 1), ~T[00:00:00])
+
+      event_calendar_date(event.start_date) && match?(%Time{}, event.end_time) ->
+        pacific_event_datetime(event.start_date, event.end_time)
+
+      event_calendar_date(event.start_date) && match?(%Time{}, event.start_time) ->
+        pacific_event_datetime(event.start_date, event.start_time)
+
+      start_day = event_calendar_date(event.start_date) ->
+        pacific_event_datetime(Date.add(start_day, 1), ~T[00:00:00])
+
+      true ->
+        nil
+    end
+  end
+
+  defp pacific_event_datetime(date, %Time{} = time) do
+    date
+    |> event_calendar_date()
+    |> DateTime.new!(time, "America/Los_Angeles")
+    |> DateTime.shift_zone!("Etc/UTC")
   end
 
   defp calculate_total_price(
@@ -8429,49 +8473,15 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  # Check if event is currently "live" (happening now in PST)
+  # Happening now: started and not yet past the end cutoff.
   defp event_live?(event) do
-    if event.start_date != nil && event.start_time != nil &&
-         event.end_time != nil do
-      # Get current time in PST
-      now_pst = DateTime.now!("America/Los_Angeles")
-      now_time_pst = DateTime.to_time(now_pst)
-      today_pst = DateTime.to_date(now_pst)
-
-      # Get event date in PST
-      event_date_pst =
-        case event.start_date do
-          %DateTime{} = dt ->
-            dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-            DateTime.to_date(dt_pst)
-
-          %Date{} = d ->
-            d
-
-          _ ->
-            nil
-        end
-
-      # Check if event is happening today
-      if event_date_pst == today_pst do
-        # Get start and end times
-        start_time = format_time(event.start_time)
-        end_time = format_time(event.end_time)
-
-        case {start_time, end_time} do
-          {%Time{} = start, %Time{} = end_time_val} ->
-            # Check if current time is between start and end times
-            Time.compare(now_time_pst, start) != :lt &&
-              Time.compare(now_time_pst, end_time_val) != :gt
-
-          _ ->
-            false
-        end
-      else
+    case event_starts_at(event) do
+      nil ->
         false
-      end
-    else
-      false
+
+      starts_at ->
+        DateTime.compare(DateTime.utc_now(), starts_at) != :lt and
+          not event_in_past?(event)
     end
   end
 
@@ -8486,24 +8496,16 @@ defmodule YscWeb.EventDetailsLive do
       now_time_pst = DateTime.to_time(now_pst)
       today_pst = DateTime.to_date(now_pst)
 
-      # Get event date in PST (convert DateTime to PST first if needed, then get Date)
-      event_date_pst =
+      # Event start_date is a Pacific wall-clock calendar day — use as-is.
+      event_date =
         case event.start_date do
-          %DateTime{} = dt ->
-            # Convert UTC DateTime to PST, then get the date
-            dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-            DateTime.to_date(dt_pst)
-
-          %Date{} = d ->
-            # Date structs don't have timezone, use as-is
-            d
-
-          _ ->
-            nil
+          %DateTime{} = dt -> DateTime.to_date(dt)
+          %Date{} = d -> d
+          _ -> nil
         end
 
       # Only show pulse if event is happening today (in PST)
-      if event_date_pst == today_pst do
+      if event_date == today_pst do
         # Check if current time (in PST) is between agenda item start and end times
         # Agenda item times are stored as Time structs and are in PST context
         Time.compare(now_time_pst, agenda_item.start_time) != :lt &&

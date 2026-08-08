@@ -49,6 +49,34 @@ defmodule Ysc.LoggingTest do
       assert Keyword.has_key?(result, :stacktrace)
     end
 
+    test "build_error_metadata/3 preserves pre-formatted stacktrace strings" do
+      formatted = "    test/logging_test.exs:1: (test)\n"
+      result = Ysc.Logging.build_error_metadata([], :x, formatted)
+      assert Keyword.get(result, :stacktrace) == formatted
+    end
+
+    test "capture_sentry/6 accepts raw stacktrace lists without error" do
+      err = RuntimeError.exception("boom")
+      st = [{__MODULE__, :test, 1, []}]
+
+      assert :ignored =
+               Ysc.Logging.capture_sentry(err, st, nil, nil, "test message", [])
+    end
+
+    test "capture_sentry/6 ignores pre-formatted stacktrace strings" do
+      err = RuntimeError.exception("boom")
+
+      assert :ignored =
+               Ysc.Logging.capture_sentry(
+                 err,
+                 "already formatted",
+                 nil,
+                 nil,
+                 "test message",
+                 []
+               )
+    end
+
     test "build_error_metadata/3 returns opts unchanged when error is nil" do
       opts = [booking_id: "b1"]
       assert Ysc.Logging.build_error_metadata(opts, nil, []) == opts

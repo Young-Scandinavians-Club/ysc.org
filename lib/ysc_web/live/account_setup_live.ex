@@ -371,7 +371,7 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Verify Your Phone Number
             <:subtitle>
-              We sent a verification code to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@user.phone_number) || @user.phone_number %></strong>. Please enter it below to continue.
+              We sent a 6-digit code to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@user.phone_number) || @user.phone_number %></strong>. Enter it below to continue.
             </:subtitle>
           </.header>
 
@@ -393,7 +393,7 @@ defmodule YscWeb.AccountSetupLive do
             <.input
               field={@phone_verification_form[:verification_code]}
               type="otp"
-              label="Verification Code"
+              label="6-digit verification code"
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
@@ -648,7 +648,8 @@ defmodule YscWeb.AccountSetupLive do
       password_setup: is_nil(user.password_set_at),
       phone_setup: is_nil(user.phone_number),
       phone_verification:
-        not is_nil(user.phone_number) and is_nil(user.phone_verified_at),
+        not is_nil(user.phone_number) and is_nil(user.phone_verified_at) and
+          Ysc.Extensions.PhoneNumber.sms_supported?(user.phone_number),
       payment_method_setup: payment_method_setup,
       membership_activation: membership_activation
     }
@@ -812,7 +813,7 @@ defmodule YscWeb.AccountSetupLive do
     )
     |> assign(
       :phone_form,
-      to_form(%{"phone_number" => "", "sms_opt_in" => "false"}, as: "user")
+      to_form(%{"phone_number" => "", "sms_opt_in" => "true"}, as: "user")
     )
     |> assign(:phone_verification_form, to_form(%{"verification_code" => ""}))
     |> assign(:code_valid, false)
@@ -858,14 +859,20 @@ defmodule YscWeb.AccountSetupLive do
 
         phone_changeset =
           if user_needs.phone_setup or is_nil(user.phone_number) do
-            Ysc.Accounts.User.registration_changeset(user, %{},
+            Ysc.Accounts.User.registration_changeset(
+              user,
+              %{"sms_opt_in" => "true"},
               hash_password: false,
               validate_email: false
             )
           else
             Ysc.Accounts.User.registration_changeset(
               user,
-              %{"phone_number" => user.phone_number},
+              %{
+                "phone_number" => user.phone_number,
+                "sms_opt_in" =>
+                  if(user.event_notifications_sms, do: "true", else: "false")
+              },
               hash_password: false,
               validate_email: false
             )
@@ -1371,25 +1378,33 @@ defmodule YscWeb.AccountSetupLive do
 
       case Accounts.update_user_phone_and_sms(user, user_params) do
         {:ok, updated_user} ->
-          {:ok, _} =
-            VerificationCodes.issue(updated_user, :phone, suffix: "initial")
-
           updated_user_needs = compute_user_needs(updated_user)
+          next_step = next_setup_step(updated_user_needs)
 
-          YscWeb.Flash.send_toast(
-            :info,
-            "Phone number saved! Please verify it with the code we sent.",
-            title: "Account setup"
-          )
+          if updated_user_needs.phone_verification do
+            {:ok, _} =
+              VerificationCodes.issue(updated_user, :phone, suffix: "initial")
 
-          # Advance to phone verification step (step 4)
+            YscWeb.Flash.send_toast(
+              :info,
+              "Phone number saved! Please verify it with the code we sent.",
+              title: "Account setup"
+            )
+          else
+            YscWeb.Flash.send_toast(
+              :info,
+              "Phone number saved. SMS verification isn't available for this number, so we've skipped that step.",
+              title: "Account setup"
+            )
+          end
+
           {:noreply,
            socket
-           |> assign(:current_step, 4)
+           |> assign(:current_step, next_step)
            |> assign(:user, updated_user)
            |> assign(:user_needs, updated_user_needs)
            |> push_patch(
-             to: ~p"/account/setup/#{socket.assigns.user.id}?step=4"
+             to: ~p"/account/setup/#{socket.assigns.user.id}?step=#{next_step}"
            )}
 
         {:error, changeset} ->

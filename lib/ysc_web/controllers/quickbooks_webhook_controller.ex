@@ -5,6 +5,16 @@ defmodule YscWeb.QuickbooksWebhookController do
   QuickBooks sends "thin notifications" that only contain entity name, ID, and operation.
   We must verify the intuit-signature header and respond quickly (within 3 seconds),
   then process the webhook asynchronously.
+
+  Two event types are acted on:
+  - `BillPayment` Create/Update - a payment was recorded against a Bill.
+  - `Bill` Delete/Void - the underlying Bill was removed or cancelled in
+    QuickBooks, so the linked expense report should be rejected to keep
+    things in sync.
+
+  Note: QuickBooks apps must explicitly opt in to receiving `Void`
+  notifications in the Intuit developer dashboard - they aren't sent by
+  default even if the entity type is subscribed.
   """
   use YscWeb, :controller
 
@@ -149,9 +159,15 @@ defmodule YscWeb.QuickbooksWebhookController do
             # Format: realmId:entityName:entityId:operation
             event_id = "#{realm_id}:#{entity_name}:#{entity_id}:#{operation}"
 
-            # Only process BillPayment Create/Update operations
-            if entity_name == "BillPayment" and
-                 operation in ["Create", "Update"] do
+            # Only process:
+            # - BillPayment Create/Update (payment recorded against a Bill)
+            # - Bill Delete/Void (the underlying Bill was removed/cancelled
+            #   in QuickBooks, so the linked expense report should be
+            #   rejected to keep things in sync)
+            if QuickbooksWebhookHandler.relevant_quickbooks_event?(
+                 entity_name,
+                 operation
+               ) do
               try do
                 webhook_event =
                   Webhooks.create_webhook_event!(%{
@@ -168,7 +184,7 @@ defmodule YscWeb.QuickbooksWebhookController do
               end
             else
               Ysc.Logging.debug(
-                "Skipping QuickBooks webhook for non-BillPayment entity",
+                "Skipping QuickBooks webhook for unhandled entity/operation",
                 entity_name: entity_name,
                 operation: operation
               )

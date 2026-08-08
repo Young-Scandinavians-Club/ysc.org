@@ -206,6 +206,7 @@ defmodule YscWeb.Router do
       live "/newsletters/:id", NewsletterArchiveLive, :show
 
       live "/newsletter/unsubscribe/:token", NewsletterUnsubscribeLive, :index
+      live "/newsletter/confirm/:token", NewsletterConfirmLive, :index
 
       live "/bookings/tahoe", TahoeBookingLive, :index
 
@@ -272,6 +273,29 @@ defmodule YscWeb.Router do
 
     get "/:provider", AuthController, :request
     get "/:provider/callback", AuthController, :callback
+  end
+
+  ## First-party OAuth (authorization code + PKCE)
+  ## `/oauth/query-console/*` kept as aliases for the Query Console app.
+  scope "/oauth", YscWeb do
+    pipe_through [:browser, :require_authenticated_user, :auth_rate_limit]
+
+    get "/authorize", OAuthController, :authorize
+    get "/query-console/authorize", OAuthController, :authorize
+  end
+
+  scope "/oauth", YscWeb do
+    pipe_through [:browser, :auth_rate_limit]
+
+    get "/logout", OAuthController, :logout
+    get "/query-console/logout", OAuthController, :logout
+  end
+
+  scope "/oauth", YscWeb do
+    pipe_through [:api, :auth_rate_limit]
+
+    post "/token", OAuthController, :token
+    post "/query-console/token", OAuthController, :token
   end
 
   ## Token login: GET renders an auto-submit form; POST consumes the one-time token.
@@ -530,6 +554,7 @@ defmodule YscWeb.Router do
       live "/events/:id/edit", AdminEventsNewLive, :edit
       live "/events/:id/tickets", AdminEventsNewLive, :tickets
       live "/events/:id/updates", AdminEventsNewLive, :updates
+      live "/events/:id/statistics", AdminEventsNewLive, :statistics
 
       get "/events/:id/tv-poster/image", EventTvPosterController, :image
       get "/events/:id/tv-poster", EventTvPosterController, :show

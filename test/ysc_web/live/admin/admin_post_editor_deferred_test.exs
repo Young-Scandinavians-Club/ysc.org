@@ -49,7 +49,8 @@ defmodule YscWeb.AdminPostEditorDeferredTest do
           |> get(~p"/admin/posts/#{post.id}")
           |> html_response(200)
         end,
-        pattern: posts_pattern
+        pattern: posts_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0

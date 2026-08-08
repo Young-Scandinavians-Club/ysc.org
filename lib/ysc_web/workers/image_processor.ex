@@ -279,31 +279,60 @@ defmodule YscWeb.Workers.ImageProcessor do
     end
   end
 
+  # Fetches the object via its public URL with a plain HTTP GET instead of a
+  # signed ExAws.S3 GetObject request (ExAws.S3.download_file/3 included).
+  #
+  # Images uploaded through the standard presigned POST flow (AdminMediaLive,
+  # ImageUploadComponent) are ACL: public-read, so an unsigned GET is
+  # sufficient and requires no credentials.
+  #
+  # This isn't a style choice: signed GET requests to the raw Tigris endpoint
+  # return 405 in this environment (verified directly against production —
+  # PUT, HEAD, and DELETE via ExAws all succeed with normal Tigris responses;
+  # GET, signed, consistently 405s with bare, non-Tigris-shaped response
+  # headers, on every bucket). See
+  # YscWeb.Workers.EventPhotoUploadWorker.download_from_s3/2, which hit the
+  # exact same problem and the same fix.
+  # sobelow_skip ["Traversal.FileModule"]
   defp download_s3_object_to_temp(%Media.Image{} = image, key, dest_path) do
-    case S3Config.bucket_name()
-         |> ExAws.S3.download_file(key, dest_path)
-         |> ExAws.request() do
-      {:ok, _} ->
+    url = S3Config.object_url(key, S3Config.bucket_name())
+
+    opts =
+      Keyword.merge(
+        [into: File.stream!(dest_path), receive_timeout: @download_timeout_ms],
+        Application.get_env(:ysc, :image_processor_s3_req_opts, [])
+      )
+
+    case Req.get(url, opts) do
+      {:ok, %{status: 200}} ->
         :ok
 
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "ImageProcessor: raw image S3 download failed",
-          error: RuntimeError.exception("raw_image S3 download failed"),
-          extra: %{
-            image_id: image.id,
-            key: key,
-            reason: inspect(reason)
-          },
-          tags: %{
-            worker: "YscWeb.Workers.ImageProcessor",
-            stage: "s3_download"
-          }
-        )
+      {:ok, %{status: status}} ->
+        log_s3_download_failure(image, key, {:http_status, status})
+        {:error, {:s3_download_failed, {:http_status, status}}}
 
-        Media.set_image_processing_state(image, :failed)
+      {:error, reason} ->
+        log_s3_download_failure(image, key, reason)
         {:error, {:s3_download_failed, reason}}
     end
+  end
+
+  defp log_s3_download_failure(image, key, reason) do
+    Ysc.Logging.error(
+      "ImageProcessor: raw image S3 download failed",
+      error: RuntimeError.exception("raw_image S3 download failed"),
+      extra: %{
+        image_id: image.id,
+        key: key,
+        reason: inspect(reason)
+      },
+      tags: %{
+        worker: "YscWeb.Workers.ImageProcessor",
+        stage: "s3_download"
+      }
+    )
+
+    Media.set_image_processing_state(image, :failed)
   end
 
   defp download_raw_url_to_temp(%Media.Image{} = image, dest_path) do

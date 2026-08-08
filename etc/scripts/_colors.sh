@@ -7,13 +7,15 @@ if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
   RESET=$(tput sgr0)
   RED=$(tput setaf 1)
   GREEN=$(tput setaf 2)
+  YELLOW=$(tput setaf 3)
   TEAL=$(tput setaf 6)
 else
   BOLD=""
   RESET=""
   RED=""
   GREEN=""
+  YELLOW=""
   TEAL=""
 fi
 
-export BOLD RESET RED GREEN TEAL
+export BOLD RESET RED GREEN YELLOW TEAL

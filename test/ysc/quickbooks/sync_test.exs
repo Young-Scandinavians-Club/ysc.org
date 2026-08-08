@@ -2120,9 +2120,14 @@ defmodule Ysc.Quickbooks.SyncTest do
       )
 
       stub(ClientMock, :query_account_by_name, fn
-        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
-        _ -> {:error, :not_found}
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Administration:Bank Service Charges:Stripe" ->
+          {:ok, "stripe_fees_account_123"}
+
+        _ ->
+          {:error, :not_found}
       end)
 
       stub(ClientMock, :query_class_by_name, fn
@@ -4872,10 +4877,17 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Mock deposit creation with verification of fee line item
       stub(ClientMock, :query_account_by_name, fn
-        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Bank Account" -> {:ok, "bank_account_123"}
-        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
-        _ -> {:error, :not_found}
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Bank Account" ->
+          {:ok, "bank_account_123"}
+
+        "Administration:Bank Service Charges:Stripe" ->
+          {:ok, "stripe_fees_account_123"}
+
+        _ ->
+          {:error, :not_found}
       end)
 
       stub(ClientMock, :query_class_by_name, fn
@@ -4915,6 +4927,190 @@ defmodule Ysc.Quickbooks.SyncTest do
       payout = Repo.reload!(payout)
       assert payout.quickbooks_sync_status == "synced"
       assert payout.quickbooks_deposit_id == "qb_deposit_with_fees"
+    end
+
+    test "sync_payout uses configured stripe_fees_account_id without name lookup",
+         %{
+           user: user
+         } do
+      user
+      |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_fee_id")
+      |> Repo.update!()
+
+      setup_default_mocks()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_fee_account_id",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment with configured fee account id",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, _sales_receipt} = Sync.sync_payment(payment)
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          arrival_date: ~N[2024-01-15 12:00:00],
+          amount: Money.new(9_680, :USD),
+          stripe_payout_id: "po_fee_account_id",
+          currency: "USD",
+          status: "paid",
+          fee_total: Money.new(320, :USD)
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123",
+        stripe_fees_account_id: "configured_fees_account_734"
+      )
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Bank Account" ->
+          {:ok, "bank_account_123"}
+
+        "Stripe Fees" ->
+          flunk("should use stripe_fees_account_id, not name")
+
+        "Administration:Bank Service Charges:Stripe" ->
+          flunk("should use stripe_fees_account_id, not FQN")
+
+        _ ->
+          {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        fee_line =
+          Enum.find(params.line, fn line ->
+            line.detail_type == "DepositLineDetail" &&
+              line.deposit_line_detail[:account_ref][:value] ==
+                "configured_fees_account_734"
+          end)
+
+        assert fee_line != nil
+        assert Decimal.equal?(fee_line.amount, Decimal.new("-320.00"))
+
+        {:ok, %{"Id" => "qb_deposit_fee_id", "TotalAmt" => "96.80"}}
+      end)
+
+      assert {:ok, _deposit} = Sync.sync_payout(payout)
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "synced"
+      assert payout.quickbooks_deposit_id == "qb_deposit_fee_id"
+    end
+
+    test "sync_payout looks up stripe fees by configured FullyQualifiedName", %{
+      user: user
+    } do
+      user
+      |> Ecto.Changeset.change(quickbooks_customer_id: "qb_customer_fee_fqn")
+      |> Repo.update!()
+
+      setup_default_mocks()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_payment_id: "pi_fee_fqn",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(320, :USD),
+          description: "Payment with FQN fee account",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, _sales_receipt} = Sync.sync_payment(payment)
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sync_status == "synced"
+
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          arrival_date: ~N[2024-01-15 12:00:00],
+          amount: Money.new(9_680, :USD),
+          stripe_payout_id: "po_fee_fqn",
+          currency: "USD",
+          status: "paid",
+          fee_total: Money.new(320, :USD)
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+
+      fqn = "Administration:Bank Service Charges:Stripe"
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123",
+        stripe_fees_account_name: fqn
+      )
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Bank Account" -> {:ok, "bank_account_123"}
+        ^fqn -> {:ok, "734"}
+        "Stripe Fees" -> flunk("should use configured FQN, not Stripe Fees")
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        fee_line =
+          Enum.find(params.line, fn line ->
+            line.detail_type == "DepositLineDetail" &&
+              line.deposit_line_detail[:account_ref][:value] == "734"
+          end)
+
+        assert fee_line != nil
+
+        {:ok, %{"Id" => "qb_deposit_fee_fqn", "TotalAmt" => "96.80"}}
+      end)
+
+      assert {:ok, _deposit} = Sync.sync_payout(payout)
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "synced"
+      assert payout.quickbooks_deposit_id == "qb_deposit_fee_fqn"
     end
 
     test "sync_payout handles multiple payments with combined fees", %{
@@ -5020,10 +5216,17 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Mock deposit creation
       stub(ClientMock, :query_account_by_name, fn
-        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Bank Account" -> {:ok, "bank_account_123"}
-        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
-        _ -> {:error, :not_found}
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Bank Account" ->
+          {:ok, "bank_account_123"}
+
+        "Administration:Bank Service Charges:Stripe" ->
+          {:ok, "stripe_fees_account_123"}
+
+        _ ->
+          {:error, :not_found}
       end)
 
       stub(ClientMock, :query_class_by_name, fn
@@ -5211,10 +5414,17 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Mock account queries
       stub(ClientMock, :query_account_by_name, fn
-        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Bank Account" -> {:ok, "bank_account_123"}
-        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
-        _ -> {:error, :not_found}
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Bank Account" ->
+          {:ok, "bank_account_123"}
+
+        "Administration:Bank Service Charges:Stripe" ->
+          {:ok, "stripe_fees_account_123"}
+
+        _ ->
+          {:error, :not_found}
       end)
 
       stub(ClientMock, :query_class_by_name, fn
@@ -5226,7 +5436,7 @@ defmodule Ysc.Quickbooks.SyncTest do
       stub(ClientMock, :query_account_by_name, fn
         "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
         "Bank Account" -> {:ok, "bank_account_123"}
-        "Stripe Fees" -> {:error, :not_found}
+        "Administration:Bank Service Charges:Stripe" -> {:error, :not_found}
         _ -> {:error, :not_found}
       end)
 
@@ -5337,10 +5547,17 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       # Mock deposit creation
       stub(ClientMock, :query_account_by_name, fn
-        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Bank Account" -> {:ok, "bank_account_123"}
-        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
-        _ -> {:error, :not_found}
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Bank Account" ->
+          {:ok, "bank_account_123"}
+
+        "Administration:Bank Service Charges:Stripe" ->
+          {:ok, "stripe_fees_account_123"}
+
+        _ ->
+          {:error, :not_found}
       end)
 
       stub(ClientMock, :query_class_by_name, fn
@@ -5452,9 +5669,14 @@ defmodule Ysc.Quickbooks.SyncTest do
       )
 
       stub(ClientMock, :query_account_by_name, fn
-        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
-        "Stripe Fees" -> {:ok, "stripe_fees_account_123"}
-        _ -> {:error, :not_found}
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Administration:Bank Service Charges:Stripe" ->
+          {:ok, "stripe_fees_account_123"}
+
+        _ ->
+          {:error, :not_found}
       end)
 
       stub(ClientMock, :query_class_by_name, fn

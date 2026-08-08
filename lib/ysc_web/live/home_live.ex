@@ -14,6 +14,8 @@ defmodule YscWeb.HomeLive do
     Tickets
   }
 
+  alias Ysc.Events.TicketTierHelpers
+
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.{PropertyDisplay, Season}
   alias Ysc.Posts.Post
@@ -94,7 +96,8 @@ defmodule YscWeb.HomeLive do
       google_wallet_membership_enabled?: GoogleWallet.configured?(:membership),
       google_wallet_membership_url: nil,
       wallet_platform: wallet_platform_from_params(socket),
-      show_passkey_prompt: false
+      show_passkey_prompt: false,
+      newsletter_subscribed: false
     )
   end
 
@@ -102,7 +105,7 @@ defmodule YscWeb.HomeLive do
   # Search engines and social media crawlers need to see actual content
   defp mount_guest_with_data(socket) do
     # Determine hero video and captions based on season (no DB query)
-    {hero_video, hero_poster, hero_captions} =
+    {hero_video, hero_poster, hero_poster_srcset, hero_captions} =
       case Season.for_date(
              :tahoe,
              DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
@@ -110,10 +113,12 @@ defmodule YscWeb.HomeLive do
         %{name: "Summer"} ->
           {~p"/video/clear_lake_hero.mp4",
            ~p"/images/clear_lake_hero_poster.webp",
+           "#{~p"/images/clear_lake_hero_poster-1280.webp"} 1280w, #{~p"/images/clear_lake_hero_poster-1920.webp"} 1920w",
            ~p"/video/clear_lake_hero_captions.vtt"}
 
         _ ->
           {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.webp",
+           "#{~p"/images/tahoe_hero_poster-1280.webp"} 1280w",
            ~p"/video/tahoe_hero_captions.vtt"}
       end
 
@@ -149,6 +154,7 @@ defmodule YscWeb.HomeLive do
       latest_news: latest_news,
       hero_video: hero_video,
       hero_poster: hero_poster,
+      hero_poster_srcset: hero_poster_srcset,
       hero_captions: hero_captions,
       newsletter_email: "",
       newsletter_first_name: "",
@@ -167,18 +173,19 @@ defmodule YscWeb.HomeLive do
     just_logged_in = socket.assigns.just_logged_in
 
     start_async(socket, :load_home_data, fn ->
-      load_logged_in_user_data(user.id, just_logged_in)
+      load_logged_in_user_data(user.id, user.email, just_logged_in)
     end)
   end
 
   # Background task to load logged-in user's home page data in parallel
-  defp load_logged_in_user_data(user_id, just_logged_in) do
+  defp load_logged_in_user_data(user_id, email, just_logged_in) do
     tasks = [
       {:user_data,
        fn -> load_user_with_subscriptions(user_id, just_logged_in) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
       {:bookings,
-       fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end}
+       fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end},
+      {:newsletter_subscribed, fn -> newsletter_subscribed?(email) end}
     ]
 
     tasks
@@ -257,6 +264,7 @@ defmodule YscWeb.HomeLive do
 
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
+    newsletter_subscribed = Map.get(results, :newsletter_subscribed, false)
 
     socket =
       socket
@@ -268,6 +276,7 @@ defmodule YscWeb.HomeLive do
         upcoming_tickets: upcoming_tickets,
         future_bookings: future_bookings,
         show_passkey_prompt: show_passkey_prompt,
+        newsletter_subscribed: newsletter_subscribed,
         async_data_loaded: true
       )
       |> assign_public_content_slices()
@@ -317,6 +326,7 @@ defmodule YscWeb.HomeLive do
       <.hero
         video={@hero_video}
         poster={@hero_poster}
+        poster_srcset={@hero_poster_srcset}
         captions={@hero_captions}
         height="85vh"
         overlay_opacity="bg-gradient-to-b from-black/30 via-black/40 to-black/60"
@@ -1051,10 +1061,17 @@ defmodule YscWeb.HomeLive do
             </p>
             <div
               :if={@newsletter_submitted}
-              class="mt-3 flex items-center justify-center text-emerald-600"
+              class="mt-3 text-emerald-600"
             >
-              <.icon name="hero-check-circle" class="w-5 h-5 mr-2" />
-              <span>Thank you for subscribing!</span>
+              <div class="flex items-center justify-center">
+                <.icon name="hero-check-circle" class="w-5 h-5 mr-2 shrink-0" />
+                <span class="font-medium">
+                  You're one step away! Check your email right now to confirm your subscription.
+                </span>
+              </div>
+              <p class="mt-2 text-sm text-zinc-600">
+                Look for an email from YSC with the subject "Action Required: Please confirm your subscription." If you don't see it in a couple minutes, check your spam or promotions folder.
+              </p>
             </div>
             <p class="mt-4 text-sm text-zinc-600">
               We don't spam! Read our
@@ -1885,31 +1902,119 @@ defmodule YscWeb.HomeLive do
                 </div>
               </.modal>
 
+              <%!-- Newsletter Subscription --%>
+              <section>
+                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+                  Newsletter
+                </h2>
+
+                <div
+                  :if={!@async_data_loaded}
+                  class="rounded-xl border border-zinc-200 bg-white px-5 py-5 animate-pulse"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-zinc-200 shrink-0"></div>
+                    <div class="space-y-2 flex-1">
+                      <div class="h-4 w-32 bg-zinc-200 rounded"></div>
+                      <div class="h-3 w-40 bg-zinc-100 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  :if={@async_data_loaded}
+                  class="rounded-xl border border-zinc-200 bg-white px-5 py-5"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class={[
+                      "flex items-center justify-center w-10 h-10 rounded-full shrink-0",
+                      if(@newsletter_subscribed,
+                        do: "bg-emerald-100",
+                        else: "bg-zinc-100"
+                      )
+                    ]}>
+                      <.icon
+                        name={
+                          if(@newsletter_subscribed,
+                            do: "hero-check",
+                            else: "hero-envelope"
+                          )
+                        }
+                        class={[
+                          "w-5 h-5",
+                          if(@newsletter_subscribed,
+                            do: "text-emerald-600",
+                            else: "text-zinc-500"
+                          )
+                        ]}
+                      />
+                    </div>
+                    <div class="min-w-0">
+                      <p class="font-semibold text-zinc-900 text-sm">
+                        {if @newsletter_subscribed,
+                          do: "Subscribed",
+                          else: "Not subscribed"}
+                      </p>
+                      <p class="text-xs text-zinc-500 mt-0.5">
+                        {if @newsletter_subscribed,
+                          do: "You'll get new newsletters in your inbox.",
+                          else: "Get news & updates in your inbox."}
+                      </p>
+                    </div>
+                  </div>
+                  <.button
+                    phx-click="toggle_newsletter_subscription"
+                    class={
+                      if(@newsletter_subscribed,
+                        do:
+                          "w-full mt-4 !bg-white !text-zinc-700 border border-zinc-300 hover:!bg-zinc-100",
+                        else: "w-full mt-4"
+                      )
+                    }
+                    phx-disable-with="Saving..."
+                  >
+                    {if @newsletter_subscribed, do: "Unsubscribe", else: "Subscribe"}
+                  </.button>
+                  <.link
+                    navigate={~p"/newsletters"}
+                    class="mt-3 flex items-center justify-center gap-1 text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Browse newsletter archive
+                    <.icon name="hero-arrow-right" class="w-3 h-3" />
+                  </.link>
+                </div>
+              </section>
+
               <%!-- Your Family Section (family/lifetime members with linked users) --%>
               <section :if={@async_data_loaded && @other_family_members != []}>
-                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
-                  Your Family
-                </h2>
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-3 min-h-[7.5rem]">
+                <div class="flex items-center justify-between mb-6">
+                  <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+                    Your Family
+                  </h2>
+                  <.link
+                    navigate={~p"/users/settings/family"}
+                    class="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Manage Family
+                  </.link>
+                </div>
+                <div class="flex flex-wrap gap-x-3 gap-y-4">
                   <%= for member <- @other_family_members do %>
-                    <div class="flex items-center justify-between text-sm">
-                      <span class="text-zinc-900 font-medium">
-                        {member.first_name} {member.last_name}
+                    <div
+                      class="flex flex-col items-center w-16 text-center"
+                      title={"#{member.first_name} #{member.last_name} · #{FamilyDisplay.relationship_label(member.family_relationship)}"}
+                    >
+                      <.user_avatar_image user={member} class="w-12 h-12" />
+                      <span class="mt-1.5 text-xs font-semibold text-zinc-900 truncate w-full">
+                        {member.first_name}
                       </span>
-                      <span class="text-zinc-500 text-xs">
+                      <span class="text-[11px] text-zinc-400 truncate w-full">
                         {FamilyDisplay.relationship_label(
                           member.family_relationship
                         )}
                       </span>
                     </div>
                   <% end %>
-                  <.link
-                    navigate={~p"/users/settings/family"}
-                    class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150"
-                  >
-                    Manage family
-                    <.icon name="hero-arrow-right" class="w-3.5 h-3.5" />
-                  </.link>
                 </div>
               </section>
 
@@ -2345,6 +2450,50 @@ defmodule YscWeb.HomeLive do
     end
   end
 
+  def handle_event("toggle_newsletter_subscription", _params, socket) do
+    user = socket.assigns.current_user
+
+    result =
+      if socket.assigns.newsletter_subscribed do
+        Newsletter.unsubscribe(user.email)
+      else
+        Newsletter.subscribe(user.email,
+          user_id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          source: "home_dashboard"
+        )
+      end
+
+    case result do
+      {:ok, _} ->
+        now_subscribed = !socket.assigns.newsletter_subscribed
+
+        {title, body} =
+          if now_subscribed,
+            do:
+              {"Subscribed!",
+               "You'll receive future newsletters in your inbox."},
+            else: {"Unsubscribed", "You won't receive newsletters anymore."}
+
+        {:noreply,
+         socket
+         |> assign(:newsletter_subscribed, now_subscribed)
+         |> YscWeb.Flash.put_toast(:info, body,
+           title: title,
+           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "We couldn't update your newsletter subscription. Please try again, or email info@ysc.org if this keeps happening."
+         )}
+    end
+  end
+
   defp verify_and_subscribe(params, email, socket) do
     # Verify Turnstile for spam protection
     # Only verify if the token is present (interaction-only mode may not always generate one)
@@ -2375,8 +2524,8 @@ defmodule YscWeb.HomeLive do
 
     opts = [source: "public_signup", metadata: metadata]
 
-    case Newsletter.subscribe(email, opts) do
-      {:ok, _subscriber} ->
+    case Newsletter.request_confirmation(email, opts) do
+      {:ok, status} when status in [:pending, :already_subscribed] ->
         {:noreply,
          socket
          |> assign(
@@ -2386,8 +2535,8 @@ defmodule YscWeb.HomeLive do
          )
          |> YscWeb.Flash.put_toast(
            :info,
-           "Thank you for subscribing to our newsletter!",
-           title: "You're subscribed",
+           "Check your email to confirm your subscription.",
+           title: "Almost there!",
            icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
          )}
 
@@ -2433,6 +2582,13 @@ defmodule YscWeb.HomeLive do
     end
   end
 
+  defp newsletter_subscribed?(email) do
+    case Newsletter.get_subscriber_by_email(email) do
+      %{subscribed: true} -> true
+      _ -> false
+    end
+  end
+
   defp event_sold_out?(event) do
     # Get event ID (handle both structs and maps)
     event_id = Map.get(event, :id) || Map.get(event, "id")
@@ -2446,10 +2602,7 @@ defmodule YscWeb.HomeLive do
 
     # Filter out donation tiers - donations don't count toward "sold out" status
     non_donation_tiers =
-      Enum.filter(ticket_tiers, fn tier ->
-        tier_type = Map.get(tier, :type) || Map.get(tier, "type")
-        tier_type != "donation" && tier_type != :donation
-      end)
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     # If there are no non-donation tiers, event is not sold out
     if Enum.empty?(non_donation_tiers) do
@@ -2461,7 +2614,8 @@ defmodule YscWeb.HomeLive do
         Enum.filter(non_donation_tiers, fn tier ->
           # Include tiers that are on sale OR have ended their sale
           # Exclude tiers that haven't started their sale yet (pre-sale)
-          tier_on_sale?(tier) || tier_sale_ended?(tier)
+          TicketTierHelpers.tier_on_sale?(tier) ||
+            TicketTierHelpers.tier_sale_ended?(tier)
         end)
 
       # If there are no relevant tiers (all are pre-sale), event is not sold out
@@ -2499,45 +2653,6 @@ defmodule YscWeb.HomeLive do
 
         all_tiers_sold_out || event_at_capacity
       end
-    end
-  end
-
-  defp tier_on_sale?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    start_date =
-      Map.get(ticket_tier, :start_date) || Map.get(ticket_tier, "start_date")
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    sale_started =
-      case start_date do
-        nil -> true
-        sd when is_struct(sd, DateTime) -> DateTime.compare(now, sd) != :lt
-        _ -> true
-      end
-
-    sale_ended =
-      case end_date do
-        nil -> false
-        ed when is_struct(ed, DateTime) -> DateTime.compare(now, ed) == :gt
-        _ -> false
-      end
-
-    sale_started && !sale_ended
-  end
-
-  defp tier_sale_ended?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    case end_date do
-      nil -> false
-      ed when is_struct(ed, DateTime) -> DateTime.compare(now, ed) == :gt
-      _ -> false
     end
   end
 

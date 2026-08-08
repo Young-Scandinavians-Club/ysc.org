@@ -5,7 +5,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
   alias Ysc.Scanning
   alias Ysc.MessagePassingEvents
-  alias YscWeb.Admin.DateTimeDisplay
+  alias YscWeb.{Admin.DateTimeDisplay, AdminMembershipHelpers}
 
   # ---------------------------------------------------------------------------
   # Render
@@ -319,7 +319,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
       <% @membership_status == :active || @membership_status == "active" -> %>
         <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
           <.icon name="hero-check-badge" class="w-3 h-3" />
-          {format_membership_type(@membership_type)}
+          {AdminMembershipHelpers.membership_type_label(@membership_type, :short)}
         </span>
       <% true -> %>
         <span class="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
@@ -631,20 +631,4 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   defp normalize_search_query(_), do: ""
 
   defp searching?(query), do: normalize_search_query(query) != ""
-
-  defp format_membership_type(nil), do: "Member"
-  defp format_membership_type("lifetime"), do: "Lifetime"
-  defp format_membership_type(:lifetime), do: "Lifetime"
-  defp format_membership_type("single"), do: "Single"
-  defp format_membership_type(:single), do: "Single"
-  defp format_membership_type("family"), do: "Family"
-  defp format_membership_type(:family), do: "Family"
-
-  defp format_membership_type(type) when is_atom(type),
-    do: type |> Atom.to_string() |> String.capitalize()
-
-  defp format_membership_type(type) when is_binary(type),
-    do: String.capitalize(type)
-
-  defp format_membership_type(_), do: "Member"
 end

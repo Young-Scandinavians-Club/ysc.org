@@ -71,6 +71,7 @@ defmodule Ysc.DataCase do
     Ysc.Bookings.AvailabilityCache.invalidate()
     Ysc.Bookings.RoomsListCache.invalidate()
     Ysc.Bookings.SeasonCache.invalidate()
+    Ysc.Sitemap.invalidate()
     :ok
   end
 
@@ -100,7 +101,7 @@ defmodule Ysc.DataCase do
     stub_with(Stripe.PaymentMethodMock, Ysc.TestStripePaymentMethodStub)
 
     # Stripe Customer.create: deterministic test IDs from metadata user_id
-    stub(Stripe.CustomerMock, :create, fn params ->
+    stub(Stripe.CustomerMock, :create, fn params, _opts ->
       user_id =
         case params do
           %{metadata: %{user_id: id}} -> id

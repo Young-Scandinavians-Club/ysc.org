@@ -1,20 +1,3 @@
-defmodule Ysc.Test.ImageProcessor.MockS3Plug do
-  @moduledoc false
-  import Plug.Conn
-
-  @tiny_png_path Path.expand("../../support/fixtures/tiny.png", __DIR__)
-
-  def init(opts), do: opts
-
-  def call(conn, _opts) do
-    content = File.read!(@tiny_png_path)
-
-    conn
-    |> put_resp_content_type("image/png")
-    |> send_resp(200, content)
-  end
-end
-
 defmodule YscWeb.Workers.ImageProcessorTest do
   @moduledoc """
   Tests for ImageProcessor worker module.
@@ -82,43 +65,14 @@ defmodule YscWeb.Workers.ImageProcessorTest do
      }}
   end
 
-  defp start_s3_mock_server do
-    Ysc.HttpTestServer.ensure_started(
-      Ysc.Test.ImageProcessor.MockS3Plug,
-      :image_processor_s3
-    )
-  end
-
-  defp override_exaws_s3_port(port) do
-    original = Application.get_env(:ex_aws, :s3)
-
-    Application.put_env(:ex_aws, :s3,
-      scheme: "http://",
-      host: "127.0.0.1",
-      port: port
-    )
-
-    on_exit(fn ->
-      if original do
-        Application.put_env(:ex_aws, :s3, original)
-      else
-        Application.delete_env(:ex_aws, :s3)
-      end
-    end)
-  end
-
-  defp override_s3_base_url(url) do
-    original = Application.get_env(:ysc, :s3_base_url)
-
-    Application.put_env(:ysc, :s3_base_url, url)
-
-    on_exit(fn ->
-      if original do
-        Application.put_env(:ysc, :s3_base_url, original)
-      else
-        Application.delete_env(:ysc, :s3_base_url)
-      end
-    end)
+  # ImageProcessor downloads S3-sourced images via a plain HTTP GET against
+  # the object's public URL (not a signed ExAws GetObject — see
+  # download_s3_object_to_temp/3's moduledoc for why), so these tests put
+  # real bytes into local MinIO rather than mocking S3.
+  defp put_image_object(key, bytes) do
+    Ysc.S3Config.bucket_name()
+    |> ExAws.S3.put_object(key, bytes)
+    |> ExAws.request!()
   end
 
   defp make_job(image_id) do
@@ -134,13 +88,10 @@ defmodule YscWeb.Workers.ImageProcessorTest do
 
   describe "perform/1 with object storage URLs" do
     test "downloads raw bytes from path-style object storage URL when upload_data key is absent" do
-      port = start_s3_mock_server()
-      override_exaws_s3_port(port)
-      override_s3_base_url("http://127.0.0.1:#{port}")
-
       bucket = Ysc.S3Config.bucket_name()
-      object_key = "wp-import/tiny.png"
-      raw_url = "http://127.0.0.1:#{port}/#{bucket}/#{object_key}"
+      object_key = "wp-import/#{Ecto.UUID.generate()}.png"
+      put_image_object(object_key, File.read!(@tiny_png_path))
+      raw_url = "#{Ysc.S3Config.base_url()}/#{bucket}/#{object_key}"
 
       image =
         create_test_image(%{
@@ -160,11 +111,13 @@ defmodule YscWeb.Workers.ImageProcessorTest do
     end
 
     test "downloads raw bytes from Tigris virtual-host URL when upload_data key is absent" do
-      port = start_s3_mock_server()
-      override_exaws_s3_port(port)
-
       bucket = Ysc.S3Config.bucket_name()
-      object_key = "wp-import/tiny.png"
+      object_key = "wp-import/#{Ecto.UUID.generate()}.png"
+      put_image_object(object_key, File.read!(@tiny_png_path))
+
+      # The actual download always goes through a freshly-built public URL
+      # (S3Config.object_url/2), not this literal host — this only exercises
+      # key-extraction from a Tigris-virtual-host-shaped raw_image_path.
       raw_url = "https://#{bucket}.fly.storage.tigris.dev/#{object_key}"
 
       image =
@@ -181,13 +134,13 @@ defmodule YscWeb.Workers.ImageProcessorTest do
     end
 
     test "prefers explicit upload_data key over raw_image_path URL derivation" do
-      port = start_s3_mock_server()
-      override_exaws_s3_port(port)
-      override_s3_base_url("http://127.0.0.1:#{port}")
-
       bucket = Ysc.S3Config.bucket_name()
-      object_key = "wp-import/tiny.png"
-      raw_url = "http://127.0.0.1:#{port}/#{bucket}/wrong-key.png"
+      object_key = "wp-import/#{Ecto.UUID.generate()}.png"
+      put_image_object(object_key, File.read!(@tiny_png_path))
+
+      # Nothing is uploaded under "wrong-key.png" — the job only succeeds if
+      # upload_data's key is used instead of deriving one from raw_image_path.
+      raw_url = "#{Ysc.S3Config.base_url()}/#{bucket}/wrong-key.png"
 
       image =
         create_test_image(%{

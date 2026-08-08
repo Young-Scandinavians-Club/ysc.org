@@ -9,6 +9,7 @@ import PanelResizer from "./panel_resizer";
 import YearScrubber from "./year_scrubber";
 import ScrollMoreIndicator from "./scroll_more_indicator";
 import CalendarHover from "./calendar_hover";
+import CalendarScrollSync from "./calendar_scroll_sync";
 import ScrollPreserver from "./scroll_preserver";
 import Autocomplete from "./autocomplete";
 import ClipboardCopy from "./clipboard_copy";
@@ -27,6 +28,7 @@ import { applyPlatformKeyLabels } from "./platform_keys";
 import AdminHelpHotspots from "./admin_help_hotspots";
 import AdminHelpGhostFrame from "./admin_help_ghost_frame";
 import AdminHelpGhostScroll from "./admin_help_ghost_scroll";
+import SalesChartTooltip from "./sales_chart_tooltip";
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const SIDEBAR_COOKIE_NAME = "admin_sb_collapsed";
@@ -51,6 +53,7 @@ window.__adminHooks = {
     YearScrubber,
     ScrollMoreIndicator,
     CalendarHover,
+    CalendarScrollSync,
     ScrollPreserver,
     Autocomplete,
     ClipboardCopy,
@@ -68,6 +71,7 @@ window.__adminHooks = {
     AdminHelpHotspots,
     AdminHelpGhostFrame,
     AdminHelpGhostScroll,
+    SalesChartTooltip,
 };
 
 // Apply platform-aware key labels on initial load and after every LiveView patch.

@@ -122,10 +122,11 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
       assert message =~ "Expired"
     end
 
-    test "schedule_next action expires batch and enqueues follow-up check", %{
-      user: user,
-      event: event
-    } do
+    test "schedule_next action (legacy job kind) expires batch without rescheduling",
+         %{
+           user: user,
+           event: event
+         } do
       %TicketOrder{
         user_id: user.id,
         event_id: event.id,
@@ -144,7 +145,8 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
                  args: %{"action" => "schedule_next"}
                })
 
-      assert message =~ "scheduled next check"
+      assert message =~ "Expired"
+      refute message =~ "scheduled next check"
     end
 
     test "handles specific order expiration", %{user: user, event: event} do

@@ -89,7 +89,10 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
         |> form("#newsletter-subscribe-form", %{"email" => email})
         |> render_submit()
 
-      assert html =~ "subscribed"
+      # Double opt-in: form submission sends a confirmation email rather
+      # than subscribing immediately.
+      assert html =~ "Check your email"
+      refute Newsletter.get_subscriber_by_email(email).subscribed
     end
 
     test "guest subscribe shows error for invalid email", %{conn: conn} do

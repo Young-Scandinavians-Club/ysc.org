@@ -1,6 +1,8 @@
 # Production deploy: runs when a version tag is pushed (e.g. v1.2.3). The tagged
 # commit must already be on origin/main. Uses etc/fly/fly-prod.toml (app: ysc-prod).
 #
+# Also deploys query_console/ to ysc-query-console-sandbox then ysc-query-console.
+#
 # CI (tests, format, credo, security) is not duplicated here: the same commit was
 # already validated when it landed on main (.github/workflows/fly-deploy.yml).
 # This workflow deploys sandbox first, then production — if sandbox deploy fails,
@@ -56,6 +58,85 @@ jobs:
           flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+
+  deploy_query_console_sandbox:
+    name: Deploy query console sandbox (gate before prod)
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-query-console-sandbox
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: query_console
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Verify tagged commit is on main
+        working-directory: .
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "${{ github.sha }}" origin/main
+
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+
+      - name: Verify Fly token can access query console sandbox
+        working-directory: .
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+        run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console-sandbox
+
+      - name: Deploy query console to Fly.io sandbox
+        run: |
+          GIT_HASH=$(git rev-parse --short=7 HEAD)
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -n "$VERSION_TAG" ]; then
+            COMMITS=$(git rev-list --count "${VERSION_TAG}..HEAD")
+            VERSION="${VERSION_TAG}-${COMMITS}-${GIT_HASH}"
+          else
+            VERSION="unknown-${GIT_HASH}"
+          fi
+          flyctl deploy -a ysc-query-console-sandbox -c fly.sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+
+  deploy_query_console_prod:
+    name: Deploy query console production
+    runs-on: ubuntu-latest
+    needs: [deploy_query_console_sandbox]
+    concurrency:
+      group: deploy-query-console-prod
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: query_console
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+
+      - name: Verify Fly token can access query console production
+        working-directory: .
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_PROD_API_TOKEN }}
+        run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console
+
+      - name: Deploy query console to Fly.io production
+        run: |
+          VERSION_TAG="${{ github.ref_name }}"
+          GIT_HASH=$(git rev-parse --short=7 HEAD)
+          VERSION="${VERSION_TAG}-${GIT_HASH}"
+          flyctl deploy \
+            -a ysc-query-console \
+            -c fly.prod.toml \
+            --local-only \
+            --build-arg BUILD_VERSION="$VERSION" \
+            --image-label "$VERSION"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_PROD_API_TOKEN }}
 
   deploy:
     name: Deploy app production

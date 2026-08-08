@@ -74,7 +74,8 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
             |> get(~p"/admin/events/#{event.id}/check-in")
             |> html_response(200)
           end,
-          pattern: events_pattern
+          pattern: events_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 0
@@ -121,10 +122,12 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
             {:ok, view, html} =
               live(conn, ~p"/admin/events/#{event.id}/check-in")
 
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render(view)
             {:ok, view, html}
           end,
-          pattern: tickets_pattern
+          pattern: tickets_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count <= 1
@@ -152,7 +155,8 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
 
             render(view)
           end,
-          pattern: list_pattern
+          pattern: list_pattern,
+          caller_pids: [view.pid]
         )
 
       assert list_query_count == 0
@@ -195,7 +199,8 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
 
             render(view)
           end,
-          pattern: aggregate_pattern
+          pattern: aggregate_pattern,
+          caller_pids: [view.pid]
         )
 
       assert aggregate_query_count == 0

@@ -48,7 +48,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     EventNotification,
     ExpenseReportConfirmation,
     ExpenseReportTreasurerNotification,
-    NewsletterStatsSnapshot
+    NewsletterStatsSnapshot,
+    TahoeWinterWeekendAvailable,
+    TahoeSummerBuyoutAvailable,
+    WelcomeEmail
   }
 
   setup do
@@ -711,6 +714,14 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert is_binary(html)
       assert String.length(html) > 0
 
+      doc = LazyHTML.from_document(html)
+      # Body copy is left-aligned like other membership emails (not centered).
+      assert LazyHTML.query(doc, "td[align=left]") |> Enum.any?()
+
+      refute Enum.any?(LazyHTML.query(doc, "td[align=center]"), fn td ->
+               LazyHTML.text(td) |> String.trim() |> String.starts_with?("Hej")
+             end)
+
       assert MembershipPaymentFailure.get_template_name() ==
                "membership_payment_failure"
     end
@@ -728,8 +739,37 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert is_binary(html)
       assert String.length(html) > 0
 
+      text = LazyHTML.text(LazyHTML.from_document(html))
+      assert text =~ "Payment Receipt"
+
       assert MembershipPaymentConfirmation.get_template_name() ==
                "membership_payment_confirmation"
+    end
+
+    test "WelcomeEmail renders", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        events: [
+          %{
+            title: "Test Event",
+            date_str: "January 1, 2026",
+            location_name: "Tahoe Cabin",
+            url: "https://example.com/events/1",
+            image_url: nil
+          }
+        ],
+        events_url: "https://example.com/events",
+        tahoe_url: "https://example.com/bookings/tahoe",
+        clear_lake_url: "https://example.com/bookings/clear-lake",
+        tahoe_season_name: "Summer",
+        tahoe_buyout_allowed: true
+      }
+
+      html = WelcomeEmail.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+
+      assert WelcomeEmail.get_template_name() == "welcome_email"
     end
 
     test "MembershipRenewalSuccess renders", %{user: user} do
@@ -978,6 +1018,40 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert ExpenseReportTreasurerNotification.get_template_name() ==
                "expense_report_treasurer_notification"
     end
+
+    test "TahoeWinterWeekendAvailable renders", %{user: user} do
+      assigns =
+        TahoeWinterWeekendAvailable.prepare_email_data(
+          ~D[2026-11-06],
+          ~D[2026-11-08],
+          "2026/2027",
+          user
+        )
+
+      html = TahoeWinterWeekendAvailable.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+
+      assert TahoeWinterWeekendAvailable.get_template_name() ==
+               "tahoe_winter_weekend_available"
+    end
+
+    test "TahoeSummerBuyoutAvailable renders", %{user: user} do
+      assigns =
+        TahoeSummerBuyoutAvailable.prepare_email_data(
+          ~D[2027-05-07],
+          ~D[2027-05-09],
+          "2027",
+          user
+        )
+
+      html = TahoeSummerBuyoutAvailable.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+
+      assert TahoeSummerBuyoutAvailable.get_template_name() ==
+               "tahoe_summer_buyout_available"
+    end
   end
 
   describe "all email templates are registered in Notifier" do
@@ -1023,7 +1097,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           BookingCancellationCabinMasterNotification,
         "booking_cancellation_treasurer_notification" =>
           BookingCancellationTreasurerNotification,
-        "newsletter_stats_snapshot" => NewsletterStatsSnapshot
+        "newsletter_stats_snapshot" => NewsletterStatsSnapshot,
+        "tahoe_winter_weekend_available" => TahoeWinterWeekendAvailable,
+        "tahoe_summer_buyout_available" => TahoeSummerBuyoutAvailable,
+        "welcome_email" => WelcomeEmail
       }
 
       for {template_name, expected_module} <- template_mappings do

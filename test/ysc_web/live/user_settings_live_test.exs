@@ -512,6 +512,91 @@ defmodule YscWeb.UserSettingsLiveTest do
       refute Repo.exists?(from(a in Avatar, where: a.user_id == ^user.id))
     end
 
+    test "validate_avatar is a no-op that keeps the socket unchanged", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      html_before = render(view)
+      render_change(view, "validate_avatar", %{})
+      assert render(view) == html_before
+    end
+
+    test "delete_avatar removes an owned avatar and clears it if current", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/thumb.webp",
+          profile_path: "https://example.com/profile.webp",
+          large_path: "https://example.com/large.webp"
+        })
+
+      {:ok, updated_user} = Avatars.set_current_avatar(user, avatar.id)
+      assert updated_user.current_avatar_id == avatar.id
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_click(view, "delete_avatar", %{"id" => avatar.id})
+
+      assert render(view) =~ "Photo deleted"
+      refute Repo.exists?(from(a in Avatar, where: a.id == ^avatar.id))
+      assert Accounts.get_user!(user.id).current_avatar_id == nil
+    end
+
+    test "delete_avatar shows an error for an avatar it does not own", %{
+      conn: conn
+    } do
+      other_user = user_fixture(%{state: :active})
+
+      {:ok, avatar} =
+        Avatars.create_avatar(other_user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_click(view, "delete_avatar", %{"id" => avatar.id})
+
+      assert render(view) =~ "Could not delete photo"
+      assert Repo.exists?(from(a in Avatar, where: a.id == ^avatar.id))
+    end
+
+    test "wallet_platform_detected assigns apple_only, google_only, and both",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_hook(view, "wallet_platform_detected", %{
+        "platform" => "apple_only"
+      })
+
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform ==
+               :apple_only
+
+      render_hook(view, "wallet_platform_detected", %{
+        "platform" => "google_only"
+      })
+
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform ==
+               :google_only
+
+      render_hook(view, "wallet_platform_detected", %{"platform" => "unknown"})
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform == :both
+    end
+
     test "update_profile shows validation errors for invalid first name", %{
       conn: conn,
       user: user
@@ -854,7 +939,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       render(view)
 
       assert has_element?(view, "#payments-list")
-      assert render(view) =~ "My Bookings &amp; Tickets"
+      assert render(view) =~ "My Bookings &amp; Payments"
 
       view
       |> element(
@@ -862,7 +947,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "My Bookings &amp; Tickets"
+      assert render(view) =~ "My Bookings &amp; Payments"
     end
 
     test "filter-payments clear_lake updates stream without crashing", %{
@@ -898,7 +983,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "My Bookings &amp; Tickets"
+      assert render(view) =~ "My Bookings &amp; Payments"
     end
 
     test "payments tab omits benefits and reservations panels when none are usable",
@@ -1108,6 +1193,34 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       render_click(view, "confirm_cancel_phone_verification")
       assert_patched(view, ~p"/users/settings")
+    end
+
+    test "changing to a non-US/CA phone number saves it directly, skipping SMS verification",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active, phone_number: "+14159098268"})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_submit(view, "update_profile", %{
+        "user" =>
+          profile_form_attrs(user, %{
+            "phone_number" => "+46701234567"
+          })
+      })
+
+      assert has_element?(view, "#reauth-modal")
+
+      html = submit_reauth_password(view, valid_user_password())
+
+      refute html =~ "Verify Your Phone Number"
+      refute has_element?(view, "#phone_verification_form")
+      assert html =~ "SMS verification isn&#39;t available"
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.phone_number == "+46701234567"
+      assert updated.phone_verified_at == nil
     end
   end
 
@@ -1788,7 +1901,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         |> render_click()
       end
 
-      assert render(view) =~ "My Bookings &amp; Tickets"
+      assert render(view) =~ "My Bookings &amp; Payments"
     end
   end
 
@@ -2657,6 +2770,51 @@ defmodule YscWeb.UserSettingsLiveTest do
       render_click(view, "next-payments-page")
 
       assert render(view) == html_on_last
+    end
+  end
+
+  describe "confirm-email token flow" do
+    test "valid token updates the user's email and redirects to settings", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+      new_email = unique_user_email()
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_update_email_instructions(
+            %{user | email: new_email},
+            user.email,
+            url
+          )
+        end)
+
+      {:ok, view, _html} = live(conn, "/users/settings/confirm-email/#{token}")
+
+      # The redirect to /users/settings happens inside the initial connect
+      # handshake (mount + handle_params), before live/2 returns, so there's
+      # no separate patch event left in the mailbox for assert_patch to catch
+      # — assert on the resulting rendered state and URL instead.
+      assert render(view) =~ "Email changed successfully"
+      assert Accounts.get_user!(user.id).email == new_email
+
+      # Regression check: push_patch doesn't re-run mount/3, so the socket's
+      # :current_user/:email_form must be refreshed explicitly or the
+      # settings page would keep showing the old email until reload.
+      assert has_element?(view, "#email_form input[value='#{new_email}']")
+    end
+
+    test "invalid or expired token shows an error and redirects to settings",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, "/users/settings/confirm-email/not-a-real-token")
+
+      assert render(view) =~ "invalid or it has expired"
+      assert Accounts.get_user!(user.id).email == user.email
     end
   end
 

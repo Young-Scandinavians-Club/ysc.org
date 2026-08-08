@@ -46,7 +46,8 @@ defmodule Ysc.Bookings.AvailabilityCacheTest do
             end_date
           )
         end,
-        pattern: ~r/FROM "bookings"/i
+        pattern: ~r/FROM "bookings"/i,
+        caller_pids: [self()]
       )
 
     assert query_count >= 1

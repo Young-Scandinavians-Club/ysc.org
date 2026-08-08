@@ -116,11 +116,14 @@ defmodule YscWeb.UserSessionController do
   end
 
   defp do_create(conn, params, info, user_params, email, password) do
-    # Get redirect_to from form params (passed as hidden field from LiveView)
-    # Also check session as fallback for backwards compatibility
+    # Get redirect_to from form params (passed as hidden field from LiveView).
+    # Treat blank strings as absent so session :user_return_to still applies
+    # (e.g. return from /oauth/authorize when the hidden field is empty).
     redirect_to =
-      params["redirect_to"] ||
-        get_session(conn, :user_return_to)
+      case params["redirect_to"] do
+        path when is_binary(path) and path != "" -> path
+        _ -> get_session(conn, :user_return_to)
+      end
 
     if user = Accounts.get_user_by_email_and_password(email, password) do
       # Check if user's email is verified - if not, redirect to account setup

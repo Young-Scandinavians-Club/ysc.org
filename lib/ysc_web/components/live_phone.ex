@@ -29,6 +29,7 @@ defmodule LivePhone do
   def update(assigns, socket) do
     current_country =
       assigns[:country] || socket.assigns[:country] ||
+        country_from_value(assigns) ||
         hd(assigns[:preferred] || ["US"])
 
     masks =
@@ -267,6 +268,40 @@ defmodule LivePhone do
 
     # And make sure we only have unique ones
     |> Enum.uniq()
+  end
+
+  # Derives the initial country from the incoming phone number value (e.g. an
+  # E.164 number already saved on the record), so the country selector
+  # reflects the stored number instead of always falling back to the first
+  # preferred country on mount/remount.
+  @spec country_from_value(map()) :: String.t() | nil
+  defp country_from_value(assigns) do
+    value =
+      case assigns[:value] do
+        value when is_binary(value) and value != "" ->
+          value
+
+        _ ->
+          case assigns do
+            %{form: form, field: field}
+            when not is_nil(form) and not is_nil(field) ->
+              input_value(form, field)
+
+            _ ->
+              nil
+          end
+      end
+
+    case value do
+      value when is_binary(value) and value != "" ->
+        case Util.get_country(value) do
+          {:ok, %Country{code: code}} -> code
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
   end
 
   @spec assign_country(Socket.t(), Country.t() | String.t()) :: Socket.t()

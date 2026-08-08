@@ -74,4 +74,27 @@ defmodule Ysc.Extensions.PhoneNumber do
         phone_number
     end
   end
+
+  @sms_supported_regions ~w(US CA)
+
+  @doc """
+  Returns whether SMS delivery is supported for a given phone number.
+
+  FlowRoute (our SMS provider) can only reliably deliver to US and Canadian
+  numbers, so anything outside those regions should skip SMS verification
+  and notifications rather than attempt (and silently fail) delivery.
+  """
+  @spec sms_supported?(String.t() | nil) :: boolean()
+  def sms_supported?(nil), do: false
+  def sms_supported?(""), do: false
+
+  def sms_supported?(phone_number) when is_binary(phone_number) do
+    case ExPhoneNumber.parse(phone_number, "") do
+      {:ok, parsed} ->
+        ExPhoneNumber.Metadata.get_region_code_for_number(parsed) in @sms_supported_regions
+
+      {:error, _} ->
+        false
+    end
+  end
 end

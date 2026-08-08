@@ -267,7 +267,9 @@ defmodule Ysc.Forms do
           board_idempotency_key,
           YscWeb.Emails.VolunteerBoardNotification.get_subject(),
           "volunteer_board_notification",
-          board_variables
+          board_variables,
+          nil,
+          volunteer.email
         )
 
       case board_result do
@@ -331,7 +333,8 @@ defmodule Ysc.Forms do
           "New Contact Form: #{contact_form.subject}",
           "contact_form_board_notification",
           board_variables,
-          board_cc
+          board_cc,
+          contact_form.email
         )
 
       case board_result do

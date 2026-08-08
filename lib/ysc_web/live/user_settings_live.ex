@@ -27,8 +27,6 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Payments.PaymentDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.BookingDisplay
-  alias YscWeb.PaymentMethodFormatter
-  alias YscWeb.PaymentMethodLogo
 
   @impl true
   def render(assigns) do
@@ -634,6 +632,30 @@ defmodule YscWeb.UserSettingsLive do
                               </path>
                             </svg>
                           </div>
+                          <button
+                            type="button"
+                            phx-click="delete_avatar"
+                            phx-value-id={avatar.id}
+                            data-confirm="Delete this photo? This cannot be undone."
+                            disabled={@deleting_avatar_id == avatar.id}
+                            aria-label="Delete photo"
+                            class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-zinc-700 text-white flex items-center justify-center shadow hover:bg-red-600 disabled:opacity-50"
+                          >
+                            <svg
+                              class="w-3 h-3"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              stroke-width="3"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
                           <%!-- Source badge for OAuth-synced avatars --%>
                           <%= cond do %>
                             <% avatar.source == :google -> %>
@@ -829,11 +851,11 @@ defmodule YscWeb.UserSettingsLive do
                   required
                 />
                 <p class="text-sm text-zinc-600 -mt-2">
-                  For security, you'll need to sign in again before we change your email.
+                  For security, you'll need to verify your identity before we change your email.
                 </p>
                 <:actions>
-                  <.button phx-disable-with="Opening verification...">
-                    Sign in again to change email
+                  <.button phx-disable-with="Opening identity verification...">
+                    Verify my identity to change email
                   </.button>
                 </:actions>
               </.simple_form>
@@ -2217,17 +2239,17 @@ defmodule YscWeb.UserSettingsLive do
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                   <h2 class="text-zinc-900 font-bold text-xl">
-                    My Bookings & Tickets
+                    My Bookings & Payments
                   </h2>
                   <p class="text-sm text-zinc-600 mt-1 max-w-2xl">
-                    View your cabin and event payment history below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. Event tickets are listed separately.
+                    View your cabin booking payment history below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. To see or use your event tickets, open Your event tickets.
                   </p>
                 </div>
                 <.link
                   navigate={~p"/users/tickets"}
                   class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 transition-colors shrink-0"
                 >
-                  <.icon name="hero-ticket" class="w-4 h-4" /> View event tickets
+                  <.icon name="hero-ticket" class="w-4 h-4" /> Your event tickets
                 </.link>
               </div>
               <!-- Loading state for payments -->
@@ -2562,21 +2584,18 @@ defmodule YscWeb.UserSettingsLive do
         socket
       end
 
-    # After OAuth reauth, restore the pending email/phone change and continue
-    # (or re-open the reauth modal if verification failed).
-    socket = maybe_resume_oauth_reauth(socket, params)
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def mount(%{"token" => token}, _session, socket) do
+    # Confirm a pending email change from the link sent to the new address.
     # Only process the token on WebSocket connection, not on the dead render.
     # If processed on both, the token is consumed on the dead render and the
-    # WebSocket mount would always see it as expired, showing two conflicting toasts.
+    # WebSocket mount would always see it as expired, showing two conflicting
+    # toasts. push_patch must happen here (handle_params), not in mount/3 —
+    # LiveView forbids issuing a live patch while a view is still mounting.
     socket =
-      if connected?(socket) do
-        case Accounts.update_user_email(socket.assigns.current_user, token) do
+      if socket.assigns[:live_action] == :confirm_email && connected?(socket) do
+        case Accounts.update_user_email(
+               socket.assigns.current_user,
+               params["token"]
+             ) do
           {:ok, updated_user, new_email} ->
             old_email = socket.assigns.current_user.email
 
@@ -2586,14 +2605,27 @@ defmodule YscWeb.UserSettingsLive do
               new_email
             )
 
-            YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.",
+            # push_patch doesn't re-run mount/3, so the stale :current_user
+            # (and everything derived from it) would otherwise still show
+            # the old email until the browser reloads.
+            socket
+            |> assign(:current_user, updated_user)
+            |> assign(:user, updated_user)
+            |> assign(:current_email, updated_user.email)
+            |> assign(
+              :email_form,
+              updated_user |> Accounts.change_user_email() |> to_form()
+            )
+            |> push_patch(to: ~p"/users/settings")
+            |> YscWeb.Flash.put_toast(:info, "Email changed successfully.",
               title: "Email",
               icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
             )
 
           :error ->
-            YscWeb.Flash.put_toast(
-              socket,
+            socket
+            |> push_patch(to: ~p"/users/settings")
+            |> YscWeb.Flash.put_toast(
               :error,
               "Email change link is invalid or it has expired.",
               title: "Email"
@@ -2603,7 +2635,11 @@ defmodule YscWeb.UserSettingsLive do
         socket
       end
 
-    {:ok, push_patch(socket, to: ~p"/users/settings")}
+    # After OAuth reauth, restore the pending email/phone change and continue
+    # (or re-open the reauth modal if verification failed).
+    socket = maybe_resume_oauth_reauth(socket, params)
+
+    {:noreply, socket}
   end
 
   @impl true
@@ -2726,6 +2762,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:current_avatar_url, nil)
       |> assign(:avatar_processing, false)
       |> assign(:selecting_avatar_id, nil)
+      |> assign(:deleting_avatar_id, nil)
       |> assign(:loading_avatars, true)
       |> assign(:loading_notification_preferences, true)
       |> allow_upload(:avatar,
@@ -3181,6 +3218,40 @@ defmodule YscWeb.UserSettingsLive do
          |> YscWeb.Flash.put_toast(
            :error,
            "Could not update profile picture.",
+           title: "Profile Picture"
+         )}
+    end
+  end
+
+  def handle_event("delete_avatar", %{"id" => avatar_id}, socket) do
+    user = socket.assigns.current_user
+    socket = assign(socket, :deleting_avatar_id, avatar_id)
+
+    case Avatars.delete_avatar(user, avatar_id) do
+      {:ok, _deleted} ->
+        updated_user =
+          Ysc.Repo.get!(Ysc.Accounts.User, user.id)
+          |> Ysc.Repo.preload(:current_avatar, force: true)
+
+        {:noreply,
+         socket
+         |> assign(:deleting_avatar_id, nil)
+         |> assign(:current_user, updated_user)
+         |> assign(:user, updated_user)
+         |> assign(:user_avatars, load_user_avatars(updated_user))
+         |> assign(
+           :current_avatar_url,
+           resolve_current_avatar_url(updated_user)
+         )
+         |> YscWeb.Flash.put_toast(:info, "Photo deleted.",
+           title: "Profile Picture"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> assign(:deleting_avatar_id, nil)
+         |> YscWeb.Flash.put_toast(:error, "Could not delete photo.",
            title: "Profile Picture"
          )}
     end
@@ -4572,47 +4643,102 @@ defmodule YscWeb.UserSettingsLive do
 
     case Accounts.update_user_profile(user, other_params) do
       {:ok, updated_user} ->
-        timestamp = DateTime.utc_now() |> DateTime.to_unix()
-
-        {:ok, _} =
-          VerificationCodes.issue(updated_user, :phone,
-            to: new_phone,
-            suffix: "settings_change_#{timestamp}"
-          )
-
-        user_params = Map.put(other_params, "phone_number", new_phone)
-
-        profile_form =
-          Accounts.change_user_profile(updated_user, user_params) |> to_form()
-
-        token =
-          Phoenix.Token.sign(
-            YscWeb.Endpoint,
-            @phone_verification_token_salt,
+        if Ysc.Extensions.PhoneNumber.sms_supported?(new_phone) do
+          send_phone_verification_code(
+            socket,
+            updated_user,
             new_phone,
-            max_age: @phone_verification_token_max_age
+            other_params
           )
+        else
+          save_unverifiable_phone_change(socket, updated_user, new_phone)
+        end
 
-        path =
-          ~p"/users/settings/phone-verification"
-          |> URI.parse()
-          |> Map.put(:query, URI.encode_query(%{"token" => token}))
-          |> URI.to_string()
-
+      {:error, changeset} ->
         socket
-        |> assign(:user, updated_user)
-        |> assign(:profile_form, profile_form)
-        |> assign(:pending_phone_number, new_phone)
+        |> assign(:profile_form, to_form(changeset))
+        |> assign(:show_reauth_modal, false)
         |> assign(:pending_phone_change, nil)
         |> assign(:pending_profile_params, nil)
-        |> assign(:phone_verification_code_state, %{})
+        |> assign(:reauth_purpose, nil)
+    end
+  end
+
+  defp send_phone_verification_code(
+         socket,
+         updated_user,
+         new_phone,
+         other_params
+       ) do
+    timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
+    {:ok, _} =
+      VerificationCodes.issue(updated_user, :phone,
+        to: new_phone,
+        suffix: "settings_change_#{timestamp}"
+      )
+
+    user_params = Map.put(other_params, "phone_number", new_phone)
+
+    profile_form =
+      Accounts.change_user_profile(updated_user, user_params) |> to_form()
+
+    token =
+      Phoenix.Token.sign(
+        YscWeb.Endpoint,
+        @phone_verification_token_salt,
+        new_phone,
+        max_age: @phone_verification_token_max_age
+      )
+
+    path =
+      ~p"/users/settings/phone-verification"
+      |> URI.parse()
+      |> Map.put(:query, URI.encode_query(%{"token" => token}))
+      |> URI.to_string()
+
+    socket
+    |> assign(:user, updated_user)
+    |> assign(:profile_form, profile_form)
+    |> assign(:pending_phone_number, new_phone)
+    |> assign(:pending_phone_change, nil)
+    |> assign(:pending_profile_params, nil)
+    |> assign(:phone_verification_code_state, %{})
+    |> assign(:show_reauth_modal, false)
+    |> assign(:reauth_purpose, nil)
+    |> assign(:reauth_verified_at, DateTime.utc_now())
+    |> push_patch(to: path)
+    |> YscWeb.Flash.put_toast(
+      :info,
+      "Phone number update initiated. Please verify the code sent to your new number.",
+      title: "Phone",
+      icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+    )
+  end
+
+  # FlowRoute (our SMS provider) can't verify numbers outside the US/Canada,
+  # so save the number directly instead of routing through the OTP step.
+  defp save_unverifiable_phone_change(socket, updated_user, new_phone) do
+    case Accounts.update_user_phone_and_sms(updated_user, %{
+           "phone_number" => new_phone
+         }) do
+      {:ok, phone_updated_user} ->
+        profile_form =
+          Accounts.change_user_profile(phone_updated_user) |> to_form()
+
+        socket
+        |> assign(:user, phone_updated_user)
+        |> assign(:current_user, phone_updated_user)
+        |> assign(:profile_form, profile_form)
+        |> assign(:pending_phone_change, nil)
+        |> assign(:pending_profile_params, nil)
         |> assign(:show_reauth_modal, false)
         |> assign(:reauth_purpose, nil)
         |> assign(:reauth_verified_at, DateTime.utc_now())
-        |> push_patch(to: path)
+        |> push_patch(to: ~p"/users/settings")
         |> YscWeb.Flash.put_toast(
           :info,
-          "Phone number update initiated. Please verify the code sent to your new number.",
+          "Phone number updated. SMS verification isn't available for this number, so we've skipped that step.",
           title: "Phone",
           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
         )
@@ -5301,165 +5427,6 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp payment_secret(_, _), do: nil
-
-  defp card_icon("visa"),
-    do:
-      "M470.1 231.3s7.6 37.2 9.3 45H446c3.3-8.9 16-43.5 16-43.5-.2.3 3.3-9.1 5.3-14.9l2.8 13.4zM576 80v352c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V80c0-26.5 21.5-48 48-48h480c26.5 0 48 21.5 48 48zM152.5 331.2L215.7 176h-42.5l-39.3 106-4.3-21.5-14-71.4c-2.3-9.9-9.4-12.7-18.2-13.1H32.7l-.7 3.1c15.8 4 29.9 9.8 42.2 17.1l35.8 135h42.5zm94.4.2L272.1 176h-40.2l-25.1 155.4h40.1zm139.9-50.8c.2-17.7-10.6-31.2-33.7-42.3-14.1-7.1-22.7-11.9-22.7-19.2.2-6.6 7.3-13.4 23.1-13.4 13.1-.3 22.7 2.8 29.9 5.9l3.6 1.7 5.5-33.6c-7.9-3.1-20.5-6.6-36-6.6-39.7 0-67.6 21.2-67.8 51.4-.3 22.3 20 34.7 35.2 42.2 15.5 7.6 20.8 12.6 20.8 19.3-.2 10.4-12.6 15.2-24.1 15.2-16 0-24.6-2.5-37.7-8.3l-5.3-2.5-5.6 34.9c9.4 4.3 26.8 8.1 44.8 8.3 42.2.1 69.7-20.8 70-53zM528 331.4L495.6 176h-31.1c-9.6 0-16.9 2.8-21 12.9l-59.7 142.5H426s6.9-19.2 8.4-23.3H486c1.2 5.5 4.8 23.3 4.8 23.3H528z"
-
-  defp card_icon("mastercard"),
-    do:
-      "M482.9 410.3c0 6.8-4.6 11.7-11.2 11.7-6.8 0-11.2-5.2-11.2-11.7 0-6.5 4.4-11.7 11.2-11.7 6.6 0 11.2 5.2 11.2 11.7zm-310.8-11.7c-7.1 0-11.2 5.2-11.2 11.7 0 6.5 4.1 11.7 11.2 11.7 6.5 0 10.9-4.9 10.9-11.7-.1-6.5-4.4-11.7-10.9-11.7zm117.5-.3c-5.4 0-8.7 3.5-9.5 8.7h19.1c-.9-5.7-4.4-8.7-9.6-8.7zm107.8.3c-6.8 0-10.9 5.2-10.9 11.7 0 6.5 4.1 11.7 10.9 11.7 6.8 0 11.2-4.9 11.2-11.7 0-6.5-4.4-11.7-11.2-11.7zm105.9 26.1c0 .3.3.5.3 1.1 0 .3-.3.5-.3 1.1-.3.3-.3.5-.5.8-.3.3-.5.5-1.1.5-.3.3-.5.3-1.1.3-.3 0-.5 0-1.1-.3-.3 0-.5-.3-.8-.5-.3-.3-.5-.5-.5-.8-.3-.5-.3-.8-.3-1.1 0-.5 0-.8.3-1.1 0-.5.3-.8.5-1.1.3-.3.5-.3.8-.5.5-.3.8-.3 1.1-.3.5 0 .8 0 1.1.3.5.3.8.3 1.1.5s.2.6.5 1.1zm-2.2 1.4c.5 0 .5-.3.8-.3.3-.3.3-.5.3-.8 0-.3 0-.5-.3-.8-.3 0-.5-.3-1.1-.3h-1.6v3.5h.8V426h.3l1.1 1.4h.8l-1.1-1.3zM576 81v352c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V81c0-26.5 21.5-48 48-48h480c26.5 0 48 21.5 48 48zM64 220.6c0 76.5 62.1 138.5 138.5 138.5 27.2 0 53.9-8.2 76.5-23.1-72.9-59.3-72.4-171.2 0-230.5-22.6-15-49.3-23.1-76.5-23.1-76.4-.1-138.5 62-138.5 138.2zm224 108.8c70.5-55 70.2-162.2 0-217.5-70.2 55.3-70.5 162.6 0 217.5zm-142.3 76.3c0-8.7-5.7-14.4-14.7-14.7-4.6 0-9.5 1.4-12.8 6.5-2.4-4.1-6.5-6.5-12.2-6.5-3.8 0-7.6 1.4-10.6 5.4V392h-8.2v36.7h8.2c0-18.9-2.5-30.2 9-30.2 10.2 0 8.2 10.2 8.2 30.2h7.9c0-18.3-2.5-30.2 9-30.2 10.2 0 8.2 10 8.2 30.2h8.2v-23zm44.9-13.7h-7.9v4.4c-2.7-3.3-6.5-5.4-11.7-5.4-10.3 0-18.2 8.2-18.2 19.3 0 11.2 7.9 19.3 18.2 19.3 5.2 0 9-1.9 11.7-5.4v4.6h7.9V392zm40.5 25.6c0-15-22.9-8.2-22.9-15.2 0-5.7 11.9-4.8 18.5-1.1l3.3-6.5c-9.4-6.1-30.2-6-30.2 8.2 0 14.3 22.9 8.3 22.9 15 0 6.3-13.5 5.8-20.7.8l-3.5 6.3c11.2 7.6 32.6 6 32.6-7.5zm35.4 9.3l-2.2-6.8c-3.8 2.1-12.2 4.4-12.2-4.1v-16.6h13.1V392h-13.1v-11.2h-8.2V392h-7.6v7.3h7.6V416c0 17.6 17.3 14.4 22.6 10.9zm13.3-13.4h27.5c0-16.2-7.4-22.6-17.4-22.6-10.6 0-18.2 7.9-18.2 19.3 0 20.5 22.6 23.9 33.8 14.2l-3.8-6c-7.8 6.4-19.6 5.8-21.9-4.9zm59.1-21.5c-4.6-2-11.6-1.8-15.2 4.4V392h-8.2v36.7h8.2V408c0-11.6 9.5-10.1 12.8-8.4l2.4-7.6zm10.6 18.3c0-11.4 11.6-15.1 20.7-8.4l3.8-6.5c-11.6-9.1-32.7-4.1-32.7 15 0 19.8 22.4 23.8 32.7 15l-3.8-6.5c-9.2 6.5-20.7 2.6-20.7-8.6zm66.7-18.3H408v4.4c-8.3-11-29.9-4.8-29.9 13.9 0 19.2 22.4 24.7 29.9 13.9v4.6h8.2V392zm33.7 0c-2.4-1.2-11-2.9-15.2 4.4V392h-7.9v36.7h7.9V408c0-11 9-10.3 12.8-8.4l2.4-7.6zm40.3-14.9h-7.9v19.3c-8.2-10.9-29.9-5.1-29.9 13.9 0 19.4 22.5 24.6 29.9 13.9v4.6h7.9v-51.7zm7.6-75.1v4.6h.8V302h1.9v-.8h-4.6v.8h1.9zm6.6 123.8c0-.5 0-1.1-.3-1.6-.3-.3-.5-.8-.8-1.1-.3-.3-.8-.5-1.1-.8-.5 0-1.1-.3-1.6-.3-.3 0-.8.3-1.4.3-.5.3-.8.5-1.1.8-.5.3-.8.8-.8 1.1-.3.5-.3 1.1-.3 1.6 0 .3 0 .8.3 1.4 0 .3.3.8.8 1.1.3.3.5.5 1.1.8.5.3 1.1.3 1.4.3.5 0 1.1 0 1.6-.3.3-.3.8-.5 1.1-.8.3-.3.5-.8.8-1.1.3-.6.3-1.1.3-1.4zm3.2-124.7h-1.4l-1.6 3.5-1.6-3.5h-1.4v5.4h.8v-4.1l1.6 3.5h1.1l1.4-3.5v4.1h1.1v-5.4zm4.4-80.5c0-76.2-62.1-138.3-138.5-138.3-27.2 0-53.9 8.2-76.5 23.1 72.1 59.3 73.2 171.5 0 230.5 22.6 15 49.5 23.1 76.5 23.1 76.4.1 138.5-61.9 138.5-138.4z"
-
-  defp card_icon("amex"),
-    do:
-      "M0 432c0 26.5 21.5 48 48 48H528c26.5 0 48-21.5 48-48v-1.1H514.3l-31.9-35.1-31.9 35.1H246.8V267.1H181L262.7 82.4h78.6l28.1 63.2V82.4h97.2L483.5 130l17-47.6H576V80c0-26.5-21.5-48-48-48H48C21.5 32 0 53.5 0 80V432zm440.4-21.7L482.6 364l42 46.3H576l-68-72.1 68-72.1H525.4l-42 46.7-41.5-46.7H390.5L458 338.6l-67.4 71.6V377.1h-83V354.9h80.9V322.6H307.6V300.2h83V267.1h-122V410.3H440.4zm96.3-72L576 380.2V296.9l-39.3 41.4zm-36.3-92l36.9-100.6V246.3H576V103H515.8l-32.2 89.3L451.7 103H390.5V246.1L327.3 103H276.1L213.7 246.3h43l11.9-28.7h65.9l12 28.7h82.7V146L466 246.3h34.4zM282 185.4l19.5-46.9 19.4 46.9H282z"
-
-  defp card_icon("discover"),
-    do:
-      "M520.4 196.1c0-7.9-5.5-12.1-15.6-12.1h-4.9v24.9h4.7c10.3 0 15.8-4.4 15.8-12.8zM528 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h480c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48zm-44.1 138.9c22.6 0 52.9-4.1 52.9 24.4 0 12.6-6.6 20.7-18.7 23.2l25.8 34.4h-19.6l-22.2-32.8h-2.2v32.8h-16zm-55.9.1h45.3v14H444v18.2h28.3V217H444v22.2h29.3V253H428zm-68.7 0l21.9 55.2 22.2-55.2h17.5l-35.5 84.2h-8.6l-35-84.2zm-55.9-3c24.7 0 44.6 20 44.6 44.6 0 24.7-20 44.6-44.6 44.6-24.7 0-44.6-20-44.6-44.6 0-24.7 20-44.6 44.6-44.6zm-49.3 6.1v19c-20.1-20.1-46.8-4.7-46.8 19 0 25 27.5 38.5 46.8 19.2v19c-29.7 14.3-63.3-5.7-63.3-38.2 0-31.2 33.1-53 63.3-38zm-97.2 66.3c11.4 0 22.4-15.3-3.3-24.4-15-5.5-20.2-11.4-20.2-22.7 0-23.2 30.6-31.4 49.7-14.3l-8.4 10.8c-10.4-11.6-24.9-6.2-24.9 2.5 0 4.4 2.7 6.9 12.3 10.3 18.2 6.6 23.6 12.5 23.6 25.6 0 29.5-38.8 37.4-56.6 11.3l10.3-9.9c3.7 7.1 9.9 10.8 17.5 10.8zM55.4 253H32v-82h23.4c26.1 0 44.1 17 44.1 41.1 0 18.5-13.2 40.9-44.1 40.9zm67.5 0h-16v-82h16zM544 433c0 8.2-6.8 15-15 15H128c189.6-35.6 382.7-139.2 416-160zM74.1 191.6c-5.2-4.9-11.6-6.6-21.9-6.6H48v54.2h4.2c10.3 0 17-2 21.9-6.4 5.7-5.2 8.9-12.8 8.9-20.7s-3.2-15.5-8.9-20.5z"
-
-  defp card_icon("jcb"),
-    do:
-      "M431.5 244.3V212c41.2 0 38.5.2 38.5.2 7.3 1.3 13.3 7.3 13.3 16 0 8.8-6 14.5-13.3 15.8-1.2.4-3.3.3-38.5.3zm42.8 20.2c-2.8-.7-3.3-.5-42.8-.5v35c39.6 0 40 .2 42.8-.5 7.5-1.5 13.5-8 13.5-17 0-8.7-6-15.5-13.5-17zM576 80v352c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V80c0-26.5 21.5-48 48-48h480c26.5 0 48 21.5 48 48zM182 192.3h-57c0 67.1 10.7 109.7-35.8 109.7-19.5 0-38.8-5.7-57.2-14.8v28c30 8.3 68 8.3 68 8.3 97.9 0 82-47.7 82-131.2zm178.5 4.5c-63.4-16-165-14.9-165 59.3 0 77.1 108.2 73.6 165 59.2V287C312.9 311.7 253 309 253 256s59.8-55.6 107.5-31.2v-28zM544 286.5c0-18.5-16.5-30.5-38-32v-.8c19.5-2.7 30.3-15.5 30.3-30.2 0-19-15.7-30-37-31 0 0 6.3-.3-120.3-.3v127.5h122.7c24.3.1 42.3-12.9 42.3-33.2z"
-
-  defp card_icon("diners"),
-    do:
-      "M239.7 79.9c-96.9 0-175.8 78.6-175.8 175.8 0 96.9 78.9 175.8 175.8 175.8 97.2 0 175.8-78.9 175.8-175.8 0-97.2-78.6-175.8-175.8-175.8zm-39.9 279.6c-41.7-15.9-71.4-56.4-71.4-103.8s29.7-87.9 71.4-104.1v207.9zm79.8.3V151.6c41.7 16.2 71.4 56.7 71.4 104.1s-29.7 87.9-71.4 104.1zM528 32H48C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48 48h480c26.5 0 48-21.5 48-48V80c0-26.5-21.5-48-48-48zM329.7 448h-90.3c-106.2 0-193.8-85.5-193.8-190.2C45.6 143.2 133.2 64 239.4 64h90.3c105 0 200.7 79.2 200.7 193.8 0 104.7-95.7 190.2-200.7 190.2z"
-
-  defp card_icon(_), do: "hero-credit-card"
-
-  defp payment_method_icon(%{type: :card, display_brand: brand}),
-    do: card_icon(brand)
-
-  defp payment_method_icon(%{type: :bank_account}), do: bank_account_icon()
-
-  defp bank_account_icon(),
-    do:
-      "M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z"
-
-  defp payment_method_display_text(%{type: :link} = pm) do
-    PaymentMethodFormatter.format_link_payment_method(
-      pm.last_four,
-      pm.display_brand
-    )
-  end
-
-  defp payment_method_display_text(%{type: :card, last_four: last_four})
-       when not is_nil(last_four) do
-    "**** **** **** #{last_four}"
-  end
-
-  defp payment_method_display_text(%{
-         type: :bank_account,
-         bank_name: bank_name,
-         account_type: _account_type,
-         last_four: last_four
-       })
-       when not is_nil(bank_name) and not is_nil(last_four) do
-    "#{bank_name} ••••#{last_four}"
-  end
-
-  defp payment_method_display_text(%{type: :bank_account, last_four: last_four})
-       when not is_nil(last_four) do
-    "Bank Account ••••#{last_four}"
-  end
-
-  defp payment_method_display_text(%{type: :card}) do
-    "Credit Card"
-  end
-
-  defp payment_method_display_text(%{type: :bank_account}) do
-    "Bank Account"
-  end
-
-  defp payment_method_display_text(_) do
-    "Payment Method"
-  end
-
-  defp payment_method_shows_expiration?(%{
-         type: type,
-         exp_month: exp_month,
-         exp_year: exp_year
-       })
-       when type in [:card, :link] and not is_nil(exp_month) and
-              not is_nil(exp_year),
-       do: true
-
-  defp payment_method_shows_expiration?(_), do: false
-
-  attr :payment_method, :map, required: true
-  attr :text_class, :string, default: "text-sm font-semibold text-zinc-700"
-  attr :expiry_class, :string, default: "text-xs text-zinc-500"
-
-  defp stored_payment_method_display(assigns) do
-    ~H"""
-    <div class="flex items-center gap-3">
-      <div class="flex-shrink-0">
-        <%= if logo = PaymentMethodLogo.path_for_payment_method(@payment_method) do %>
-          <img
-            src={logo}
-            alt=""
-            class="h-6 w-auto max-w-[4rem] object-contain"
-            loading="lazy"
-            decoding="async"
-          />
-        <% else %>
-          <svg
-            :if={@payment_method.type == :card}
-            stroke="currentColor"
-            fill="currentColor"
-            stroke-width="0"
-            viewBox="0 0 576 512"
-            xmlns="http://www.w3.org/2000/svg"
-            class="w-6 h-6 fill-zinc-700"
-          >
-            <path d={payment_method_icon(@payment_method)}></path>
-          </svg>
-          <svg
-            :if={@payment_method.type == :bank_account}
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="w-6 h-6 text-zinc-700"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d={payment_method_icon(@payment_method)}
-            >
-            </path>
-          </svg>
-          <.icon
-            :if={@payment_method.type not in [:card, :bank_account]}
-            name="hero-credit-card"
-            class="w-6 h-6 text-zinc-700"
-          />
-        <% end %>
-      </div>
-      <div>
-        <p class={@text_class}>
-          {payment_method_display_text(@payment_method)}
-        </p>
-        <p
-          :if={payment_method_shows_expiration?(@payment_method)}
-          class={@expiry_class}
-        >
-          Expires {String.pad_leading(to_string(@payment_method.exp_month), 2, "0")} / {@payment_method.exp_year}
-        </p>
-        <p
-          :if={
-            @payment_method.type == :bank_account && @payment_method.account_type
-          }
-          class={@expiry_class}
-        >
-          {@payment_method.account_type}
-        </p>
-      </div>
-    </div>
-    """
-  end
 
   # Helper function to ensure Stripe customer exists
   @dialyzer {:nowarn_function, ensure_stripe_customer_exists: 1}

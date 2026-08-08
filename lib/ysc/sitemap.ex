@@ -20,10 +20,14 @@ defmodule Ysc.Sitemap do
   Returns the sitemap XML string, using a cached version when available.
   """
   def generate do
-    case Cachex.get(:ysc_cache, @cache_key) do
-      {:ok, nil} -> build_and_cache()
-      {:ok, xml} -> xml
-      {:error, _reason} -> build_and_cache()
+    if Ysc.ProcessCache.enabled?() do
+      case Cachex.get(:ysc_cache, @cache_key) do
+        {:ok, nil} -> build_and_cache()
+        {:ok, xml} -> xml
+        {:error, _reason} -> build_and_cache()
+      end
+    else
+      build_xml()
     end
   end
 
@@ -31,7 +35,11 @@ defmodule Ysc.Sitemap do
   Clears the cached sitemap so it will be regenerated on the next request.
   """
   def invalidate do
-    Cachex.del(:ysc_cache, @cache_key)
+    if Ysc.ProcessCache.enabled?() do
+      Cachex.del(:ysc_cache, @cache_key)
+    end
+
+    :ok
   end
 
   defp build_and_cache do

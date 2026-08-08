@@ -487,9 +487,8 @@ defmodule YscWeb.AdminMoneyLive do
     start_date = socket.assigns.start_date
     end_date = socket.assigns.end_date
 
-    period_accounts = Ledgers.get_accounts_with_balances(start_date, end_date)
-    current_accounts = Ledgers.get_accounts_with_balances()
-    ledger_accounts = Ledgers.list_accounts()
+    {period_accounts, current_accounts, ledger_accounts} =
+      Ledgers.get_overview_accounts_with_balances(start_date, end_date)
 
     socket
     |> assign(:accounts_with_balances, period_accounts)
@@ -1435,7 +1434,13 @@ defmodule YscWeb.AdminMoneyLive do
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100">
-                  <tr :for={expense_report <- @expense_reports_inbox}>
+                  <tr
+                    :for={expense_report <- @expense_reports_inbox}
+                    id={"expense-inbox-row-#{expense_report.id}"}
+                    phx-click="show_expense_report_status_modal"
+                    phx-value-expense_report_id={expense_report.id}
+                    class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                  >
                     <td class="px-4 py-3 text-sm text-zinc-900">
                       <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
                         <div class="flex flex-col">
@@ -1462,7 +1467,10 @@ defmodule YscWeb.AdminMoneyLive do
                         "%Y-%m-%d"
                       )}
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right text-sm">
+                    <td
+                      class="px-4 py-3 whitespace-nowrap text-right text-sm"
+                      onclick="event.stopPropagation()"
+                    >
                       <button
                         type="button"
                         id={"expense-inbox-review-#{expense_report.id}"}
@@ -1600,7 +1608,18 @@ defmodule YscWeb.AdminMoneyLive do
                      @payments_empty?) && "hidden"
                 ]}
               >
-                <tr :for={{id, payment} <- @streams.payments} id={id}>
+                <tr
+                  :for={{id, payment} <- @streams.payments}
+                  id={id}
+                  phx-click={
+                    if(payment.payment_type_info.type == "Payout",
+                      do: "show_payout_modal",
+                      else: "show_payment_modal"
+                    )
+                  }
+                  phx-value-payment_id={payment.id}
+                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
                     {payment.reference_id}
                   </td>
@@ -1727,10 +1746,14 @@ defmodule YscWeb.AdminMoneyLive do
                     Status
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    QuickBooks Sync Status
+                    <span class="block max-w-[7rem] whitespace-normal leading-tight">
+                      QuickBooks Sync Status
+                    </span>
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    QuickBooks Bill ID
+                    <span class="block max-w-[7rem] whitespace-normal leading-tight">
+                      QuickBooks Bill ID
+                    </span>
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                     Submitted At
@@ -1741,7 +1764,13 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={expense_report <- @expense_reports}>
+                <tr
+                  :for={expense_report <- @expense_reports}
+                  id={"expense-report-row-#{expense_report.id}"}
+                  phx-click="show_expense_report_status_modal"
+                  phx-value-expense_report_id={expense_report.id}
+                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
                     {String.slice(to_string(expense_report.id), 0..12)}...
                   </td>
@@ -1794,7 +1823,10 @@ defmodule YscWeb.AdminMoneyLive do
                       "%Y-%m-%d %H:%M"
                     )}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
+                    onclick="event.stopPropagation()"
+                  >
                     <button
                       type="button"
                       id={"expense-report-view-#{expense_report.id}"}
@@ -2038,7 +2070,13 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={webhook <- @webhook_events}>
+                <tr
+                  :for={webhook <- @webhook_events}
+                  id={"webhook-row-#{webhook.id}"}
+                  phx-click="show_webhook_modal"
+                  phx-value-webhook_id={webhook.id}
+                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
                     {String.slice(webhook.event_id, 0..20)}...
                   </td>
@@ -2057,7 +2095,10 @@ defmodule YscWeb.AdminMoneyLive do
                       "%Y-%m-%d %H:%M:%S"
                     )}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
+                    onclick="event.stopPropagation()"
+                  >
                     <button
                       type="button"
                       id={"webhook-view-#{webhook.id}"}
@@ -2109,7 +2150,13 @@ defmodule YscWeb.AdminMoneyLive do
             <strong>Amount:</strong> {Money.to_string!(@selected_payment.amount)}
           </p>
           <p :if={@selected_payment.user} class="text-sm text-zinc-600">
-            <strong>User:</strong> {@selected_payment.user.email}
+            <strong>User:</strong>
+            <.link
+              navigate={~p"/admin/users/#{@selected_payment.user.id}/details"}
+              class="text-blue-600 hover:underline"
+            >
+              {@selected_payment.user.email}
+            </.link>
           </p>
         </div>
 
@@ -2266,12 +2313,23 @@ defmodule YscWeb.AdminMoneyLive do
         </.form>
       </.modal>
       <!-- Credit Modal -->
-      <.modal :if={@show_credit_modal} id="credit-modal" show>
+      <.modal
+        :if={@show_credit_modal}
+        id="credit-modal"
+        show
+        on_cancel={JS.push("close_credit_modal")}
+      >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Add Credit</h3>
 
         <div :if={@selected_user} class="mb-4">
           <p class="text-sm text-zinc-600">
-            <strong>User:</strong> {@selected_user.email}
+            <strong>User:</strong>
+            <.link
+              navigate={~p"/admin/users/#{@selected_user.id}/details"}
+              class="text-blue-600 hover:underline"
+            >
+              {@selected_user.email}
+            </.link>
           </p>
         </div>
 
@@ -2354,7 +2412,12 @@ defmodule YscWeb.AdminMoneyLive do
         </.form>
       </.modal>
       <!-- Webhook Details Modal -->
-      <.modal :if={@show_webhook_modal && @selected_webhook} id="webhook-modal" show>
+      <.modal
+        :if={@show_webhook_modal && @selected_webhook}
+        id="webhook-modal"
+        show
+        on_cancel={JS.push("close_webhook_modal")}
+      >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">
           Webhook Event Details
         </h3>
@@ -2449,15 +2512,32 @@ defmodule YscWeb.AdminMoneyLive do
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="text-sm font-medium text-zinc-700">Stripe Payout ID</p>
-              <p class="text-sm text-zinc-900 font-mono">
-                {@selected_payout.stripe_payout_id}
-              </p>
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <a
+                  href={"https://dashboard.stripe.com/payouts/#{@selected_payout.stripe_payout_id}"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-sm text-zinc-900 hover:text-blue-600 font-mono transition-colors underline decoration-dotted break-all min-w-0"
+                  title="View in Stripe Dashboard"
+                >
+                  {@selected_payout.stripe_payout_id}
+                </a>
+                <.admin_clipboard_button
+                  id={"copy-stripe-payout-#{@selected_payout.id}"}
+                  variant={:icon}
+                  copy={@selected_payout.stripe_payout_id}
+                  title="Copy Stripe Payout ID"
+                  aria_label="Copy Stripe Payout ID"
+                />
+              </div>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Status</p>
-              <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_payout_status_color(@selected_payout.status)}"}>
+              <.badge type={
+                AdminBadgeHelpers.payout_status_badge_type(@selected_payout.status)
+              }>
                 {String.capitalize(@selected_payout.status || "unknown")}
-              </span>
+              </.badge>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Payout Amount</p>
@@ -2612,14 +2692,17 @@ defmodule YscWeb.AdminMoneyLive do
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <%= if Ecto.assoc_loaded?(payment.user) && payment.user do %>
-                      <div class="flex flex-col">
-                        <span class="text-xs font-medium">
+                      <.link
+                        navigate={~p"/admin/users/#{payment.user.id}/details"}
+                        class="flex flex-col group"
+                      >
+                        <span class="text-xs font-medium text-blue-600 group-hover:underline">
                           {get_user_display_name(payment.user)}
                         </span>
-                        <span class="text-xs text-zinc-500">
+                        <span class="text-xs text-zinc-500 group-hover:underline">
                           {payment.user.email}
                         </span>
-                      </div>
+                      </.link>
                     <% else %>
                       <span class="text-xs text-zinc-400">System</span>
                     <% end %>
@@ -2628,9 +2711,13 @@ defmodule YscWeb.AdminMoneyLive do
                     {Money.to_string!(payment.amount)}
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
-                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                      {payment.status}
-                    </span>
+                    <.badge type={
+                      AdminBadgeHelpers.ledger_payment_status_badge_type(
+                        payment.status
+                      )
+                    }>
+                      {String.capitalize(to_string(payment.status))}
+                    </.badge>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <.admin_quickbooks_sync_status
@@ -2718,14 +2805,17 @@ defmodule YscWeb.AdminMoneyLive do
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <%= if Ecto.assoc_loaded?(refund.user) && refund.user do %>
-                      <div class="flex flex-col">
-                        <span class="text-xs font-medium">
+                      <.link
+                        navigate={~p"/admin/users/#{refund.user.id}/details"}
+                        class="flex flex-col group"
+                      >
+                        <span class="text-xs font-medium text-blue-600 group-hover:underline">
                           {get_user_display_name(refund.user)}
                         </span>
-                        <span class="text-xs text-zinc-500">
+                        <span class="text-xs text-zinc-500 group-hover:underline">
                           {refund.user.email}
                         </span>
-                      </div>
+                      </.link>
                     <% else %>
                       <span class="text-xs text-zinc-400">System</span>
                     <% end %>
@@ -2739,9 +2829,13 @@ defmodule YscWeb.AdminMoneyLive do
                     </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
-                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                      {refund.status}
-                    </span>
+                    <.badge type={
+                      AdminBadgeHelpers.ledger_payment_status_badge_type(
+                        refund.status
+                      )
+                    }>
+                      {String.capitalize(to_string(refund.status))}
+                    </.badge>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <.admin_quickbooks_sync_status
@@ -2858,13 +2952,11 @@ defmodule YscWeb.AdminMoneyLive do
                 </span>
               </span>
               <%= if payout_reconciles? do %>
-                <span class="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
-                  Reconciled ✓
-                </span>
+                <.badge type="green">Reconciled ✓</.badge>
               <% else %>
-                <span class="text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded">
+                <.badge type="red">
                   Mismatch — some charges may not be linked yet
-                </span>
+                </.badge>
               <% end %>
             </div>
           </div>
@@ -2911,9 +3003,13 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Status</p>
-              <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if @selected_payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
+              <.badge type={
+                AdminBadgeHelpers.ledger_payment_status_badge_type(
+                  @selected_payment.status
+                )
+              }>
                 {String.capitalize(to_string(@selected_payment.status || "unknown"))}
-              </span>
+              </.badge>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Amount</p>
@@ -2935,14 +3031,17 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="text-sm font-medium text-zinc-700">User</p>
               <p class="text-sm text-zinc-900">
                 <%= if Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user do %>
-                  <div class="flex flex-col">
-                    <span class="font-medium">
+                  <.link
+                    navigate={~p"/admin/users/#{@selected_payment.user.id}/details"}
+                    class="flex flex-col group"
+                  >
+                    <span class="font-medium text-blue-600 group-hover:underline">
                       {get_user_display_name(@selected_payment.user)}
                     </span>
-                    <span class="text-xs text-zinc-500">
+                    <span class="text-xs text-zinc-500 group-hover:underline">
                       {@selected_payment.user.email}
                     </span>
-                  </div>
+                  </.link>
                 <% else %>
                   <span class="text-zinc-400">System</span>
                 <% end %>
@@ -2967,9 +3066,24 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div :if={@selected_payment.external_payment_id}>
               <p class="text-sm font-medium text-zinc-700">Stripe Payment ID</p>
-              <p class="text-sm text-zinc-900 font-mono text-xs">
-                {String.slice(@selected_payment.external_payment_id, 0..20)}...
-              </p>
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <a
+                  href={"https://dashboard.stripe.com/payments/#{@selected_payment.external_payment_id}"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs text-zinc-900 hover:text-blue-600 font-mono transition-colors underline decoration-dotted break-all min-w-0"
+                  title="View in Stripe Dashboard"
+                >
+                  {@selected_payment.external_payment_id}
+                </a>
+                <.admin_clipboard_button
+                  id={"copy-stripe-payment-#{@selected_payment.id}"}
+                  variant={:icon}
+                  copy={@selected_payment.external_payment_id}
+                  title="Copy Stripe Payment ID"
+                  aria_label="Copy Stripe Payment ID"
+                />
+              </div>
             </div>
           </div>
           <!-- QuickBooks Information -->
@@ -3134,9 +3248,13 @@ defmodule YscWeb.AdminMoneyLive do
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
-                      <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
+                      <.badge type={
+                        AdminBadgeHelpers.ledger_payment_status_badge_type(
+                          refund.status
+                        )
+                      }>
                         {String.capitalize(to_string(refund.status || "unknown"))}
-                      </span>
+                      </.badge>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
                       <.admin_quickbooks_sync_status
@@ -3252,6 +3370,7 @@ defmodule YscWeb.AdminMoneyLive do
         :if={@show_expense_report_modal && @selected_expense_report}
         id="expense-report-modal"
         show
+        on_cancel={JS.push("close_expense_report_modal")}
       >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">
           Expense Report Details
@@ -3274,7 +3393,14 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="font-medium text-zinc-700">User</p>
               <p class="text-zinc-900">
                 <%= if Ecto.assoc_loaded?(@selected_expense_report.user) && @selected_expense_report.user do %>
-                  {get_user_display_name(@selected_expense_report.user)} ({@selected_expense_report.user.email})
+                  <.link
+                    navigate={
+                      ~p"/admin/users/#{@selected_expense_report.user.id}/details"
+                    }
+                    class="text-blue-600 hover:underline"
+                  >
+                    {get_user_display_name(@selected_expense_report.user)} ({@selected_expense_report.user.email})
+                  </.link>
                 <% else %>
                   <span class="text-zinc-400">Unknown</span>
                 <% end %>
@@ -3804,16 +3930,6 @@ defmodule YscWeb.AdminMoneyLive do
   defp get_debit_credit_amount_color(:debit), do: "text-purple-700"
   defp get_debit_credit_amount_color(:credit), do: "text-blue-700"
   defp get_debit_credit_amount_color(_), do: "text-zinc-900"
-
-  defp get_payout_status_color(status) do
-    case String.downcase(to_string(status || "")) do
-      "paid" -> "bg-green-100 text-green-800"
-      "pending" -> "bg-yellow-100 text-yellow-800"
-      "failed" -> "bg-red-100 text-red-800"
-      "canceled" -> "bg-zinc-100 text-zinc-800"
-      _ -> "bg-zinc-100 text-zinc-800"
-    end
-  end
 
   defp parse_amount_string(amount_str) when is_binary(amount_str) do
     # Try parsing as decimal first

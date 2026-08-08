@@ -42,6 +42,65 @@ defmodule Ysc.ExpenseReports do
     |> List.first()
   end
 
+  @doc """
+  List all expense reports for an event, newest first, with items and
+  submitter preloaded.
+  """
+  def list_expense_reports_for_event(event_id) do
+    from(er in ExpenseReport,
+      where: er.event_id == ^event_id,
+      order_by: [desc: :inserted_at],
+      preload: [:expense_items, :income_items, :user]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Total net cost (expenses minus income) of an event's expense reports.
+
+  Only reports in `statuses` (default `approved` and `paid`) are counted, so
+  drafts, pending submissions, and rejected reports don't inflate cost totals.
+  """
+  def total_for_event(event_id, statuses \\ ["approved", "paid"]) do
+    totals_for_event(event_id, statuses).net_total
+  end
+
+  @doc """
+  Aggregate expense, income, and net totals across an event's expense
+  reports, so callers can show gross costs and other income (e.g. cash
+  collected at the door) as separate line items rather than only a netted
+  figure.
+
+  Only reports in `statuses` (default `approved` and `paid`) are counted.
+  """
+  def totals_for_event(event_id, statuses \\ ["approved", "paid"]) do
+    zero = Money.new(0, :USD)
+
+    event_id
+    |> list_expense_reports_for_event()
+    |> Enum.filter(&(&1.status in statuses))
+    |> Enum.reduce(
+      %{expense_total: zero, income_total: zero, net_total: zero},
+      fn report, acc ->
+        report_totals = calculate_totals(report)
+
+        %{
+          expense_total:
+            money_sum(acc.expense_total, report_totals.expense_total),
+          income_total: money_sum(acc.income_total, report_totals.income_total),
+          net_total: money_sum(acc.net_total, report_totals.net_total)
+        }
+      end
+    )
+  end
+
+  defp money_sum(%Money{} = a, %Money{} = b) do
+    case Money.add(a, b) do
+      {:ok, sum} -> sum
+      _ -> a
+    end
+  end
+
   defp expense_reports_query(user_id) do
     from er in ExpenseReport,
       where: er.user_id == ^user_id,
@@ -291,12 +350,56 @@ defmodule Ysc.ExpenseReports do
   @doc """
   Marks an expense report as paid.
 
-  This is called when a payment is initiated in QuickBooks (via webhook).
+  This is called when a payment is confirmed in QuickBooks (via webhook).
   """
   def mark_expense_report_as_paid(%ExpenseReport{} = expense_report) do
     expense_report
-    |> ExpenseReport.changeset(%{status: "paid"})
+    |> ExpenseReport.status_changeset(%{status: "paid"})
     |> Repo.update()
+  end
+
+  @doc """
+  Marks an expense report as rejected because its linked QuickBooks Bill was
+  deleted or voided in QuickBooks.
+
+  This is distinct from an admin rejection (`update_expense_report/2` via
+  `status_changeset`): it stamps `quickbooks_sync_error` with a
+  system-generated note so anyone looking at a "rejected" report can tell
+  whether a human rejected it or QuickBooks did, since the two mean very
+  different things for follow-up.
+  """
+  def mark_expense_report_as_rejected_due_to_quickbooks_deletion(
+        %ExpenseReport{} = expense_report,
+        bill_id
+      ) do
+    note =
+      "Automatically rejected: linked QuickBooks Bill #{bill_id} was deleted or voided in QuickBooks (detected #{DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()})."
+
+    expense_report
+    |> ExpenseReport.status_changeset(%{
+      status: "rejected",
+      quickbooks_sync_error: note
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets an expense report by its QuickBooks Bill ID.
+
+  Pass `lock: true` to select the row `FOR UPDATE` - callers that read the
+  report and then conditionally write a new status based on it (e.g. the
+  QuickBooks BillPayment and Bill-deletion webhook workers) should do so
+  inside a `Repo.transaction/1` with `lock: true` to serialize concurrent
+  webhook processing for the same report and avoid racing status updates.
+  """
+  def get_expense_report_by_quickbooks_bill_id(bill_id, opts \\ []) do
+    query = from(er in ExpenseReport, where: er.quickbooks_bill_id == ^bill_id)
+    query = if opts[:lock], do: lock(query, "FOR UPDATE"), else: query
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      expense_report -> {:ok, expense_report}
+    end
   end
 
   def submit_expense_report(%ExpenseReport{} = expense_report) do

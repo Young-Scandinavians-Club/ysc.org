@@ -1,9 +1,9 @@
 defmodule Ysc.ExpenseReports.Scheduler do
   @moduledoc """
-  Schedules expense report QuickBooks sync jobs on startup.
+  Schedules expense report QuickBooks sync jobs.
 
-  This module ensures that the expense report backup sync worker runs on application
-  startup to catch any expense reports that need to be synced to QuickBooks.
+  The recurring schedule is handled by Oban's Cron plugin (configured in config.exs)
+  to run every 6 hours. This module provides a way to manually trigger an immediate sync.
   """
 
   alias YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker
@@ -11,15 +11,17 @@ defmodule Ysc.ExpenseReports.Scheduler do
   @doc """
   Starts the expense report sync scheduler.
   This should be called during application startup.
+
+  Note: Recurring jobs are handled by Oban's Cron plugin (every 6 hours).
+  No immediate job is scheduled on boot - the next cron tick covers it.
   """
   def start_scheduler do
     require Ysc.Logging
 
     Ysc.Logging.info(
-      "Expense report QuickBooks sync scheduler initialized - enqueueing initial sync job"
+      "Expense report QuickBooks sync scheduler initialized - recurring jobs handled by Oban.Cron (every 6 hours)"
     )
 
-    schedule_immediate_sync()
     :ok
   end
 

@@ -6,6 +6,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.AuthEvent
+  alias Ysc.Newsletter
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -1015,6 +1016,154 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       refute has_element?(view, "section", "Rejection notes")
 
       _ = application
+    end
+  end
+
+  describe "soft-delete confirmation" do
+    test "saving deleted state shows confirm modal and does not persist yet", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "deleted",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      assert has_element?(view, "#confirm-delete-user-modal")
+      assert has_element?(view, "#confirm-delete-user-button")
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :active
+    end
+
+    test "confirming delete soft-deletes the user", %{conn: conn} do
+      user = user_fixture(%{state: :active})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "deleted",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      render_click(view, "confirm_delete_user")
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :deleted
+      refute has_element?(view, "#confirm-delete-user-modal")
+    end
+
+    test "cancelling delete dismisses modal and leaves user unchanged", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "state" => "deleted",
+          "billing_address" => %{
+            "address" => "",
+            "city" => "",
+            "region" => "",
+            "postal_code" => "",
+            "country" => ""
+          }
+        }
+      })
+      |> render_submit()
+
+      render_click(view, "cancel_delete_user")
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.state == :active
+      refute has_element?(view, "#confirm-delete-user-modal")
+    end
+  end
+
+  describe "admin notification preferences" do
+    test "notifications tab shows preferences form collapsed by default", %{
+      conn: conn
+    } do
+      user = user_fixture()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/notifications")
+
+      render_async(view)
+
+      assert has_element?(view, "details#admin-user-notification-preferences")
+
+      refute has_element?(
+               view,
+               "details#admin-user-notification-preferences[open]"
+             )
+
+      assert has_element?(view, "#admin-notification-form")
+    end
+
+    test "admin can update notification preferences and newsletter sync", %{
+      conn: conn
+    } do
+      user =
+        user_fixture(%{
+          event_notifications: true,
+          event_notifications_sms: true,
+          account_notifications_sms: true
+        })
+
+      Newsletter.sync_user_preference(user, newsletter_subscribed: true)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/notifications")
+
+      render_async(view)
+
+      view
+      |> form("#admin-notification-form", %{
+        "user" => %{
+          "newsletter_notifications" => "false",
+          "event_notifications" => "false",
+          "event_notifications_sms" => "false",
+          "account_notifications_sms" => "false",
+          "account_notifications" => "true"
+        }
+      })
+      |> render_submit()
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      refute updated.event_notifications
+      refute updated.event_notifications_sms
+      refute updated.account_notifications_sms
+
+      sub = Newsletter.get_subscriber_by_email(user.email)
+      assert sub != nil
+      refute sub.subscribed
     end
   end
 

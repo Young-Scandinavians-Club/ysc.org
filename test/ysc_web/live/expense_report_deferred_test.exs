@@ -36,7 +36,8 @@ defmodule YscWeb.ExpenseReportDeferredTest do
           |> get(~p"/expensereport/#{report.id}/success")
           |> html_response(200)
         end,
-        pattern: expense_reports_pattern
+        pattern: expense_reports_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0

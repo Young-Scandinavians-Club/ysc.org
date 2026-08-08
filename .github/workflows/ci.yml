@@ -74,6 +74,7 @@ jobs:
               mc alias set local http://127.0.0.1:9000 minioadmin minioadmin &&
               mc mb local/media --ignore-existing &&
               mc mb local/expense-reports --ignore-existing &&
+              mc mb local/app-resources --ignore-existing &&
               mc mb local/avatars --ignore-existing &&
               mc anonymous set public local/media &&
               mc anonymous set public local/avatars

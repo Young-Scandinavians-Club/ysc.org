@@ -58,6 +58,37 @@ defmodule YscWeb.SEOTest do
     end
   end
 
+  describe "og_image_or_default/1" do
+    test "falls back to the YSC logo" do
+      assert SEO.og_image_or_default(nil) == SEO.default_og_image_url()
+      assert SEO.og_image_or_default("") == SEO.default_og_image_url()
+      assert SEO.og_image_or_default("   ") == SEO.default_og_image_url()
+
+      assert SEO.og_image_or_default("https://cdn.example.com/cover.jpg") ==
+               "https://cdn.example.com/cover.jpg"
+    end
+  end
+
+  describe "twitter_card_for_image/1" do
+    test "uses summary for missing or default logo images" do
+      assert SEO.twitter_card_for_image(SEO.og_image_or_default(nil)) ==
+               "summary"
+
+      assert SEO.twitter_card_for_image(SEO.og_image_or_default("")) ==
+               "summary"
+
+      assert SEO.twitter_card_for_image(SEO.og_image_or_default("   ")) ==
+               "summary"
+
+      assert SEO.twitter_card_for_image(SEO.default_og_image_url()) == "summary"
+    end
+
+    test "uses summary_large_image for custom photos" do
+      assert SEO.twitter_card_for_image("https://cdn.example.com/cover.jpg") ==
+               "summary_large_image"
+    end
+  end
+
   describe "assigns_for_post/1" do
     test "uses title, truncated plain-text description, featured image, and canonical URL" do
       author = user_fixture()
@@ -103,7 +134,7 @@ defmodule YscWeb.SEOTest do
                YscWeb.Endpoint.url() <> "/uploads/post_opt.jpg"
     end
 
-    test "falls back to default image and description when missing" do
+    test "falls back to YSC logo and description when missing" do
       author = user_fixture()
 
       {:ok, post} =
@@ -125,8 +156,8 @@ defmodule YscWeb.SEOTest do
 
       assert seo.meta_description =~ "Young Scandinavians Club news feed"
 
-      assert seo.og_image ==
-               YscWeb.Endpoint.url() <> SEO.default_og_image_path()
+      assert seo.og_image == SEO.default_og_image_url()
+      assert SEO.default_og_image_path() == "/images/ysc_logo.webp"
     end
   end
 

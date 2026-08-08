@@ -2,9 +2,10 @@ defmodule YscWeb.EventsListLive do
   use YscWeb, :live_component
 
   alias Ysc.Events
-  alias Ysc.Events.DateTimeFormatter
+  alias Ysc.Events.{DateTimeFormatter, TicketTierHelpers}
   alias Ysc.Media.Image
   alias Money
+  alias YscWeb.DateDisplay
   alias YscWeb.PlainText
 
   @impl true
@@ -91,7 +92,36 @@ defmodule YscWeb.EventsListLive do
                 <div class="max-w-3xl">
                   <%!-- Status badges (both mobile and desktop) --%>
                   <div class="flex flex-wrap items-center gap-2 mb-4">
-                    <span class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate">
+                    <% hero_cancelled? =
+                      (Map.get(@hero_event, :state) || Map.get(@hero_event, "state")) in [
+                        :cancelled,
+                        "cancelled"
+                      ] %>
+                    <% hero_day_label =
+                      unless hero_cancelled?,
+                        do: DateDisplay.event_day_label(@hero_event) %>
+                    <span
+                      :if={hero_day_label == :today}
+                      class="px-3 py-1.5 bg-red-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400 animate-pulse"
+                    >
+                      <.icon
+                        name="hero-bolt-solid"
+                        class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                      />Happening Today
+                    </span>
+                    <span
+                      :if={hero_day_label == :tomorrow}
+                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400 animate-badge-shine-orange"
+                    >
+                      <.icon
+                        name="hero-calendar-solid"
+                        class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                      />Happening Tomorrow
+                    </span>
+                    <span
+                      :if={hero_day_label == nil && !hero_cancelled?}
+                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate"
+                    >
                       <.icon
                         name="hero-calendar-solid"
                         class="w-3.5 h-3.5 inline me-0.5 relative z-10"
@@ -499,10 +529,7 @@ defmodule YscWeb.EventsListLive do
 
     # Filter out donation tiers - donations don't count toward "sold out" status
     non_donation_tiers =
-      Enum.filter(ticket_tiers, fn tier ->
-        tier_type = Map.get(tier, :type) || Map.get(tier, "type")
-        tier_type != "donation" && tier_type != :donation
-      end)
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     # If there are no non-donation tiers, event is not sold out
     if Enum.empty?(non_donation_tiers) do
@@ -514,7 +541,8 @@ defmodule YscWeb.EventsListLive do
         Enum.filter(non_donation_tiers, fn tier ->
           # Include tiers that are on sale OR have ended their sale
           # Exclude tiers that haven't started their sale yet (pre-sale)
-          tier_on_sale?(tier, now) || tier_sale_ended?(tier, now)
+          TicketTierHelpers.tier_on_sale?(tier, now) ||
+            TicketTierHelpers.tier_sale_ended?(tier, now)
         end)
 
       # If there are no relevant tiers (all are pre-sale), event is not sold out
@@ -549,40 +577,6 @@ defmodule YscWeb.EventsListLive do
 
         all_tiers_sold_out || event_at_capacity
       end
-    end
-  end
-
-  defp tier_on_sale?(ticket_tier, now) do
-    start_date =
-      Map.get(ticket_tier, :start_date) || Map.get(ticket_tier, "start_date")
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    # Check if sale has started
-    sale_started =
-      case start_date do
-        nil -> true
-        sd -> DateTime.compare(now, sd) != :lt
-      end
-
-    # Check if sale has ended
-    sale_ended =
-      case end_date do
-        nil -> false
-        ed -> DateTime.compare(now, ed) == :gt
-      end
-
-    sale_started && !sale_ended
-  end
-
-  defp tier_sale_ended?(ticket_tier, now) do
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    case end_date do
-      nil -> false
-      ed -> DateTime.compare(now, ed) == :gt
     end
   end
 

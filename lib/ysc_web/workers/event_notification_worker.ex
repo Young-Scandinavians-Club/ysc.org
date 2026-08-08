@@ -6,7 +6,17 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   Only sends if the event is still published at that time.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :bulk_mail, max_attempts: 3
+
+  use Oban.Worker,
+    queue: :bulk_mail,
+    max_attempts: 3,
+    unique: [
+      fields: [:args],
+      keys: [:event_id],
+      states: :incomplete,
+      period: :infinity
+    ],
+    replace: [scheduled: [:scheduled_at]]
 
   alias Ysc.Events
   alias Ysc.Repo
@@ -31,38 +41,61 @@ defmodule YscWeb.Workers.EventNotificationWorker do
 
         :ok
 
+      %Event{notification_sent_at: sent_at} when not is_nil(sent_at) ->
+        Ysc.Logging.info("Event notifications already sent, skipping",
+          event_id: event_id
+        )
+
+        :ok
+
       event ->
-        # Only send if event is still published
-        if event.state == "published" or event.state == :published do
-          # Only send if event date is in the future (not retroactive)
-          if EventDateTime.in_future?(event) do
-            send_event_notifications(event)
-          else
-            Ysc.Logging.info(
-              "Event is retroactive (past date), skipping notifications",
-              event_id: event_id,
-              start_date: event.start_date,
-              start_time: event.start_time
-            )
-
-            :ok
-          end
-        else
-          Ysc.Logging.info(
-            "Event is no longer published, skipping notifications",
-            event_id: event_id,
-            state: event.state
-          )
-
-          :ok
-        end
+        send_event_notifications(event)
     end
   end
 
   @doc """
   Send event notification emails to all users with event notifications enabled.
+
+  Guards against already-sent, unpublished, and retroactive (past-date) events itself
+  — not just via `perform/1` — so a direct call (e.g. from a console) can't bypass
+  those checks the way a scheduled job would.
   """
-  def send_event_notifications(event) do
+  def send_event_notifications(%Event{} = event) do
+    require Ysc.Logging
+
+    cond do
+      not is_nil(event.notification_sent_at) ->
+        Ysc.Logging.info("Event notifications already sent, skipping",
+          event_id: event.id
+        )
+
+        :ok
+
+      event.state not in [:published, "published"] ->
+        Ysc.Logging.info(
+          "Event is no longer published, skipping notifications",
+          event_id: event.id,
+          state: event.state
+        )
+
+        :ok
+
+      not EventDateTime.in_future?(event) ->
+        Ysc.Logging.info(
+          "Event is retroactive (past date), skipping notifications",
+          event_id: event.id,
+          start_date: event.start_date,
+          start_time: event.start_time
+        )
+
+        :ok
+
+      true ->
+        do_send_event_notifications(event)
+    end
+  end
+
+  defp do_send_event_notifications(event) do
     require Ysc.Logging
 
     try do
@@ -180,74 +213,53 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   @doc """
   Schedules event notification emails for all users with event notifications enabled.
 
-  The emails will be sent 1 hour after the event is published.
+  The emails will be sent 1 hour after the event is published. Safe to call again
+  for the same event (e.g. after the admin edits event dates before the job has
+  fired) — any previously scheduled job for this event is cancelled first, and a
+  fresh one is always inserted via Oban rather than sent synchronously inline, so
+  callers (like the admin editor's autosave) are never blocked on a mass email
+  send. `perform/1` re-checks published state and future-ness at send time.
   """
   def schedule_notifications(event_id, published_at) do
     require Ysc.Logging
 
-    # Calculate 1 hour after publish time
+    cancel_pending_jobs(event_id)
+
     notification_datetime = DateTime.add(published_at, 3600, :second)
 
-    now = DateTime.utc_now()
+    case %{"event_id" => event_id}
+         |> new(scheduled_at: notification_datetime)
+         |> Oban.insert() do
+      {:ok, _job} ->
+        Ysc.Logging.info("Scheduled event notification emails",
+          event_id: event_id,
+          published_at: published_at,
+          scheduled_at: notification_datetime
+        )
 
-    # Check if the scheduled time is in the future
-    if DateTime.compare(notification_datetime, now) == :gt do
-      # Schedule for 1 hour after publish
-      %{
-        "event_id" => event_id
-      }
-      |> new(scheduled_at: notification_datetime)
-      |> Oban.insert()
+        :ok
 
-      Ysc.Logging.info("Scheduled event notification emails",
-        event_id: event_id,
-        published_at: published_at,
-        scheduled_at: notification_datetime
-      )
-    else
-      # If 1 hour has already passed, send immediately
-      Ysc.Logging.info(
-        "1 hour has already passed since publish, sending notifications immediately",
-        event_id: event_id,
-        published_at: published_at
-      )
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to schedule event notification emails",
+          event_id: event_id,
+          error: inspect(reason)
+        )
 
-      # Load event and send emails immediately
-      case Repo.get(Event, event_id)
-           |> Repo.preload([:organizer, :cover_image]) do
-        nil ->
-          Ysc.Logging.warning("Event not found for immediate notification",
-            event_id: event_id
-          )
-
-          :ok
-
-        event ->
-          # Only send if event is still published
-          if event.state == "published" or event.state == :published do
-            # Only send if event date is in the future (not retroactive)
-            if EventDateTime.in_future?(event) do
-              send_event_notifications(event)
-            else
-              Ysc.Logging.info(
-                "Event is retroactive (past date), skipping immediate notification",
-                event_id: event_id,
-                start_date: event.start_date,
-                start_time: event.start_time
-              )
-
-              :ok
-            end
-          else
-            Ysc.Logging.info(
-              "Event is not published, skipping immediate notification",
-              event_id: event_id,
-              state: event.state
-            )
-
-            :ok
-          end
-      end
+        {:error, reason}
     end
+  end
+
+  defp cancel_pending_jobs(event_id) do
+    from(j in Oban.Job,
+      where: j.worker == "YscWeb.Workers.EventNotificationWorker",
+      where: fragment("?->>'event_id' = ?", j.args, ^event_id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Repo.update_all(
+      set: [
+        state: "cancelled",
+        cancelled_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      ]
+    )
   end
 end

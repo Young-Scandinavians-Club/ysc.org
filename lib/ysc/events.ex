@@ -21,6 +21,88 @@ defmodule Ysc.Events do
   alias Ysc.Accounts.User
   alias Ysc.StaffPreview
 
+  @max_sales_chart_days 120
+
+  # Timezone used to evaluate when an event should leave "upcoming" lists
+  # (public events page and admin Upcoming/Past tabs). Events with an explicit
+  # end date/time use it. Events with only a start time use that cutoff;
+  # date-only events receive a one-day grace period.
+  @event_timezone "America/Los_Angeles"
+
+  # Whether an event should still be treated as "upcoming": true until the
+  # end date/time passes (falling back to the start date/time, then to a
+  # day-after grace period, when no explicit end or time is set).
+  defp event_upcoming_dynamic do
+    dynamic(
+      [e],
+      fragment(
+        """
+        CASE
+          WHEN ? IS NOT NULL AND ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          ELSE
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+        END > ?
+        """,
+        e.end_date,
+        e.end_time,
+        e.end_date,
+        e.end_time,
+        ^@event_timezone,
+        e.end_date,
+        e.end_date,
+        ^@event_timezone,
+        e.start_time,
+        e.start_date,
+        e.start_time,
+        ^@event_timezone,
+        e.start_date,
+        ^@event_timezone,
+        ^DateTime.utc_now()
+      )
+    )
+  end
+
+  # Inverse of `event_upcoming_dynamic/0`, for the "past events" list.
+  defp event_past_dynamic do
+    dynamic(
+      [e],
+      fragment(
+        """
+        CASE
+          WHEN ? IS NOT NULL AND ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          ELSE
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+        END <= ?
+        """,
+        e.end_date,
+        e.end_time,
+        e.end_date,
+        e.end_time,
+        ^@event_timezone,
+        e.end_date,
+        e.end_date,
+        ^@event_timezone,
+        e.start_time,
+        e.start_date,
+        e.start_time,
+        ^@event_timezone,
+        e.start_date,
+        ^@event_timezone,
+        ^DateTime.utc_now()
+      )
+    )
+  end
+
   def subscribe() do
     Phoenix.PubSub.subscribe(Ysc.PubSub, topic())
   end
@@ -198,11 +280,9 @@ defmodule Ysc.Events do
   end
 
   defp maybe_filter_tab(query, :upcoming) do
-    now = DateTime.utc_now()
-
     query
     |> where([e], e.state not in ["draft"])
-    |> where([e], e.start_date > ^now)
+    |> where(^event_upcoming_dynamic())
   end
 
   defp maybe_filter_tab(query, :drafts) do
@@ -210,11 +290,9 @@ defmodule Ysc.Events do
   end
 
   defp maybe_filter_tab(query, :past) do
-    now = DateTime.utc_now()
-
     query
     |> where([e], e.state not in ["draft"])
-    |> where([e], e.start_date <= ^now)
+    |> where(^event_past_dynamic())
   end
 
   defp maybe_filter_tab(query, _), do: query
@@ -619,7 +697,7 @@ defmodule Ysc.Events do
   def update_event_editor(%Event{} = event, attrs) do
     event
     |> Event.editor_changeset(attrs)
-    |> Repo.update()
+    |> Repo.update(stale_error_field: :lock_version)
     |> finalize_event_update()
   end
 
@@ -629,6 +707,7 @@ defmodule Ysc.Events do
         invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
         maybe_reschedule_event_photo_reminder(event)
+        maybe_reschedule_event_notification(event)
         {:ok, event}
 
       {:error, changeset} ->
@@ -672,7 +751,7 @@ defmodule Ysc.Events do
 
   def count_upcoming_events_from_db do
     from(e in Event,
-      where: e.start_date > ^DateTime.utc_now(),
+      where: ^event_upcoming_dynamic(),
       where: e.state in [:published, :cancelled]
     )
     |> Repo.aggregate(:count, :id)
@@ -685,7 +764,7 @@ defmodule Ysc.Events do
   def has_more_past_events?(limit) do
     # Count events and check if there are more than the limit
     from(e in Event,
-      where: e.start_date <= ^DateTime.utc_now(),
+      where: ^event_past_dynamic(),
       where: e.state in [:published, :cancelled],
       select: count(e.id)
     )
@@ -705,7 +784,7 @@ defmodule Ysc.Events do
 
     events =
       from(e in Event,
-        where: e.start_date > ^DateTime.utc_now(),
+        where: ^event_upcoming_dynamic(),
         where: e.state in [:published, :cancelled],
         left_join: t in Ticket,
         on:
@@ -916,7 +995,7 @@ defmodule Ysc.Events do
 
     events =
       from(e in Event,
-        where: e.start_date <= ^DateTime.utc_now(),
+        where: ^event_past_dynamic(),
         where: e.state in [:published, :cancelled],
         left_join: t in Ticket,
         on:
@@ -1366,6 +1445,19 @@ defmodule Ysc.Events do
   end
 
   defp maybe_reschedule_event_photo_reminder(_event), do: :ok
+
+  defp maybe_reschedule_event_notification(
+         %Event{state: state, published_at: published_at} = event
+       )
+       when state in [:published, "published"] and not is_nil(published_at) do
+    if is_nil(event.notification_sent_at) do
+      schedule_event_notifications(event, published_at)
+    end
+
+    :ok
+  end
+
+  defp maybe_reschedule_event_notification(_event), do: :ok
 
   def unpublish_event(%Event{} = event) do
     event
@@ -2005,6 +2097,212 @@ defmodule Ysc.Events do
       |> Map.put(:total_amount, total_amount)
       |> Map.delete(:ticket_tier_price)
     end)
+  end
+
+  @doc """
+  Get ticket sales revenue for an event, broken down by ticket tier.
+
+  Only counts confirmed tickets on non-donation tiers, net of any per-ticket
+  discount. Donation tiers are excluded: their amount is user-entered at
+  checkout rather than `ticket_tier.price` (which is typically `nil` for
+  donations), so they can't be priced this way — see
+  `get_event_donations_total/1` for the correct way to total donations.
+  Returns a map with `:by_tier` (one entry per tier with tickets sold and
+  revenue), plus `:total_revenue` and `:total_tickets_sold` across all tiers.
+  """
+  def get_event_sales_stats(event_id) do
+    rows =
+      from(t in Ticket,
+        join: tt in assoc(t, :ticket_tier),
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        group_by: [tt.id, tt.name, tt.price],
+        select: %{
+          ticket_tier_id: tt.id,
+          ticket_tier_name: tt.name,
+          ticket_tier_price: tt.price,
+          tickets_sold: count(t.id),
+          discount_total: sum(fragment("(?.discount_amount).amount", t))
+        },
+        order_by: [asc: tt.name]
+      )
+      |> Repo.all()
+
+    by_tier =
+      Enum.map(rows, fn row ->
+        {:ok, gross} = Money.mult(row.ticket_tier_price, row.tickets_sold)
+        discount = Ysc.MoneyHelper.usd_from_db_sum(row.discount_total)
+        revenue = money_sub_floor_zero(gross, discount)
+
+        %{
+          ticket_tier_id: row.ticket_tier_id,
+          name: row.ticket_tier_name,
+          tickets_sold: row.tickets_sold,
+          revenue: revenue
+        }
+      end)
+
+    %{
+      by_tier: by_tier,
+      total_revenue:
+        Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
+      total_tickets_sold: Enum.reduce(by_tier, 0, &(&1.tickets_sold + &2))
+    }
+  end
+
+  @doc """
+  Get daily ticket sales (net revenue and ticket count) for an event, ordered
+  oldest to newest. Only counts confirmed tickets on non-donation tiers (see
+  `get_event_sales_stats/1` for why donation tiers are excluded).
+
+  When the event's ticket tiers have a sale window (see
+  `get_event_ticket_sale_window/1`) and that window spans no more than
+  #{@max_sales_chart_days} days, the result is zero-filled across the whole
+  window so gaps in sales are visible rather than skipped. Otherwise only days
+  with actual sales are returned.
+  """
+  def get_event_sales_over_time(event_id) do
+    points =
+      from(t in Ticket,
+        join: tt in assoc(t, :ticket_tier),
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        group_by: [
+          fragment("date_trunc('day', ?)", t.inserted_at),
+          tt.id,
+          tt.name
+        ],
+        select: %{
+          date: fragment("date_trunc('day', ?)", t.inserted_at),
+          ticket_tier_id: tt.id,
+          ticket_tier_name: tt.name,
+          tickets_sold: count(t.id),
+          gross: sum(fragment("(?.price).amount", tt)),
+          discount_total: sum(fragment("(?.discount_amount).amount", t))
+        },
+        order_by: fragment("date_trunc('day', ?)", t.inserted_at)
+      )
+      |> Repo.all()
+      |> Enum.group_by(&NaiveDateTime.to_date(&1.date))
+      |> Enum.map(fn {date, tier_rows} ->
+        by_tier =
+          Enum.map(tier_rows, fn row ->
+            gross = Ysc.MoneyHelper.usd_from_db_sum(row.gross)
+            discount = Ysc.MoneyHelper.usd_from_db_sum(row.discount_total)
+
+            %{
+              ticket_tier_id: row.ticket_tier_id,
+              name: row.ticket_tier_name,
+              tickets_sold: row.tickets_sold,
+              revenue: money_sub_floor_zero(gross, discount)
+            }
+          end)
+
+        %{
+          date: date,
+          tickets_sold: Enum.reduce(by_tier, 0, &(&1.tickets_sold + &2)),
+          revenue:
+            Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
+          by_tier: by_tier
+        }
+      end)
+      |> Enum.sort_by(& &1.date, Date)
+
+    fill_sales_timeline(points, get_event_ticket_sale_window(event_id))
+  end
+
+  @doc """
+  The overall ticket sale window for an event: the earliest ticket tier
+  `start_date` and latest `end_date` across all its ticket tiers. Either value
+  is `nil` when no tier sets a sale window.
+  """
+  def get_event_ticket_sale_window(event_id) do
+    from(tt in TicketTier,
+      where: tt.event_id == ^event_id,
+      select: %{start_date: min(tt.start_date), end_date: max(tt.end_date)}
+    )
+    |> Repo.one() || %{start_date: nil, end_date: nil}
+  end
+
+  defp fill_sales_timeline(rows, window) do
+    window_dates =
+      [window.start_date, window.end_date]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&DateTime.to_date/1)
+
+    case window_dates ++ Enum.map(rows, & &1.date) do
+      [] ->
+        []
+
+      dates ->
+        first_date = Enum.min(dates, Date)
+        last_date = Enum.max(dates, Date)
+        span_days = Date.diff(last_date, first_date)
+
+        if span_days > 0 and span_days <= @max_sales_chart_days do
+          revenue_by_date = Map.new(rows, &{&1.date, &1})
+
+          Date.range(first_date, last_date)
+          |> Enum.map(fn date ->
+            Map.get(revenue_by_date, date, %{
+              date: date,
+              tickets_sold: 0,
+              revenue: Money.new(0, :USD),
+              by_tier: []
+            })
+          end)
+        else
+          rows
+        end
+    end
+  end
+
+  @doc """
+  Total Stripe processing fees booked against this event's confirmed ticket
+  payments.
+  """
+  def get_event_stripe_fees_total(event_id) do
+    payment_ids =
+      from(t in Ticket,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            not is_nil(t.payment_id),
+        distinct: true,
+        select: t.payment_id
+      )
+      |> Repo.all()
+
+    Ysc.Ledgers.sum_stripe_fees_for_payments(payment_ids)
+  end
+
+  @doc """
+  Total collected via this event's donation ticket tiers.
+
+  Donations are treated as a bonus to the club as a whole, not event revenue,
+  so this is reported separately from `get_event_sales_stats/1` and is not
+  included in ticket sales totals.
+  """
+  def get_event_donations_total(event_id) do
+    Ysc.Ledgers.sum_donation_revenue_for_event(event_id)
+  end
+
+  defp money_add(%Money{} = a, %Money{} = b) do
+    case Money.add(a, b) do
+      {:ok, sum} -> sum
+      _ -> a
+    end
+  end
+
+  defp money_sub_floor_zero(%Money{} = a, %Money{} = b) do
+    case Money.sub(a, b) do
+      {:ok, diff} ->
+        if Money.negative?(diff), do: Money.new(0, :USD), else: diff
+
+      _ ->
+        a
+    end
   end
 
   @doc """
@@ -2984,17 +3282,19 @@ defmodule Ysc.Events do
   Creates an event update and enqueues the notification worker.
   """
   def create_event_update(event, attrs) do
-    result =
+    sms_body = Map.get(attrs, :sms_body) || Map.get(attrs, "sms_body")
+
+    changeset =
       %EventUpdate{}
       |> EventUpdate.changeset(attrs)
+      |> maybe_put_sms_body(sms_body)
       |> Ecto.Changeset.put_assoc(:event, event)
       |> Ecto.Changeset.put_change(
         :sent_by_id,
         attrs[:sent_by_id] || attrs["sent_by_id"]
       )
-      |> Repo.insert()
 
-    case result do
+    case Repo.insert(changeset) do
       {:ok, event_update} ->
         broadcast(%Ysc.MessagePassingEvents.EventUpdateCreated{
           event_update: event_update,
@@ -3007,6 +3307,12 @@ defmodule Ysc.Events do
         error
     end
   end
+
+  defp maybe_put_sms_body(changeset, sms_body) when is_binary(sms_body) do
+    Ecto.Changeset.put_change(changeset, :sms_body, sms_body)
+  end
+
+  defp maybe_put_sms_body(changeset, _), do: changeset
 
   @doc """
   Returns all updates for an event, newest first (admin view).
@@ -3189,6 +3495,66 @@ defmodule Ysc.Events do
       error ->
         error
     end
+  end
+
+  @doc """
+  Records SMS delivery stats on an event update after SMS fan-out completes.
+  """
+  def mark_event_update_sms_sent(event_update, sms_recipient_count, sms_body)
+      when is_integer(sms_recipient_count) and is_binary(sms_body) do
+    event_update
+    |> Ecto.Changeset.change(%{
+      sms_recipient_count: sms_recipient_count,
+      sms_body: sms_body
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Collects deduplicated SMS recipients for an event update blast.
+
+  Returns confirmed, non-donation ticket purchasers who have a phone number
+  and `event_notifications_sms` enabled, deduplicated by phone number.
+  """
+  def list_event_update_sms_recipients(event_id) do
+    event_id
+    |> event_update_sms_recipients_query()
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns the count of unique SMS recipients for an event update blast.
+  """
+  def count_event_update_sms_recipients(event_id) do
+    from(r in subquery(event_update_sms_recipients_query(event_id)),
+      select: count(r.phone_number)
+    )
+    |> Repo.one()
+  end
+
+  defp event_update_sms_recipients_query(event_id) do
+    from t in Ticket,
+      join: tt in TicketTier,
+      on: t.ticket_tier_id == tt.id,
+      join: u in User,
+      on: t.user_id == u.id,
+      where:
+        t.event_id == ^event_id and t.status == :confirmed and
+          tt.type != :donation,
+      where: u.event_notifications_sms == true,
+      where: not is_nil(u.phone_number) and u.phone_number != "",
+      distinct: u.phone_number,
+      order_by: [asc: u.phone_number],
+      select: %{
+        user_id: u.id,
+        phone_number: u.phone_number,
+        first_name: u.first_name
+      }
+  end
+
+  @doc false
+  def ci_query_explain_event_update_sms_recipients_query do
+    event_update_sms_recipients_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc """

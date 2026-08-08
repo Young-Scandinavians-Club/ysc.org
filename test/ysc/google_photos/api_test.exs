@@ -141,6 +141,36 @@ defmodule Ysc.GooglePhotos.ApiTest do
       assert_receive {:content_type, "video/mp4"}
     end
 
+    test "maps newly accepted photo and video extensions to correct content types" do
+      Req.Test.stub(@stub, fn conn ->
+        if path?(conn, :uploads) do
+          send(
+            self(),
+            {:content_type, req_header(conn, "x-goog-upload-content-type")}
+          )
+
+          ok_upload(conn)
+        else
+          Plug.Conn.send_resp(conn, 404, "unexpected")
+        end
+      end)
+
+      for {filename, expected_type} <- [
+            {"photo.heif", "image/heif"},
+            {"photo.bmp", "image/bmp"},
+            {"photo.tif", "image/tiff"},
+            {"photo.tiff", "image/tiff"},
+            {"clip.3g2", "video/3gpp2"},
+            {"clip.wmv", "video/x-ms-wmv"},
+            {"clip.asf", "video/x-ms-asf"},
+            {"clip.m2ts", "video/mp2t"},
+            {"clip.mts", "video/mp2t"}
+          ] do
+        assert {:ok, _} = Api.upload_bytes(@access_token, "bytes", filename)
+        assert_receive {:content_type, ^expected_type}
+      end
+    end
+
     test "rejects oversize photos before HTTP" do
       # Api.upload_bytes/3 gates on Limits.validate_upload/2 with byte_size/1
       # before any Req call. Pass size as an integer — never allocate 200MB.

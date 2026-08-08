@@ -85,6 +85,13 @@ defmodule YscWeb.FamilyManagementLiveTest do
                "Family Management"
              )
 
+      html = render_loaded(view)
+
+      assert html =~ "Manage your family members"
+      assert html =~ "Add their details first"
+      assert html =~ "People you have added and people with their own login"
+      assert html =~ "No family members yet. Add someone to get started."
+
       assert has_element?(
                view,
                "#family-member-limit",
@@ -136,8 +143,34 @@ defmodule YscWeb.FamilyManagementLiveTest do
       html = render(view)
       refute has_element?(view, "#family-member-modal")
       assert html =~ "Casey Lee"
-      assert html =~ "Roster Only"
+      assert html =~ "Invite pending"
       assert has_element?(view, "#active-family-members-table")
+    end
+
+    test "shows details saved subtitle for roster member without birth date", %{
+      conn: conn
+    } do
+      user = lifetime_member()
+      conn = log_in_user(conn, user)
+
+      assert {:ok, member} =
+               %Ysc.Accounts.FamilyMember{}
+               |> Ecto.Changeset.change(%{
+                 user_id: user.id,
+                 first_name: "Robin",
+                 last_name: "Nguyen",
+                 type: :child,
+                 birth_date: nil
+               })
+               |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      html = render_loaded(view)
+
+      assert html =~ "Robin Nguyen"
+      assert html =~ "Details saved"
+      refute html =~ "DOB:"
+      assert member.birth_date == nil
     end
 
     test "saved family member remains after page reload", %{conn: conn} do

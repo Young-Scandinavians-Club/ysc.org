@@ -1620,6 +1620,110 @@ defmodule Ysc.Ledgers do
     entries
   end
 
+  @doc """
+  Books standalone Stripe fees deducted at payout time (e.g. Billing Usage Fee,
+  instant payout fee) to the internal ledger.
+
+  Per-charge processing fees are already booked when payments are recorded; this
+  only covers fee balance transactions that appear on the payout itself.
+
+  Creates:
+  - Debit `stripe_fees` (expense)
+  - Credit `stripe_account` (reduce receivable)
+
+  Idempotent: skips if payout-time fee entries already exist for the payout's
+  virtual payment.
+  """
+  def book_payout_stripe_fees(%Payout{} = payout, %Money{} = fee_amount) do
+    require Ysc.Logging
+
+    cond do
+      is_nil(payout.payment_id) ->
+        Ysc.Logging.warning(
+          "Cannot book payout Stripe fees: payout has no payment_id",
+          payout_id: payout.id,
+          stripe_payout_id: payout.stripe_payout_id
+        )
+
+        {:error, :missing_payment_id}
+
+      not Money.positive?(fee_amount) ->
+        {:ok, :no_fees}
+
+      payout_stripe_fees_already_booked?(payout.payment_id) ->
+        Ysc.Logging.debug(
+          "Payout Stripe fees already booked; skipping",
+          payout_id: payout.id,
+          stripe_payout_id: payout.stripe_payout_id
+        )
+
+        {:ok, :already_booked}
+
+      true ->
+        ensure_basic_accounts()
+
+        stripe_fee_account = get_account_by_name("stripe_fees")
+        stripe_account = get_account_by_name("stripe_account")
+
+        if is_nil(stripe_fee_account) or is_nil(stripe_account) do
+          {:error, :accounts_not_found}
+        else
+          description =
+            "Stripe payout fee for #{payout.stripe_payout_id}"
+
+          Repo.transaction(fn ->
+            {:ok, fee_expense_entry} =
+              create_entry(%{
+                account_id: stripe_fee_account.id,
+                payment_id: payout.payment_id,
+                amount: fee_amount,
+                debit_credit: :debit,
+                description: description,
+                related_entity_type: :administration,
+                related_entity_id: payout.payment_id
+              })
+
+            {:ok, stripe_fee_deduction_entry} =
+              create_entry(%{
+                account_id: stripe_account.id,
+                payment_id: payout.payment_id,
+                amount: fee_amount,
+                debit_credit: :credit,
+                description: description,
+                related_entity_type: :administration,
+                related_entity_id: payout.payment_id
+              })
+
+            Ysc.Logging.info(
+              "Booked payout-time Stripe fees to ledger",
+              payout_id: payout.id,
+              stripe_payout_id: payout.stripe_payout_id,
+              fee_amount: Money.to_string!(fee_amount)
+            )
+
+            [fee_expense_entry, stripe_fee_deduction_entry]
+          end)
+        end
+    end
+  end
+
+  defp payout_stripe_fees_already_booked?(payment_id)
+       when is_binary(payment_id) do
+    stripe_fee_account = get_account_by_name("stripe_fees")
+
+    if is_nil(stripe_fee_account) do
+      false
+    else
+      from(e in LedgerEntry,
+        where: e.payment_id == ^payment_id,
+        where: e.account_id == ^stripe_fee_account.id,
+        where: e.debit_credit == "debit",
+        where: like(e.description, "Stripe payout fee for %")
+      )
+      |> Repo.exists?()
+    end
+  end
+
   ## Payout Management
 
   @doc """
@@ -2950,75 +3054,109 @@ defmodule Ysc.Ledgers do
   Gets all ledger accounts with their balances.
   """
   def get_accounts_with_balances do
-    # First get all accounts
     accounts = Repo.all(LedgerAccount)
+    account_ids = Enum.map(accounts, & &1.id)
 
-    # Then calculate balances for each account
-    # Note: get_account_balance already normalizes based on normal_balance
-    Enum.map(accounts, fn account ->
-      balance = get_account_balance(account.id)
-      %{account: account, balance: balance}
-    end)
+    accounts
+    |> accounts_with_balances_from_entries(
+      entries_by_account_for_all(account_ids)
+    )
   end
 
   @doc """
   Gets all ledger accounts with their balances within a date range.
   """
   def get_accounts_with_balances(start_date, end_date) do
-    # First get all accounts
     accounts = Repo.all(LedgerAccount)
-
-    # Batch fetch all ledger entries for all accounts in one query
     account_ids = Enum.map(accounts, & &1.id)
 
-    entries_by_account =
-      from(e in LedgerEntry,
-        join: p in Payment,
-        on: e.payment_id == p.id,
-        where: e.account_id in ^account_ids,
-        where: p.payment_date >= ^start_date,
-        where: p.payment_date <= ^end_date,
-        select: {e.account_id, e.amount, e.debit_credit}
-      )
-      |> Repo.all()
-      |> Enum.group_by(fn {account_id, _amount, _debit_credit} ->
-        account_id
-      end)
+    accounts
+    |> accounts_with_balances_from_entries(
+      entries_by_account_for_date_range(account_ids, start_date, end_date)
+    )
+  end
 
-    # Calculate balance for each account using the pre-fetched entries
+  @doc """
+  Gets period and current balances for all accounts with a single accounts fetch.
+
+  Returns `{period_accounts, current_accounts, accounts}` for admin overview
+  screens that need both balance snapshots without redundant account queries.
+  """
+  def get_overview_accounts_with_balances(start_date, end_date) do
+    accounts = Repo.all(LedgerAccount)
+    account_ids = Enum.map(accounts, & &1.id)
+
+    current_entries_by_account = entries_by_account_for_all(account_ids)
+
+    period_entries_by_account =
+      entries_by_account_for_date_range(account_ids, start_date, end_date)
+
+    period_accounts =
+      accounts_with_balances_from_entries(accounts, period_entries_by_account)
+
+    current_accounts =
+      accounts_with_balances_from_entries(accounts, current_entries_by_account)
+
+    {period_accounts, current_accounts, accounts}
+  end
+
+  defp entries_by_account_for_all(account_ids) do
+    from(e in LedgerEntry,
+      where: e.account_id in ^account_ids,
+      select: {e.account_id, e.amount, e.debit_credit}
+    )
+    |> Repo.all()
+    |> Enum.group_by(fn {account_id, _amount, _debit_credit} -> account_id end)
+  end
+
+  defp entries_by_account_for_date_range(account_ids, start_date, end_date) do
+    from(e in LedgerEntry,
+      join: p in Payment,
+      on: e.payment_id == p.id,
+      where: e.account_id in ^account_ids,
+      where: p.payment_date >= ^start_date,
+      where: p.payment_date <= ^end_date,
+      select: {e.account_id, e.amount, e.debit_credit}
+    )
+    |> Repo.all()
+    |> Enum.group_by(fn {account_id, _amount, _debit_credit} -> account_id end)
+  end
+
+  defp accounts_with_balances_from_entries(accounts, entries_by_account) do
     Enum.map(accounts, fn account ->
       entries = Map.get(entries_by_account, account.id, [])
 
-      balance =
-        Enum.reduce(entries, Money.new(0, :USD), fn {_account_id, entry_amount,
-                                                     debit_credit},
-                                                    acc ->
-          normal_balance_str = to_string(account.normal_balance)
-          debit_credit_str = to_string(debit_credit)
+      %{account: account, balance: balance_from_entries(account, entries)}
+    end)
+  end
 
-          increases_balance? =
-            case {normal_balance_str, debit_credit_str} do
-              {"debit", "debit"} -> true
-              {"debit", "credit"} -> false
-              {"credit", "debit"} -> false
-              {"credit", "credit"} -> true
-              _ -> false
-            end
+  defp balance_from_entries(account, entries) do
+    Enum.reduce(entries, Money.new(0, :USD), fn {_account_id, entry_amount,
+                                                 debit_credit},
+                                                acc ->
+      normal_balance_str = to_string(account.normal_balance)
+      debit_credit_str = to_string(debit_credit)
 
-          if increases_balance? do
-            case Money.add(acc, entry_amount) do
-              {:ok, result} -> result
-              {:error, _reason} -> acc
-            end
-          else
-            case Money.sub(acc, entry_amount) do
-              {:ok, result} -> result
-              {:error, _reason} -> acc
-            end
-          end
-        end)
+      increases_balance? =
+        case {normal_balance_str, debit_credit_str} do
+          {"debit", "debit"} -> true
+          {"debit", "credit"} -> false
+          {"credit", "debit"} -> false
+          {"credit", "credit"} -> true
+          _ -> false
+        end
 
-      %{account: account, balance: balance}
+      if increases_balance? do
+        case Money.add(acc, entry_amount) do
+          {:ok, result} -> result
+          {:error, _reason} -> acc
+        end
+      else
+        case Money.sub(acc, entry_amount) do
+          {:ok, result} -> result
+          {:error, _reason} -> acc
+        end
+      end
     end)
   end
 
@@ -3133,6 +3271,49 @@ defmodule Ysc.Ledgers do
       limit: ^limit
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Sums Stripe processing fees booked as debits against the given payment ids.
+
+  Used for per-event cost reporting (e.g. event statistics), where the caller
+  first resolves the relevant payment ids and passes them in here.
+  """
+  def sum_stripe_fees_for_payments([]), do: Money.new(0, :USD)
+
+  def sum_stripe_fees_for_payments(payment_ids) when is_list(payment_ids) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id in ^payment_ids,
+      where: a.name == "stripe_fees",
+      where: e.debit_credit == "debit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> Ysc.MoneyHelper.usd_from_db_sum()
+  end
+
+  @doc """
+  Total donation revenue booked against an event's donation ticket tiers.
+
+  Donation amounts are user-entered at checkout (not `ticket_tier.price`) and
+  recorded as ledger credits to the `donation_revenue` account tagged with
+  `related_entity_type: :donation, related_entity_id: event_id` — this is the
+  only reliable source for "how much was donated", since donation tiers don't
+  carry a fixed price and always create exactly one ticket regardless of the
+  amount given.
+  """
+  def sum_donation_revenue_for_event(event_id) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.related_entity_type == ^:donation,
+      where: e.related_entity_id == ^event_id,
+      where: a.name == "donation_revenue",
+      where: e.debit_credit == "credit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> Ysc.MoneyHelper.usd_from_db_sum()
   end
 
   @doc """

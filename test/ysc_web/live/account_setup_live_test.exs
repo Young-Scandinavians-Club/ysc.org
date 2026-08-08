@@ -716,6 +716,16 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert has_element?(view, "#phone_form")
     end
 
+    test "defaults SMS opt-in checkbox to checked", %{conn: conn, user: user} do
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
+
+      assert has_element?(
+               view,
+               "#phone_form input[name='user[sms_opt_in]'][type='checkbox'][checked]"
+             )
+    end
+
     test "shows skip button", %{conn: conn, user: user} do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "3"}))
@@ -763,6 +773,27 @@ defmodule YscWeb.AccountSetupLiveTest do
       refute has_element?(view, "#phone_verification_form")
     end
 
+    test "non-US/CA phone number saves and skips the verification step", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
+
+      render_submit(view, "save_phone", %{
+        "user" => %{"phone_number" => "+46701234567", "sms_opt_in" => "false"}
+      })
+
+      # No further setup is needed once the unverifiable phone number is saved,
+      # so the LiveView completes setup and redirects home instead of showing
+      # the (unreachable, since FlowRoute can't text this number) OTP step.
+      assert_redirect(view, "/")
+
+      updated_user = Accounts.get_user!(user.id)
+      assert updated_user.phone_number == "+46701234567"
+      assert updated_user.phone_verified_at == nil
+    end
+
     test "unauthenticated user cannot access step 3", %{user: user} do
       {:ok, view, _html} =
         live(build_conn(), account_setup_path(user, %{"step" => "3"}))
@@ -793,10 +824,12 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "shows the phone verification form", %{conn: conn, user: user} do
-      {:ok, view, _html} =
+      {:ok, view, html} =
         live(conn, account_setup_path(user, %{"step" => "4"}))
 
       assert has_element?(view, "#phone_verification_form")
+      assert html =~ "6-digit code"
+      assert html =~ "6-digit verification code"
     end
 
     test "invalid code shows error", %{conn: conn, user: user} do

@@ -64,6 +64,18 @@ defmodule Ysc.S3Config do
   end
 
   @doc """
+  Returns the S3 bucket name for shared app resources (GeoIP DB, etc.).
+
+  SECURITY NOTE: This bucket is BACKEND-ONLY.
+  - No public base URL or CORS
+  - Populated by CI (e.g. weekly GeoIP sync); apps only read
+  - Uses backend credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+  """
+  def app_resources_bucket_name do
+    Application.get_env(:ysc, :app_resources_s3_bucket, "app-resources")
+  end
+
+  @doc """
   Optional HTTPS origin for the media bucket (e.g. Tigris custom domain).
   When set, `upload_url/0` and public `object_url/1` use this host instead of
   `*.fly.storage.tigris.dev`.
@@ -420,7 +432,7 @@ defmodule Ysc.S3Config do
   Constructs the full URL for an S3 object given a key and bucket name.
   """
   def object_url(key, bucket) do
-    key = String.trim_leading(key, "/")
+    key = key |> String.trim_leading("/") |> encode_object_key()
     raw = public_object_base_for_bucket(bucket)
 
     resolved =
@@ -457,6 +469,20 @@ defmodule Ysc.S3Config do
             "#{tigris_bucket_virtual_host_url(bucket)}/#{key}"
         end
     end
+  end
+
+  # Callers pass the logical (decoded) object key -- e.g. a literal filename
+  # with spaces, or a key round-tripped through URI.decode/1 after being
+  # parsed back out of a stored URL -- so it must be percent-encoded here
+  # before being spliced into a URL string. Skipping this produced invalid
+  # request targets (literal spaces in the HTTP request line) for any object
+  # whose key wasn't already URL-safe.
+  defp encode_object_key(key) do
+    key
+    |> String.split("/")
+    |> Enum.map_join("/", fn segment ->
+      URI.encode(segment, &URI.char_unreserved?/1)
+    end)
   end
 
   @doc """

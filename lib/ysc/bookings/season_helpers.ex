@@ -59,6 +59,119 @@ defmodule Ysc.Bookings.SeasonHelpers do
   end
 
   @doc """
+  Whether the (recurring) Winter season's current-or-next occurrence has
+  entered the bookable window yet, plus a "start year/end year" label for it
+  (e.g. `"2025/2026"`) derived from the resolved dates.
+
+  A season named `"Winter"` is treated as not buyout-eligible elsewhere
+  (`Season.buyout_allowed_on_date?/2`); this mirrors that convention to decide
+  when a "winter reservations are open" notice should be shown at all, so it
+  only appears once at least the season's start date is actually selectable
+  (given `max_booking_date`, e.g. from `calculate_max_booking_date/3`) and
+  disappears again once the season has passed and the next occurrence isn't
+  yet in reach.
+
+  `max_booking_date` reflects the *current* season's own advance rule (only
+  extended by the *next* season's rule when the current season has no limit
+  of its own — see `calculate_max_booking_date_no_limit/3`). If some other
+  season's numeric limit happens to reach past Winter's start, that alone
+  doesn't mean Winter's own booking window has opened, so Winter's own
+  `advance_booking_days` (when set) is checked independently as well.
+  """
+  def winter_booking_window(seasons, today, max_booking_date)
+      when is_list(seasons) do
+    case Enum.find(seasons, &(&1.name == "Winter")) do
+      nil ->
+        {false, nil}
+
+      winter ->
+        {winter_start, winter_end} = get_season_date_range(winter, today)
+
+        within_global_window? =
+          Date.compare(winter_start, max_booking_date) != :gt
+
+        within_winter_own_limit? =
+          if winter.advance_booking_days && winter.advance_booking_days > 0 do
+            winter_own_max = Date.add(today, winter.advance_booking_days)
+            Date.compare(winter_start, winter_own_max) != :gt
+          else
+            true
+          end
+
+        open? = within_global_window? and within_winter_own_limit?
+
+        {open?, "#{winter_start.year}/#{winter_end.year}"}
+    end
+  end
+
+  @doc """
+  Finds the first "whole weekend" (Friday check-in, Sunday check-out — the
+  shape required by Tahoe's Saturday/Sunday rule, see
+  `Ysc.Bookings.BookingValidator.validate_weekend_requirement/1`) of the named
+  season's current-or-next occurrence, and whether it's actually bookable
+  right now.
+
+  "Bookable right now" requires all of:
+  - The weekend hasn't already started (`weekend_checkin >= today`). Without
+    this, a season already well underway when this check first runs (e.g.
+    deploying partway through Summer) would compute a check-in date back near
+    the season's start — already in the past — which trivially satisfies both
+    checks below and would fire immediately for a weekend nobody can book
+    anymore. This also means a season occurrence that's already mostly over
+    by the time this ships is correctly skipped entirely rather than
+    misfiring — the next real notification is simply the *next* occurrence.
+  - The property's overall calendar reach (`calculate_max_booking_date/3`,
+    driven by *today's* current season) has extended far enough to include
+    the weekend's check-in date — this is what stops e.g. a Summer weekend
+    from being reported open while still deep in Winter, even though Summer
+    itself may have no advance-booking limit of its own.
+  - The weekend's own season doesn't independently restrict it further
+    (`date_selectable?/4`, checked for both check-in and check-out in case a
+    season boundary falls inside the weekend).
+
+  Returns `nil` when no season with that name is configured, otherwise a map
+  with `:season`, `:weekend_checkin`, `:weekend_checkout`, `:cycle_year`
+  (the resolved occurrence's start year — a stable dedup key across the
+  season's annual recurrence), and `:open?`.
+  """
+  def first_weekend_booking_window(property, seasons, today, season_name)
+      when is_list(seasons) do
+    case Enum.find(seasons, &(&1.name == season_name)) do
+      nil ->
+        nil
+
+      season ->
+        {season_start, _season_end} = get_season_date_range(season, today)
+        weekend_checkin = next_friday_on_or_after(season_start)
+        weekend_checkout = Date.add(weekend_checkin, 2)
+
+        max_booking_date = calculate_max_booking_date(property, today, seasons)
+
+        open? =
+          Date.compare(weekend_checkin, today) != :lt and
+            Date.compare(weekend_checkin, max_booking_date) != :gt and
+            date_selectable?(property, weekend_checkin, today, seasons) and
+            date_selectable?(property, weekend_checkout, today, seasons)
+
+        %{
+          season: season,
+          weekend_checkin: weekend_checkin,
+          weekend_checkout: weekend_checkout,
+          cycle_year: season_start.year,
+          open?: open?
+        }
+    end
+  end
+
+  defp next_friday_on_or_after(date) do
+    case Date.day_of_week(date, :monday) do
+      5 -> date
+      dow when dow < 5 -> Date.add(date, 5 - dow)
+      dow -> Date.add(date, 5 - dow + 7)
+    end
+  end
+
+  @doc """
   Gets the actual date range for a season based on a reference date.
 
   Handles year-spanning seasons (e.g., Nov 1 - Apr 30).

@@ -4,6 +4,7 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
   import Swoosh.TestAssertions
   import Ysc.AccountsFixtures
 
+  alias Ysc.Payments
   alias YscWeb.Emails.ApplicationApprovedPaymentSuccess
 
   test "get_template_name/0 and get_subject/0" do
@@ -14,16 +15,39 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
              "Membership is Active"
   end
 
-  test "render/1 produces HTML email body" do
+  test "render/1 produces HTML email body for card payment" do
     user = user_fixture()
 
     html =
       ApplicationApprovedPaymentSuccess.render(%{
-        first_name: user.first_name
+        first_name: user.first_name,
+        bank_payment: false
       })
 
     assert is_binary(html)
-    assert html =~ user.first_name
+    doc = LazyHTML.from_document(html)
+    text = LazyHTML.text(doc)
+
+    assert text =~ user.first_name
+    assert text =~ "has been charged"
+    refute text =~ "bank payment is processing"
+  end
+
+  test "render/1 produces bank-aware copy when bank_payment is true" do
+    user = user_fixture()
+
+    html =
+      ApplicationApprovedPaymentSuccess.render(%{
+        first_name: user.first_name,
+        bank_payment: true
+      })
+
+    doc = LazyHTML.from_document(html)
+    text = LazyHTML.text(doc)
+
+    assert text =~ "bank payment is processing"
+    assert text =~ "payment receipt"
+    refute text =~ "has been charged"
   end
 
   test "schedule/1 sends payment success email" do
@@ -32,7 +56,41 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
     assert %Oban.Job{
              args: %{
                "template" => "application_approved_payment_success",
-               "idempotency_key" => "approved_payment_success_" <> _
+               "idempotency_key" => "approved_payment_success_" <> _,
+               "params" => %{"bank_payment" => false}
+             }
+           } = ApplicationApprovedPaymentSuccess.schedule(user)
+
+    assert_email_sent(
+      subject: ApplicationApprovedPaymentSuccess.get_subject(),
+      to: {nil, user.email}
+    )
+  end
+
+  test "schedule/1 sets bank_payment when default PM is bank account" do
+    user = user_fixture(%{state: :active})
+
+    user =
+      user
+      |> Ysc.Accounts.User.update_user_changeset(%{
+        stripe_id: "cus_bank_email_#{System.unique_integer([:positive])}"
+      })
+      |> Ysc.Repo.update!()
+
+    {:ok, _pm} =
+      Payments.insert_payment_method(%{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: "pm_bank_#{System.unique_integer([:positive])}",
+        provider_customer_id: user.stripe_id,
+        type: :bank_account,
+        provider_type: "us_bank_account",
+        is_default: true
+      })
+
+    assert %Oban.Job{
+             args: %{
+               "params" => %{"bank_payment" => true}
              }
            } = ApplicationApprovedPaymentSuccess.schedule(user)
 

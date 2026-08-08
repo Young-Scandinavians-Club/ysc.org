@@ -397,4 +397,13 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
                BoardVolunteerBilling.stripe_pause_collection_params(true)
     end
   end
+
+  describe "ci_query_explain_query/0" do
+    test "builds a runnable Ecto query for CI query-plan diagnostics" do
+      query = BoardVolunteerBilling.ci_query_explain_query()
+
+      assert %Ecto.Query{} = query
+      assert Ysc.Repo.all(query) == []
+    end
+  end
 end

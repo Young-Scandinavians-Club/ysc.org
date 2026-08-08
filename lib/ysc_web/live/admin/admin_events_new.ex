@@ -10,6 +10,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.Events
   alias Ysc.Events.Event
   alias Ysc.Events.EventUpdate
+  alias Ysc.ExpenseReports
   alias YscWeb.AdminCheckInPaths
   alias Ysc.Media.Image
 
@@ -18,6 +19,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias YscWeb.AdminEventsLive.TicketTierManagement
   alias YscWeb.Components.Events.CommunicationTimeline
   alias YscWeb.Emails.EventUpdateNotification
+  alias YscWeb.Sms.Segment
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -270,26 +272,22 @@ defmodule YscWeb.AdminEventsNewLive do
                 Event Details
               </.admin_tab>
               <.admin_tab
-                active={!@partiful_link_present && @live_action == :tickets}
-                patch={
-                  if @partiful_link_present,
-                    do: "#",
-                    else: ~p"/admin/events/#{@event.id}/tickets"
-                }
-                class={
-                  if @partiful_link_present,
-                    do: "opacity-50 cursor-not-allowed pointer-events-none",
-                    else: nil
-                }
+                active={@live_action == :tickets}
+                patch={~p"/admin/events/#{@event.id}/tickets"}
               >
-                Tickets {if @partiful_link_present,
-                  do: "(Disabled - Using Partiful)"}
+                Tickets
               </.admin_tab>
               <.admin_tab
                 active={@live_action == :updates}
                 patch={~p"/admin/events/#{@event.id}/updates"}
               >
                 Updates
+              </.admin_tab>
+              <.admin_tab
+                active={@live_action == :statistics}
+                patch={~p"/admin/events/#{@event.id}/statistics"}
+              >
+                Statistics
               </.admin_tab>
             </.admin_tabs>
           </div>
@@ -349,23 +347,12 @@ defmodule YscWeb.AdminEventsNewLive do
                   label="Partiful Link (Optional)"
                   placeholder="https://partiful.com/e/..."
                   phx-debounce="300"
-                  disabled={@ticket_tier_count > 0}
                 />
                 <p
-                  :if={@ticket_tier_count > 0}
-                  class="text-xs text-amber-700 -mt-2 flex items-start gap-1.5"
-                >
-                  <.icon
-                    name="hero-information-circle"
-                    class="w-4 h-4 flex-shrink-0"
-                  />
-                  Partiful cannot be used when this event has ticket tiers. Remove all ticket tiers on the Tickets tab to add a Partiful link.
-                </p>
-                <p
-                  :if={@ticket_tier_count == 0 && @partiful_link_present}
+                  :if={@partiful_link_present}
                   class="text-xs text-zinc-500 -mt-2"
                 >
-                  Using Partiful for registration. When a Partiful link is set, ticket tiers cannot be added.
+                  Shown to attendees as an RSVP callout on the event page, alongside any ticket tiers.
                 </p>
               </div>
 
@@ -375,14 +362,19 @@ defmodule YscWeb.AdminEventsNewLive do
                 <h3 class="text-lg font-medium">Date and Time</h3>
                 <div class="flex flex-row w-full space-x-4">
                   <div class="flex">
+                    <%!-- Events: min_nights 0 = single day or multi-day range.
+                         Booking calendars keep the default of 1 night minimum. --%>
                     <.date_range_picker
                       label="Date*"
                       id="event_date"
                       form={@form}
                       start_date_field={@form[:start_date]}
                       end_date_field={@form[:end_date]}
-                      min={Date.utc_today()}
+                      min={Date.add(@pacific_today, -365)}
+                      today={@pacific_today}
                       allow_saturdays={true}
+                      min_nights={0}
+                      max_nights={365}
                     />
                   </div>
 
@@ -867,7 +859,14 @@ defmodule YscWeb.AdminEventsNewLive do
                       This includes both ticket purchasers and registered attendees.
                     </p>
                     <p class="mt-2 text-sm font-medium text-blue-600">
-                      {@recipient_count} recipient(s) will receive this update
+                      {@recipient_count} email recipient(s) will receive this update
+                    </p>
+                    <p
+                      :if={sms_checked?(@update_form)}
+                      class="mt-1 text-sm font-medium text-blue-600"
+                      id="sms-recipient-count"
+                    >
+                      {@sms_recipient_count} SMS recipient(s) with event SMS notifications enabled
                     </p>
                   </div>
 
@@ -886,23 +885,34 @@ defmodule YscWeb.AdminEventsNewLive do
                     />
 
                     <div>
-                      <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-2">
+                      <span
+                        id="update-message-label"
+                        class="block text-sm font-semibold leading-6 text-zinc-800 mb-2"
+                      >
                         Message
-                      </label>
-                      <.input
-                        type="hidden"
-                        id="update[raw_body]"
-                        field={@update_form[:raw_body]}
-                        phx-hook="TrixHook"
-                        phx-debounce={200}
-                      />
-                      <div id="update-richtext" phx-update="ignore">
-                        <trix-editor
-                          input="update[raw_body]"
-                          class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
-                          placeholder="Write the update message to send to all attendees..."
-                        >
-                        </trix-editor>
+                      </span>
+                      <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
+                        <.input
+                          type="hidden"
+                          id="update[raw_body]"
+                          field={@update_form[:raw_body]}
+                          phx-hook="TrixHook"
+                          phx-debounce={200}
+                        />
+                        <.live_component
+                          module={YscWeb.TrixImagePickerComponent}
+                          id={:event_update_body_image_picker}
+                          target_input_id="update[raw_body]"
+                        />
+                        <div id="update-richtext" phx-update="ignore">
+                          <trix-editor
+                            input="update[raw_body]"
+                            aria-labelledby="update-message-label"
+                            class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
+                            placeholder="Write the update message to send to all attendees..."
+                          >
+                          </trix-editor>
+                        </div>
                       </div>
                     </div>
 
@@ -914,12 +924,68 @@ defmodule YscWeb.AdminEventsNewLive do
                       />
                     </div>
 
+                    <div class="flex items-center gap-2">
+                      <.input
+                        field={@update_form[:send_sms]}
+                        type="checkbox"
+                        label="Also send SMS to attendees with SMS event notifications enabled"
+                      />
+                    </div>
+
+                    <div
+                      :if={sms_checked?(@update_form) and @sms_preview}
+                      id="event-update-sms-preview"
+                      class="rounded border border-zinc-200 bg-zinc-50 p-4 space-y-2"
+                    >
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold text-zinc-800">
+                          SMS preview
+                        </h3>
+                        <p class="text-xs text-zinc-500">
+                          {@sms_preview.char_count}/{@sms_preview.single_limit} units · {@sms_preview.segment_count} SMS segment(s) · {sms_encoding_label(
+                            @sms_preview.encoding
+                          )}
+                        </p>
+                      </div>
+                      <pre
+                        id="event-update-sms-preview-body"
+                        class="whitespace-pre-wrap break-words text-sm font-mono text-zinc-800 bg-white border border-zinc-200 rounded p-3"
+                      >{@sms_preview.body}</pre>
+                      <p
+                        :if={@sms_preview.multi_segment?}
+                        id="event-update-sms-segment-warning"
+                        class="text-sm text-amber-700"
+                      >
+                        This message will send as {@sms_preview.segment_count} SMS messages per recipient (extra cost).
+                        <%= if @sms_preview.truncated? do %>
+                          It was truncated to fit a 2-segment limit.
+                        <% end %>
+                      </p>
+                      <p
+                        :if={
+                          @sms_preview.truncated? and
+                            not @sms_preview.multi_segment?
+                        }
+                        id="event-update-sms-truncated-note"
+                        class="text-sm text-amber-700"
+                      >
+                        The SMS body was truncated to fit the length limit.
+                      </p>
+                    </div>
+
                     <div class="flex flex-wrap items-center gap-4 pt-2">
                       <.button
                         type="submit"
                         phx-disable-with="Sending..."
                         class="bg-blue-600 hover:bg-blue-700"
-                        data-confirm={"Send this update to #{@recipient_count} recipient(s)? This cannot be undone."}
+                        data-confirm={
+                          event_update_confirm_message(
+                            @recipient_count,
+                            @sms_recipient_count,
+                            @update_form,
+                            @sms_preview
+                          )
+                        }
                       >
                         <.icon
                           name="hero-paper-airplane"
@@ -965,6 +1031,250 @@ defmodule YscWeb.AdminEventsNewLive do
                 class="w-full border border-zinc-200 rounded min-h-[400px]"
               />
             </.modal>
+          </div>
+
+          <div :if={@live_action == :statistics} class="relative py-8 space-y-8">
+            <div
+              id="event-stats-kpis"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              <.admin_stat_card
+                id="stat-net-revenue"
+                label="Net Revenue"
+                value={money_display(@net_event_revenue)}
+                value_class={
+                  if Money.negative?(@net_event_revenue),
+                    do: "text-red-600",
+                    else: "text-green-600"
+                }
+                subtitle="Ticket sales + other income − costs"
+                class="lg:col-span-3"
+              />
+              <.admin_stat_card
+                id="stat-ticket-sales"
+                label="Ticket Sales"
+                value={money_display(@sales_stats.total_revenue)}
+                subtitle={"#{@sales_stats.total_tickets_sold} ticket(s) sold"}
+              />
+              <.admin_stat_card
+                id="stat-other-income"
+                label="Other Income"
+                value={money_display(@expense_report_totals.income_total)}
+                subtitle="Income items on expense reports"
+              />
+              <.admin_stat_card
+                id="stat-total-revenue"
+                label="Total Revenue"
+                value={money_display(@total_event_revenue)}
+                subtitle="Ticket sales + other income"
+              />
+              <.admin_stat_card
+                id="stat-stripe-fees"
+                label="Stripe Fees"
+                value={money_display(@stripe_fees_total)}
+                subtitle="Processing fees on ticket payments"
+              />
+              <.admin_stat_card
+                id="stat-expense-reports"
+                label="Expense Reports"
+                value={money_display(@expense_report_totals.expense_total)}
+                subtitle="Gross costs (approved + paid)"
+              />
+              <.admin_stat_card
+                id="stat-total-costs"
+                label="Total Costs"
+                value={money_display(@total_event_costs)}
+                subtitle="Stripe fees + expense reports"
+              />
+            </div>
+
+            <div
+              :if={Money.positive?(@donations_total)}
+              id="stat-donations"
+              class="bg-purple-50 border border-purple-200 rounded-lg p-6"
+            >
+              <p class="text-xs font-black text-purple-400 uppercase tracking-[0.2em] mb-3">
+                Donations Collected
+              </p>
+              <p class="text-3xl font-black text-purple-900">
+                {money_display(@donations_total)}
+              </p>
+              <p class="text-xs text-purple-700 mt-1 font-medium">
+                Via donation ticket tiers — a bonus to the club as a whole, not counted in event revenue above.
+              </p>
+            </div>
+
+            <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div>
+                <h2 class="text-xl font-bold">Sales Over Time</h2>
+                <p class="text-zinc-600 text-sm">
+                  Confirmed ticket revenue by day.
+                  <span :if={ticket_sale_window_label(@ticket_sale_window)}>
+                    {ticket_sale_window_label(@ticket_sale_window)}.
+                  </span>
+                </p>
+                <p
+                  :if={@event_update_markers != %{}}
+                  class="text-xs text-amber-700 flex items-center gap-1 mt-1"
+                >
+                  <.icon name="hero-envelope" class="w-3.5 h-3.5" />
+                  marks a day an event update email was sent — hover a bar for details
+                </p>
+              </div>
+
+              <p :if={@sales_over_time == []} class="text-sm text-zinc-500">
+                No ticket sales yet.
+              </p>
+
+              <div :if={@sales_over_time != []} class="flex gap-2">
+                <div class="flex flex-col justify-between shrink-0 w-14 h-40 pb-6 text-right text-[10px] text-zinc-400 tabular-nums">
+                  <span>{money_display(@sales_chart_max_revenue)}</span>
+                  <span>{money_display(money_half(@sales_chart_max_revenue))}</span>
+                  <span>$0</span>
+                </div>
+
+                <div
+                  id="sales-over-time-chart"
+                  phx-hook="SalesChartTooltip"
+                  data-tooltip-target="sales-chart-tooltip-popup"
+                  class="flex-1 flex items-end gap-1 h-40 overflow-x-auto border-l border-zinc-100 pl-2 pb-2"
+                >
+                  <div
+                    :for={point <- @sales_over_time}
+                    class="flex flex-col items-center justify-end shrink-0 w-9 h-full cursor-default"
+                    data-tooltip={sales_point_tooltip(point, @event_update_markers)}
+                  >
+                    <.icon
+                      :if={Map.has_key?(@event_update_markers, point.date)}
+                      name="hero-envelope-solid"
+                      class="w-3 h-3 text-amber-500 mb-0.5 shrink-0 pointer-events-none"
+                    />
+                    <div
+                      class="w-5 bg-blue-500 hover:bg-blue-600 rounded-t transition-colors pointer-events-none"
+                      style={"height: #{sales_bar_height_pct(point, @sales_chart_max_revenue)}%"}
+                    />
+                    <span class="text-[10px] text-zinc-400 mt-1 whitespace-nowrap pointer-events-none">
+                      {Calendar.strftime(point.date, "%-m/%-d")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                id="sales-chart-tooltip-popup"
+                class="fixed z-50 hidden max-w-xs rounded-md bg-zinc-900 px-3 py-2 text-xs text-zinc-100 shadow-lg whitespace-pre-line"
+                style="display: none;"
+              >
+              </div>
+            </div>
+
+            <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div>
+                <h2 class="text-xl font-bold">Sales by Ticket Tier</h2>
+                <p class="text-zinc-600 text-sm">
+                  Confirmed tickets, net of discounts.
+                </p>
+              </div>
+
+              <p
+                :if={@sales_stats.by_tier == []}
+                class="text-sm text-zinc-500"
+              >
+                No ticket tiers with sales yet.
+              </p>
+
+              <table
+                :if={@sales_stats.by_tier != []}
+                class="min-w-full divide-y divide-zinc-200 text-sm"
+              >
+                <thead>
+                  <tr class="text-left text-zinc-500">
+                    <th class="py-2 pr-4 font-medium">Tier</th>
+                    <th class="py-2 pr-4 font-medium">Tickets Sold</th>
+                    <th class="py-2 pr-4 font-medium">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  <tr
+                    :for={tier <- @sales_stats.by_tier}
+                    id={"tier-sales-#{tier.ticket_tier_id}"}
+                  >
+                    <td class="py-2 pr-4 text-zinc-800">{tier.name}</td>
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {tier.tickets_sold}
+                    </td>
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {money_display(tier.revenue)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h2 class="text-xl font-bold">Expense Reports</h2>
+                  <p class="text-zinc-600 text-sm">
+                    Costs linked to this event, net of any income items logged against the report. Only approved and paid reports count toward totals.
+                  </p>
+                </div>
+                <.link
+                  navigate={~p"/admin/money?tab=expenses"}
+                  class="text-sm font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                >
+                  Open Money → Expenses
+                </.link>
+              </div>
+
+              <p
+                :if={@event_expense_reports == []}
+                class="text-sm text-zinc-500"
+              >
+                No expense reports linked to this event.
+              </p>
+
+              <table
+                :if={@event_expense_reports != []}
+                class="min-w-full divide-y divide-zinc-200 text-sm"
+              >
+                <thead>
+                  <tr class="text-left text-zinc-500">
+                    <th class="py-2 pr-4 font-medium">Submitted By</th>
+                    <th class="py-2 pr-4 font-medium">Purpose</th>
+                    <th class="py-2 pr-4 font-medium">Status</th>
+                    <th class="py-2 pr-4 font-medium">Net Cost</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  <tr
+                    :for={report <- @event_expense_reports}
+                    id={"expense-report-#{report.id}"}
+                  >
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {expense_report_submitter_name(report.user)}
+                    </td>
+                    <td class="py-2 pr-4 text-zinc-800">{report.purpose}</td>
+                    <td class="py-2 pr-4">
+                      <.badge type={expense_report_status_badge_type(report.status)}>
+                        {String.capitalize(report.status || "unknown")}
+                      </.badge>
+                    </td>
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {money_display(
+                        ExpenseReports.calculate_totals(report).net_total
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p class="text-sm font-medium text-zinc-700 pt-2 border-t border-zinc-100">
+                Net total (approved + paid): {money_display(
+                  @expense_report_totals.net_total
+                )}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -1028,7 +1338,6 @@ defmodule YscWeb.AdminEventsNewLive do
             end
           end)
           |> maybe_refresh_tab_data()
-          |> maybe_assign_ticket_tier_count()
         else
           socket
         end
@@ -1042,7 +1351,6 @@ defmodule YscWeb.AdminEventsNewLive do
       socket
       |> assign(:list_params, Map.drop(params, ["id"]))
       |> maybe_refresh_tab_data()
-      |> maybe_assign_ticket_tier_count()
 
     {:noreply, socket}
   end
@@ -1063,6 +1371,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     capacity_attrs = %{"unlimited_capacity" => is_nil(event.max_attendees)}
     capacity_changeset = Event.changeset(event, capacity_attrs)
+    pacific_today = pacific_today()
 
     socket
     |> assign(:event, event)
@@ -1072,12 +1381,12 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:description_length, description_length(event.description))
     |> assign(:event_title, event.title)
     |> assign(:state, event.state)
+    |> assign(:pacific_today, pacific_today)
     |> assign(:start_date, event.start_date)
     |> assign(:end_date, event.end_date)
     |> assign(:start_time, event.start_time)
     |> assign(:end_time, event.end_time)
     |> assign(:can_publish, can_publish?(event.start_date, event.title))
-    |> assign(:ticket_tier_count, 0)
     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
     |> assign(trigger_submit: false, check_errors: false)
     |> assign(:hosts, [])
@@ -1093,12 +1402,14 @@ defmodule YscWeb.AdminEventsNewLive do
           "title" => "",
           "raw_body" => "",
           "rendered_body" => "",
-          "show_on_event_page" => false
+          "show_on_event_page" => false,
+          "send_sms" => false
         },
         as: "update"
       )
     )
     |> assign_updates_tab_defaults()
+    |> assign_statistics_tab_defaults()
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign(:location_presets, EventLocationConfig.presets())
@@ -1115,12 +1426,12 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:list_params, Map.drop(params, ["id"]))
     |> assign(:event_title, "")
     |> assign(:state, :draft)
+    |> assign(:pacific_today, pacific_today())
     |> assign(:start_date, nil)
     |> assign(:end_date, nil)
     |> assign(:start_time, nil)
     |> assign(:end_time, nil)
     |> assign(:can_publish, false)
-    |> assign(:ticket_tier_count, 0)
     |> assign(:partiful_link_present, false)
     |> assign(trigger_submit: false, check_errors: false)
     |> assign(:hosts, [])
@@ -1129,6 +1440,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:host_search_results, [])
     |> stream(:agendas, [], reset: true)
     |> assign_updates_tab_defaults()
+    |> assign_statistics_tab_defaults()
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign(:check_in_path, nil)
@@ -1140,10 +1452,36 @@ defmodule YscWeb.AdminEventsNewLive do
     socket
     |> assign(:event_updates, [])
     |> assign(:recipient_count, 0)
+    |> assign(:sms_recipient_count, 0)
+    |> assign(:sms_preview, nil)
     |> assign(:photo_collection, nil)
     |> assign(:photo_upload_url, nil)
     |> assign(:communication_timeline, [])
     |> assign(:dev_routes?, dev_routes?)
+  end
+
+  defp assign_statistics_tab_defaults(socket) do
+    socket
+    |> assign(:sales_stats, %{
+      by_tier: [],
+      total_revenue: Money.new(0, :USD),
+      total_tickets_sold: 0
+    })
+    |> assign(:sales_over_time, [])
+    |> assign(:sales_chart_max_revenue, Money.new(0, :USD))
+    |> assign(:ticket_sale_window, %{start_date: nil, end_date: nil})
+    |> assign(:event_update_markers, %{})
+    |> assign(:stripe_fees_total, Money.new(0, :USD))
+    |> assign(:event_expense_reports, [])
+    |> assign(:expense_report_totals, %{
+      expense_total: Money.new(0, :USD),
+      income_total: Money.new(0, :USD),
+      net_total: Money.new(0, :USD)
+    })
+    |> assign(:total_event_revenue, Money.new(0, :USD))
+    |> assign(:total_event_costs, Money.new(0, :USD))
+    |> assign(:net_event_revenue, Money.new(0, :USD))
+    |> assign(:donations_total, Money.new(0, :USD))
   end
 
   defp assign_edit_tab_data(socket, event) do
@@ -1162,6 +1500,11 @@ defmodule YscWeb.AdminEventsNewLive do
     socket
     |> assign(:event_updates, event_updates)
     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
+    |> assign(
+      :sms_recipient_count,
+      Events.count_event_update_sms_recipients(event.id)
+    )
+    |> assign_sms_preview()
     |> assign_photo_upload(event)
     |> then(fn socket ->
       assign_communication_timeline(
@@ -1172,6 +1515,164 @@ defmodule YscWeb.AdminEventsNewLive do
       )
     end)
   end
+
+  defp assign_statistics_tab_data(socket, event) do
+    sales_stats = Events.get_event_sales_stats(event.id)
+    sales_over_time = Events.get_event_sales_over_time(event.id)
+    stripe_fees_total = Events.get_event_stripe_fees_total(event.id)
+    expense_reports = ExpenseReports.list_expense_reports_for_event(event.id)
+    expense_report_totals = ExpenseReports.totals_for_event(event.id)
+
+    # Revenue = ticket sales plus any other income logged on expense reports
+    # (e.g. cash collected at the door). Costs = Stripe fees plus the gross
+    # expense total, so income isn't silently netted out of "costs" — it's
+    # its own visible line item, and the two roll up to the same net figure.
+    total_revenue =
+      money_add(sales_stats.total_revenue, expense_report_totals.income_total)
+
+    total_costs =
+      money_add(stripe_fees_total, expense_report_totals.expense_total)
+
+    net_revenue = money_sub(total_revenue, total_costs)
+
+    socket
+    |> assign(:sales_stats, sales_stats)
+    |> assign(:sales_over_time, sales_over_time)
+    |> assign(
+      :sales_chart_max_revenue,
+      sales_chart_max_revenue(sales_over_time)
+    )
+    |> assign(
+      :ticket_sale_window,
+      Events.get_event_ticket_sale_window(event.id)
+    )
+    |> assign(:event_update_markers, event_update_markers(event.id))
+    |> assign(:stripe_fees_total, stripe_fees_total)
+    |> assign(:event_expense_reports, expense_reports)
+    |> assign(:expense_report_totals, expense_report_totals)
+    |> assign(:total_event_revenue, total_revenue)
+    |> assign(:total_event_costs, total_costs)
+    |> assign(:net_event_revenue, net_revenue)
+    |> assign(:donations_total, Events.get_event_donations_total(event.id))
+  end
+
+  defp sales_chart_max_revenue(points) do
+    Enum.reduce(points, Money.new(0, :USD), fn point, max_so_far ->
+      if Decimal.compare(point.revenue.amount, max_so_far.amount) == :gt,
+        do: point.revenue,
+        else: max_so_far
+    end)
+  end
+
+  defp event_update_markers(event_id) do
+    event_id
+    |> Events.list_event_updates()
+    |> Enum.filter(& &1.sent_at)
+    |> Enum.group_by(&DateTime.to_date(&1.sent_at))
+  end
+
+  defp money_add(%Money{} = a, %Money{} = b) do
+    case Money.add(a, b) do
+      {:ok, sum} -> sum
+      _ -> a
+    end
+  end
+
+  defp money_sub(%Money{} = a, %Money{} = b) do
+    case Money.sub(a, b) do
+      {:ok, diff} -> diff
+      _ -> a
+    end
+  end
+
+  defp money_half(%Money{} = m) do
+    Money.new(Decimal.div(m.amount, Decimal.new(2)), :USD)
+  end
+
+  # Money.to_string!/1 renders negative amounts as "$-1.00"; this renders them
+  # the conventional way ("-$1.00") for anything shown to admins on this tab.
+  defp money_display(%Money{} = m), do: Ysc.MoneyHelper.format_money!(m)
+
+  defp sales_bar_height_pct(%{revenue: revenue}, %Money{} = max_revenue) do
+    if Decimal.compare(max_revenue.amount, Decimal.new(0)) == :gt do
+      pct =
+        revenue.amount
+        |> Decimal.div(max_revenue.amount)
+        |> Decimal.mult(100)
+        |> Decimal.to_float()
+
+      max(pct, 4.0)
+    else
+      4.0
+    end
+  end
+
+  defp ticket_sale_window_label(%{start_date: nil, end_date: nil}), do: nil
+
+  defp ticket_sale_window_label(%{start_date: start_date, end_date: end_date}) do
+    case {start_date, end_date} do
+      {%DateTime{}, %DateTime{}} ->
+        "Tickets on sale #{format_short_date(start_date)} – #{format_short_date(end_date)}"
+
+      {%DateTime{}, nil} ->
+        "Tickets on sale since #{format_short_date(start_date)}"
+
+      {nil, %DateTime{}} ->
+        "Ticket sales end #{format_short_date(end_date)}"
+    end
+  end
+
+  defp format_short_date(%DateTime{} = dt),
+    do: Calendar.strftime(dt, "%b %-d, %Y")
+
+  defp sales_point_tooltip(point, event_update_markers) do
+    header = Calendar.strftime(point.date, "%b %-d, %Y")
+
+    summary =
+      "#{money_display(point.revenue)} · #{point.tickets_sold} ticket(s)"
+
+    tier_lines =
+      Enum.map(point.by_tier, fn tier ->
+        "  #{tier.name}: #{tier.tickets_sold} · #{money_display(tier.revenue)}"
+      end)
+
+    update_lines =
+      case event_update_marker_title(event_update_markers, point.date) do
+        nil -> []
+        title -> [title]
+      end
+
+    Enum.join([header, summary] ++ tier_lines ++ update_lines, "\n")
+  end
+
+  defp event_update_marker_title(event_update_markers, date) do
+    case Map.get(event_update_markers, date) do
+      nil ->
+        nil
+
+      updates ->
+        titles = Enum.map_join(updates, ", ", &(&1.title || "Event update"))
+
+        "Update sent: #{titles} (#{Calendar.strftime(date, "%b %-d, %Y")})"
+    end
+  end
+
+  defp expense_report_status_badge_type(status) do
+    case String.downcase(to_string(status || "")) do
+      "draft" -> "dark"
+      "submitted" -> "default"
+      "approved" -> "green"
+      "rejected" -> "red"
+      "paid" -> "sky"
+      _ -> "dark"
+    end
+  end
+
+  defp expense_report_submitter_name(%{first_name: first, last_name: last}) do
+    String.trim("#{first} #{last}")
+  end
+
+  defp expense_report_submitter_name(_), do: "—"
 
   defp host_ids_from(hosts), do: hosts |> Enum.map(& &1.id) |> MapSet.new()
 
@@ -1241,27 +1742,12 @@ defmodule YscWeb.AdminEventsNewLive do
             :edit ->
               assign_edit_tab_data(socket, event)
 
+            :statistics ->
+              assign_statistics_tab_data(socket, event)
+
             _ ->
               socket
           end
-      end
-    else
-      socket
-    end
-  end
-
-  defp maybe_assign_ticket_tier_count(socket) do
-    if connected?(socket) do
-      case socket.assigns[:event] do
-        %{id: event_id} ->
-          assign(
-            socket,
-            :ticket_tier_count,
-            Events.count_ticket_tiers_for_event(event_id)
-          )
-
-        _ ->
-          socket
       end
     else
       socket
@@ -1470,10 +1956,24 @@ defmodule YscWeb.AdminEventsNewLive do
      )
      |> assign(:event_title, event_params["title"])
      |> assign(:page_title, event_params["title"])
-     |> assign(:start_date, event_params["start_date"])
-     |> assign(:end_date, event_params["end_date"])
-     |> assign(:start_time, event_params["start_time"])
-     |> assign(:end_time, event_params["end_time"])
+     # Prefer typed values from the event/changeset so header formatting and
+     # the date picker do not receive raw form strings.
+     |> assign(
+       :start_date,
+       Ecto.Changeset.get_field(updated_changeset, :start_date)
+     )
+     |> assign(
+       :end_date,
+       Ecto.Changeset.get_field(updated_changeset, :end_date)
+     )
+     |> assign(
+       :start_time,
+       Ecto.Changeset.get_field(updated_changeset, :start_time)
+     )
+     |> assign(
+       :end_time,
+       Ecto.Changeset.get_field(updated_changeset, :end_time)
+     )
      |> assign(
        :can_publish,
        can_publish?(
@@ -1500,6 +2000,7 @@ defmodule YscWeb.AdminEventsNewLive do
     socket =
       socket
       |> assign(:update_form, to_form(updated_params, as: "update"))
+      |> assign_sms_preview()
       |> maybe_refresh_update_preview()
 
     {:noreply, socket}
@@ -1546,6 +2047,7 @@ defmodule YscWeb.AdminEventsNewLive do
     socket =
       socket
       |> assign(:update_form, to_form(params, as: "update"))
+      |> assign_sms_preview()
       |> maybe_refresh_update_preview()
 
     {:noreply, socket}
@@ -1568,28 +2070,16 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("send-photo-reminder", _params, socket) do
     event = socket.assigns.event
 
-    case EventPhotos.deliver_reminder_now(event, force: true) do
-      :ok ->
-        event = Events.get_event!(event.id)
-        collection = EventPhotos.get_by_event_id(event.id)
-        event_updates = Events.list_event_updates(event.id)
-
-        {:noreply,
-         socket
-         |> assign(:event, event)
-         |> assign(:photo_collection, collection)
-         |> assign_communication_timeline(event, event_updates, collection)
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "Photo reminder emails have been queued.",
-           title: "Event photos"
-         )}
-
-      {:error, :not_found} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Event not found.",
-           title: "Event photos"
-         )}
+    if Application.get_env(:ysc, :dev_routes, false) do
+      do_send_photo_reminder(event, socket)
+    else
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "This dev-only action is not available in this environment.",
+         title: "Event photos"
+       )}
     end
   end
 
@@ -1597,6 +2087,7 @@ defmodule YscWeb.AdminEventsNewLive do
     event = socket.assigns.event
     raw_body = params["raw_body"] || ""
     rendered_body = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+    send_sms = params["send_sms"] == "true"
 
     if String.trim(raw_body) == "" do
       {:noreply,
@@ -1605,11 +2096,24 @@ defmodule YscWeb.AdminEventsNewLive do
          title: "Update"
        )}
     else
+      sms_body =
+        if send_sms do
+          Segment.build_event_update_sms(
+            event.title || "",
+            params["title"],
+            rendered_body
+          ).body
+        else
+          nil
+        end
+
       attrs = %{
         title: params["title"],
         raw_body: raw_body,
         rendered_body: rendered_body,
         show_on_event_page: params["show_on_event_page"] == "true",
+        send_sms: send_sms,
+        sms_body: sms_body,
         sent_by_id: socket.assigns.current_user.id
       }
 
@@ -1623,10 +2127,17 @@ defmodule YscWeb.AdminEventsNewLive do
           socket =
             case oban_result do
               {:ok, _job} ->
+                flash_msg =
+                  if send_sms do
+                    "Update queued for #{socket.assigns.recipient_count} email(s) and #{socket.assigns.sms_recipient_count} SMS recipient(s)."
+                  else
+                    "Update queued for #{socket.assigns.recipient_count} recipient(s)."
+                  end
+
                 YscWeb.Flash.put_toast(
                   socket,
                   :info,
-                  "Update queued for #{socket.assigns.recipient_count} recipient(s).",
+                  flash_msg,
                   title: "Event Update"
                 )
 
@@ -1655,11 +2166,13 @@ defmodule YscWeb.AdminEventsNewLive do
                  "title" => "",
                  "raw_body" => "",
                  "rendered_body" => "",
-                 "show_on_event_page" => false
+                 "show_on_event_page" => false,
+                 "send_sms" => false
                },
                as: "update"
              )
            )
+           |> assign(:sms_preview, nil)
            |> assign_updates_tab_data(event)}
 
         {:error, changeset} ->
@@ -1973,54 +2486,87 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_info(
-        {Ysc.Events,
-         %Ysc.MessagePassingEvents.TicketTierAdded{ticket_tier: ticket_tier}},
+        {Ysc.Events, %Ysc.MessagePassingEvents.TicketTierAdded{}},
         socket
       ) do
-    if ticket_tier.event_id == socket.assigns[:event].id do
-      {:noreply,
-       assign(
-         socket,
-         :ticket_tier_count,
-         Events.count_ticket_tiers_for_event(socket.assigns.event.id)
-       )}
-    else
-      {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   @impl true
   def handle_info(
-        {Ysc.Events,
-         %Ysc.MessagePassingEvents.TicketTierDeleted{ticket_tier: ticket_tier}},
+        {Ysc.Events, %Ysc.MessagePassingEvents.TicketTierDeleted{}},
         socket
       ) do
-    if ticket_tier.event_id == socket.assigns[:event].id do
-      {:noreply,
-       assign(
-         socket,
-         :ticket_tier_count,
-         Events.count_ticket_tiers_for_event(socket.assigns.event.id)
-       )}
-    else
-      {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:updated_event, data}, socket) do
-    # Handle the message and update the socket as needed
-    # For example, you might want to update the event changeset
-    changeset = Event.changeset(socket.assigns[:event], data)
+  def handle_info({:updated_event, %{id: "event_date"} = data}, socket) do
+    current_event = Events.get_event!(socket.assigns.event.id)
 
-    if changeset.valid? do
-      Events.update_event_editor(socket.assigns[:event], data)
-    end
+    {attrs, cleared_end_time?} =
+      %{
+        start_date: data[:start_date],
+        end_date: data[:end_date]
+      }
+      |> maybe_clear_end_time_for_single_day(current_event)
 
-    {:noreply,
-     assign(socket, start_date: data[:start_date], end_date: data[:end_date])
-     |> assign_form(changeset)}
+    changeset = Event.editor_changeset(current_event, attrs)
+
+    {updated_event, updated_changeset, save_error?} =
+      if changeset.valid? do
+        case Events.update_event_editor(current_event, attrs) do
+          {:ok, event} ->
+            {event, Event.editor_changeset(event, attrs), false}
+
+          {:error, error_changeset} ->
+            {current_event, error_changeset, true}
+        end
+      else
+        {current_event, changeset, true}
+      end
+
+    socket =
+      socket
+      |> assign(:event, updated_event)
+      |> assign(:start_date, updated_event.start_date)
+      |> assign(:end_date, updated_event.end_date)
+      |> assign(:start_time, updated_event.start_time)
+      |> assign(:end_time, updated_event.end_time)
+      |> assign(
+        :can_publish,
+        can_publish?(updated_event.start_date, updated_event.title)
+      )
+      |> assign_form(updated_changeset)
+
+    socket =
+      cond do
+        save_error? ->
+          YscWeb.Flash.put_toast(
+            socket,
+            :error,
+            "Could not save event dates. Check the form for errors.",
+            title: "Event"
+          )
+
+        cleared_end_time? ->
+          YscWeb.Flash.put_toast(
+            socket,
+            :info,
+            "End time was cleared because it was overnight or after the start time on a single-day event.",
+            title: "Event"
+          )
+
+        true ->
+          socket
+      end
+
+    {:noreply, socket}
   end
+
+  # Ticket-tier sale date pickers (and any other date pickers) send the same
+  # message shape; ignore them here so they do not overwrite event dates.
+  def handle_info({:updated_event, _data}, socket), do: {:noreply, socket}
 
   @impl true
   def handle_info(
@@ -2072,15 +2618,21 @@ defmodule YscWeb.AdminEventsNewLive do
      socket |> assign_form(changeset) |> assign(:event, updated_event)}
   end
 
-  def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do
+  def handle_info({YscWeb.TrixImagePickerComponent, id, image}, socket) do
     url = Image.display_path(image)
+
+    target_input_id =
+      case id do
+        :event_update_body_image_picker -> "update[raw_body]"
+        _ -> "post[raw_body]"
+      end
 
     {:noreply,
      push_event(socket, "insert-trix-image", %{
        url: url,
        href: "#{url}?content-disposition=attachment",
        alt: image.alt_text || image.title || "",
-       target_input_id: "post[raw_body]"
+       target_input_id: target_input_id
      })}
   end
 
@@ -2280,6 +2832,44 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
+  defp do_send_photo_reminder(event, socket) do
+    case EventPhotos.deliver_reminder_now(event,
+           force: true,
+           allow_future: true
+         ) do
+      :ok ->
+        event = Events.get_event!(event.id)
+        collection = EventPhotos.get_by_event_id(event.id)
+        event_updates = Events.list_event_updates(event.id)
+
+        {:noreply,
+         socket
+         |> assign(:event, event)
+         |> assign(:photo_collection, collection)
+         |> assign_communication_timeline(event, event_updates, collection)
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Photo reminder emails have been queued.",
+           title: "Event photos"
+         )}
+
+      {:error, :not_found} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Event not found.",
+           title: "Event photos"
+         )}
+
+      {:error, :event_not_ended} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "This event hasn't ended yet, so there won't be any photos to remind attendees about.",
+           title: "Event photos"
+         )}
+    end
+  end
+
   defp maybe_refresh_update_preview(socket) do
     if socket.assigns[:show_update_preview_modal] do
       case build_update_preview(socket) do
@@ -2290,6 +2880,70 @@ defmodule YscWeb.AdminEventsNewLive do
       socket
     end
   end
+
+  defp assign_sms_preview(socket) do
+    form = socket.assigns[:update_form]
+    event = socket.assigns[:event]
+
+    if sms_checked?(form) and event do
+      params = form_params(form)
+      raw_body = params["raw_body"] || ""
+      rendered_body = params["rendered_body"] || raw_body
+
+      preview =
+        Segment.build_event_update_sms(
+          event.title || "",
+          params["title"],
+          rendered_body
+        )
+
+      assign(socket, :sms_preview, preview)
+    else
+      assign(socket, :sms_preview, nil)
+    end
+  end
+
+  defp sms_checked?(nil), do: false
+
+  defp sms_checked?(%Phoenix.HTML.Form{} = form) do
+    value =
+      case form[:send_sms] do
+        %{value: value} -> value
+        _ -> form_params(form)["send_sms"]
+      end
+
+    value in [true, "true"]
+  end
+
+  defp sms_checked?(_), do: false
+
+  defp form_params(%Phoenix.HTML.Form{params: params}) when is_map(params),
+    do: params
+
+  defp form_params(_), do: %{}
+
+  defp event_update_confirm_message(
+         recipient_count,
+         sms_recipient_count,
+         form,
+         sms_preview
+       ) do
+    if sms_checked?(form) do
+      segments =
+        case sms_preview do
+          %{segment_count: count} -> count
+          _ -> 1
+        end
+
+      "Send this update to #{recipient_count} email recipient(s) and #{sms_recipient_count} SMS recipient(s) (#{segments} SMS segment(s) each)? This cannot be undone."
+    else
+      "Send this update to #{recipient_count} recipient(s)? This cannot be undone."
+    end
+  end
+
+  defp sms_encoding_label(:gsm7), do: "GSM-7"
+  defp sms_encoding_label(:ucs2), do: "UCS-2"
+  defp sms_encoding_label(_), do: "SMS"
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     form = to_form(changeset, as: "event")
@@ -2332,6 +2986,43 @@ defmodule YscWeb.AdminEventsNewLive do
       assign_form(socket, updated_changeset)
       |> assign(:event, updated_event)
     end
+  end
+
+  # Multi-day events often keep an overnight end_time (e.g. 18:00 → 02:00).
+  # Collapsing to a single calendar day would make start > end and silently
+  # fail validation — clear the end time so the date change can persist.
+  defp maybe_clear_end_time_for_single_day(attrs, event) do
+    start_date = date_only(attrs[:start_date])
+    end_date = date_only(attrs[:end_date])
+
+    same_day? = start_date != nil and end_date != nil and start_date == end_date
+
+    if same_day? and overnight_or_inverted_times?(event) do
+      {Map.put(attrs, :end_time, nil), true}
+    else
+      {attrs, false}
+    end
+  end
+
+  # Equality is intentional: a zero-length same-day window (end == start) is
+  # treated as inverted / invalid for a single-day event, same as overnight.
+  defp overnight_or_inverted_times?(%{
+         start_time: start_time,
+         end_time: end_time
+       })
+       when not is_nil(start_time) and not is_nil(end_time) do
+    Time.compare(end_time, start_time) != :gt
+  end
+
+  defp overnight_or_inverted_times?(_), do: false
+
+  defp date_only(%DateTime{} = dt), do: DateTime.to_date(dt)
+  defp date_only(%Date{} = date), do: date
+  defp date_only(%NaiveDateTime{} = ndt), do: NaiveDateTime.to_date(ndt)
+  defp date_only(_), do: nil
+
+  defp pacific_today do
+    DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
   end
 
   defp build_location_attrs(params) do

@@ -219,14 +219,16 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert has_element?(
                view,
                "#tahoe-booking-eligibility-banner-public",
-               "Full buyout active"
+               "Your family already has the entire cabin booked"
              )
 
-      assert html =~ "full buyout reservation"
+      assert html =~ "reservation for the entire cabin"
 
       socket = :sys.get_state(view.pid).socket
       refute socket.assigns.can_book
-      assert socket.assigns.booking_error_title == "Full buyout active"
+
+      assert socket.assigns.booking_error_title ==
+               "Your family already has the entire cabin booked"
     end
 
     test "blocks another family member when primary has an active full buyout",
@@ -1529,7 +1531,18 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
       render_async(view, 2_000)
 
       render_click(view, "switch-tab", %{"tab" => "information"})

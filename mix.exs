@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.3.1",
+      version: "2.14.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -92,6 +92,8 @@ defmodule Ysc.MixProject do
           YscWeb.AdminEventsNewLive,
           YscWeb.AdminNewsletterEditorLive,
           YscWeb.AdminPostEditorLive,
+          YscWeb.DevButtonShowcaseLive,
+          YscWeb.DevAvatarShowcaseLive,
           Ysc.Stripe.WebhookHandler,
           Ysc.Quickbooks.Sync,
           Ysc.ExpenseReports.QuickbooksSync,
@@ -264,7 +266,7 @@ defmodule Ysc.MixProject do
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
       {:remote_ip, "~> 1.2"},
-      {:req, "~> 0.6"},
+      {:req, "~> 0.7"},
       {:retry_on, "~> 0.1"},
       {:sentry, "~> 13.3"},
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},

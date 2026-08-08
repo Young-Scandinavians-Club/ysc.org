@@ -22,12 +22,13 @@ defmodule Ysc.Tickets.TimeoutWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"action" => "schedule_next"}}) do
-    # This job schedules the next timeout check and then schedules itself again
+    # Legacy self-rescheduling job kind, kept only so any job already queued
+    # under the old chain (pre-Oban.Cron takeover) still runs once and stops
+    # instead of erroring. Recurring checks now come solely from Oban.Cron.
     {expired_count, failed_count} = expire_timed_out_orders()
-    Ysc.Tickets.Scheduler.schedule_next_timeout_check()
 
     {:ok,
-     "Expired #{expired_count} timed out ticket orders (#{failed_count} failed) and scheduled next check"}
+     "Expired #{expired_count} timed out ticket orders (#{failed_count} failed)"}
   end
 
   @impl Oban.Worker

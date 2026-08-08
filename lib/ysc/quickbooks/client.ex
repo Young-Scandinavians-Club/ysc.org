@@ -1450,6 +1450,11 @@ defmodule Ysc.Quickbooks.Client do
     |> String.replace("\\", "\\\\")
   end
 
+  # QuickBooks Account.Name is the leaf only. Paths with ":" are FullyQualifiedName.
+  defp account_name_query_field(name) when is_binary(name) do
+    if String.contains?(name, ":"), do: "FullyQualifiedName", else: "Name"
+  end
+
   defp get_cached_item_id(cache_key) do
     # Use application environment as a simple cache
     Application.get_env(:ysc, :quickbooks_item_cache, %{})[cache_key]
@@ -2619,7 +2624,11 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   @doc """
-  Queries for a QuickBooks Account by name.
+  Queries for a QuickBooks Account by name or FullyQualifiedName.
+
+  Leaf names (no `:`) match `Account.Name`. Nested chart-of-accounts paths
+  containing `:` (e.g. `"Administration:Bank Service Charges:Stripe"`) match
+  `Account.FullyQualifiedName`.
 
   Returns {:ok, account_id} if found, {:error, :not_found} otherwise.
 
@@ -2649,9 +2658,12 @@ defmodule Ysc.Quickbooks.Client do
   defp query_account_by_name_from_api(name, cache_key) do
     with {:ok, access_token} <- get_access_token(),
          {:ok, company_id} <- get_company_id() do
-      # Query for account by name
+      # Nested chart-of-accounts paths (e.g. "Parent:Child:Leaf") must match
+      # FullyQualifiedName; leaf-only names match Name.
+      field = account_name_query_field(name)
+
       query =
-        "SELECT Id, Name FROM Account WHERE Name = '#{escape_query_string(name)}' AND Active = true"
+        "SELECT Id, Name, FullyQualifiedName FROM Account WHERE #{field} = '#{escape_query_string(name)}' AND Active = true"
 
       url = build_query_url(company_id, query)
       headers = build_headers(access_token)
@@ -2659,6 +2671,7 @@ defmodule Ysc.Quickbooks.Client do
       Ysc.Logging.debug(
         "[QB Client] query_account_by_name: Querying for account",
         name: name,
+        field: field,
         query: query
       )
 
@@ -5308,6 +5321,155 @@ defmodule Ysc.Quickbooks.Client do
 
         {:error, error} ->
           Ysc.Logging.error("Failed to get BillPayment from QuickBooks",
+            error: inspect(error)
+          )
+
+          {:error, :request_failed}
+      end
+    end
+  end
+
+  @doc """
+  Gets a Bill by ID from QuickBooks.
+
+  Used to confirm a Bill's remaining `Balance` before treating it as fully
+  paid — the mere existence of a linked BillPayment does not mean the Bill
+  has been paid in full (QuickBooks allows partial payments).
+  """
+  @spec get_bill(String.t()) :: {:ok, map()} | {:error, atom() | String.t()}
+  def get_bill(bill_id) do
+    with {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      url = build_url(company_id, "bill/#{bill_id}", [])
+      headers = build_headers(access_token)
+
+      Ysc.Logging.info("Getting QuickBooks Bill",
+        company_id: company_id,
+        bill_id: bill_id
+      )
+
+      request = Finch.build(:get, url, headers)
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          case Jason.decode(response_body) do
+            {:ok, data} ->
+              bill = get_response_entity(data, "Bill")
+
+              Ysc.Logging.info("Successfully retrieved QuickBooks Bill",
+                bill_id: Map.get(bill, "Id"),
+                balance: Map.get(bill, "Balance")
+              )
+
+              {:ok, bill}
+
+            {:error, error} ->
+              Ysc.Logging.error("Failed to parse QuickBooks response",
+                error: inspect(error),
+                response: response_body
+              )
+
+              {:error, :invalid_response}
+          end
+
+        {:error, {:rate_limited, _resp}} ->
+          # Rate limit exceeded after all retries - log as warning, not error
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "bill",
+            bill_id: bill_id,
+            max_retries: max_429_retries()
+          )
+
+          {:error, :rate_limited}
+
+        {:ok, %Finch.Response{status: 401, body: _response_body}} ->
+          Ysc.Logging.warning(
+            "QuickBooks authentication failed, attempting token refresh"
+          )
+
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:get, url, headers)
+
+              case Finch.request(request, Ysc.Finch) do
+                {:ok,
+                 %Finch.Response{status: status, body: retry_response_body}}
+                when status in 200..299 ->
+                  case Jason.decode(retry_response_body) do
+                    {:ok, data} ->
+                      bill = get_response_entity(data, "Bill")
+                      {:ok, bill}
+
+                    _error ->
+                      {:error, :invalid_response}
+                  end
+
+                {:ok, %Finch.Response{status: 404, body: _retry_response_body}} ->
+                  Ysc.Logging.info(
+                    "QuickBooks Bill not found after token refresh (likely deleted)",
+                    bill_id: bill_id
+                  )
+
+                  {:error, :not_found}
+
+                {:ok,
+                 %Finch.Response{status: status, body: retry_response_body}} ->
+                  error = parse_error_response(retry_response_body)
+
+                  Ysc.Logging.error(
+                    "[QB Client] get_bill: QuickBooks API error after token refresh",
+                    status: status,
+                    parsed_error: error
+                  )
+
+                  {:error, error}
+
+                {:error, error} ->
+                  Ysc.Logging.error("Request failed after token refresh",
+                    error: inspect(error)
+                  )
+
+                  {:error, :request_failed}
+              end
+
+            error ->
+              Ysc.Logging.error("Failed to refresh QuickBooks access token",
+                error: inspect(error)
+              )
+
+              {:error, :authentication_failed}
+          end
+
+        {:ok, %Finch.Response{status: 404, body: _response_body}} ->
+          # Bill no longer exists (e.g. it was deleted) - treat distinctly
+          # from other error statuses so callers can react appropriately.
+          Ysc.Logging.info("QuickBooks Bill not found (likely deleted)",
+            bill_id: bill_id
+          )
+
+          {:error, :not_found}
+
+        {:ok, %Finch.Response{status: status, body: response_body}} ->
+          error = parse_error_response(response_body)
+
+          Ysc.Logging.error("Failed to get QuickBooks Bill",
+            status: status,
+            error: error,
+            bill_id: bill_id
+          )
+
+          {:error, error}
+
+        {:error, error} ->
+          Ysc.Logging.error("Failed to get Bill from QuickBooks",
             error: inspect(error)
           )
 

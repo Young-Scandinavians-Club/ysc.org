@@ -462,8 +462,8 @@ defmodule YscWeb.FamilyManagementLive do
           Family Management
         </h1>
         <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
-          Manage your family roster and invite members to share your membership benefits.
-          Add someone to your roster first, then send an invite so they can create their own login.
+          Manage your family members and invite them to share your membership benefits.
+          Add their details first, then send an invite so they can sign in.
         </p>
         <p id="family-member-limit" class="text-xs text-zinc-500 mt-2">
           Limit: 1 spouse, up to 9 children
@@ -500,13 +500,13 @@ defmodule YscWeb.FamilyManagementLive do
       </div>
 
       <p class="text-sm text-zinc-500">
-        Roster members and linked accounts. Invite roster-only members so they can share benefits.
+        People you have added and people with their own login. Send an invite to anyone who does not have login access yet.
       </p>
 
       <%= if @active_rows == [] do %>
         <div class="text-center py-8">
           <p class="text-zinc-600 text-sm mb-4">
-            No family members yet. Add someone to your roster to get started.
+            No family members yet. Add someone to get started.
           </p>
           <.button type="button" phx-click="show_add_family_member">
             <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add Family Member
@@ -1036,7 +1036,7 @@ defmodule YscWeb.FamilyManagementLive do
         subtitle =
           case member.birth_date do
             %Date{} = date -> "DOB: #{DateDisplay.format_date_long(date)}"
-            _ -> "Roster member"
+            _ -> "Details saved"
           end
 
         %{
@@ -1046,7 +1046,7 @@ defmodule YscWeb.FamilyManagementLive do
           name: "#{member.first_name} #{member.last_name}",
           subtitle: subtitle,
           relationship: FamilyDisplay.relationship_label(member.type),
-          status_label: "Roster Only",
+          status_label: "Invite pending",
           badge_type: "yellow"
         }
       end)

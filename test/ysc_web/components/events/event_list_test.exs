@@ -201,6 +201,34 @@ defmodule YscWeb.EventsListLiveTest do
       assert html =~ title
     end
 
+    test "hero does not show Happening Today/Soon badges when the event is cancelled" do
+      title = "Cancelled Today #{System.unique_integer()}"
+
+      _event =
+        event_fixture(%{
+          title: title,
+          state: :cancelled,
+          start_date: DateTime.utc_now() |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      html =
+        render_component(YscWeb.EventsListLive, %{
+          id: "events-list",
+          defer_load: false,
+          show_hero: true,
+          upcoming: true,
+          limit: 4
+        })
+
+      assert html =~ "Cancelled"
+      refute html =~ "Happening Today"
+      refute html =~ "Happening Tomorrow"
+      refute html =~ "Happening Soon"
+    end
+
     test "hero shows Save the Date badge when tickets_tbd is true" do
       organizer = user_fixture()
 
@@ -527,6 +555,40 @@ defmodule YscWeb.EventsListLiveTest do
 
       assert html =~ "DonCap"
       refute html =~ "Sold Out"
+    end
+
+    test "shows days-left badge from the stored event calendar date" do
+      organizer = user_fixture()
+
+      today_pacific = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+      event_calendar_date = Date.add(today_pacific, 3)
+
+      # Event dates are Pacific wall-clock calendar days stored as UTC midnight
+      # of that day (not a true UTC instant of an evening Pacific time).
+      start_date =
+        event_calendar_date
+        |> DateTime.new!(~T[00:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          title: "Boundary #{System.unique_integer()}",
+          start_date: start_date,
+          end_date: DateTime.add(start_date, 1, :day)
+        })
+
+      html =
+        render_component(YscWeb.EventsListLive, %{
+          id: "events-list",
+          defer_load: false,
+          show_hero: false,
+          upcoming: true
+        })
+
+      assert html =~ event.title
+      assert html =~ "3 days left"
+      refute html =~ "4 days left"
     end
 
     test "does not mark sold out when tiers are only pre-sale (not on sale yet)" do

@@ -255,6 +255,33 @@ defmodule Ysc.Bookings.PricingRuleTest do
 
       assert changeset.valid?
     end
+
+    test "accepts explicitly clearing a previously-set children_amount to nil" do
+      attrs = %{
+        amount: Money.new(10_000, :USD),
+        children_amount: Money.new(5000, :USD),
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        property: :tahoe
+      }
+
+      {:ok, rule} =
+        %PricingRule{}
+        |> PricingRule.changeset(attrs)
+        |> Repo.insert()
+
+      # Update with children_amount explicitly nil so it is recorded as a
+      # change (rather than being absent from cast) and clears the stored
+      # value. Note: Ecto's own `validate_change/3` short-circuits on a nil
+      # change before calling our validator, so the `nil ->` clause inside
+      # validate_money/2 is unreachable dead code guarding against something
+      # Ecto already handles — this test covers the clearing behavior itself.
+      changeset = PricingRule.changeset(rule, %{children_amount: nil})
+
+      assert changeset.valid?
+      {:ok, updated} = Repo.update(changeset)
+      assert is_nil(updated.children_amount)
+    end
   end
 
   describe "booking_mode enum" do
@@ -1122,6 +1149,15 @@ defmodule Ysc.Bookings.PricingRuleTest do
                from pr in PricingRule,
                  where: pr.id == ^inserted.id
              )
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "builds a runnable Ecto query for CI query-plan diagnostics" do
+      query = PricingRule.ci_query_explain_query()
+
+      assert %Ecto.Query{} = query
+      assert Repo.all(query) == []
     end
   end
 end

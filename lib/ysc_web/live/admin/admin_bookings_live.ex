@@ -10,6 +10,7 @@ defmodule YscWeb.AdminBookingsLive do
 
   alias Ysc.Avatars
   alias Ysc.Bookings
+  alias Ysc.Bookings.BookingLocker
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
@@ -575,31 +576,44 @@ defmodule YscWeb.AdminBookingsLive do
               <label class="block text-sm font-semibold text-zinc-700 mb-2">
                 Guest Details
               </label>
-              <div class="flex items-center gap-3">
-                <.user_avatar_image
-                  user={@booking.user}
-                  class="w-10 h-10 rounded-full flex-shrink-0"
-                />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-zinc-900 truncate">
-                    {if @booking.user do
-                      if @booking.user.first_name && @booking.user.last_name do
+              <%= if @booking.user do %>
+                <.link
+                  navigate={~p"/admin/users/#{@booking.user.id}/details"}
+                  class="flex items-center gap-3 group min-w-0"
+                >
+                  <.user_avatar_image
+                    user={@booking.user}
+                    class="w-10 h-10 rounded-full flex-shrink-0"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-blue-600 group-hover:underline truncate">
+                      {if @booking.user.first_name && @booking.user.last_name do
                         "#{@booking.user.first_name} #{@booking.user.last_name}"
                       else
                         @booking.user.email || "Unknown User"
-                      end
-                    else
-                      "Unknown User"
-                    end}
-                  </p>
-                  <p
-                    :if={@booking.user && @booking.user.email}
-                    class="text-xs text-zinc-500 truncate"
-                  >
-                    {@booking.user.email}
-                  </p>
+                      end}
+                    </p>
+                    <p
+                      :if={@booking.user.email}
+                      class="text-xs text-zinc-500 group-hover:underline truncate"
+                    >
+                      {@booking.user.email}
+                    </p>
+                  </div>
+                </.link>
+              <% else %>
+                <div class="flex items-center gap-3">
+                  <.user_avatar_image
+                    user={nil}
+                    class="w-10 h-10 rounded-full flex-shrink-0"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-zinc-900 truncate">
+                      Unknown User
+                    </p>
+                  </div>
                 </div>
-              </div>
+              <% end %>
               <div class="mt-3 flex items-center gap-4 text-xs">
                 <div class="flex items-center gap-1.5">
                   <span class="font-semibold text-zinc-700">
@@ -636,9 +650,18 @@ defmodule YscWeb.AdminBookingsLive do
                       <div class="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center font-medium text-xs">
                         {"#{String.first(guest.first_name)}#{String.first(guest.last_name)}"}
                       </div>
-                      <span class="text-zinc-900">
-                        {"#{guest.first_name} #{guest.last_name}"}
-                      </span>
+                      <%= if guest.is_booking_user && @booking.user do %>
+                        <.link
+                          navigate={~p"/admin/users/#{@booking.user.id}/details"}
+                          class="text-blue-600 hover:underline font-medium"
+                        >
+                          {"#{guest.first_name} #{guest.last_name}"}
+                        </.link>
+                      <% else %>
+                        <span class="text-zinc-900">
+                          {"#{guest.first_name} #{guest.last_name}"}
+                        </span>
+                      <% end %>
                       <span :if={guest.is_child} class="text-zinc-500">
                         (Child)
                       </span>
@@ -1022,7 +1045,13 @@ defmodule YscWeb.AdminBookingsLive do
             <strong>Booking:</strong> {@booking.reference_id || @booking.id}
           </p>
           <p :if={@booking.user} class="text-sm text-zinc-600">
-            <strong>User:</strong> {@booking.user.email}
+            <strong>User:</strong>
+            <.link
+              navigate={~p"/admin/users/#{@booking.user.id}/details"}
+              class="text-blue-600 hover:underline"
+            >
+              {@booking.user.email}
+            </.link>
           </p>
         </div>
 
@@ -1107,29 +1136,48 @@ defmodule YscWeb.AdminBookingsLive do
             <%= for booking <- @day_guests_bookings do %>
               <div class="bg-zinc-50 rounded-lg p-4 border border-zinc-200 hover:bg-zinc-100 transition-colors">
                 <div class="flex items-start justify-between gap-4">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <.user_avatar_image
-                      user={booking.user}
-                      class="w-9 h-9 rounded-full flex-shrink-0"
-                    />
-                    <div class="min-w-0">
-                      <p class="text-sm font-semibold text-zinc-900 truncate">
-                        {if booking.user do
-                          if booking.user.first_name && booking.user.last_name do
-                            "#{booking.user.first_name} #{booking.user.last_name}"
-                          else
-                            booking.user.email || "Unknown User"
-                          end
-                        else
-                          "Unknown User"
-                        end}
-                      </p>
-                      <p
-                        :if={booking.user && booking.user.email}
-                        class="text-xs text-zinc-500 truncate"
+                  <div class="flex items-start gap-3 min-w-0">
+                    <%= if booking.user do %>
+                      <.link
+                        navigate={~p"/admin/users/#{booking.user.id}/details"}
+                        class="flex-shrink-0"
                       >
-                        {booking.user.email}
-                      </p>
+                        <.user_avatar_image
+                          user={booking.user}
+                          class="w-9 h-9 rounded-full"
+                        />
+                      </.link>
+                    <% else %>
+                      <.user_avatar_image
+                        user={nil}
+                        class="w-9 h-9 rounded-full flex-shrink-0"
+                      />
+                    <% end %>
+                    <div class="min-w-0">
+                      <%= if booking.user do %>
+                        <.link
+                          navigate={~p"/admin/users/#{booking.user.id}/details"}
+                          class="block group min-w-0"
+                        >
+                          <p class="text-sm font-semibold text-blue-600 group-hover:underline truncate">
+                            {if booking.user.first_name && booking.user.last_name do
+                              "#{booking.user.first_name} #{booking.user.last_name}"
+                            else
+                              booking.user.email || "Unknown User"
+                            end}
+                          </p>
+                          <p
+                            :if={booking.user.email}
+                            class="text-xs text-zinc-500 group-hover:underline truncate"
+                          >
+                            {booking.user.email}
+                          </p>
+                        </.link>
+                      <% else %>
+                        <p class="text-sm font-semibold text-zinc-900 truncate">
+                          Unknown User
+                        </p>
+                      <% end %>
                       <div class="flex items-center gap-3 mt-1 text-xs text-zinc-600">
                         <span>
                           {Calendar.strftime(booking.checkin_date, "%b %d")} → {Calendar.strftime(
@@ -1468,9 +1516,11 @@ defmodule YscWeb.AdminBookingsLive do
         show
       >
         <.header>
-          {if @live_action == :new_booking,
-            do: "New Booking",
-            else: "Edit Booking"}
+          {cond do
+            @live_action == :edit_booking -> "Edit Booking"
+            @booking_type == :day -> "New Day Booking"
+            true -> "New Booking"
+          end}
         </.header>
 
         <div
@@ -1584,6 +1634,20 @@ defmodule YscWeb.AdminBookingsLive do
             type="hidden"
             field={@booking_form[:booking_mode]}
             value="buyout"
+          />
+
+          <.input
+            :if={@booking_type == :day}
+            type="hidden"
+            name="booking[room_id]"
+            value=""
+          />
+
+          <.input
+            :if={@booking_type == :day}
+            type="hidden"
+            field={@booking_form[:booking_mode]}
+            value="day"
           />
 
           <:actions>
@@ -2025,7 +2089,11 @@ defmodule YscWeb.AdminBookingsLive do
               <% end %>
             </div>
             <!-- Scrollable Right Area: Date Columns -->
-            <div class="flex-1 overflow-x-scroll calendar-scroll-area">
+            <div
+              id="calendar-scroll-area"
+              phx-hook="CalendarScrollSync"
+              class="flex-1 overflow-x-scroll calendar-scroll-area"
+            >
               <!-- Header: Date columns -->
               <div>
                 <div
@@ -2046,15 +2114,32 @@ defmodule YscWeb.AdminBookingsLive do
                   <% end %>
                 </div>
               </div>
-              <!-- Bookings Row (only for Clear Lake) -->
+              <!-- Guests / day spot booking row (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div
                   class="relative grid"
                   style={"grid-template-columns: repeat(#{total_cols}, minmax(56px, 1fr));"}
                 >
                   <%= for i <- 0..(total_cols - 1) do %>
+                    <% date = get_date_from_col(i, @calendar_dates) %>
+                    <% is_selected_start =
+                      @date_selection_type == :day && @date_selection_start && date &&
+                        Date.compare(date, @date_selection_start) == :eq %>
+                    <% hover_end =
+                      if @date_selection_type == :day,
+                        do: @date_selection_hover_end,
+                        else: nil %>
+                    <% is_in_range =
+                      @date_selection_type == :day && @date_selection_start && date &&
+                        date_selection_in_range?(
+                          date,
+                          @date_selection_start,
+                          hover_end
+                        ) %>
                     <% base_bg =
                       cond do
+                        is_selected_start -> "bg-purple-200"
+                        is_in_range -> "bg-purple-100/60"
                         today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
                         true -> "bg-white"
                       end %>
@@ -2070,32 +2155,75 @@ defmodule YscWeb.AdminBookingsLive do
                   <% end %>
                   <%= for {date, day_idx} <- Enum.with_index(@calendar_dates) do %>
                     <% availability_info = Map.get(@daily_availability, date) %>
+                    <% guest_count =
+                      if availability_info,
+                        do: availability_info.day_bookings_count,
+                        else: 0 %>
                     <% col_start = day_idx * 2 + 1 %>
                     <% col_end = col_start + 2 %>
-                    <%= if availability_info do %>
-                      <div
-                        class="flex items-center justify-center h-14"
-                        style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
+                    <% is_selected_start =
+                      @date_selection_type == :day && @date_selection_start &&
+                        Date.compare(date, @date_selection_start) == :eq %>
+                    <% hover_end =
+                      if @date_selection_type == :day,
+                        do: @date_selection_hover_end,
+                        else: nil %>
+                    <% is_in_range =
+                      @date_selection_type == :day && @date_selection_start &&
+                        date_selection_in_range?(
+                          date,
+                          @date_selection_start,
+                          hover_end
+                        ) %>
+                    <% day_bg =
+                      cond do
+                        is_selected_start -> "bg-purple-200"
+                        is_in_range -> "bg-purple-100/60"
+                        true -> nil
+                      end %>
+                    <div
+                      class="relative flex items-center justify-center h-14"
+                      style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
+                    >
+                      <button
+                        type="button"
+                        class={[
+                          "absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-purple-50 transition-colors",
+                          day_bg
+                        ]}
+                        phx-click="select-date-day"
+                        phx-value-date={Date.to_string(date)}
+                        phx-disable-with="Loading..."
+                        data-date={Date.to_string(date)}
+                        data-selection-type={
+                          if @date_selection_type == :day, do: "day", else: ""
+                        }
+                        title="Click to select date range for day/spot booking"
+                        aria-label={"Select date range for day booking on #{Date.to_string(date)}"}
                       >
-                        <%= if availability_info.day_bookings_count > 0 do %>
-                          <.button
-                            type="button"
-                            variant="outline"
-                            color="purple"
-                            phx-click="show-day-guests"
-                            phx-value-date={Date.to_string(date)}
-                            phx-disable-with="Loading..."
-                            class="!min-h-9 !py-1 !px-2 text-sm"
-                          >
-                            {availability_info.day_bookings_count} guests
-                          </.button>
-                        <% else %>
-                          <span class="text-sm font-semibold text-zinc-400">
-                            0 guests
-                          </span>
-                        <% end %>
-                      </div>
-                    <% end %>
+                        <span
+                          :if={guest_count == 0}
+                          class="text-sm font-semibold text-zinc-400"
+                        >
+                          0 guests
+                        </span>
+                        <span :if={guest_count > 0} class="sr-only">
+                          Select date range for day booking
+                        </span>
+                      </button>
+                      <.button
+                        :if={guest_count > 0}
+                        type="button"
+                        variant="outline"
+                        color="purple"
+                        phx-click="show-day-guests"
+                        phx-value-date={Date.to_string(date)}
+                        phx-disable-with="Loading..."
+                        class="!min-h-9 !py-1 !px-2 text-sm relative z-10"
+                      >
+                        {guest_count} guests
+                      </.button>
+                    </div>
                   <% end %>
                 </div>
               <% end %>
@@ -2420,9 +2548,15 @@ defmodule YscWeb.AdminBookingsLive do
                       <% end %>
                     </div>
                   <% else %>
-                    <.badge type="green" class="whitespace-nowrap flex-shrink-0">
-                      Full Buyout
-                    </.badge>
+                    <%= if booking.booking_mode == :day do %>
+                      <.badge type="sky" class="whitespace-nowrap flex-shrink-0">
+                        Day
+                      </.badge>
+                    <% else %>
+                      <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                        Full Buyout
+                      </.badge>
+                    <% end %>
                   <% end %>
                 </:col>
                 <:col :let={{_, booking}} label="Status" field={:status}>
@@ -3992,6 +4126,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Determine booking type from params
     booking_type =
       cond do
+        params["type"] == "day" -> :day
         params["type"] == "buyout" -> :buyout
         params["type"] == "room" -> :room
         params["room_id"] -> :room
@@ -4061,7 +4196,13 @@ defmodule YscWeb.AdminBookingsLive do
 
     # Determine booking type from existing booking
     has_rooms = Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
-    booking_type = if has_rooms, do: :room, else: :buyout
+
+    booking_type =
+      cond do
+        has_rooms or booking.booking_mode == :room -> :room
+        booking.booking_mode == :day -> :day
+        true -> :buyout
+      end
 
     # Get room_id if it's a room booking
     room_id = if has_rooms, do: List.first(booking.rooms).id, else: nil
@@ -4408,38 +4549,53 @@ defmodule YscWeb.AdminBookingsLive do
 
   def handle_event("delete-booking", %{"id" => id}, socket) do
     booking = Bookings.get_booking!(id)
-    Bookings.delete_booking(booking)
 
-    # Remove from stream if we're on the reservations section
-    socket =
-      if socket.assigns[:current_section] == :reservations do
-        socket
-        |> stream_delete(:reservations, booking)
-      else
-        # If not on reservations section, preserve date range and navigate
-        query_params = %{property: socket.assigns.selected_property}
+    case release_inventory_before_delete(booking) do
+      :ok ->
+        booking = Bookings.get_booking!(id)
+        Bookings.delete_booking(booking)
 
-        query_params =
-          if socket.assigns[:calendar_start_date] &&
-               socket.assigns[:calendar_end_date] do
-            Map.merge(query_params, %{
-              from_date: Date.to_string(socket.assigns.calendar_start_date),
-              to_date: Date.to_string(socket.assigns.calendar_end_date)
-            })
+        # Remove from stream if we're on the reservations section
+        socket =
+          if socket.assigns[:current_section] == :reservations do
+            socket
+            |> stream_delete(:reservations, booking)
           else
-            query_params
+            # If not on reservations section, preserve date range and navigate
+            query_params = %{property: socket.assigns.selected_property}
+
+            query_params =
+              if socket.assigns[:calendar_start_date] &&
+                   socket.assigns[:calendar_end_date] do
+                Map.merge(query_params, %{
+                  from_date: Date.to_string(socket.assigns.calendar_start_date),
+                  to_date: Date.to_string(socket.assigns.calendar_end_date)
+                })
+              else
+                query_params
+              end
+
+            socket
+            |> push_patch(
+              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
+            )
+            |> update_calendar_view(socket.assigns.selected_property)
           end
 
-        socket
-        |> push_patch(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
-        |> update_calendar_view(socket.assigns.selected_property)
-      end
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully",
+           title: "Booking"
+         )}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully",
-       title: "Booking"
-     )}
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to delete booking: #{inspect(reason)}"
+         )}
+    end
   end
 
   def handle_event("view-booking", %{"booking-id" => booking_id}, socket) do
@@ -4670,6 +4826,59 @@ defmodule YscWeb.AdminBookingsLive do
       {:noreply,
        socket
        |> assign(:date_selection_type, :buyout)
+       |> assign(:date_selection_start, date)
+       |> assign(:date_selection_hover_end, nil)}
+    end
+  end
+
+  def handle_event("select-date-day", %{"date" => date_str}, socket) do
+    date = Date.from_iso8601!(date_str)
+
+    # If we already have a start date selected, this is the end date
+    if socket.assigns[:date_selection_type] == :day &&
+         socket.assigns[:date_selection_start] do
+      start_date_selected = socket.assigns.date_selection_start
+      # Ensure end date is after start date
+      {final_start, final_end} =
+        if Date.compare(date, start_date_selected) == :lt do
+          {date, start_date_selected}
+        else
+          {start_date_selected, date}
+        end
+
+      # Navigate to form with date range
+      tz = socket.assigns[:timezone] || "America/Los_Angeles"
+
+      calendar_start =
+        socket.assigns[:calendar_start_date] ||
+          Date.add(today_in_timezone(tz), -2)
+
+      calendar_end =
+        socket.assigns[:calendar_end_date] ||
+          Date.add(today_in_timezone(tz), 14)
+
+      query_params = [
+        property: socket.assigns.selected_property,
+        from_date: Date.to_string(calendar_start),
+        to_date: Date.to_string(calendar_end),
+        type: "day",
+        start_date: Date.to_string(final_start),
+        end_date: Date.to_string(final_end)
+      ]
+
+      {:noreply,
+       socket
+       |> assign(:date_selection_type, nil)
+       |> assign(:date_selection_start, nil)
+       |> assign(:date_selection_hover_end, nil)
+       |> push_patch(
+         to: ~p"/admin/bookings/bookings/new?#{URI.encode_query(query_params)}"
+       )}
+    else
+      # First click - set start date
+      {:noreply,
+       socket
+       |> assign(:date_selection_type, :day)
        |> assign(:date_selection_start, date)
        |> assign(:date_selection_hover_end, nil)}
     end
@@ -5058,14 +5267,9 @@ defmodule YscWeb.AdminBookingsLive do
     date = Date.from_iso8601!(date_str)
 
     bookings =
-      Bookings.list_bookings(:clear_lake, date, date,
-        preload: [user: :current_avatar],
-        exclude_statuses: [:canceled, :refunded]
+      Bookings.list_guests_staying_on_date(:clear_lake, date,
+        preload: [user: :current_avatar]
       )
-      |> Enum.filter(fn b ->
-        Date.compare(b.checkin_date, date) != :gt &&
-          Date.compare(b.checkout_date, date) == :gt
-      end)
 
     {:noreply,
      socket
@@ -6235,6 +6439,54 @@ defmodule YscWeb.AdminBookingsLive do
      )}
   end
 
+  # A :hold/:complete booking has reserved real PropertyInventory /
+  # RoomInventory. Hard-deleting the row without releasing that inventory
+  # first leaves it permanently stuck as held/booked with no booking left to
+  # explain it.
+  defp release_inventory_before_delete(%{status: :hold} = booking) do
+    normalize_release_result(BookingLocker.release_hold(booking.id))
+  end
+
+  defp release_inventory_before_delete(%{status: :complete} = booking) do
+    normalize_release_result(BookingLocker.cancel_complete_booking(booking.id))
+  end
+
+  defp release_inventory_before_delete(_booking), do: :ok
+
+  defp normalize_release_result({:ok, _booking}), do: :ok
+
+  # No matching PropertyInventory/RoomInventory rows for this booking's dates
+  # (e.g. WP-migrated bookings that were never given live inventory rows) -
+  # there's nothing to release, so let the delete proceed.
+  defp normalize_release_result({:error, {:error, :inventory_update_failed}}),
+    do: :ok
+
+  defp normalize_release_result({:error, reason}), do: {:error, reason}
+
+  # Status transitions away from :hold/:complete hold real PropertyInventory /
+  # RoomInventory reservations. Editing `status` via the plain changeset path
+  # below would leave that inventory permanently stuck as held/booked, so
+  # cancel/refund must go through BookingLocker instead, which releases it
+  # atomically with the status change.
+  defp save_existing_admin_booking(
+         socket,
+         %{status: current_status} = existing_booking,
+         %{"status" => new_status} = booking_params,
+         room_id,
+         rooms
+       )
+       when current_status in [:hold, :complete] and
+              new_status in [:canceled, :refunded] do
+    cancel_or_refund_existing_admin_booking(
+      socket,
+      existing_booking,
+      new_status,
+      booking_params,
+      room_id,
+      rooms
+    )
+  end
+
   defp save_existing_admin_booking(
          socket,
          existing_booking,
@@ -6261,8 +6513,8 @@ defmodule YscWeb.AdminBookingsLive do
         room_id && booking_params["booking_mode"] == :room ->
           [skip_validation: true, rooms: rooms]
 
-        # For buyout bookings, clear rooms so stale associations don't persist
-        booking_params["booking_mode"] == :buyout ->
+        # For buyout or day bookings, clear rooms so stale associations don't persist
+        booking_params["booking_mode"] in [:buyout, :day] ->
           [skip_validation: true, rooms: []]
 
         true ->
@@ -6291,14 +6543,117 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
+  # Cancel/refund releases inventory for the booking's *current* dates, so any
+  # other field edits submitted in the same form (dates, guest counts, etc.)
+  # are discarded - they'd be meaningless on a booking that's being canceled.
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         %{status: :hold} = booking,
+         :canceled,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    BookingLocker.release_hold(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :canceled)
+  end
+
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         %{status: :complete} = booking,
+         :canceled,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    BookingLocker.cancel_complete_booking(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :canceled)
+  end
+
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         %{status: :complete} = booking,
+         :refunded,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    BookingLocker.refund_complete_booking(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :refunded)
+  end
+
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         _booking,
+         :refunded,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    {:noreply,
+     YscWeb.Flash.put_toast(
+       socket,
+       :error,
+       "Only a complete booking can be marked refunded."
+     )}
+  end
+
+  defp handle_admin_cancel_result(
+         {:ok, _booking},
+         socket,
+         _original_booking,
+         _status
+       ) do
+    {:noreply, admin_booking_save_success(socket, "updated")}
+  end
+
+  # No matching PropertyInventory/RoomInventory rows for this booking's dates
+  # (e.g. WP-migrated bookings that were never given live inventory rows) -
+  # there's nothing to release, so just flip the status directly.
+  defp handle_admin_cancel_result(
+         {:error, {:error, :inventory_update_failed}},
+         socket,
+         booking,
+         status
+       ) do
+    case Bookings.update_booking(booking, %{status: status},
+           skip_validation: true
+         ) do
+      {:ok, _booking} ->
+        {:noreply, admin_booking_save_success(socket, "updated")}
+
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to update booking status: #{inspect(reason)}"
+         )}
+    end
+  end
+
+  defp handle_admin_cancel_result({:error, reason}, socket, booking, status) do
+    Ysc.Logging.error(
+      "Failed to release inventory for admin booking status change",
+      booking_id: booking.id,
+      target_status: status,
+      reason: inspect(reason)
+    )
+
+    {:noreply,
+     YscWeb.Flash.put_toast(
+       socket,
+       :error,
+       "Failed to update booking status: #{inspect(reason)}"
+     )}
+  end
+
   defp save_new_admin_booking(socket, booking_params, rooms) do
     # Create new booking using BookingLocker which handles:
     # - Setting status to :complete
     # - Updating inventory
     # - Sending confirmation email
     # - Scheduling check-in/checkout reminders
-    alias Ysc.Bookings.BookingLocker
-
     attrs = %{
       user_id: booking_params["user_id"],
       property: booking_params["property"],
@@ -6853,8 +7208,8 @@ defmodule YscWeb.AdminBookingsLive do
         :infinity
       )
 
-    # Separate room bookings from buyout bookings
-    # Room bookings have rooms associated, buyout bookings have no rooms
+    # Separate room bookings from buyout bookings.
+    # Day/spot bookings (Clear Lake) are shown via daily_availability, not the buyout row.
     room_bookings =
       Enum.filter(bookings_in_range, fn booking ->
         Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
@@ -6862,7 +7217,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     buyout_bookings =
       Enum.filter(bookings_in_range, fn booking ->
-        !Ecto.assoc_loaded?(booking.rooms) || booking.rooms == []
+        booking.booking_mode == :buyout
       end)
 
     # Calculate daily availability for Clear Lake (per guest/day mode)

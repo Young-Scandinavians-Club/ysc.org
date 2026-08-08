@@ -3,62 +3,45 @@ defmodule Ysc.GeoIPTest do
   Tests for the Ysc.GeoIP module.
 
   These tests verify:
-  - Safe degradation when no license key is configured
+  - Safe degradation outside deployed environments
   - Correct parsing of locus lookup results
   - Graceful handling of lookup failures and unexpected data shapes
   - The configured?/0 helper
   """
-  use ExUnit.Case, async: true
+  # async: false — configured?/0 tests mutate the process-global `:ysc, :environment`
+  # config via Ysc.Test.EnvHelper; running concurrently with other async suites doing
+  # the same risks races even under EnvHelper's global lock (see incident where "returns
+  # true in sandbox" flaked in CI).
+  use ExUnit.Case, async: false
 
   alias Ysc.GeoIP
+  alias Ysc.Test.EnvHelper
 
   # ---------------------------------------------------------------------------
   # configured?/0
   # ---------------------------------------------------------------------------
 
   describe "configured?/0" do
-    test "returns false when no license key is set" do
-      original = Application.get_env(:locus, :license_key)
-
-      try do
-        Application.delete_env(:locus, :license_key)
-        refute GeoIP.configured?()
-      after
-        if original, do: Application.put_env(:locus, :license_key, original)
-      end
+    test "returns false in the test environment" do
+      refute GeoIP.configured?()
     end
 
-    test "returns false when license key is an empty string" do
-      original = Application.get_env(:locus, :license_key)
-
-      try do
-        Application.put_env(:locus, :license_key, "")
+    test "returns false in the development environment" do
+      EnvHelper.with_environment("dev", fn ->
         refute GeoIP.configured?()
-      after
-        restore_locus_key(original)
-      end
+      end)
     end
 
-    test "returns true when a non-empty license key is set" do
-      original = Application.get_env(:locus, :license_key)
-
-      try do
-        Application.put_env(:locus, :license_key, "fake-test-key")
+    test "returns true in sandbox" do
+      EnvHelper.with_environment("sandbox", fn ->
         assert GeoIP.configured?()
-      after
-        restore_locus_key(original)
-      end
+      end)
     end
 
-    test "returns false when license key is not a binary" do
-      original = Application.get_env(:locus, :license_key)
-
-      try do
-        Application.put_env(:locus, :license_key, :not_a_string)
-        refute GeoIP.configured?()
-      after
-        restore_locus_key(original)
-      end
+    test "returns true in production" do
+      EnvHelper.with_environment("production", fn ->
+        assert GeoIP.configured?()
+      end)
     end
   end
 
@@ -66,14 +49,7 @@ defmodule Ysc.GeoIPTest do
   # lookup/1 – without a live database
   # ---------------------------------------------------------------------------
 
-  describe "lookup/1 when locus is not configured" do
-    setup do
-      original = Application.get_env(:locus, :license_key)
-      Application.delete_env(:locus, :license_key)
-      on_exit(fn -> restore_locus_key(original) end)
-      :ok
-    end
-
+  describe "lookup/1 when GeoIP is not configured" do
     test "returns an empty map for a valid IP" do
       assert GeoIP.lookup("93.184.216.34") == %{}
     end
@@ -95,33 +71,12 @@ defmodule Ysc.GeoIPTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # Internal entry parsing – tested via the public interface by injecting
-  # a fake locus response through :meck (if available) or by testing the
-  # helper behaviour directly with a real loader stub.
-  #
-  # Because the locus loader is an Erlang process started by the application,
-  # we verify the parse path by mocking :locus at the module level using
-  # Mox-style expectations. In the absence of a real MaxMind DB in CI, we
-  # isolate parsing with a private parse helper instead. The tests below rely
-  # on the fact that when the loader is started but the database is not yet
-  # loaded, :locus.lookup/2 returns {:error, _} which should produce %{}.
-  # ---------------------------------------------------------------------------
-
   describe "lookup/1 error resilience" do
-    test "returns empty map for an invalid IP string" do
-      # Even if locus is configured, a garbage IP should never crash
-      original = Application.get_env(:locus, :license_key)
-
-      try do
-        Application.put_env(:locus, :license_key, "fake-key")
-        # locus loader for :city may not be running in tests – that's fine,
-        # the rescue block in GeoIP.lookup/1 catches the error.
-        result = GeoIP.lookup("not-an-ip")
-        assert result == %{}
-      after
-        restore_locus_key(original)
-      end
+    test "returns empty map for an invalid IP string when deployed" do
+      EnvHelper.with_environment("sandbox", fn ->
+        # locus loader for :city is not running in tests – rescue / error path
+        assert GeoIP.lookup("not-an-ip") == %{}
+      end)
     end
 
     test "returns empty map for an atom" do
@@ -129,27 +84,15 @@ defmodule Ysc.GeoIPTest do
     end
 
     test "returns empty map when lookup returns :not_found (reserved IP)" do
-      original = Application.get_env(:locus, :license_key)
-
-      try do
-        Application.put_env(:locus, :license_key, "fake-key")
-
-        # Valid IP shape; MaxMind DB may not be loaded in test — :not_found is handled.
+      EnvHelper.with_environment("sandbox", fn ->
         assert GeoIP.lookup("127.0.0.1") == %{}
-      after
-        restore_locus_key(original)
-      end
+      end)
     end
 
-    test "returns empty map for public IP when DB is unavailable (error or not_found)" do
-      original = Application.get_env(:locus, :license_key)
-
-      try do
-        Application.put_env(:locus, :license_key, "fake-key")
+    test "returns empty map for public IP when DB is unavailable" do
+      EnvHelper.with_environment("sandbox", fn ->
         assert GeoIP.lookup("8.8.8.8") == %{}
-      after
-        restore_locus_key(original)
-      end
+      end)
     end
   end
 
@@ -198,13 +141,4 @@ defmodule Ysc.GeoIPTest do
       assert GeoIP.parse_locus_entry(:not_a_map) == %{}
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # Helpers
-  # ---------------------------------------------------------------------------
-
-  defp restore_locus_key(nil), do: Application.delete_env(:locus, :license_key)
-
-  defp restore_locus_key(key),
-    do: Application.put_env(:locus, :license_key, key)
 end

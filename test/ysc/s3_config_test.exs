@@ -241,6 +241,28 @@ defmodule Ysc.S3ConfigTest do
     end
   end
 
+  describe "app_resources_bucket_name/0" do
+    test "returns configured app resources bucket name" do
+      previous = Application.get_env(:ysc, :app_resources_s3_bucket)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :app_resources_s3_bucket)
+        else
+          Application.put_env(:ysc, :app_resources_s3_bucket, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :app_resources_s3_bucket,
+        "ysc-app-resources-test"
+      )
+
+      assert S3Config.app_resources_bucket_name() == "ysc-app-resources-test"
+    end
+  end
+
   describe "base_url/0" do
     test "returns base URL" do
       url = S3Config.base_url()
@@ -290,6 +312,15 @@ defmodule Ysc.S3ConfigTest do
       url = S3Config.object_url(key, bucket)
       assert is_binary(url)
       assert String.contains?(url, key)
+    end
+
+    test "percent-encodes unsafe characters in the key without touching '/' separators" do
+      key = "public/YSC LOGO 4 color straight text 091222.ai.webp"
+      url = S3Config.object_url(key, "custom-bucket")
+
+      refute String.contains?(url, " ")
+      assert String.contains?(url, "/public/YSC%20LOGO%204%20color")
+      assert URI.parse(url).path |> URI.decode() |> String.ends_with?(key)
     end
   end
 

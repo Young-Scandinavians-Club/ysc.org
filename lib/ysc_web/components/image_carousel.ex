@@ -45,19 +45,32 @@ defmodule YscWeb.Components.ImageCarousel do
       />
   """
   def image_carousel_hero_background(assigns) do
+    first = List.first(assigns.images) || %{}
+
     assigns =
-      assign_new(assigns, :overlay_class, fn ->
+      assigns
+      |> assign_new(:overlay_class, fn ->
         "absolute inset-0 z-[5] bg-black/40 pointer-events-none"
       end)
+      |> assign(:bleed_src, first[:src] || first["src"])
+      |> assign(:bleed_srcset, first[:srcset] || first["srcset"])
 
     ~H"""
-    <div
-      id={@wrapper_id}
-      phx-hook="ImageCarouselAutoplay"
-      class="absolute inset-0 h-full w-full z-[2]"
-    >
-      <.image_carousel id={@carousel_id} images={@images} class="h-full w-full" />
-      <div class={@overlay_class} aria-hidden="true" />
+    <div id={@wrapper_id} phx-hook="ImageCarouselAutoplay" class="hero-media-stage">
+      <div :if={@bleed_src} class="hero-media-stage__bleed" aria-hidden="true">
+        <img
+          src={@bleed_src}
+          srcset={@bleed_srcset}
+          sizes="100vw"
+          alt=""
+          loading="eager"
+          decoding="async"
+        />
+      </div>
+      <div class="hero-media-stage__inner">
+        <.image_carousel id={@carousel_id} images={@images} class="h-full w-full" />
+        <div class={@overlay_class} aria-hidden="true" />
+      </div>
     </div>
     """
   end
@@ -66,7 +79,8 @@ defmodule YscWeb.Components.ImageCarousel do
 
   attr :images, :list,
     required: true,
-    doc: "List of image maps with :src and :alt keys"
+    doc:
+      "List of image maps with :src and :alt keys; optional :srcset and :sizes for responsive heroes"
 
   attr :class, :string,
     default: "",
@@ -291,6 +305,12 @@ defmodule YscWeb.Components.ImageCarousel do
             <div class="carousel-slide">
               <img
                 src={image[:src] || image["src"]}
+                srcset={image[:srcset] || image["srcset"]}
+                sizes={
+                  (image[:srcset] || image["srcset"]) &&
+                    (image[:sizes] || image["sizes"] ||
+                       "(max-width: 1920px) 100vw, 1920px")
+                }
                 alt={image[:alt] || image["alt"] || "Cabin image #{index + 1}"}
                 loading={if index == 0, do: "eager", else: "lazy"}
                 fetchpriority={if index == 0, do: "high", else: "low"}

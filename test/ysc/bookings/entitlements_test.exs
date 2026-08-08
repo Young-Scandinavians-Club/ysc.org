@@ -803,7 +803,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
               []
             )
           end,
-          pattern: entitlement_query?
+          pattern: entitlement_query?,
+          caller_pids: [self()]
         )
 
       {cached, cached_queries} =
@@ -820,7 +821,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
               pricing_context: context
             )
           end,
-          pattern: entitlement_query?
+          pattern: entitlement_query?,
+          caller_pids: [self()]
         )
 
       assert uncached_queries == 2
@@ -937,6 +939,713 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
       assert ent_id != nil
       assert Money.cmp(discount, Money.new(:USD, 25)) == 0
+    end
+  end
+
+  describe "get_entitlement/1 and get_entitlement!/1" do
+    test "get_entitlement/1 returns nil for a nil id" do
+      assert is_nil(Entitlements.get_entitlement(nil))
+    end
+
+    test "get_entitlement/1 returns nil for an unknown id" do
+      assert is_nil(Entitlements.get_entitlement(Ecto.ULID.generate()))
+    end
+
+    test "get_entitlement/1 and get_entitlement!/1 return the row for a known id",
+         %{
+           user: user,
+           admin: admin
+         } do
+      assert {:ok, ent} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      assert Entitlements.get_entitlement(ent.id).id == ent.id
+      assert Entitlements.get_entitlement!(ent.id).id == ent.id
+    end
+
+    test "get_entitlement!/1 raises for an unknown id" do
+      assert_raise Ecto.NoResultsError, fn ->
+        Entitlements.get_entitlement!(Ecto.ULID.generate())
+      end
+    end
+  end
+
+  describe "list_outstanding/1" do
+    test "excludes consumed, expired, and inactive entitlements", %{
+      user: user,
+      admin: admin
+    } do
+      assert {:ok, outstanding} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      past =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, expired} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5),
+                   expires_at: past
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
+
+      assert {:ok, consumed} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      booking = booking_fixture(%{user_id: user.id, status: :hold})
+      assert :ok = Entitlements.consume_for_booking!(consumed.id, booking.id)
+
+      ids = Entitlements.list_outstanding() |> Enum.map(& &1.id)
+
+      assert outstanding.id in ids
+      refute expired.id in ids
+      refute consumed.id in ids
+    end
+
+    test "filters by property, defaulting property-less entitlements into every property",
+         %{
+           user: user,
+           admin: admin
+         } do
+      assert {:ok, tahoe_only} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5),
+                   property: :tahoe
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, any_property} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, clear_lake_only} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5),
+                   property: :clear_lake
+                 },
+                 send_notification: false
+               )
+
+      ids = Entitlements.list_outstanding(property: :tahoe) |> Enum.map(& &1.id)
+
+      assert tahoe_only.id in ids
+      assert any_property.id in ids
+      refute clear_lake_only.id in ids
+    end
+
+    test "filters by benefit_kind", %{user: user, admin: admin} do
+      assert {:ok, fixed} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, percent} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :percent_off,
+                   percent_off: Decimal.new(10),
+                   buyout_max_discount: Money.new(:USD, 100)
+                 },
+                 send_notification: false
+               )
+
+      ids =
+        Entitlements.list_outstanding(benefit_kind: :fixed_amount_off)
+        |> Enum.map(& &1.id)
+
+      assert fixed.id in ids
+      refute percent.id in ids
+    end
+  end
+
+  describe "list_all_for_user/1" do
+    test "returns every entitlement for the user regardless of status, most recent first",
+         %{
+           user: user,
+           admin: admin
+         } do
+      past =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, expired} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5),
+                   expires_at: past
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
+
+      assert {:ok, active} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      other_user = user_fixture()
+
+      assert {:ok, _other} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: other_user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      results = Entitlements.list_all_for_user(user.id)
+      ids = Enum.map(results, & &1.id)
+
+      assert active.id in ids
+      assert expired.id in ids
+      assert length(ids) == 2
+
+      first = Enum.find(results, &(&1.id == active.id))
+      assert match?(%Ysc.Accounts.User{}, first.issued_by_user)
+    end
+  end
+
+  describe "suggest_buyout_max_discount/5" do
+    setup %{user: _user, admin: _admin} do
+      assert {:ok, _} =
+               Bookings.create_pricing_rule(%{
+                 amount: Money.new(430, :USD),
+                 booking_mode: :buyout,
+                 price_unit: :buyout_fixed,
+                 property: :tahoe,
+                 season_id: nil,
+                 room_id: nil,
+                 room_category_id: nil
+               })
+
+      checkin = Date.utc_today() |> Date.add(90)
+      %{checkin: checkin, checkout: Date.add(checkin, 1)}
+    end
+
+    test "percent_off computes a percentage of the one-night buyout rate", %{
+      checkin: checkin,
+      checkout: checkout
+    } do
+      assert {:ok, discount} =
+               Entitlements.suggest_buyout_max_discount(
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 :percent_off,
+                 percent_off: Decimal.new(10)
+               )
+
+      assert Money.cmp(discount, Money.new(:USD, 43)) == 0
+    end
+
+    test "free_nights multiplies the one-night rate by the free night count", %{
+      checkin: checkin,
+      checkout: checkout
+    } do
+      assert {:ok, discount} =
+               Entitlements.suggest_buyout_max_discount(
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 :free_nights,
+                 free_nights: 2
+               )
+
+      assert Money.cmp(discount, Money.new(:USD, 860)) == 0
+    end
+
+    test "free_nights defaults to 1 night when omitted", %{
+      checkin: checkin,
+      checkout: checkout
+    } do
+      assert {:ok, discount} =
+               Entitlements.suggest_buyout_max_discount(
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 :free_nights
+               )
+
+      assert Money.cmp(discount, Money.new(:USD, 430)) == 0
+    end
+
+    test "unrecognized benefit_kind returns zero", %{
+      checkin: checkin,
+      checkout: checkout
+    } do
+      assert {:ok, discount} =
+               Entitlements.suggest_buyout_max_discount(
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 :fixed_amount_off
+               )
+
+      assert Money.cmp(discount, Money.new(0, :USD)) == 0
+    end
+
+    test "propagates a pricing error for an invalid date range" do
+      checkin = Date.utc_today() |> Date.add(30)
+      checkout = Date.add(checkin, -1)
+
+      assert {:error, :invalid_date_range} =
+               Entitlements.suggest_buyout_max_discount(
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 :percent_off,
+                 percent_off: Decimal.new(10)
+               )
+    end
+  end
+
+  describe "entitlement_grant_default_params/0" do
+    test "returns the expected default form params" do
+      defaults = Entitlements.entitlement_grant_default_params()
+
+      assert defaults["benefit_kind"] == "percent_off"
+      assert defaults["percent_off"] == "50"
+      assert defaults["free_nights"] == "1"
+      assert defaults["buyout_max_discount"] == "250"
+      assert defaults["property"] == ""
+      assert defaults["expires_on"] == ""
+    end
+  end
+
+  describe "grant_attrs_from_entitlement_form/3" do
+    test "maps free_nights benefit_kind and tahoe property", %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{
+            "benefit_kind" => "free_nights",
+            "property" => "tahoe",
+            "user_id" => "  some-user-id  ",
+            "max_guests" => "4",
+            "free_nights" => "2",
+            "percent_off" => "",
+            "amount_off" => "",
+            "buyout_max_discount" => "300.50",
+            "expires_on" => "",
+            "internal_note" => "  hi  "
+          },
+          admin.id
+        )
+
+      assert attrs.user_id == "some-user-id"
+      assert attrs.issued_by_user_id == admin.id
+      assert attrs.benefit_kind == :free_nights
+      assert attrs.property == :tahoe
+      assert attrs.max_guests == 4
+      assert attrs.free_nights == 2
+      assert is_nil(attrs.percent_off)
+      assert is_nil(attrs.amount_off)
+
+      assert Money.cmp(
+               attrs.buyout_max_discount,
+               Money.new(:USD, Decimal.new("300.50"))
+             ) == 0
+
+      assert is_nil(attrs.expires_at)
+      assert attrs.internal_note == "hi"
+    end
+
+    test "maps fixed_amount_off benefit_kind and clear_lake property", %{
+      admin: admin
+    } do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{
+            "benefit_kind" => "fixed_amount_off",
+            "property" => "clear_lake",
+            "amount_off" => "42.00"
+          },
+          admin.id
+        )
+
+      assert attrs.benefit_kind == :fixed_amount_off
+      assert attrs.property == :clear_lake
+
+      assert Money.cmp(attrs.amount_off, Money.new(:USD, Decimal.new("42.00"))) ==
+               0
+    end
+
+    test "defaults unrecognized benefit_kind to percent_off and unrecognized property to nil",
+         %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"benefit_kind" => "something_else", "property" => "moon_base"},
+          admin.id
+        )
+
+      assert attrs.benefit_kind == :percent_off
+      assert is_nil(attrs.property)
+    end
+
+    test "prefers member_user_id over the form's user_id param", %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"user_id" => "form-user-id"},
+          admin.id,
+          "explicit-member-id"
+        )
+
+      assert attrs.user_id == "explicit-member-id"
+    end
+
+    test "treats a blank user_id param as nil", %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"user_id" => ""},
+          admin.id
+        )
+
+      assert is_nil(attrs.user_id)
+    end
+
+    test "treats unparsable numeric fields as nil", %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{
+            "max_guests" => "not-a-number",
+            "percent_off" => "not-a-number",
+            "amount_off" => "not-a-number"
+          },
+          admin.id
+        )
+
+      assert is_nil(attrs.max_guests)
+      assert is_nil(attrs.percent_off)
+      assert is_nil(attrs.amount_off)
+    end
+
+    test "parses valid numeric fields", %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"max_guests" => "6", "percent_off" => "15.5"},
+          admin.id
+        )
+
+      assert attrs.max_guests == 6
+      assert Decimal.equal?(attrs.percent_off, Decimal.new("15.5"))
+    end
+
+    test "parses a valid expires_on date to end-of-day America/Los_Angeles in UTC",
+         %{
+           admin: admin
+         } do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"expires_on" => "2026-03-15"},
+          admin.id
+        )
+
+      assert %DateTime{} = attrs.expires_at
+      assert attrs.expires_at.time_zone == "Etc/UTC"
+
+      local = DateTime.shift_zone!(attrs.expires_at, "America/Los_Angeles")
+      assert local.hour == 23
+      assert local.minute == 59
+      assert Date.to_iso8601(DateTime.to_date(local)) == "2026-03-15"
+    end
+
+    test "treats an invalid expires_on date string as nil", %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"expires_on" => "not-a-date"},
+          admin.id
+        )
+
+      assert is_nil(attrs.expires_at)
+    end
+
+    test "treats a blank internal_note as nil", %{admin: admin} do
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"internal_note" => ""},
+          admin.id
+        )
+
+      assert is_nil(attrs.internal_note)
+    end
+  end
+
+  describe "create_entitlement/2 with notification enabled (default)" do
+    test "schedules a granted email and still creates the entitlement", %{
+      user: user,
+      admin: admin
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, ent} =
+                 Entitlements.create_entitlement(%{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 15)
+                 })
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "booking_entitlement_granted",
+            "idempotency_key" => "booking_entitlement_granted:#{ent.id}"
+          }
+        )
+
+        assert ent.user_id == user.id
+        assert Entitlements.get_entitlement!(ent.id).id == ent.id
+      end)
+    end
+
+    test "returns the changeset error without attempting to send an email", %{
+      user: user,
+      admin: admin
+    } do
+      assert {:error, %Ecto.Changeset{}} =
+               Entitlements.create_entitlement(%{
+                 user_id: user.id,
+                 issued_by_user_id: admin.id,
+                 benefit_kind: :invalid_kind
+               })
+    end
+  end
+
+  describe "apply_best_entitlement/7 with a nil subtotal" do
+    test "treats a nil subtotal as zero in the pricing_items summary", %{
+      user: user
+    } do
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
+
+      {final_total, items, subtotal, discount, ent_id} =
+        Entitlements.apply_best_entitlement(
+          user.id,
+          :tahoe,
+          :buyout,
+          checkin,
+          checkout,
+          nil,
+          %{},
+          []
+        )
+
+      assert is_nil(subtotal)
+      assert is_nil(ent_id)
+      assert is_nil(final_total)
+      assert Money.cmp(discount, Money.new(0, :USD)) == 0
+      assert items["subtotal"] == %{"amount" => "0", "currency" => "USD"}
+    end
+  end
+
+  describe "revoke_entitlement/1 success" do
+    test "revokes an active entitlement", %{user: user, admin: admin} do
+      assert {:ok, ent} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 15)
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, revoked} = Entitlements.revoke_entitlement(ent)
+      assert revoked.status != :active
+    end
+  end
+
+  describe "price_with_locked_entitlement/4 additional branches" do
+    test "returns a zero-discount total when the booking has no applied entitlement",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = locker_buyout_dates(30)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      subtotal = Money.new(:USD, 300)
+
+      assert {:ok, priced} =
+               Entitlements.price_with_locked_entitlement(
+                 booking,
+                 subtotal,
+                 :buyout
+               )
+
+      assert Money.cmp(priced.discount, Money.new(0, :USD)) == 0
+      assert Money.cmp(priced.total, subtotal) == 0
+      assert priced.breakdown_additions == %{}
+    end
+
+    test "rejects an entitlement that isn't eligible for the booking's property",
+         %{
+           user: user,
+           admin: admin
+         } do
+      {checkin, checkout} = locker_buyout_dates(31)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   property: :clear_lake,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
+
+      assert {:error, :entitlement_not_eligible_for_booking} =
+               Entitlements.price_with_locked_entitlement(
+                 booking,
+                 Money.new(:USD, 300),
+                 :buyout
+               )
+    end
+
+    test "percent_off entitlement summary includes the formatted percentage", %{
+      user: user,
+      admin: admin
+    } do
+      {checkin, checkout} = locker_buyout_dates(32)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :percent_off,
+                   property: :tahoe,
+                   percent_off: Decimal.new(10),
+                   buyout_max_discount: Money.new(500_000, :USD),
+                   max_guests: 10
+                 },
+                 send_notification: false
+               )
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
+
+      assert {:ok, priced} =
+               Entitlements.price_with_locked_entitlement(
+                 booking,
+                 Money.new(:USD, 300),
+                 :buyout
+               )
+
+      assert priced.breakdown_additions.entitlement_summary =~ "% off stay"
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "returns a well-formed Ecto query for CI query-plan checks" do
+      assert %Ecto.Query{} = Entitlements.ci_query_explain_query()
     end
   end
 

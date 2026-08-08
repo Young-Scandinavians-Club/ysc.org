@@ -8,7 +8,7 @@ defmodule YscWeb.AdminScannerLive do
   alias Ysc.Events
   alias Ysc.Scanning
   alias Ysc.Scanning.QrToken
-  alias YscWeb.Admin.DateTimeDisplay
+  alias YscWeb.{Admin.DateTimeDisplay, AdminMembershipHelpers}
 
   # --- Render ---
 
@@ -1079,7 +1079,10 @@ defmodule YscWeb.AdminScannerLive do
         <div class="flex justify-between">
           <span class="text-emerald-100">Membership</span>
           <span class="font-semibold">
-            {format_membership_type(@scan_result.membership_type)}
+            {AdminMembershipHelpers.membership_type_label(
+              @scan_result.membership_type,
+              :full
+            )}
           </span>
         </div>
         <div :if={@scan_result.member_since} class="flex justify-between">
@@ -1774,17 +1777,6 @@ defmodule YscWeb.AdminScannerLive do
   defp check_rate_limit(user_id) do
     Ysc.ScanRateLimit.check(user_id)
   end
-
-  defp format_membership_type(nil), do: "Unknown"
-  defp format_membership_type(:lifetime), do: "Lifetime Membership"
-  defp format_membership_type(:single), do: "Single Membership"
-  defp format_membership_type(:family), do: "Family Membership"
-
-  defp format_membership_type(type) when is_atom(type) do
-    type |> Atom.to_string() |> String.capitalize() |> then(&"#{&1} Membership")
-  end
-
-  defp format_membership_type(_), do: "Membership"
 
   defp result_badge_class(:success), do: "bg-emerald-100 text-emerald-800"
   defp result_badge_class(:already_scanned), do: "bg-red-100 text-red-800"

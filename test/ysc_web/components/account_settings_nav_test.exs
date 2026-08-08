@@ -16,7 +16,7 @@ defmodule YscWeb.Components.AccountSettingsNavTest do
       assert html =~ "Account"
       assert html =~ "Profile"
       assert html =~ "Membership"
-      assert html =~ "Bookings &amp; Tickets"
+      assert html =~ "Bookings &amp; Payments"
       assert html =~ "Security"
       assert html =~ "Notifications"
       refute html =~ "Family"

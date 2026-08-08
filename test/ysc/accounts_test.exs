@@ -1991,6 +1991,19 @@ defmodule Ysc.AccountsTest do
       assert done.post_migration_onboarding_completed_at
       refute Accounts.needs_post_migration_onboarding?(done)
     end
+
+    test "wp_migrated?/1" do
+      native_user = oauth_user_fixture(%{phone_number: "+14159098313"})
+      assert native_user.post_migration_onboarding_completed_at
+      refute Accounts.wp_migrated?(native_user)
+
+      {:ok, migrated_user} =
+        native_user
+        |> Ecto.Changeset.change(post_migration_onboarding_completed_at: nil)
+        |> Repo.update()
+
+      assert Accounts.wp_migrated?(migrated_user)
+    end
   end
 
   describe "user notes" do
@@ -2239,7 +2252,8 @@ defmodule Ysc.AccountsTest do
       {_stats, subscription_preload_count} =
         Ysc.QueryCounter.with_query_counter(
           fn -> Accounts.get_membership_stats() end,
-          pattern: subscription_preload_pattern
+          pattern: subscription_preload_pattern,
+          caller_pids: [self()]
         )
 
       assert subscription_preload_count == 0
@@ -2306,6 +2320,25 @@ defmodule Ysc.AccountsTest do
       assert a >= 0 and b >= 0
       assert y != ""
       assert pct == nil or is_integer(pct)
+    end
+
+    test "get_membership_joins_ytd_comparison excludes subscriptions that never converted" do
+      before = Accounts.get_membership_joins_ytd_comparison().current_ytd_joins
+
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_incomplete_#{System.unique_integer()}",
+          stripe_status: "incomplete_expired",
+          name: "Abandoned checkout"
+        })
+
+      after_count =
+        Accounts.get_membership_joins_ytd_comparison().current_ytd_joins
+
+      assert after_count == before
     end
 
     test "get_membership_stats and list_memberships include lifetime and family primaries" do
@@ -3251,6 +3284,84 @@ defmodule Ysc.AccountsTest do
       refute pm_a.is_default
       assert pm_b.is_default
     end
+
+    test "pushes the new default to the Stripe customer so future charges use it" do
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          stripe_id: "cus_accounts_push"
+        })
+
+      pm =
+        %PaymentMethod{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_accounts_push_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_accounts_push",
+          provider_type: "card",
+          type: :card,
+          last_four: "1234",
+          exp_month: 9,
+          exp_year: 2032,
+          display_brand: "visa",
+          is_default: false
+        }
+        |> Repo.insert!()
+
+      expect(Stripe.CustomerMock, :update, fn "cus_accounts_push",
+                                              params,
+                                              _opts ->
+        assert params.invoice_settings.default_payment_method == pm.provider_id
+        {:ok, %Stripe.Customer{id: "cus_accounts_push"}}
+      end)
+
+      assert {:ok, _} = Accounts.update_default_payment_method(user, pm.id)
+    end
+
+    test "rejects a payment method owned by a different user without changing defaults" do
+      owner = user_fixture(%{phone_number: unique_user_phone()})
+      caller = user_fixture(%{phone_number: unique_user_phone()})
+
+      foreign_pm =
+        %PaymentMethod{
+          user_id: owner.id,
+          provider: :stripe,
+          provider_id: "pm_foreign_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_foreign_#{System.unique_integer([:positive])}",
+          provider_type: "card",
+          type: :card,
+          last_four: "9999",
+          exp_month: 1,
+          exp_year: 2035,
+          display_brand: "visa",
+          is_default: true
+        }
+        |> Repo.insert!()
+
+      caller_pm =
+        %PaymentMethod{
+          user_id: caller.id,
+          provider: :stripe,
+          provider_id: "pm_caller_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_caller_#{System.unique_integer([:positive])}",
+          provider_type: "card",
+          type: :card,
+          last_four: "1111",
+          exp_month: 2,
+          exp_year: 2035,
+          display_brand: "visa",
+          is_default: true
+        }
+        |> Repo.insert!()
+
+      assert {:error, :payment_method_not_owned_by_user} =
+               Accounts.update_default_payment_method(caller, foreign_pm.id)
+
+      assert Repo.get!(PaymentMethod, foreign_pm.id).is_default
+      assert Repo.get!(PaymentMethod, caller_pm.id).is_default
+    end
   end
 
   describe "record_application_outcome/4" do
@@ -3463,6 +3574,99 @@ defmodule Ysc.AccountsTest do
                )
 
       assert cs.errors[:phone_number]
+    end
+  end
+
+  describe "soft-delete stop-comms side effects" do
+    test "transitioning to deleted unsubscribes newsletter, disables prefs, and revokes sessions" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :active,
+          event_notifications: true,
+          event_notifications_sms: true,
+          account_notifications_sms: true
+        })
+
+      Newsletter.sync_user_preference(user, newsletter_subscribed: true)
+      _token = Accounts.generate_user_session_token(user)
+
+      assert {:ok, updated} =
+               Accounts.update_user(user, %{"state" => "deleted"}, admin)
+
+      assert updated.state == :deleted
+      refute updated.event_notifications
+      refute updated.event_notifications_sms
+      refute updated.account_notifications_sms
+      refute Accounts.receives_outbound_comms?(updated)
+
+      sub = Newsletter.get_subscriber_by_email(user.email)
+      assert sub != nil
+      refute sub.subscribed
+
+      refute Repo.get_by(UserToken, user_id: user.id, context: "session")
+    end
+
+    test "update_user_with_address transitioning to deleted also stops comms" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :active,
+          event_notifications: true
+        })
+
+      Newsletter.sync_user_preference(user, newsletter_subscribed: true)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "deleted",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 admin
+               )
+
+      assert updated.state == :deleted
+      refute updated.event_notifications
+      refute Newsletter.get_subscriber_by_email(user.email).subscribed
+    end
+
+    test "receives_outbound_comms?/1 is false only for deleted users" do
+      refute Accounts.receives_outbound_comms?(%User{state: :deleted})
+      refute Accounts.receives_outbound_comms?(%{state: :deleted})
+      assert Accounts.receives_outbound_comms?(%User{state: :active})
+      assert Accounts.receives_outbound_comms?(%User{state: :suspended})
+      assert Accounts.receives_outbound_comms?(%{event_notifications: false})
+    end
+
+    test "saving already-deleted user does not fail when newsletter is absent" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :deleted
+        })
+
+      assert {:ok, %User{state: :deleted}} =
+               Accounts.update_user(
+                 user,
+                 %{"first_name" => "StillDeleted"},
+                 admin
+               )
     end
   end
 

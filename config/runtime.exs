@@ -113,6 +113,43 @@ config :ysc, :google_photos,
   client_secret: System.get_env("GOOGLE_PHOTOS_CLIENT_SECRET"),
   redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI")
 
+# Outbound admin link to the standalone Query Console app.
+if query_console_url = System.get_env("QUERY_CONSOLE_URL") do
+  if query_console_url != "" do
+    config :ysc, :query_console_url, query_console_url
+  end
+end
+
+# ## First-party OAuth clients (Query Console and future apps)
+# QUERY_CONSOLE_SSO_* registers the Query Console client into :oauth_clients.
+# Only override when QUERY_CONSOLE_SSO_CLIENT_ID is set so test/dev defaults remain.
+if System.get_env("QUERY_CONSOLE_SSO_CLIENT_ID") do
+  query_console_redirect_uris =
+    (System.get_env("QUERY_CONSOLE_SSO_REDIRECT_URIS") || "")
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  client_id = System.get_env("QUERY_CONSOLE_SSO_CLIENT_ID")
+
+  post_logout_redirect_uris =
+    (System.get_env("QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS") || "")
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  clients =
+    Map.put(Application.get_env(:ysc, :oauth_clients, %{}), client_id, %{
+      client_secret: System.get_env("QUERY_CONSOLE_SSO_CLIENT_SECRET"),
+      redirect_uris: query_console_redirect_uris,
+      post_logout_redirect_uris: post_logout_redirect_uris,
+      roles: [:admin],
+      states: [:active]
+    })
+
+  config :ysc, :oauth_clients, clients
+end
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server
@@ -293,6 +330,9 @@ if config_env() == :prod do
   expense_reports_bucket =
     System.get_env("EXPENSE_REPORTS_BUCKET_NAME") || "expense-reports"
 
+  app_resources_bucket =
+    System.get_env("APP_RESOURCES_BUCKET_NAME") || "app-resources"
+
   avatars_bucket =
     case System.get_env("AVATARS_BUCKET_NAME") do
       value when is_binary(value) and value != "" ->
@@ -316,6 +356,7 @@ if config_env() == :prod do
     s3_expense_reports_public_url: s3_expense_reports_public_url,
     s3_use_custom_domain: s3_use_custom_domain,
     expense_reports_s3_bucket: expense_reports_bucket,
+    app_resources_s3_bucket: app_resources_bucket,
     avatars_s3_bucket: avatars_bucket,
     aws_access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY")
@@ -330,6 +371,19 @@ if config_env() == :prod do
   s3_scheme = (uri.scheme || "https") <> "://"
   s3_host = uri.host || "fly.storage.tigris.dev"
 
+  # Tigris requires virtual-hosted-style addressing (https://<bucket>.<host>/<key>)
+  # and rejects path-style requests (https://<host>/<bucket>/<key>) with 405 —
+  # ExAws.Operation.S3 defaults to path-style unless `virtual_host: true` is set
+  # (see ExAws.Operation.S3.add_bucket_to_path/2). Without this, every plain
+  # ExAws.S3 operation (get_object, delete_object, head_object, download_file)
+  # fails against Tigris; S3Config's own upload-URL helpers already know this
+  # (see tigris_bucket_virtual_host_url/1) but that never reached this config.
+  normalized_s3_host = s3_host |> String.downcase() |> String.trim_trailing(".")
+
+  s3_virtual_host? =
+    normalized_s3_host == "tigris.dev" or
+      String.ends_with?(normalized_s3_host, ".tigris.dev")
+
   ex_aws_s3_config =
     [
       scheme: s3_scheme,
@@ -337,6 +391,7 @@ if config_env() == :prod do
       region: s3_region
     ]
     |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
+    |> Enum.concat(if s3_virtual_host?, do: [virtual_host: true], else: [])
     |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
   config :ex_aws, :s3, ex_aws_s3_config
@@ -606,19 +661,30 @@ if config_env() == :prod do
       # QuickBooks Account IDs (required - cannot be auto-created)
       bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
       stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+      stripe_fees_account_id:
+        System.get_env("QUICKBOOKS_STRIPE_FEES_ACCOUNT_ID"),
+      stripe_fees_account_name:
+        System.get_env(
+          "QUICKBOOKS_STRIPE_FEES_ACCOUNT_NAME",
+          "Administration:Bank Service Charges:Stripe"
+        ),
+      ticket_discounts_account_id:
+        System.get_env("QUICKBOOKS_TICKET_DISCOUNTS_ACCOUNT_ID"),
+      ticket_discounts_account_name:
+        System.get_env(
+          "QUICKBOOKS_TICKET_DISCOUNTS_ACCOUNT_NAME",
+          "Ticket Discounts"
+        ),
       # Optional: QuickBooks Customer ID for payments with no user (avoids :user_not_found on payouts)
       system_customer_id: System.get_env("QUICKBOOKS_SYSTEM_CUSTOMER_ID")
   end
 end
 
-# ## MaxMind GeoIP configuration
+# ## GeoIP configuration
 #
-# Set MAXMIND_LICENSE_KEY to enable IP geolocation for auth events.
-# When not set, geolocation is silently disabled and auth events will
-# be stored without location data.
-# The database is only downloaded in deployed environments (sandbox/production);
-# see Ysc.Application.maybe_start_geo_ip_loader/0.
-if license_key = System.get_env("MAXMIND_LICENSE_KEY") do
-  config :locus,
-    license_key: license_key
-end
+# Deployed environments (sandbox/production) load GeoLite2-City from the shared
+# `ysc-app-resources` S3 bucket via Ysc.GeoIP.DatabaseFetcher. The weekly GitHub
+# Actions workflow `.github/workflows/sync-geoip-database.yml` downloads from
+# MaxMind and uploads `geoip/GeoLite2-City.tar.gz`. Keep MAXMIND_LICENSE_KEY in
+# GitHub Actions secrets only — do not set it on Fly app machines.
+# See Ysc.Application.maybe_start_geo_ip_loader/0.

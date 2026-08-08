@@ -45,6 +45,14 @@ defmodule Ysc.Bookings.Season do
     # nil means use property default (4 for Tahoe, 30 for Clear Lake)
     field :max_nights, :integer, default: nil
 
+    # System-managed tracking for the "first bookable weekend" blast email
+    # (Ysc.Bookings.SeasonWeekendAvailabilityWorker). Not admin-editable —
+    # intentionally excluded from changeset/2's cast list, same as
+    # Event.notification_sent_at.
+    field :weekend_notification_sent_cycle_year, :integer
+    field :weekend_notification_sent_at, :utc_datetime
+    field :weekend_notification_recipient_count, :integer
+
     # Relationships
     has_many :pricing_rules, Ysc.Bookings.PricingRule, foreign_key: :season_id
     has_many :rooms, Ysc.Bookings.Room, foreign_key: :default_season_id

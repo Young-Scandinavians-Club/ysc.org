@@ -99,13 +99,48 @@ defmodule Mix.Tasks.Quickbooks.VerifySandbox do
       IO.puts("")
     end
 
-    # 3) Required accounts by name
+    # 3) Required accounts by name / config
     IO.puts("--- Required accounts (by name) ---")
 
-    for name <- ["Undeposited Funds", "Stripe Fees"] do
+    qb = Application.get_env(:ysc, :quickbooks, [])
+
+    stripe_fees_name =
+      qb[:stripe_fees_account_name] ||
+        "Administration:Bank Service Charges:Stripe"
+
+    ticket_discounts_name =
+      qb[:ticket_discounts_account_name] || "Ticket Discounts"
+
+    account_names = [
+      "Undeposited Funds",
+      stripe_fees_name,
+      ticket_discounts_name,
+      "Events Inc",
+      "Clear Lake Inc",
+      "Tahoe Income",
+      "Special Project Fundraising",
+      "Administration Inc:Membership Dues",
+      "Administration Inc:Membership Dues:Family",
+      "Administration Inc:Membership Dues:Single"
+    ]
+
+    for name <- account_names do
       case client.query_account_by_name(name) do
         {:ok, id} -> IO.puts("  OK  #{name}: #{id}")
         {:error, reason} -> IO.puts("  FAIL #{name}: #{inspect(reason)}")
+      end
+    end
+
+    for {label, id} <- [
+          {"stripe_fees_account_id", qb[:stripe_fees_account_id]},
+          {"ticket_discounts_account_id", qb[:ticket_discounts_account_id]}
+        ] do
+      case id do
+        id when is_binary(id) and id != "" ->
+          IO.puts("  OK  #{label} config: #{id}")
+
+        _ ->
+          IO.puts("  (#{label} not set)")
       end
     end
 

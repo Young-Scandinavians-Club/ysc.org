@@ -34,7 +34,8 @@ defmodule YscWeb.AdminMembershipsQueryTest do
             |> get("/admin/memberships")
             |> html_response(200)
           end,
-          pattern: users_pattern
+          pattern: users_pattern,
+          caller_pids: [self()]
         )
 
       assert users_query_count == 0
@@ -60,10 +61,12 @@ defmodule YscWeb.AdminMembershipsQueryTest do
         Ysc.QueryCounter.with_query_counter(
           fn ->
             {:ok, view, _html} = live(conn, ~p"/admin/memberships")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render_async(view)
             render(view)
           end,
-          pattern: subscription_preload_pattern
+          pattern: subscription_preload_pattern,
+          caller_pids: [self()]
         )
 
       assert subscription_preload_count <= 2

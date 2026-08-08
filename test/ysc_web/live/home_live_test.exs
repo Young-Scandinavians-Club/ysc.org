@@ -117,9 +117,12 @@ defmodule YscWeb.HomeLiveTest do
       |> render_submit()
 
       html = render(view)
-      assert Newsletter.get_subscriber_by_email(email).subscribed
+      # Double opt-in: the anonymous signup form no longer subscribes
+      # immediately — it creates a pending record and sends a confirmation
+      # email instead.
+      refute Newsletter.get_subscriber_by_email(email).subscribed
       refute has_element?(view, "#newsletter-error")
-      assert html =~ "Thank you for subscribing"
+      assert html =~ "Check your email"
     end
 
     test "lists published news posts in the latest news section", %{conn: conn} do
@@ -387,9 +390,24 @@ defmodule YscWeb.HomeLiveTest do
     end
 
     defp do_hide_started_today_tickets_test(conn, user, event, started_at) do
+      # Events store a bare calendar date plus a separate wall-clock time
+      # (interpreted in America/Los_Angeles), not an arbitrary UTC instant.
+      # Break `started_at` down the same way so this event is genuinely
+      # "already started" under that model, matching how real events are
+      # stored and keeping it out of the homepage's upcoming events teaser.
+      pst_started_at = DateTime.shift_zone!(started_at, "America/Los_Angeles")
+
+      start_date =
+        DateTime.new!(DateTime.to_date(pst_started_at), ~T[00:00:00], "Etc/UTC")
+
       {:ok, event} =
         event
-        |> Ecto.Changeset.change(%{start_date: started_at})
+        |> Ecto.Changeset.change(%{
+          start_date: start_date,
+          start_time: DateTime.to_time(pst_started_at),
+          end_date: nil,
+          end_time: nil
+        })
         |> Repo.update()
 
       conn = log_in_user(conn, user)
@@ -878,6 +896,12 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "/video/" and
                (html =~ "tahoe_hero" or html =~ "clear_lake_hero")
+
+      assert html =~ "hero-media-stage"
+      assert html =~ "hero-media-stage__inner"
+      assert html =~ "hero-media-stage__bleed"
+      assert html =~ "srcset="
+      assert html =~ "100vw, 1920px"
     end
 
     test "guest home includes Nordic heritage flag row", %{conn: conn} do
@@ -944,10 +968,9 @@ defmodule YscWeb.HomeLiveTest do
       render_submit(view, "subscribe_newsletter", %{"email" => email})
 
       html = render(view)
-      assert Newsletter.get_subscriber_by_email(email).subscribed
+      refute Newsletter.get_subscriber_by_email(email).subscribed
 
-      assert html =~ "Thank you for subscribing" or
-               html =~ "Thank you for subscribing!"
+      assert html =~ "Check your email"
     end
   end
 

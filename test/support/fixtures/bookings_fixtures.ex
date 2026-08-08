@@ -7,7 +7,7 @@ defmodule Ysc.BookingsFixtures do
   import Ecto.Query
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, Room, Season}
+  alias Ysc.Bookings.{Booking, PricingRule, PricingRuleCache, Room, Season}
   alias Ysc.Bookings.SeasonHelpers
   alias Ysc.Repo
 
@@ -88,6 +88,57 @@ defmodule Ysc.BookingsFixtures do
     end
 
     Ysc.Bookings.SeasonCache.invalidate()
+    :ok
+  end
+
+  @doc """
+  Ensures the property-wide (`season_id: nil`) day and buyout pricing rules used by
+  `seeds_bookings.exs` exist for Clear Lake, then busts `PricingRuleCache`.
+
+  `PricingRuleCache` is process-wide and caches misses too (see
+  `Ysc.Bookings.PricingRuleCache.get/6`), so whether `ClearLakeBookingLive` resolves
+  `booking_mode=day` depends on whichever test happened to warm the cache first —
+  without this, "day mode" LiveView tests are flaky depending on suite run order.
+  Call this before rendering the LiveView in such tests.
+  """
+  def ensure_clear_lake_pricing_rules! do
+    get_or_create_pricing_rule = fn attrs ->
+      query =
+        from pr in PricingRule,
+          where:
+            pr.property == ^attrs.property and
+              pr.booking_mode == ^attrs.booking_mode and
+              pr.price_unit == ^attrs.price_unit and
+              is_nil(pr.season_id)
+
+      case Repo.one(query) do
+        nil ->
+          %PricingRule{}
+          |> PricingRule.changeset(attrs)
+          |> Repo.insert!()
+
+        existing ->
+          existing
+      end
+    end
+
+    get_or_create_pricing_rule.(%{
+      amount: Money.new(50, :USD),
+      booking_mode: :day,
+      price_unit: :per_guest_per_day,
+      property: :clear_lake,
+      season_id: nil
+    })
+
+    get_or_create_pricing_rule.(%{
+      amount: Money.new(500, :USD),
+      booking_mode: :buyout,
+      price_unit: :buyout_fixed,
+      property: :clear_lake,
+      season_id: nil
+    })
+
+    PricingRuleCache.invalidate()
     :ok
   end
 

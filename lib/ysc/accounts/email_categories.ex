@@ -23,7 +23,8 @@ defmodule Ysc.Accounts.EmailCategories do
                                    "membership_payment_reminder_30day",
                                    "membership_renewal_payment_method_reminder",
                                    "membership_renewal_reminder",
-                                   "membership_renewal_success"
+                                   "membership_renewal_success",
+                                   "welcome_email"
                                  ])
 
   # Map of email template names to their notification categories
@@ -47,6 +48,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "membership_renewal_reminder" => :account,
     "membership_payment_reminder_7day" => :account,
     "membership_payment_reminder_30day" => :account,
+    "welcome_email" => :account,
     "booking_checkin_reminder" => :account,
     "expense_report_confirmation" => :account,
     # Board/admin notifications (always sent, no user preference check)
@@ -64,6 +66,8 @@ defmodule Ysc.Accounts.EmailCategories do
     "event_notification" => :event,
     "event_update_notification" => :event,
     "save_the_date_available" => :event,
+    "tahoe_winter_weekend_available" => :event,
+    "tahoe_summer_buyout_available" => :event,
     # Booking notifications (can be disabled)
     "booking_confirmation" => :account,
     "booking_entitlement_granted" => :account,
@@ -74,6 +78,9 @@ defmodule Ysc.Accounts.EmailCategories do
     "family_invite_accepted" => :account,
     "family_invite_cancelled" => :account,
     "family_member_removed" => :account,
+    # Double opt-in confirmation — must always send regardless of newsletter
+    # preference, since it's what grants that preference in the first place.
+    "newsletter_confirmation" => :account,
     # Newsletter (preference checked via newsletter_subscribers when sent through EmailNotifier)
     "newsletter_edition" => :newsletter
   }
@@ -150,22 +157,26 @@ defmodule Ysc.Accounts.EmailCategories do
   """
   @spec should_send_email?(map(), String.t()) :: boolean()
   def should_send_email?(user, template_name) when is_binary(template_name) do
-    case get_category(template_name) do
-      :account ->
-        # Account notifications cannot be disabled
-        true
+    if Ysc.Accounts.receives_outbound_comms?(user) do
+      case get_category(template_name) do
+        :account ->
+          # Account notifications cannot be disabled
+          true
 
-      :event ->
-        # Check if user has event notifications enabled
-        Map.get(user, :event_notifications, true)
+        :event ->
+          # Check if user has event notifications enabled
+          Map.get(user, :event_notifications, true)
 
-      :newsletter ->
-        # Newsletter preference lives in newsletter_subscribers
-        case user && user.email &&
-               Newsletter.get_subscriber_by_email(user.email) do
-          nil -> false
-          subscriber -> subscriber.subscribed
-        end
+        :newsletter ->
+          # Newsletter preference lives in newsletter_subscribers
+          case user && user.email &&
+                 Newsletter.get_subscriber_by_email(user.email) do
+            nil -> false
+            subscriber -> subscriber.subscribed
+          end
+      end
+    else
+      false
     end
   end
 

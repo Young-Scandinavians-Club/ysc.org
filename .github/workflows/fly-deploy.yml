@@ -8,6 +8,9 @@
 # CI deploy_sandbox uses cancel-in-progress: false so a release deploy is never cancelled by CI;
 # Deploy Production keeps cancel-in-progress: true and wins the shared deploy-sandbox group.
 #
+# Query console (query_console/) deploys in parallel: ysc-query-console-sandbox on main,
+# ysc-query-console on v* tags (see deploy_query_console_* jobs).
+#
 # Secrets: use FLY_SANDBOX_API_TOKEN for the sandbox Fly org (recommended). If unset, FLY_API_TOKEN
 # is used so existing repos keep working — do not point FLY_API_TOKEN at production.
 
@@ -66,6 +69,35 @@ jobs:
         run: |
           mix deps.compile
           mix compile --warnings-as-errors
+
+      # GHA service containers do not pass `server /data` to the MinIO image, so the
+      # container exits immediately (help text only) and the health check never passes.
+      # Start MinIO explicitly on the runner (same image as etc/docker/docker-compose).
+      # Kept in sync with the identical step in ci.yml.
+      - name: Start MinIO and create buckets
+        run: |
+          docker rm -f minio_ci 2>/dev/null || true
+          docker run -d --name minio_ci -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:RELEASE.2025-03-12T18-04-18Z@sha256:46b3009bf7041eefbd90bd0d2b38c6ddc24d20a35d609551a1802c558c1c958f \
+            server /data --console-address ":9001"
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:9000/minio/health/live && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:9000/minio/health/live
+          docker run --rm --network host --entrypoint /bin/sh \
+            minio/mc:RELEASE.2025-03-12T17-29-24Z@sha256:470f5546b596e16c7816b9c3fa7a78ce4076bb73c2c73f7faeec0c8043923123 \
+            -c "
+              mc alias set local http://127.0.0.1:9000 minioadmin minioadmin &&
+              mc mb local/media --ignore-existing &&
+              mc mb local/expense-reports --ignore-existing &&
+              mc mb local/app-resources --ignore-existing &&
+              mc mb local/avatars --ignore-existing &&
+              mc anonymous set public local/media &&
+              mc anonymous set public local/avatars
+            "
 
       - name: Run tests and generate lcov report
         env:
@@ -240,5 +272,46 @@ jobs:
             VERSION="unknown-${GIT_HASH}"
           fi
           flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+
+  deploy_query_console_sandbox:
+    name: Deploy query console sandbox
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: needs.deploy.outputs.skip != 'true'
+    concurrency:
+      group: deploy-query-console-sandbox
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: query_console
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+      - name: Verify Fly token can access query console sandbox
+        working-directory: .
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+        run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console-sandbox
+      - name: Deploy query console to Fly.io sandbox
+        run: |
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "Stale run — main has moved on, skipping query console sandbox deploy."
+            exit 0
+          fi
+
+          GIT_HASH=$(git rev-parse --short=7 HEAD)
+          VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -n "$VERSION_TAG" ]; then
+            COMMITS=$(git rev-list --count "${VERSION_TAG}..HEAD")
+            VERSION="${VERSION_TAG}-${COMMITS}-${GIT_HASH}"
+          else
+            VERSION="unknown-${GIT_HASH}"
+          fi
+          flyctl deploy -a ysc-query-console-sandbox -c fly.sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}

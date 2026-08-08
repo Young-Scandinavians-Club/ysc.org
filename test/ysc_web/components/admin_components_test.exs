@@ -151,6 +151,7 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ "Failed"
       assert html =~ "Error"
       assert html =~ "timeout"
+      assert html =~ "items-start"
     end
 
     test "stack layout truncates error text when error_hint is truncate" do

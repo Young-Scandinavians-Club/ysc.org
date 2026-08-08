@@ -774,8 +774,37 @@ defmodule Ysc.Stripe.WebhookHandler do
       :ok
     else
       if event.status in ["active", "trialing"] do
-        customer = Ysc.Accounts.get_user_from_stripe_id(event.customer)
-        Subscriptions.create_subscription_from_stripe(customer, event)
+        customer =
+          resolve_user_for_customer(event.customer, event.metadata["user_id"])
+
+        if customer do
+          case Subscriptions.create_subscription_from_stripe(customer, event) do
+            {:ok, _subscription} ->
+              :ok
+
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Failed to create subscription from customer.subscription.created",
+                stripe_customer_id: event.customer,
+                stripe_subscription_id: event.id,
+                error: inspect(reason)
+              )
+
+              # Raise to mark webhook as failed and rollback - a silently
+              # dropped subscription create is the same class of bug this
+              # module exists to prevent (see the nil-customer raise below).
+              raise "Failed to create subscription: #{inspect(reason)}"
+          end
+        else
+          Ysc.Logging.error(
+            "No user found for customer.subscription.created (checked customer_id and metadata.user_id)",
+            stripe_customer_id: event.customer,
+            stripe_subscription_id: event.id
+          )
+
+          # Raise to mark webhook as failed and rollback - missing user is a critical error
+          raise "No user found for customer_id: #{event.customer}"
+        end
       end
 
       :ok
@@ -837,18 +866,19 @@ defmodule Ysc.Stripe.WebhookHandler do
         # overwrite existing values with nil, or active?/1 will incorrectly return false
         # (nil current_period_end is treated as inactive), causing "no membership" for users.
         #
-        # CRITICAL: Don't downgrade an active subscription to "incomplete" during upgrade
-        # transitions. When upgrading (e.g. Single → Family), Stripe creates a proration
-        # invoice and briefly marks the subscription as "incomplete" until payment settles.
-        # If we save "incomplete" to the DB, preload_active_subscriptions_for_auth (which
-        # filters by stripe_status IN ('active','trialing')) will find nothing and the user
-        # will see a "No membership" banner until the follow-up "active" webhook arrives.
-        # We still update subscription items so the plan change is reflected immediately.
+        # CRITICAL: Don't downgrade an active subscription to "incomplete".
+        # This covers (1) upgrade proration invoices and (2) ACH Direct Debit while
+        # the PaymentIntent is still processing — we may have persisted local status
+        # as active on activate so the member has access before settlement.
+        # If we save "incomplete" to the DB, preload_active_subscriptions_for_auth
+        # (which filters by stripe_status IN ('active','trialing')) will find nothing
+        # and the user will see a "No membership" banner until the follow-up "active"
+        # webhook arrives. We still update subscription items so plan changes apply.
         attrs =
           if event.status == "incomplete" and
                subscription.stripe_status in ["active", "trialing"] do
             Ysc.Logging.debug(
-              "Skipping incomplete status for active subscription during upgrade transition",
+              "Skipping incomplete status for active subscription (upgrade or ACH processing)",
               subscription_id: subscription.id,
               stripe_subscription_id: event.id,
               current_stripe_status: subscription.stripe_status
@@ -1254,10 +1284,24 @@ defmodule Ysc.Stripe.WebhookHandler do
         :ok
 
       subscription_id ->
-        # Get the user from the customer ID
+        # Get the user from the customer ID. Falls back to the local
+        # subscription's user_id when the customer_id doesn't match any
+        # user's stripe_id (e.g. the user has a stray duplicate Stripe
+        # customer) - the subscription's user_id FK is authoritative
+        # regardless of which customer Stripe happens to have billed.
         customer_id = invoice[:customer] || invoice["customer"]
         invoice_id = invoice[:id] || invoice["id"]
-        user = Ysc.Accounts.get_user_from_stripe_id(customer_id)
+
+        user =
+          resolve_user_for_customer(
+            customer_id,
+            subscription_id
+            |> Subscriptions.get_subscription_by_stripe_id()
+            |> case do
+              %{user_id: user_id} -> user_id
+              nil -> nil
+            end
+          )
 
         if user do
           # Check if we already have a payment record for this invoice
@@ -2185,6 +2229,26 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     # Return Money directly with the fee in dollars (no need to convert back to cents)
     Money.new(estimated_fee, :USD)
+  end
+
+  # Looks up a user by Stripe customer_id, falling back to a known user_id
+  # (from Stripe object metadata, or from a local record like a subscription)
+  # when the customer_id doesn't match any user. A user should only ever
+  # have one Stripe customer, but if that ever drifts (see
+  # Customers.ensure_stripe_customer/1), the fallback keeps webhook
+  # processing working instead of hard-failing on a lookup we know how to
+  # route around.
+  defp resolve_user_for_customer(customer_id, fallback_user_id) do
+    case Ysc.Accounts.get_user_from_stripe_id(customer_id) do
+      nil when is_binary(fallback_user_id) ->
+        Ysc.Accounts.get_user(fallback_user_id)
+
+      nil ->
+        nil
+
+      user ->
+        user
+    end
   end
 
   # Helper function to resolve subscription ID from invoice
@@ -3141,6 +3205,11 @@ defmodule Ysc.Stripe.WebhookHandler do
           updated_payout =
             Repo.reload!(updated_payout) |> Repo.preload([:payments, :refunds])
 
+          # Book standalone payout-time fees (Billing Usage Fee, instant payout
+          # fee, etc.) to the internal ledger. Per-charge fees were already
+          # booked when those payments were recorded.
+          book_payout_time_stripe_fees(updated_payout, balance_transactions)
+
           Ysc.Logging.info(
             "[Payout] Final payout transaction counts after linking",
             payout_id: stripe_payout_id,
@@ -3171,13 +3240,141 @@ defmodule Ysc.Stripe.WebhookHandler do
       error ->
         Ysc.Logging.error("Exception while linking balance transactions",
           payout_id: stripe_payout_id,
-          error: Exception.message(error),
-          error_type: error.__struct__,
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          error: error,
+          stacktrace: __STACKTRACE__
         )
 
         # Return the payout even if linking failed (caller can check status)
         updated_payout
+    end
+  end
+
+  @doc false
+  # Sums fee cents across payout balance transactions for `fee_total`.
+  # Per-charge fees use BT `:fee`; standalone Stripe fees (Billing Usage Fee, etc.)
+  # use abs(BT `:amount`) because those rows typically have `fee: 0`.
+  def sum_fee_cents_from_balance_transactions(balance_transactions)
+      when is_list(balance_transactions) do
+    Enum.reduce(balance_transactions, 0, fn balance_transaction, acc ->
+      try do
+        acc + fee_cents_contribution(balance_transaction)
+      rescue
+        error ->
+          require Ysc.Logging
+
+          Ysc.Logging.warning(
+            "Error processing balance transaction for fee calculation",
+            error: Exception.message(error),
+            balance_transaction_id:
+              extract_balance_transaction_id(balance_transaction)
+          )
+
+          acc
+      end
+    end)
+  end
+
+  @doc false
+  # Fees that should be booked to the ledger at payout time (not already booked
+  # with individual payments): standalone stripe_fee rows and the payout BT's
+  # own `:fee` (e.g. instant payout fee).
+  def sum_payout_time_fee_cents_from_balance_transactions(balance_transactions)
+      when is_list(balance_transactions) do
+    Enum.reduce(balance_transactions, 0, fn balance_transaction, acc ->
+      try do
+        acc + payout_time_fee_cents_contribution(balance_transaction)
+      rescue
+        error ->
+          require Ysc.Logging
+
+          Ysc.Logging.warning(
+            "Error processing balance transaction for payout-time fee calculation",
+            error: Exception.message(error),
+            balance_transaction_id:
+              extract_balance_transaction_id(balance_transaction)
+          )
+
+          acc
+      end
+    end)
+  end
+
+  defp fee_cents_contribution(balance_transaction) do
+    transaction_type = get_balance_transaction_field(balance_transaction, :type)
+
+    reporting_category =
+      get_balance_transaction_field(balance_transaction, :reporting_category)
+
+    cond do
+      transaction_type == "payout" ->
+        0
+
+      stripe_fee_balance_transaction?(transaction_type, reporting_category) ->
+        amount =
+          get_balance_transaction_field(balance_transaction, :amount, 0) || 0
+
+        abs(amount)
+
+      true ->
+        get_balance_transaction_field(balance_transaction, :fee, 0) || 0
+    end
+  end
+
+  defp payout_time_fee_cents_contribution(balance_transaction) do
+    transaction_type = get_balance_transaction_field(balance_transaction, :type)
+
+    reporting_category =
+      get_balance_transaction_field(balance_transaction, :reporting_category)
+
+    cond do
+      stripe_fee_balance_transaction?(transaction_type, reporting_category) ->
+        amount =
+          get_balance_transaction_field(balance_transaction, :amount, 0) || 0
+
+        abs(amount)
+
+      transaction_type == "payout" ->
+        get_balance_transaction_field(balance_transaction, :fee, 0) || 0
+
+      true ->
+        0
+    end
+  end
+
+  defp stripe_fee_balance_transaction?(type, reporting_category) do
+    type in ["stripe_fee"] or reporting_category in ["stripe_fee", "fee"]
+  end
+
+  defp book_payout_time_stripe_fees(payout, balance_transactions) do
+    require Ysc.Logging
+
+    fee_cents =
+      sum_payout_time_fee_cents_from_balance_transactions(balance_transactions)
+
+    if fee_cents > 0 do
+      currency = payout.currency || "usd"
+      currency_atom = normalize_currency(String.downcase(currency))
+
+      fee_amount =
+        Money.new(MoneyHelper.cents_to_dollars(fee_cents), currency_atom)
+
+      case Ledgers.book_payout_stripe_fees(payout, fee_amount) do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Failed to book payout-time Stripe fees to ledger",
+            payout_id: payout.id,
+            stripe_payout_id: payout.stripe_payout_id,
+            fee_amount: Money.to_string!(fee_amount),
+            error: inspect(reason)
+          )
+
+          :error
+      end
+    else
+      :ok
     end
   end
 
@@ -3193,37 +3390,13 @@ defmodule Ysc.Stripe.WebhookHandler do
             payout_id: stripe_payout_id
           )
 
-          # Calculate total fees from balance transactions
-          # Skip the payout balance transaction itself (type: "payout")
+          # Calculate total fees from balance transactions:
+          # - charge/refund BTs: sum the `:fee` field (processing fees)
+          # - stripe_fee / reporting_category "fee" BTs: use abs(:amount)
+          #   (e.g. Billing - Usage Fee; these typically have fee: 0)
+          # - skip type "payout" (the payout itself)
           total_fee_cents =
-            Enum.reduce(balance_transactions, 0, fn balance_transaction, acc ->
-              try do
-                # Skip payout balance transactions
-                transaction_type =
-                  get_balance_transaction_field(balance_transaction, :type)
-
-                if transaction_type == "payout" do
-                  # Skip the payout transaction itself
-                  acc
-                else
-                  fee_cents =
-                    get_balance_transaction_field(balance_transaction, :fee, 0) ||
-                      0
-
-                  acc + fee_cents
-                end
-              rescue
-                error ->
-                  Ysc.Logging.warning(
-                    "Error processing balance transaction for fee calculation",
-                    error: Exception.message(error),
-                    balance_transaction_id:
-                      extract_balance_transaction_id(balance_transaction)
-                  )
-
-                  acc
-              end
-            end)
+            sum_fee_cents_from_balance_transactions(balance_transactions)
 
           if total_fee_cents > 0 do
             currency = payout.currency || "usd"
@@ -3429,21 +3602,16 @@ defmodule Ysc.Stripe.WebhookHandler do
       if charge do
         # Use extract_id_from_expandable/1 to handle both plain string IDs and
         # expanded Stripe objects (e.g. %Stripe.PaymentIntent{id: "pi_..."}).
+        # Prefer Map.get/2 over struct field access: stripity_stripe Charge structs
+        # omit some API fields (e.g. :invoice) depending on API version.
         payment_intent_id =
-          if is_struct(charge) do
-            extract_id_from_expandable(charge.payment_intent)
-          else
-            extract_id_from_expandable(
-              charge[:payment_intent] || charge["payment_intent"]
-            )
-          end
+          extract_id_from_expandable(
+            Map.get(charge, :payment_intent) ||
+              Map.get(charge, "payment_intent")
+          )
 
         invoice_id =
-          if is_struct(charge) do
-            extract_id_from_expandable(charge.invoice)
-          else
-            extract_id_from_expandable(charge[:invoice] || charge["invoice"])
-          end
+          resolve_charge_invoice_id(charge, charge_id)
 
         # Try payment_intent_id first (booking payments), then invoice_id
         # (subscription payments). Use sequential fallback rather than exclusive
@@ -3490,12 +3658,52 @@ defmodule Ysc.Stripe.WebhookHandler do
       error ->
         Ysc.Logging.error("Exception while linking charge to payout",
           charge_id: charge_id,
-          error: Exception.message(error),
-          error_type: error.__struct__,
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          error: error,
+          stacktrace: __STACKTRACE__
         )
 
         :skipped
+    end
+  end
+
+  # stripity_stripe Charge structs omit `:invoice` on current API versions even though
+  # Stripe still returns it. Fall back to a raw charge retrieve (map) when needed so
+  # subscription payments keyed by invoice id can be linked to payouts.
+  defp resolve_charge_invoice_id(charge, charge_id) do
+    extract_id_from_expandable(
+      Map.get(charge, :invoice) || Map.get(charge, "invoice")
+    ) || fetch_charge_invoice_id(charge_id)
+  end
+
+  defp fetch_charge_invoice_id(nil), do: nil
+
+  defp fetch_charge_invoice_id(charge_id) when is_binary(charge_id) do
+    # Prefer Req over stripity_stripe here: Charge OpenAPI structs omit `:invoice`,
+    # and even `response_as: :map` drops fields not in the generated schema.
+    api_key = Application.get_env(:stripity_stripe, :api_key)
+
+    base_url =
+      Application.get_env(
+        :stripity_stripe,
+        :api_base_url,
+        "https://api.stripe.com"
+      )
+
+    req_opts = Application.get_env(:ysc, :stripe_charge_fetch_req_opts, [])
+
+    case Req.get(
+           "#{base_url}/v1/charges/#{charge_id}",
+           [
+             headers: [{"Authorization", "Bearer #{api_key}"}],
+             decode_body: true
+           ] ++
+             req_opts
+         ) do
+      {:ok, %Req.Response{status: 200, body: body}} when is_map(body) ->
+        extract_id_from_expandable(body["invoice"])
+
+      _ ->
+        nil
     end
   end
 
@@ -3651,9 +3859,8 @@ defmodule Ysc.Stripe.WebhookHandler do
       error ->
         Ysc.Logging.error("Exception while linking refund to payout",
           stripe_refund_id: stripe_refund_id,
-          error: Exception.message(error),
-          error_type: error.__struct__,
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          error: error,
+          stacktrace: __STACKTRACE__
         )
 
         :skipped

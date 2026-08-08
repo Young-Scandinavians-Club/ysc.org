@@ -192,6 +192,12 @@ defmodule Ysc.Messages do
   end
 
   defp deliver_claimed_email(email, attrs, delivery) do
+    # EmailNotifier may have pre-created the row with rendered_message: nil.
+    # Persist the rendered body before delivery so admin previews work on both
+    # success and failure paths.
+    {delivery, rendered} =
+      persist_email_rendered_message(delivery, email, attrs)
+
     tracked_email =
       email
       |> maybe_disable_ses_link_tracking(attrs[:message_template])
@@ -208,7 +214,8 @@ defmodule Ysc.Messages do
           accepted_at: now,
           provider_message_id: Map.get(metadata, :id),
           provider_request_id: Map.get(metadata, :request_id),
-          last_delivery_error: nil
+          last_delivery_error: nil,
+          rendered_message: rendered
         })
         |> Repo.update!()
 
@@ -218,7 +225,7 @@ defmodule Ysc.Messages do
 
       error ->
         delivery_error = DeliveryError.classify(error)
-        persist_email_failure(delivery, delivery_error)
+        persist_email_failure(delivery, delivery_error, rendered)
 
         if delivery_error.category == :rate_limited do
           RateLimiter.throttle!(retry_after_seconds(delivery.delivery_attempts))
@@ -235,13 +242,45 @@ defmodule Ysc.Messages do
   rescue
     error ->
       delivery_error = DeliveryError.classify({:error, error})
-      persist_email_failure(delivery, delivery_error)
+      rendered = email_rendered_message(email, attrs)
+      persist_email_failure(delivery, delivery_error, rendered)
       delivery_error_result(attrs, delivery_error)
   end
 
-  defp persist_email_failure(delivery, delivery_error) do
-    delivery
-    |> MessageIdempotency.changeset(%{
+  defp persist_email_rendered_message(delivery, email, attrs) do
+    rendered = email_rendered_message(email, attrs)
+
+    if is_binary(rendered) and rendered != "" and
+         delivery.rendered_message != rendered do
+      updated =
+        delivery
+        |> MessageIdempotency.changeset(%{rendered_message: rendered})
+        |> Repo.update!()
+
+      {updated, rendered}
+    else
+      {delivery, rendered || delivery.rendered_message}
+    end
+  end
+
+  defp email_rendered_message(email, attrs) do
+    cond do
+      is_binary(attrs[:rendered_message]) and attrs[:rendered_message] != "" ->
+        attrs[:rendered_message]
+
+      is_binary(email.html_body) and email.html_body != "" ->
+        email.html_body
+
+      is_binary(email.text_body) and email.text_body != "" ->
+        email.text_body
+
+      true ->
+        nil
+    end
+  end
+
+  defp persist_email_failure(delivery, delivery_error, rendered) do
+    attrs = %{
       delivery_status:
         if(delivery_error.category == :permanent,
           do: :terminal_failed,
@@ -249,7 +288,17 @@ defmodule Ysc.Messages do
         ),
       delivery_lease_expires_at: nil,
       last_delivery_error: delivery_error
-    })
+    }
+
+    attrs =
+      if is_binary(rendered) and rendered != "" do
+        Map.put(attrs, :rendered_message, rendered)
+      else
+        attrs
+      end
+
+    delivery
+    |> MessageIdempotency.changeset(attrs)
     |> Repo.update()
   end
 

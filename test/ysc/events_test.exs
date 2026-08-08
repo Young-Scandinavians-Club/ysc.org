@@ -4,6 +4,7 @@ defmodule Ysc.EventsTest do
   alias Ysc.Agendas
   alias Ysc.Events
   alias Ysc.Events.{Event, EventPricingCache, FaqQuestion, Ticket, TicketTier}
+  alias Ysc.Ledgers
   alias Ysc.Repo
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
@@ -1062,6 +1063,119 @@ defmodule Ysc.EventsTest do
     end
   end
 
+  describe "events page visibility window (PST-aware)" do
+    defp pst_date(offset_days) do
+      "America/Los_Angeles"
+      |> DateTime.now!()
+      |> DateTime.to_date()
+      |> Date.add(offset_days)
+    end
+
+    defp bare_date(%Date{} = date) do
+      DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+    end
+
+    defp upcoming?(event) do
+      Enum.any?(Events.list_upcoming_events(50), &(&1.id == event.id))
+    end
+
+    defp past?(event) do
+      Enum.any?(Events.list_past_events(50), &(&1.id == event.id))
+    end
+
+    defp in_admin_tab?(event, tab) do
+      params = %{page: 1, page_size: 50}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params, tab: tab)
+
+      Enum.any?(rows, &(&1.id == event.id))
+    end
+
+    test "no-time event dated today (PST) is still upcoming" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(0))
+        })
+
+      assert upcoming?(event)
+      refute past?(event)
+      assert in_admin_tab?(event, :upcoming)
+      refute in_admin_tab?(event, :past)
+    end
+
+    test "no-time event dated yesterday (PST) has moved to past" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-1))
+        })
+
+      refute upcoming?(event)
+      assert past?(event)
+      refute in_admin_tab?(event, :upcoming)
+      assert in_admin_tab?(event, :past)
+    end
+
+    test "multi-day event with no end time stays upcoming through the day after its end date" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-2)),
+          end_date: bare_date(pst_date(1))
+        })
+
+      assert upcoming?(event)
+      refute past?(event)
+      assert in_admin_tab?(event, :upcoming)
+      refute in_admin_tab?(event, :past)
+    end
+
+    test "multi-day event moves to past once its end date and time pass" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-3)),
+          end_date: bare_date(pst_date(-2)),
+          end_time: ~T[12:00:00]
+        })
+
+      refute upcoming?(event)
+      assert past?(event)
+      refute in_admin_tab?(event, :upcoming)
+      assert in_admin_tab?(event, :past)
+    end
+
+    test "timed event with only a start time in the past has moved to past" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-1)),
+          start_time: ~T[08:00:00]
+        })
+
+      refute upcoming?(event)
+      assert past?(event)
+      refute in_admin_tab?(event, :upcoming)
+      assert in_admin_tab?(event, :past)
+    end
+
+    test "timed event with only a start time tomorrow (PST) is still upcoming" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(1)),
+          start_time: ~T[08:00:00]
+        })
+
+      assert upcoming?(event)
+      refute past?(event)
+      assert in_admin_tab?(event, :upcoming)
+      refute in_admin_tab?(event, :past)
+    end
+  end
+
   describe "ticket tier queries" do
     test "list_ticket_tiers_for_event/1 returns tiers for event" do
       {:ok, event} = create_event_fixture()
@@ -1863,6 +1977,298 @@ defmodule Ysc.EventsTest do
       purchase = Enum.at(summary, 0)
       assert Map.has_key?(purchase, :ticket_count)
       assert Map.has_key?(purchase, :total_amount)
+    end
+  end
+
+  describe "get_event_sales_stats/1" do
+    test "sums revenue per tier net of discounts, and excludes donation tiers",
+         %{user: user} do
+      {:ok, event} = create_event_fixture()
+
+      {:ok, paid_tier} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "VIP",
+          type: :paid,
+          price: Money.new(100, :USD)
+        })
+
+      {:ok, donation_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      # Two full-price VIP tickets.
+      for _i <- 1..2 do
+        %Ticket{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: paid_tier.id,
+          status: :confirmed,
+          expires_at: expires_at
+        }
+        |> Repo.insert!()
+      end
+
+      # One discounted VIP ticket.
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: paid_tier.id,
+        status: :confirmed,
+        discount_amount: Money.new(20, :USD),
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      # A pending (not confirmed) ticket should not count.
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: paid_tier.id,
+        status: :pending,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      # Donation tickets have no fixed price and must not crash/appear here.
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      stats = Events.get_event_sales_stats(event.id)
+
+      assert stats.total_tickets_sold == 3
+      assert Money.equal?(stats.total_revenue, Money.new(280, :USD))
+      assert [tier_row] = stats.by_tier
+      assert tier_row.name == "VIP"
+      assert tier_row.tickets_sold == 3
+      assert Money.equal?(tier_row.revenue, Money.new(280, :USD))
+    end
+
+    test "returns zero totals and empty by_tier for an event with no confirmed tickets" do
+      {:ok, event} = create_event_fixture()
+      stats = Events.get_event_sales_stats(event.id)
+
+      assert stats.by_tier == []
+      assert stats.total_tickets_sold == 0
+      assert Money.equal?(stats.total_revenue, Money.new(0, :USD))
+    end
+  end
+
+  describe "get_event_sales_over_time/1" do
+    test "buckets confirmed ticket revenue by day and excludes donation tiers",
+         %{user: user} do
+      {:ok, event} = create_event_fixture()
+
+      {:ok, tier} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          price: Money.new(50, :USD)
+        })
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      day1 =
+        DateTime.utc_now()
+        |> DateTime.add(-2, :day)
+        |> DateTime.truncate(:second)
+
+      day2 =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :day)
+        |> DateTime.truncate(:second)
+
+      for _i <- 1..2 do
+        %Ticket{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          inserted_at: day1,
+          expires_at: expires_at
+        }
+        |> Repo.insert!()
+      end
+
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        inserted_at: day2,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      points = Events.get_event_sales_over_time(event.id)
+      dates = Enum.map(points, & &1.date)
+
+      assert DateTime.to_date(day1) in dates
+      assert DateTime.to_date(day2) in dates
+
+      day1_point = Enum.find(points, &(&1.date == DateTime.to_date(day1)))
+      assert day1_point.tickets_sold == 2
+      assert Money.equal?(day1_point.revenue, Money.new(100, :USD))
+
+      day2_point = Enum.find(points, &(&1.date == DateTime.to_date(day2)))
+      assert day2_point.tickets_sold == 1
+      assert Money.equal?(day2_point.revenue, Money.new(50, :USD))
+    end
+
+    test "returns an empty list for an event with no confirmed tickets and no sale window" do
+      {:ok, event} = create_event_fixture()
+      assert Events.get_event_sales_over_time(event.id) == []
+    end
+  end
+
+  describe "get_event_ticket_sale_window/1" do
+    test "returns the earliest start_date and latest end_date across tiers" do
+      {:ok, event} = create_event_fixture()
+
+      start1 =
+        DateTime.add(DateTime.utc_now(), -10, :day)
+        |> DateTime.truncate(:second)
+
+      end1 =
+        DateTime.add(DateTime.utc_now(), 5, :day) |> DateTime.truncate(:second)
+
+      start2 =
+        DateTime.add(DateTime.utc_now(), -5, :day) |> DateTime.truncate(:second)
+
+      end2 =
+        DateTime.add(DateTime.utc_now(), 20, :day) |> DateTime.truncate(:second)
+
+      {:ok, _tier1} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          start_date: start1,
+          end_date: end1
+        })
+
+      {:ok, _tier2} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          start_date: start2,
+          end_date: end2
+        })
+
+      window = Events.get_event_ticket_sale_window(event.id)
+
+      assert DateTime.compare(window.start_date, start1) == :eq
+      assert DateTime.compare(window.end_date, end2) == :eq
+    end
+
+    test "returns nil start/end when no tiers set a sale window" do
+      {:ok, event} = create_event_fixture()
+      {:ok, _tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+      assert Events.get_event_ticket_sale_window(event.id) == %{
+               start_date: nil,
+               end_date: nil
+             }
+    end
+  end
+
+  describe "get_event_stripe_fees_total/1" do
+    test "sums stripe fees only for confirmed tickets with a payment", %{
+      user: user
+    } do
+      {:ok, event} = create_event_fixture()
+      {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+      Ledgers.ensure_basic_accounts()
+      stripe_fees_account = Ledgers.get_account_by_name("stripe_fees")
+
+      [payment] = Ysc.LedgersFixtures.payment_rows!(user.id, 1)
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment.id,
+          amount: Money.new(320, :USD),
+          debit_credit: :debit,
+          description: "fee"
+        })
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      # Confirmed ticket linked to the payment: counts.
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        payment_id: payment.id,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      # Confirmed ticket with no payment: ignored.
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      assert Money.equal?(
+               Events.get_event_stripe_fees_total(event.id),
+               Money.new(320, :USD)
+             )
+    end
+
+    test "returns zero for an event with no confirmed ticket payments" do
+      {:ok, event} = create_event_fixture()
+
+      assert Money.equal?(
+               Events.get_event_stripe_fees_total(event.id),
+               Money.new(0, :USD)
+             )
+    end
+  end
+
+  describe "get_event_donations_total/1" do
+    test "delegates to the donation_revenue ledger total for the event" do
+      {:ok, event} = create_event_fixture()
+
+      Ledgers.ensure_basic_accounts()
+      donation_account = Ledgers.get_account_by_name("donation_revenue")
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: donation_account.id,
+          amount: Money.new(75, :USD),
+          debit_credit: :credit,
+          related_entity_type: :donation,
+          related_entity_id: event.id,
+          description: "Donation"
+        })
+
+      assert Money.equal?(
+               Events.get_event_donations_total(event.id),
+               Money.new(75, :USD)
+             )
+    end
+
+    test "returns zero for an event with no donations" do
+      {:ok, event} = create_event_fixture()
+
+      assert Money.equal?(
+               Events.get_event_donations_total(event.id),
+               Money.new(0, :USD)
+             )
     end
   end
 

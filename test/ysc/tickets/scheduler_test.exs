@@ -7,10 +7,9 @@ defmodule Ysc.Tickets.SchedulerTest do
   alias Ysc.Tickets.Scheduler
 
   describe "scheduler" do
-    test "start_scheduler/0 schedules immediate and periodic checks" do
-      # In :inline mode, jobs execute immediately
-      # We just verify that start_scheduler returns successfully
-      assert {:ok, _job} = Scheduler.start_scheduler()
+    test "start_scheduler/0 returns :ok without scheduling an immediate job" do
+      # Recurring checks are handled by Oban.Cron; boot should not enqueue one.
+      assert :ok = Scheduler.start_scheduler()
     end
 
     test "schedule_next_timeout_check/0 schedules a job" do

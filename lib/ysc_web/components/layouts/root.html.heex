@@ -38,14 +38,15 @@
       content={assigns[:og_url]}
     />
     <meta
-      :if={assigns[:og_image]}
       property="og:image"
-      content={assigns[:og_image]}
+      content={YscWeb.SEO.og_image_or_default(assigns[:og_image])}
     />
     <meta
       name="twitter:card"
       content={
-        if(assigns[:og_image], do: "summary_large_image", else: "summary")
+        YscWeb.SEO.twitter_card_for_image(
+          YscWeb.SEO.og_image_or_default(assigns[:og_image])
+        )
       }
     />
     <meta
@@ -58,9 +59,8 @@
       content={assigns[:meta_description]}
     />
     <meta
-      :if={assigns[:og_image]}
       name="twitter:image"
-      content={assigns[:og_image]}
+      content={YscWeb.SEO.og_image_or_default(assigns[:og_image])}
     />
     <link
       :if={assigns[:canonical_url]}

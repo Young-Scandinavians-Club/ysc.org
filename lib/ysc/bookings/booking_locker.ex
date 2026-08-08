@@ -54,6 +54,18 @@ defmodule Ysc.Bookings.BookingLocker do
   # Tahoe uses room-level inventory, not property capacity
   @default_capacity_tahoe 0
 
+  # Returns the list of night-dates for a stay, i.e. [checkin_date, checkout_date).
+  # Guards the case where checkout_date <= checkin_date (e.g. equal dates) so we
+  # don't feed Date.range/2 a descending bound, which infers a negative step and
+  # would otherwise return the day before checkin_date instead of an empty stay.
+  defp stay_night_dates(checkin_date, checkout_date) do
+    if Date.compare(checkout_date, checkin_date) == :gt do
+      Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
+    else
+      []
+    end
+  end
+
   @doc """
   Atomically creates a buyout booking with proper inventory locking.
 
@@ -121,8 +133,7 @@ defmodule Ysc.Bookings.BookingLocker do
     hold_expires_at = DateTime.add(DateTime.utc_now(), hold_duration, :minute)
 
     Repo.transaction(fn ->
-      days =
-        Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
+      days = stay_night_dates(checkin_date, checkout_date)
 
       # Ensure property_inventory rows exist
       ensure_property_inventory_for_days(property, days)
@@ -577,9 +588,7 @@ defmodule Ysc.Bookings.BookingLocker do
       {:error, :no_rooms_provided}
     else
       Repo.transaction(fn ->
-        days =
-          Date.range(checkin_date, Date.add(checkout_date, -1))
-          |> Enum.to_list()
+        days = stay_night_dates(checkin_date, checkout_date)
 
         # Get all rooms to determine property (must all be same property)
         rooms = fetch_and_validate_rooms(room_ids)
@@ -1102,8 +1111,7 @@ defmodule Ysc.Bookings.BookingLocker do
     hold_expires_at = DateTime.add(DateTime.utc_now(), hold_duration, :minute)
 
     Repo.transaction(fn ->
-      days =
-        Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
+      days = stay_night_dates(checkin_date, checkout_date)
 
       # Ensure property_inventory rows exist with capacity_total = season cap (e.g., 12)
       ensure_property_inventory_for_days(property, days)

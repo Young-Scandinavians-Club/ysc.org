@@ -42,7 +42,7 @@ defmodule Ysc.Newsletter do
     Phoenix.PubSub.broadcast(
       Ysc.PubSub,
       @editions_topic,
-      {:edition_sent, edition}
+      {:edition_sent, preload_edition_creator(edition)}
     )
   end
 
@@ -51,8 +51,14 @@ defmodule Ysc.Newsletter do
     Phoenix.PubSub.broadcast(
       Ysc.PubSub,
       @editions_topic,
-      {:edition_delivery_progress, edition}
+      {:edition_delivery_progress, preload_edition_creator(edition)}
     )
+  end
+
+  defp preload_edition_creator(%Edition{} = edition) do
+    if Ecto.assoc_loaded?(edition.creator),
+      do: edition,
+      else: Repo.preload(edition, :creator)
   end
 
   # Fields fetched in list queries — excludes :archived_html (large text).
@@ -164,6 +170,10 @@ defmodule Ysc.Newsletter do
       last_name: last_name,
       subscribed: true,
       subscription_token: token,
+      # This is a trusted/immediate subscribe path (authenticated toggle,
+      # admin, CSV import, etc.) — auto-confirm so `confirmed_at IS NULL`
+      # remains a reliable signal exclusively for double opt-in pending rows.
+      confirmed_at: subscribed_at,
       source: source,
       metadata: metadata,
       subscribed_at: subscribed_at,
@@ -196,6 +206,8 @@ defmodule Ysc.Newsletter do
       subscribed: true,
       unsubscribed_at: nil,
       source: new_source,
+      # Trusted/immediate subscribe path — auto-confirm (see create_subscriber/7).
+      confirmed_at: existing.confirmed_at || subscribed_at,
       metadata: Map.merge(existing.metadata || %{}, metadata)
     }
 
@@ -233,6 +245,215 @@ defmodule Ysc.Newsletter do
       nil
     end
   end
+
+  @doc """
+  Requests a double opt-in confirmation for an anonymous newsletter signup.
+
+  Unlike `subscribe/2`, this does NOT add the email to the active list.
+  Instead it stores a pending subscriber record (creating one, or rotating
+  the confirmation token on an existing not-yet-confirmed record) and sends
+  a confirmation email. The address only becomes an active subscriber once
+  `confirm_subscription/1` is called with the emailed token.
+
+  A 24-hour reminder email is also scheduled, and is skipped at send time if
+  the subscriber has since confirmed or been removed.
+
+  Options:
+  - :source - Source of subscription (e.g. "public_signup")
+  - :metadata - Map of extra data
+
+  Returns:
+  - `{:ok, :pending}` - a confirmation email was sent (or resent)
+  - `{:ok, :already_subscribed}` - the email is already an active, confirmed
+    subscriber; no email sent (avoids duplicate emails / enumeration)
+  - `{:error, changeset}` or `{:error, atom}` - same error shapes as `subscribe/2`
+  """
+  def request_confirmation(email, opts \\ [])
+
+  def request_confirmation(email, opts) when is_binary(email) do
+    email
+    |> String.trim()
+    |> Email.normalize()
+    |> request_confirmation_normalized(opts)
+  end
+
+  def request_confirmation(_email, _opts), do: {:error, :invalid_email}
+
+  defp request_confirmation_normalized(email, opts) do
+    case Ysc.Newsletter.EmailValidator.validate_email(email) do
+      :ok -> do_request_confirmation(email, opts)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp do_request_confirmation(email, opts) do
+    source = Keyword.get(opts, :source, "public_signup")
+    metadata = Keyword.get(opts, :metadata, %{})
+
+    case get_subscriber_by_email(email) do
+      nil ->
+        email
+        |> create_pending_subscriber(source, metadata)
+        |> after_pending_write()
+
+      %Subscriber{subscribed: true, confirmed_at: confirmed_at}
+      when not is_nil(confirmed_at) ->
+        {:ok, :already_subscribed}
+
+      existing ->
+        existing
+        |> reactivate_pending_subscriber(source, metadata)
+        |> after_pending_write()
+    end
+  end
+
+  defp after_pending_write({:ok, %Subscriber{} = subscriber}) do
+    send_confirmation_email(subscriber)
+    schedule_confirmation_reminder(subscriber)
+    {:ok, :pending}
+  end
+
+  defp after_pending_write({:error, _reason} = error), do: error
+
+  defp create_pending_subscriber(email, source, metadata) do
+    %Subscriber{}
+    |> Subscriber.create_changeset(%{
+      email: email,
+      subscribed: false,
+      subscription_token: Subscriber.generate_subscription_token(),
+      confirmation_token: Subscriber.generate_confirmation_token(),
+      confirmed_at: nil,
+      source: source,
+      metadata: metadata,
+      subscribed_at: nil,
+      unsubscribed_at: nil
+    })
+    |> Repo.insert()
+  end
+
+  defp reactivate_pending_subscriber(existing, source, metadata) do
+    attrs = %{
+      confirmation_token: Subscriber.generate_confirmation_token(),
+      source: existing.source || source,
+      metadata: Map.merge(existing.metadata || %{}, metadata)
+    }
+
+    existing
+    |> Subscriber.update_changeset(attrs)
+    |> Repo.update()
+  end
+
+  defp send_confirmation_email(%Subscriber{} = subscriber, opts \\ []) do
+    reminder = Keyword.get(opts, :reminder, false)
+
+    subject =
+      if reminder,
+        do: "Just checking in — please confirm your subscription",
+        else: "Action Required: Please confirm your subscription"
+
+    url =
+      YscWeb.Emails.Helpers.absolute_url(
+        "/newsletter/confirm/#{subscriber.confirmation_token}"
+      )
+
+    idempotency_key =
+      if reminder,
+        do: "newsletter_confirmation_reminder_#{subscriber.id}",
+        else:
+          "newsletter_confirmation_#{subscriber.id}_#{subscriber.confirmation_token}"
+
+    case YscWeb.Emails.Notifier.schedule_email(
+           subscriber.email,
+           idempotency_key,
+           subject,
+           "newsletter_confirmation",
+           %{url: url, reminder: reminder},
+           ""
+         ) do
+      {:error, reason} ->
+        Ysc.Logging.warning("Newsletter: failed to schedule confirmation email",
+          subscriber_id: subscriber.id,
+          reminder: reminder,
+          error: inspect(reason)
+        )
+
+        :ok
+
+      _job ->
+        :ok
+    end
+  end
+
+  defp schedule_confirmation_reminder(%Subscriber{} = subscriber) do
+    case YscWeb.Workers.NewsletterConfirmationReminder.schedule(subscriber.id) do
+      {:ok, %Oban.Job{}} ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Newsletter: failed to schedule confirmation reminder",
+          subscriber_id: subscriber.id,
+          error: inspect(reason)
+        )
+
+        :ok
+    end
+  end
+
+  @doc """
+  Sends a reminder confirmation email for a still-pending subscriber.
+
+  Called by `YscWeb.Workers.NewsletterConfirmationReminder`, 24 hours after
+  `request_confirmation/2` scheduled it. No-ops if the subscriber no longer
+  exists or has already confirmed since scheduling (covers both a completed
+  confirmation and an unsubscribe/removal in the meantime).
+  """
+  def deliver_confirmation_reminder(subscriber_id) do
+    case Repo.get(Subscriber, subscriber_id) do
+      nil ->
+        :ok
+
+      %Subscriber{confirmed_at: confirmed_at} when not is_nil(confirmed_at) ->
+        :ok
+
+      subscriber ->
+        send_confirmation_email(subscriber, reminder: true)
+    end
+  end
+
+  @doc """
+  Confirms a pending double opt-in subscription using the emailed token.
+
+  Idempotent: replaying the same link after it has already been confirmed
+  returns the subscriber unchanged rather than erroring, so reloading the
+  confirmation page is always safe.
+
+  Returns `{:ok, subscriber}` or `{:error, :not_found}`.
+  """
+  def confirm_subscription(token) when is_binary(token) do
+    case Repo.get_by(Subscriber, confirmation_token: token) do
+      nil ->
+        {:error, :not_found}
+
+      %Subscriber{confirmed_at: confirmed_at} = subscriber
+      when not is_nil(confirmed_at) ->
+        {:ok, subscriber}
+
+      subscriber ->
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        subscriber
+        |> Subscriber.update_changeset(%{
+          subscribed: true,
+          confirmed_at: now,
+          subscribed_at: now,
+          unsubscribed_at: nil
+        })
+        |> Repo.update()
+    end
+  end
+
+  def confirm_subscription(_token), do: {:error, :not_found}
 
   @doc """
   Unsubscribes by email or by subscription token.
@@ -421,6 +642,7 @@ defmodule Ysc.Newsletter do
     Subscriber
     |> maybe_filter_subscribed(opts)
     |> maybe_filter_source(opts)
+    |> exclude_deleted_linked_users()
     |> Repo.all()
   end
 
@@ -433,6 +655,7 @@ defmodule Ysc.Newsletter do
     Subscriber
     |> maybe_filter_subscribed(opts)
     |> maybe_filter_source(opts)
+    |> exclude_deleted_linked_users()
     |> select([s], count(s.id))
     |> Repo.one()
   end
@@ -450,6 +673,16 @@ defmodule Ysc.Newsletter do
       nil -> query
       source -> where(query, [s], s.source == ^source)
     end
+  end
+
+  # Soft-deleted users must not receive newsletter editions even if a
+  # subscriber row is still marked subscribed (belt-and-suspenders with
+  # unsubscribe-on-delete). Anonymous subscribers (nil user_id) are kept.
+  defp exclude_deleted_linked_users(query) do
+    from s in query,
+      left_join: u in Ysc.Accounts.User,
+      on: u.id == s.user_id,
+      where: is_nil(s.user_id) or u.state != :deleted
   end
 
   @doc """
@@ -869,7 +1102,7 @@ defmodule Ysc.Newsletter do
              %{edition_id: edition.id}
              |> YscWeb.Workers.NewsletterSender.new()
              |> Oban.insert() do
-        {:ok, sending_edition}
+        {:ok, preload_edition_creator(sending_edition)}
       else
         {:error, %Ecto.Changeset{}} = err ->
           err

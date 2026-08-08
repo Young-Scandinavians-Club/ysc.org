@@ -12,7 +12,9 @@ config :ysc,
   ecto_repos: [Ysc.Repo],
   environment: "dev",
   # Minimum disposable-domain rows expected after loading priv/disposable_domains.txt (tests use this as a floor).
-  disposable_domains_threshold: 10_000
+  disposable_domains_threshold: 10_000,
+  # Standalone Query Console base URL (admin sidebar link). Override per env / QUERY_CONSOLE_URL.
+  query_console_url: nil
 
 # Configure Elixir's Calendar to use Timex timezone database
 config :elixir, :time_zone_database, Timex.Timezone.Database
@@ -138,6 +140,12 @@ config :ysc, Oban,
     {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 5},
     # Rebuild indexes concurrently nightly to prevent bloat and fragmentation
     Oban.Plugins.Reindexer,
+    # Rescue jobs left stuck `executing` when a node is killed/deployed mid-job
+    # (e.g. a large event video upload) back to `available` so they retry.
+    # rescue_after is generous because EventPhotoUploadWorker can legitimately
+    # run for a long time downloading + re-uploading multi-GB videos; a
+    # shorter window would rescue still-running jobs and cause duplicate work.
+    {Oban.Plugins.Lifeline, rescue_after: :timer.hours(3)},
     {Oban.Plugins.Cron,
      crontab: [
        {"0 * * * *", YscWeb.Workers.FileExportCleanUp},
@@ -163,7 +171,9 @@ config :ysc, Oban,
         YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker},
        # 04:00 UTC = 8:00 PM PST (UTC-8) / 9:00 PM PDT (UTC-7)
        {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker},
-       {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker}
+       {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
+       # 17:00 UTC = 9:00 AM PST (UTC-8) / 10:00 AM PDT (UTC-7)
+       {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker}
      ]}
   ]
 
@@ -353,6 +363,21 @@ config :ysc, :quickbooks,
   # QuickBooks Account IDs (required - cannot be auto-created)
   bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
   stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+  # Stripe fees expense account for payout Deposit fee lines.
+  # Prefer ID when known; otherwise Name or FullyQualifiedName (paths with ":").
+  stripe_fees_account_id: System.get_env("QUICKBOOKS_STRIPE_FEES_ACCOUNT_ID"),
+  stripe_fees_account_name:
+    System.get_env(
+      "QUICKBOOKS_STRIPE_FEES_ACCOUNT_NAME",
+      "Administration:Bank Service Charges:Stripe"
+    ),
+  ticket_discounts_account_id:
+    System.get_env("QUICKBOOKS_TICKET_DISCOUNTS_ACCOUNT_ID"),
+  ticket_discounts_account_name:
+    System.get_env(
+      "QUICKBOOKS_TICKET_DISCOUNTS_ACCOUNT_NAME",
+      "Ticket Discounts"
+    ),
   # Optional: QuickBooks Customer ID for payments with no user (e.g. system/anonymous).
   # Set this to avoid :user_not_found when exporting payouts that include such payments.
   system_customer_id: System.get_env("QUICKBOOKS_SYSTEM_CUSTOMER_ID")

@@ -262,12 +262,16 @@ defmodule YscWeb.NewsletterArchiveLive do
           {@newsletter_error}
         </p>
 
-        <div
-          :if={@newsletter_submitted}
-          class="mt-3 flex items-center justify-center gap-2 text-emerald-600"
-        >
-          <.icon name="hero-check-circle" class="w-5 h-5" />
-          <span class="text-sm font-medium">You're subscribed!</span>
+        <div :if={@newsletter_submitted} class="mt-3 text-emerald-600">
+          <div class="flex items-center justify-center gap-2">
+            <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
+            <span class="text-sm font-medium">
+              You're one step away! Check your email to confirm your subscription.
+            </span>
+          </div>
+          <p class="mt-2 text-xs text-zinc-500">
+            Look for an email from YSC with the subject "Action Required: Please confirm your subscription." If you don't see it in a couple minutes, check your spam or promotions folder.
+          </p>
         </div>
       </form>
     </div>
@@ -556,11 +560,11 @@ defmodule YscWeb.NewsletterArchiveLive do
   defp do_subscribe(email, socket) do
     metadata = %{"signup_date" => DateTime.utc_now() |> DateTime.to_iso8601()}
 
-    case Newsletter.subscribe(email,
+    case Newsletter.request_confirmation(email,
            source: "public_signup",
            metadata: metadata
          ) do
-      {:ok, _subscriber} ->
+      {:ok, status} when status in [:pending, :already_subscribed] ->
         {:noreply,
          socket
          |> assign(
@@ -570,8 +574,8 @@ defmodule YscWeb.NewsletterArchiveLive do
          )
          |> YscWeb.Flash.put_toast(
            :info,
-           "Thank you for subscribing to our newsletter!",
-           title: "You're subscribed",
+           "Check your email to confirm your subscription.",
+           title: "Almost there!",
            icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
          )}
 

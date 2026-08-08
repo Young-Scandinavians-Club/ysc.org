@@ -39,7 +39,7 @@
     <mj-spacer height="16px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#f8f9fa" border-radius="4px" padding="16px">
       <strong>Name:</strong> <%= @name %><br/>
-      <strong>Email:</strong> <a href="mailto:<%= @email %>" style="color: #1976d2;"><%= @email %></a><br/>
+      <strong>Email:</strong>&nbsp;<a href="mailto:<%= @email %>" style="color: #1976d2;"><%= @email %></a><br/>
       <strong>Subject:</strong> <%= @subject %><br/>
       <strong>Contact Form ID:</strong> <%= @contact_form_id %><br/>
       <strong>Submitted:</strong> <%= @submitted_at %>

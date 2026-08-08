@@ -526,7 +526,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Family Membership
         <:subtitle>
-          Your membership benefits are shared with you through the primary family member. You do not need to choose a plan or add a payment method.
+          Your membership benefits are shared with you by your family membership manager. You do not need to choose a plan or add a payment method.
         </:subtitle>
       </.header>
 
@@ -1066,29 +1066,46 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         phone_changed =
           updated_user.phone_number != socket.assigns.original_phone
 
+        sms_supported? =
+          Ysc.Extensions.PhoneNumber.sms_supported?(updated_user.phone_number)
+
         phone_needs_verification =
-          phone_changed or is_nil(updated_user.phone_verified_at)
+          not is_nil(updated_user.phone_number) and
+            (phone_changed or is_nil(updated_user.phone_verified_at)) and
+            sms_supported?
 
         socket =
           socket
           |> assign(:user, updated_user)
 
-        if phone_needs_verification and not is_nil(updated_user.phone_number) do
-          {:ok, _} =
-            VerificationCodes.issue(updated_user, :phone,
-              suffix: "onboarding_initial"
+        cond do
+          phone_needs_verification ->
+            {:ok, _} =
+              VerificationCodes.issue(updated_user, :phone,
+                suffix: "onboarding_initial"
+              )
+
+            YscWeb.Flash.send_toast(
+              :info,
+              "A verification code was sent to #{updated_user.phone_number}",
+              title: "Phone Verification"
             )
 
-          YscWeb.Flash.send_toast(
-            :info,
-            "A verification code was sent to #{updated_user.phone_number}",
-            title: "Phone Verification"
-          )
+            {:noreply, assign(socket, :current_step, @step_phone_verification)}
 
-          {:noreply, assign(socket, :current_step, @step_phone_verification)}
-        else
-          # Skip phone verification, proceed to next step
-          {:noreply, advance_to_next_step(socket, @step_profile)}
+          not is_nil(updated_user.phone_number) and phone_changed and
+              not sms_supported? ->
+            YscWeb.Flash.send_toast(
+              :info,
+              "Phone number saved. SMS verification isn't available for this number, so we've skipped that step.",
+              title: "Phone"
+            )
+
+            {:noreply, advance_to_next_step(socket, @step_profile)}
+
+          true ->
+            # Skip phone verification, proceed to next step
+            {:noreply, advance_to_next_step(socket, @step_profile)}
         end
 
       {:error, changeset} ->

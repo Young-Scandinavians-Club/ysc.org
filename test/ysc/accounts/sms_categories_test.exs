@@ -58,6 +58,16 @@ defmodule Ysc.Accounts.SmsCategoriesTest do
                %{event_notifications_sms: false},
                "event_notification"
              )
+
+      assert SmsCategories.should_send_sms?(
+               %{event_notifications_sms: true},
+               "event_update_notification"
+             )
+
+      refute SmsCategories.should_send_sms?(
+               %{event_notifications_sms: false},
+               "event_update_notification"
+             )
     end
 
     test "returns true when template name is not a binary" do
@@ -65,6 +75,18 @@ defmodule Ysc.Accounts.SmsCategoriesTest do
                %{account_notifications_sms: false},
                :booking_checkin_reminder
              )
+    end
+
+    test "does not send to soft-deleted users including security templates" do
+      deleted = %{
+        state: :deleted,
+        account_notifications_sms: true,
+        event_notifications_sms: true
+      }
+
+      refute SmsCategories.should_send_sms?(deleted, "two_factor_verification")
+      refute SmsCategories.should_send_sms?(deleted, "booking_checkin_reminder")
+      refute SmsCategories.should_send_sms?(deleted, "event_notification")
     end
   end
 

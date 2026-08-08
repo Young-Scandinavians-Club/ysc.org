@@ -27,7 +27,8 @@ defmodule YscWeb.BookingCheckoutDeferredTest do
           |> get(~p"/bookings/checkout/#{booking.id}")
           |> html_response(200)
         end,
-        pattern: bookings_pattern
+        pattern: bookings_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0

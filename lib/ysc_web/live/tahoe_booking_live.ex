@@ -61,6 +61,9 @@ defmodule YscWeb.TahoeBookingLive do
 
     max_booking_date = calculate_max_booking_date_cached(seasons, today)
 
+    {winter_booking_open?, winter_season_label} =
+      SeasonHelpers.winter_booking_window(seasons, today, max_booking_date)
+
     # Parse query parameters, handling malformed/double-encoded URLs
     parsed_params = parse_mount_params(params)
 
@@ -218,6 +221,8 @@ defmodule YscWeb.TahoeBookingLive do
         current_season: current_season,
         season_start_date: season_start_date,
         season_end_date: season_end_date,
+        winter_booking_open?: winter_booking_open?,
+        winter_season_label: winter_season_label,
         seasons: seasons,
         property_rooms_snapshot: property_rooms_snapshot,
         selected_room_id: nil,
@@ -347,6 +352,9 @@ defmodule YscWeb.TahoeBookingLive do
 
         max_booking_date = calculate_max_booking_date_cached(seasons, today)
 
+        {winter_booking_open?, winter_season_label} =
+          SeasonHelpers.winter_booking_window(seasons, today, max_booking_date)
+
         # Calculate restricted date range for family/lifetime members with 1 room booking
         {restricted_min_date, restricted_max_date, dates_restricted} =
           calculate_restricted_dates(socket, today, max_booking_date)
@@ -372,6 +380,8 @@ defmodule YscWeb.TahoeBookingLive do
               current_season: current_season,
               season_start_date: season_start_date,
               season_end_date: season_end_date,
+              winter_booking_open?: winter_booking_open?,
+              winter_season_label: winter_season_label,
               can_book: can_book,
               booking_error_title: booking_error_title,
               booking_disabled_reason: booking_disabled_reason,
@@ -963,6 +973,9 @@ defmodule YscWeb.TahoeBookingLive do
 
     max_booking_date = calculate_max_booking_date_cached(seasons, today)
 
+    {winter_booking_open?, winter_season_label} =
+      SeasonHelpers.winter_booking_window(seasons, today, max_booking_date)
+
     {restricted_min_date, restricted_max_date, dates_restricted} =
       recalculate_restricted_date_range(socket, max_booking_date)
 
@@ -972,6 +985,8 @@ defmodule YscWeb.TahoeBookingLive do
       current_season: current_season,
       season_start_date: season_start_date,
       season_end_date: season_end_date,
+      winter_booking_open?: winter_booking_open?,
+      winter_season_label: winter_season_label,
       max_booking_date: max_booking_date,
       restricted_min_date: restricted_min_date,
       restricted_max_date: restricted_max_date,
@@ -1080,20 +1095,33 @@ defmodule YscWeb.TahoeBookingLive do
       <section
         :if={@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh] bg-white"
       >
-        <div class="absolute inset-0 h-full w-full z-[2]">
-          <img
-            src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-            alt="Tahoe Cabin Exterior"
-            class="h-full w-full object-cover"
-            fetchpriority="high"
-            loading="eager"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
+        <div class="hero-media-stage">
+          <div class="hero-media-stage__bleed" aria-hidden="true">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="100vw"
+              alt=""
+              loading="eager"
+              decoding="async"
+            />
+          </div>
+          <div class="hero-media-stage__inner">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="(max-width: 1920px) 100vw, 1920px"
+              alt="Tahoe Cabin Exterior"
+              fetchpriority="high"
+              loading="eager"
+            />
+            <div
+              class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
+              aria-hidden="true"
+            >
+            </div>
           </div>
         </div>
         <%!-- Title Text Section --%>
@@ -1114,20 +1142,33 @@ defmodule YscWeb.TahoeBookingLive do
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh] bg-white"
       >
-        <div class="absolute inset-0 h-full w-full z-[2]">
-          <img
-            src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-            alt="Tahoe Cabin Exterior"
-            class="h-full w-full object-cover"
-            fetchpriority="high"
-            loading="eager"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
+        <div class="hero-media-stage">
+          <div class="hero-media-stage__bleed" aria-hidden="true">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="100vw"
+              alt=""
+              loading="eager"
+              decoding="async"
+            />
+          </div>
+          <div class="hero-media-stage__inner">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="(max-width: 1920px) 100vw, 1920px"
+              alt="Tahoe Cabin Exterior"
+              fetchpriority="high"
+              loading="eager"
+            />
+            <div
+              class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
+              aria-hidden="true"
+            >
+            </div>
           </div>
         </div>
         <%!-- Title Text Section --%>
@@ -1496,6 +1537,7 @@ defmodule YscWeb.TahoeBookingLive do
                         property={@property}
                         today={@today}
                         seasons={@seasons}
+                        min_nights={1}
                         max_nights={room_picker_max_nights(@seasons, @checkin_date)}
                         disabled={@date_tooltips_loading?}
                       />
@@ -3332,13 +3374,22 @@ defmodule YscWeb.TahoeBookingLive do
                           30 MINS
                         </span>
                       </div>
-                      <div class="flex items-center justify-between p-4">
+                      <div class="flex items-center justify-between p-4 border-b border-zinc-100">
                         <div class="flex items-center gap-3">
                           <span class="text-xl">🛷</span>
                           <span class="font-semibold">Granlibakken (Sledding)</span>
                         </div>
                         <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
                           5 MINS
+                        </span>
+                      </div>
+                      <div class="flex items-center justify-between p-4">
+                        <div class="flex items-center gap-3">
+                          <span class="text-xl">🎿</span>
+                          <span class="font-semibold">Tahoe XC (Cross-country skiing)</span>
+                        </div>
+                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+                          20 MINS
                         </span>
                       </div>
                     </div>
@@ -3731,8 +3782,11 @@ defmodule YscWeb.TahoeBookingLive do
                     </div>
                   </div>
                 </section>
-                <!-- Winter Season Reservations Notice -->
-                <section class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-12">
+                <!-- Winter Season Reservations Notice (only shown while winter reservations are open for booking) -->
+                <section
+                  :if={@winter_booking_open?}
+                  class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-12"
+                >
                   <div class="flex items-start gap-3">
                     <.icon
                       name="hero-megaphone"
@@ -3740,20 +3794,30 @@ defmodule YscWeb.TahoeBookingLive do
                     />
                     <div class="flex-1">
                       <h2 class="text-xl font-bold text-blue-900 mb-2">
-                        Winter Season 2025/2026 Reservations
+                        Winter Season {@winter_season_label} Reservations
                       </h2>
                       <p class="text-blue-800 font-semibold mb-3">
-                        Reservations for winter season 2025/2026 are now open!
+                        Reservations for winter season {@winter_season_label} are open!
                       </p>
-                      <div class="bg-white rounded-xl p-4 border border-blue-200">
+                      <div class="bg-white rounded-xl p-4 border border-blue-200 space-y-3">
+                        <div class="flex items-start gap-2">
+                          <.icon
+                            name="hero-home-modern"
+                            class="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5"
+                          />
+                          <p class="text-sm text-blue-900">
+                            <strong>Individual room bookings:</strong>
+                            Available all winter, year-round. Room limits per membership apply — see Winter Season Room Limits below.
+                          </p>
+                        </div>
                         <div class="flex items-start gap-2">
                           <.icon
                             name="hero-exclamation-triangle"
                             class="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5"
                           />
                           <p class="text-sm text-blue-900">
-                            <strong>Winter note:</strong>
-                            {buyout_mode_availability_copy(@seasons)} Individual rooms remain available year-round.
+                            <strong>Whole-cabin buyout:</strong>
+                            {buyout_mode_availability_copy(@seasons)}
                           </p>
                         </div>
                       </div>
@@ -4072,16 +4136,10 @@ defmodule YscWeb.TahoeBookingLive do
                                 Days Before Check-In
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                {if @buyout_refund_policy &&
-                                      @buyout_refund_policy.name,
-                                    do: @buyout_refund_policy.name,
-                                    else: "Full Cabin"}
+                                Entire cabin
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                {if @room_refund_policy &&
-                                      @room_refund_policy.name,
-                                    do: @room_refund_policy.name,
-                                    else: "Room Booking"}
+                                Individual room(s)
                               </th>
                             </tr>
                           </thead>
@@ -4171,9 +4229,7 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @buyout_refund_policy && @buyout_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              {if @buyout_refund_policy.name,
-                                do: @buyout_refund_policy.name,
-                                else: "Entire cabin"}:
+                              Entire cabin:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@buyout_refund_policy.rules) do %>
@@ -4187,9 +4243,7 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @room_refund_policy && @room_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              {if @room_refund_policy.name,
-                                do: @room_refund_policy.name,
-                                else: "Room Booking"}:
+                              Individual room(s):
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@room_refund_policy.rules) do %>
@@ -4303,7 +4357,7 @@ defmodule YscWeb.TahoeBookingLive do
                         />
                         <div>
                           <p class="font-bold text-red-900 text-lg mb-1">
-                            ⚠️ Critical: Linens and towels are NOT provided
+                            Important: Bring your own linens and towels
                           </p>
                           <p class="text-sm text-red-800">
                             You must bring your own bedding and towels for your stay.
@@ -6943,8 +6997,8 @@ defmodule YscWeb.TahoeBookingLive do
 
     {
       false,
-      "Full buyout active",
-      "Your family group already has a full buyout reservation. You can make a new reservation once that stay is complete (after #{formatted_date}) or if the buyout is cancelled."
+      "Your family already has the entire cabin booked",
+      "Someone in your family already has a reservation for the entire cabin. You can book again after checkout on #{formatted_date}, or if that reservation is cancelled."
     }
   end
 

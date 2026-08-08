@@ -8,7 +8,9 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
   - Ledger entries for mixed event/donation payments
   - QuickBooks sync with proper donation classification
   """
-  use Ysc.DataCase, async: true
+  # async: false — setup clears :ysc_cache globally; parallel tests can lose cache
+  # entries (SMS rate limits, QuickBooks tokens) mid-assertion under CI load.
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures
@@ -112,7 +114,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
     # Set up default mocks for query functions (needed for automatic sync jobs)
     stub(ClientMock, :query_account_by_name, fn
       "Events Inc" -> {:ok, "events_account_default"}
-      "Donations" -> {:ok, "donations_account_default"}
+      "Special Project Fundraising" -> {:ok, "donations_account_default"}
       "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
       _ -> {:error, :not_found}
     end)
@@ -428,7 +430,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
       # Stub account and class queries
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         _ -> {:error, :not_found}
       end)
@@ -633,7 +635,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
         _ -> {:error, :not_found}
@@ -745,7 +747,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
         _ -> {:error, :not_found}
@@ -860,7 +862,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
         _ -> {:error, :not_found}

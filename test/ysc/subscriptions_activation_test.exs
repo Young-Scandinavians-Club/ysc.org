@@ -1,5 +1,6 @@
 defmodule Ysc.SubscriptionsActivationTest do
-  use Ysc.DataCase, async: true
+  # async: false — mutates Application env `:membership_plans`
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures
@@ -81,6 +82,61 @@ defmodule Ysc.SubscriptionsActivationTest do
                  user,
                  return_url: "http://localhost/finalize"
                )
+    end
+
+    test "retries an incomplete subscription with the saved payment method" do
+      user = user_with_default_pm()
+      stripe_sub_id = "sub_incomplete_#{System.unique_integer([:positive])}"
+      invoice_id = "in_act_retry_#{System.unique_integer([:positive])}"
+
+      {:ok, _incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          name: "Incomplete",
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          user_id: user.id,
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      default_pm = Payments.get_default_payment_method(user)
+
+      expect(Stripe.SubscriptionMock, :update, fn ^stripe_sub_id, params ->
+        assert params[:default_payment_method] == default_pm.provider_id
+
+        {:ok,
+         %Stripe.Subscription{
+           id: stripe_sub_id,
+           status: "incomplete",
+           latest_invoice: %Stripe.Invoice{id: invoice_id}
+         }}
+      end)
+
+      expect(Stripe.InvoiceMock, :pay, fn ^invoice_id, params ->
+        assert params[:payment_method] == default_pm.provider_id
+        {:ok, %Stripe.Invoice{id: invoice_id, status: "paid"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :retrieve, fn ^stripe_sub_id ->
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_sub_id,
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      assert {:ok, :activated} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 membership_type: :single,
+                 return_url: "http://localhost/finalize"
+               )
+
+      # Local status is synced by Stripe webhooks; the critical outcome is that
+      # activation entered the incomplete-subscription retry path instead of
+      # short-circuiting to :already_active.
+      assert %Subscriptions.Subscription{stripe_id: ^stripe_sub_id} =
+               Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
     end
 
     test "creates stripe subscription and persists locally" do
@@ -192,6 +248,100 @@ defmodule Ysc.SubscriptionsActivationTest do
                  user,
                  return_url: "http://localhost/finalize"
                )
+    end
+
+    test "bank account incomplete Stripe status is persisted as active for immediate access" do
+      user =
+        user_fixture(%{
+          state: :active
+        })
+
+      user =
+        user
+        |> Ysc.Accounts.User.update_user_changeset(%{
+          stripe_id: "cus_ach_#{System.unique_integer([:positive])}"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_ach_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :bank_account,
+          provider_type: "us_bank_account",
+          is_default: true
+        })
+
+      stripe_sub_id = "sub_ach_#{System.unique_integer([:positive])}"
+
+      expect(Stripe.SubscriptionMock, :create, fn params ->
+        assert params.customer == user.stripe_id
+        assert is_binary(params.default_payment_method)
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_sub_id,
+           customer: user.stripe_id,
+           status: "incomplete"
+         )}
+      end)
+
+      assert {:ok, :activated} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 membership_type: :single,
+                 return_url: "http://localhost/finalize"
+               )
+
+      local = Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+      assert %Subscriptions.Subscription{stripe_status: "active"} = local
+      assert Subscriptions.active?(local)
+
+      _ = MembershipCache.invalidate_user(user.id)
+      assert MembershipCache.get_active_membership(user)
+    end
+
+    test "activates an existing incomplete local subscription on bank-account retry" do
+      user =
+        user_fixture(%{state: :active})
+        |> then(fn user ->
+          user
+          |> Ysc.Accounts.User.update_user_changeset(%{
+            stripe_id: "cus_ach_retry_#{System.unique_integer([:positive])}"
+          })
+          |> Ysc.Repo.update!()
+        end)
+
+      stripe_sub_id = "sub_ach_retry_#{System.unique_integer([:positive])}"
+
+      {:ok, existing} =
+        %Subscriptions.Subscription{}
+        |> Subscriptions.Subscription.changeset(%{
+          user_id: user.id,
+          name: "Membership Subscription",
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete"
+        })
+        |> Ysc.Repo.insert()
+
+      stripe_subscription =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "incomplete"
+        )
+
+      assert {:ok, updated} =
+               Subscriptions.create_subscription_from_stripe(
+                 user,
+                 stripe_subscription,
+                 payment_method_type: :bank_account
+               )
+
+      assert updated.id == existing.id
+      assert updated.stripe_status == "active"
     end
   end
 end

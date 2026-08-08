@@ -13,7 +13,16 @@ defmodule Ysc.Tickets.BookingValidator do
   import Ecto.Query, warn: false
   alias Ysc.Repo
   alias Ysc.Events
-  alias Ysc.Events.{Event, EventDateTime, TicketTier, Ticket, TicketReservation}
+
+  alias Ysc.Events.{
+    Event,
+    EventDateTime,
+    TicketTier,
+    Ticket,
+    TicketReservation,
+    TicketTierHelpers
+  }
+
   alias Ysc.Accounts
 
   @doc """
@@ -184,7 +193,7 @@ defmodule Ysc.Tickets.BookingValidator do
           tier.event_id != event_id ->
             {:error, :tier_not_for_event}
 
-          not tier_on_sale?(tier) ->
+          not TicketTierHelpers.tier_sale_started?(tier) ->
             {:error, :tier_not_on_sale}
 
           quantity <= 0 ->
@@ -229,18 +238,19 @@ defmodule Ysc.Tickets.BookingValidator do
       tier_capacity_validations =
         Enum.map(ticket_selections, fn {tier_id, quantity} ->
           case Map.get(tiers_by_id, tier_id) do
-            %{type: type} when type in [:donation, "donation"] ->
-              :ok
-
             tier ->
-              check_tier_capacity_with_context(
-                tier,
-                quantity,
-                user_id,
-                sold_counts,
-                reserved_counts,
-                user_reserved_counts
-              )
+              if TicketTierHelpers.donation_tier?(tier) do
+                :ok
+              else
+                check_tier_capacity_with_context(
+                  tier,
+                  quantity,
+                  user_id,
+                  sold_counts,
+                  reserved_counts,
+                  user_reserved_counts
+                )
+              end
           end
         end)
 
@@ -321,23 +331,11 @@ defmodule Ysc.Tickets.BookingValidator do
       total_quantity: quantity,
       available: available,
       sold: sold_count,
-      on_sale: tier_on_sale_from_map?(tier_map),
+      on_sale: TicketTierHelpers.tier_sale_started?(tier_map),
       start_date:
         Map.get(tier_map, :start_date) || Map.get(tier_map, "start_date"),
       end_date: Map.get(tier_map, :end_date) || Map.get(tier_map, "end_date")
     }
-  end
-
-  defp tier_on_sale_from_map?(tier_map) do
-    start_date =
-      Map.get(tier_map, :start_date) || Map.get(tier_map, "start_date")
-
-    if is_nil(start_date) do
-      true
-    else
-      now = DateTime.utc_now()
-      DateTime.compare(now, start_date) != :lt
-    end
   end
 
   defp get_available_tier_quantity(%TicketTier{quantity: nil}, _user_id),
@@ -403,12 +401,12 @@ defmodule Ysc.Tickets.BookingValidator do
 
   defp non_donation_ticket_quantity(ticket_selections, tiers_by_id) do
     Enum.reduce(ticket_selections, 0, fn {tier_id, quantity}, acc ->
-      case Map.get(tiers_by_id, tier_id) do
-        %{type: type} when type in [:donation, "donation"] ->
-          acc
+      tier = Map.get(tiers_by_id, tier_id)
 
-        _ ->
-          acc + quantity
+      if TicketTierHelpers.donation_tier?(tier) do
+        acc
+      else
+        acc + quantity
       end
     end)
   end
@@ -416,9 +414,12 @@ defmodule Ysc.Tickets.BookingValidator do
   defp non_donation_tier_ids(ticket_selections, tiers_by_id) do
     ticket_selections
     |> Enum.flat_map(fn {tier_id, _quantity} ->
-      case Map.get(tiers_by_id, tier_id) do
-        %{type: type} when type in [:donation, "donation"] -> []
-        _ -> [tier_id]
+      tier = Map.get(tiers_by_id, tier_id)
+
+      if TicketTierHelpers.donation_tier?(tier) do
+        []
+      else
+        [tier_id]
       end
     end)
   end
@@ -550,13 +551,6 @@ defmodule Ysc.Tickets.BookingValidator do
        ) do
     current_attendees = count_confirmed_tickets_for_event(event.id)
     current_attendees + requested_quantity <= max_attendees
-  end
-
-  defp tier_on_sale?(%TicketTier{start_date: nil}), do: true
-
-  defp tier_on_sale?(%TicketTier{start_date: start_date}) do
-    now = DateTime.utc_now()
-    DateTime.compare(now, start_date) != :lt
   end
 
   defp get_ticket_tier(tier_id) do

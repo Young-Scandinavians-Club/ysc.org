@@ -253,28 +253,45 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assigns = %{
         first_name: "John",
         renewal_date: "December 8, 2024",
-        membership_url: "https://example.com/users/membership"
+        membership_url: "https://example.com/users/membership",
+        headline: "Your Membership Renews in 7 Days",
+        days_until_renewal: 7
       }
 
       html = MembershipRenewalReminder.render(assigns)
       assert is_binary(html)
       assert html =~ "John"
+      assert html =~ "Your Membership Renews in 7 Days"
 
       assert MembershipRenewalReminder.get_template_name() ==
                "membership_renewal_reminder"
 
-      assert MembershipRenewalReminder.get_subject() ==
+      assert MembershipRenewalReminder.get_subject(%{days_until_renewal: 7}) ==
                "Your YSC Membership Renews in 7 Days"
+
+      assert MembershipRenewalReminder.get_subject(%{days_until_renewal: 1}) ==
+               "Your YSC Membership Renews Tomorrow"
+
+      assert MembershipRenewalReminder.get_subject(%{days_until_renewal: 0}) ==
+               "Your YSC Membership Renews Today"
     end
 
     test "prepare_email_data returns correct data" do
       user = user_fixture()
-      subscription = %{current_period_end: DateTime.utc_now()}
+
+      renewal_at =
+        DateTime.utc_now()
+        |> DateTime.add(3, :day)
+        |> DateTime.truncate(:second)
+
+      subscription = %{current_period_end: renewal_at}
 
       data = MembershipRenewalReminder.prepare_email_data(user, subscription)
       assert data.first_name == user.first_name
       assert data.renewal_date =~ ~r/\w+ \d+, \d{4}/
       assert data.membership_url =~ "/users/membership"
+      assert data.days_until_renewal == 3
+      assert data.headline == "Your Membership Renews in 3 Days"
     end
 
     test "prepare_email_data uses Valued Member when first_name is nil" do

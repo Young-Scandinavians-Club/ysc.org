@@ -12,6 +12,18 @@ config :ysc, :google_photos,
   client_secret: "test_google_photos_client_secret",
   dev_stub: false
 
+config :ysc, :query_console_url, "http://localhost:4001"
+
+config :ysc, :oauth_clients, %{
+  "query_console_test" => %{
+    client_secret: "test_secret_change_me",
+    redirect_uris: ["http://localhost:4001/auth/ysc/callback"],
+    post_logout_redirect_uris: ["http://localhost:4001/auth/signed-out"],
+    roles: [:admin],
+    states: [:active]
+  }
+}
+
 config :ysc, :google_photos_req_opts,
   plug: {Req.Test, Ysc.GooglePhotos.Api.ReqStub}
 
@@ -108,6 +120,18 @@ config :ex_aws,
 
 config :ex_aws, :req_opts, connect_options: [protocols: [:http1]]
 
+# These workers issue plain Req.get/2 calls (not via ExAws), which have their
+# own default retry: up to 3 retries with exponential backoff (1s, 2s, 4s) on
+# transport errors — the same slow-connection-failure problem the ExAws
+# :retries override above addresses, but for Req directly. Tests that
+# deliberately point these at an unreachable host (e.g. port 1) would
+# otherwise take ~7s each waiting out the backoff.
+config :ysc,
+  geo_ip_s3_req_opts: [retry: false],
+  avatar_s3_req_opts: [retry: false],
+  event_photo_s3_req_opts: [retry: false],
+  image_processor_s3_req_opts: [retry: false]
+
 # Relax auth rate limits in test so login/forgot-password tests don't hit them
 config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
 
@@ -147,6 +171,7 @@ config :ysc, :discord_http_client, Ysc.Alerts.DiscordHttpMock
 
 config :ysc,
   expense_reports_s3_bucket: "expense-reports",
+  app_resources_s3_bucket: "app-resources",
   expense_reports_s3_upload: Ysc.ExpenseReports.S3UploadMock,
   environment: "test"
 

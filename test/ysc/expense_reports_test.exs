@@ -2423,4 +2423,467 @@ defmodule Ysc.ExpenseReportsTest do
       assert report.status == "draft"
     end
   end
+
+  describe "list_expense_reports_for_event/1" do
+    test "lists reports for the given event, newest first, and excludes other events",
+         %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+      other_event = event_fixture()
+
+      {:ok, report1} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "First",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      {:ok, report2} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Second",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      {:ok, _other_event_report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => other_event.id,
+            "status" => "draft",
+            "purpose" => "Other event",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      results = ExpenseReports.list_expense_reports_for_event(event.id)
+
+      assert MapSet.new(Enum.map(results, & &1.id)) ==
+               MapSet.new([report1.id, report2.id])
+    end
+
+    test "returns empty list for an event with no expense reports" do
+      assert ExpenseReports.list_expense_reports_for_event(Ecto.ULID.generate()) ==
+               []
+    end
+  end
+
+  describe "total_for_event/2 and totals_for_event/2" do
+    test "only counts approved/paid reports by default, netting income against expenses",
+         %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+
+      {:ok, paid} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Venue",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "Venue Co",
+                "description" => "Rental",
+                "amount" => "1200.00"
+              }
+            ]
+          },
+          user
+        )
+
+      {:ok, _paid} =
+        ExpenseReports.update_expense_report(paid, %{status: "paid"})
+
+      {:ok, approved} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Catering",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-16",
+                "vendor" => "Caterer",
+                "description" => "Food",
+                "amount" => "300.00"
+              }
+            ],
+            "income_items" => [
+              %{
+                "date" => "2024-01-16",
+                "description" => "Cash collected",
+                "amount" => "50.00"
+              }
+            ]
+          },
+          user
+        )
+
+      {:ok, _approved} =
+        ExpenseReports.update_expense_report(approved, %{status: "approved"})
+
+      {:ok, _still_draft} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Pending review",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-17",
+                "vendor" => "Vendor",
+                "description" => "Should not count",
+                "amount" => "9999.00"
+              }
+            ]
+          },
+          user
+        )
+
+      totals = ExpenseReports.totals_for_event(event.id)
+
+      assert Money.equal?(totals.expense_total, Money.new(1500, :USD))
+      assert Money.equal?(totals.income_total, Money.new(50, :USD))
+      assert Money.equal?(totals.net_total, Money.new(1450, :USD))
+
+      assert Money.equal?(
+               ExpenseReports.total_for_event(event.id),
+               Money.new(1450, :USD)
+             )
+    end
+
+    test "accepts a custom statuses list", %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+
+      {:ok, _draft} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Draft item",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "Vendor",
+                "description" => "Draft",
+                "amount" => "42.00"
+              }
+            ]
+          },
+          user
+        )
+
+      assert Money.equal?(
+               ExpenseReports.total_for_event(event.id, ["draft"]),
+               Money.new(42, :USD)
+             )
+
+      assert Money.equal?(
+               ExpenseReports.total_for_event(event.id),
+               Money.new(0, :USD)
+             )
+    end
+
+    test "returns zero totals for an event with no expense reports" do
+      totals = ExpenseReports.totals_for_event(Ecto.ULID.generate())
+      assert Money.equal?(totals.expense_total, Money.new(0, :USD))
+      assert Money.equal?(totals.income_total, Money.new(0, :USD))
+      assert Money.equal?(totals.net_total, Money.new(0, :USD))
+    end
+  end
+
+  describe "get_expense_report_by_quickbooks_bill_id/2" do
+    test "returns {:ok, report} when a report with the bill id exists", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "status" => "draft",
+            "purpose" => "QB bill lookup",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      report =
+        report
+        |> Ecto.Changeset.change(%{quickbooks_bill_id: "bill-42"})
+        |> Repo.update!()
+
+      assert {:ok, found} =
+               ExpenseReports.get_expense_report_by_quickbooks_bill_id(
+                 "bill-42"
+               )
+
+      assert found.id == report.id
+    end
+
+    test "returns {:error, :not_found} when no report has the bill id" do
+      assert {:error, :not_found} =
+               ExpenseReports.get_expense_report_by_quickbooks_bill_id(
+                 "nonexistent-bill"
+               )
+    end
+
+    test "supports lock: true option inside a transaction", %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "status" => "draft",
+            "purpose" => "QB bill lookup lock",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      report =
+        report
+        |> Ecto.Changeset.change(%{quickbooks_bill_id: "bill-locked"})
+        |> Repo.update!()
+
+      {:ok, result} =
+        Repo.transaction(fn ->
+          ExpenseReports.get_expense_report_by_quickbooks_bill_id(
+            "bill-locked",
+            lock: true
+          )
+        end)
+
+      assert {:ok, found} = result
+      assert found.id == report.id
+    end
+  end
+
+  describe "mark_expense_report_as_rejected_due_to_quickbooks_deletion/2" do
+    test "sets status to rejected and stamps a system-generated note", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "status" => "draft",
+            "purpose" => "QB deletion rejection",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      report =
+        report
+        |> Ecto.Changeset.change(%{quickbooks_bill_id: "bill-deleted-1"})
+        |> Repo.update!()
+
+      assert {:ok, updated} =
+               ExpenseReports.mark_expense_report_as_rejected_due_to_quickbooks_deletion(
+                 report,
+                 "bill-deleted-1"
+               )
+
+      assert updated.status == "rejected"
+      assert updated.quickbooks_sync_error =~ "bill-deleted-1"
+      assert updated.quickbooks_sync_error =~ "Automatically rejected"
+    end
+  end
+
+  describe "calculate_totals/1 — non-preloaded (DB aggregate) path" do
+    test "computes totals via SUM query when associations are not preloaded",
+         %{
+           user: user
+         } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "DB totals test",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "V",
+                "description" => "D",
+                "amount" => "75.00"
+              }
+            ],
+            "income_items" => [
+              %{
+                "date" => "2024-01-16",
+                "description" => "Income",
+                "amount" => "15.00"
+              }
+            ]
+          },
+          user
+        )
+
+      # Fetch without preloading expense_items/income_items so
+      # calculate_totals/1 goes through the DB-aggregate branch.
+      not_preloaded = Repo.get!(Ysc.ExpenseReports.ExpenseReport, report.id)
+      refute Ecto.assoc_loaded?(not_preloaded.expense_items)
+      refute Ecto.assoc_loaded?(not_preloaded.income_items)
+
+      totals = ExpenseReports.calculate_totals(not_preloaded)
+      assert Money.equal?(totals.expense_total, Money.new(:USD, "75.00"))
+      assert Money.equal?(totals.income_total, Money.new(:USD, "15.00"))
+      assert Money.equal?(totals.net_total, Money.new(:USD, "60.00"))
+    end
+
+    test "returns zero totals from DB when report has no items", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "DB totals empty",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      not_preloaded = Repo.get!(Ysc.ExpenseReports.ExpenseReport, report.id)
+      totals = ExpenseReports.calculate_totals(not_preloaded)
+      assert Money.equal?(totals.expense_total, Money.new(0, :USD))
+      assert Money.equal?(totals.income_total, Money.new(0, :USD))
+      assert Money.equal?(totals.net_total, Money.new(0, :USD))
+    end
+  end
+
+  describe "upload_receipt_to_s3/2 — kind option" do
+    test "uses proofs/ prefix when kind: :proof", %{user: user} do
+      tmp_dir = System.tmp_dir!()
+
+      path =
+        Path.join(tmp_dir, "proof_#{System.unique_integer([:positive])}.pdf")
+
+      File.write!(path, "content")
+
+      try do
+        key =
+          ExpenseReports.upload_receipt_to_s3(path,
+            user_id: user.id,
+            kind: :proof
+          )
+
+        assert String.starts_with?(key, "proofs/#{user.id}/")
+      after
+        File.rm(path)
+      end
+    end
+
+    test "falls back to receipts/ prefix for an unrecognized kind", %{
+      user: user
+    } do
+      tmp_dir = System.tmp_dir!()
+
+      path =
+        Path.join(
+          tmp_dir,
+          "unknownkind_#{System.unique_integer([:positive])}.pdf"
+        )
+
+      File.write!(path, "content")
+
+      try do
+        key =
+          ExpenseReports.upload_receipt_to_s3(path,
+            user_id: user.id,
+            kind: :something_else
+          )
+
+        assert String.starts_with?(key, "receipts/#{user.id}/")
+      after
+        File.rm(path)
+      end
+    end
+  end
 end
