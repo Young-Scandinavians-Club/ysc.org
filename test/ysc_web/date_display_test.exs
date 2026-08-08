@@ -188,4 +188,35 @@ defmodule YscWeb.DateDisplayTest do
                "—"
     end
   end
+
+  describe "event_day_label/1" do
+    test "uses the stored calendar date, not a Pacific timezone shift" do
+      today_pacific =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+      # Midnight UTC of tomorrow is still "tomorrow" as a wall-clock event date,
+      # even though that instant is still "today" in Pacific time.
+      tomorrow = Date.add(today_pacific, 1)
+      start_date = DateTime.new!(tomorrow, ~T[00:00:00], "Etc/UTC")
+
+      assert DateDisplay.event_day_label(%{start_date: start_date}) == :tomorrow
+      refute DateDisplay.event_day_label(%{start_date: start_date}) == :today
+    end
+
+    test "returns :today for today's Pacific wall-clock date" do
+      today_pacific =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+      start_date = DateTime.new!(today_pacific, ~T[00:00:00], "Etc/UTC")
+
+      assert DateDisplay.event_day_label(%{start_date: start_date}) == :today
+    end
+
+    test "returns nil when start_date is missing" do
+      assert DateDisplay.event_day_label(%{}) == nil
+      assert DateDisplay.event_day_label(%{start_date: nil}) == nil
+    end
+  end
 end

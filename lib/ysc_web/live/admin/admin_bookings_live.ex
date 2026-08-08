@@ -1516,9 +1516,11 @@ defmodule YscWeb.AdminBookingsLive do
         show
       >
         <.header>
-          {if @live_action == :new_booking,
-            do: "New Booking",
-            else: "Edit Booking"}
+          {cond do
+            @live_action == :edit_booking -> "Edit Booking"
+            @booking_type == :day -> "New Day Booking"
+            true -> "New Booking"
+          end}
         </.header>
 
         <div
@@ -1632,6 +1634,20 @@ defmodule YscWeb.AdminBookingsLive do
             type="hidden"
             field={@booking_form[:booking_mode]}
             value="buyout"
+          />
+
+          <.input
+            :if={@booking_type == :day}
+            type="hidden"
+            name="booking[room_id]"
+            value=""
+          />
+
+          <.input
+            :if={@booking_type == :day}
+            type="hidden"
+            field={@booking_form[:booking_mode]}
+            value="day"
           />
 
           <:actions>
@@ -2098,15 +2114,32 @@ defmodule YscWeb.AdminBookingsLive do
                   <% end %>
                 </div>
               </div>
-              <!-- Bookings Row (only for Clear Lake) -->
+              <!-- Guests / day spot booking row (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div
                   class="relative grid"
                   style={"grid-template-columns: repeat(#{total_cols}, minmax(56px, 1fr));"}
                 >
                   <%= for i <- 0..(total_cols - 1) do %>
+                    <% date = get_date_from_col(i, @calendar_dates) %>
+                    <% is_selected_start =
+                      @date_selection_type == :day && @date_selection_start && date &&
+                        Date.compare(date, @date_selection_start) == :eq %>
+                    <% hover_end =
+                      if @date_selection_type == :day,
+                        do: @date_selection_hover_end,
+                        else: nil %>
+                    <% is_in_range =
+                      @date_selection_type == :day && @date_selection_start && date &&
+                        date_selection_in_range?(
+                          date,
+                          @date_selection_start,
+                          hover_end
+                        ) %>
                     <% base_bg =
                       cond do
+                        is_selected_start -> "bg-purple-200"
+                        is_in_range -> "bg-purple-100/60"
                         today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
                         true -> "bg-white"
                       end %>
@@ -2122,32 +2155,75 @@ defmodule YscWeb.AdminBookingsLive do
                   <% end %>
                   <%= for {date, day_idx} <- Enum.with_index(@calendar_dates) do %>
                     <% availability_info = Map.get(@daily_availability, date) %>
+                    <% guest_count =
+                      if availability_info,
+                        do: availability_info.day_bookings_count,
+                        else: 0 %>
                     <% col_start = day_idx * 2 + 1 %>
                     <% col_end = col_start + 2 %>
-                    <%= if availability_info do %>
-                      <div
-                        class="flex items-center justify-center h-14"
-                        style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
+                    <% is_selected_start =
+                      @date_selection_type == :day && @date_selection_start &&
+                        Date.compare(date, @date_selection_start) == :eq %>
+                    <% hover_end =
+                      if @date_selection_type == :day,
+                        do: @date_selection_hover_end,
+                        else: nil %>
+                    <% is_in_range =
+                      @date_selection_type == :day && @date_selection_start &&
+                        date_selection_in_range?(
+                          date,
+                          @date_selection_start,
+                          hover_end
+                        ) %>
+                    <% day_bg =
+                      cond do
+                        is_selected_start -> "bg-purple-200"
+                        is_in_range -> "bg-purple-100/60"
+                        true -> nil
+                      end %>
+                    <div
+                      class="relative flex items-center justify-center h-14"
+                      style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
+                    >
+                      <button
+                        type="button"
+                        class={[
+                          "absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-purple-50 transition-colors",
+                          day_bg
+                        ]}
+                        phx-click="select-date-day"
+                        phx-value-date={Date.to_string(date)}
+                        phx-disable-with="Loading..."
+                        data-date={Date.to_string(date)}
+                        data-selection-type={
+                          if @date_selection_type == :day, do: "day", else: ""
+                        }
+                        title="Click to select date range for day/spot booking"
+                        aria-label={"Select date range for day booking on #{Date.to_string(date)}"}
                       >
-                        <%= if availability_info.day_bookings_count > 0 do %>
-                          <.button
-                            type="button"
-                            variant="outline"
-                            color="purple"
-                            phx-click="show-day-guests"
-                            phx-value-date={Date.to_string(date)}
-                            phx-disable-with="Loading..."
-                            class="!min-h-9 !py-1 !px-2 text-sm"
-                          >
-                            {availability_info.day_bookings_count} guests
-                          </.button>
-                        <% else %>
-                          <span class="text-sm font-semibold text-zinc-400">
-                            0 guests
-                          </span>
-                        <% end %>
-                      </div>
-                    <% end %>
+                        <span
+                          :if={guest_count == 0}
+                          class="text-sm font-semibold text-zinc-400"
+                        >
+                          0 guests
+                        </span>
+                        <span :if={guest_count > 0} class="sr-only">
+                          Select date range for day booking
+                        </span>
+                      </button>
+                      <.button
+                        :if={guest_count > 0}
+                        type="button"
+                        variant="outline"
+                        color="purple"
+                        phx-click="show-day-guests"
+                        phx-value-date={Date.to_string(date)}
+                        phx-disable-with="Loading..."
+                        class="!min-h-9 !py-1 !px-2 text-sm relative z-10"
+                      >
+                        {guest_count} guests
+                      </.button>
+                    </div>
                   <% end %>
                 </div>
               <% end %>
@@ -2472,9 +2548,15 @@ defmodule YscWeb.AdminBookingsLive do
                       <% end %>
                     </div>
                   <% else %>
-                    <.badge type="green" class="whitespace-nowrap flex-shrink-0">
-                      Full Buyout
-                    </.badge>
+                    <%= if booking.booking_mode == :day do %>
+                      <.badge type="sky" class="whitespace-nowrap flex-shrink-0">
+                        Day
+                      </.badge>
+                    <% else %>
+                      <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                        Full Buyout
+                      </.badge>
+                    <% end %>
                   <% end %>
                 </:col>
                 <:col :let={{_, booking}} label="Status" field={:status}>
@@ -4044,6 +4126,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Determine booking type from params
     booking_type =
       cond do
+        params["type"] == "day" -> :day
         params["type"] == "buyout" -> :buyout
         params["type"] == "room" -> :room
         params["room_id"] -> :room
@@ -4113,7 +4196,13 @@ defmodule YscWeb.AdminBookingsLive do
 
     # Determine booking type from existing booking
     has_rooms = Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
-    booking_type = if has_rooms, do: :room, else: :buyout
+
+    booking_type =
+      cond do
+        has_rooms or booking.booking_mode == :room -> :room
+        booking.booking_mode == :day -> :day
+        true -> :buyout
+      end
 
     # Get room_id if it's a room booking
     room_id = if has_rooms, do: List.first(booking.rooms).id, else: nil
@@ -4737,6 +4826,59 @@ defmodule YscWeb.AdminBookingsLive do
       {:noreply,
        socket
        |> assign(:date_selection_type, :buyout)
+       |> assign(:date_selection_start, date)
+       |> assign(:date_selection_hover_end, nil)}
+    end
+  end
+
+  def handle_event("select-date-day", %{"date" => date_str}, socket) do
+    date = Date.from_iso8601!(date_str)
+
+    # If we already have a start date selected, this is the end date
+    if socket.assigns[:date_selection_type] == :day &&
+         socket.assigns[:date_selection_start] do
+      start_date_selected = socket.assigns.date_selection_start
+      # Ensure end date is after start date
+      {final_start, final_end} =
+        if Date.compare(date, start_date_selected) == :lt do
+          {date, start_date_selected}
+        else
+          {start_date_selected, date}
+        end
+
+      # Navigate to form with date range
+      tz = socket.assigns[:timezone] || "America/Los_Angeles"
+
+      calendar_start =
+        socket.assigns[:calendar_start_date] ||
+          Date.add(today_in_timezone(tz), -2)
+
+      calendar_end =
+        socket.assigns[:calendar_end_date] ||
+          Date.add(today_in_timezone(tz), 14)
+
+      query_params = [
+        property: socket.assigns.selected_property,
+        from_date: Date.to_string(calendar_start),
+        to_date: Date.to_string(calendar_end),
+        type: "day",
+        start_date: Date.to_string(final_start),
+        end_date: Date.to_string(final_end)
+      ]
+
+      {:noreply,
+       socket
+       |> assign(:date_selection_type, nil)
+       |> assign(:date_selection_start, nil)
+       |> assign(:date_selection_hover_end, nil)
+       |> push_patch(
+         to: ~p"/admin/bookings/bookings/new?#{URI.encode_query(query_params)}"
+       )}
+    else
+      # First click - set start date
+      {:noreply,
+       socket
+       |> assign(:date_selection_type, :day)
        |> assign(:date_selection_start, date)
        |> assign(:date_selection_hover_end, nil)}
     end
@@ -6371,8 +6513,8 @@ defmodule YscWeb.AdminBookingsLive do
         room_id && booking_params["booking_mode"] == :room ->
           [skip_validation: true, rooms: rooms]
 
-        # For buyout bookings, clear rooms so stale associations don't persist
-        booking_params["booking_mode"] == :buyout ->
+        # For buyout or day bookings, clear rooms so stale associations don't persist
+        booking_params["booking_mode"] in [:buyout, :day] ->
           [skip_validation: true, rooms: []]
 
         true ->
@@ -7066,8 +7208,8 @@ defmodule YscWeb.AdminBookingsLive do
         :infinity
       )
 
-    # Separate room bookings from buyout bookings
-    # Room bookings have rooms associated, buyout bookings have no rooms
+    # Separate room bookings from buyout bookings.
+    # Day/spot bookings (Clear Lake) are shown via daily_availability, not the buyout row.
     room_bookings =
       Enum.filter(bookings_in_range, fn booking ->
         Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
@@ -7075,7 +7217,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     buyout_bookings =
       Enum.filter(bookings_in_range, fn booking ->
-        !Ecto.assoc_loaded?(booking.rooms) || booking.rooms == []
+        booking.booking_mode == :buyout
       end)
 
     # Calculate daily availability for Clear Lake (per guest/day mode)

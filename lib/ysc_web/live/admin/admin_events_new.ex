@@ -362,14 +362,19 @@ defmodule YscWeb.AdminEventsNewLive do
                 <h3 class="text-lg font-medium">Date and Time</h3>
                 <div class="flex flex-row w-full space-x-4">
                   <div class="flex">
+                    <%!-- Events: min_nights 0 = single day or multi-day range.
+                         Booking calendars keep the default of 1 night minimum. --%>
                     <.date_range_picker
                       label="Date*"
                       id="event_date"
                       form={@form}
                       start_date_field={@form[:start_date]}
                       end_date_field={@form[:end_date]}
-                      min={Date.utc_today()}
+                      min={Date.add(@pacific_today, -365)}
+                      today={@pacific_today}
                       allow_saturdays={true}
+                      min_nights={0}
+                      max_nights={365}
                     />
                   </div>
 
@@ -1366,6 +1371,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     capacity_attrs = %{"unlimited_capacity" => is_nil(event.max_attendees)}
     capacity_changeset = Event.changeset(event, capacity_attrs)
+    pacific_today = pacific_today()
 
     socket
     |> assign(:event, event)
@@ -1375,6 +1381,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:description_length, description_length(event.description))
     |> assign(:event_title, event.title)
     |> assign(:state, event.state)
+    |> assign(:pacific_today, pacific_today)
     |> assign(:start_date, event.start_date)
     |> assign(:end_date, event.end_date)
     |> assign(:start_time, event.start_time)
@@ -1419,6 +1426,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:list_params, Map.drop(params, ["id"]))
     |> assign(:event_title, "")
     |> assign(:state, :draft)
+    |> assign(:pacific_today, pacific_today())
     |> assign(:start_date, nil)
     |> assign(:end_date, nil)
     |> assign(:start_time, nil)
@@ -1948,10 +1956,24 @@ defmodule YscWeb.AdminEventsNewLive do
      )
      |> assign(:event_title, event_params["title"])
      |> assign(:page_title, event_params["title"])
-     |> assign(:start_date, event_params["start_date"])
-     |> assign(:end_date, event_params["end_date"])
-     |> assign(:start_time, event_params["start_time"])
-     |> assign(:end_time, event_params["end_time"])
+     # Prefer typed values from the event/changeset so header formatting and
+     # the date picker do not receive raw form strings.
+     |> assign(
+       :start_date,
+       Ecto.Changeset.get_field(updated_changeset, :start_date)
+     )
+     |> assign(
+       :end_date,
+       Ecto.Changeset.get_field(updated_changeset, :end_date)
+     )
+     |> assign(
+       :start_time,
+       Ecto.Changeset.get_field(updated_changeset, :start_time)
+     )
+     |> assign(
+       :end_time,
+       Ecto.Changeset.get_field(updated_changeset, :end_time)
+     )
      |> assign(
        :can_publish,
        can_publish?(
@@ -2479,19 +2501,72 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   @impl true
-  def handle_info({:updated_event, data}, socket) do
-    # Handle the message and update the socket as needed
-    # For example, you might want to update the event changeset
-    changeset = Event.changeset(socket.assigns[:event], data)
+  def handle_info({:updated_event, %{id: "event_date"} = data}, socket) do
+    current_event = Events.get_event!(socket.assigns.event.id)
 
-    if changeset.valid? do
-      Events.update_event_editor(socket.assigns[:event], data)
-    end
+    {attrs, cleared_end_time?} =
+      %{
+        start_date: data[:start_date],
+        end_date: data[:end_date]
+      }
+      |> maybe_clear_end_time_for_single_day(current_event)
 
-    {:noreply,
-     assign(socket, start_date: data[:start_date], end_date: data[:end_date])
-     |> assign_form(changeset)}
+    changeset = Event.editor_changeset(current_event, attrs)
+
+    {updated_event, updated_changeset, save_error?} =
+      if changeset.valid? do
+        case Events.update_event_editor(current_event, attrs) do
+          {:ok, event} ->
+            {event, Event.editor_changeset(event, attrs), false}
+
+          {:error, error_changeset} ->
+            {current_event, error_changeset, true}
+        end
+      else
+        {current_event, changeset, true}
+      end
+
+    socket =
+      socket
+      |> assign(:event, updated_event)
+      |> assign(:start_date, updated_event.start_date)
+      |> assign(:end_date, updated_event.end_date)
+      |> assign(:start_time, updated_event.start_time)
+      |> assign(:end_time, updated_event.end_time)
+      |> assign(
+        :can_publish,
+        can_publish?(updated_event.start_date, updated_event.title)
+      )
+      |> assign_form(updated_changeset)
+
+    socket =
+      cond do
+        save_error? ->
+          YscWeb.Flash.put_toast(
+            socket,
+            :error,
+            "Could not save event dates. Check the form for errors.",
+            title: "Event"
+          )
+
+        cleared_end_time? ->
+          YscWeb.Flash.put_toast(
+            socket,
+            :info,
+            "End time was cleared because it was overnight or after the start time on a single-day event.",
+            title: "Event"
+          )
+
+        true ->
+          socket
+      end
+
+    {:noreply, socket}
   end
+
+  # Ticket-tier sale date pickers (and any other date pickers) send the same
+  # message shape; ignore them here so they do not overwrite event dates.
+  def handle_info({:updated_event, _data}, socket), do: {:noreply, socket}
 
   @impl true
   def handle_info(
@@ -2911,6 +2986,43 @@ defmodule YscWeb.AdminEventsNewLive do
       assign_form(socket, updated_changeset)
       |> assign(:event, updated_event)
     end
+  end
+
+  # Multi-day events often keep an overnight end_time (e.g. 18:00 → 02:00).
+  # Collapsing to a single calendar day would make start > end and silently
+  # fail validation — clear the end time so the date change can persist.
+  defp maybe_clear_end_time_for_single_day(attrs, event) do
+    start_date = date_only(attrs[:start_date])
+    end_date = date_only(attrs[:end_date])
+
+    same_day? = start_date != nil and end_date != nil and start_date == end_date
+
+    if same_day? and overnight_or_inverted_times?(event) do
+      {Map.put(attrs, :end_time, nil), true}
+    else
+      {attrs, false}
+    end
+  end
+
+  # Equality is intentional: a zero-length same-day window (end == start) is
+  # treated as inverted / invalid for a single-day event, same as overnight.
+  defp overnight_or_inverted_times?(%{
+         start_time: start_time,
+         end_time: end_time
+       })
+       when not is_nil(start_time) and not is_nil(end_time) do
+    Time.compare(end_time, start_time) != :gt
+  end
+
+  defp overnight_or_inverted_times?(_), do: false
+
+  defp date_only(%DateTime{} = dt), do: DateTime.to_date(dt)
+  defp date_only(%Date{} = date), do: date
+  defp date_only(%NaiveDateTime{} = ndt), do: NaiveDateTime.to_date(ndt)
+  defp date_only(_), do: nil
+
+  defp pacific_today do
+    DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
   end
 
   defp build_location_attrs(params) do

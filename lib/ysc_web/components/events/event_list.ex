@@ -111,7 +111,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <span
                       :if={hero_day_label == :tomorrow}
-                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400 animate-badge-shine-emerald"
+                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400 animate-badge-shine-orange"
                     >
                       <.icon
                         name="hero-calendar-solid"

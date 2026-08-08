@@ -217,6 +217,24 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
+function imageContentTypeFromUrl(url) {
+  const path = (url || "").split("?")[0].toLowerCase();
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".gif")) return "image/gif";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".avif")) return "image/avif";
+  if (path.endsWith(".svg")) return "image/svg+xml";
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+  return "image/jpeg";
+}
+
+function withContentDisposition(url) {
+  if (!url) return url;
+  if (/[?&]content-disposition=/i.test(url)) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}content-disposition=attachment`;
+}
+
 module.exports = {
   mounted() {
     window.Trix = Trix;
@@ -252,11 +270,15 @@ module.exports = {
         `trix-editor[input="${target_input_id}"]`,
       );
       if (!editorEl) return;
+      // Always set href so Trix wraps the preview in <a> (needed for lightbox + download).
+      // Keep an explicit href as-is; when falling back to url, append the
+      // disposition param without clobbering existing query string.
+      const imageHref = href || withContentDisposition(url);
       const attachment = new Trix.Attachment({
         url,
-        href,
+        href: imageHref,
         alt,
-        contentType: "image",
+        contentType: imageContentTypeFromUrl(url),
       });
       editorEl.editor.insertAttachment(attachment);
     });

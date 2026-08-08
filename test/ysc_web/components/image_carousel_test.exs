@@ -29,11 +29,37 @@ defmodule YscWeb.Components.ImageCarouselTest do
 
       assert html =~ ~s(id="hero-wrapper")
       assert html =~ ~s(phx-hook="ImageCarouselAutoplay")
-      assert html =~ "absolute inset-0 h-full w-full z-[2]"
+      assert html =~ "hero-media-stage"
+      assert html =~ "hero-media-stage__inner"
+      assert html =~ "hero-media-stage__bleed"
       assert html =~ "slide-hero-carousel-0"
       assert html =~ "/images/test.jpg"
       assert html =~ "bg-black/40"
       assert html =~ ~s(aria-hidden="true")
+    end
+
+    test "renders srcset and sizes when provided on images" do
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &ImageCarousel.image_carousel_hero_background/1,
+          %{
+            wrapper_id: "hero-wrapper",
+            carousel_id: "hero-carousel",
+            images: [
+              %{
+                src: "/images/test.jpg",
+                srcset:
+                  "/images/test-1280.webp 1280w, /images/test-1920.webp 1920w",
+                alt: "Test"
+              }
+            ]
+          }
+        )
+
+      assert html =~
+               ~s(srcset="/images/test-1280.webp 1280w, /images/test-1920.webp 1920w")
+
+      assert html =~ ~s|sizes="(max-width: 1920px) 100vw, 1920px"|
     end
 
     test "supports custom overlay classes" do

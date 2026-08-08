@@ -287,26 +287,18 @@ defmodule YscWeb.Components.Events.EventCard do
     if start_date == nil do
       nil
     else
-      now = DateTime.utc_now()
+      # Event start_date is a Pacific wall-clock calendar day — use the date
+      # component as-is, consistent with DateDisplay.event_day_label/1
+      event_date_only = DateTime.to_date(start_date)
 
-      # If event is in the past, return nil
-      if DateTime.compare(now, start_date) == :gt do
-        nil
-      else
-        # Calculate days difference using Pacific calendar days, to stay
-        # consistent with DateDisplay.event_day_label/1
-        event_date_only =
-          start_date
-          |> DateTime.shift_zone!("America/Los_Angeles")
-          |> DateTime.to_date()
+      now_date_only =
+        DateTime.utc_now()
+        |> DateTime.shift_zone!("America/Los_Angeles")
+        |> DateTime.to_date()
 
-        now_date_only =
-          now
-          |> DateTime.shift_zone!("America/Los_Angeles")
-          |> DateTime.to_date()
-
-        diff = Date.diff(event_date_only, now_date_only)
-        max(0, diff)
+      case Date.diff(event_date_only, now_date_only) do
+        diff when diff >= 0 -> diff
+        _ -> nil
       end
     end
   end

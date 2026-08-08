@@ -521,7 +521,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       <section
         :if={@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh] bg-white"
       >
         <YscWeb.Components.ImageCarousel.image_carousel_hero_background
           wrapper_id="clear-lake-carousel-wrapper"
@@ -2404,7 +2404,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh] bg-white"
       >
         <YscWeb.Components.ImageCarousel.image_carousel_hero_background
           wrapper_id="clear-lake-carousel-wrapper-nonuser"
@@ -3923,18 +3923,26 @@ defmodule YscWeb.ClearLakeBookingLive do
     [
       %{
         src: ~p"/images/clear_lake/clear_lake_main.webp",
+        srcset:
+          "#{~p"/images/clear_lake/clear_lake_main-1280.webp"} 1280w, #{~p"/images/clear_lake/clear_lake_main-1500.webp"} 1500w",
         alt: "Clear Lake Cabin Exterior"
       },
       %{
         src: ~p"/images/history/clear_lake_from_above.webp",
+        srcset:
+          "#{~p"/images/history/clear_lake_from_above-1280.webp"} 1280w, #{~p"/images/history/clear_lake_from_above-1920.webp"} 1920w",
         alt: "Clear Lake Aerial View"
       },
       %{
         src: ~p"/images/clear_lake/clear_lake_dock.webp",
+        srcset:
+          "#{~p"/images/clear_lake/clear_lake_dock-1280.webp"} 1280w, #{~p"/images/clear_lake/clear_lake_dock-1920.webp"} 1920w, #{~p"/images/clear_lake/clear_lake_dock-2560.webp"} 2560w",
         alt: "Clear Lake Dock"
       },
       %{
         src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
+        srcset:
+          "#{~p"/images/clear_lake/clear_lake_dock_2-1280.webp"} 1280w, #{~p"/images/clear_lake/clear_lake_dock_2-1920.webp"} 1920w",
         alt: "Clear Lake Dock"
       },
       %{src: ~p"/images/clear_lake/clear_lake_sweep.webp", alt: "Clear Lake"},

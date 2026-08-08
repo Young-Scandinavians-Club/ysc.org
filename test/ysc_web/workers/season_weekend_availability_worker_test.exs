@@ -43,6 +43,10 @@ defmodule YscWeb.Workers.SeasonWeekendAvailabilityWorkerTest do
     test "does not send again for the same cycle year" do
       recipient = user_fixture()
 
+      # Warm the cache so the second run must read notification bookkeeping from
+      # the database, not a stale cached season struct.
+      assert [_ | _] = Ysc.Bookings.SeasonCache.get_all_for_property(:tahoe)
+
       assert :ok = SeasonWeekendAvailabilityWorker.run(~D[2026-10-01])
       sent_at_first = tahoe_season("Winter").weekend_notification_sent_at
 

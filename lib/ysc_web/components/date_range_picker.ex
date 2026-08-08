@@ -297,9 +297,6 @@ defmodule YscWeb.Components.DateRangePicker do
 
   @impl true
   def update(assigns, socket) do
-    range_start = from_str!(assigns.start_date_field.value)
-    range_end = from_str!(end_value(assigns))
-
     injected_today = assigns[:today]
     today = injected_today || Date.utc_today()
 
@@ -308,6 +305,21 @@ defmodule YscWeb.Components.DateRangePicker do
       injected_today ||
         (socket.assigns[:current] && socket.assigns.current[:date]) ||
         Date.utc_today()
+
+    # While the calendar is open, keep in-progress picks. Parent re-renders
+    # (form auto-save, PubSub, etc.) used to overwrite range_* from the form and
+    # could leave state at :set_end/:reset so the next click was validated
+    # against stale dates and silently ignored.
+    calendar_open? = socket.assigns[:calendar?] == true
+
+    {range_start, range_end, state} =
+      if calendar_open? do
+        {socket.assigns.range_start, socket.assigns.range_end,
+         socket.assigns[:state] || @initial_state}
+      else
+        {from_str!(assigns.start_date_field.value),
+         from_str!(end_value(assigns)), @initial_state}
+      end
 
     {
       :ok,
@@ -329,16 +341,10 @@ defmodule YscWeb.Components.DateRangePicker do
         assigns[:blocked_stay_dates] || %{}
       )
       |> assign(:max_nights, assigns[:max_nights] || 4)
+      |> assign(:min_nights, assigns[:min_nights] || 1)
       |> assign(:seasons, assigns[:seasons])
       |> assign(:allow_saturdays, assigns[:allow_saturdays] || false)
-      # Only reset state if we don't have a range yet, otherwise preserve it
-      |> assign(
-        :state,
-        if(range_start && range_end,
-          do: socket.assigns[:state] || @initial_state,
-          else: @initial_state
-        )
-      )
+      |> assign(:state, state)
     }
   end
 
@@ -347,7 +353,20 @@ defmodule YscWeb.Components.DateRangePicker do
     if socket.assigns[:disabled] do
       {:noreply, socket}
     else
-      {:noreply, socket |> assign(:calendar?, true)}
+      # Focus the month on the current selection (or today) and always start a
+      # fresh start-date pick so earlier days are not stuck disabled in :set_end.
+      focus_date =
+        case socket.assigns.range_start do
+          nil -> socket.assigns.today || Date.utc_today()
+          start -> DateTime.to_date(to_datetime(start))
+        end
+
+      {:noreply,
+       socket
+       |> assign(:calendar?, true)
+       |> assign(:state, @initial_state)
+       |> assign(:hover_range_end, nil)
+       |> assign(:current, format_date(focus_date))}
     end
   end
 
@@ -362,12 +381,12 @@ defmodule YscWeb.Components.DateRangePicker do
 
   @impl true
   def handle_event("close-calendar", _, socket) do
-    [range_start, range_end] =
-      [
-        socket.assigns.range_start,
-        socket.assigns.range_end || socket.assigns.range_start
-      ]
-      |> Enum.sort(&(DateTime.compare(&1, &2) != :gt))
+    range_start = to_datetime(socket.assigns.range_start)
+
+    range_end =
+      to_datetime(socket.assigns.range_end || socket.assigns.range_start)
+
+    {range_start, range_end} = normalize_sorted_range(range_start, range_end)
 
     attrs = %{
       id: socket.assigns.id,
@@ -431,9 +450,18 @@ defmodule YscWeb.Components.DateRangePicker do
         if socket.assigns[:max] && Date.compare(date, socket.assigns.max) == :gt do
           {:noreply, socket}
         else
+          # Clicking a day before the current start while choosing an end date
+          # restarts the selection (needed for events moving to an earlier day).
+          socket = maybe_restart_selection_before_start(socket, date)
+
           # Validate date based on current state and rules
           if valid_date_selection?(socket, date) do
-            ranges = calculate_date_ranges(socket.assigns.state, date_time)
+            ranges =
+              calculate_date_ranges(
+                socket.assigns.state,
+                date_time,
+                socket.assigns
+              )
 
             state =
               if socket.assigns.is_range? do
@@ -529,6 +557,22 @@ defmodule YscWeb.Components.DateRangePicker do
     }
   end
 
+  defp maybe_restart_selection_before_start(socket, date) do
+    range_start = socket.assigns.range_start
+
+    if socket.assigns.state == :set_end and range_start != nil do
+      start_date = DateTime.to_date(to_datetime(range_start))
+
+      if Date.compare(date, start_date) == :lt do
+        assign(socket, :state, :set_start)
+      else
+        socket
+      end
+    else
+      socket
+    end
+  end
+
   defp end_value(assigns) when is_map_key(assigns, :end_date_field) do
     case assigns.end_date_field.value do
       nil -> nil
@@ -613,16 +657,28 @@ defmodule YscWeb.Components.DateRangePicker do
     |> Enum.chunk_every(7)
   end
 
-  defp calculate_date_ranges(:set_start, date_time) do
-    %{
-      range_start: date_time,
-      range_end: nil
-    }
+  defp calculate_date_ranges(:set_start, date_time, assigns) do
+    # min_nights: 0 (admin events) — first click selects a single day; a later
+    # click can still extend the end date into a multi-day range.
+    # min_nights: 1+ (bookings) — first click only sets check-in; checkout must
+    # be a later day (at least one night).
+    if Map.get(assigns, :min_nights, 1) == 0 do
+      %{
+        range_start: date_time,
+        range_end: date_time
+      }
+    else
+      %{
+        range_start: date_time,
+        range_end: nil
+      }
+    end
   end
 
-  defp calculate_date_ranges(:set_end, date_time), do: %{range_end: date_time}
+  defp calculate_date_ranges(:set_end, date_time, _assigns),
+    do: %{range_end: date_time}
 
-  defp calculate_date_ranges(:reset, _date_time) do
+  defp calculate_date_ranges(:reset, _date_time, _assigns) do
     %{
       range_start: nil,
       range_end: nil
@@ -664,6 +720,7 @@ defmodule YscWeb.Components.DateRangePicker do
       allow_saturdays: Map.get(assigns, :allow_saturdays, false),
       seasons: Map.get(assigns, :seasons),
       max_nights: Map.get(assigns, :max_nights, 4),
+      min_nights: Map.get(assigns, :min_nights, 1),
       date_tooltips: Map.get(assigns, :date_tooltips, %{}),
       checkout_date_tooltips: Map.get(assigns, :checkout_date_tooltips, %{}),
       blocked_stay_dates: Map.get(assigns, :blocked_stay_dates, %{})
@@ -752,35 +809,15 @@ defmodule YscWeb.Components.DateRangePicker do
   defp stay_range_unavailable_reason(_checkout_day, _ctx), do: nil
 
   defp date_disabled_by_rules?(day, ctx) when is_map(ctx) do
-    %{
-      min: min,
-      range_start: range_start,
-      state: state,
-      max: max,
-      property: property,
-      today: today,
-      allow_saturdays: allow_saturdays,
-      seasons: seasons,
-      max_nights: max_nights
-    } = Map.put_new(ctx, :max_nights, 4)
+    ctx =
+      ctx
+      |> Map.put_new(:max_nights, 4)
+      |> Map.put_new(:min_nights, 1)
 
-    if before_min_date?(day, min) do
-      true
-    else
-      if after_max_date?(day, max) do
-        true
-      else
-        check_season_and_other_rules(
-          day,
-          range_start,
-          state,
-          property,
-          today,
-          allow_saturdays,
-          seasons,
-          max_nights
-        )
-      end
+    cond do
+      before_min_date?(day, ctx.min) -> true
+      after_max_date?(day, ctx.max) -> true
+      true -> check_season_and_other_rules(day, ctx)
     end
   end
 
@@ -788,33 +825,43 @@ defmodule YscWeb.Components.DateRangePicker do
     max && Date.compare(day, max) == :gt
   end
 
-  defp check_season_and_other_rules(
-         day,
-         range_start,
-         state,
-         property,
-         today,
-         allow_saturdays,
-         seasons,
-         max_nights
-       ) do
+  defp check_season_and_other_rules(day, ctx) do
+    %{
+      range_start: range_start,
+      state: state,
+      property: property,
+      today: today,
+      allow_saturdays: allow_saturdays,
+      seasons: seasons,
+      max_nights: max_nights,
+      min_nights: min_nights
+    } = ctx
+
     if property && today do
       alias Ysc.Bookings.SeasonHelpers
 
       if SeasonHelpers.date_selectable?(property, day, today, seasons) do
-        check_other_rules(day, range_start, state, allow_saturdays, max_nights)
+        check_end_date_rules(
+          day,
+          range_start,
+          state,
+          allow_saturdays,
+          max_nights,
+          min_nights
+        )
       else
         true
       end
     else
-      check_other_rules(day, range_start, state, allow_saturdays, max_nights)
+      check_end_date_rules(
+        day,
+        range_start,
+        state,
+        allow_saturdays,
+        max_nights,
+        min_nights
+      )
     end
-  end
-
-  # Check other date rules (Saturday, range validation, etc.).
-  # Saturday check-in is allowed for Tahoe; checkout rules enforce Sat→Sun only.
-  defp check_other_rules(day, range_start, state, allow_saturdays, max_nights) do
-    check_end_date_rules(day, range_start, state, allow_saturdays, max_nights)
   end
 
   defp saturday?(day) do
@@ -830,56 +877,66 @@ defmodule YscWeb.Components.DateRangePicker do
          range_start,
          state,
          allow_saturdays,
-         max_nights
+         max_nights,
+         min_nights
        ) do
     case state do
       :set_end when not is_nil(range_start) ->
-        validate_end_date_range(day, range_start, allow_saturdays, max_nights)
+        not end_date_allowed?(
+          day,
+          range_start,
+          allow_saturdays,
+          max_nights,
+          min_nights
+        )
 
       _ ->
         false
     end
   end
 
-  defp validate_end_date_range(day, range_start, allow_saturdays, max_nights) do
-    start_date = DateTime.to_date(range_start)
+  # Shared end-date rules for disable checks and click validation.
+  # Returns true when `day` is an allowed checkout / range end.
+  defp end_date_allowed?(
+         day,
+         range_start,
+         allow_saturdays,
+         max_nights,
+         min_nights
+       ) do
+    start_date = DateTime.to_date(to_datetime(range_start))
     nights = Date.diff(day, start_date)
 
     cond do
       nights > max_nights ->
+        false
+
+      # Days before the current start stay clickable when same-day ranges are
+      # allowed so the user can restart on an earlier date (events).
+      nights < 0 and min_nights == 0 ->
         true
 
-      nights < 1 ->
-        true
+      nights < min_nights ->
+        false
 
       # Saturday check-out always leaves Sat without Sun in the inclusive span
       saturday?(day) && !allow_saturdays ->
-        true
+        false
 
       # Saturday check-in: only Sunday checkout (one night)
       saturday?(start_date) && !allow_saturdays &&
           not (nights == 1 && sunday?(day)) ->
+        false
+
+      allow_saturdays ->
         true
 
       true ->
-        check_saturday_sunday_range(start_date, day, allow_saturdays)
-    end
-  end
-
-  defp check_saturday_sunday_range(start_date, day, allow_saturdays) do
-    if allow_saturdays do
-      false
-    else
-      date_range = Date.range(start_date, day) |> Enum.to_list()
-      day_of_weeks = Enum.map(date_range, &Date.day_of_week/1)
-      has_saturday = 6 in day_of_weeks
-      has_sunday = 7 in day_of_weeks
-
-      if has_saturday && not has_sunday do
-        true
-      else
-        false
-      end
+        date_range = Date.range(start_date, day) |> Enum.to_list()
+        day_of_weeks = Enum.map(date_range, &Date.day_of_week/1)
+        has_saturday = 6 in day_of_weeks
+        has_sunday = 7 in day_of_weeks
+        not (has_saturday and not has_sunday)
     end
   end
 
@@ -926,33 +983,17 @@ defmodule YscWeb.Components.DateRangePicker do
   defp check_other_selection_rules(socket, date_day) do
     allow_saturdays = Map.get(socket.assigns, :allow_saturdays, false)
     max_nights = Map.get(socket.assigns, :max_nights, 4)
+    min_nights = Map.get(socket.assigns, :min_nights, 1)
 
     case socket.assigns.state do
       :set_end when not is_nil(socket.assigns.range_start) ->
-        start_date = DateTime.to_date(socket.assigns.range_start)
-        nights = Date.diff(date_day, start_date)
-
-        cond do
-          nights < 1 or nights > max_nights ->
-            false
-
-          saturday?(date_day) && !allow_saturdays ->
-            false
-
-          saturday?(start_date) && !allow_saturdays &&
-              not (nights == 1 && sunday?(date_day)) ->
-            false
-
-          allow_saturdays ->
-            true
-
-          true ->
-            date_range = Date.range(start_date, date_day) |> Enum.to_list()
-            day_of_weeks = Enum.map(date_range, &Date.day_of_week/1)
-            has_saturday = 6 in day_of_weeks
-            has_sunday = 7 in day_of_weeks
-            not (has_saturday && not has_sunday)
-        end
+        end_date_allowed?(
+          date_day,
+          socket.assigns.range_start,
+          allow_saturdays,
+          max_nights,
+          min_nights
+        )
 
       _ ->
         true
@@ -1101,6 +1142,32 @@ defmodule YscWeb.Components.DateRangePicker do
   end
 
   defp from_str!(date_time_str), do: date_time_str
+
+  # Ensure range endpoints are comparable DateTimes (or both nil) before sort.
+  # Preserves range_end falling back to range_start at the call site.
+  defp normalize_sorted_range(nil, nil), do: {nil, nil}
+  defp normalize_sorted_range(%DateTime{} = start, nil), do: {start, start}
+  defp normalize_sorted_range(nil, %DateTime{} = ending), do: {ending, ending}
+
+  defp normalize_sorted_range(%DateTime{} = start, %DateTime{} = ending) do
+    [range_start, range_end] =
+      Enum.sort([start, ending], &(DateTime.compare(&1, &2) != :gt))
+
+    {range_start, range_end}
+  end
+
+  defp to_datetime(nil), do: nil
+  defp to_datetime(%DateTime{} = dt), do: DateTime.truncate(dt, :second)
+
+  defp to_datetime(%Date{} = date) do
+    DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+  end
+
+  defp to_datetime(%NaiveDateTime{} = ndt) do
+    DateTime.from_naive!(ndt, "Etc/UTC") |> DateTime.truncate(:second)
+  end
+
+  defp to_datetime(other) when is_binary(other), do: from_str!(other)
 
   defp select_button_text(_start_date, nil) do
     "Select Date"

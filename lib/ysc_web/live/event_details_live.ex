@@ -450,8 +450,11 @@ defmodule YscWeb.EventDetailsLive do
                 <%= if !event_in_past?(@event) && @event.state != :cancelled do %>
                   <div class="mt-3 inline-flex items-center gap-2 bg-blue-50 px-2 py-1 rounded-full">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                    <span class="text-xs font-black text-blue-600 uppercase tracking-widest">
-                      Upcoming
+                    <span
+                      id="event-status-label"
+                      class="text-xs font-black text-blue-600 uppercase tracking-widest"
+                    >
+                      {if event_live?(@event), do: "Live", else: "Upcoming"}
                     </span>
                   </div>
                 <% end %>
@@ -731,7 +734,12 @@ defmodule YscWeb.EventDetailsLive do
                 <span class="w-8 h-px bg-zinc-200"></span> Details
               </h3>
               <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-normal leading-relaxed">
-                <div id="article-body" class="post-render" phx-hook="GLightboxHook">
+                <div
+                  id="article-body"
+                  class="post-render"
+                  phx-hook="GLightboxHook"
+                  phx-update="ignore"
+                >
                   {raw(event_body(@event))}
                 </div>
               </article>
@@ -7852,28 +7860,58 @@ defmodule YscWeb.EventDetailsLive do
     |> Enum.any?(fn {_tier_id, quantity} -> quantity > 0 end)
   end
 
-  defp event_in_past?(%{start_date: nil}), do: false
-
+  # True once the event's end cutoff has passed (matches Events upcoming/past
+  # listing): end date+time, else end of end date, else start date+time, else
+  # end of start date.
   defp event_in_past?(event) do
-    now = DateTime.utc_now()
-
-    event_datetime =
-      case {event.start_date, event.start_time} do
-        {%DateTime{} = date, %Time{} = time} ->
-          DateTime.new!(DateTime.to_date(date), time, "America/Los_Angeles")
-          |> DateTime.shift_zone!("Etc/UTC")
-
-        {%DateTime{} = date, nil} ->
-          date
-
-        _ ->
-          nil
-      end
-
-    case event_datetime do
+    case event_ends_at(event) do
       nil -> false
-      dt -> DateTime.compare(now, dt) == :gt
+      ends_at -> DateTime.compare(DateTime.utc_now(), ends_at) != :lt
     end
+  end
+
+  defp event_starts_at(event) do
+    case event_calendar_date(event.start_date) do
+      %Date{} = date ->
+        case event.start_time do
+          %Time{} = time -> pacific_event_datetime(date, time)
+          _ -> pacific_event_datetime(date, ~T[00:00:00])
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  # Cutoff used by Events list queries: prefer explicit end, then start, with a
+  # one-day grace when only a calendar date is set.
+  defp event_ends_at(event) do
+    cond do
+      event_calendar_date(event.end_date) && match?(%Time{}, event.end_time) ->
+        pacific_event_datetime(event.end_date, event.end_time)
+
+      end_day = event_calendar_date(event.end_date) ->
+        pacific_event_datetime(Date.add(end_day, 1), ~T[00:00:00])
+
+      event_calendar_date(event.start_date) && match?(%Time{}, event.end_time) ->
+        pacific_event_datetime(event.start_date, event.end_time)
+
+      event_calendar_date(event.start_date) && match?(%Time{}, event.start_time) ->
+        pacific_event_datetime(event.start_date, event.start_time)
+
+      start_day = event_calendar_date(event.start_date) ->
+        pacific_event_datetime(Date.add(start_day, 1), ~T[00:00:00])
+
+      true ->
+        nil
+    end
+  end
+
+  defp pacific_event_datetime(date, %Time{} = time) do
+    date
+    |> event_calendar_date()
+    |> DateTime.new!(time, "America/Los_Angeles")
+    |> DateTime.shift_zone!("Etc/UTC")
   end
 
   defp calculate_total_price(
@@ -8435,49 +8473,15 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  # Check if event is currently "live" (happening now in PST)
+  # Happening now: started and not yet past the end cutoff.
   defp event_live?(event) do
-    if event.start_date != nil && event.start_time != nil &&
-         event.end_time != nil do
-      # Get current time in PST
-      now_pst = DateTime.now!("America/Los_Angeles")
-      now_time_pst = DateTime.to_time(now_pst)
-      today_pst = DateTime.to_date(now_pst)
-
-      # Get event date in PST
-      event_date_pst =
-        case event.start_date do
-          %DateTime{} = dt ->
-            dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-            DateTime.to_date(dt_pst)
-
-          %Date{} = d ->
-            d
-
-          _ ->
-            nil
-        end
-
-      # Check if event is happening today
-      if event_date_pst == today_pst do
-        # Get start and end times
-        start_time = format_time(event.start_time)
-        end_time = format_time(event.end_time)
-
-        case {start_time, end_time} do
-          {%Time{} = start, %Time{} = end_time_val} ->
-            # Check if current time is between start and end times
-            Time.compare(now_time_pst, start) != :lt &&
-              Time.compare(now_time_pst, end_time_val) != :gt
-
-          _ ->
-            false
-        end
-      else
+    case event_starts_at(event) do
+      nil ->
         false
-      end
-    else
-      false
+
+      starts_at ->
+        DateTime.compare(DateTime.utc_now(), starts_at) != :lt and
+          not event_in_past?(event)
     end
   end
 
@@ -8492,24 +8496,16 @@ defmodule YscWeb.EventDetailsLive do
       now_time_pst = DateTime.to_time(now_pst)
       today_pst = DateTime.to_date(now_pst)
 
-      # Get event date in PST (convert DateTime to PST first if needed, then get Date)
-      event_date_pst =
+      # Event start_date is a Pacific wall-clock calendar day — use as-is.
+      event_date =
         case event.start_date do
-          %DateTime{} = dt ->
-            # Convert UTC DateTime to PST, then get the date
-            dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-            DateTime.to_date(dt_pst)
-
-          %Date{} = d ->
-            # Date structs don't have timezone, use as-is
-            d
-
-          _ ->
-            nil
+          %DateTime{} = dt -> DateTime.to_date(dt)
+          %Date{} = d -> d
+          _ -> nil
         end
 
       # Only show pulse if event is happening today (in PST)
-      if event_date_pst == today_pst do
+      if event_date == today_pst do
         # Check if current time (in PST) is between agenda item start and end times
         # Agenda item times are stored as Time structs and are in PST context
         Time.compare(now_time_pst, agenda_item.start_time) != :lt &&

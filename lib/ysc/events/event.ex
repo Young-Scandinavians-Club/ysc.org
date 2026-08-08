@@ -230,15 +230,27 @@ defmodule Ysc.Events.Event do
 
     start_datetime = EventDateTime.combine(start_date, start_time)
 
-    if publish_at && start_datetime &&
-         DateTime.compare(publish_at, start_datetime) == :gt do
-      add_error(
-        changeset,
-        :publish_at,
-        "must be before the event start date and time"
-      )
-    else
-      changeset
+    cond do
+      is_nil(publish_at) or is_nil(start_datetime) ->
+        changeset
+
+      DateTime.compare(publish_at, start_datetime) != :gt ->
+        changeset
+
+      # Already-published events often keep a historical publish_at. Moving the
+      # event earlier must not be blocked by that stale schedule — leave
+      # publish_at unchanged and skip the ordering error. Use data.state so
+      # scheduled→published transitions still validate publish_at vs start.
+      changeset.data.state == :published and
+          not changed?(changeset, :publish_at) ->
+        changeset
+
+      true ->
+        add_error(
+          changeset,
+          :publish_at,
+          "must be before the event start date and time"
+        )
     end
   end
 
