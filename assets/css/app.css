@@ -816,6 +816,10 @@ body.overflow-hidden {
     text-align: center;
 }
 
+.post-render figure.attachment.attachment--preview img {
+    cursor: zoom-in;
+}
+
 .attachment--preview .attachment__caption {
     color: #666;
     font-size: 0.9em;
