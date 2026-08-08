@@ -15,4 +15,21 @@ defmodule YscWeb.ErrorHTMLTest do
     assert html =~ "500"
     assert html =~ "Something went wrong"
   end
+
+  test "404 response includes document title", %{conn: conn} do
+    conn = get(conn, "/this-route-does-not-exist-for-error-title-test")
+    html = html_response(conn, 404)
+
+    assert html =~
+             ~r/<title>\s*Page not found · Young Scandinavians Club\s*<\/title>/
+  end
+
+  test "error layout titles by status" do
+    assert YscWeb.Layouts.error_page_title(%{status: 404}) == "Page not found"
+
+    assert YscWeb.Layouts.error_page_title(%{status: 500}) ==
+             "Something went wrong"
+
+    assert YscWeb.Layouts.error_page_title(%{page_title: "Custom"}) == "Custom"
+  end
 end
