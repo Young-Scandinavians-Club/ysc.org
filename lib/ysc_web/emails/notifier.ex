@@ -62,6 +62,7 @@ defmodule YscWeb.Emails.Notifier do
     "membership_renewal_payment_method_reminder" =>
       YscWeb.Emails.MembershipRenewalPaymentMethodReminder,
     "membership_renewal_reminder" => YscWeb.Emails.MembershipRenewalReminder,
+    "membership_ended" => YscWeb.Emails.MembershipEnded,
     "family_invite" => YscWeb.Emails.FamilyInvite,
     "family_invite_accepted" => YscWeb.Emails.FamilyInviteAccepted,
     "family_invite_cancelled" => YscWeb.Emails.FamilyInviteCancelled,

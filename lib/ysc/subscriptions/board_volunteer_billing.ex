@@ -170,11 +170,14 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   end
 
   defp clear_scheduled_cancellation(%Subscription{} = sub) do
-    if is_nil(sub.ends_at) do
+    if is_nil(sub.ends_at) and sub.cancel_at_period_end != true do
       :ok
     else
       case sub
-           |> Ecto.Changeset.change(%{ends_at: nil})
+           |> Ecto.Changeset.change(%{
+             ends_at: nil,
+             cancel_at_period_end: false
+           })
            |> Repo.update() do
         {:ok, _} ->
           if is_binary(sub.user_id) do

@@ -19,6 +19,10 @@ defmodule Ysc.Subscriptions.Subscription do
 
     field :stripe_id, :string
     field :stripe_status, :string
+    # True when the member (or Stripe) scheduled cancel-at-period-end.
+    # Used to distinguish voluntary auto-renew-off lapses from payment-failure
+    # / immediate cancellations for the membership-ended re-engagement email.
+    field :cancel_at_period_end, :boolean, default: false
 
     field :start_date, :utc_datetime
     field :current_period_start, :utc_datetime
@@ -40,6 +44,7 @@ defmodule Ysc.Subscriptions.Subscription do
       :trial_ends_at,
       :stripe_id,
       :stripe_status,
+      :cancel_at_period_end,
       :start_date,
       :current_period_start,
       :current_period_end,
