@@ -1809,10 +1809,14 @@ defmodule Ysc.Subscriptions do
     cond do
       existing.stripe_status == "incomplete" and
           stripe_subscription.status in ["active", "trialing"] ->
-        sync_existing_subscription_from_stripe(user, existing, stripe_subscription)
+        sync_existing_subscription_from_stripe(
+          user,
+          existing,
+          stripe_subscription
+        )
 
       stripe_subscription.status == "incomplete" and
-          payment_method_type == :bank_account and
+        payment_method_type == :bank_account and
           existing.stripe_status != "active" ->
         case existing
              |> Subscription.changeset(%{stripe_status: "active"})
@@ -1831,8 +1835,15 @@ defmodule Ysc.Subscriptions do
     end
   end
 
-  defp sync_existing_subscription_from_stripe(user, existing, stripe_subscription) do
-    case update_subscription(existing, subscription_attrs_from_stripe(stripe_subscription)) do
+  defp sync_existing_subscription_from_stripe(
+         user,
+         existing,
+         stripe_subscription
+       ) do
+    case update_subscription(
+           existing,
+           subscription_attrs_from_stripe(stripe_subscription)
+         ) do
       {:ok, updated} ->
         invalidate_membership_caches(user.id)
         broadcast_membership_updated(user.id)
@@ -1868,7 +1879,11 @@ defmodule Ysc.Subscriptions do
     }
 
     if stripe_subscription.cancel_at do
-      Map.put(attrs, :ends_at, DateTime.from_unix!(stripe_subscription.cancel_at))
+      Map.put(
+        attrs,
+        :ends_at,
+        DateTime.from_unix!(stripe_subscription.cancel_at)
+      )
     else
       attrs
     end
