@@ -132,11 +132,12 @@ defmodule Ysc.SubscriptionsActivationTest do
                  return_url: "http://localhost/finalize"
                )
 
-      # Local status is synced by Stripe webhooks; the critical outcome is that
-      # activation entered the incomplete-subscription retry path instead of
-      # short-circuiting to :already_active.
-      assert %Subscriptions.Subscription{stripe_id: ^stripe_sub_id} =
-               Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+      local = Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+      assert %Subscriptions.Subscription{stripe_status: "active"} = local
+      assert Subscriptions.active?(local)
+
+      _ = MembershipCache.invalidate_user(user.id)
+      assert MembershipCache.get_active_membership(user)
     end
 
     test "creates stripe subscription and persists locally" do
