@@ -445,6 +445,36 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert_patch(view)
     end
 
+    test "two-click Guests row selection opens new day booking on Clear Lake",
+         %{
+           conn: conn
+         } do
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings?property=clear_lake&from_date=2030-04-01&to_date=2030-04-30"
+        )
+
+      view
+      |> element("button[phx-click=select-date-day][data-date=\"2030-04-05\"]")
+      |> render_click()
+
+      view
+      |> element("button[phx-click=select-date-day][data-date=\"2030-04-08\"]")
+      |> render_click()
+
+      assert_patch(view)
+
+      assert has_element?(view, "#booking-form")
+
+      assert has_element?(
+               view,
+               "#booking-form input[name='booking[booking_mode]'][value=day]"
+             )
+
+      assert has_element?(view, "#booking-form-modal", "New Day Booking")
+    end
+
     test "two-click room row selection opens new room booking when rooms exist",
          %{
            conn: conn
@@ -1367,6 +1397,161 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       html = render(view)
       assert html =~ "Henry"
       refute html =~ "Grace"
+    end
+  end
+
+  describe "Clear Lake day/spot booking create and edit" do
+    setup [:create_admin]
+
+    defp insert_clear_lake_day_booking_for_edit!(
+           user_id,
+           checkin,
+           checkout,
+           guests_count \\ 3
+         ) do
+      %Ysc.Bookings.Booking{}
+      |> Ysc.Bookings.Booking.changeset(
+        %{
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: guests_count,
+          property: :clear_lake,
+          booking_mode: :day,
+          user_id: user_id,
+          status: :complete,
+          total_price: Money.new(400, :USD)
+        },
+        skip_validation: true
+      )
+      |> Ysc.Repo.insert!()
+    end
+
+    test "new day booking form creates a complete Clear Lake spot booking", %{
+      conn: conn
+    } do
+      user = user_fixture(%{first_name: "Spot", last_name: "AdminCreate"})
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/new?property=clear_lake&from_date=2036-06-01&to_date=2036-06-15&type=day&start_date=2036-06-05&end_date=2036-06-08"
+        )
+
+      assert has_element?(view, "#booking-form-modal", "New Day Booking")
+      assert has_element?(view, "#booking-form")
+
+      assert has_element?(
+               view,
+               "#booking-form input[name='booking[booking_mode]'][value=day]"
+             )
+
+      view
+      |> element("#booking-user-autocomplete-input")
+      |> render_keyup(%{"value" => user.email})
+
+      view
+      |> element(
+        "button[phx-click='select-booking-user'][phx-value-id='#{user.id}']"
+      )
+      |> render_click()
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2036-06-05",
+          "checkout_date" => "2036-06-08",
+          "guests_count" => "2",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "property" => "clear_lake"
+        }
+      })
+      |> render_submit()
+
+      booking =
+        Repo.one!(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.property == :clear_lake,
+            order_by: [desc: b.inserted_at],
+            limit: 1
+          )
+        )
+
+      assert booking.booking_mode == :day
+      assert booking.status == :complete
+      assert booking.checkin_date == ~D[2036-06-05]
+      assert booking.checkout_date == ~D[2036-06-08]
+      assert booking.guests_count == 2
+    end
+
+    test "edit day booking keeps booking_mode day (does not flip to buyout)", %{
+      conn: conn
+    } do
+      user = user_fixture(%{first_name: "Spot", last_name: "EditKeep"})
+      checkin = ~D[2036-07-10]
+      checkout = ~D[2036-07-13]
+
+      booking =
+        insert_clear_lake_day_booking_for_edit!(user.id, checkin, checkout)
+
+      {:ok, view, html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=clear_lake&from_date=2036-07-01&to_date=2036-07-20"
+        )
+
+      assert html =~ "Edit Booking"
+
+      assert has_element?(
+               view,
+               "#booking-form input[name='booking[booking_mode]'][value=day]"
+             )
+
+      refute has_element?(
+               view,
+               "#booking-form input[name='booking[booking_mode]'][value=buyout]"
+             )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2036-07-10",
+          "checkout_date" => "2036-07-13",
+          "guests_count" => "4",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "status" => "complete"
+        }
+      })
+      |> render_submit()
+
+      updated = Bookings.get_booking!(booking.id)
+      assert updated.booking_mode == :day
+      assert updated.guests_count == 4
+      assert updated.status == :complete
+    end
+
+    test "day bookings are not rendered on the Full Buyout calendar row", %{
+      conn: conn
+    } do
+      user = user_fixture(%{first_name: "Spot", last_name: "NotBuyout"})
+      checkin = ~D[2036-08-05]
+      checkout = ~D[2036-08-08]
+
+      booking =
+        insert_clear_lake_day_booking_for_edit!(user.id, checkin, checkout)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings?property=clear_lake&from_date=2036-08-01&to_date=2036-08-15"
+        )
+
+      # Buyout booking bars use view-booking with booking id; day stays must not appear there
+      refute has_element?(
+               view,
+               "[phx-click=view-booking][phx-value-booking-id='#{booking.id}']"
+             )
     end
   end
 
