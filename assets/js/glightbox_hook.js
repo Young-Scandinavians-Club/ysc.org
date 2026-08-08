@@ -61,30 +61,30 @@ const GLightboxHook = {
             const img = link.querySelector("img");
             if (!img) return;
             if (link.closest("figure.attachment[data-trix-attachment]")) return;
-            if (link.dataset.glightboxReady) return;
 
             const href = link.getAttribute("href");
             const src = img.getAttribute("src");
             if (!IMAGE_EXTENSIONS.test(href) && !IMAGE_EXTENSIONS.test(src)) return;
 
-            // Extract caption text from siblings of the img inside the link
-            const caption = extractCaption(link, img);
+            // First pass only: restructure DOM and clean href (idempotent via glightboxReady).
+            // On re-init after destroy, still re-add ready links to the new gallery.
+            if (!link.dataset.glightboxReady) {
+                const caption = extractCaption(link, img);
+                restructureImageLink(link, img, caption);
 
-            // Restructure DOM for nicer presentation
-            restructureImageLink(link, img, caption);
+                const cleanHref = cleanImageHref(href);
+                link.setAttribute("href", cleanHref);
+                link.classList.add("glightbox");
+                if (caption) link.dataset.glightboxCaption = caption;
+                link.dataset.glightboxReady = "true";
+            }
 
-            // Clean URL (strip download disposition) for both the link and lightbox
-            const cleanHref = cleanImageHref(href);
-            link.setAttribute("href", cleanHref);
-            link.classList.add("glightbox");
-
-            const entry = { href: cleanHref, type: "image" };
+            const entry = { href: link.getAttribute("href"), type: "image" };
+            const caption = link.dataset.glightboxCaption || "";
             if (caption) entry.title = caption;
 
             elements.push(entry);
             clickTargets.push(link);
-
-            link.dataset.glightboxReady = "true";
         });
 
         if (elements.length === 0) return;

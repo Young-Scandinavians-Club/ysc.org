@@ -228,6 +228,13 @@ function imageContentTypeFromUrl(url) {
   return "image/jpeg";
 }
 
+function withContentDisposition(url) {
+  if (!url) return url;
+  if (/[?&]content-disposition=/i.test(url)) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}content-disposition=attachment`;
+}
+
 module.exports = {
   mounted() {
     window.Trix = Trix;
@@ -264,7 +271,9 @@ module.exports = {
       );
       if (!editorEl) return;
       // Always set href so Trix wraps the preview in <a> (needed for lightbox + download).
-      const imageHref = href || `${url}?content-disposition=attachment`;
+      // Keep an explicit href as-is; when falling back to url, append the
+      // disposition param without clobbering existing query string.
+      const imageHref = href || withContentDisposition(url);
       const attachment = new Trix.Attachment({
         url,
         href: imageHref,

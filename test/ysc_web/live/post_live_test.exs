@@ -548,10 +548,10 @@ defmodule YscWeb.PostLiveTest do
     test "includes GLightbox hook for images", %{conn: conn} do
       post = create_post(%{title: "Test"})
 
-      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+      {:ok, view, html} = live(conn, ~p"/posts/#{post.id}")
 
       assert html =~ ~s(phx-hook="GLightboxHook")
-      assert html =~ ~s(phx-update="ignore")
+      assert has_element?(view, "#article-body[phx-update=ignore]")
     end
 
     test "article body has proper styling classes", %{conn: conn} do
