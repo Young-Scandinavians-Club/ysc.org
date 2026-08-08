@@ -450,7 +450,10 @@ defmodule YscWeb.EventDetailsLive do
                 <%= if !event_in_past?(@event) && @event.state != :cancelled do %>
                   <div class="mt-3 inline-flex items-center gap-2 bg-blue-50 px-2 py-1 rounded-full">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                    <span class="text-xs font-black text-blue-600 uppercase tracking-widest">
+                    <span
+                      id="event-status-label"
+                      class="text-xs font-black text-blue-600 uppercase tracking-widest"
+                    >
                       {if event_live?(@event), do: "Live", else: "Upcoming"}
                     </span>
                   </div>
@@ -7867,12 +7870,16 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp event_starts_at(%{start_date: nil}), do: nil
-
   defp event_starts_at(event) do
-    case event.start_time do
-      %Time{} = time -> pacific_event_datetime(event.start_date, time)
-      _ -> pacific_event_datetime(event.start_date, ~T[00:00:00])
+    case event_calendar_date(event.start_date) do
+      %Date{} = date ->
+        case event.start_time do
+          %Time{} = time -> pacific_event_datetime(date, time)
+          _ -> pacific_event_datetime(date, ~T[00:00:00])
+        end
+
+      _ ->
+        nil
     end
   end
 
@@ -7885,6 +7892,9 @@ defmodule YscWeb.EventDetailsLive do
 
       end_day = event_calendar_date(event.end_date) ->
         pacific_event_datetime(Date.add(end_day, 1), ~T[00:00:00])
+
+      event_calendar_date(event.start_date) && match?(%Time{}, event.end_time) ->
+        pacific_event_datetime(event.start_date, event.end_time)
 
       event_calendar_date(event.start_date) && match?(%Time{}, event.start_time) ->
         pacific_event_datetime(event.start_date, event.start_time)

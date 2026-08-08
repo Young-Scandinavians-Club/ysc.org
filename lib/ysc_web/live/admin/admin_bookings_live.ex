@@ -1636,7 +1636,7 @@ defmodule YscWeb.AdminBookingsLive do
             value="buyout"
           />
 
-          <input
+          <.input
             :if={@booking_type == :day}
             type="hidden"
             name="booking[room_id]"
@@ -2179,37 +2179,50 @@ defmodule YscWeb.AdminBookingsLive do
                       cond do
                         is_selected_start -> "bg-purple-200"
                         is_in_range -> "bg-purple-100/60"
-                        true -> ""
+                        true -> nil
                       end %>
                     <div
-                      class={"flex items-center justify-center h-14 cursor-pointer hover:bg-purple-50 transition-colors #{day_bg}"}
+                      class="relative flex items-center justify-center h-14"
                       style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
-                      phx-click="select-date-day"
-                      phx-value-date={Date.to_string(date)}
-                      phx-disable-with="Loading..."
-                      data-date={Date.to_string(date)}
-                      data-selection-type={
-                        if @date_selection_type == :day, do: "day", else: ""
-                      }
-                      title="Click to select date range for day/spot booking"
                     >
-                      <%= if guest_count > 0 do %>
-                        <.button
-                          type="button"
-                          variant="outline"
-                          color="purple"
-                          phx-click="show-day-guests"
-                          phx-value-date={Date.to_string(date)}
-                          phx-disable-with="Loading..."
-                          class="!min-h-9 !py-1 !px-2 text-sm"
+                      <button
+                        type="button"
+                        class={[
+                          "absolute inset-0 flex items-center justify-center cursor-pointer hover:bg-purple-50 transition-colors",
+                          day_bg
+                        ]}
+                        phx-click="select-date-day"
+                        phx-value-date={Date.to_string(date)}
+                        phx-disable-with="Loading..."
+                        data-date={Date.to_string(date)}
+                        data-selection-type={
+                          if @date_selection_type == :day, do: "day", else: ""
+                        }
+                        title="Click to select date range for day/spot booking"
+                        aria-label={"Select date range for day booking on #{Date.to_string(date)}"}
+                      >
+                        <span
+                          :if={guest_count == 0}
+                          class="text-sm font-semibold text-zinc-400"
                         >
-                          {guest_count} guests
-                        </.button>
-                      <% else %>
-                        <span class="text-sm font-semibold text-zinc-400">
                           0 guests
                         </span>
-                      <% end %>
+                        <span :if={guest_count > 0} class="sr-only">
+                          Select date range for day booking
+                        </span>
+                      </button>
+                      <.button
+                        :if={guest_count > 0}
+                        type="button"
+                        variant="outline"
+                        color="purple"
+                        phx-click="show-day-guests"
+                        phx-value-date={Date.to_string(date)}
+                        phx-disable-with="Loading..."
+                        class="!min-h-9 !py-1 !px-2 text-sm relative z-10"
+                      >
+                        {guest_count} guests
+                      </.button>
                     </div>
                   <% end %>
                 </div>
@@ -2535,9 +2548,15 @@ defmodule YscWeb.AdminBookingsLive do
                       <% end %>
                     </div>
                   <% else %>
-                    <.badge type="green" class="whitespace-nowrap flex-shrink-0">
-                      Full Buyout
-                    </.badge>
+                    <%= if booking.booking_mode == :day do %>
+                      <.badge type="sky" class="whitespace-nowrap flex-shrink-0">
+                        Day
+                      </.badge>
+                    <% else %>
+                      <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                        Full Buyout
+                      </.badge>
+                    <% end %>
                   <% end %>
                 </:col>
                 <:col :let={{_, booking}} label="Status" field={:status}>

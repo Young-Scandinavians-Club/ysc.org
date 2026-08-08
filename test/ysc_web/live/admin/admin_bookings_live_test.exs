@@ -456,11 +456,11 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
         )
 
       view
-      |> element("div[phx-click=select-date-day][data-date=\"2030-04-05\"]")
+      |> element("button[phx-click=select-date-day][data-date=\"2030-04-05\"]")
       |> render_click()
 
       view
-      |> element("div[phx-click=select-date-day][data-date=\"2030-04-08\"]")
+      |> element("button[phx-click=select-date-day][data-date=\"2030-04-08\"]")
       |> render_click()
 
       assert_patch(view)
@@ -472,7 +472,7 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
                "#booking-form input[name='booking[booking_mode]'][value=day]"
              )
 
-      assert render(view) =~ "New Day Booking"
+      assert has_element?(view, "#booking-form-modal", "New Day Booking")
     end
 
     test "two-click room row selection opens new room booking when rooms exist",
@@ -1431,13 +1431,13 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     } do
       user = user_fixture(%{first_name: "Spot", last_name: "AdminCreate"})
 
-      {:ok, view, html} =
+      {:ok, view, _html} =
         live(
           conn,
           ~p"/admin/bookings/bookings/new?property=clear_lake&from_date=2036-06-01&to_date=2036-06-15&type=day&start_date=2036-06-05&end_date=2036-06-08"
         )
 
-      assert html =~ "New Day Booking"
+      assert has_element?(view, "#booking-form-modal", "New Day Booking")
       assert has_element?(view, "#booking-form")
 
       assert has_element?(

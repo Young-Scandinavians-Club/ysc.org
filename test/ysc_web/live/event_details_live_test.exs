@@ -1064,10 +1064,10 @@ defmodule YscWeb.EventDetailsLiveTest do
           attrs: %{title: "Upcoming Event"}
         )
 
-      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      assert html =~ "Upcoming Event"
-      assert has_element?(view, "span", "Upcoming")
+      assert has_element?(view, "h1", "Upcoming Event")
+      assert has_element?(view, "#event-status-label", "Upcoming")
       refute has_element?(view, "p", "Event has ended")
     end
 
@@ -1075,9 +1075,9 @@ defmodule YscWeb.EventDetailsLiveTest do
       event =
         event_with_state(:past, with_image: true, attrs: %{title: "Past Event"})
 
-      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      assert html =~ "Past Event"
+      assert has_element?(view, "h1", "Past Event")
       assert has_element?(view, "p", "Event has ended")
       refute has_element?(view, "button", "Get Tickets")
     end
@@ -1091,12 +1091,12 @@ defmodule YscWeb.EventDetailsLiveTest do
           attrs: %{title: "Happening Now"}
         )
 
-      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      assert html =~ "Happening Now"
-      assert has_element?(view, "span", "Live")
+      assert has_element?(view, "h1", "Happening Now")
+      assert has_element?(view, "#event-status-label", "Live")
       refute has_element?(view, "p", "Event has ended")
-      refute html =~ "Event Ended"
+      refute has_element?(view, "#event-status-label", "Event Ended")
     end
 
     test "does not show Event has ended after start when end time is later today",
@@ -1118,9 +1118,34 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      assert has_element?(view, "span", "Live")
+      assert has_element?(view, "#event-status-label", "Live")
       refute has_element?(view, "p", "Event has ended")
       refute has_element?(view, "div", "Event Ended")
+    end
+
+    test "remains active until same-day end_time when end_date is absent", %{
+      conn: conn
+    } do
+      now_pt = DateTime.now!("America/Los_Angeles")
+      today = DateTime.to_date(now_pt)
+      start_time = DateTime.to_time(now_pt) |> Time.add(-3600, :second)
+      end_time = DateTime.to_time(now_pt) |> Time.add(3600, :second)
+
+      event =
+        event_fixture(%{
+          title: "No End Date Mixer",
+          state: :published,
+          start_date: DateTime.new!(today, ~T[00:00:00], "Etc/UTC"),
+          end_date: nil,
+          start_time: start_time,
+          end_time: end_time,
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "#event-status-label", "Live")
+      refute has_element?(view, "p", "Event has ended")
     end
 
     test "displays cancelled event correctly", %{conn: conn} do
