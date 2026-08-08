@@ -5,6 +5,11 @@ defmodule YscWeb.Sms.EventUpdateNotification do
   Body is precomputed (HTML stripped + soft-capped) and passed as `:body`.
   """
 
+  # Keys required in priv/dev/notification_preview_samples.exs (mix lint_notification_samples).
+  @preview_keys [:body]
+
+  def preview_keys, do: @preview_keys
+
   @doc """
   Gets the template name.
   """

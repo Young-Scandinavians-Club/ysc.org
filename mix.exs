@@ -29,11 +29,13 @@ defmodule Ysc.MixProject do
         tool: ExCoveralls,
         ignore_modules: [
           Mix.Tasks.CheckQuickbooksSync,
+          Mix.Tasks.Ci.EmailPreviews,
           Mix.Tasks.Ci.QueryExplain,
           Mix.Tasks.CopyVendorAssets,
           Mix.Tasks.DebugEmails,
           Mix.Tasks.ExpireCheckoutSessions,
           Mix.Tasks.GenerateVideoPosters,
+          Mix.Tasks.LintNotificationSamples,
           Mix.Tasks.Message.Requeue,
           Mix.Tasks.Quickbooks.RetrySyncs,
           Mix.Tasks.Quickbooks.VerifySandbox,
@@ -301,7 +303,8 @@ defmodule Ysc.MixProject do
         "compile --warnings-as-errors",
         "credo --strict",
         "dialyzer",
-        "shell_lint"
+        "shell_lint",
+        "lint_notification_samples"
       ],
       test: [
         "ecto.create --quiet",

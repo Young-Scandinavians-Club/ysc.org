@@ -7,6 +7,10 @@ defmodule YscWeb.Sms.PhoneVerification do
 
   alias YscWeb.Sms.Template
 
+  @preview_keys [:code, :first_name]
+
+  def preview_keys, do: @preview_keys
+
   @doc """
   Gets the template name.
   """
