@@ -1795,8 +1795,9 @@ defmodule Ysc.Subscriptions do
     end
   end
 
-  # When a prior attempt left an incomplete local row and ACH is still processing
-  # on Stripe, flip the local status to active so membership access is granted.
+  # When a prior attempt left an incomplete local row, sync it from Stripe so
+  # membership access matches a successful retry (card) or grant access while
+  # ACH is still processing on Stripe.
   defp maybe_activate_existing_incomplete_bank_subscription(
          user,
          existing,
@@ -1805,22 +1806,71 @@ defmodule Ysc.Subscriptions do
        ) do
     payment_method_type = Keyword.get(opts, :payment_method_type)
 
-    if stripe_subscription.status == "incomplete" and
-         payment_method_type == :bank_account and
-         existing.stripe_status != "active" do
-      case existing
-           |> Subscription.changeset(%{stripe_status: "active"})
-           |> Repo.update() do
-        {:ok, updated} ->
-          invalidate_membership_caches(user.id)
-          broadcast_membership_updated(user.id)
-          {:ok, updated}
+    cond do
+      existing.stripe_status == "incomplete" and
+          stripe_subscription.status in ["active", "trialing"] ->
+        sync_existing_subscription_from_stripe(user, existing, stripe_subscription)
 
-        {:error, reason} ->
-          {:error, reason}
-      end
+      stripe_subscription.status == "incomplete" and
+          payment_method_type == :bank_account and
+          existing.stripe_status != "active" ->
+        case existing
+             |> Subscription.changeset(%{stripe_status: "active"})
+             |> Repo.update() do
+          {:ok, updated} ->
+            invalidate_membership_caches(user.id)
+            broadcast_membership_updated(user.id)
+            {:ok, updated}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      true ->
+        {:ok, existing}
+    end
+  end
+
+  defp sync_existing_subscription_from_stripe(user, existing, stripe_subscription) do
+    case update_subscription(existing, subscription_attrs_from_stripe(stripe_subscription)) do
+      {:ok, updated} ->
+        invalidate_membership_caches(user.id)
+        broadcast_membership_updated(user.id)
+        {:ok, updated}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp subscription_attrs_from_stripe(stripe_subscription) do
+    attrs = %{
+      stripe_status: stripe_subscription.status,
+      start_date:
+        stripe_subscription.start_date &&
+          DateTime.from_unix!(stripe_subscription.start_date),
+      current_period_start:
+        case SubscriptionHelpers.current_period_start(stripe_subscription) do
+          nil -> nil
+          timestamp -> DateTime.from_unix!(timestamp)
+        end,
+      current_period_end:
+        case SubscriptionHelpers.current_period_end(stripe_subscription) do
+          nil -> nil
+          timestamp -> DateTime.from_unix!(timestamp)
+        end,
+      trial_ends_at:
+        stripe_subscription.trial_end &&
+          DateTime.from_unix!(stripe_subscription.trial_end),
+      ends_at:
+        stripe_subscription.ended_at &&
+          DateTime.from_unix!(stripe_subscription.ended_at)
+    }
+
+    if stripe_subscription.cancel_at do
+      Map.put(attrs, :ends_at, DateTime.from_unix!(stripe_subscription.cancel_at))
     else
-      {:ok, existing}
+      attrs
     end
   end
 
