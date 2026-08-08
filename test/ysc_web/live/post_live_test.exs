@@ -551,6 +551,7 @@ defmodule YscWeb.PostLiveTest do
       {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
 
       assert html =~ ~s(phx-hook="GLightboxHook")
+      assert html =~ ~s(phx-update="ignore")
     end
 
     test "article body has proper styling classes", %{conn: conn} do

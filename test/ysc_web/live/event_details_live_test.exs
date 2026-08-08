@@ -463,6 +463,19 @@ defmodule YscWeb.EventDetailsLiveTest do
                "#article-body a[href='https://example.com/info'][target='_blank'][rel='noopener noreferrer']"
              )
     end
+
+    test "includes GLightbox hook on article body", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Lightbox Hook Event"}
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "#article-body[phx-hook=GLightboxHook]")
+      assert has_element?(view, "#article-body[phx-update=ignore]")
+    end
   end
 
   describe "unauthenticated user interactions" do

@@ -217,6 +217,17 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
+function imageContentTypeFromUrl(url) {
+  const path = (url || "").split("?")[0].toLowerCase();
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".gif")) return "image/gif";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".avif")) return "image/avif";
+  if (path.endsWith(".svg")) return "image/svg+xml";
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+  return "image/jpeg";
+}
+
 module.exports = {
   mounted() {
     window.Trix = Trix;
@@ -252,11 +263,13 @@ module.exports = {
         `trix-editor[input="${target_input_id}"]`,
       );
       if (!editorEl) return;
+      // Always set href so Trix wraps the preview in <a> (needed for lightbox + download).
+      const imageHref = href || `${url}?content-disposition=attachment`;
       const attachment = new Trix.Attachment({
         url,
-        href,
+        href: imageHref,
         alt,
-        contentType: "image",
+        contentType: imageContentTypeFromUrl(url),
       });
       editorEl.editor.insertAttachment(attachment);
     });
