@@ -105,7 +105,7 @@ defmodule YscWeb.HomeLive do
   # Search engines and social media crawlers need to see actual content
   defp mount_guest_with_data(socket) do
     # Determine hero video and captions based on season (no DB query)
-    {hero_video, hero_poster, hero_captions} =
+    {hero_video, hero_poster, hero_poster_srcset, hero_captions} =
       case Season.for_date(
              :tahoe,
              DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
@@ -113,10 +113,12 @@ defmodule YscWeb.HomeLive do
         %{name: "Summer"} ->
           {~p"/video/clear_lake_hero.mp4",
            ~p"/images/clear_lake_hero_poster.webp",
+           "#{~p"/images/clear_lake_hero_poster-1280.webp"} 1280w, #{~p"/images/clear_lake_hero_poster-1920.webp"} 1920w",
            ~p"/video/clear_lake_hero_captions.vtt"}
 
         _ ->
           {~p"/video/tahoe_hero.mp4", ~p"/images/tahoe_hero_poster.webp",
+           "#{~p"/images/tahoe_hero_poster-1280.webp"} 1280w",
            ~p"/video/tahoe_hero_captions.vtt"}
       end
 
@@ -152,6 +154,7 @@ defmodule YscWeb.HomeLive do
       latest_news: latest_news,
       hero_video: hero_video,
       hero_poster: hero_poster,
+      hero_poster_srcset: hero_poster_srcset,
       hero_captions: hero_captions,
       newsletter_email: "",
       newsletter_first_name: "",
@@ -323,6 +326,7 @@ defmodule YscWeb.HomeLive do
       <.hero
         video={@hero_video}
         poster={@hero_poster}
+        poster_srcset={@hero_poster_srcset}
         captions={@hero_captions}
         height="85vh"
         overlay_opacity="bg-gradient-to-b from-black/30 via-black/40 to-black/60"
