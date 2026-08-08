@@ -233,6 +233,8 @@ defmodule YscWeb.Router do
     scope "/dev", YscWeb do
       pipe_through :browser
 
+      get "/preview-email/:name", DevEmailPreviewController, :show
+
       live_session :dev_button_showcase,
         on_mount: [
           {YscWeb.LiveToastMount, :mount_toasts_sync},
@@ -242,6 +244,7 @@ defmodule YscWeb.Router do
         ] do
         live "/button-showcase", DevButtonShowcaseLive, :index
         live "/avatar-showcase", DevAvatarShowcaseLive, :index
+        live "/notifications", DevNotificationsLive, :index
       end
     end
   end

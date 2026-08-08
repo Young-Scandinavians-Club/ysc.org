@@ -548,6 +548,16 @@ defmodule YscWeb.Emails.Notifier do
     @template_mappings[template_name]
   end
 
+  @doc """
+  Returns the map of template name => module for all registered email templates.
+  """
+  def template_mappings, do: @template_mappings
+
+  @doc """
+  Returns sorted template names registered with the email notifier.
+  """
+  def template_names, do: @template_mappings |> Map.keys() |> Enum.sort()
+
   defp determine_error_type(reason) do
     if is_atom(reason) do
       reason

@@ -10,6 +10,16 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
   alias Ysc.Repo
   alias YscWeb.Sms.Template
 
+  @preview_keys [
+    :first_name,
+    :property_name,
+    :checkin_date,
+    :door_code,
+    :checkin_time
+  ]
+
+  def preview_keys, do: @preview_keys
+
   @doc """
   Gets the template name.
   """
