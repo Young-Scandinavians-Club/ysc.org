@@ -908,7 +908,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       html = MembershipEnded.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
-      assert html =~ "Your Membership Has Ended"
+
+      doc = LazyHTML.from_document(html)
+      text = LazyHTML.text(doc)
+      assert text =~ "Your Membership Has Ended"
       assert MembershipEnded.get_template_name() == "membership_ended"
     end
 

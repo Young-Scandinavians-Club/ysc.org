@@ -260,8 +260,11 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       html = MembershipEnded.render(assigns)
       assert is_binary(html)
-      assert html =~ "Freja"
-      assert html =~ "Your Membership Has Ended"
+
+      doc = LazyHTML.from_document(html)
+      text = LazyHTML.text(doc)
+      assert text =~ "Freja"
+      assert text =~ "Your Membership Has Ended"
       assert MembershipEnded.get_template_name() == "membership_ended"
       assert MembershipEnded.get_subject() == "Your YSC Membership Has Ended"
     end
@@ -274,7 +277,12 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         |> DateTime.add(-1, :day)
         |> DateTime.truncate(:second)
 
-      subscription = %{ends_at: ends_at, current_period_end: ends_at}
+      subscription = %{
+        ends_at: ends_at,
+        current_period_end: ends_at,
+        cancel_at_period_end: true
+      }
+
       data = MembershipEnded.prepare_email_data(user, subscription)
 
       assert data.first_name == user.first_name

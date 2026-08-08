@@ -558,7 +558,8 @@ defmodule Ysc.Subscriptions do
         case subscription
              |> Ecto.Changeset.change(%{
                stripe_status: stripe_subscription.status,
-               ends_at: ends_at
+               ends_at: ends_at,
+               cancel_at_period_end: true
              })
              |> Repo.update() do
           {:ok, updated_subscription} ->
@@ -634,7 +635,8 @@ defmodule Ysc.Subscriptions do
             SubscriptionHelpers.current_period_end(stripe_subscription)
             |> DateTime.from_unix!()
             |> DateTime.truncate(:second),
-          ends_at: nil
+          ends_at: nil,
+          cancel_at_period_end: false
         })
         |> sync_board_pause_after()
 

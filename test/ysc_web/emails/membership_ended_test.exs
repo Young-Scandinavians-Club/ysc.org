@@ -32,7 +32,8 @@ defmodule YscWeb.Emails.MembershipEndedTest do
 
       subscription = %{
         ends_at: ends_at,
-        current_period_end: ends_at
+        current_period_end: ends_at,
+        cancel_at_period_end: true
       }
 
       data = MembershipEnded.prepare_email_data(user, subscription)
@@ -50,7 +51,8 @@ defmodule YscWeb.Emails.MembershipEndedTest do
       data =
         MembershipEnded.prepare_email_data(user, %{
           ends_at: ends_at,
-          current_period_end: ends_at
+          current_period_end: ends_at,
+          cancel_at_period_end: true
         })
 
       assert data.first_name == "Valued Member"
@@ -60,7 +62,7 @@ defmodule YscWeb.Emails.MembershipEndedTest do
       assert_raise ArgumentError, "User cannot be nil", fn ->
         Ysc.Test.Invoke.call(MembershipEnded, :prepare_email_data, [
           nil,
-          %{ends_at: DateTime.utc_now()}
+          %{ends_at: DateTime.utc_now(), cancel_at_period_end: true}
         ])
       end
     end
@@ -82,19 +84,22 @@ defmodule YscWeb.Emails.MembershipEndedTest do
           upcoming_events_url: "https://example.com/events"
         })
 
-      assert html =~ user.first_name
-      assert html =~ "Your Membership Has Ended"
-      assert html =~ "automatic renewal was turned off"
-      assert html =~ "Renew Membership"
-      assert html =~ "August 1, 2026"
-      assert html =~ "Tahoe and Clear Lake"
-      assert html =~ "memberships@ysc.org"
-      assert html =~ "Vi ses snart"
+      doc = LazyHTML.from_document(html)
+      text = LazyHTML.text(doc)
+
+      assert text =~ user.first_name
+      assert text =~ "Your Membership Has Ended"
+      assert text =~ "automatic renewal was turned off"
+      assert text =~ "Renew Membership"
+      assert text =~ "August 1, 2026"
+      assert text =~ "Tahoe and Clear Lake"
+      assert text =~ "memberships@ysc.org"
+      assert text =~ "Vi ses snart"
     end
   end
 
   describe "maybe_schedule/2" do
-    test "schedules email when ends_at is set", %{user: user} do
+    test "schedules email when cancel_at_period_end is set", %{user: user} do
       ends_at =
         DateTime.utc_now()
         |> DateTime.add(-1, :day)
@@ -107,16 +112,18 @@ defmodule YscWeb.Emails.MembershipEndedTest do
           stripe_status: "active",
           name: "Ended Membership",
           current_period_end: ends_at,
-          ends_at: ends_at
+          ends_at: ends_at,
+          cancel_at_period_end: true
         })
 
       assert :ok = MembershipEnded.maybe_schedule(user, subscription)
       assert_email_sent(subject: "Your YSC Membership Has Ended")
     end
 
-    test "skips when ends_at is nil (not a voluntary auto-renew off)", %{
-      user: user
-    } do
+    test "skips when cancel_at_period_end is false (not a voluntary auto-renew off)",
+         %{
+           user: user
+         } do
       past =
         DateTime.utc_now()
         |> DateTime.add(-1, :day)
@@ -129,7 +136,8 @@ defmodule YscWeb.Emails.MembershipEndedTest do
           stripe_status: "cancelled",
           name: "Payment Failure Cancel",
           current_period_end: past,
-          ends_at: nil
+          ends_at: past,
+          cancel_at_period_end: false
         })
 
       assert :skipped = MembershipEnded.maybe_schedule(user, subscription)
@@ -149,13 +157,15 @@ defmodule YscWeb.Emails.MembershipEndedTest do
           stripe_status: "active",
           name: "Ended Idempotent",
           current_period_end: ends_at,
-          ends_at: ends_at
+          ends_at: ends_at,
+          cancel_at_period_end: true
         })
 
       assert :ok = MembershipEnded.maybe_schedule(user, subscription)
       assert :ok = MembershipEnded.maybe_schedule(user, subscription)
 
       assert_email_sent(subject: "Your YSC Membership Has Ended")
+      assert_no_email_sent()
     end
   end
 end
