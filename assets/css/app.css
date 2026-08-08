@@ -170,7 +170,7 @@ html {
     display: block;
     position: absolute;
     /* Keep bleed off the top gap so top corners stay crisp against white. */
-    top: calc(var(--nav-height) + 0.25rem);
+    top: calc(var(--nav-height));
     right: 0;
     bottom: 0;
     left: 0;
@@ -218,7 +218,7 @@ html {
   .hero-media-stage__inner {
     /* Fully replace inset:0 so left/right/width don't fight. */
     inset: auto;
-    top: calc(var(--nav-height) + 0.25rem);
+    top: calc(var(--nav-height));
     bottom: 1rem;
     left: 50%;
     width: min(1920px, calc(100% - 2rem));
