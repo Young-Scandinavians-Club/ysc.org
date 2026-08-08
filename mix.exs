@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.14.0",
+      version: "2.15.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
