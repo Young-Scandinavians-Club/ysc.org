@@ -22,6 +22,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     MembershipPaymentFailure,
     MembershipRenewalPaymentMethodReminder,
     MembershipRenewalReminder,
+    MembershipEnded,
     MembershipRenewalSuccess,
     OutageNotification,
     BookingCancellationCabinMasterNotification,
@@ -245,6 +246,40 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       html = ConductViolationConfirmation.render(assigns)
       assert is_binary(html)
       assert html =~ "Sam"
+    end
+  end
+
+  describe "MembershipEnded" do
+    test "renders with assigns" do
+      assigns = %{
+        first_name: "Freja",
+        end_date: "August 7, 2026",
+        membership_url: "https://example.com/users/membership",
+        upcoming_events_url: "https://example.com/events"
+      }
+
+      html = MembershipEnded.render(assigns)
+      assert is_binary(html)
+      assert html =~ "Freja"
+      assert html =~ "Your Membership Has Ended"
+      assert MembershipEnded.get_template_name() == "membership_ended"
+      assert MembershipEnded.get_subject() == "Your YSC Membership Has Ended"
+    end
+
+    test "prepare_email_data returns correct data" do
+      user = user_fixture()
+
+      ends_at =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :day)
+        |> DateTime.truncate(:second)
+
+      subscription = %{ends_at: ends_at, current_period_end: ends_at}
+      data = MembershipEnded.prepare_email_data(user, subscription)
+
+      assert data.first_name == user.first_name
+      assert data.end_date =~ ~r/\w+ \d+, \d{4}/
+      assert data.membership_url =~ "/users/membership"
     end
   end
 

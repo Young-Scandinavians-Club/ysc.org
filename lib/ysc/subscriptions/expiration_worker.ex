@@ -20,6 +20,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   alias Ysc.Subscriptions
   alias Ysc.Subscriptions.Subscription
   alias Ysc.Stripe.SubscriptionHelpers
+  alias YscWeb.Emails.MembershipEnded
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
@@ -95,6 +96,9 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
               user_id: updated_subscription.user_id,
               stripe_status: updated_subscription.stripe_status
             )
+
+            # Use the pre-sync subscription so `ends_at` (auto-renew off) is still present
+            maybe_send_membership_ended_email(subscription)
           end
 
           :ok
@@ -133,6 +137,28 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
         end
 
         {:error, reason}
+    end
+  end
+
+  defp maybe_send_membership_ended_email(%Subscription{} = subscription) do
+    user = Ysc.Accounts.get_user(subscription.user_id)
+
+    case MembershipEnded.maybe_schedule(user, subscription) do
+      :ok ->
+        :ok
+
+      :skipped ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Membership ended email could not be scheduled after expiration",
+          subscription_id: subscription.id,
+          user_id: subscription.user_id,
+          error: inspect(reason)
+        )
+
+        :ok
     end
   end
 

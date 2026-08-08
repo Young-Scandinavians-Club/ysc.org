@@ -45,6 +45,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     MembershipRenewalSuccess,
     MembershipPaymentReminder7Day,
     MembershipPaymentReminder30Day,
+    MembershipEnded,
     EventNotification,
     ExpenseReportConfirmation,
     ExpenseReportTreasurerNotification,
@@ -896,6 +897,21 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
                "membership_payment_reminder_30day"
     end
 
+    test "MembershipEnded renders", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        end_date: "August 1, 2026",
+        membership_url: "https://example.com/users/membership",
+        upcoming_events_url: "https://example.com/events"
+      }
+
+      html = MembershipEnded.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+      assert html =~ "Your Membership Has Ended"
+      assert MembershipEnded.get_template_name() == "membership_ended"
+    end
+
     test "EventNotification renders", %{user: user} do
       assigns = %{
         first_name: user.first_name,
@@ -1086,6 +1102,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "membership_renewal_success" => MembershipRenewalSuccess,
         "membership_payment_reminder_7day" => MembershipPaymentReminder7Day,
         "membership_payment_reminder_30day" => MembershipPaymentReminder30Day,
+        "membership_ended" => MembershipEnded,
         "booking_checkin_reminder" => BookingCheckinReminder,
         "booking_checkout_reminder" => BookingCheckoutReminder,
         "event_notification" => EventNotification,

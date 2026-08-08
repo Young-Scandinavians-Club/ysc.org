@@ -815,6 +815,12 @@ defmodule Ysc.Stripe.WebhookHandler do
     subscription = Subscriptions.get_subscription_by_stripe_id(event.id)
 
     if subscription do
+      # ends_at is set when the member turned off auto-renewal; use it before
+      # mark_as_cancelled so the re-engagement email can detect a voluntary lapse.
+      user =
+        subscription.user_id && Ysc.Accounts.get_user(subscription.user_id)
+
+      YscWeb.Emails.MembershipEnded.maybe_schedule(user, subscription)
       Subscriptions.mark_as_cancelled(subscription)
     end
 
