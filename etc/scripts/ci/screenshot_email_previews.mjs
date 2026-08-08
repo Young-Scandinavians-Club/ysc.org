@@ -7,10 +7,16 @@
  * Resolves playwright from PLAYWRIGHT_NODE_PATH / NODE_PATH when set (CI installs
  * the package outside the repo). Plain `import "playwright"` does not honor
  * NODE_PATH under ES modules.
+ *
+ * Email HTML references static assets via absolute URLs (Endpoint.url() +
+ * "/images/..."). There is no Phoenix server in this job, so localhost
+ * requests are fulfilled from priv/static.
  */
 import fs from "fs";
 import path from "path";
-import { pathToFileURL } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function importPlaywright() {
   const roots = [process.env.PLAYWRIGHT_NODE_PATH, process.env.NODE_PATH]
@@ -28,6 +34,87 @@ async function importPlaywright() {
   }
 
   return import("playwright");
+}
+
+function resolveStaticRoot() {
+  if (process.env.STATIC_ROOT) {
+    return path.resolve(process.env.STATIC_ROOT);
+  }
+
+  const repoRoot = process.env.YSC_REPO_ROOT
+    ? path.resolve(process.env.YSC_REPO_ROOT)
+    : path.resolve(__dirname, "../../..");
+
+  return path.join(repoRoot, "priv/static");
+}
+
+function contentTypeFor(filePath) {
+  switch (path.extname(filePath).toLowerCase()) {
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".gif":
+      return "image/gif";
+    case ".webp":
+      return "image/webp";
+    case ".svg":
+      return "image/svg+xml";
+    case ".css":
+      return "text/css";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+/**
+ * Map http(s)://localhost[:port]/path to priv/static/path when the file exists.
+ * Aborts other localhost requests so screenshots do not hang waiting on a
+ * non-running Phoenix server.
+ */
+async function installStaticAssetRoute(context, staticRoot) {
+  const root = path.resolve(staticRoot);
+  if (!fs.existsSync(root)) {
+    console.warn(`STATIC_ROOT does not exist: ${root}`);
+    return;
+  }
+
+  await context.route(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/.*/, async (route) => {
+    const url = new URL(route.request().url());
+    const pathname = decodeURIComponent(url.pathname);
+    const candidate = path.resolve(root, "." + pathname);
+
+    if (
+      (candidate === root || candidate.startsWith(root + path.sep)) &&
+      fs.existsSync(candidate) &&
+      fs.statSync(candidate).isFile()
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: contentTypeFor(candidate),
+        body: fs.readFileSync(candidate),
+      });
+      return;
+    }
+
+    await route.abort();
+  });
+}
+
+async function waitForImages(page) {
+  await page.evaluate(async () => {
+    const images = Array.from(document.images);
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
+        });
+      }),
+    );
+  });
 }
 
 async function main() {
@@ -48,12 +135,16 @@ async function main() {
     process.exit(1);
   }
 
+  const staticRoot = resolveStaticRoot();
+  console.log(`serving static assets from ${staticRoot}`);
+
   const { chromium } = await importPlaywright();
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 680, height: 900 },
     deviceScaleFactor: 2,
   });
+  await installStaticAssetRoute(context, staticRoot);
 
   for (const file of htmlFiles) {
     const htmlPath = path.join(absDir, file);
@@ -62,6 +153,7 @@ async function main() {
     await page.goto(pathToFileURL(htmlPath).href, {
       waitUntil: "networkidle",
     });
+    await waitForImages(page);
     // Emails are typically ~600px wide; full-page capture for long templates.
     await page.screenshot({ path: pngPath, fullPage: true, type: "png" });
     await page.close();

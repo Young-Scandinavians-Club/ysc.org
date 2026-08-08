@@ -134,8 +134,11 @@ else
   mix ci.email_previews --output-dir "$PREVIEWS_DIR" --templates "${templates_csv}"
 fi
 
-# Screenshot HTML → PNG
+# Screenshot HTML → PNG (serve priv/static for localhost image URLs in HTML)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 NODE_PATH="${PLAYWRIGHT_NODE_PATH:-${NODE_PATH:-}}" \
+  YSC_REPO_ROOT="${YSC_REPO_ROOT:-$REPO_ROOT}" \
+  STATIC_ROOT="${STATIC_ROOT:-${REPO_ROOT}/priv/static}" \
   node "${SCRIPT_DIR}/screenshot_email_previews.mjs" "$PREVIEWS_DIR"
 
 # Publish images to a per-PR branch so the sticky comment can embed them.
