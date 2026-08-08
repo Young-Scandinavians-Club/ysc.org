@@ -58,7 +58,7 @@ defmodule YscWeb.DevNotificationsLive do
         </div>
         <div class="flex items-center gap-3 text-sm">
           <.link
-            href={~p"/dev/mailbox"}
+            href="/dev/mailbox"
             class="text-blue-700 hover:underline"
             target="_blank"
           >
@@ -66,14 +66,14 @@ defmodule YscWeb.DevNotificationsLive do
           </.link>
           <%= if @tab == :email and @selected_name do %>
             <.link
-              href={~p"/dev/preview-email/#{@selected_name}?mailbox=1"}
+              href={"/dev/preview-email/#{@selected_name}?mailbox=1"}
               class="text-blue-700 hover:underline"
               target="_blank"
             >
               Send to mailbox
             </.link>
             <.link
-              href={~p"/dev/preview-email/#{@selected_name}"}
+              href={"/dev/preview-email/#{@selected_name}"}
               class="text-blue-700 hover:underline"
               target="_blank"
             >
@@ -88,7 +88,7 @@ defmodule YscWeb.DevNotificationsLive do
           <div class="p-3 border-b border-zinc-100 space-y-3">
             <div class="flex rounded-lg bg-zinc-100 p-1 text-sm font-medium">
               <.link
-                patch={~p"/dev/notifications?type=email"}
+                patch="/dev/notifications?type=email"
                 class={[
                   "flex-1 text-center rounded-md px-2 py-1.5 transition",
                   @tab == :email && "bg-white shadow text-zinc-900",
@@ -98,7 +98,7 @@ defmodule YscWeb.DevNotificationsLive do
                 Emails ({length(@emails)})
               </.link>
               <.link
-                patch={~p"/dev/notifications?type=sms"}
+                patch="/dev/notifications?type=sms"
                 class={[
                   "flex-1 text-center rounded-md px-2 py-1.5 transition",
                   @tab == :sms && "bg-white shadow text-zinc-900",
@@ -134,9 +134,7 @@ defmodule YscWeb.DevNotificationsLive do
                     <%= for item <- items do %>
                       <li>
                         <.link
-                          patch={
-                            ~p"/dev/notifications?type=email&name=#{item.name}"
-                          }
+                          patch={"/dev/notifications?type=email&name=#{item.name}"}
                           class={[
                             "block rounded-md px-2 py-1.5 text-sm leading-snug",
                             @selected_name == item.name && @tab == :email &&
@@ -166,7 +164,7 @@ defmodule YscWeb.DevNotificationsLive do
                     <%= for item <- items do %>
                       <li>
                         <.link
-                          patch={~p"/dev/notifications?type=sms&name=#{item.name}"}
+                          patch={"/dev/notifications?type=sms&name=#{item.name}"}
                           class={[
                             "block rounded-md px-2 py-1.5 text-sm leading-snug",
                             @selected_name == item.name && @tab == :sms &&
@@ -206,7 +204,7 @@ defmodule YscWeb.DevNotificationsLive do
                 </p>
               </div>
               <iframe
-                src={~p"/dev/preview-email/#{@selected_name}"}
+                src={"/dev/preview-email/#{@selected_name}"}
                 title={"Preview #{@selected_name}"}
                 class="flex-1 w-full border-0 bg-white"
                 id="email-preview-iframe"
