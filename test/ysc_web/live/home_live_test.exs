@@ -896,6 +896,12 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "/video/" and
                (html =~ "tahoe_hero" or html =~ "clear_lake_hero")
+
+      assert html =~ "hero-media-stage"
+      assert html =~ "hero-media-stage__inner"
+      assert html =~ "hero-media-stage__bleed"
+      assert html =~ "srcset="
+      assert html =~ "100vw, 1920px"
     end
 
     test "guest home includes Nordic heritage flag row", %{conn: conn} do
