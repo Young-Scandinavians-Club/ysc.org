@@ -85,5 +85,4 @@ defmodule YscWeb.EventTvPosterController do
 
     "#{slug}-tv-poster.#{format}"
   end
-
 end
