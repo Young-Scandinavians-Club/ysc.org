@@ -6,7 +6,7 @@ defmodule YscWeb.EventTvPosterController do
   use YscWeb, :controller
 
   alias Ysc.Events
-  alias Ysc.Events.{TicketTierHelpers, TvPosterImage}
+  alias Ysc.Events.{EventHelpers, TvPosterImage}
   alias YscWeb.Emails.Helpers
 
   def show(conn, %{"id" => id}) do
@@ -67,7 +67,7 @@ defmodule YscWeb.EventTvPosterController do
       event: event,
       event_url: Helpers.absolute_url("/events/#{event.id}"),
       asset_base_url: Helpers.origin() <> "/",
-      sold_out: event_sold_out?(event),
+      sold_out: EventHelpers.event_sold_out?(event),
       selling_fast: Map.get(event, :selling_fast, false)
     }
   end
@@ -84,55 +84,5 @@ defmodule YscWeb.EventTvPosterController do
       end
 
     "#{slug}-tv-poster.#{format}"
-  end
-
-  defp event_sold_out?(event) do
-    now = DateTime.utc_now()
-    ticket_tiers = Map.get(event, :ticket_tiers) || []
-
-    non_donation_tiers =
-      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
-
-    if non_donation_tiers == [] do
-      false
-    else
-      relevant_tiers =
-        Enum.filter(non_donation_tiers, fn tier ->
-          TicketTierHelpers.tier_on_sale?(tier, now) ||
-            TicketTierHelpers.tier_sale_ended?(tier, now)
-        end)
-
-      if relevant_tiers == [] do
-        false
-      else
-        all_tiers_sold_out =
-          Enum.all?(relevant_tiers, fn tier ->
-            get_available_quantity(tier) == 0
-          end)
-
-        event_at_capacity =
-          case Map.get(event, :max_attendees) do
-            nil ->
-              false
-
-            max_attendees ->
-              (Map.get(event, :ticket_count) || 0) >= max_attendees
-          end
-
-        all_tiers_sold_out || event_at_capacity
-      end
-    end
-  end
-
-  defp get_available_quantity(ticket_tier) do
-    quantity = Map.get(ticket_tier, :quantity)
-
-    sold_count = Map.get(ticket_tier, :sold_tickets_count) || 0
-
-    case quantity do
-      nil -> :unlimited
-      0 -> :unlimited
-      qty -> max(0, qty - sold_count)
-    end
   end
 end
