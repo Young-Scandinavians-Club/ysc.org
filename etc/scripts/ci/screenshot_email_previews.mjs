@@ -3,11 +3,32 @@
  * Screenshot email HTML files in a directory to PNG using Playwright.
  *
  * Usage: node screenshot_email_previews.mjs <previews_dir>
+ *
+ * Resolves playwright from PLAYWRIGHT_NODE_PATH / NODE_PATH when set (CI installs
+ * the package outside the repo). Plain `import "playwright"` does not honor
+ * NODE_PATH under ES modules.
  */
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import { chromium } from "playwright";
+
+async function importPlaywright() {
+  const roots = [process.env.PLAYWRIGHT_NODE_PATH, process.env.NODE_PATH]
+    .filter(Boolean)
+    .flatMap((p) => String(p).split(path.delimiter));
+
+  for (const root of roots) {
+    // Prefer the package's ESM entry (index.mjs); index.js is CJS-only.
+    for (const file of ["index.mjs", "index.js"]) {
+      const entry = path.join(root, "playwright", file);
+      if (fs.existsSync(entry)) {
+        return import(pathToFileURL(entry).href);
+      }
+    }
+  }
+
+  return import("playwright");
+}
 
 async function main() {
   const dir = process.argv[2];
@@ -27,6 +48,7 @@ async function main() {
     process.exit(1);
   }
 
+  const { chromium } = await importPlaywright();
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 680, height: 900 },
