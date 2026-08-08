@@ -2399,12 +2399,7 @@ defmodule YscWeb.AdminBookingsLive do
                       <% end %>
                     </div>
                   <% end %>
-                  {for booking <-
-                         @room_bookings
-                         |> Enum.filter(fn b ->
-                           Ecto.assoc_loaded?(b.rooms) &&
-                             Enum.any?(b.rooms, &(&1.id == room.id))
-                         end) do
+                  {for booking <- Map.get(@room_bookings_by_room_id, room.id, []) do
                     raw(
                       render_booking_div(booking, @calendar_start_date, total_days)
                     )
@@ -3490,6 +3485,7 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:filtered_rooms, [])
       |> assign(:filtered_blackouts, [])
       |> assign(:room_bookings, [])
+      |> assign(:room_bookings_by_room_id, %{})
       |> assign(:buyout_bookings, [])
       |> assign(:booking_payments, [])
       |> assign(:booking_refunds, [])
@@ -7200,8 +7196,9 @@ defmodule YscWeb.AdminBookingsLive do
           end),
           Task.async(fn ->
             Bookings.list_bookings(property, start_date, end_date,
-              preload: [rooms: :room_category, user: :current_avatar],
-              exclude_statuses: [:canceled, :refunded]
+              preload: [:rooms, user: :current_avatar],
+              exclude_statuses: [:canceled, :refunded],
+              exclude_booking_modes: [:day]
             )
           end)
         ],
@@ -7232,10 +7229,29 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:filtered_rooms, filtered_rooms)
     |> assign(:calendar_dates, calendar_dates)
     |> assign(:room_bookings, room_bookings)
+    |> assign(
+      :room_bookings_by_room_id,
+      build_room_bookings_by_room_id(room_bookings)
+    )
     |> assign(:buyout_bookings, buyout_bookings)
     |> assign(:filtered_blackouts, filtered_blackouts)
     |> assign(:calendar_start_date, start_date)
     |> assign(:daily_availability, daily_availability)
+  end
+
+  defp build_room_bookings_by_room_id(room_bookings)
+       when is_list(room_bookings) do
+    room_bookings
+    |> Enum.flat_map(fn booking ->
+      if Ecto.assoc_loaded?(booking.rooms) do
+        Enum.map(booking.rooms, &{&1.id, booking})
+      else
+        []
+      end
+    end)
+    |> Enum.group_by(fn {room_id, _} -> room_id end, fn {_, booking} ->
+      booking
+    end)
   end
 
   defp generate_calendar_dates(start_date, end_date) do
