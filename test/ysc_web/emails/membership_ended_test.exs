@@ -168,4 +168,94 @@ defmodule YscWeb.Emails.MembershipEndedTest do
       assert_no_email_sent()
     end
   end
+
+  describe "voluntary_lapse?/1" do
+    test "returns true only when cancel_at_period_end is set" do
+      assert MembershipEnded.voluntary_lapse?(%{cancel_at_period_end: true})
+      refute MembershipEnded.voluntary_lapse?(%{cancel_at_period_end: false})
+      refute MembershipEnded.voluntary_lapse?(%{})
+    end
+  end
+
+  describe "maybe_schedule_email_multi/4" do
+    alias Ecto.Multi
+
+    test "adds email job for voluntary lapse", %{user: user} do
+      ends_at =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_multi_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Multi Email",
+          current_period_end: ends_at,
+          ends_at: ends_at,
+          cancel_at_period_end: true
+        })
+
+      multi =
+        MembershipEnded.maybe_schedule_email_multi(
+          Multi.new(),
+          :membership_ended_email,
+          user,
+          subscription
+        )
+
+      assert MapSet.member?(multi.names, :membership_ended_email)
+    end
+
+    test "returns multi unchanged when not a voluntary lapse", %{user: user} do
+      past =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_multi_skip_#{System.unique_integer([:positive])}",
+          stripe_status: "cancelled",
+          name: "Not Voluntary",
+          current_period_end: past,
+          ends_at: past,
+          cancel_at_period_end: false
+        })
+
+      multi = Multi.new()
+
+      assert multi ==
+               MembershipEnded.maybe_schedule_email_multi(
+                 multi,
+                 :membership_ended_email,
+                 user,
+                 subscription
+               )
+    end
+
+    test "returns multi unchanged when user is nil" do
+      multi = Multi.new()
+
+      assert multi ==
+               MembershipEnded.maybe_schedule_email_multi(
+                 multi,
+                 :membership_ended_email,
+                 nil,
+                 %{cancel_at_period_end: true}
+               )
+    end
+  end
+
+  describe "maybe_schedule/2 guards" do
+    test "returns skipped for nil user" do
+      assert :skipped = MembershipEnded.maybe_schedule(nil, %{cancel_at_period_end: true})
+    end
+
+    test "returns skipped for nil subscription", %{user: user} do
+      assert :skipped = MembershipEnded.maybe_schedule(user, nil)
+    end
+  end
 end

@@ -289,6 +289,23 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assert data.end_date =~ ~r/\w+ \d+, \d{4}/
       assert data.membership_url =~ "/users/membership"
     end
+
+    test "prepare_email_data uses current_period_end when ends_at is absent" do
+      user = user_fixture()
+
+      period_end =
+        DateTime.utc_now()
+        |> DateTime.add(-3, :day)
+        |> DateTime.truncate(:second)
+
+      data =
+        MembershipEnded.prepare_email_data(user, %{
+          current_period_end: period_end,
+          cancel_at_period_end: true
+        })
+
+      assert data.end_date =~ ~r/\w+ \d+, \d{4}/
+    end
   end
 
   describe "MembershipRenewalReminder" do

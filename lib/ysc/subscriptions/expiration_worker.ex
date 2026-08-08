@@ -162,19 +162,21 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
     ending? =
       Subscriptions.cancelled?(preview) or not Subscriptions.active?(preview)
 
-    multi = Multi.new() |> Multi.update(:subscription, changeset)
-
     multi =
-      if ending? do
-        MembershipEnded.maybe_schedule_email_multi(
-          multi,
-          :membership_ended_email,
-          user,
-          subscription
-        )
-      else
-        multi
-      end
+      Multi.new()
+      |> then(fn multi ->
+        if ending? do
+          MembershipEnded.maybe_schedule_email_multi(
+            multi,
+            :membership_ended_email,
+            user,
+            subscription
+          )
+        else
+          multi
+        end
+      end)
+      |> Multi.update(:subscription, changeset)
 
     multi
     |> Repo.transaction()
