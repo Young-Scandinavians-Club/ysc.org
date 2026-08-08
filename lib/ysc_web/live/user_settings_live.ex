@@ -885,7 +885,7 @@ defmodule YscWeb.UserSettingsLive do
                     <p class="text-sm text-blue-700 mt-1">
                       You are a family member. You share membership benefits from <strong><%= if @primary_user,
                         do: "#{@primary_user.first_name} #{@primary_user.last_name}",
-                        else: "your family membership manager" %></strong>.
+                        else: "the member who manages your family account" %></strong>.
                       Family members cannot purchase or manage their own membership.
                     </p>
                     <%= if @primary_user do %>
@@ -3714,7 +3714,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You're on a family membership and can't purchase a separate plan. Ask your family membership manager to make membership changes.",
+           "You're on a family membership and can't purchase a separate plan. Ask the member who manages your family account to make membership changes.",
            title: "Membership"
          )}
       else
@@ -3789,7 +3789,7 @@ defmodule YscWeb.UserSettingsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "You're on a family membership and can't purchase a separate plan. Ask your family membership manager to make membership changes.",
+               "You're on a family membership and can't purchase a separate plan. Ask the member who manages your family account to make membership changes.",
                title: "Membership"
              )}
 

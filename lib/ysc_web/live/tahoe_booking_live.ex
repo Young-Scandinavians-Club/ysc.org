@@ -3168,7 +3168,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </p>
                         <p class="mt-2">
                           <strong>Note:</strong>
-                          All cash refunds are subject to a 3% processing fee. Road closure cancellations must be reported immediately to the Cabin Master at {EmailConfig.tahoe_email()} for credit.
+                          All cash refunds are subject to a 3% processing fee. Road closure cancellations must be reported immediately to the cabin contact at {EmailConfig.tahoe_email()} for credit.
                         </p>
                       </div>
                     </div>
@@ -3550,7 +3550,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </li>
                         <li>The door code is unique to your booking period</li>
                         <li>
-                          If you don't receive the code, check your spam folder. Still nothing? Email the Tahoe Cabin Master at <a
+                          If you don't receive the code, check your spam folder. Still nothing? Email the Tahoe cabin contact at <a
                             href={"mailto:#{EmailConfig.tahoe_email()}"}
                             class="text-blue-200 hover:text-white underline"
                           >
@@ -3816,7 +3816,7 @@ defmodule YscWeb.TahoeBookingLive do
                             class="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5"
                           />
                           <p class="text-sm text-blue-900">
-                            <strong>Whole-cabin buyout:</strong>
+                            <strong>Rent the entire cabin:</strong>
                             {buyout_mode_availability_copy(@seasons)}
                           </p>
                         </div>
@@ -4271,7 +4271,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </li>
                         <li>
                           <strong>Road closure cancellations</strong>
-                          may be credited for a future stay (email the Cabin Master at {EmailConfig.tahoe_email()}).
+                          may be credited for a future stay (email the cabin contact at {EmailConfig.tahoe_email()}).
                         </li>
                         <li>
                           <strong>Cash refunds</strong>

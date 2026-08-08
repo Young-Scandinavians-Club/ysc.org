@@ -218,7 +218,13 @@ defmodule YscWeb.UserBookingDetailLive do
                       <p class="font-semibold mb-2">Cancellation Policy:</p>
                       <div class="text-sm text-blue-800">
                         <p>
-                          See your confirmation email, or email our cabin volunteer contact for help with cancellations and refunds.
+                          See your confirmation email, or email our cabin volunteer contact at <.link
+                            href={"mailto:#{get_cabin_master_email(@booking.property)}"}
+                            class="text-blue-900 hover:text-blue-700 underline font-medium"
+                          >
+                            {get_cabin_master_email(@booking.property)}
+                          </.link>
+                          for help with cancellations and refunds.
                         </p>
                       </div>
                     </div>

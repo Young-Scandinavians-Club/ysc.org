@@ -24,7 +24,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
     test "shows clarified eligibility step copy", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/users/register")
 
-      assert html =~ "Select every option that applies to you"
+      assert html =~ "Check all that describe you"
       assert html =~ "You only need to meet one to qualify"
     end
 

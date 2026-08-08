@@ -2092,7 +2092,7 @@ defmodule YscWeb.HomeLive do
     case plan_type do
       :lifetime ->
         if is_sub_account do
-          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "your family membership manager"}. Enjoy full access to all club properties and events forever."
+          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the member who manages your family account"}. Enjoy full access to all club properties and events forever."
         else
           "You are a lifetime member. Enjoy full access to all club properties and events forever."
         end
@@ -2107,7 +2107,7 @@ defmodule YscWeb.HomeLive do
           |> String.capitalize()
 
         if is_sub_account do
-          "You have access to a #{membership_type} membership through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "your family membership manager"}. Your membership benefits are shared through their family membership."
+          "You have access to a #{membership_type} membership through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the member who manages your family account"}. Your membership benefits are shared through their family membership."
         else
           cond do
             scheduled_for_cancellation? && renewal_date ->

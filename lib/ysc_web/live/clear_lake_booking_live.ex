@@ -1942,7 +1942,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </li>
                         <li>The door code is unique to your booking period</li>
                         <li>
-                          If you don't receive the code, check your spam folder. Still nothing? Email the Clear Lake Cabin Master at <a
+                          If you don't receive the code, check your spam folder. Still nothing? Email the Clear Lake cabin contact at <a
                             href={"mailto:#{EmailConfig.clear_lake_email()}"}
                             class="text-teal-200 hover:text-white underline"
                           >
@@ -2342,7 +2342,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </p>
                           <p>
                             <strong>Boating & Dock Access:</strong>
-                            Members enjoy free mooring at our private dock. Please email the Cabin Master at {EmailConfig.clear_lake_email()} in advance.
+                            Members enjoy free mooring at our private dock. Please email the cabin contact at {EmailConfig.clear_lake_email()} in advance.
                             <em>Note: trailers must be parked off-site.</em>
                           </p>
                           <div class="p-4 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs">
