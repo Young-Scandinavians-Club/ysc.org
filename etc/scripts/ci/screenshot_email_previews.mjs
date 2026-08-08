@@ -4,9 +4,10 @@
  *
  * Usage: node screenshot_email_previews.mjs <previews_dir>
  */
-const fs = require("fs");
-const path = require("path");
-const { pathToFileURL } = require("url");
+import fs from "fs";
+import path from "path";
+import { pathToFileURL } from "url";
+import { chromium } from "playwright";
 
 async function main() {
   const dir = process.argv[2];
@@ -26,7 +27,6 @@ async function main() {
     process.exit(1);
   }
 
-  const { chromium } = require("playwright");
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 680, height: 900 },
