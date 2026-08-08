@@ -103,7 +103,6 @@ defmodule YscWeb.Emails.MembershipEnded do
 
     Ysc.Logging.info("Sending membership ended re-engagement email",
       user_id: user.id,
-      email: user.email,
       subscription_id: Map.get(subscription, :id),
       end_date: attrs.idempotency_key
     )

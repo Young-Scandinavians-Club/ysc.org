@@ -16,7 +16,6 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   import Ecto.Query
   require Ysc.Logging
 
-  alias Ecto.Multi
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Repo
   alias Ysc.Subscriptions
@@ -152,6 +151,9 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   # Persist Stripe sync and (when voluntary and actually ending) the
   # membership-ended email in one transaction so a failed Oban insert does not
   # leave the subscription expired without a retryable email job.
+  # Ecto.Multi opacity vs MapSet triggers Dialyzer call_without_opaque (same
+  # pattern as Accounts / Posts Multi helpers).
+  @dialyzer {:nowarn_function, apply_expiration_transition: 2}
   defp apply_expiration_transition(%Subscription{} = subscription, attrs) do
     user = Ysc.Accounts.get_user(subscription.user_id)
     changeset = Subscription.changeset(subscription, attrs)
@@ -162,23 +164,20 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
     ending? =
       Subscriptions.cancelled?(preview) or not Subscriptions.active?(preview)
 
-    multi =
-      Multi.new()
-      |> then(fn multi ->
-        if ending? do
-          MembershipEnded.maybe_schedule_email_multi(
-            multi,
-            :membership_ended_email,
-            user,
-            subscription
-          )
-        else
-          multi
-        end
-      end)
-      |> Multi.update(:subscription, changeset)
-
-    multi
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:subscription, changeset)
+    |> then(fn multi ->
+      if ending? do
+        MembershipEnded.maybe_schedule_email_multi(
+          multi,
+          :membership_ended_email,
+          user,
+          preview
+        )
+      else
+        multi
+      end
+    end)
     |> Repo.transaction()
     |> case do
       {:ok, %{subscription: updated}} ->

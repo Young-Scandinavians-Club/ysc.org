@@ -251,7 +251,8 @@ defmodule YscWeb.Emails.MembershipEndedTest do
 
   describe "maybe_schedule/2 guards" do
     test "returns skipped for nil user" do
-      assert :skipped = MembershipEnded.maybe_schedule(nil, %{cancel_at_period_end: true})
+      assert :skipped =
+               MembershipEnded.maybe_schedule(nil, %{cancel_at_period_end: true})
     end
 
     test "returns skipped for nil subscription", %{user: user} do

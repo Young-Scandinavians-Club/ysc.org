@@ -1236,7 +1236,8 @@ defmodule Ysc.Subscriptions do
           DateTime.from_unix!(stripe_subscription.trial_end),
       ends_at:
         stripe_subscription.ended_at &&
-          DateTime.from_unix!(stripe_subscription.ended_at)
+          DateTime.from_unix!(stripe_subscription.ended_at),
+      cancel_at_period_end: stripe_subscription.cancel_at_period_end == true
     }
 
     %Subscription{}
@@ -1745,7 +1746,8 @@ defmodule Ysc.Subscriptions do
               DateTime.from_unix!(stripe_subscription.trial_end),
           ends_at:
             stripe_subscription.ended_at &&
-              DateTime.from_unix!(stripe_subscription.ended_at)
+              DateTime.from_unix!(stripe_subscription.ended_at),
+          cancel_at_period_end: stripe_subscription.cancel_at_period_end == true
         })
 
       subscription = Repo.insert(subscription_changeset)
