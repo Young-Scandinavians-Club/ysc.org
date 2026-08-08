@@ -10,7 +10,11 @@ defmodule YscWeb.Dev.NotificationSamples do
 
   @doc """
   Loads the sample config from `priv/dev/notification_preview_samples.exs`.
+
+  Path is a fixed repo-relative file (not user input). Evaluated at runtime so
+  edits to the samples file are picked up without recompiling.
   """
+  # sobelow_skip ["RCE.CodeModule"]
   def load do
     path = Path.join(File.cwd!(), @samples_path)
 
@@ -128,6 +132,7 @@ defmodule YscWeb.Dev.NotificationSamples do
   def samples_path, do: @samples_path
 
   # Newsletter intro is stored as HTML in the sample config; mark it safe for MJML.
+  # sobelow_skip ["XSS.Raw"]
   defp prepare_render_assigns("newsletter_edition", assigns) do
     case Map.get(assigns, :intro_text) do
       html when is_binary(html) ->

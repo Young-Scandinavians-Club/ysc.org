@@ -156,10 +156,11 @@ dialyzer:  ## Run Dialyzer type checker (builds PLT on first run, cached after)
 lint:  ## Run the lint suite
 	@mix credo --all
 	@mix format --check-formatted
+	@mix lint_notification_samples
 	@$(MAKE) shell-lint shell-format-check config-format-check
 
 .PHONY: preflight
-preflight:  ## Run all CI checks locally (compile, format, credo, sobelow, audit, tests)
+preflight:  ## Run all CI checks locally (compile, format, credo, dialyzer, notification samples, sobelow, audit, tests)
 	@BOLD="$(BOLD)" RESET="$(RESET)" RED="$(RED)" GREEN="$(GREEN)" TEAL="$(TEAL)" \
 		DOCKER_COMPOSE_FILE="$(DOCKER_COMPOSE_FILE)" \
 		./etc/scripts/preflight.sh

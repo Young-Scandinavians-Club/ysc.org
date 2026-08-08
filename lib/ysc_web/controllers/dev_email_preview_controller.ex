@@ -1,10 +1,13 @@
 defmodule YscWeb.DevEmailPreviewController do
   @moduledoc false
+  # Dev-only email HTML preview (`dev_routes: true`). Serves trusted MJML-rendered
+  # sample emails; not reachable in production.
   use YscWeb, :controller
 
   alias YscWeb.Dev.NotificationSamples
   alias YscWeb.Emails.Notifier
 
+  # sobelow_skip ["XSS.HTML"]
   def show(conn, %{"name" => name} = params) do
     name = normalize_name(name)
 
@@ -14,10 +17,12 @@ defmodule YscWeb.DevEmailPreviewController do
           maybe_send_to_mailbox(name)
         end
 
+        # Intentional: full email HTML document for iframe preview (dev-only route).
         html(conn, html)
 
       {:error, :unknown} ->
-        send_resp(conn, 404, "Unknown email template: #{name}")
+        # Do not echo the requested name into the body (Sobelow XSS.SendResp).
+        send_resp(conn, 404, "Unknown email template")
     end
   end
 
