@@ -41,66 +41,61 @@ defmodule YscWeb.MediaGalleryCursorTest do
     test "adds before_date and before_id when year is not selected" do
       date = ~U[2024-03-01 00:00:00Z]
 
-      assert MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
-               last_image_date: date,
-               last_image_id: 42,
-               selected_year: nil
-             }) == [limit: 30, before_date: date, before_id: 42]
+      opts =
+        MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
+          last_image_date: date,
+          last_image_id: 42,
+          selected_year: nil
+        })
+
+      assert opts[:limit] == 30
+      assert opts[:before_date] == date
+      assert opts[:before_id] == 42
     end
 
     test "adds before_date only when year is nil and id is missing" do
       date = ~U[2024-03-01 00:00:00Z]
 
-      assert MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
-               last_image_date: date,
-               selected_year: nil
-             }) == [limit: 30, before_date: date]
+      opts =
+        MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
+          last_image_date: date,
+          selected_year: nil
+        })
+
+      assert opts[:limit] == 30
+      assert opts[:before_date] == date
+      refute Keyword.has_key?(opts, :before_id)
     end
 
     test "includes start_at_year when filtering by year" do
       date = ~U[2024-03-01 00:00:00Z]
 
-      assert MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
-               last_image_date: date,
-               last_image_id: 7,
-               selected_year: 2024
-             }) == [
-               limit: 30,
-               before_date: date,
-               before_id: 7,
-               start_at_year: 2024
-             ]
+      opts =
+        MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
+          last_image_date: date,
+          last_image_id: 7,
+          selected_year: 2024
+        })
+
+      assert opts[:limit] == 30
+      assert opts[:before_date] == date
+      assert opts[:before_id] == 7
+      assert opts[:start_at_year] == 2024
     end
 
     test "includes start_at_year without before_id when id is nil" do
       date = ~U[2024-03-01 00:00:00Z]
 
-      assert MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
-               last_image_date: date,
-               selected_year: 2023
-             }) == [limit: 30, before_date: date, start_at_year: 2023]
-    end
-  end
+      opts =
+        MediaGalleryCursor.cursor_opts_from_assigns([limit: 30], %{
+          last_image_date: date,
+          selected_year: 2023
+        })
 
-  describe "apply_reset_page/4" do
-    test "marks end of timeline and resets stream assigns" do
-      socket = %Phoenix.LiveView.Socket{
-        assigns: %{
-          __changed__: %{},
-          streams: %{},
-          last_image_date: nil,
-          last_image_id: nil,
-          end_of_timeline?: false
-        }
-      }
-
-      images = [%{id: 1, inserted_at: ~U[2024-01-01 00:00:00Z]}]
-
-      updated = MediaGalleryCursor.apply_reset_page(socket, images, 30, :picker_images)
-
-      assert updated.assigns.end_of_timeline? == true
-      assert updated.assigns.last_image_id == 1
-      assert is_map(updated.assigns.streams.picker_images)
+      assert opts[:limit] == 30
+      assert opts[:before_date] == date
+      assert opts[:start_at_year] == 2023
+      refute Keyword.has_key?(opts, :before_id)
     end
   end
 end

@@ -4,7 +4,6 @@ defmodule YscWeb.MediaGalleryCursor do
   """
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [stream: 3]
 
   alias Ysc.Media
 
@@ -94,7 +93,7 @@ defmodule YscWeb.MediaGalleryCursor do
     socket
     |> assign(:end_of_timeline?, length(images) < per_page)
     |> assign_cursor_from_images(images)
-    |> stream(stream_name, images, reset: true)
+    |> Phoenix.LiveView.stream(stream_name, images, reset: true)
   end
 
   @doc """
@@ -105,6 +104,6 @@ defmodule YscWeb.MediaGalleryCursor do
   def apply_append_page(socket, images, stream_name) do
     socket
     |> assign_cursor_from_images(images)
-    |> stream(stream_name, images)
+    |> Phoenix.LiveView.stream(stream_name, images)
   end
 end
