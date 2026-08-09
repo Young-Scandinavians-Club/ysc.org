@@ -2834,6 +2834,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
         )
 
       old_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
       new_days =
         Date.range(new_checkin, Date.add(new_checkout, -1)) |> Enum.to_list()
 
@@ -2881,6 +2882,87 @@ defmodule Ysc.Bookings.BookingLockerTest do
                  children_count: 0,
                  booking_mode: :day
                })
+    end
+
+    test "reconciles room inventory when guest count changes", %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin modify room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = locker_room_dates(650, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(:USD, "400.00")
+      }
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(attrs,
+          rooms: [room],
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      nights = Date.diff(checkout, checkin)
+
+      booked_before =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout and ri.booked == true
+          ),
+          :count
+        )
+
+      assert booked_before == nights
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(
+                 booking,
+                 %{
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   guests_count: 3,
+                   children_count: 0,
+                   booking_mode: :room
+                 },
+                 rooms: [room]
+               )
+
+      assert updated.guests_count == 3
+
+      booked_after =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout and ri.booked == true
+          ),
+          :count
+        )
+
+      assert booked_after == nights
     end
 
     defp buyout_booked?(property, days) do
