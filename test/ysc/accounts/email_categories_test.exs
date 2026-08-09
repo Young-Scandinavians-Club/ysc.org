@@ -18,6 +18,8 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
 
       assert EmailCategories.get_category("membership_payment_confirmation") ==
                :account
+
+      assert EmailCategories.get_category("membership_ended") == :account
     end
 
     test "defaults to :account for unknown templates" do
@@ -64,6 +66,9 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
                membership_email
 
       assert EmailCategories.get_reply_to("membership_renewal_success") ==
+               membership_email
+
+      assert EmailCategories.get_reply_to("membership_ended") ==
                membership_email
 
       assert EmailCategories.get_reply_to("application_approved") ==

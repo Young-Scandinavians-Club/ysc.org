@@ -97,9 +97,9 @@ echo "${GREEN}✓ Shell scripts OK${RESET}"
 echo ""
 
 # ── Phase 4: Parallel checks that read compiled _build/dev artifacts ──────────
-# credo and sobelow read from _build/dev (compiled above); test uses _build/test.
-# All three are safe to run in parallel since no concurrent writes to the same env.
-echo "${BOLD}[Phase 4] Running parallel checks (credo, sobelow, tests)...${RESET}"
+# credo, sobelow, dialyzer, and notification sample lint read from _build/dev;
+# test uses _build/test. Safe to run in parallel (no concurrent writes to the same env).
+echo "${BOLD}[Phase 4] Running parallel checks (credo, dialyzer, notification samples, sobelow, tests)...${RESET}"
 
 (
   mix credo --strict >"$tmpdir/credo.log" 2>&1 &&
@@ -107,6 +107,20 @@ echo "${BOLD}[Phase 4] Running parallel checks (credo, sobelow, tests)...${RESET
     echo "✗ credo" >"$tmpdir/credo.status"
 ) &
 pid_credo=$!
+
+(
+  mix lint_notification_samples >"$tmpdir/notif.log" 2>&1 &&
+    echo "✓ notification_samples" >"$tmpdir/notif.status" ||
+    echo "✗ notification_samples" >"$tmpdir/notif.status"
+) &
+pid_notif=$!
+
+(
+  mix dialyzer >"$tmpdir/dialyzer.log" 2>&1 &&
+    echo "✓ dialyzer" >"$tmpdir/dialyzer.status" ||
+    echo "✗ dialyzer" >"$tmpdir/dialyzer.status"
+) &
+pid_dialyzer=$!
 
 (
   mix sobelow --skip --exit >"$tmpdir/sobelow.log" 2>&1 &&
@@ -122,9 +136,11 @@ pid_sobelow=$!
 ) &
 pid_test=$!
 
-wait $pid_credo $pid_sobelow $pid_test
+wait $pid_credo $pid_notif $pid_dialyzer $pid_sobelow $pid_test
 
 credo_status=$(cat "$tmpdir/credo.status")
+notif_status=$(cat "$tmpdir/notif.status")
+dialyzer_status=$(cat "$tmpdir/dialyzer.status")
 sobelow_status=$(cat "$tmpdir/sobelow.status")
 test_status=$(cat "$tmpdir/test.status")
 
@@ -136,6 +152,22 @@ if [[ "$credo_status" == "✗ credo" ]]; then
   failed=1
 else
   echo "${GREEN}✓ Credo checks passed${RESET}"
+fi
+
+if [[ "$notif_status" == "✗ notification_samples" ]]; then
+  echo "${RED}✗ Notification sample lint failed. Update priv/dev/notification_preview_samples.exs${RESET}"
+  cat "$tmpdir/notif.log"
+  failed=1
+else
+  echo "${GREEN}✓ Notification preview samples OK${RESET}"
+fi
+
+if [[ "$dialyzer_status" == "✗ dialyzer" ]]; then
+  echo "${RED}✗ Dialyzer failed${RESET}"
+  cat "$tmpdir/dialyzer.log"
+  failed=1
+else
+  echo "${GREEN}✓ Dialyzer passed${RESET}"
 fi
 
 if [[ "$sobelow_status" == "✗ sobelow" ]]; then

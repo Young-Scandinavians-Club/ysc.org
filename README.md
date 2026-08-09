@@ -42,7 +42,10 @@ make dev          # in a second terminal, with stripe listen running
 | --- | --- |
 | App | http://localhost:4000 |
 | Dev email inbox | http://localhost:4000/dev/mailbox |
+| Notification previews | http://localhost:4000/dev/notifications |
 | MinIO console | http://localhost:9001 |
+
+Email/SMS template previews, sample data, and PR screenshots: [EMAIL_TESTING_GUIDE.md](docs/EMAIL_TESTING_GUIDE.md).
 
 **Issues?** [Troubleshooting](docs/TROUBLESHOOTING.md) · **Seed data details:** [SEED_DATA_REFERENCE.md](docs/SEED_DATA_REFERENCE.md)
 

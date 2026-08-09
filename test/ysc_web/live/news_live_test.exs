@@ -107,12 +107,19 @@ defmodule YscWeb.NewsLiveTest do
       conn: conn
     } do
       author = user_fixture(%{role: "admin"})
-      title = "PubSub Post #{System.unique_integer()}"
+      unique = System.unique_integer()
+      title = "PubSub Post #{unique}"
+      url_name = "pubsub-post-#{unique}"
+
+      # Far-future publish time so parallel async tests cannot push this post
+      # out of the recent-posts slice (list_recent_posts(10)).
+      published_on =
+        DateTime.utc_now()
+        |> DateTime.add(10_000, :day)
+        |> DateTime.truncate(:second)
 
       {:ok, view, _html} = live(conn, ~p"/news")
       render_news_async(view)
-
-      url_name = "pubsub-post-#{System.unique_integer()}"
 
       assert {:ok, _post} =
                Posts.create_post(
@@ -122,11 +129,13 @@ defmodule YscWeb.NewsLiveTest do
                    "url_name" => url_name,
                    "state" => "published",
                    "featured_post" => false,
-                   "published_on" => DateTime.utc_now()
+                   "published_on" => published_on
                  },
                  author
                )
 
+      # Process the PubSub invalidation message before asserting on the stream.
+      render(view)
       assert has_element?(view, "a[href='/posts/#{url_name}']", title)
     end
 

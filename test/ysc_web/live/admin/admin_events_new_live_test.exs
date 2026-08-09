@@ -1292,4 +1292,23 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert Enum.all?(tickets, &(&1.status == :confirmed))
     end
   end
+
+  describe "statistics tab" do
+    setup [:create_admin]
+
+    test "loads statistics content asynchronously", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, title: "Stats Event"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+
+      render_async(view)
+
+      assert has_element?(view, "#event-statistics-content")
+      refute has_element?(view, "#event-statistics-loading")
+      assert has_element?(view, "#event-stats-kpis")
+    end
+  end
 end

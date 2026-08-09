@@ -140,6 +140,7 @@ User subscribes → Phoenix LiveView → Save to YSC DB
 - Newsletter subscriptions are stored in the app database (newsletter_subscribers)
 - Subscription status is tracked in the YSC database
 - In development, app emails (including any newsletter-related) use Swoosh local adapter and are viewable at /dev/mailbox
+- All templates can also be reviewed with sample data at /dev/notifications (see [EMAIL_TESTING_GUIDE.md](EMAIL_TESTING_GUIDE.md))
 
 
 ## Port Reference
@@ -147,7 +148,8 @@ User subscribes → Phoenix LiveView → Save to YSC DB
 | Service       | Port | URL                              | Purpose                    |
 |---------------|------|----------------------------------|----------------------------|
 | Phoenix       | 4000 | http://localhost:4000            | Main application           |
-| Swoosh Mailbox| 4000 | http://localhost:4000/dev/mailbox| App email preview          |
+| Notification catalog | 4000 | http://localhost:4000/dev/notifications | All email/SMS templates (sample data) |
+| Swoosh Mailbox| 4000 | http://localhost:4000/dev/mailbox| Sent app emails (Local adapter) |
 | PostgreSQL    | 5432 | localhost:5432                   | Database                   |
 | MinIO S3 API    | 9000 | http://localhost:9000            | Local S3-compatible API    |
 | MinIO Console   | 9001 | http://localhost:9001            | Bucket/object web UI       |
@@ -379,12 +381,16 @@ lib/
 
 | System | URL | Purpose |
 |--------|-----|---------|
-| Swoosh Mailbox | http://localhost:4000/dev/mailbox | App emails (registration, tickets, notifications) |
+| Notification catalog | http://localhost:4000/dev/notifications | All email/SMS templates with sample data |
+| Swoosh Mailbox | http://localhost:4000/dev/mailbox | Emails sent by the running app |
 
 **Key Email Files:**
 - `lib/ysc_web/emails/` - Email templates (MJML)
+- `priv/dev/notification_preview_samples.exs` - Sample assigns for previews
 - `config/config.exs` - Swoosh configuration
 - `lib/ysc/mailer.ex` - Email sending logic
+
+See [EMAIL_TESTING_GUIDE.md](EMAIL_TESTING_GUIDE.md) for the full preview workflow.
 
 
 

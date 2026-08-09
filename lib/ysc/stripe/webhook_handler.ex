@@ -815,7 +815,37 @@ defmodule Ysc.Stripe.WebhookHandler do
     subscription = Subscriptions.get_subscription_by_stripe_id(event.id)
 
     if subscription do
-      Subscriptions.mark_as_cancelled(subscription)
+      # Schedule the re-engagement email in the same DB transaction as
+      # mark_as_cancelled so a transient Oban insert failure rolls back and
+      # Stripe retries the webhook (idempotent by membership_ended key).
+      user =
+        subscription.user_id && Ysc.Accounts.get_user(subscription.user_id)
+
+      result =
+        Ecto.Multi.new()
+        |> YscWeb.Emails.MembershipEnded.maybe_schedule_email_multi(
+          :membership_ended_email,
+          user,
+          subscription
+        )
+        |> Ecto.Multi.run(:cancelled, fn _repo, _changes ->
+          Subscriptions.mark_as_cancelled(subscription)
+        end)
+        |> Repo.transaction()
+
+      case result do
+        {:ok, _} ->
+          :ok
+
+        {:error, _op, reason, _changes} ->
+          Ysc.Logging.error(
+            "Failed to cancel subscription / schedule membership ended email",
+            subscription_id: subscription.id,
+            error: inspect(reason)
+          )
+
+          Repo.rollback(reason)
+      end
     end
 
     :ok
@@ -915,6 +945,21 @@ defmodule Ysc.Stripe.WebhookHandler do
             Map.put(attrs, :ends_at, DateTime.from_unix!(event.cancel_at))
           else
             attrs
+          end
+
+        # Sync cancel_at_period_end while the subscription is still active.
+        # Once terminal, preserve the local voluntary-lapse marker so Stripe
+        # clearing cancel_at_period_end after cancel does not drop it.
+        attrs =
+          cond do
+            event.cancel_at_period_end == true ->
+              Map.put(attrs, :cancel_at_period_end, true)
+
+            event.status in ["active", "trialing"] ->
+              Map.put(attrs, :cancel_at_period_end, false)
+
+            true ->
+              attrs
           end
 
         # CRITICAL: Wrap subscription update and items update in transaction

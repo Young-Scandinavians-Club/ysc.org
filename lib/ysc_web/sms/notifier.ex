@@ -279,6 +279,16 @@ defmodule YscWeb.Sms.Notifier do
     @template_mappings[template_name]
   end
 
+  @doc """
+  Returns the map of template name => module for all registered SMS templates.
+  """
+  def template_mappings, do: @template_mappings
+
+  @doc """
+  Returns sorted template names registered with the SMS notifier.
+  """
+  def template_names, do: @template_mappings |> Map.keys() |> Enum.sort()
+
   # Private functions
 
   defp valid_phone_number?(phone_number) when is_binary(phone_number) do
