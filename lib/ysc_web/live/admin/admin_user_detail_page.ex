@@ -4337,38 +4337,25 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
-  defp fetch_family_assigns(selected_user) do
-    if Accounts.primary_user?(selected_user) and
-         (Accounts.has_lifetime_membership?(selected_user) or
-            has_family_subscription?(selected_user)) do
-      user =
-        Accounts.get_user!(selected_user.id, [
-          :family_members,
-          {:primary_user, [:current_avatar, :family_members]},
-          {:sub_accounts, :current_avatar},
-          :current_avatar
-        ])
+  @family_tab_user_preloads [
+    :family_members,
+    {:primary_user, [:current_avatar, :family_members, :sub_accounts]},
+    {:sub_accounts, :current_avatar},
+    :current_avatar
+  ]
 
+  defp fetch_family_assigns(selected_user) do
+    user = family_tab_user(selected_user)
+
+    if Accounts.primary_user?(user) and
+         (Accounts.has_lifetime_membership?(user) or
+            has_family_subscription?(user)) do
       primary_user = Accounts.get_primary_user(user)
 
       sub_accounts =
         if primary_user, do: [], else: Accounts.get_sub_accounts(user)
 
-      family_members =
-        if primary_user do
-          case primary_user.family_members do
-            %Ecto.Association.NotLoaded{} -> []
-            members when is_list(members) -> members
-            _ -> []
-          end
-        else
-          case user.family_members do
-            %Ecto.Association.NotLoaded{} -> []
-            members when is_list(members) -> members
-            _ -> []
-          end
-        end
-
+      family_members = family_members_for_user(user, primary_user)
       primary_for_invites = primary_user || user
 
       pending_invites =
@@ -4383,34 +4370,24 @@ defmodule YscWeb.AdminUserDetailsLive do
         can_manage_family: true
       }
     else
-      primary_user = Accounts.get_primary_user(selected_user)
+      primary_user = Accounts.get_primary_user(user)
 
       if primary_user do
-        primary_with_data =
-          Accounts.get_user!(primary_user.id, [:family_members, :sub_accounts])
-
-        all_sub_accounts = Accounts.get_sub_accounts(primary_with_data)
-        siblings = Enum.reject(all_sub_accounts, &(&1.id == selected_user.id))
-
-        family_members =
-          case primary_with_data.family_members do
-            %Ecto.Association.NotLoaded{} -> []
-            members when is_list(members) -> members
-            _ -> []
-          end
+        all_sub_accounts = Accounts.get_sub_accounts(primary_user)
+        siblings = Enum.reject(all_sub_accounts, &(&1.id == user.id))
 
         pending_invites =
           FamilyInvites.list_invites(primary_user)
           |> Enum.filter(&is_nil(&1.accepted_at))
 
         can_manage =
-          Accounts.has_lifetime_membership?(primary_with_data) or
-            has_family_subscription?(primary_with_data)
+          Accounts.has_lifetime_membership?(primary_user) or
+            has_family_subscription?(primary_user)
 
         %{
           primary_user: primary_user,
           sub_accounts: siblings,
-          family_members: family_members,
+          family_members: family_members_for_user(nil, primary_user),
           pending_invites: pending_invites,
           can_manage_family: can_manage
         }
@@ -4423,6 +4400,47 @@ defmodule YscWeb.AdminUserDetailsLive do
           can_manage_family: false
         }
       end
+    end
+  end
+
+  defp family_tab_user(user) do
+    if family_tab_preloads_loaded?(user) do
+      user
+    else
+      Accounts.get_user!(user.id, @family_tab_user_preloads)
+    end
+  end
+
+  defp family_tab_preloads_loaded?(user) do
+    Ecto.assoc_loaded?(user.family_members) and
+      Ecto.assoc_loaded?(user.sub_accounts) and
+      Ecto.assoc_loaded?(user.current_avatar) and
+      primary_household_preloads_loaded?(user)
+  end
+
+  defp primary_household_preloads_loaded?(%{primary_user_id: nil}), do: true
+
+  defp primary_household_preloads_loaded?(user) do
+    case user.primary_user do
+      %Ecto.Association.NotLoaded{} ->
+        false
+
+      nil ->
+        true
+
+      primary_user ->
+        Ecto.assoc_loaded?(primary_user.family_members) and
+          Ecto.assoc_loaded?(primary_user.sub_accounts)
+    end
+  end
+
+  defp family_members_for_user(user, primary_user) do
+    source = if primary_user, do: primary_user, else: user
+
+    case source.family_members do
+      %Ecto.Association.NotLoaded{} -> []
+      members when is_list(members) -> members
+      _ -> []
     end
   end
 
@@ -4941,7 +4959,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       Accounts.get_user!(id, [
         :family_members,
         :billing_address,
-        {:primary_user, :current_avatar},
+        {:primary_user, [:current_avatar, :family_members, :sub_accounts]},
         {:sub_accounts, :current_avatar},
         :current_avatar
       ])
