@@ -2668,6 +2668,58 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "admin_modify_complete_booking/3" do
+    test "reconciles Clear Lake day capacity when guests_count changes" do
+      user = user_fixture()
+      checkin = ~D[2036-10-05]
+      checkout = ~D[2036-10-08]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      assert day_capacity_booked(:clear_lake, stay_days) == [2, 2, 2]
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 5,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+
+      assert updated.guests_count == 5
+      assert day_capacity_booked(:clear_lake, stay_days) == [5, 5, 5]
+    end
+
+    defp day_capacity_booked(property, days) do
+      alias Ysc.Bookings.PropertyInventory
+
+      days
+      |> Enum.map(fn day ->
+        Repo.one!(
+          from(pi in PropertyInventory,
+            where: pi.property == ^property and pi.day == ^day,
+            select: pi.capacity_booked
+          )
+        )
+      end)
+    end
+  end
+
   describe "modify_complete_booking/3 error branches" do
     defp complete_buyout_booking_for_modify!(user, checkin, checkout) do
       {:ok, _} =

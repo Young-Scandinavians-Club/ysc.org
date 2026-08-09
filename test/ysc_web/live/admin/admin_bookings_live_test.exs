@@ -26,6 +26,20 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
   defp section_label("pending_refunds"), do: "Pending Refunds"
   defp section_label("reservations"), do: "Reservations"
 
+  defp day_capacity_booked_for(property, days) do
+    alias Ysc.Bookings.PropertyInventory
+
+    days
+    |> Enum.map(fn day ->
+      Repo.one!(
+        from(pi in PropertyInventory,
+          where: pi.property == ^property and pi.day == ^day,
+          select: pi.capacity_booked
+        )
+      )
+    end)
+  end
+
   defp insert_pending_refund!(property) do
     user = user_fixture()
     booking = booking_fixture(%{user_id: user.id, property: property})
@@ -1529,6 +1543,54 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert updated.booking_mode == :day
       assert updated.guests_count == 4
       assert updated.status == :complete
+    end
+
+    test "edit day booking reconciles capacity_booked inventory", %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "Inventory"})
+
+      checkin = ~D[2036-09-10]
+      checkout = ~D[2036-09-13]
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=clear_lake&from_date=2036-09-01&to_date=2036-09-20"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2036-09-10",
+          "checkout_date" => "2036-09-13",
+          "guests_count" => "5",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "status" => "complete"
+        }
+      })
+      |> render_submit()
+
+      assert Bookings.get_booking!(booking.id).guests_count == 5
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [5, 5, 5]
     end
 
     test "day bookings are not rendered on the Full Buyout calendar row", %{
