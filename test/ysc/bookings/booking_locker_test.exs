@@ -2793,7 +2793,9 @@ defmodule Ysc.Bookings.BookingLockerTest do
         )
 
       old_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
-      new_days = Date.range(new_checkin, Date.add(new_checkout, -1)) |> Enum.to_list()
+
+      new_days =
+        Date.range(new_checkin, Date.add(new_checkout, -1)) |> Enum.to_list()
 
       assert day_capacity_booked(:clear_lake, old_days) == [3, 3, 3]
 

@@ -1644,7 +1644,9 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
     end
 
-    test "edit complete day booking shows blackout conflict toast", %{conn: conn} do
+    test "edit complete day booking shows blackout conflict toast", %{
+      conn: conn
+    } do
       ensure_clear_lake_pricing_rules!()
       user = user_fixture(%{first_name: "Spot", last_name: "Blackout"})
 
@@ -1695,7 +1697,8 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
         })
         |> render_submit()
 
-      assert html =~ "Cannot update booking: selected dates overlap a blackout period."
+      assert html =~
+               "Cannot update booking: selected dates overlap a blackout period."
     end
 
     test "day bookings are not rendered on the Full Buyout calendar row", %{
