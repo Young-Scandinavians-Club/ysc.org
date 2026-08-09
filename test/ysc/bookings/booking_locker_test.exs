@@ -2813,6 +2813,88 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert day_capacity_booked(:clear_lake, new_days) == [3, 3, 3]
     end
 
+    test "reconciles buyout inventory when stay dates change" do
+      user = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(620)
+      new_checkin = Date.add(checkin, 14)
+      new_checkout = Date.add(checkout, 14)
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 4,
+            booking_mode: :buyout
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      old_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      new_days = Date.range(new_checkin, Date.add(new_checkout, -1)) |> Enum.to_list()
+
+      assert buyout_booked?(:tahoe, old_days)
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 "checkin_date" => new_checkin,
+                 "checkout_date" => new_checkout,
+                 "guests_count" => 4,
+                 "children_count" => 0,
+                 "booking_mode" => :buyout
+               })
+
+      assert updated.checkin_date == new_checkin
+      refute buyout_booked?(:tahoe, old_days)
+      assert buyout_booked?(:tahoe, new_days)
+    end
+
+    test "returns changeset error for invalid stay dates" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      checkin = ~D[2036-12-01]
+      checkout = ~D[2036-12-04]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:error, %Ecto.Changeset{}} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 checkin_date: checkout,
+                 checkout_date: checkin,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+    end
+
+    defp buyout_booked?(property, days) do
+      alias Ysc.Bookings.PropertyInventory
+
+      Enum.all?(days, fn day ->
+        Repo.one!(
+          from(pi in PropertyInventory,
+            where: pi.property == ^property and pi.day == ^day,
+            select: pi.buyout_booked
+          )
+        )
+      end)
+    end
+
     defp day_capacity_booked(property, days) do
       alias Ysc.Bookings.PropertyInventory
 
