@@ -1698,6 +1698,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     case result do
       {:ok, updated} -> invalidate_availability_cache({:ok, updated})
+      {:error, {:error, reason}} -> {:error, reason}
       {:error, reason} -> {:error, reason}
     end
   end
