@@ -241,7 +241,7 @@ defmodule Ysc.Accounts.SignupApplication do
   end
 
   defp validate_birth_date(changeset) do
-    case get_field(changeset, :birth_date) do
+    case Ecto.Changeset.get_field(changeset, :birth_date) do
       nil ->
         changeset
 
@@ -317,7 +317,7 @@ defmodule Ysc.Accounts.SignupApplication do
     # Only validate emails in production environment to prevent blocking legitimate
     # signups due to email validation errors in dev/sandbox environments.
     if should_validate_email?(opts) do
-      case get_field(changeset, :user_id) do
+      case Ecto.Changeset.get_field(changeset, :user_id) do
         nil ->
           # No user_id means we can't validate the email
           changeset
