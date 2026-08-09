@@ -80,7 +80,15 @@ defmodule YscWeb do
 
       unquote(html_helpers())
       import YscWeb.AdminComponents
-      import YscWeb.AdminFlopHelpers, only: [non_flop_params: 1]
+      import YscWeb.AdminFlopHelpers,
+        only: [
+          non_flop_params: 1,
+          title_search_query: 1,
+          build_title_search_filter_params: 2,
+          merge_date_range_into_params: 3,
+          compact_filter_params: 1,
+          merge_title_filter_into_params: 2
+        ]
       import YscWeb.AdminHelpComponents
 
       # Global event: "clear" is sent by the client-error flash in the layout when dismissed.

@@ -340,8 +340,7 @@ defmodule YscWeb.AdminPostsLive do
              date_to: date_to
            ) do
         {:ok, {posts, meta}} ->
-          title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
-          search_query = if title_filter, do: title_filter.value, else: ""
+          search_query = title_search_query(meta)
 
           {:noreply,
            socket
@@ -366,40 +365,9 @@ defmodule YscWeb.AdminPostsLive do
   end
 
   def handle_event("search", %{"q" => q}, socket) do
-    existing_filters =
-      socket.assigns.meta.flop.filters
-      |> Enum.reject(&(&1.field == :title))
-
-    new_filters =
-      if q != "" do
-        [%Flop.Filter{field: :title, op: :ilike, value: q} | existing_filters]
-      else
-        existing_filters
-      end
-
-    filter_params =
-      new_filters
-      |> Enum.with_index()
-      |> Enum.into(%{}, fn {filter, idx} ->
-        {"#{idx}",
-         %{
-           "field" => "#{filter.field}",
-           "op" => "#{filter.op}",
-           "value" => "#{filter.value}"
-         }}
-      end)
-
-    date_from = socket.assigns.date_from
-    date_to = socket.assigns.date_to
-
     new_params =
-      %{"filters" => filter_params}
-      |> then(fn p ->
-        if date_from != "", do: Map.put(p, "date_from", date_from), else: p
-      end)
-      |> then(fn p ->
-        if date_to != "", do: Map.put(p, "date_to", date_to), else: p
-      end)
+      %{"filters" => build_title_search_filter_params(socket.assigns.meta, q)}
+      |> merge_date_range_into_params(socket.assigns.date_from, socket.assigns.date_to)
 
     {:noreply, push_patch(socket, to: ~p"/admin/posts?#{new_params}")}
   end
@@ -418,41 +386,14 @@ defmodule YscWeb.AdminPostsLive do
       |> Map.delete("date_from")
       |> Map.delete("date_to")
 
-    updated_filters =
-      Enum.reduce(params["filters"] || %{}, %{}, fn {k, v}, acc ->
-        updated = maybe_update_filter(v)
-
-        if updated["value"] in ["", nil] do
-          acc
-        else
-          Map.put(acc, k, updated)
-        end
-      end)
-
-    title_filter =
-      Enum.find(socket.assigns.meta.flop.filters, &(&1.field == :title))
-
     final_filters =
-      if title_filter && title_filter.value != "" do
-        next_idx = map_size(updated_filters)
-
-        Map.put(updated_filters, "#{next_idx}", %{
-          "field" => "title",
-          "op" => "ilike",
-          "value" => title_filter.value
-        })
-      else
-        updated_filters
-      end
+      params["filters"]
+      |> compact_filter_params()
+      |> merge_title_filter_into_params(socket.assigns.meta)
 
     new_params =
       Map.merge(params, %{"filters" => final_filters})
-      |> then(fn p ->
-        if date_from != "", do: Map.put(p, "date_from", date_from), else: p
-      end)
-      |> then(fn p ->
-        if date_to != "", do: Map.put(p, "date_to", date_to), else: p
-      end)
+      |> merge_date_range_into_params(date_from, date_to)
 
     {:noreply, push_patch(socket, to: ~p"/admin/posts?#{new_params}")}
   end
@@ -560,11 +501,6 @@ defmodule YscWeb.AdminPostsLive do
          )}
     end
   end
-
-  defp maybe_update_filter(%{"value" => [""]} = filter),
-    do: Map.replace(filter, "value", "")
-
-  defp maybe_update_filter(filter), do: filter
 
   defp maybe_stream_update_post(socket, nil), do: socket
 
