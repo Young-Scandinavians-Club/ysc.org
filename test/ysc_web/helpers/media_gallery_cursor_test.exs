@@ -6,7 +6,11 @@ defmodule YscWeb.MediaGalleryCursorTest do
   describe "assign_cursor_from_images/2" do
     test "clears cursor assigns for an empty page" do
       socket = %Phoenix.LiveView.Socket{
-        assigns: %{__changed__: %{}, last_image_date: ~U[2024-01-01 00:00:00Z], last_image_id: 1}
+        assigns: %{
+          __changed__: %{},
+          last_image_date: ~U[2024-01-01 00:00:00Z],
+          last_image_id: 1
+        }
       }
 
       updated = MediaGalleryCursor.assign_cursor_from_images(socket, [])
@@ -34,7 +38,9 @@ defmodule YscWeb.MediaGalleryCursorTest do
     test "returns base opts when cursor date is nil" do
       base = [limit: 30, search: "party"]
 
-      assert MediaGalleryCursor.cursor_opts_from_assigns(base, %{last_image_date: nil}) ==
+      assert MediaGalleryCursor.cursor_opts_from_assigns(base, %{
+               last_image_date: nil
+             }) ==
                base
     end
 
