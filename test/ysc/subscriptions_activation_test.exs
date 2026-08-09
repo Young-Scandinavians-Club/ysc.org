@@ -341,7 +341,10 @@ defmodule Ysc.SubscriptionsActivationTest do
         )
 
       assert {:ok, updated} =
-               Subscriptions.create_subscription_from_stripe(user, stripe_subscription)
+               Subscriptions.create_subscription_from_stripe(
+                 user,
+                 stripe_subscription
+               )
 
       assert updated.id == existing.id
       assert updated.stripe_status == "active"
