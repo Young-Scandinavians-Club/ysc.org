@@ -58,8 +58,11 @@ defmodule YscWeb.MediaGalleryCursor do
     |> Keyword.put(:before_id, id)
   end
 
-  def cursor_opts_from_assigns(opts, %{last_image_date: date, selected_year: nil}),
-    do: Keyword.put(opts, :before_date, date)
+  def cursor_opts_from_assigns(opts, %{
+        last_image_date: date,
+        selected_year: nil
+      }),
+      do: Keyword.put(opts, :before_date, date)
 
   def cursor_opts_from_assigns(opts, %{
         last_image_date: date,
@@ -73,7 +76,10 @@ defmodule YscWeb.MediaGalleryCursor do
     |> Keyword.put(:start_at_year, year)
   end
 
-  def cursor_opts_from_assigns(opts, %{last_image_date: date, selected_year: year})
+  def cursor_opts_from_assigns(opts, %{
+        last_image_date: date,
+        selected_year: year
+      })
       when not is_nil(year) do
     opts
     |> Keyword.put(:before_date, date)
