@@ -29,6 +29,45 @@ defmodule YscWeb.AdminUsersLiveTest do
       assert html =~ "Member One"
     end
 
+    test "shows an Applied column with the application submission date", %{
+      conn: conn
+    } do
+      user = user_fixture(%{first_name: "Applied", last_name: "Column"})
+      signup_application_fixture(user)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/users")
+
+      assert html =~ "Applied"
+      assert html =~ "Applied Column"
+    end
+
+    test "defaults to sorting by application date, newest first", %{
+      conn: conn
+    } do
+      older = user_fixture(%{first_name: "Older", last_name: "Applicant"})
+
+      signup_application_fixture(older, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -10, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      newer = user_fixture(%{first_name: "Newer", last_name: "Applicant"})
+
+      signup_application_fixture(newer, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -1, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      {:ok, _view, html} = live(conn, ~p"/admin/users")
+
+      newer_pos = :binary.match(html, "Newer Applicant") |> elem(0)
+      older_pos = :binary.match(html, "Older Applicant") |> elem(0)
+
+      assert newer_pos < older_pos
+    end
+
     test "patching to review from users list keeps list rows without reloading the table query",
          %{conn: conn} do
       pending_user =

@@ -25,7 +25,16 @@ defmodule Ysc.Accounts.User do
       :board_position,
       :membership_type
     ],
-    sortable: [:email, :first_name, :last_name, :state, :role, :membership_type],
+    sortable: [
+      :email,
+      :first_name,
+      :last_name,
+      :state,
+      :role,
+      :membership_type,
+      :application_date,
+      :subscription_start
+    ],
     default_limit: 50,
     max_limit: 200,
     default_order: %{
@@ -69,6 +78,8 @@ defmodule Ysc.Accounts.User do
     field :quickbooks_customer_id, :string
 
     field :membership_type, :string, virtual: true
+    field :application_date, :utc_datetime, virtual: true
+    field :subscription_start, :utc_datetime, virtual: true
 
     # Notification preferences (email). Newsletter state lives in newsletter_subscribers; this is virtual for form only.
     field :newsletter_notifications, :boolean, virtual: true
