@@ -557,6 +557,18 @@ defmodule YscWeb.UserAuthTest do
       refute UserAuth.valid_internal_redirect?("//evil.com/path")
     end
 
+    test "rejects tab/CR/LF-smuggled protocol-relative paths (EEF-CVE-2026-64941 style bypass)" do
+      # Browsers strip ASCII tab/CR/LF while parsing a URL, so "/\t/evil.com"
+      # is delivered to the browser as "//evil.com" even though it contains
+      # no literal "//" substring server-side.
+      refute UserAuth.valid_internal_redirect?("/\t/evil.com")
+      refute UserAuth.valid_internal_redirect?("/\n/evil.com")
+      refute UserAuth.valid_internal_redirect?("/\r/evil.com")
+      refute UserAuth.valid_internal_redirect?("/%09/evil.com")
+      refute UserAuth.valid_internal_redirect?("/%0a/evil.com")
+      refute UserAuth.valid_internal_redirect?("/%0d/evil.com")
+    end
+
     test "rejects URL-encoded protocol-relative paths (open redirect bypass)" do
       refute UserAuth.valid_internal_redirect?("/%2f%2fevil.com")
       refute UserAuth.valid_internal_redirect?("/%252f%252fevil.com")
