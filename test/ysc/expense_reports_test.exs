@@ -1885,6 +1885,27 @@ defmodule Ysc.ExpenseReportsTest do
 
       assert report.address_id != nil
     end
+
+    test "reimbursement_method outside bank_transfer/check leaves the changeset untouched by the custom validators",
+         %{user: user} do
+      {:error, changeset} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Test"
+          },
+          user
+        )
+
+      refute changeset.valid?
+      errors = errors_on(changeset)
+
+      # Only the base schema's required-field error fires; none of the
+      # bank_transfer/check-specific validators add anything since
+      # reimbursement_method is neither "bank_transfer" nor "check".
+      assert errors.reimbursement_method == ["can't be blank"]
+    end
   end
 
   describe "get_decrypted_bank_account/2 and get_decrypted_bank_account!/2" do
@@ -2884,6 +2905,15 @@ defmodule Ysc.ExpenseReportsTest do
       after
         File.rm(path)
       end
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "builds a runnable Ecto query for CI query-plan diagnostics" do
+      query = ExpenseReports.ci_query_explain_query()
+
+      assert %Ecto.Query{} = query
+      assert Repo.all(query) == []
     end
   end
 end
