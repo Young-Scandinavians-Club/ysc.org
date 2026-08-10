@@ -114,7 +114,7 @@ defmodule YscWeb.BookingReceiptLive do
           refund_message =
             if Money.positive?(refund_amount) do
               if is_pending_refund do
-                "Booking cancelled. We are reviewing your refund of #{MoneyHelper.format_money!(refund_amount)}. You will get an email when it is approved. No action is needed on your side."
+                "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} needs a quick club review before it's sent (this is normal for some cancellation amounts). We'll email you when it's processed - you don't need to do anything else."
               else
                 "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
               end
@@ -1000,7 +1000,7 @@ defmodule YscWeb.BookingReceiptLive do
                           />
                           <p class="text-xs text-amber-800">
                             <strong>Refund under review:</strong>
-                            We're reviewing your refund. You'll get an email when it's approved. No action is needed on your side.
+                            Your refund needs a quick club review before it's sent (this is normal). We'll email you when it's processed - you don't need to do anything else.
                           </p>
                         </div>
                       </div>

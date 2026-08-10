@@ -83,7 +83,7 @@ defmodule YscWeb.UserBookingDetailLive do
             refund_message =
               if Money.positive?(refund_amount) do
                 if is_pending_refund do
-                  "Booking cancelled. We are reviewing your refund of #{MoneyHelper.format_money!(refund_amount)}. You will get an email when it is approved. No action is needed on your side."
+                  "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} needs a quick club review before it's sent (this is normal for some cancellation amounts). We'll email you when it's processed - you don't need to do anything else."
                 else
                   "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
                 end
@@ -201,7 +201,7 @@ defmodule YscWeb.UserBookingDetailLive do
                   <% end %>
                   <%= if @refund_info.policy_rules && length(@refund_info.policy_rules) > 0 do %>
                     <div class="pt-3 border-t border-blue-200">
-                      <p class="font-semibold mb-2">Cancellation Policy:</p>
+                      <p class="font-semibold mb-2">Refund schedule:</p>
                       <div class="text-sm text-blue-800 space-y-2">
                         {RefundPolicyDisplay.rules_sorted_asc(
                           @refund_info.policy_rules
@@ -215,7 +215,7 @@ defmodule YscWeb.UserBookingDetailLive do
                     </div>
                   <% else %>
                     <div class="pt-3 border-t border-blue-200">
-                      <p class="font-semibold mb-2">Cancellation Policy:</p>
+                      <p class="font-semibold mb-2">Need help?</p>
                       <div class="text-sm text-blue-800">
                         <p>
                           See your confirmation email, or email our cabin volunteer contact for help with cancellations and refunds.
@@ -323,7 +323,7 @@ defmodule YscWeb.UserBookingDetailLive do
                     <%= if @booking.booking_mode == :room do %>
                       Individual room(s)
                     <% else %>
-                      Group booking (shared cabin)
+                      Shared cabin
                     <% end %>
                   <% end %>
                 </div>

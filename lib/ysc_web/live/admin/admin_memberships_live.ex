@@ -19,20 +19,26 @@ defmodule YscWeb.AdminMembershipsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:active_page, :memberships)
-     |> assign(:page_title, "Memberships")
-     |> assign(:stats, %{total: 0, single: 0, family: 0, lifetime: 0})
-     |> assign(:loading_stats?, true)
-     |> assign(:type_filter, nil)
-     |> assign(:params, %{})
-     |> assign(:meta, nil)
-     |> assign(:empty, false)
-     |> stream_configure(:memberships,
-       dom_id: &"membership-#{&1.primary_user.id}"
-     )
-     |> stream(:memberships, [], reset: true)}
+    socket =
+      socket
+      |> assign(:active_page, :memberships)
+      |> assign(:page_title, "Memberships")
+      |> assign(:stats, %{total: 0, single: 0, family: 0, lifetime: 0})
+      |> assign(:loading_stats?, true)
+      |> assign(:type_filter, nil)
+      |> assign(:params, %{})
+      |> assign(:meta, nil)
+      |> assign(:empty, false)
+      |> stream_configure(:memberships,
+        dom_id: &"membership-#{&1.primary_user.id}"
+      )
+      |> stream(:memberships, [], reset: true)
+
+    if connected?(socket) do
+      send(self(), :load_membership_stats)
+    end
+
+    {:ok, socket}
   end
 
   @impl true
@@ -59,8 +65,6 @@ defmodule YscWeb.AdminMembershipsLive do
            socket
            |> assign(:meta, meta)
            |> assign(:empty, memberships == [])
-           |> assign(:stats, Accounts.get_membership_stats())
-           |> assign(:loading_stats?, false)
            |> stream(:memberships, memberships, reset: true)}
 
         {:error, _meta} ->
@@ -87,6 +91,14 @@ defmodule YscWeb.AdminMembershipsLive do
     new_params = Map.delete(socket.assigns[:params], "search")
 
     {:noreply, push_patch(socket, to: ~p"/admin/memberships?#{new_params}")}
+  end
+
+  @impl true
+  def handle_info(:load_membership_stats, socket) do
+    {:noreply,
+     socket
+     |> assign(:stats, Accounts.get_membership_stats())
+     |> assign(:loading_stats?, false)}
   end
 
   @impl true

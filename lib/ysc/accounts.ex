@@ -3162,39 +3162,32 @@ defmodule Ysc.Accounts do
          {:application_date, direction, _index},
          _now
        ) do
+    joined =
+      from u in query,
+        left_join: sa in SignupApplication,
+        on: sa.user_id == u.id
+
     case direction do
       :asc ->
-        from u in query,
+        from [u, sa] in joined,
           order_by: [
-            asc:
+            asc_nulls_last:
               fragment(
-                """
-                COALESCE(
-                  (SELECT COALESCE(sa.completed, sa.reviewed_at)
-                   FROM signup_applications sa
-                   WHERE sa.user_id = ?),
-                  ?
-                )
-                """,
-                u.id,
+                "COALESCE(?, ?, ?)",
+                sa.completed,
+                sa.reviewed_at,
                 u.inserted_at
               )
           ]
 
       :desc ->
-        from u in query,
+        from [u, sa] in joined,
           order_by: [
-            desc:
+            desc_nulls_last:
               fragment(
-                """
-                COALESCE(
-                  (SELECT COALESCE(sa.completed, sa.reviewed_at)
-                   FROM signup_applications sa
-                   WHERE sa.user_id = ?),
-                  ?
-                )
-                """,
-                u.id,
+                "COALESCE(?, ?, ?)",
+                sa.completed,
+                sa.reviewed_at,
                 u.inserted_at
               )
           ]
@@ -3909,31 +3902,38 @@ defmodule Ysc.Accounts do
   """
   def get_membership_stats do
     base = active_membership_primary_users_query()
+    family_price_id = family_membership_price_id()
 
-    total = from(u in base, select: count(u.id)) |> Repo.one()
+    %{total: total, lifetime: lifetime, family: family} =
+      if family_price_id do
+        family_sub = active_family_membership_user_ids_query(family_price_id)
 
-    lifetime =
-      from(u in base,
-        where: not is_nil(u.lifetime_membership_awarded_at),
-        select: count(u.id)
-      )
-      |> Repo.one()
-
-    family =
-      case family_membership_price_id() do
-        nil ->
-          0
-
-        family_price_id ->
-          from(u in base,
-            where: is_nil(u.lifetime_membership_awarded_at),
-            where:
-              u.id in subquery(
-                active_family_membership_user_ids_query(family_price_id)
-              ),
-            select: count(u.id)
-          )
-          |> Repo.one()
+        from(u in base,
+          select: %{
+            total: count(u.id),
+            lifetime:
+              count(u.id)
+              |> filter(not is_nil(u.lifetime_membership_awarded_at)),
+            family:
+              count(u.id)
+              |> filter(
+                is_nil(u.lifetime_membership_awarded_at) and
+                  u.id in subquery(family_sub)
+              )
+          }
+        )
+        |> Repo.one()
+      else
+        from(u in base,
+          select: %{
+            total: count(u.id),
+            lifetime:
+              count(u.id)
+              |> filter(not is_nil(u.lifetime_membership_awarded_at)),
+            family: type(^0, :integer)
+          }
+        )
+        |> Repo.one()
       end
 
     %{
@@ -4018,49 +4018,36 @@ defmodule Ysc.Accounts do
          {:subscription_start, direction, _index},
          now
        ) do
+    joined =
+      from u in query,
+        left_join:
+          css in subquery(current_active_subscription_start_subquery(now)),
+        on: css.user_id == u.id
+
     case direction do
       :asc ->
-        from u in query,
-          order_by: [
-            asc_nulls_last:
-              fragment(
-                """
-                (SELECT s.current_period_start
-                 FROM subscriptions s
-                 WHERE s.user_id = ?
-                   AND s.stripe_status IN ('active', 'trialing')
-                   AND s.current_period_end > ?
-                   AND (s.ends_at IS NULL OR s.ends_at > ?)
-                 ORDER BY s.current_period_start DESC
-                 LIMIT 1)
-                """,
-                u.id,
-                ^now,
-                ^now
-              )
-          ]
+        from [u, css] in joined,
+          order_by: [asc_nulls_last: css.subscription_start]
 
       :desc ->
-        from u in query,
-          order_by: [
-            desc_nulls_last:
-              fragment(
-                """
-                (SELECT s.current_period_start
-                 FROM subscriptions s
-                 WHERE s.user_id = ?
-                   AND s.stripe_status IN ('active', 'trialing')
-                   AND s.current_period_end > ?
-                   AND (s.ends_at IS NULL OR s.ends_at > ?)
-                 ORDER BY s.current_period_start DESC
-                 LIMIT 1)
-                """,
-                u.id,
-                ^now,
-                ^now
-              )
-          ]
+        from [u, css] in joined,
+          order_by: [desc_nulls_last: css.subscription_start]
     end
+  end
+
+  # MAX(current_period_start) per user matches "latest active subscription"
+  # (ORDER BY current_period_start DESC LIMIT 1) when multiple rows exist.
+  defp current_active_subscription_start_subquery(now) do
+    from(s in Subscription,
+      where: s.stripe_status in ["active", "trialing"],
+      where: s.current_period_end > ^now,
+      where: is_nil(s.ends_at) or s.ends_at > ^now,
+      group_by: s.user_id,
+      select: %{
+        user_id: s.user_id,
+        subscription_start: max(s.current_period_start)
+      }
+    )
   end
 
   defp restore_subscription_start_sort(meta, nil), do: meta

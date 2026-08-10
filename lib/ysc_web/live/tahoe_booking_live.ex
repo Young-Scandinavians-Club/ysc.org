@@ -1502,11 +1502,18 @@ defmodule YscWeb.TahoeBookingLive do
                   </div>
                   <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
                     <p class="text-xs font-semibold text-zinc-900 mb-2">
-                      Membership Limits:
+                      Room limits for your membership:
                     </p>
                     <div class="text-xs text-zinc-700 space-y-0.5">
-                      <p>Single: <strong>1 Room</strong> per booking</p>
-                      <p>Family/Lifetime: <strong>2 Rooms</strong> per booking</p>
+                      <p>
+                        Single membership: up to <strong>1 room</strong>
+                        per reservation
+                      </p>
+                      <p>
+                        Family membership (and lifetime members): up to
+                        <strong>2 rooms</strong>
+                        per reservation
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -3956,10 +3963,11 @@ defmodule YscWeb.TahoeBookingLive do
                           </tr>
                           <tr class="border-b border-zinc-100 hover:bg-white">
                             <td class="py-3 px-4 font-semibold">
-                              Membership Limits
+                              Room limits
                             </td>
                             <td class="py-3 px-4">
-                              Family/Lifetime: 2 rooms<br />Single: 1 room
+                              Single membership: 1 room per reservation<br />
+                              Family membership (and lifetime members): 2 rooms per reservation
                             </td>
                           </tr>
                           <tr class="hover:bg-white">
