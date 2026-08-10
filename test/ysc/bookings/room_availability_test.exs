@@ -1,5 +1,5 @@
 defmodule Ysc.Bookings.RoomAvailabilityTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: true
 
   alias Ysc.Bookings
   alias Ysc.Bookings.{Room, BookingLocker}

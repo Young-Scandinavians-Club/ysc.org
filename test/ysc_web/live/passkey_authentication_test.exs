@@ -2,7 +2,7 @@ defmodule YscWeb.PasskeyAuthenticationTest do
   @moduledoc """
   Comprehensive tests for passkey authentication flow.
   """
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures

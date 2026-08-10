@@ -277,9 +277,14 @@ defmodule Ysc.Avatars do
 
   # sobelow_skip ["Traversal.FileModule"]
   defp download_and_create_avatar(user, image_url, source) do
+    req_opts =
+      [receive_timeout: 15_000]
+      |> Keyword.merge(Application.get_env(:ysc, :avatar_oauth_req_opts, []))
+      |> Keyword.put(:max_redirects, 0)
+
     with :ok <- Ysc.Http.UrlFetchGuard.validate_url_for_server_fetch(image_url),
          {:ok, %Req.Response{status: 200, body: body}} <-
-           Req.get(image_url, max_redirects: 0, receive_timeout: 15_000) do
+           Req.get(image_url, req_opts) do
       do_store_oauth_avatar(user, image_url, source, body)
     else
       {:error, reason}

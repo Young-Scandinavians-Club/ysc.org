@@ -1,5 +1,5 @@
 defmodule YscWeb.AdminMediaLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures

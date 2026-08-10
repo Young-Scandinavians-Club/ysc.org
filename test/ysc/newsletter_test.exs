@@ -1,5 +1,5 @@
 defmodule Ysc.NewsletterTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: true
 
   alias Ysc.Newsletter
   alias Ysc.Newsletter.Edition

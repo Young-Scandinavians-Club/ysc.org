@@ -1,5 +1,5 @@
 defmodule Ysc.ExpenseReports.BankAccountTest do
-  use Ysc.DataCase
+  use Ysc.DataCase, async: true
 
   alias Ysc.ExpenseReports.BankAccount
   import Ysc.AccountsFixtures

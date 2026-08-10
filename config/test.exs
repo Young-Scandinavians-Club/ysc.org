@@ -129,6 +129,7 @@ config :ex_aws, :req_opts, connect_options: [protocols: [:http1]]
 config :ysc,
   geo_ip_s3_req_opts: [retry: false],
   avatar_s3_req_opts: [retry: false],
+  avatar_oauth_req_opts: [retry: false],
   event_photo_s3_req_opts: [retry: false],
   image_processor_s3_req_opts: [retry: false]
 

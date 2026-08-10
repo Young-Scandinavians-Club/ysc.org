@@ -503,11 +503,33 @@ defmodule Ysc.Payments do
   end
 
   defp insert_payment_method_resilient(user, attrs, mode) do
+    # A unique-constraint violation aborts the *entire* enclosing transaction
+    # at the SQL level, even though Ecto turns it into a changeset error --
+    # nesting a plain Repo.transaction/1 does NOT help here (unlike a real
+    # savepoint, DBConnection treats an already-open transaction as a
+    # passthrough and propagates failure to the outermost one; see the
+    # comment on Ledgers.process_refund/1 for the same gotcha). So when this
+    # runs inside the webhook handler's transaction, wrap the insert attempt
+    # in a real SQL SAVEPOINT: on conflict, roll back to it (undoing just the
+    # failed insert, not the whole transaction) before running the recovery
+    # lookup below -- otherwise that lookup would run against an
+    # already-aborted transaction and fail with `25P02
+    # in_failed_sql_transaction` instead of recovering.
+    in_transaction? = Repo.in_transaction?()
+
+    if in_transaction?, do: Repo.query!("SAVEPOINT insert_payment_method")
+
     case insert_payment_method(attrs) do
       {:ok, _} = ok ->
+        if in_transaction?,
+          do: Repo.query!("RELEASE SAVEPOINT insert_payment_method")
+
         ok
 
       {:error, reason} = error ->
+        if in_transaction?,
+          do: Repo.query!("ROLLBACK TO SAVEPOINT insert_payment_method")
+
         if duplicate_payment_method_error?(reason) do
           recover_payment_method_insert_conflict(user, attrs, mode)
         else
@@ -515,6 +537,10 @@ defmodule Ysc.Payments do
         end
     end
   end
+
+  @doc false
+  def insert_payment_method_resilient_for_test(user, attrs, mode),
+    do: insert_payment_method_resilient(user, attrs, mode)
 
   defp recover_payment_method_insert_conflict(user, attrs, mode) do
     provider = attrs.provider

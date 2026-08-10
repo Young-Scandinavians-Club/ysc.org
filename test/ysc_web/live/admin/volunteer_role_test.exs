@@ -10,7 +10,7 @@ defmodule YscWeb.VolunteerRoleTest do
   - Floating admin button visibility
   - Role management (assigning volunteer role via admin UI)
   """
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures

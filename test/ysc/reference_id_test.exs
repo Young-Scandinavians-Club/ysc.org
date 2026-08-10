@@ -1,5 +1,5 @@
 defmodule Ysc.ReferenceGeneratorTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   alias Ysc.ReferenceGenerator
 
   describe "generate_reference_id/1" do

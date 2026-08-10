@@ -2,7 +2,7 @@ defmodule Ysc.Accounts.PasskeyTest do
   @moduledoc """
   Tests for passkey-related functions in Accounts context.
   """
-  use Ysc.DataCase
+  use Ysc.DataCase, async: true
 
   import Ysc.AccountsFixtures
 

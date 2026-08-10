@@ -2,6 +2,7 @@ defmodule Ysc.PaymentsTest do
   use Ysc.DataCase, async: true
 
   alias Ysc.Payments
+  alias Ysc.Payments.PaymentMethod
   alias Ysc.Repo
   import Ecto.Query
   import Ysc.AccountsFixtures
@@ -370,6 +371,57 @@ defmodule Ysc.PaymentsTest do
           assert Keyword.has_key?(errors, :provider_id) or
                    Keyword.has_key?(errors, :provider)
       end
+    end
+  end
+
+  describe "insert_payment_method_resilient/3 conflict recovery" do
+    test "recovers from a unique-constraint conflict without poisoning the enclosing transaction" do
+      user = user_fixture()
+      pm_id = "pm_resilient_conflict_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: pm_id,
+        provider_customer_id: "cus_resilient_conflict",
+        type: :card,
+        provider_type: "card",
+        is_default: false
+      }
+
+      assert {:ok, winner} = Payments.insert_payment_method(attrs)
+
+      # Simulates the webhook handler's enclosing `Repo.transaction/1`: the
+      # loser of a race calls insert_payment_method_resilient/3 with attrs
+      # that now conflict with `winner`. Before the savepoint fix, the
+      # unique-constraint violation aborted this whole transaction at the SQL
+      # level, and the subsequent recovery lookup died with
+      # `25P02 in_failed_sql_transaction` instead of returning `winner`.
+      result =
+        Repo.transaction(fn ->
+          recovered =
+            Payments.insert_payment_method_resilient_for_test(
+              user,
+              attrs,
+              :sync
+            )
+
+          # Proves the transaction is still usable afterward.
+          reloaded = Repo.get!(PaymentMethod, winner.id)
+
+          {recovered, reloaded}
+        end)
+
+      assert {:ok, {{:ok, recovered}, reloaded}} = result
+      assert recovered.id == winner.id
+      assert reloaded.id == winner.id
+
+      assert Repo.aggregate(
+               from(pm in PaymentMethod,
+                 where: pm.user_id == ^user.id and pm.provider_id == ^pm_id
+               ),
+               :count
+             ) == 1
     end
   end
 
