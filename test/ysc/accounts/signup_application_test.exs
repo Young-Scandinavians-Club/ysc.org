@@ -30,6 +30,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true
       }
 
@@ -620,6 +621,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true,
         started: ~U[2000-01-01 00:00:00Z],
         completed: ~U[2000-01-02 00:00:00Z],
@@ -731,6 +733,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true
       }
 
@@ -859,6 +862,59 @@ defmodule Ysc.Accounts.SignupApplicationTest do
     end
   end
 
+  describe "scandinavia connection fields validation" do
+    test "requires at least one scandinavia connection field" do
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, %{
+          membership_type: "single",
+          membership_eligibility: ["born_in_scandinavia"],
+          birth_date: ~D[1990-01-01],
+          address: "123 Viking Way",
+          country: "USA",
+          city: "San Francisco",
+          postal_code: "94107",
+          place_of_birth: "Oslo",
+          citizenship: "Norwegian",
+          most_connected_nordic_country: "Norway",
+          agreed_to_bylaws: true
+        })
+
+      refute changeset.valid?
+
+      assert %{
+               link_to_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               lived_in_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               spoken_languages: [
+                 "Please fill in at least one of these three fields"
+               ]
+             } = errors_on(changeset)
+    end
+
+    test "accepts when only one scandinavia connection field is provided" do
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, %{
+          membership_type: "single",
+          membership_eligibility: ["born_in_scandinavia"],
+          birth_date: ~D[1990-01-01],
+          address: "123 Viking Way",
+          country: "USA",
+          city: "San Francisco",
+          postal_code: "94107",
+          place_of_birth: "Oslo",
+          citizenship: "Norwegian",
+          most_connected_nordic_country: "Norway",
+          link_to_scandinavia: "Born in Stockholm",
+          agreed_to_bylaws: true
+        })
+
+      assert changeset.valid?
+    end
+  end
+
   # Helper function to create valid application attributes
   defp valid_application_attrs(overrides \\ %{}) do
     Enum.into(overrides, %{
@@ -872,6 +928,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
       place_of_birth: "Oslo",
       citizenship: "Norwegian",
       most_connected_nordic_country: "Norway",
+      link_to_scandinavia: "Grandparents from Norway",
       agreed_to_bylaws: true
     })
   end

@@ -1609,6 +1609,15 @@ defmodule Ysc.AccountsTest do
       assert %{
                agreed_to_bylaws: [
                  "Please check the box to confirm you agree to the bylaws"
+               ],
+               link_to_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               lived_in_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               spoken_languages: [
+                 "Please fill in at least one of these three fields"
                ]
              } =
                errors_on(changeset)
@@ -1627,6 +1636,7 @@ defmodule Ysc.AccountsTest do
           place_of_birth: "SE",
           citizenship: "SE",
           most_connected_nordic_country: "SE",
+          link_to_scandinavia: "Born in Stockholm",
           agreed_to_bylaws: true
         })
 
@@ -3465,6 +3475,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3524,6 +3535,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3872,6 +3884,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3911,6 +3924,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
