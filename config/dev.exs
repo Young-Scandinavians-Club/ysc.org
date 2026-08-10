@@ -89,6 +89,10 @@ config :phoenix, :plug_init_mode, :runtime
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 
+# Chrome/ChromicPDF: give headless Chrome longer to cold-start on macOS.
+# If you don't need TV-poster generation locally, set CHROMIC_PDF_ENABLED=false in .env instead.
+config :ysc, ChromicPDF, session_pool: [init_timeout: 30_000]
+
 config :ex_aws,
   access_key_id: "minioadmin",
   secret_access_key: "minioadmin",

@@ -32,6 +32,7 @@ defmodule YscWeb.Emails.Notifier do
     "change_email" => YscWeb.Emails.ChangeEmail,
     "email_changed" => YscWeb.Emails.EmailChanged,
     "admin_application_submitted" => YscWeb.Emails.AdminApplicationSubmitted,
+    "admin_membership_report" => YscWeb.Emails.AdminMembershipReport,
     "conduct_violation_confirmation" =>
       YscWeb.Emails.ConductViolationConfirmation,
     "conduct_violation_board_notification" =>

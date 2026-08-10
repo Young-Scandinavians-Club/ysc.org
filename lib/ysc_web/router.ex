@@ -520,6 +520,7 @@ defmodule YscWeb.Router do
 
       # Membership monitoring
       live "/memberships", AdminMembershipsLive, :index
+      live "/memberships/report", AdminMembershipReportLive, :index
       live "/users/:id", AdminUsersLive, :edit
       live "/users/:id/review", AdminUsersLive, :review
       live "/users/:id/details", AdminUserDetailsLive, :profile
