@@ -176,6 +176,32 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert ec.available == :unlimited
       assert ec.at_capacity == false
     end
+
+    test "treats a tier with quantity 0 as unlimited", %{event: event} do
+      {:ok, zero_tier} =
+        Events.create_ticket_tier(%{
+          name: "Legacy unset quantity",
+          type: :paid,
+          price: Money.new(10, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      # The create/update changeset normalizes an incoming 0 to nil (treated
+      # as unlimited already), so a raw quantity: 0 row can only occur via
+      # legacy/imported data. Bypass the changeset with update_all to
+      # reproduce that on-disk state.
+      Repo.update_all(
+        from(tt in Ysc.Events.TicketTier, where: tt.id == ^zero_tier.id),
+        set: [quantity: 0]
+      )
+
+      assert {:ok, %{tiers: tiers}} =
+               BookingLocker.check_availability_with_lock(event.id)
+
+      assert %{available: :unlimited} =
+               Enum.find(tiers, &(&1.tier_id == zero_tier.id))
+    end
   end
 
   describe "atomic_booking/3 tier and capacity validation" do
