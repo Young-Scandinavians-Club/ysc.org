@@ -192,10 +192,12 @@ defmodule YscWeb.AuthController do
               user
             end
 
-          # Sync OAuth profile image asynchronously (non-blocking)
-          if image_url do
-            source = provider_to_avatar_source(provider)
+          # Sync OAuth profile image asynchronously (non-blocking).
+          # Only :google/:facebook are supported by Avatars.sync_oauth_avatar/3;
+          # other providers (e.g. :apple) don't expose a stable photo URL we sync.
+          source = image_url && provider_to_avatar_source(provider)
 
+          if source do
             Task.Supervisor.start_child(Ysc.TaskSupervisor, fn ->
               Ysc.Avatars.sync_oauth_avatar(updated_user, image_url, source)
             end)
@@ -236,5 +238,5 @@ defmodule YscWeb.AuthController do
 
   defp provider_to_avatar_source(:google), do: :google
   defp provider_to_avatar_source(:facebook), do: :facebook
-  defp provider_to_avatar_source(_), do: :upload
+  defp provider_to_avatar_source(_), do: nil
 end

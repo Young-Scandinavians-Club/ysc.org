@@ -132,4 +132,60 @@ defmodule YscWeb.AdminBadgeHelpersTest do
       assert AdminBadgeHelpers.event_state_badge_type(:unknown) == "default"
     end
   end
+
+  describe "newsletter_source_badge_type/1" do
+    test "maps known subscriber sources to badge colors" do
+      assert AdminBadgeHelpers.newsletter_source_badge_type("public_signup") ==
+               "green"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("newsletters_page") ==
+               "green"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("signup") == "green"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("user_registration") ==
+               "sky"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type(
+               "user_registration_linked"
+             ) == "sky"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("user_settings") ==
+               "sky"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("email_change") ==
+               "sky"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("admin_added") ==
+               "yellow"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("wp_migration") ==
+               "zinc"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type("hard_bounce") ==
+               "red"
+    end
+
+    test "defaults unrecognized or nil sources" do
+      assert AdminBadgeHelpers.newsletter_source_badge_type("something_new") ==
+               "default"
+
+      assert AdminBadgeHelpers.newsletter_source_badge_type(nil) == "default"
+    end
+  end
+
+  describe "newsletter_source_label/1" do
+    test "returns Unknown for nil or empty source" do
+      assert AdminBadgeHelpers.newsletter_source_label(nil) == "Unknown"
+      assert AdminBadgeHelpers.newsletter_source_label("") == "Unknown"
+    end
+
+    test "humanizes underscored source strings" do
+      assert AdminBadgeHelpers.newsletter_source_label("public_signup") ==
+               "Public signup"
+
+      assert AdminBadgeHelpers.newsletter_source_label("wp_migration") ==
+               "Wp migration"
+    end
+  end
 end

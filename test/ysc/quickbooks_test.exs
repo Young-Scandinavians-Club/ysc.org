@@ -236,19 +236,104 @@ defmodule Ysc.QuickbooksTest do
                Quickbooks.get_or_create_customer(user)
     end
 
-    test "returns error if display name is missing" do
-      # This test verifies that build_display_name returns nil when both names are empty
-      # Since first_name and last_name are required fields in the schema, we can't
-      # actually create a user with empty names. However, the build_display_name function
-      # handles this case by checking if both trimmed strings are empty.
-      #
-      # In practice, this error would only occur if the user data somehow had
-      # both first_name and last_name as nil or empty strings, which shouldn't
-      # happen due to schema validations. But the code handles it defensively.
-      #
-      # We'll skip this test since we can't create invalid user data due to validations.
-      # The build_display_name function is tested implicitly in other tests.
-      :ok
+    test "returns :missing_name when both first and last name are blank" do
+      user = user_fixture()
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{
+          quickbooks_customer_id: nil,
+          first_name: "",
+          last_name: ""
+        })
+        |> Repo.update!()
+
+      assert {:error, :missing_name} = Quickbooks.get_or_create_customer(user)
+    end
+
+    test "uses last name only when first name is blank" do
+      user = user_fixture()
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{
+          quickbooks_customer_id: nil,
+          first_name: "",
+          last_name: "Solo"
+        })
+        |> Repo.update!()
+
+      expect(ClientMock, :create_customer, fn params ->
+        assert params.display_name == "Solo"
+        {:ok, %{"Id" => "cust_last_only"}}
+      end)
+
+      assert {:ok, "cust_last_only"} = Quickbooks.get_or_create_customer(user)
+    end
+
+    test "uses first name only when last name is blank" do
+      user = user_fixture()
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{
+          quickbooks_customer_id: nil,
+          first_name: "Solo",
+          last_name: ""
+        })
+        |> Repo.update!()
+
+      expect(ClientMock, :create_customer, fn params ->
+        assert params.display_name == "Solo"
+        {:ok, %{"Id" => "cust_first_only"}}
+      end)
+
+      assert {:ok, "cust_first_only"} = Quickbooks.get_or_create_customer(user)
+    end
+
+    test "still returns customer id when persisting quickbooks_customer_id fails",
+         %{} do
+      user = user_fixture()
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{quickbooks_customer_id: nil, first_name: ""})
+        |> Repo.update!()
+
+      expect(ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "cust_unsaved"}}
+      end)
+
+      assert {:ok, "cust_unsaved"} = Quickbooks.get_or_create_customer(user)
+
+      # The customer was "created" in QuickBooks, but since the user's own
+      # first_name is blank, update_user_changeset fails validate_required
+      # and quickbooks_customer_id is never persisted locally.
+      reloaded = Repo.reload!(user)
+      assert reloaded.quickbooks_customer_id == nil
+    end
+
+    test "still returns retried customer id when persisting fails after duplicate-name retry" do
+      user = user_fixture()
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{quickbooks_customer_id: nil, first_name: ""})
+        |> Repo.update!()
+
+      expect(ClientMock, :create_customer, 1, fn _params ->
+        {:error, "Duplicate Name Exists Error"}
+      end)
+
+      expect(ClientMock, :create_customer, 1, fn _params ->
+        {:ok, %{"Id" => "cust_retry_unsaved"}}
+      end)
+
+      assert {:ok, "cust_retry_unsaved"} =
+               Quickbooks.get_or_create_customer(user)
+
+      reloaded = Repo.reload!(user)
+      assert reloaded.quickbooks_customer_id == nil
     end
   end
 
@@ -737,6 +822,187 @@ defmodule Ysc.QuickbooksTest do
                  quantity: 1,
                  unit_price: Decimal.new("3.00"),
                  refund_from_account_id: "uf"
+               })
+    end
+  end
+
+  describe "coverage — remaining branches" do
+    test "purchase sales receipt accepts a Decimal quantity directly" do
+      stub(ClientMock, :query_class_by_name, fn "Administration" ->
+        {:ok, "adm"}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        assert [line] = params.line
+        assert line.sales_item_line_detail.quantity == Decimal.new(2)
+        {:ok, %{"Id" => "sr_decimal_qty"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_purchase_sales_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: Decimal.new(2),
+                 unit_price: Decimal.new("5.00")
+               })
+    end
+
+    test "purchase sales receipt defaults line quantity to 1 for a non-integer, non-Decimal quantity" do
+      stub(ClientMock, :query_class_by_name, fn "Administration" ->
+        {:ok, "adm"}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        # total_amt must be derived from the same normalized (fallback) quantity
+        # sent in the line item, not the raw unnormalized "2" — otherwise the
+        # receipt total and the line item quantity would silently disagree.
+        assert params.total_amt == Decimal.new("5.00")
+        assert [line] = params.line
+        assert line.sales_item_line_detail.quantity == Decimal.new(1)
+        {:ok, %{"Id" => "sr_fallback_qty"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_purchase_sales_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: "2",
+                 unit_price: Decimal.new("5.00")
+               })
+    end
+
+    test "purchase sales receipt omits deposit account name when not provided" do
+      stub(ClientMock, :query_class_by_name, fn "Administration" ->
+        {:ok, "adm"}
+      end)
+
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        assert params.deposit_to_account_ref == %{value: "dep_no_name"}
+        {:ok, %{"Id" => "sr_dep_no_name"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_purchase_sales_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 1,
+                 unit_price: Decimal.new("5.00"),
+                 deposit_to_account_id: "dep_no_name"
+               })
+    end
+
+    test "refund receipt accepts a Decimal quantity directly" do
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
+        assert [line] = params.line
+        assert line.sales_item_line_detail.quantity == Decimal.new(2)
+        {:ok, %{"Id" => "rr_decimal_qty"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: Decimal.new(2),
+                 unit_price: Decimal.new("5.00"),
+                 refund_from_account_id: "uf"
+               })
+    end
+
+    test "refund receipt defaults line quantity to 1 for a non-integer, non-Decimal quantity" do
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
+        # total_amt must be derived from the same normalized (fallback) quantity
+        # sent in the line item, not the raw unnormalized "2".
+        assert params.total_amt == Decimal.new("5.00")
+        assert [line] = params.line
+        assert line.sales_item_line_detail.quantity == Decimal.new(1)
+        {:ok, %{"Id" => "rr_fallback_qty"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: "2",
+                 unit_price: Decimal.new("5.00"),
+                 refund_from_account_id: "uf"
+               })
+    end
+
+    test "refund sales receipt includes tax_code_ref, payment_method_id, and deposit account without a name" do
+      expect(ClientMock, :create_sales_receipt, fn params, _opts ->
+        assert [line] = params.line
+        assert line.sales_item_line_detail.tax_code_ref == %{value: "TAX1"}
+        assert params.payment_method_ref == %{value: "pm_ref"}
+        assert params.deposit_to_account_ref == %{value: "dep_ref"}
+        {:ok, %{"Id" => "sr_refund_opts"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_sales_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 1,
+                 unit_price: Decimal.new("5.00"),
+                 tax_code_ref: "TAX1",
+                 payment_method_id: "pm_ref",
+                 deposit_to_account_id: "dep_ref"
+               })
+    end
+
+    test "refund receipt includes class_ref, tax_code_ref, payment_method_id, txn_date, memo, and private_note" do
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
+        assert [line] = params.line
+
+        assert line.sales_item_line_detail.class_ref == %{
+                 value: "cls",
+                 name: "Class"
+               }
+
+        assert line.sales_item_line_detail.tax_code_ref == %{value: "TAX2"}
+        assert params.payment_method_ref == %{value: "pm_rr"}
+        assert params.txn_date == "2024-03-01"
+        assert params.memo == "Refund memo rr"
+        assert params.private_note == "Refund note rr"
+        {:ok, %{"Id" => "rr_full_opts"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 1,
+                 unit_price: Decimal.new("5.00"),
+                 refund_from_account_id: "uf",
+                 class_ref: %{value: "cls", name: "Class"},
+                 tax_code_ref: "TAX2",
+                 payment_method_id: "pm_rr",
+                 txn_date: ~D[2024-03-01],
+                 memo: "Refund memo rr",
+                 private_note: "Refund note rr"
+               })
+    end
+
+    test "client_module reads the configured :quickbooks_client outside of test env" do
+      previous_env = Application.fetch_env(:ysc, :environment)
+      Application.put_env(:ysc, :environment, "dev")
+
+      on_exit(fn ->
+        case previous_env do
+          {:ok, value} -> Application.put_env(:ysc, :environment, value)
+          :error -> Application.delete_env(:ysc, :environment)
+        end
+      end)
+
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        assert params.deposit_to_account_ref == %{value: "bank_env"}
+        {:ok, %{"Id" => "dep_env"}}
+      end)
+
+      assert {:ok, %{"Id" => "dep_env"}} =
+               Quickbooks.create_stripe_payout_deposit(%{
+                 bank_account_id: "bank_env",
+                 undeposited_funds_account_id: "uf_env",
+                 amount: 1.0
                })
     end
   end

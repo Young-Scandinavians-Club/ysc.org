@@ -675,6 +675,16 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     Date.add(date, days_until_monday)
   end
 
+  # Nearest Monday, from today, that falls within the seeded Summer season
+  # (May-Oct, matched by month/day only) and within the booking advance window.
+  defp next_summer_monday do
+    Date.utc_today()
+    |> Stream.iterate(&Date.add(&1, 1))
+    |> Enum.find(fn d ->
+      Date.day_of_week(d, :monday) == 1 and d.month in 5..10
+    end)
+  end
+
   defp first_saturday_on_or_after(date) do
     days_until_saturday = rem(13 - Date.day_of_week(date, :monday), 7)
     Date.add(date, days_until_saturday)
@@ -774,6 +784,133 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
     assert tooltips[Date.to_iso8601(winter_checkout)] =~
              "winter nights"
+  end
+
+  test "validate_modification_dates/3 builds its own snapshot when given a Booking directly",
+       %{user: user} do
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    new_checkin = Date.add(checkin, 7)
+    new_checkout = Date.add(checkout, 7)
+
+    assert :ok =
+             ModificationDateAvailability.validate_modification_dates(
+               booking,
+               new_checkin,
+               new_checkout
+             )
+  end
+
+  test "unsupported booking modes are rejected and fall back to the generic tooltip message",
+       %{user: user} do
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+    bad_booking = %{booking | booking_mode: :unsupported_mode}
+
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        bad_booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    new_checkin = Date.add(checkin, 7)
+    new_checkout = Date.add(checkout, 7)
+
+    assert {:error, :invalid_booking_mode} =
+             ModificationDateAvailability.validate_modification_dates(
+               snapshot,
+               new_checkin,
+               new_checkout
+             )
+
+    tooltips =
+      ModificationDateAvailability.checkout_date_tooltips(
+        bad_booking,
+        new_checkin,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons,
+        snapshot
+      )
+
+    assert tooltips[Date.to_iso8601(new_checkout)] ==
+             "The selected dates are not available"
+  end
+
+  test "checkout tooltips flag a buyout extension into another booked buyout as property_unavailable",
+       %{user: user} do
+    other_user =
+      user_fixture()
+      |> Ecto.Changeset.change(state: :active)
+      |> Repo.update!()
+
+    # Nearest upcoming midsummer Monday (season matching is month/day-only
+    # and recurs every year) so this stays clear of the seeded Winter season
+    # while still landing inside the booking advance window.
+    checkin = next_summer_monday()
+    checkout = Date.add(checkin, 2)
+    booking = complete_buyout_booking!(user, checkin, checkout)
+
+    overlapping_checkin = checkout
+    overlapping_checkout = Date.add(checkout, 2)
+
+    assert {:ok, _} =
+             BookingLocker.create_admin_booking(
+               %{
+                 user_id: other_user.id,
+                 property: :tahoe,
+                 checkin_date: overlapping_checkin,
+                 checkout_date: overlapping_checkout,
+                 booking_mode: :buyout,
+                 guests_count: 8,
+                 total_price: Money.new(1500, :USD)
+               },
+               skip_email: true,
+               skip_reminders: true
+             )
+
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    extended_checkout = Date.add(checkout, 1)
+
+    tooltips =
+      ModificationDateAvailability.checkout_date_tooltips(
+        booking,
+        checkin,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons,
+        snapshot
+      )
+
+    assert tooltips[Date.to_iso8601(extended_checkout)] ==
+             "The selected dates or guest count are not available"
+
+    assert {:error, :property_unavailable} =
+             ModificationDateAvailability.validate_modification_dates(
+               snapshot,
+               checkin,
+               extended_checkout
+             )
   end
 
   test "checkout tooltips block Saturday check-in except Sunday one-night", %{

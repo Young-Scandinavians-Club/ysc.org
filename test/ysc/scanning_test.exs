@@ -257,6 +257,57 @@ defmodule Ysc.ScanningTest do
       assert s1.id in ids
       assert s2.id in ids
     end
+
+    test "filters sessions by type when :type option is given" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, membership_session} =
+        Scanning.create_session(%{
+          name: "Membership",
+          type: :membership,
+          created_by_id: admin.id
+        })
+
+      {:ok, event_session} =
+        Scanning.create_session(%{
+          name: "Event",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      ids =
+        Scanning.list_sessions(type: :membership) |> Enum.map(& &1.id)
+
+      assert membership_session.id in ids
+      refute event_session.id in ids
+    end
+  end
+
+  describe "get_open_membership_sessions/0" do
+    test "returns open event_membership sessions across admins" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      open_session = event_membership_session_fixture(event, admin)
+
+      other_event = event_fixture(%{organizer_id: admin.id})
+      closed_session = event_membership_session_fixture(other_event, admin)
+      {:ok, _} = Scanning.close_session(closed_session.id)
+
+      other_admin = user_fixture(%{role: "admin"})
+      other_admin_event = event_fixture(%{organizer_id: other_admin.id})
+
+      other_admin_open_session =
+        event_membership_session_fixture(other_admin_event, other_admin)
+
+      ids = Scanning.get_open_membership_sessions() |> Enum.map(& &1.id)
+
+      assert open_session.id in ids
+      assert other_admin_open_session.id in ids
+      refute closed_session.id in ids
+    end
   end
 
   describe "get_open_session_for_event/2" do
@@ -437,6 +488,24 @@ defmodule Ysc.ScanningTest do
       assert session.event_id == event.id
       assert session.type == :event
       assert is_nil(session.closed_at)
+    end
+
+    test "returns an error changeset when creation attrs are invalid" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      assert {:error, changeset} =
+               Scanning.get_or_create_open_session_for_event(
+                 event.id,
+                 :event,
+                 %{
+                   type: :event,
+                   event_id: event.id,
+                   created_by_id: admin.id
+                 }
+               )
+
+      assert %{name: [_ | _]} = errors_on(changeset)
     end
   end
 
@@ -709,6 +778,41 @@ defmodule Ysc.ScanningTest do
       token = QrToken.sign_ticket("00000000000000000000000000")
 
       assert {:error, :invalid, _msg} = Scanning.process_scan(session, token)
+    end
+
+    test "checks in a confirmed ticket that has no associated order (legacy data)",
+         %{session: session, order: order} do
+      ticket = hd(order.tickets)
+
+      ticket
+      |> Ecto.Changeset.change(ticket_order_id: nil)
+      |> Ysc.Repo.update!()
+
+      token = QrToken.sign_ticket(ticket.id)
+
+      assert {:ok, {updated_ticket, _record}} =
+               Scanning.process_scan(session, token)
+
+      assert updated_ticket.checked_in == true
+    end
+
+    test "returns already_scanned without group data for an already checked-in ticket with no order",
+         %{session: session, order: order} do
+      ticket = hd(order.tickets)
+
+      ticket
+      |> Ysc.Events.Ticket.check_in_changeset()
+      |> Ysc.Repo.update!()
+      |> Ecto.Changeset.change(ticket_order_id: nil)
+      |> Ysc.Repo.update!()
+
+      token = QrToken.sign_ticket(ticket.id)
+
+      assert {:error, :already_scanned, info} =
+               Scanning.process_scan(session, token)
+
+      assert info.ticket_id == ticket.id
+      refute Map.has_key?(info, :unchecked_tickets)
     end
   end
 
@@ -1471,6 +1575,15 @@ defmodule Ysc.ScanningTest do
 
       refute Scanning.member_checked_in?(session.id, member.id)
     end
+
+    test "returns invalid error without check-in when the scanned user does not exist",
+         %{session: session} do
+      missing_user_id = Ecto.ULID.generate()
+      token = QrToken.sign_membership(missing_user_id)
+
+      assert {:error, :invalid, _message} =
+               Scanning.process_scan(session, token)
+    end
   end
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -1762,6 +1875,15 @@ defmodule Ysc.ScanningTest do
 
       assert after_checkin.checked_in? == true
     end
+
+    test "returns [] when the search matches no users", %{session: session} do
+      unique = System.unique_integer([:positive])
+
+      assert Scanning.search_users_for_checkin(
+               session.id,
+               "NoSuchPersonXYZ#{unique}"
+             ) == []
+    end
   end
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -1862,6 +1984,12 @@ defmodule Ysc.ScanningTest do
 
       assert {:ok, result} = Scanning.process_scan(session, token)
       assert DateTime.compare(result.member_since, user.inserted_at) == :eq
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "returns a valid Ecto query" do
+      assert %Ecto.Query{} = Scanning.ci_query_explain_query()
     end
   end
 end

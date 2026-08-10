@@ -114,6 +114,42 @@ defmodule Ysc.Accounts.AuthServiceTest do
       {:ok, auth_event} = AuthService.log_login_success(user, conn)
       assert auth_event.session_id == "12345"
     end
+
+    test "stores base64-encoded session_id from binary user_token" do
+      user = user_fixture()
+
+      conn =
+        mock_conn()
+        |> Plug.Test.init_test_session(%{})
+        |> put_session(:user_token, "raw-binary-token")
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+      assert auth_event.session_id == Base.encode64("raw-binary-token")
+    end
+
+    test "returns nil session_id when session is fetched but no user_token is set" do
+      user = user_fixture()
+      conn = mock_conn() |> Plug.Test.init_test_session(%{})
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+      assert auth_event.session_id == nil
+    end
+
+    test "returns error tuple when the auth event changeset is invalid" do
+      user = user_fixture()
+      # ip_address has a max length of 45; a bare (no comma) x-forwarded-for
+      # value longer than that survives get_client_ip untruncated and fails
+      # changeset validation.
+      too_long_ip = String.duplicate("9", 50)
+
+      conn =
+        mock_conn(%{
+          req_headers: [{"x-forwarded-for", too_long_ip}]
+        })
+
+      assert {:error, changeset} = AuthService.log_login_success(user, conn)
+      refute changeset.valid?
+    end
   end
 
   describe "log_login_failure/4" do
@@ -171,6 +207,20 @@ defmodule Ysc.Accounts.AuthServiceTest do
         AuthService.get_failed_attempts_for_ip("203.0.113.1", 15)
 
       assert length(recent_failures) >= 5
+    end
+
+    test "returns error tuple when the auth event changeset is invalid" do
+      too_long_ip = String.duplicate("8", 50)
+
+      conn =
+        mock_conn(%{
+          req_headers: [{"x-forwarded-for", too_long_ip}]
+        })
+
+      assert {:error, changeset} =
+               AuthService.log_login_failure("bad_ip@example.com", conn)
+
+      refute changeset.valid?
     end
   end
 
@@ -358,6 +408,14 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       assert auth_data.ip_address == "127.0.0.1"
     end
+
+    test "falls back to loopback IP, nil session, and nil headers for a plain map" do
+      auth_data = AuthService.extract_auth_data(%{})
+
+      assert auth_data.ip_address == "127.0.0.1"
+      assert auth_data.user_agent == nil
+      assert auth_data.session_id == nil
+    end
   end
 
   describe "check_suspicious_activity/1" do
@@ -541,6 +599,121 @@ defmodule Ysc.Accounts.AuthServiceTest do
       updated_event = Repo.get(AuthEvent, auth_event.id)
       assert "unusual_location" in updated_event.threat_indicators
       refute "new_device" in updated_event.threat_indicators
+    end
+
+    test "treats an identical geo location key as familiar even with a different IP" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        country: "US",
+        region: "California",
+        city: "San Francisco",
+        ip_address: "203.0.113.1"
+      })
+
+      updated_event =
+        check_activity_for(user, %{
+          ip_address: "198.51.100.9",
+          browser: "Chrome",
+          operating_system: "Windows",
+          device_type: "desktop",
+          country: "US",
+          region: "California",
+          city: "San Francisco"
+        })
+
+      refute "unusual_location" in (updated_event.threat_indicators || [])
+      refute "new_device" in (updated_event.threat_indicators || [])
+    end
+
+    test "falls back to IP family comparison when a geo-less recent event has a different IP" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        ip_address: "203.0.113.9"
+      })
+
+      updated_event =
+        check_activity_for(user, %{
+          ip_address: "203.0.113.50",
+          browser: "Chrome",
+          operating_system: "Windows",
+          device_type: "desktop",
+          country: "US",
+          region: "California",
+          city: "San Francisco"
+        })
+
+      refute "unusual_location" in (updated_event.threat_indicators || [])
+    end
+
+    test "flags unusual_location when a recent event has no IP address (unknown IP family)" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        ip_address: nil
+      })
+
+      updated_event =
+        check_activity_for(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "Windows",
+          device_type: "desktop"
+        })
+
+      assert "unusual_location" in (updated_event.threat_indicators || [])
+    end
+
+    test "compares IPv6-style addresses by their family prefix" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        ip_address: "2001:db8::1"
+      })
+
+      updated_event =
+        check_activity_for(user, %{
+          ip_address: "2001:db8::42",
+          browser: "Chrome",
+          operating_system: "Windows",
+          device_type: "desktop"
+        })
+
+      refute "unusual_location" in (updated_event.threat_indicators || [])
+    end
+
+    test "falls back to the raw value for non-IPv4/IPv6 formatted addresses" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        ip_address: "not-an-ip"
+      })
+
+      updated_event =
+        check_activity_for(user, %{
+          ip_address: "also-not-an-ip",
+          browser: "Chrome",
+          operating_system: "Windows",
+          device_type: "desktop"
+        })
+
+      assert "unusual_location" in (updated_event.threat_indicators || [])
     end
 
     test "does not flag familiar device and location on repeat login" do
@@ -1071,6 +1244,16 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert is_binary(result)
       assert String.valid?(result)
     end
+
+    test "cleans a truncated (incomplete) multi-byte UTF-8 sequence" do
+      # First two bytes of a 3-byte UTF-8 sequence (e.g. the Euro sign),
+      # missing its final byte.
+      incomplete = <<0xE2, 0x82>>
+      result = AuthService.sanitize_utf8(incomplete)
+
+      assert is_binary(result)
+      assert String.valid?(result)
+    end
   end
 
   describe "IP address extraction" do
@@ -1361,6 +1544,24 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       assert AuthService.enrich_auth_event_geo(auth_event) == auth_event
     end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "returns a valid Ecto query" do
+      assert %Ecto.Query{} = AuthService.ci_query_explain_query()
+    end
+  end
+
+  defp check_activity_for(user, login_attrs) do
+    {:ok, auth_event} =
+      user
+      |> AuthEvent.login_success_changeset(login_attrs)
+      |> Repo.insert()
+
+    {updated_event, _recent_events} =
+      AuthService.check_suspicious_activity(auth_event)
+
+    updated_event
   end
 
   defp insert_prior_login!(user, attrs) do

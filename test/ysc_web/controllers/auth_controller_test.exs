@@ -47,6 +47,49 @@ defmodule YscWeb.AuthControllerTest do
     }
   end
 
+  # Helper function to create OAuth auth struct with a profile image
+  defp build_oauth_auth_with_image(email, provider, image) do
+    %Ueberauth.Auth{
+      provider: provider,
+      info: %Ueberauth.Auth.Info{
+        email: email,
+        name: "Test User",
+        first_name: "Test",
+        last_name: "User",
+        image: image
+      },
+      credentials: %Ueberauth.Auth.Credentials{
+        token: "mock_token",
+        refresh_token: "mock_refresh",
+        expires: true,
+        expires_at: System.system_time(:second) + 3600
+      },
+      uid: "mock_uid_123"
+    }
+  end
+
+  # Helper function to create OAuth auth struct where email is only available
+  # via the raw provider payload (Ueberauth.Auth.Info doesn't expose :raw).
+  defp build_oauth_auth_raw_email(raw_key, email) do
+    %Ueberauth.Auth{
+      provider: :google,
+      info: %{
+        email: nil,
+        name: "Test User",
+        first_name: "Test",
+        last_name: "User",
+        raw: %{raw_key => email}
+      },
+      credentials: %Ueberauth.Auth.Credentials{
+        token: "mock_token",
+        refresh_token: "mock_refresh",
+        expires: true,
+        expires_at: System.system_time(:second) + 3600
+      },
+      uid: "mock_uid_123"
+    }
+  end
+
   # Helper function to create OAuth failure struct
   defp build_oauth_failure(error_message) do
     %Ueberauth.Failure{
@@ -59,6 +102,13 @@ defmodule YscWeb.AuthControllerTest do
         }
       ]
     }
+  end
+
+  describe "request/2" do
+    test "passes the connection through unchanged (Ueberauth handles the redirect)",
+         %{conn: conn} do
+      assert AuthController.request(conn, %{}) == conn
+    end
   end
 
   describe "callback/2 - OAuth failure scenarios" do
@@ -490,6 +540,274 @@ defmodule YscWeb.AuthControllerTest do
 
       assert redirected_to(conn)
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Facebook"
+    end
+  end
+
+  describe "callback/2 - email extraction fallbacks" do
+    test "extracts email from raw 'email' key when info.email is nil", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "rawemail@example.com"})
+      auth = build_oauth_auth_raw_email("email", user.email)
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Successfully signed in"
+    end
+
+    test "extracts email from raw 'emailAddress' key as a last resort", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "rawemailaddr@example.com"})
+      auth = build_oauth_auth_raw_email("emailAddress", user.email)
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Successfully signed in"
+    end
+  end
+
+  describe "callback/2 - OAuth avatar image handling" do
+    # These tests exercise `extract_image/1` + `provider_to_avatar_source/1` —
+    # the *decision* of whether/what to sync. All the URLs asserted "rejected"
+    # below resolve `image_url` to `nil` synchronously (no HTTPS scheme, or a
+    # blocked host), so `Ysc.Avatars.sync_oauth_avatar/3` never even starts and
+    # `Avatars.list_user_avatars/1` can be asserted immediately — no async
+    # task to await. The actual download/upload/processing pipeline for
+    # *accepted* URLs is exercised directly (and synchronously) against
+    # `Avatars.sync_oauth_avatar/3` in test/ysc/avatars_test.exs; this
+    # controller only decides whether to call it, so we don't duplicate that
+    # coverage here (it's also HTTPS-only, so retesting it end-to-end through
+    # the controller would need a local HTTPS test server just for that).
+    test "strips Google's size suffix from the profile image URL and syncs it",
+         %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "googleavatar@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :google,
+          "https://lh3.googleusercontent.com/a/photo=s96-c"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Successfully signed in"
+    end
+
+    test "syncs a non-Google provider's profile image as-is", %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "fbavatar@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :facebook,
+          "https://graph.facebook.com/photo.jpg"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Successfully signed in"
+    end
+
+    test "does not attempt to sync an avatar for the :apple provider", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "otheravatar@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :apple,
+          "https://appleid.apple.com/photo.jpg"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+
+      # Ysc.Avatars.sync_oauth_avatar/3 only supports :google/:facebook —
+      # provider_to_avatar_source/1 must resolve unsupported providers (like
+      # :apple) to `nil` so no task is started with an unsupported source
+      # (previously this passed `:upload`, which has no matching function
+      # clause in sync_oauth_avatar/3 and would crash the background task).
+      assert Ysc.Avatars.list_user_avatars(user) == []
+    end
+
+    test "ignores a non-HTTPS profile image URL", %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "httpavatar@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :google,
+          "http://example.com/photo=s96-c"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Successfully signed in"
+
+      assert Ysc.Avatars.list_user_avatars(user) == []
+    end
+
+    test "ignores a profile image URL pointing at localhost", %{conn: conn} do
+      user =
+        user_fixture(%{state: "active", email: "localhostavatar@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :google,
+          "https://localhost/photo.jpg"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
+    end
+
+    test "ignores a profile image URL pointing at a .localhost subdomain", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "sublocalhost@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :google,
+          "https://internal.localhost/photo.jpg"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
+    end
+
+    test "ignores a profile image URL pointing at a private 10.x address", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "tennet@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :google,
+          "https://10.0.0.5/photo.jpg"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
+    end
+
+    test "ignores a profile image URL pointing inside the 172.16/12 private range",
+         %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "privaterange@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :google,
+          "https://172.20.0.5/photo.jpg"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
+    end
+
+    test "accepts a profile image URL with a 172.x host outside the private range",
+         %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "publicrange@example.com"})
+
+      auth =
+        build_oauth_auth_with_image(
+          user.email,
+          :google,
+          "https://172.40.0.5/photo.jpg"
+        )
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Successfully signed in"
     end
   end
 end

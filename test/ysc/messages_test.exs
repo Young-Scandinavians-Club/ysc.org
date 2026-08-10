@@ -2157,6 +2157,213 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
       assert record.rendered_message == nil
     end
   end
+
+  describe "email_recipient_to_string/1 — binary recipient bypassing Swoosh normalization" do
+    test "uses the raw string when email.to is set directly to a binary",
+         %{mailer_config: mailer_config} do
+      Application.put_env(
+        :ysc,
+        Ysc.Mailer,
+        Keyword.merge(mailer_config, adapter: Ysc.Test.FailingSwooshAdapter)
+      )
+
+      key = "em_raw_binary_to_#{System.unique_integer([:positive])}"
+      parent = self()
+
+      ref =
+        :telemetry.attach(
+          "ysc-messages-raw-binary-to-#{key}",
+          [:ysc, :email, :send_failed],
+          fn _event, _measurements, metadata, _ ->
+            if metadata[:idempotency_key] == key do
+              send(parent, {:raw_binary_to, metadata})
+            end
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      assert {:error, "failed to send email"} =
+               Messages.run_send_message_idempotent(
+                 Swoosh.Email.new()
+                 |> Map.put(:to, "already-a-string@example.com")
+                 |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+                 |> Swoosh.Email.subject("Fail")
+                 |> Swoosh.Email.text_body("x"),
+                 %{
+                   message_type: :email,
+                   idempotency_key: key,
+                   message_template: "booking_confirmation",
+                   params: %{},
+                   email: "already-a-string@example.com",
+                   rendered_message: "<p>x</p>"
+                 }
+               )
+
+      assert_receive {:raw_binary_to, meta}, 3_000
+      assert meta.recipient == "already-a-string@example.com"
+    end
+  end
+
+  describe "ensure_email_delivery/1 edge cases" do
+    test "returns {:error, changeset} for invalid attrs" do
+      assert {:error, %Ecto.Changeset{valid?: false}} =
+               Messages.ensure_email_delivery(%{delivery_retry: true})
+    end
+
+    test "run_send_message_idempotent surfaces the changeset error via the with/else fallback" do
+      email =
+        Swoosh.Email.new()
+        |> Swoosh.Email.to("changeset-fallback@example.com")
+        |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+        |> Swoosh.Email.subject("Changeset fallback")
+        |> Swoosh.Email.text_body("x")
+
+      assert {:error, %Ecto.Changeset{valid?: false}} =
+               Messages.run_send_message_idempotent(email, %{
+                 delivery_retry: true
+               })
+    end
+
+    test "rejects a non-:email message_type without inserting a row" do
+      key = "em_mismatch_type_#{System.unique_integer([:positive])}"
+
+      assert {:error, %Ecto.Changeset{valid?: false} = changeset} =
+               Messages.ensure_email_delivery(%{
+                 message_type: :sms,
+                 idempotency_key: key,
+                 message_template: "booking_confirmation",
+                 delivery_retry: true
+               })
+
+      assert errors_on(changeset).message_type == ["must be :email"]
+
+      refute Ysc.Repo.get_by(MessageIdempotency,
+               idempotency_key: key,
+               message_template: "booking_confirmation"
+             )
+    end
+  end
+
+  describe "persist_email_failure/3 — no rendered content available" do
+    test "omits rendered_message from the update when there is nothing to render",
+         %{mailer_config: mailer_config} do
+      Application.put_env(
+        :ysc,
+        Ysc.Mailer,
+        Keyword.merge(mailer_config, adapter: Ysc.Test.FailingSwooshAdapter)
+      )
+
+      key = "em_no_rendered_#{System.unique_integer([:positive])}"
+
+      assert {:error, {:delivery, _delivery_error}} =
+               Messages.run_send_message_idempotent(
+                 Swoosh.Email.new()
+                 |> Swoosh.Email.to("no-content@example.com")
+                 |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+                 |> Swoosh.Email.subject("No content"),
+                 %{
+                   message_type: :email,
+                   idempotency_key: key,
+                   message_template: "booking_confirmation",
+                   params: %{},
+                   email: "no-content@example.com",
+                   delivery_retry: true
+                 }
+               )
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.rendered_message == nil
+    end
+  end
+
+  describe "mailer_deliver_failure_level/1 — non-smtp_unavailable reasons" do
+    setup %{mailer_config: mailer_config} do
+      prev_error = Application.get_env(:ysc, Ysc.Test.FailingSwooshAdapter, [])
+
+      on_exit(fn ->
+        Application.put_env(:ysc, Ysc.Test.FailingSwooshAdapter, prev_error)
+      end)
+
+      Application.put_env(
+        :ysc,
+        Ysc.Mailer,
+        Keyword.merge(mailer_config, adapter: Ysc.Test.FailingSwooshAdapter)
+      )
+
+      :ok
+    end
+
+    test "logs at warning for a non-smtp_unavailable atom reason" do
+      Application.put_env(:ysc, Ysc.Test.FailingSwooshAdapter, error: :timeout)
+
+      key = "em_atom_reason_#{System.unique_integer([:positive])}"
+
+      email =
+        Swoosh.Email.new()
+        |> Swoosh.Email.to("atom-reason@example.com")
+        |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+        |> Swoosh.Email.subject("Atom reason")
+        |> Swoosh.Email.text_body("x")
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:error, "failed to send email"} =
+                   Messages.run_send_message_idempotent(email, %{
+                     message_type: :email,
+                     idempotency_key: key,
+                     message_template: "booking_confirmation",
+                     params: %{},
+                     email: "atom-reason@example.com",
+                     rendered_message: "<p>x</p>"
+                   })
+        end)
+
+      assert log =~ "[warning]"
+    end
+
+    test "logs at error level for a non-atom, non-recognized reason" do
+      Application.put_env(
+        :ysc,
+        Ysc.Test.FailingSwooshAdapter,
+        error: "some unexpected string reason"
+      )
+
+      key = "em_string_reason_#{System.unique_integer([:positive])}"
+
+      email =
+        Swoosh.Email.new()
+        |> Swoosh.Email.to("string-reason@example.com")
+        |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+        |> Swoosh.Email.subject("String reason")
+        |> Swoosh.Email.text_body("x")
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:error, "failed to send email"} =
+                   Messages.run_send_message_idempotent(email, %{
+                     message_type: :email,
+                     idempotency_key: key,
+                     message_template: "booking_confirmation",
+                     params: %{},
+                     email: "string-reason@example.com",
+                     rendered_message: "<p>x</p>"
+                   })
+        end)
+
+      assert log =~ "[error]"
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "builds a runnable Ecto query for CI query-plan diagnostics" do
+      query = Messages.ci_query_explain_query()
+
+      assert %Ecto.Query{} = query
+      assert Ysc.Repo.all(query) == []
+    end
+  end
 end
 
 defmodule Ysc.MessagesTest.FlowrouteTestRaise do
