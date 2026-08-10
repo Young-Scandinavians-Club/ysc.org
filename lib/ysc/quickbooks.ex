@@ -97,15 +97,18 @@ defmodule Ysc.Quickbooks do
   end
 
   defp do_create_purchase_sales_receipt(params, opts) do
-    total_amt = Decimal.mult(Decimal.new(params.quantity), params.unit_price)
-
-    # Convert quantity to Decimal if it's not already
+    # Convert quantity to Decimal if it's not already, falling back to 1 for
+    # anything Decimal.new/1 can't accept directly (e.g. a float). total_amt
+    # must be derived from this same normalized value so it never diverges
+    # from the quantity actually sent in sales_item_line_detail below.
     quantity =
       case params.quantity do
         %Decimal{} = qty -> qty
         qty when is_integer(qty) -> Decimal.new(qty)
         _ -> Decimal.new(1)
       end
+
+    total_amt = Decimal.mult(quantity, params.unit_price)
 
     sales_item_detail = %{
       item_ref: %{value: params.item_id},
@@ -338,15 +341,19 @@ defmodule Ysc.Quickbooks do
   def create_refund_receipt(params, opts \\ []) do
     # RefundReceipts use positive amounts - the transaction type determines direction
     unit_price = Decimal.abs(params.unit_price)
-    total_amt = Decimal.mult(Decimal.new(params.quantity), unit_price)
 
-    # Convert quantity to Decimal if it's not already
+    # Convert quantity to Decimal if it's not already, falling back to 1 for
+    # anything Decimal.new/1 can't accept directly (e.g. a float). total_amt
+    # must be derived from this same normalized value so it never diverges
+    # from the quantity actually sent in sales_item_line_detail below.
     quantity =
       case params.quantity do
         %Decimal{} = qty -> qty
         qty when is_integer(qty) -> Decimal.new(qty)
         _ -> Decimal.new(1)
       end
+
+    total_amt = Decimal.mult(quantity, unit_price)
 
     sales_item_detail = %{
       item_ref: %{value: params.item_id},

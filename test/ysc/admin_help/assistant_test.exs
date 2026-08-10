@@ -1,31 +1,11 @@
-defmodule Ysc.AdminHelp.AssistantTest.ScriptedClient do
-  @moduledoc false
-
-  # Test double for `Ysc.OpenRouter` that pops a queued response per call, so
-  # a test can script exactly what each chat turn (finder / locate / clarify /
-  # follow-up) returns. Responses live in the *process dictionary* of the
-  # calling test process — `Assistant` calls this synchronously in-process
-  # (no spawn), so `Process.put/2` from the test body is visible here.
-  def do_chat(_messages, _config) do
-    case Process.get(:scripted_responses) do
-      [next | rest] ->
-        Process.put(:scripted_responses, rest)
-        next
-
-      _ ->
-        {:ok, Jason.encode!(%{"answer" => "fallback", "suggested_step" => nil})}
-    end
-  end
-end
-
 defmodule Ysc.AdminHelp.AssistantTest do
   # Mutates the global :open_router app env — must not run concurrently with
   # other tests that read or mutate it.
   use ExUnit.Case, async: false
 
   alias Ysc.AdminHelp.Assistant
-  alias Ysc.AdminHelp.AssistantTest.ScriptedClient
   alias Ysc.AdminHelpRateLimit
+  alias Ysc.Test.ScriptedOpenRouterClient, as: ScriptedClient
   alias YscWeb.AdminHelp.Guides.PublishPost
   alias YscWeb.AdminHelp.Registry
 

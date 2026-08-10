@@ -2226,16 +2226,23 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
                })
     end
 
-    test "returns :delivery_record_not_found when the inserted row doesn't match the email-only lookup" do
+    test "rejects a non-:email message_type without inserting a row" do
       key = "em_mismatch_type_#{System.unique_integer([:positive])}"
 
-      assert {:error, :delivery_record_not_found} =
+      assert {:error, %Ecto.Changeset{valid?: false} = changeset} =
                Messages.ensure_email_delivery(%{
                  message_type: :sms,
                  idempotency_key: key,
                  message_template: "booking_confirmation",
                  delivery_retry: true
                })
+
+      assert errors_on(changeset).message_type == ["must be :email"]
+
+      refute Ysc.Repo.get_by(MessageIdempotency,
+               idempotency_key: key,
+               message_template: "booking_confirmation"
+             )
     end
   end
 

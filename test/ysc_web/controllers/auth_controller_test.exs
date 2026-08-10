@@ -584,6 +584,17 @@ defmodule YscWeb.AuthControllerTest do
   end
 
   describe "callback/2 - OAuth avatar image handling" do
+    # These tests exercise `extract_image/1` + `provider_to_avatar_source/1` —
+    # the *decision* of whether/what to sync. All the URLs asserted "rejected"
+    # below resolve `image_url` to `nil` synchronously (no HTTPS scheme, or a
+    # blocked host), so `Ysc.Avatars.sync_oauth_avatar/3` never even starts and
+    # `Avatars.list_user_avatars/1` can be asserted immediately — no async
+    # task to await. The actual download/upload/processing pipeline for
+    # *accepted* URLs is exercised directly (and synchronously) against
+    # `Avatars.sync_oauth_avatar/3` in test/ysc/avatars_test.exs; this
+    # controller only decides whether to call it, so we don't duplicate that
+    # coverage here (it's also HTTPS-only, so retesting it end-to-end through
+    # the controller would need a local HTTPS test server just for that).
     test "strips Google's size suffix from the profile image URL and syncs it",
          %{conn: conn} do
       user = user_fixture(%{state: "active", email: "googleavatar@example.com"})
@@ -631,7 +642,7 @@ defmodule YscWeb.AuthControllerTest do
                "Successfully signed in"
     end
 
-    test "defaults to :upload avatar source for unrecognized providers", %{
+    test "does not attempt to sync an avatar for the :apple provider", %{
       conn: conn
     } do
       user = user_fixture(%{state: "active", email: "otheravatar@example.com"})
@@ -651,6 +662,13 @@ defmodule YscWeb.AuthControllerTest do
         |> AuthController.callback(%{})
 
       assert redirected_to(conn)
+
+      # Ysc.Avatars.sync_oauth_avatar/3 only supports :google/:facebook —
+      # provider_to_avatar_source/1 must resolve unsupported providers (like
+      # :apple) to `nil` so no task is started with an unsupported source
+      # (previously this passed `:upload`, which has no matching function
+      # clause in sync_oauth_avatar/3 and would crash the background task).
+      assert Ysc.Avatars.list_user_avatars(user) == []
     end
 
     test "ignores a non-HTTPS profile image URL", %{conn: conn} do
@@ -674,6 +692,8 @@ defmodule YscWeb.AuthControllerTest do
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
                "Successfully signed in"
+
+      assert Ysc.Avatars.list_user_avatars(user) == []
     end
 
     test "ignores a profile image URL pointing at localhost", %{conn: conn} do
@@ -695,6 +715,7 @@ defmodule YscWeb.AuthControllerTest do
         |> AuthController.callback(%{})
 
       assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
     end
 
     test "ignores a profile image URL pointing at a .localhost subdomain", %{
@@ -717,6 +738,7 @@ defmodule YscWeb.AuthControllerTest do
         |> AuthController.callback(%{})
 
       assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
     end
 
     test "ignores a profile image URL pointing at a private 10.x address", %{
@@ -739,6 +761,7 @@ defmodule YscWeb.AuthControllerTest do
         |> AuthController.callback(%{})
 
       assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
     end
 
     test "ignores a profile image URL pointing inside the 172.16/12 private range",
@@ -760,6 +783,7 @@ defmodule YscWeb.AuthControllerTest do
         |> AuthController.callback(%{})
 
       assert redirected_to(conn)
+      assert Ysc.Avatars.list_user_avatars(user) == []
     end
 
     test "accepts a profile image URL with a 172.x host outside the private range",

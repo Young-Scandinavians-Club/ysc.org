@@ -614,8 +614,8 @@ defmodule Ysc.Accounts.AuthServiceTest do
         ip_address: "203.0.113.1"
       })
 
-      {:ok, auth_event} =
-        AuthEvent.login_success_changeset(user, %{
+      updated_event =
+        check_activity_for(user, %{
           ip_address: "198.51.100.9",
           browser: "Chrome",
           operating_system: "Windows",
@@ -624,10 +624,6 @@ defmodule Ysc.Accounts.AuthServiceTest do
           region: "California",
           city: "San Francisco"
         })
-        |> Repo.insert()
-
-      {updated_event, _recent_events} =
-        AuthService.check_suspicious_activity(auth_event)
 
       refute "unusual_location" in (updated_event.threat_indicators || [])
       refute "new_device" in (updated_event.threat_indicators || [])
@@ -643,8 +639,8 @@ defmodule Ysc.Accounts.AuthServiceTest do
         ip_address: "203.0.113.9"
       })
 
-      {:ok, auth_event} =
-        AuthEvent.login_success_changeset(user, %{
+      updated_event =
+        check_activity_for(user, %{
           ip_address: "203.0.113.50",
           browser: "Chrome",
           operating_system: "Windows",
@@ -653,10 +649,6 @@ defmodule Ysc.Accounts.AuthServiceTest do
           region: "California",
           city: "San Francisco"
         })
-        |> Repo.insert()
-
-      {updated_event, _recent_events} =
-        AuthService.check_suspicious_activity(auth_event)
 
       refute "unusual_location" in (updated_event.threat_indicators || [])
     end
@@ -671,17 +663,13 @@ defmodule Ysc.Accounts.AuthServiceTest do
         ip_address: nil
       })
 
-      {:ok, auth_event} =
-        AuthEvent.login_success_changeset(user, %{
+      updated_event =
+        check_activity_for(user, %{
           ip_address: "203.0.113.1",
           browser: "Chrome",
           operating_system: "Windows",
           device_type: "desktop"
         })
-        |> Repo.insert()
-
-      {updated_event, _recent_events} =
-        AuthService.check_suspicious_activity(auth_event)
 
       assert "unusual_location" in (updated_event.threat_indicators || [])
     end
@@ -696,17 +684,13 @@ defmodule Ysc.Accounts.AuthServiceTest do
         ip_address: "2001:db8::1"
       })
 
-      {:ok, auth_event} =
-        AuthEvent.login_success_changeset(user, %{
+      updated_event =
+        check_activity_for(user, %{
           ip_address: "2001:db8::42",
           browser: "Chrome",
           operating_system: "Windows",
           device_type: "desktop"
         })
-        |> Repo.insert()
-
-      {updated_event, _recent_events} =
-        AuthService.check_suspicious_activity(auth_event)
 
       refute "unusual_location" in (updated_event.threat_indicators || [])
     end
@@ -721,17 +705,13 @@ defmodule Ysc.Accounts.AuthServiceTest do
         ip_address: "not-an-ip"
       })
 
-      {:ok, auth_event} =
-        AuthEvent.login_success_changeset(user, %{
+      updated_event =
+        check_activity_for(user, %{
           ip_address: "also-not-an-ip",
           browser: "Chrome",
           operating_system: "Windows",
           device_type: "desktop"
         })
-        |> Repo.insert()
-
-      {updated_event, _recent_events} =
-        AuthService.check_suspicious_activity(auth_event)
 
       assert "unusual_location" in (updated_event.threat_indicators || [])
     end
@@ -1570,6 +1550,18 @@ defmodule Ysc.Accounts.AuthServiceTest do
     test "returns a valid Ecto query" do
       assert %Ecto.Query{} = AuthService.ci_query_explain_query()
     end
+  end
+
+  defp check_activity_for(user, login_attrs) do
+    {:ok, auth_event} =
+      user
+      |> AuthEvent.login_success_changeset(login_attrs)
+      |> Repo.insert()
+
+    {updated_event, _recent_events} =
+      AuthService.check_suspicious_activity(auth_event)
+
+    updated_event
   end
 
   defp insert_prior_login!(user, attrs) do

@@ -1906,6 +1906,31 @@ defmodule Ysc.ExpenseReportsTest do
       # reimbursement_method is neither "bank_transfer" nor "check".
       assert errors.reimbursement_method == ["can't be blank"]
     end
+
+    test "a non-blank reimbursement_method outside bank_transfer/check fails schema inclusion but not the custom validators",
+         %{user: user} do
+      {:error, changeset} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Test",
+            "reimbursement_method" => "cash"
+          },
+          user
+        )
+
+      refute changeset.valid?
+      errors = errors_on(changeset)
+
+      # validate_inclusion/3 in ExpenseReport.submission_changeset/3 rejects
+      # "cash" outright; ExpenseReports.validate_reimbursement_setup/2's
+      # `_ -> changeset` fallback (neither "bank_transfer" nor "check") never
+      # runs the bank-account/address validators, so those keys stay absent.
+      assert errors.reimbursement_method == ["is invalid"]
+      refute Map.has_key?(errors, :bank_account_id)
+      refute Map.has_key?(errors, :address_id)
+    end
   end
 
   describe "get_decrypted_bank_account/2 and get_decrypted_bank_account!/2" do

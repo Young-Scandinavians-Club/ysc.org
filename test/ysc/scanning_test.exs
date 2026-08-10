@@ -296,9 +296,16 @@ defmodule Ysc.ScanningTest do
       closed_session = event_membership_session_fixture(other_event, admin)
       {:ok, _} = Scanning.close_session(closed_session.id)
 
+      other_admin = user_fixture(%{role: "admin"})
+      other_admin_event = event_fixture(%{organizer_id: other_admin.id})
+
+      other_admin_open_session =
+        event_membership_session_fixture(other_admin_event, other_admin)
+
       ids = Scanning.get_open_membership_sessions() |> Enum.map(& &1.id)
 
       assert open_session.id in ids
+      assert other_admin_open_session.id in ids
       refute closed_session.id in ids
     end
   end

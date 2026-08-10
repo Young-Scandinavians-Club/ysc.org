@@ -29,12 +29,32 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
           current_user: admin
         })
 
-      assert html =~ "Grant Tickets"
-      assert html =~ "Search by name or email"
-      assert html =~ "Quantity"
-      assert html =~ "Override capacity limits"
-      assert html =~ "Migration override"
-      assert html =~ "Send ticket confirmation email"
+      # render_component/2 returns a static HTML string (no connected
+      # LiveView process), so has_element?/3 doesn't apply here — LazyHTML
+      # gives the same DOM-selector precision for static markup, matching
+      # the pattern already used for rendered HTML in
+      # test/ysc_web/emails/all_email_templates_test.exs.
+      doc = LazyHTML.from_document(html)
+
+      assert doc |> LazyHTML.query("#ticket-grant-form") |> Enum.any?()
+
+      assert doc
+             |> LazyHTML.query("input[name=user_search]")
+             |> Enum.any?()
+
+      assert doc |> LazyHTML.query("#ticket_grant_quantity") |> Enum.any?()
+
+      assert doc
+             |> LazyHTML.query("#ticket_grant_skip_capacity[type=checkbox]")
+             |> Enum.any?()
+
+      assert doc
+             |> LazyHTML.query("#ticket_grant_skip_sale_guards[type=checkbox]")
+             |> Enum.any?()
+
+      assert doc
+             |> LazyHTML.query("#ticket_grant_send_email[type=checkbox]")
+             |> Enum.any?()
     end
   end
 
@@ -373,7 +393,11 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
           socket
         )
 
-      assert Phoenix.Flash.get(socket.assigns.flash, :error) =~ "tier"
+      # Exact match (not a broad "tier" substring) so this test uniquely
+      # verifies the :invalid_ticket_tier branch of grant_error_message/1
+      # rather than any other tier-related error the form can surface.
+      assert Phoenix.Flash.get(socket.assigns.flash, :error) ==
+               "Invalid ticket tier."
     end
   end
 end

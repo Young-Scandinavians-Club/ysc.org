@@ -133,8 +133,28 @@ defmodule Ysc.Messages do
       |> Map.put(:delivery_status, :pending)
       |> Map.put(:delivery_attempts, 0)
 
+    changeset =
+      MessageIdempotency.changeset(%MessageIdempotency{}, delivery_attrs)
+
+    # find_email_delivery/1 only ever looks up message_type: :email rows, so
+    # anything else would insert a row this function could never return —
+    # reject it up front instead of leaving an orphaned idempotency entry.
+    case Ecto.Changeset.get_field(changeset, :message_type) do
+      :email ->
+        insert_email_delivery(changeset, attrs)
+
+      nil ->
+        {:error, changeset}
+
+      _other ->
+        {:error,
+         Ecto.Changeset.add_error(changeset, :message_type, "must be :email")}
+    end
+  end
+
+  defp insert_email_delivery(changeset, attrs) do
     case Repo.insert(
-           MessageIdempotency.changeset(%MessageIdempotency{}, delivery_attrs),
+           changeset,
            on_conflict: :nothing,
            conflict_target: [:message_type, :idempotency_key, :message_template]
          ) do

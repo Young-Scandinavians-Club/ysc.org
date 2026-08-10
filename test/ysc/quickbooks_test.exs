@@ -853,7 +853,10 @@ defmodule Ysc.QuickbooksTest do
       end)
 
       expect(ClientMock, :create_sales_receipt, fn params, _opts ->
-        assert params.total_amt == Decimal.new("10.00")
+        # total_amt must be derived from the same normalized (fallback) quantity
+        # sent in the line item, not the raw unnormalized "2" — otherwise the
+        # receipt total and the line item quantity would silently disagree.
+        assert params.total_amt == Decimal.new("5.00")
         assert [line] = params.line
         assert line.sales_item_line_detail.quantity == Decimal.new(1)
         {:ok, %{"Id" => "sr_fallback_qty"}}
@@ -907,6 +910,9 @@ defmodule Ysc.QuickbooksTest do
 
     test "refund receipt defaults line quantity to 1 for a non-integer, non-Decimal quantity" do
       expect(ClientMock, :create_refund_receipt, fn params, _opts ->
+        # total_amt must be derived from the same normalized (fallback) quantity
+        # sent in the line item, not the raw unnormalized "2".
+        assert params.total_amt == Decimal.new("5.00")
         assert [line] = params.line
         assert line.sales_item_line_detail.quantity == Decimal.new(1)
         {:ok, %{"Id" => "rr_fallback_qty"}}
@@ -977,9 +983,15 @@ defmodule Ysc.QuickbooksTest do
     end
 
     test "client_module reads the configured :quickbooks_client outside of test env" do
-      previous_env = Application.get_env(:ysc, :environment)
+      previous_env = Application.fetch_env(:ysc, :environment)
       Application.put_env(:ysc, :environment, "dev")
-      on_exit(fn -> Application.put_env(:ysc, :environment, previous_env) end)
+
+      on_exit(fn ->
+        case previous_env do
+          {:ok, value} -> Application.put_env(:ysc, :environment, value)
+          :error -> Application.delete_env(:ysc, :environment)
+        end
+      end)
 
       expect(ClientMock, :create_deposit, fn params, _opts ->
         assert params.deposit_to_account_ref == %{value: "bank_env"}
