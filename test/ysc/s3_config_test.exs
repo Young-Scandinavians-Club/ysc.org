@@ -50,6 +50,23 @@ defmodule Ysc.S3ConfigTest do
                  :avatars
                )
     end
+
+    test "allows a malformed URL (no parseable host) when custom domain flag is on" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+
+      on_exit(fn ->
+        if previous_flag == nil do
+          Application.delete_env(:ysc, :s3_use_custom_domain)
+        else
+          Application.put_env(:ysc, :s3_use_custom_domain, previous_flag)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+
+      assert :ok ==
+               S3Config.assert_direct_upload_url!("not-a-url", :media)
+    end
   end
 
   describe "S3_USE_CUSTOM_DOMAIN (s3_use_custom_domain)" do
@@ -183,6 +200,43 @@ defmodule Ysc.S3ConfigTest do
       )
 
       refute S3Config.include_tigris_virtual_host_in_csp?()
+    end
+
+    test "uses trimmed_nonempty_public_url check when custom domain flag is on" do
+      keys = [
+        :s3_use_custom_domain,
+        :s3_media_public_url,
+        :s3_avatars_public_url,
+        :s3_expense_reports_public_url
+      ]
+
+      previous = Enum.map(keys, &Application.get_env(:ysc, &1))
+
+      on_exit(fn ->
+        Enum.zip(keys, previous)
+        |> Enum.each(fn {k, v} ->
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
+        end)
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+      Application.put_env(:ysc, :s3_media_public_url, "https://assets.example.com")
+      Application.put_env(:ysc, :s3_avatars_public_url, "https://avatars.example.com")
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "https://expenses.example.com"
+      )
+
+      refute S3Config.include_tigris_virtual_host_in_csp?()
+
+      # Whitespace-only is treated as unset even though the flag is on, so
+      # not all three are configured.
+      Application.put_env(:ysc, :s3_avatars_public_url, "   ")
+      assert S3Config.include_tigris_virtual_host_in_csp?()
     end
 
     test "is true when env URLs are only fly.storage hosts (sandbox-style)" do
@@ -710,6 +764,403 @@ defmodule Ysc.S3ConfigTest do
     test "returns configured or default aws credential keys" do
       assert is_binary(S3Config.aws_access_key_id())
       assert is_binary(S3Config.aws_secret_access_key())
+    end
+  end
+
+  describe "storage_csp_connect_sources/0 additional branches" do
+    test "uses trimmed_nonempty_public_url check and drops whitespace-only URLs when custom domain flag is on" do
+      keys = [
+        :s3_use_custom_domain,
+        :s3_media_public_url,
+        :s3_avatars_public_url,
+        :s3_expense_reports_public_url
+      ]
+
+      previous = Enum.map(keys, &Application.get_env(:ysc, &1))
+
+      on_exit(fn ->
+        Enum.zip(keys, previous)
+        |> Enum.each(fn {k, v} ->
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
+        end)
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+      Application.put_env(:ysc, :s3_media_public_url, "https://assets.example.com")
+      Application.put_env(:ysc, :s3_avatars_public_url, "   ")
+      Application.delete_env(:ysc, :s3_expense_reports_public_url)
+
+      sources = S3Config.storage_csp_connect_sources()
+
+      assert "https://assets.example.com" in sources
+      assert length(sources) == 1
+    end
+
+    test "includes a non-default port in the connect origin" do
+      previous = Application.get_env(:ysc, :s3_media_public_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_media_public_url)
+        else
+          Application.put_env(:ysc, :s3_media_public_url, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_media_public_url,
+        "https://assets.example.com:8443"
+      )
+
+      assert "https://assets.example.com:8443" in S3Config.storage_csp_connect_sources()
+    end
+
+    test "drops a public URL without a parseable scheme/host" do
+      previous = Application.get_env(:ysc, :s3_media_public_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_media_public_url)
+        else
+          Application.put_env(:ysc, :s3_media_public_url, previous)
+        end
+      end)
+
+      # No scheme, so custom_public_base_url/1 accepts it (non-empty, not a
+      # Tigris host) but csp_connect_origin/1 cannot derive an origin from it.
+      Application.put_env(:ysc, :s3_media_public_url, "assets.example.com")
+
+      refute Enum.any?(
+               S3Config.storage_csp_connect_sources(),
+               &String.contains?(&1, "assets.example.com")
+             )
+    end
+  end
+
+  describe "upload_url/0 with S3_USE_CUSTOM_DOMAIN" do
+    test "uses the media public URL verbatim when the flag is true" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+      previous_pub = Application.get_env(:ysc, :s3_media_public_url)
+
+      on_exit(fn ->
+        if previous_flag == nil do
+          Application.delete_env(:ysc, :s3_use_custom_domain)
+        else
+          Application.put_env(:ysc, :s3_use_custom_domain, previous_flag)
+        end
+
+        if previous_pub == nil do
+          Application.delete_env(:ysc, :s3_media_public_url)
+        else
+          Application.put_env(:ysc, :s3_media_public_url, previous_pub)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+      Application.put_env(:ysc, :s3_media_public_url, "https://assets.ysc.org")
+
+      assert S3Config.upload_url() == "https://assets.ysc.org"
+    end
+
+    test "raises when the flag is true but the media public URL is missing" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+      previous_pub = Application.get_env(:ysc, :s3_media_public_url)
+
+      on_exit(fn ->
+        if previous_flag == nil do
+          Application.delete_env(:ysc, :s3_use_custom_domain)
+        else
+          Application.put_env(:ysc, :s3_use_custom_domain, previous_flag)
+        end
+
+        if previous_pub == nil do
+          Application.delete_env(:ysc, :s3_media_public_url)
+        else
+          Application.put_env(:ysc, :s3_media_public_url, previous_pub)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+      Application.delete_env(:ysc, :s3_media_public_url)
+
+      assert_raise ArgumentError, fn -> S3Config.upload_url() end
+    end
+  end
+
+  describe "tigris_scheme_and_port_frag (via upload_url/0)" do
+    test "omits the fragment when the scheme's default port is used (http/80)" do
+      previous = Application.get_env(:ysc, :s3_base_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_base_url, "http://fly.storage.tigris.dev")
+      bucket = S3Config.bucket_name()
+
+      assert S3Config.upload_url() ==
+               "http://#{bucket}.fly.storage.tigris.dev"
+    end
+
+    test "includes a non-default explicit port in the fragment" do
+      previous = Application.get_env(:ysc, :s3_base_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_base_url,
+        "https://fly.storage.tigris.dev:8443"
+      )
+
+      bucket = S3Config.bucket_name()
+
+      assert S3Config.upload_url() ==
+               "https://#{bucket}.fly.storage.tigris.dev:8443"
+    end
+
+    test "falls back to https with no port fragment for an unrecognized scheme" do
+      previous = Application.get_env(:ysc, :s3_base_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_base_url,
+        "customproto://fly.storage.tigris.dev"
+      )
+
+      bucket = S3Config.bucket_name()
+
+      assert S3Config.upload_url() ==
+               "https://#{bucket}.fly.storage.tigris.dev"
+    end
+  end
+
+  describe "server_side_encryption?/0" do
+    test "is true when the base URL points at Tigris" do
+      previous = Application.get_env(:ysc, :s3_base_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_base_url, "https://fly.storage.tigris.dev")
+      assert S3Config.server_side_encryption?()
+    end
+
+    test "is false for a non-Tigris base URL (e.g. MinIO)" do
+      previous = Application.get_env(:ysc, :s3_base_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_base_url, "http://localhost:9000")
+      refute S3Config.server_side_encryption?()
+    end
+  end
+
+  describe "object_url/2 additional branches" do
+    test "uses the public URL verbatim when custom domain flag is true" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+      previous_bucket = Application.get_env(:ysc, :s3_bucket)
+      previous_pub = Application.get_env(:ysc, :s3_media_public_url)
+
+      on_exit(fn ->
+        for {k, v} <- [
+              {:s3_use_custom_domain, previous_flag},
+              {:s3_bucket, previous_bucket},
+              {:s3_media_public_url, previous_pub}
+            ] do
+          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+      Application.put_env(:ysc, :s3_bucket, "media-bucket")
+      Application.put_env(:ysc, :s3_media_public_url, "https://assets.ysc.org")
+
+      assert S3Config.object_url("k.jpg", "media-bucket") ==
+               "https://assets.ysc.org/k.jpg"
+    end
+
+    test "raises when custom domain flag is true but the bucket's public URL is invalid" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+      previous_bucket = Application.get_env(:ysc, :s3_bucket)
+      previous_pub = Application.get_env(:ysc, :s3_media_public_url)
+
+      on_exit(fn ->
+        for {k, v} <- [
+              {:s3_use_custom_domain, previous_flag},
+              {:s3_bucket, previous_bucket},
+              {:s3_media_public_url, previous_pub}
+            ] do
+          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+      Application.put_env(:ysc, :s3_bucket, "media-bucket")
+      Application.put_env(:ysc, :s3_media_public_url, "   ")
+
+      assert_raise ArgumentError, fn ->
+        S3Config.object_url("k.jpg", "media-bucket")
+      end
+    end
+
+    test "falls back to the Tigris virtual host when base URL is blank and bucket has no public URL" do
+      previous_base = Application.get_env(:ysc, :s3_base_url)
+      previous_bucket = Application.get_env(:ysc, :s3_bucket)
+      previous_pub = Application.get_env(:ysc, :s3_media_public_url)
+
+      on_exit(fn ->
+        for {k, v} <- [
+              {:s3_base_url, previous_base},
+              {:s3_bucket, previous_bucket},
+              {:s3_media_public_url, previous_pub}
+            ] do
+          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+        end
+      end)
+
+      Application.delete_env(:ysc, :s3_media_public_url)
+      Application.put_env(:ysc, :s3_base_url, "")
+      Application.put_env(:ysc, :s3_bucket, "blank-base-bucket")
+
+      assert S3Config.object_url("k.jpg", "blank-base-bucket") ==
+               "https://blank-base-bucket.fly.storage.tigris.dev/k.jpg"
+    end
+  end
+
+  describe "expense_report_file_presigned_url_args/2 with S3_USE_CUSTOM_DOMAIN" do
+    test "uses trimmed_nonempty_public_url check when the flag is true" do
+      previous_flag = Application.get_env(:ysc, :s3_use_custom_domain)
+      previous_pub = Application.get_env(:ysc, :s3_expense_reports_public_url)
+
+      on_exit(fn ->
+        for {k, v} <- [
+              {:s3_use_custom_domain, previous_flag},
+              {:s3_expense_reports_public_url, previous_pub}
+            ] do
+          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+        end
+      end)
+
+      Application.put_env(:ysc, :s3_use_custom_domain, true)
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "https://expenses.ysc.org"
+      )
+
+      {_config, :get, host, _path, opts} =
+        S3Config.expense_report_file_presigned_url_args("k", 60)
+
+      assert host == "expenses.ysc.org"
+      assert opts[:bucket_as_host] == true
+    end
+  end
+
+  describe "parse_public_http_origin! (via expense_report_file_presigned_url_args/2)" do
+    test "raises when the public URL has no host" do
+      previous = Application.get_env(:ysc, :s3_expense_reports_public_url)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :s3_expense_reports_public_url)
+        else
+          Application.put_env(:ysc, :s3_expense_reports_public_url, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "https:///no-host-here"
+      )
+
+      assert_raise ArgumentError, fn ->
+        S3Config.expense_report_file_presigned_url_args("k", 60)
+      end
+    end
+  end
+
+  describe "default_base_url (via base_url/0)" do
+    test "returns the MinIO URL for the :dev environment" do
+      previous_env = Application.get_env(:ysc, :environment)
+      previous_base = Application.get_env(:ysc, :s3_base_url)
+
+      on_exit(fn ->
+        if previous_env == nil do
+          Application.delete_env(:ysc, :environment)
+        else
+          Application.put_env(:ysc, :environment, previous_env)
+        end
+
+        if previous_base == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous_base)
+        end
+      end)
+
+      Application.delete_env(:ysc, :s3_base_url)
+      Application.put_env(:ysc, :environment, "dev")
+
+      assert S3Config.base_url() == "http://localhost:9000"
+    end
+
+    test "returns the Tigris URL for a deployed environment" do
+      previous_env = Application.get_env(:ysc, :environment)
+      previous_base = Application.get_env(:ysc, :s3_base_url)
+
+      on_exit(fn ->
+        if previous_env == nil do
+          Application.delete_env(:ysc, :environment)
+        else
+          Application.put_env(:ysc, :environment, previous_env)
+        end
+
+        if previous_base == nil do
+          Application.delete_env(:ysc, :s3_base_url)
+        else
+          Application.put_env(:ysc, :s3_base_url, previous_base)
+        end
+      end)
+
+      Application.delete_env(:ysc, :s3_base_url)
+      Application.put_env(:ysc, :environment, "prod")
+
+      assert S3Config.base_url() == "https://fly.storage.tigris.dev"
     end
   end
 end
