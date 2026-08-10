@@ -2237,6 +2237,67 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert booking.booking_mode == :day
       assert booking.status == :complete
     end
+
+    test "concurrent admin day bookings accumulate capacity_booked on new inventory rows",
+         %{sandbox_owner: owner} do
+      ensure_clear_lake_day_pricing_rule()
+      user1 = user_fixture()
+      user2 = user_fixture()
+      {checkin, checkout} = locker_room_dates(130, 2)
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      Repo.delete_all(
+        from(pi in Ysc.Bookings.PropertyInventory,
+          where: pi.property == :clear_lake and pi.day in ^stay_days
+        )
+      )
+
+      booking_attrs = fn user, guests ->
+        %{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          booking_mode: :day,
+          guests_count: guests,
+          total_price: Money.new(:USD, "#{guests * 100}.00")
+        }
+      end
+
+      results =
+        [
+          {user1, 5},
+          {user2, 3}
+        ]
+        |> Task.async_stream(
+          fn {user, guests} ->
+            Ysc.DataCase.allow_sandbox(self(), owner)
+
+            BookingLocker.create_admin_booking(
+              booking_attrs.(user, guests),
+              skip_email: true,
+              skip_reminders: true
+            )
+          end,
+          max_concurrency: 2,
+          timeout: 5_000
+        )
+        |> Enum.to_list()
+
+      assert Enum.all?(results, &match?({:ok, {:ok, _}}, &1))
+
+      capacity_per_day =
+        Enum.map(stay_days, fn day ->
+          Repo.one!(
+            from(pi in Ysc.Bookings.PropertyInventory,
+              where: pi.property == :clear_lake and pi.day == ^day,
+              select: pi.capacity_booked
+            )
+          )
+        end)
+
+      assert capacity_per_day == [8, 8]
+    end
   end
 
   describe "confirm_booking/1 Clear Lake per-guest" do

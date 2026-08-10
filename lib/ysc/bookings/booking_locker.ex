@@ -1759,47 +1759,27 @@ defmodule Ysc.Bookings.BookingLocker do
         end
 
       :day ->
-        {count, _} =
-          Repo.update_all(
-            day_property_inventory_query(booking),
-            inc: [capacity_booked: booking.guests_count],
-            set: [updated_at: DateTime.truncate(DateTime.utc_now(), :second)]
-          )
+        # Ensure rows exist with on_conflict: :nothing, then atomically increment.
+        # The previous insert-on-conflict-replace path could drop concurrent
+        # bookings when two admin day bookings raced on dates with no inventory.
+        ensure_property_inventory_for_days(
+          booking.property,
+          day_property_inventory_stay_days(booking)
+        )
 
-        if count == 0 do
-          ensure_day_inventory_exists_and_book(booking)
-        else
-          :ok
-        end
+        updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+        Repo.update_all(
+          day_property_inventory_query(booking),
+          inc: [capacity_booked: booking.guests_count],
+          set: [updated_at: updated_at]
+        )
+
+        :ok
 
       _ ->
         :ok
     end
-  end
-
-  defp ensure_day_inventory_exists_and_book(booking) do
-    dates =
-      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
-
-    Enum.each(dates, fn date ->
-      capacity_total = get_property_capacity_for_date(booking.property, date)
-
-      Repo.insert(
-        %PropertyInventory{
-          property: booking.property,
-          day: date,
-          buyout_booked: false,
-          buyout_held: false,
-          capacity_total: capacity_total,
-          capacity_held: 0,
-          capacity_booked: booking.guests_count
-        },
-        on_conflict: {:replace, [:capacity_booked, :updated_at]},
-        conflict_target: [:property, :day]
-      )
-    end)
-
-    :ok
   end
 
   # Ensures property inventory rows exist for the date range and marks as booked
