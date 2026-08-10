@@ -12,6 +12,7 @@ defmodule Ysc.Subscriptions.ExpirationWorkerTest do
   alias Ysc.Subscriptions
   alias Ysc.Subscriptions.ExpirationWorker
 
+  import Swoosh.TestAssertions
   import Ysc.AccountsFixtures
 
   setup do
@@ -127,6 +128,49 @@ defmodule Ysc.Subscriptions.ExpirationWorkerTest do
         })
 
       assert {1, 0} = ExpirationWorker.check_and_expire_subscriptions()
+      refute_email_sent(subject: "Your YSC Membership Has Ended")
+    end
+
+    test "sends membership ended email when auto-renew was turned off", %{
+      user: user
+    } do
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_exp_auto_renew_off",
+          stripe_status: "active",
+          name: "Auto Renew Off",
+          current_period_end: past_date,
+          ends_at: past_date,
+          cancel_at_period_end: true
+        })
+
+      assert {1, 0} = ExpirationWorker.check_and_expire_subscriptions()
+      assert_email_sent(subject: "Your YSC Membership Has Ended")
+    end
+
+    test "does not send membership ended email without cancel_at_period_end", %{
+      user: user
+    } do
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_exp_payment_failure",
+          stripe_status: "active",
+          name: "Payment Failure Path",
+          current_period_end: past_date,
+          ends_at: past_date,
+          cancel_at_period_end: false
+        })
+
+      assert {1, 0} = ExpirationWorker.check_and_expire_subscriptions()
+      refute_email_sent(subject: "Your YSC Membership Has Ended")
     end
 
     test "treats subscription as renewed when Stripe reports active future period",

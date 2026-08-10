@@ -404,6 +404,7 @@ defmodule Ysc.Bookings do
     * `:preload` - association preloads (default `[:rooms, :user]`)
     * `:statuses` - include only bookings with these statuses
     * `:exclude_statuses` - omit bookings with these statuses
+    * `:exclude_booking_modes` - omit bookings with these modes (e.g. `[:day]` for calendar views)
 
   ## Examples
       # Get all bookings for Tahoe
@@ -424,6 +425,7 @@ defmodule Ysc.Bookings do
     preloads = Keyword.get(opts, :preload, [:rooms, :user])
     statuses = Keyword.get(opts, :statuses)
     exclude_statuses = Keyword.get(opts, :exclude_statuses)
+    exclude_booking_modes = Keyword.get(opts, :exclude_booking_modes)
 
     query =
       from b in Booking, order_by: [asc: b.checkin_date], preload: ^preloads
@@ -438,6 +440,13 @@ defmodule Ysc.Bookings do
 
         true ->
           query
+      end
+
+    query =
+      if is_list(exclude_booking_modes) do
+        from b in query, where: b.booking_mode not in ^exclude_booking_modes
+      else
+        query
       end
 
     query =

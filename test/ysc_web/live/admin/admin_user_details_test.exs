@@ -1167,6 +1167,28 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     end
   end
 
+  describe "family tab" do
+    test "loads family management UI for lifetime primary users", %{conn: conn} do
+      user = user_fixture()
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/family")
+
+      render_async(view)
+
+      assert render(view) =~ "Associated Users"
+      assert has_element?(view, "#add-family-user-search-form")
+    end
+  end
+
   defp register_and_log_in_admin(%{conn: conn}) do
     user = user_fixture(%{role: :admin})
     %{conn: log_in_user(conn, user), user: user}

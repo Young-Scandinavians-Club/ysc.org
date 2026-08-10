@@ -4,242 +4,284 @@
 
 /* This file is for your main application CSS */
 
-
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
 
 .agenda-tracks-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: #d4d4d8 #f4f4f5;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 #f4f4f5;
 }
 
 .agenda-tracks-scroll::-webkit-scrollbar {
-    height: 10px;
+  height: 10px;
 }
 
 .agenda-tracks-scroll::-webkit-scrollbar-track {
-    background: #f4f4f5;
-    border-radius: 9999px;
+  background: #f4f4f5;
+  border-radius: 9999px;
 }
 
 .agenda-tracks-scroll::-webkit-scrollbar-thumb {
-    background: #d4d4d8;
-    border-radius: 9999px;
+  background: #d4d4d8;
+  border-radius: 9999px;
 }
 
 .agenda-tracks-scroll::-webkit-scrollbar-thumb:hover {
-    background: #a1a1aa;
+  background: #a1a1aa;
 }
 
 .thin-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
 .thin-scrollbar:hover,
 .thin-scrollbar.is-interacting {
-    scrollbar-color: #d4d4d8 transparent;
+  scrollbar-color: #d4d4d8 transparent;
 }
 
 .thin-scrollbar::-webkit-scrollbar {
-    height: 6px;
+  height: 6px;
 }
 
 .thin-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-    margin-inline: 1rem;
+  background: transparent;
+  margin-inline: 1rem;
 }
 
 .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 9999px;
-    transition: background 0.2s ease;
+  background: transparent;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
 }
 
 .thin-scrollbar:hover::-webkit-scrollbar-thumb,
 .thin-scrollbar.is-interacting::-webkit-scrollbar-thumb {
-    background: #d4d4d8;
+  background: #d4d4d8;
 }
 
 .thin-scrollbar:hover::-webkit-scrollbar-thumb:hover,
 .thin-scrollbar.is-interacting::-webkit-scrollbar-thumb:hover {
-    background: #a1a1aa;
+  background: #a1a1aa;
 }
 
 /* Toast container: always on top (nav, modals, overlays). Explicit here to avoid Tailwind purging. */
 
 #toast-group,
 .toast-container-above-all {
-    z-index: 10000;
+  z-index: 10000;
 }
-
 
 /* Improve scrolling performance and prevent layout shifts */
 
 html {
-    scroll-behavior: smooth;
-    /* Bar content height; --nav-height adds the 1px reserved border on #rootNavbar. */
-    --nav-bar-height: 4.5rem;
-    --nav-height: calc(var(--nav-bar-height) + 1px);
+  scroll-behavior: smooth;
+  /* Bar content height; --nav-height adds the 1px reserved border on #rootNavbar. */
+  --nav-bar-height: 4.5rem;
+  --nav-height: calc(var(--nav-bar-height) + 1px);
 }
 
 @media (min-width: 1024px) {
-    html {
-        /* Desktop: logo row + lg:py-4 inner padding + py-3 nav links = 5rem. */
-        --nav-bar-height: 5rem;
-        --nav-height: calc(var(--nav-bar-height) + 1px);
-    }
+  html {
+    /* Desktop: logo row + lg:py-4 inner padding + py-3 nav links = 5rem. */
+    --nav-bar-height: 5rem;
+    --nav-height: calc(var(--nav-bar-height) + 1px);
+  }
 }
-
 
 /* Ensure the scroll stops below sticky navbar for history page sections */
 
 #key-events,
 #presidents,
 [id^="presidents-"] {
-    scroll-margin-top: var(--nav-height);
+  scroll-margin-top: var(--nav-height);
 }
-
 
 /* Hero / booking pages: pull media under the fixed nav, pad content by exact bar height. */
 
 .hero-nav-overlap {
-    margin-top: calc(-1 * var(--nav-height));
-    padding-top: var(--nav-height);
+  margin-top: calc(-1 * var(--nav-height));
+  padding-top: var(--nav-height);
 }
 
 /* Hero media: full-bleed below 1920px; capped + rounded on ultrawide with soft continuation. */
 .hero-media-stage {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    overflow: hidden;
-    pointer-events: none;
-    background-color: #fff;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: #fff;
 }
 
 .hero-media-stage__bleed {
-    display: none;
+  display: none;
 }
 
 .hero-media-stage__inner {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    width: 100%;
-    max-width: 1920px;
-    height: 100%;
-    margin-inline: auto;
-    left: 0;
-    right: 0;
-    overflow: hidden;
-    pointer-events: auto;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  max-width: 1920px;
+  height: 100%;
+  margin-inline: auto;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  pointer-events: auto;
 }
 
 .hero-media-stage__inner > img,
 .hero-media-stage__inner > video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 @media (min-width: 1921px) {
-    /* Soft full-width color continuation behind the capped media. */
-    .hero-media-stage__bleed {
-        display: block;
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        overflow: hidden;
-    }
+  /*
+      Float the media as a rounded card below the nav.
+      A white gap above the card is required for top corner rounding to read;
+      otherwise the corners sit on matching bleed and look square.
+    */
+  #hero-section.hero-nav-overlap,
+  #hero-section {
+    overflow: visible;
+  }
 
-    .hero-media-stage__bleed > img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        object-position: center;
-        transform: scale(1.1);
-        filter: blur(72px) saturate(0.9) brightness(1.12);
-        opacity: 0.4;
-        display: block;
-    }
+  .hero-media-stage {
+    overflow: visible;
+    background-color: #fff;
+  }
 
-    /* Keep the field light/white while letting image color whisper through. */
-    .hero-media-stage__bleed::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background:
-            linear-gradient(
-                90deg,
-                rgba(255, 255, 255, 0.88) 0%,
-                rgba(255, 255, 255, 0.45) 18%,
-                rgba(255, 255, 255, 0.45) 82%,
-                rgba(255, 255, 255, 0.88) 100%
-            ),
-            rgba(255, 255, 255, 0.35);
-    }
+  .hero-media-stage__bleed {
+    display: block;
+    position: absolute;
+    /* Keep bleed off the top gap so top corners stay crisp against white. */
+    top: calc(var(--nav-height));
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 0;
+    overflow: hidden;
+    opacity: 0.55;
+    mask-image: linear-gradient(
+      90deg,
+      #000 0%,
+      #000 8%,
+      transparent 22%,
+      transparent 78%,
+      #000 92%,
+      #000 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      #000 0%,
+      #000 8%,
+      transparent 22%,
+      transparent 78%,
+      #000 92%,
+      #000 100%
+    );
+  }
 
-    .hero-media-stage__inner {
-        /* Match site imagery (rounded-2xl) once the media hits the max width. */
-        border-radius: 1.5rem;
-        box-shadow:
-            0 0 0 1px rgba(15, 23, 42, 0.06),
-            0 18px 40px -18px rgba(15, 23, 42, 0.28);
-    }
+  .hero-media-stage__bleed > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transform: scale(1.1);
+    filter: blur(72px) saturate(0.85) brightness(1.15);
+    opacity: 0.45;
+    display: block;
+  }
+
+  .hero-media-stage__bleed::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.55);
+  }
+
+  .hero-media-stage__inner {
+    /* Fully replace inset:0 so left/right/width don't fight. */
+    inset: auto;
+    top: calc(var(--nav-height));
+    bottom: 1rem;
+    left: 50%;
+    width: min(1920px, calc(100% - 2rem));
+    max-width: none;
+    height: auto;
+    margin: 0;
+    transform: translateX(-50%) translateZ(0);
+    border-radius: 1.5rem;
+    overflow: hidden;
+    /* Force border-radius clipping for video/replaced content (Safari). */
+    isolation: isolate;
+    box-shadow:
+      0 0 0 1px rgba(15, 23, 42, 0.06),
+      0 18px 40px -18px rgba(15, 23, 42, 0.28);
+  }
+
+  .hero-media-stage__inner .image-carousel-container,
+  .hero-media-stage__inner .carousel-wrapper {
+    border-radius: inherit;
+    overflow: hidden;
+    height: 100%;
+  }
 }
-
 
 /* History page styling */
 
 .history-serif {
-    font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, "Times New Roman", serif;
 }
 
 .archival-photo img {
-    filter: sepia(0.05) contrast(0.98);
-    transition: filter 0.3s ease;
+  filter: sepia(0.05) contrast(0.98);
+  transition: filter 0.3s ease;
 }
 
 .archival-photo:hover img {
-    filter: sepia(0) contrast(1);
+  filter: sepia(0) contrast(1);
 }
 
 .ledger-callout {
-    font-family: "Courier New", monospace;
-    border-left: 2px solid #d4d4d8;
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
-    color: #71717a;
-    letter-spacing: 0.03em;
+  font-family: "Courier New", monospace;
+  border-left: 2px solid #d4d4d8;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #71717a;
+  letter-spacing: 0.03em;
 }
 
 .era-1950s img,
 .era-1960s img {
-    filter: sepia(0.2) contrast(1.05);
-    transition: filter 0.3s ease;
+  filter: sepia(0.2) contrast(1.05);
+  transition: filter 0.3s ease;
 }
 
 .era-1970s img,
 .era-1980s img {
-    filter: sepia(0.12) contrast(1.03);
-    transition: filter 0.3s ease;
+  filter: sepia(0.12) contrast(1.03);
+  transition: filter 0.3s ease;
 }
 
 .era-1990s img {
-    filter: sepia(0.06) contrast(1.01);
-    transition: filter 0.3s ease;
+  filter: sepia(0.06) contrast(1.01);
+  transition: filter 0.3s ease;
 }
 
 .era-1950s:hover img,
@@ -247,90 +289,89 @@ html {
 .era-1970s:hover img,
 .era-1980s:hover img,
 .era-1990s:hover img {
-    filter: sepia(0) contrast(1);
+  filter: sepia(0) contrast(1);
 }
 
 .decade-watermark {
-    font-size: 8rem;
-    font-weight: 400;
-    opacity: 0.04;
-    color: #18181b;
-    position: absolute;
-    left: 50%;
-    top: 0;
-    transform: translateX(-50%);
-    pointer-events: none;
-    user-select: none;
-    z-index: 0;
+  font-size: 8rem;
+  font-weight: 400;
+  opacity: 0.04;
+  color: #18181b;
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
 }
-
 
 /* Ensure proper flex layout for content wrapper */
 
 #content-wrapper {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
-
 
 /* Admin floating button — top corners sit below the sticky navbar */
 
 #admin-floating-button-wrap.admin-floating-top-left {
-    top: calc(var(--nav-height) + 1rem);
-    left: 1rem;
+  top: calc(var(--nav-height) + 1rem);
+  left: 1rem;
 }
 
 #admin-floating-button-wrap.admin-floating-top-right {
-    top: calc(var(--nav-height) + 1rem);
-    right: 1rem;
+  top: calc(var(--nav-height) + 1rem);
+  right: 1rem;
 }
 
 #admin-floating-button-wrap.admin-floating-bottom-left {
-    bottom: 1rem;
-    left: 1rem;
+  bottom: 1rem;
+  left: 1rem;
 }
 
 #admin-floating-button-wrap.admin-floating-bottom-right {
-    bottom: 1rem;
-    right: 1rem;
+  bottom: 1rem;
+  right: 1rem;
 }
 
 /* Fullscreen layouts omit the navbar */
 body:not(:has(#rootNavbar)) #admin-floating-button-wrap.admin-floating-top-left,
-body:not(:has(#rootNavbar)) #admin-floating-button-wrap.admin-floating-top-right {
-    top: 1rem;
+body:not(:has(#rootNavbar))
+  #admin-floating-button-wrap.admin-floating-top-right {
+  top: 1rem;
 }
-
 
 /* =============================================
    STICKY NAVBAR
    ============================================= */
 
-
 /* Transitions for the navbar */
 
 #rootNavbar {
-    /* Reserve border space so .nav-sticky does not change layout height. */
-    border-bottom: 1px solid transparent;
-    box-sizing: border-box;
-    /* Shadow animates smoothly so the nav "lifts up" on scroll and
+  /* Reserve border space so .nav-sticky does not change layout height. */
+  border-bottom: 1px solid transparent;
+  box-sizing: border-box;
+  /* Shadow animates smoothly so the nav "lifts up" on scroll and
        "sits down" when the user returns to the top.
        Transform handles the mobile slide-in/out. */
-    transition: background-color 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.25s ease-out, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    background-color 0.2s ease-out,
+    border-color 0.2s ease-out,
+    box-shadow 0.25s ease-out,
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #rootNavbar .nav-bar-inner {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
-
 
 /* Non-hero: lock bar height in CSS so JS measurement cannot resize the spacer. */
 
 #site-header:not(.hero-mode) #rootNavbar .nav-bar-inner {
-    height: var(--nav-bar-height);
+  height: var(--nav-bar-height);
 }
-
 
 /*
  * Non-hero: nav is always fixed; .nav-height-spacer (in layout) holds its height
@@ -339,118 +380,114 @@ body:not(:has(#rootNavbar)) #admin-floating-button-wrap.admin-floating-top-right
  */
 
 #site-header:not(.hero-mode) .nav-height-spacer {
-    height: var(--nav-height);
-    pointer-events: none;
+  height: var(--nav-height);
+  pointer-events: none;
 }
 
 #site-header:not(.hero-mode) #rootNavbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
 }
-
 
 /* ---- Scrolled state (visual only on non-hero) ---- */
 
 #rootNavbar.nav-sticky {
-    background-color: white;
-    border-bottom: 1px solid #f4f4f5;
-    /* zinc-100 */
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+  background-color: white;
+  border-bottom: 1px solid #f4f4f5;
+  /* zinc-100 */
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.05);
 }
-
 
 /* ---- Mobile: hide on scroll-down, reveal on scroll-up ---- */
 
 @media (max-width: 1023px) {
-    #rootNavbar.nav-mobile-hidden {
-        transform: translateY(-100%);
-    }
+  #rootNavbar.nav-mobile-hidden {
+    transform: translateY(-100%);
+  }
 }
 
 .tmp-element {
-    visibility: hidden;
-    white-space: pre;
+  visibility: hidden;
+  white-space: pre;
 }
-
 
 /* DROPDOWN */
 
 .expanded {
-    display: block;
+  display: block;
 }
-
 
 /* HAMBURGER MENU ANIMATION */
 
 .nav-icon {
-    width: 24px;
-    height: 18px;
-    position: relative;
-    transform: rotate(0deg);
-    transition: 0.5s ease-in-out;
-    cursor: pointer;
+  width: 24px;
+  height: 18px;
+  position: relative;
+  transform: rotate(0deg);
+  transition: 0.5s ease-in-out;
+  cursor: pointer;
 }
 
 .nav-icon span {
-    display: block;
-    position: absolute;
-    height: 3px;
-    width: 100%;
-    background: currentColor;
-    border-radius: 3px;
-    opacity: 1;
-    left: 0;
-    transform: rotate(0deg);
-    transition: 0.25s ease-in-out;
+  display: block;
+  position: absolute;
+  height: 3px;
+  width: 100%;
+  background: currentColor;
+  border-radius: 3px;
+  opacity: 1;
+  left: 0;
+  transform: rotate(0deg);
+  transition: 0.25s ease-in-out;
 }
 
 .nav-icon span:nth-child(1) {
-    top: 0px;
+  top: 0px;
 }
 
 .nav-icon span:nth-child(2),
 .nav-icon span:nth-child(3) {
-    top: 7.5px;
+  top: 7.5px;
 }
 
 .nav-icon span:nth-child(4) {
-    top: 15px;
+  top: 15px;
 }
 
 .nav-icon.open span:nth-child(1) {
-    top: 7.5px;
-    width: 0%;
-    left: 50%;
+  top: 7.5px;
+  width: 0%;
+  left: 50%;
 }
 
 .nav-icon.open span:nth-child(2) {
-    transform: rotate(45deg);
+  transform: rotate(45deg);
 }
 
 .nav-icon.open span:nth-child(3) {
-    transform: rotate(-45deg);
+  transform: rotate(-45deg);
 }
 
 .nav-icon.open span:nth-child(4) {
-    top: 7.5px;
-    width: 0%;
-    left: 50%;
+  top: 7.5px;
+  width: 0%;
+  left: 50%;
 }
-
 
 /* HERO MODE - Transparent navigation with white text */
 
 #site-header.hero-mode {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 50;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
 }
-
 
 /*
  * Hero nav stays position:fixed so there is never a static→fixed jump.
@@ -459,54 +496,57 @@ body:not(:has(#rootNavbar)) #admin-floating-button-wrap.admin-floating-top-right
  */
 
 #site-header.hero-mode #rootNavbar {
-    --hero-nav-progress: 0;
-    --hero-nav-chrome-progress: 0;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background: transparent;
-    border-color: transparent;
-    /* Only animate transform (mobile hide); scroll drives the cross-fade. */
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --hero-nav-progress: 0;
+  --hero-nav-chrome-progress: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: transparent;
+  border-color: transparent;
+  /* Only animate transform (mobile hide); scroll drives the cross-fade. */
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 
 /* Gradient layer — fades out as the user scrolls */
 
 #site-header.hero-mode #rootNavbar::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient( to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.12) 60%, transparent 100%);
-    opacity: calc(1 - var(--hero-nav-progress));
-    pointer-events: none;
-    z-index: 0;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0.12) 60%,
+    transparent 100%
+  );
+  opacity: calc(1 - var(--hero-nav-progress));
+  pointer-events: none;
+  z-index: 0;
 }
-
 
 /* White solid background — fades in with scroll */
 
 #site-header.hero-mode #rootNavbar::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: white;
-    border-bottom: 1px solid #f4f4f5;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
-    opacity: var(--hero-nav-progress);
-    pointer-events: none;
-    z-index: 0;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: white;
+  border-bottom: 1px solid #f4f4f5;
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.05);
+  opacity: var(--hero-nav-progress);
+  pointer-events: none;
+  z-index: 0;
 }
-
 
 /* Keep links/menus above the ::before/::after layers */
 
-#site-header.hero-mode #rootNavbar>* {
-    position: relative;
-    z-index: 1;
+#site-header.hero-mode #rootNavbar > * {
+  position: relative;
+  z-index: 1;
 }
-
 
 /*
  * Nav chrome follows scroll via --hero-nav-chrome-progress (later window than the bar).
@@ -519,126 +559,158 @@ body:not(:has(#rootNavbar)) #admin-floating-button-wrap.admin-floating-top-right
 #site-header.hero-mode .menu-label,
 #site-header.hero-mode .hamburger-btn,
 #site-header.hero-mode #avatar-menuLink {
-    color: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.4)), 0 0 1px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.5));
-    transition: none !important;
+  color: color-mix(
+    in srgb,
+    #18181b calc(var(--hero-nav-chrome-progress) * 100%),
+    white
+  );
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.4)),
+    0 0 1px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.5));
+  transition: none !important;
 }
 
 #site-header.hero-mode .nav-link:hover,
 #site-header.hero-mode button.nav-link:hover {
-    background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2));
-    color: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
+  background-color: color-mix(
+    in srgb,
+    #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%),
+    rgba(255, 255, 255, 0.2)
+  );
+  color: color-mix(
+    in srgb,
+    #18181b calc(var(--hero-nav-chrome-progress) * 100%),
+    white
+  );
 }
 
 #site-header.hero-mode .nav-icon span {
-    background: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
-    transition: transform 0.25s ease-in-out, opacity 0.25s ease-in-out, top 0.25s ease-in-out, left 0.25s ease-in-out, width 0.25s ease-in-out !important;
+  background: color-mix(
+    in srgb,
+    #18181b calc(var(--hero-nav-chrome-progress) * 100%),
+    white
+  );
+  transition:
+    transform 0.25s ease-in-out,
+    opacity 0.25s ease-in-out,
+    top 0.25s ease-in-out,
+    left 0.25s ease-in-out,
+    width 0.25s ease-in-out !important;
 }
 
 #site-header.hero-mode .hamburger-btn:hover {
-    background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2));
+  background-color: color-mix(
+    in srgb,
+    #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%),
+    rgba(255, 255, 255, 0.2)
+  );
 }
 
 #site-header.hero-mode #avatar-menuLink:hover {
-    background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2)) !important;
+  background-color: color-mix(
+    in srgb,
+    #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%),
+    rgba(255, 255, 255, 0.2)
+  ) !important;
 }
 
 #site-header.hero-mode #avatar-menuLink .text-zinc-800 {
-    color: color-mix(in srgb, #27272a calc(var(--hero-nav-chrome-progress) * 100%), white) !important;
-    transition: none !important;
+  color: color-mix(
+    in srgb,
+    #27272a calc(var(--hero-nav-chrome-progress) * 100%),
+    white
+  ) !important;
+  transition: none !important;
 }
 
 #site-header.hero-mode #avatar-menuLink .text-zinc-500 {
-    color: color-mix(in srgb, #71717a calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.8)) !important;
-    transition: none !important;
+  color: color-mix(
+    in srgb,
+    #71717a calc(var(--hero-nav-chrome-progress) * 100%),
+    rgba(255, 255, 255, 0.8)
+  ) !important;
+  transition: none !important;
 }
 
-
 /* Dropdown chevron animation */
-
 
 /* Only rotate chevron icons, not all spans */
 
 .dropdown-open .hero-chevron-down,
 .dropdown-open .hero-chevron-up {
-    transform: rotate(180deg);
+  transform: rotate(180deg);
 }
-
 
 /* MOBILE SLIDE-IN MENU */
 
 .mobile-menu-panel {
-    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15);
 }
-
 
 /* Mobile menu content styling */
 
 .mobile-menu-content ul {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .mobile-menu-content .nav-link {
-    display: block;
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    color: #18181b;
-    border-radius: 0.5rem;
-    transition: background-color 0.2s ease;
+  display: block;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: #18181b;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease;
 }
 
 .mobile-menu-content .nav-link:hover {
-    background-color: #f4f4f5;
+  background-color: #f4f4f5;
 }
-
 
 /* Mobile menu dropdown styling */
 
-.mobile-menu-content>ul>li>.relative>button {
-    justify-content: flex-start !important;
-    text-align: left;
-    width: 100%;
-    padding: 0.75rem 1rem;
+.mobile-menu-content > ul > li > .relative > button {
+  justify-content: flex-start !important;
+  text-align: left;
+  width: 100%;
+  padding: 0.75rem 1rem;
 }
 
 .mobile-menu-content .dropdown-content {
-    position: static !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding-left: 1rem;
-    margin-top: 0.25rem;
+  position: static !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding-left: 1rem;
+  margin-top: 0.25rem;
 }
 
 .mobile-menu-content .dropdown-content ul {
-    background: #f9fafb;
-    border-radius: 0.5rem;
-    padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
 }
 
 .mobile-menu-content .dropdown-content a {
-    display: block;
-    padding: 0.625rem 0.75rem;
-    color: #3f3f46;
-    border-radius: 0.375rem;
-    font-weight: 500;
-    font-size: 0.875rem;
+  display: block;
+  padding: 0.625rem 0.75rem;
+  color: #3f3f46;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  font-size: 0.875rem;
 }
 
 .mobile-menu-content .dropdown-content a:hover {
-    background-color: #e4e4e7;
-    color: #18181b;
+  background-color: #e4e4e7;
+  color: #18181b;
 }
-
 
 /* Prevent body scroll when menu is open */
 
 body.overflow-hidden {
-    overflow: hidden;
+  overflow: hidden;
 }
-
 
 /* Override hero-mode white text and shadows for mobile slide-in menu (it has white background) */
 
@@ -646,289 +718,283 @@ body.overflow-hidden {
 #site-header.hero-mode .mobile-menu-panel button.nav-link,
 #site-header.hero-mode .mobile-menu-panel .menu-label,
 #site-header.hero-mode .mobile-menu-panel #avatar-menuLink {
-    text-shadow: none;
+  text-shadow: none;
 }
 
 .mobile-menu-panel .nav-link,
 #site-header.hero-mode .mobile-menu-panel .nav-link {
-    color: #18181b !important;
+  color: #18181b !important;
 }
 
 .mobile-menu-panel .nav-link:hover,
 #site-header.hero-mode .mobile-menu-panel .nav-link:hover {
-    background-color: #f4f4f5 !important;
-    color: #18181b !important;
+  background-color: #f4f4f5 !important;
+  color: #18181b !important;
 }
 
 .mobile-menu-panel .dropdown-content a,
 #site-header.hero-mode .mobile-menu-panel .dropdown-content a {
-    color: #3f3f46 !important;
+  color: #3f3f46 !important;
 }
 
 .mobile-menu-panel .dropdown-content a:hover,
 #site-header.hero-mode .mobile-menu-panel .dropdown-content a:hover {
-    background-color: #e4e4e7 !important;
-    color: #18181b !important;
+  background-color: #e4e4e7 !important;
+  color: #18181b !important;
 }
 
 .pagination-link,
 .pagination-ellipsis {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding-left: 1rem;
-    /* 12px */
-    padding-right: 1rem;
-    /* 12px */
-    padding-top: 1.25rem;
-    /* 16px */
-    padding-bottom: 1.25rem;
-    /* 16px */
-    height: 2.5rem;
-    border-radius: 0.25rem;
-    /* 32px */
-    color: rgb(113 113 122);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding-left: 1rem;
+  /* 12px */
+  padding-right: 1rem;
+  /* 12px */
+  padding-top: 1.25rem;
+  /* 16px */
+  padding-bottom: 1.25rem;
+  /* 16px */
+  height: 2.5rem;
+  border-radius: 0.25rem;
+  /* 32px */
+  color: rgb(113 113 122);
 }
 
 .is-current {
-    color: rgb(63 63 70);
-    background-color: rgb(244 244 245);
+  color: rgb(63 63 70);
+  background-color: rgb(244 244 245);
 }
 
 .pagination-link:hover {
-    color: rgb(63 63 70);
-    background-color: rgb(244 244 245);
+  color: rgb(63 63 70);
+  background-color: rgb(244 244 245);
 }
 
 .tooltip:after,
 .tooltip:before {
-    bottom: 100%;
-    left: 50%;
-    border: solid transparent;
-    content: "";
-    height: 0;
-    width: 0;
-    position: absolute;
-    pointer-events: none;
+  bottom: 100%;
+  left: 50%;
+  border: solid transparent;
+  content: "";
+  height: 0;
+  width: 0;
+  position: absolute;
+  pointer-events: none;
 }
 
 .tooltip:after {
-    border-color: rgba(24, 24, 27, 0);
-    border-bottom-color: #18181b;
-    border-width: 8px;
-    margin-left: -8px;
+  border-color: rgba(24, 24, 27, 0);
+  border-bottom-color: #18181b;
+  border-width: 8px;
+  margin-left: -8px;
 }
 
 .tooltip:before {
-    border-width: 9px;
-    margin-left: -9px;
+  border-width: 9px;
+  margin-left: -9px;
 }
 
-
 /* Expense Report Success Page Styles */
-
 
 /* Print styles for expense report success page */
 
 @media print {
-    /* Hide navigation */
-    #site-header,
-    #rootNavbar,
-    header {
-        display: none !important;
-    }
-    /* Hide footer */
-    footer {
-        display: none !important;
-    }
-    /* Hide reimbursement timeline */
-    .reimbursement-timeline {
-        display: none !important;
-    }
-    /* Hide action buttons */
-    .print-hide {
-        display: none !important;
-    }
-    /* Ensure content prints properly */
-    body {
-        margin: 0;
-        padding: 0;
-    }
-    .max-w-xl {
-        max-width: 100% !important;
-    }
-    /* Keep the totals card and other marked sections together on one page */
-    .print-no-break {
-        page-break-inside: avoid;
-        break-inside: avoid;
-    }
-    /* Avoid breaking expense/income line items across pages */
-    .space-y-3>div,
-    .space-y-4>div {
-        page-break-inside: avoid;
-        break-inside: avoid;
-    }
-    /* Start each major card on the same page if possible */
-    .bg-white.rounded-lg.shadow-sm {
-        page-break-inside: avoid;
-        break-inside: avoid;
-    }
+  /* Hide navigation */
+  #site-header,
+  #rootNavbar,
+  header {
+    display: none !important;
+  }
+  /* Hide footer */
+  footer {
+    display: none !important;
+  }
+  /* Hide reimbursement timeline */
+  .reimbursement-timeline {
+    display: none !important;
+  }
+  /* Hide action buttons */
+  .print-hide {
+    display: none !important;
+  }
+  /* Ensure content prints properly */
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  .max-w-xl {
+    max-width: 100% !important;
+  }
+  /* Keep the totals card and other marked sections together on one page */
+  .print-no-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* Avoid breaking expense/income line items across pages */
+  .space-y-3 > div,
+  .space-y-4 > div {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* Start each major card on the same page if possible */
+  .bg-white.rounded-lg.shadow-sm {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
 }
-
 
 /* Trix-authored content rendering — used on public post/event pages and in the admin editor preview */
 
 .trix-content {
-    line-height: 1.5;
-    overflow-wrap: break-word;
-    word-break: break-word;
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .trix-content * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 .trix-content h1 {
-    font-size: 1.2em;
-    line-height: 1.2;
+  font-size: 1.2em;
+  line-height: 1.2;
 }
 
 .trix-content hr {
-    border: 0;
-    border-top: 1px solid #d4d4d8;
-    margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid #d4d4d8;
+  margin: 1.5em 0;
 }
 
 .trix-content blockquote {
-    border: 0 solid #ccc;
-    border-left-width: 0.3em;
-    margin-left: 0.3em;
-    padding-left: 0.6em;
+  border: 0 solid #ccc;
+  border-left-width: 0.3em;
+  margin-left: 0.3em;
+  padding-left: 0.6em;
 }
 
 .trix-content [dir="rtl"] blockquote,
 .trix-content blockquote[dir="rtl"] {
-    border-width: 0;
-    border-right-width: 0.3em;
-    margin-right: 0.3em;
-    padding-right: 0.6em;
+  border-width: 0;
+  border-right-width: 0.3em;
+  margin-right: 0.3em;
+  padding-right: 0.6em;
 }
 
 /* Restore list markers removed by Tailwind Preflight / .trix-content * reset */
 .trix-content ul {
-    list-style-type: disc;
-    margin-left: 1em;
-    padding-left: 1em;
+  list-style-type: disc;
+  margin-left: 1em;
+  padding-left: 1em;
 }
 
 .trix-content ol {
-    list-style-type: decimal;
-    margin-left: 1em;
-    padding-left: 1em;
+  list-style-type: decimal;
+  margin-left: 1em;
+  padding-left: 1em;
 }
 
 .trix-content li {
-    display: list-item;
+  display: list-item;
 }
 
-.trix-content li+li {
-    margin-top: 0.25em;
+.trix-content li + li {
+  margin-top: 0.25em;
 }
 
 .trix-content [dir="rtl"] ul,
 .trix-content [dir="rtl"] ol,
 .trix-content ul[dir="rtl"],
 .trix-content ol[dir="rtl"] {
-    margin-left: 0;
-    margin-right: 1em;
-    padding-left: 0;
-    padding-right: 1em;
+  margin-left: 0;
+  margin-right: 1em;
+  padding-left: 0;
+  padding-right: 1em;
 }
 
 .trix-content pre {
-    display: inline-block;
-    width: 100%;
-    vertical-align: top;
-    font-family: monospace;
-    font-size: 0.9em;
-    padding: 1rem;
-    white-space: pre;
-    background-color: rgb(82 82 91);
-    overflow-x: auto;
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+  font-family: monospace;
+  font-size: 0.9em;
+  padding: 1rem;
+  white-space: pre;
+  background-color: rgb(82 82 91);
+  overflow-x: auto;
 }
 
 .trix-content img,
 .post-render img {
-    max-width: 100%;
-    height: auto;
-    margin-top: 0em !important;
-    margin-bottom: 0em !important;
-    border-radius: 0.75rem;
+  max-width: 100%;
+  height: auto;
+  margin-top: 0em !important;
+  margin-bottom: 0em !important;
+  border-radius: 0.75rem;
 }
 
 .trix-content .attachment {
-    display: inline-block;
-    position: relative;
-    max-width: 100%;
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
 }
 
 .trix-content .attachment a {
-    color: inherit;
-    text-decoration: none;
+  color: inherit;
+  text-decoration: none;
 }
 
 .trix-content .attachment a:hover,
 .trix-content .attachment a:visited:hover {
-    color: inherit;
+  color: inherit;
 }
 
 .attachment__caption {
-    text-align: center;
-    padding-top: 0.25em;
-    padding-bottom: 0.25em;
+  text-align: center;
+  padding-top: 0.25em;
+  padding-bottom: 0.25em;
 }
 
-.attachment__caption .attachment__name+.attachment__size::before {
-    content: " \2022 ";
+.attachment__caption .attachment__name + .attachment__size::before {
+  content: " \2022 ";
 }
 
 .attachment--preview {
-    width: 100%;
-    text-align: center;
+  width: 100%;
+  text-align: center;
 }
 
 .post-render figure.attachment.attachment--preview img {
-    cursor: zoom-in;
+  cursor: zoom-in;
 }
 
 .attachment--preview .attachment__caption {
-    color: #666;
-    font-size: 0.9em;
-    line-height: 1.2;
+  color: #666;
+  font-size: 0.9em;
+  line-height: 1.2;
 }
-
 
 /* =============================================
    FILE ATTACHMENT CARDS (non-image Trix attachments)
    Applies in the admin editor (.trix-content) and public rendered content (.post-render)
    ============================================= */
 
-
 /* Reset the old minimal defaults */
 
 .attachment--file {
-    display: block;
-    color: inherit;
-    line-height: 1;
-    margin: 0.5em 0;
-    padding: 0;
-    border: none;
-    border-radius: 0;
+  display: block;
+  color: inherit;
+  line-height: 1;
+  margin: 0.5em 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
 }
-
 
 /* Override inline-block from .attachment so file cards are full-width.
    Also zero out the padding-top/bottom that .post-render figure / .trix-content figure
@@ -936,2806 +1002,2808 @@ body.overflow-hidden {
 
 .trix-content .attachment--file,
 .post-render .attachment--file {
-    display: block;
-    margin: 0.875em 0;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+  display: block;
+  margin: 0.875em 0;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
-
 
 /* The <a> tag becomes the visible card surface */
 
-.trix-content .attachment--file>a,
-.post-render .attachment--file>a {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.625rem 0.875rem;
-    background-color: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    text-decoration: none;
-    color: #374151;
-    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-    min-width: 0;
-    /* Override .post-render animated underline */
-    background-image: none !important;
-    background-size: 0 !important;
+.trix-content .attachment--file > a,
+.post-render .attachment--file > a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  color: #374151;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  min-width: 0;
+  /* Override .post-render animated underline */
+  background-image: none !important;
+  background-size: 0 !important;
 }
 
-.trix-content .attachment--file>a:hover,
-.post-render .attachment--file>a:hover {
-    background-color: #f3f4f6;
-    border-color: #d1d5db;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-    color: #111827;
-    background-size: 0 !important;
+.trix-content .attachment--file > a:hover,
+.post-render .attachment--file > a:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  color: #111827;
+  background-size: 0 !important;
 }
-
 
 /* --- File type icon (::before on the <a>) --- */
 
-
 /* Default: generic document icon, gray */
 
-.trix-content .attachment--file>a::before,
-.post-render .attachment--file>a::before {
-    content: "";
-    flex-shrink: 0;
-    width: 2rem;
-    height: 2rem;
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
+.trix-content .attachment--file > a::before,
+.post-render .attachment--file > a::before {
+  content: "";
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
 }
-
 
 /* PDF: red */
 
-.trix-content [data-trix-content-type="application/pdf"]>a::before,
-.post-render [data-trix-content-type="application/pdf"]>a::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23DC2626'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
+.trix-content [data-trix-content-type="application/pdf"] > a::before,
+.post-render [data-trix-content-type="application/pdf"] > a::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23DC2626'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
 }
-
 
 /* Word documents: blue */
 
-.trix-content [data-trix-content-type*="wordprocessingml"]>a::before,
-.trix-content [data-trix-content-type*="msword"]>a::before,
-.post-render [data-trix-content-type*="wordprocessingml"]>a::before,
-.post-render [data-trix-content-type*="msword"]>a::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%232563EB'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
+.trix-content [data-trix-content-type*="wordprocessingml"] > a::before,
+.trix-content [data-trix-content-type*="msword"] > a::before,
+.post-render [data-trix-content-type*="wordprocessingml"] > a::before,
+.post-render [data-trix-content-type*="msword"] > a::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%232563EB'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z'/%3E%3C/svg%3E");
 }
-
 
 /* Spreadsheets / CSV: green */
 
-.trix-content [data-trix-content-type*="spreadsheetml"]>a::before,
-.trix-content [data-trix-content-type*="excel"]>a::before,
-.trix-content [data-trix-content-type="text/csv"]>a::before,
-.post-render [data-trix-content-type*="spreadsheetml"]>a::before,
-.post-render [data-trix-content-type*="excel"]>a::before,
-.post-render [data-trix-content-type="text/csv"]>a::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%2316A34A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h1.5a1.125 1.125 0 0 1 1.125 1.125v1.5a1.125 1.125 0 0 1-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m7.5-3.75c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m0 0h-7.5'/%3E%3C/svg%3E");
+.trix-content [data-trix-content-type*="spreadsheetml"] > a::before,
+.trix-content [data-trix-content-type*="excel"] > a::before,
+.trix-content [data-trix-content-type="text/csv"] > a::before,
+.post-render [data-trix-content-type*="spreadsheetml"] > a::before,
+.post-render [data-trix-content-type*="excel"] > a::before,
+.post-render [data-trix-content-type="text/csv"] > a::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%2316A34A'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h1.5a1.125 1.125 0 0 1 1.125 1.125v1.5a1.125 1.125 0 0 1-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m7.5-3.75c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m0 0h-7.5'/%3E%3C/svg%3E");
 }
-
 
 /* Presentations: orange */
 
-.trix-content [data-trix-content-type*="presentationml"]>a::before,
-.trix-content [data-trix-content-type*="powerpoint"]>a::before,
-.post-render [data-trix-content-type*="presentationml"]>a::before,
-.post-render [data-trix-content-type*="powerpoint"]>a::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23EA580C'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605'/%3E%3C/svg%3E");
+.trix-content [data-trix-content-type*="presentationml"] > a::before,
+.trix-content [data-trix-content-type*="powerpoint"] > a::before,
+.post-render [data-trix-content-type*="presentationml"] > a::before,
+.post-render [data-trix-content-type*="powerpoint"] > a::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23EA580C'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605'/%3E%3C/svg%3E");
 }
-
 
 /* Archives (zip / gzip / tar / rar): amber */
 
-.trix-content [data-trix-content-type*="zip"]>a::before,
-.trix-content [data-trix-content-type*="gzip"]>a::before,
-.trix-content [data-trix-content-type*="x-tar"]>a::before,
-.trix-content [data-trix-content-type*="x-rar"]>a::before,
-.post-render [data-trix-content-type*="zip"]>a::before,
-.post-render [data-trix-content-type*="gzip"]>a::before,
-.post-render [data-trix-content-type*="x-tar"]>a::before,
-.post-render [data-trix-content-type*="x-rar"]>a::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23D97706'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z'/%3E%3C/svg%3E");
+.trix-content [data-trix-content-type*="zip"] > a::before,
+.trix-content [data-trix-content-type*="gzip"] > a::before,
+.trix-content [data-trix-content-type*="x-tar"] > a::before,
+.trix-content [data-trix-content-type*="x-rar"] > a::before,
+.post-render [data-trix-content-type*="zip"] > a::before,
+.post-render [data-trix-content-type*="gzip"] > a::before,
+.post-render [data-trix-content-type*="x-tar"] > a::before,
+.post-render [data-trix-content-type*="x-rar"] > a::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23D97706'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z'/%3E%3C/svg%3E");
 }
-
 
 /* Video: violet */
 
-.trix-content [data-trix-content-type^="video/"]>a::before,
-.post-render [data-trix-content-type^="video/"]>a::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%237C3AED'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25z'/%3E%3C/svg%3E");
+.trix-content [data-trix-content-type^="video/"] > a::before,
+.post-render [data-trix-content-type^="video/"] > a::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%237C3AED'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25z'/%3E%3C/svg%3E");
 }
-
 
 /* Audio: pink */
 
-.trix-content [data-trix-content-type^="audio/"]>a::before,
-.post-render [data-trix-content-type^="audio/"]>a::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23DB2777'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m9 9 10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z'/%3E%3C/svg%3E");
+.trix-content [data-trix-content-type^="audio/"] > a::before,
+.post-render [data-trix-content-type^="audio/"] > a::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23DB2777'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m9 9 10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z'/%3E%3C/svg%3E");
 }
-
 
 /* --- Caption: filename stacked above size --- */
 
 .trix-content .attachment--file .attachment__caption,
 .post-render .attachment--file .attachment__caption {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    flex: 1;
-    text-align: left;
-    padding: 0;
-    margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+  padding: 0;
+  margin: 0;
 }
 
 .trix-content .attachment--file .attachment__name,
 .post-render .attachment--file .attachment__name {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #1f2937;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 .trix-content .attachment--file .attachment__size,
 .post-render .attachment--file .attachment__size {
-    font-size: 0.75rem;
-    color: #9ca3af;
-    display: block;
-    margin-top: 0.1em;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  display: block;
+  margin-top: 0.1em;
 }
-
 
 /* Remove the bullet separator (name and size are now stacked) */
 
-.trix-content .attachment--file .attachment__caption .attachment__name+.attachment__size::before,
-.post-render .attachment--file .attachment__caption .attachment__name+.attachment__size::before {
-    content: none;
+.trix-content
+  .attachment--file
+  .attachment__caption
+  .attachment__name
+  + .attachment__size::before,
+.post-render
+  .attachment--file
+  .attachment__caption
+  .attachment__name
+  + .attachment__size::before {
+  content: none;
 }
-
 
 /* --- Download arrow (::after on the <a>) --- */
 
-.trix-content .attachment--file>a::after,
-.post-render .attachment--file>a::after {
-    content: "";
-    flex-shrink: 0;
-    width: 1.125rem;
-    height: 1.125rem;
-    margin-left: auto;
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-    opacity: 0.35;
-    transition: opacity 0.15s;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3'/%3E%3C/svg%3E");
+.trix-content .attachment--file > a::after,
+.post-render .attachment--file > a::after {
+  content: "";
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-left: auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%236B7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3'/%3E%3C/svg%3E");
 }
 
-.trix-content .attachment--file>a:hover::after,
-.post-render .attachment--file>a:hover::after {
-    opacity: 0.7;
+.trix-content .attachment--file > a:hover::after,
+.post-render .attachment--file > a:hover::after {
+  opacity: 0.7;
 }
 
 .attachment-gallery {
-    display: flex;
-    flex-wrap: wrap;
-    position: relative;
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
+  display: flex;
+  flex-wrap: wrap;
+  position: relative;
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
 }
 
 .trix-content figure,
 .post-render figure {
-    padding-top: 1em !important;
-    padding-bottom: 1em !important;
-    margin-top: 0em !important;
-    margin-bottom: 0em !important;
+  padding-top: 1em !important;
+  padding-bottom: 1em !important;
+  margin-top: 0em !important;
+  margin-bottom: 0em !important;
 }
 
 .attachment-gallery .attachment {
-    flex: 1 0 33%;
-    padding: 0 0.5em;
-    max-width: 33%;
+  flex: 1 0 33%;
+  padding: 0 0.5em;
+  max-width: 33%;
 }
 
 .attachment-gallery.attachment-gallery--2 .attachment,
 .attachment-gallery.attachment-gallery--4 .attachment {
-    flex-basis: 50%;
-    max-width: 50%;
+  flex-basis: 50%;
+  max-width: 50%;
 }
-
 
 /* Text links inside rendered content */
 
 .post-render a:not(.glightbox) {
-    color: #3b82f6;
-    text-decoration: none;
-    background-image: linear-gradient(#3b82f6, #3b82f6);
-    background-size: 0% 1px;
-    background-position: 0 100%;
-    background-repeat: no-repeat;
-    transition: background-size 0.3s ease, color 0.3s ease;
+  color: #3b82f6;
+  text-decoration: none;
+  background-image: linear-gradient(#3b82f6, #3b82f6);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition:
+    background-size 0.3s ease,
+    color 0.3s ease;
 }
 
 .post-render a:not(.glightbox):hover {
-    color: #2563eb;
-    background-size: 100% 1px;
+  color: #2563eb;
+  background-size: 100% 1px;
 }
 
 .post-render a:not(.glightbox):active {
-    color: #1d4ed8;
+  color: #1d4ed8;
 }
-
 
 /* Inline image figure created by GLightboxHook for plain <a><img>caption</a> */
 
 .post-render figure.post-render-image-figure {
-    display: block;
-    margin: 1.5em 0 !important;
-    padding: 0 !important;
+  display: block;
+  margin: 1.5em 0 !important;
+  padding: 0 !important;
 }
 
 .post-render .post-render-image-figure a {
-    display: block;
-    line-height: 0;
-    border-radius: 0.75rem;
-    overflow: hidden;
-    cursor: zoom-in;
-    transition: opacity 0.2s ease;
-    background-image: none !important;
-    background-size: 0 !important;
-    color: inherit !important;
-    text-decoration: none !important;
+  display: block;
+  line-height: 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  cursor: zoom-in;
+  transition: opacity 0.2s ease;
+  background-image: none !important;
+  background-size: 0 !important;
+  color: inherit !important;
+  text-decoration: none !important;
 }
 
 .post-render .post-render-image-figure a:hover {
-    opacity: 0.85;
-    color: inherit !important;
-    background-size: 0 !important;
+  opacity: 0.85;
+  color: inherit !important;
+  background-size: 0 !important;
 }
 
 .post-render .post-render-image-figure img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 0.75rem;
-    margin: 0 !important;
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 0 !important;
 }
 
 .post-render figcaption.post-render-caption {
-    display: block;
-    margin-top: 0.5em !important;
-    padding: 0 0.25em;
-    font-size: 0.875rem;
-    font-style: italic;
-    color: #78716c;
-    line-height: 1.5;
-    text-align: center;
-    letter-spacing: 0.01em;
+  display: block;
+  margin-top: 0.5em !important;
+  padding: 0 0.25em;
+  font-size: 0.875rem;
+  font-style: italic;
+  color: #78716c;
+  line-height: 1.5;
+  text-align: center;
+  letter-spacing: 0.01em;
 }
-
 
 /* FLAGS */
 
 .fib,
 .fi {
-    background-size: cover;
-    background-position: 50%;
-    background-repeat: no-repeat;
+  background-size: cover;
+  background-position: 50%;
+  background-repeat: no-repeat;
 }
 
 .fi {
-    position: relative;
-    display: inline-block;
-    line-height: 1em;
+  position: relative;
+  display: inline-block;
+  line-height: 1em;
 }
 
 .fi:before {
-    content: " ";
+  content: " ";
 }
-
 
 /*
 === COUNTRY FLAGS ===
 */
 
 .fi-xx {
-    background-image: url(/images/flagicons/flags/4x3/xx.svg);
+  background-image: url(/images/flagicons/flags/4x3/xx.svg);
 }
 
 .fi-xx.fis {
-    background-image: url(/images/flagicons/flags/1x1/xx.svg);
+  background-image: url(/images/flagicons/flags/1x1/xx.svg);
 }
 
 .fi-ad {
-    background-image: url(/images/flagicons/flags/4x3/ad.svg);
+  background-image: url(/images/flagicons/flags/4x3/ad.svg);
 }
 
 .fi-ad.fis {
-    background-image: url(/images/flagicons/flags/1x1/ad.svg);
+  background-image: url(/images/flagicons/flags/1x1/ad.svg);
 }
 
 .fi-ae {
-    background-image: url(/images/flagicons/flags/4x3/ae.svg);
+  background-image: url(/images/flagicons/flags/4x3/ae.svg);
 }
 
 .fi-ae.fis {
-    background-image: url(/images/flagicons/flags/1x1/ae.svg);
+  background-image: url(/images/flagicons/flags/1x1/ae.svg);
 }
 
 .fi-af {
-    background-image: url(/images/flagicons/flags/4x3/af.svg);
+  background-image: url(/images/flagicons/flags/4x3/af.svg);
 }
 
 .fi-af.fis {
-    background-image: url(/images/flagicons/flags/1x1/af.svg);
+  background-image: url(/images/flagicons/flags/1x1/af.svg);
 }
 
 .fi-ag {
-    background-image: url(/images/flagicons/flags/4x3/ag.svg);
+  background-image: url(/images/flagicons/flags/4x3/ag.svg);
 }
 
 .fi-ag.fis {
-    background-image: url(/images/flagicons/flags/1x1/ag.svg);
+  background-image: url(/images/flagicons/flags/1x1/ag.svg);
 }
 
 .fi-ai {
-    background-image: url(/images/flagicons/flags/4x3/ai.svg);
+  background-image: url(/images/flagicons/flags/4x3/ai.svg);
 }
 
 .fi-ai.fis {
-    background-image: url(/images/flagicons/flags/1x1/ai.svg);
+  background-image: url(/images/flagicons/flags/1x1/ai.svg);
 }
 
 .fi-al {
-    background-image: url(/images/flagicons/flags/4x3/al.svg);
+  background-image: url(/images/flagicons/flags/4x3/al.svg);
 }
 
 .fi-al.fis {
-    background-image: url(/images/flagicons/flags/1x1/al.svg);
+  background-image: url(/images/flagicons/flags/1x1/al.svg);
 }
 
 .fi-am {
-    background-image: url(/images/flagicons/flags/4x3/am.svg);
+  background-image: url(/images/flagicons/flags/4x3/am.svg);
 }
 
 .fi-am.fis {
-    background-image: url(/images/flagicons/flags/1x1/am.svg);
+  background-image: url(/images/flagicons/flags/1x1/am.svg);
 }
 
 .fi-ao {
-    background-image: url(/images/flagicons/flags/4x3/ao.svg);
+  background-image: url(/images/flagicons/flags/4x3/ao.svg);
 }
 
 .fi-ao.fis {
-    background-image: url(/images/flagicons/flags/1x1/ao.svg);
+  background-image: url(/images/flagicons/flags/1x1/ao.svg);
 }
 
 .fi-aq {
-    background-image: url(/images/flagicons/flags/4x3/aq.svg);
+  background-image: url(/images/flagicons/flags/4x3/aq.svg);
 }
 
 .fi-aq.fis {
-    background-image: url(/images/flagicons/flags/1x1/aq.svg);
+  background-image: url(/images/flagicons/flags/1x1/aq.svg);
 }
 
 .fi-ar {
-    background-image: url(/images/flagicons/flags/4x3/ar.svg);
+  background-image: url(/images/flagicons/flags/4x3/ar.svg);
 }
 
 .fi-ar.fis {
-    background-image: url(/images/flagicons/flags/1x1/ar.svg);
+  background-image: url(/images/flagicons/flags/1x1/ar.svg);
 }
 
 .fi-as {
-    background-image: url(/images/flagicons/flags/4x3/as.svg);
+  background-image: url(/images/flagicons/flags/4x3/as.svg);
 }
 
 .fi-as.fis {
-    background-image: url(/images/flagicons/flags/1x1/as.svg);
+  background-image: url(/images/flagicons/flags/1x1/as.svg);
 }
 
 .fi-at {
-    background-image: url(/images/flagicons/flags/4x3/at.svg);
+  background-image: url(/images/flagicons/flags/4x3/at.svg);
 }
 
 .fi-at.fis {
-    background-image: url(/images/flagicons/flags/1x1/at.svg);
+  background-image: url(/images/flagicons/flags/1x1/at.svg);
 }
 
 .fi-au {
-    background-image: url(/images/flagicons/flags/4x3/au.svg);
+  background-image: url(/images/flagicons/flags/4x3/au.svg);
 }
 
 .fi-au.fis {
-    background-image: url(/images/flagicons/flags/1x1/au.svg);
+  background-image: url(/images/flagicons/flags/1x1/au.svg);
 }
 
 .fi-aw {
-    background-image: url(/images/flagicons/flags/4x3/aw.svg);
+  background-image: url(/images/flagicons/flags/4x3/aw.svg);
 }
 
 .fi-aw.fis {
-    background-image: url(/images/flagicons/flags/1x1/aw.svg);
+  background-image: url(/images/flagicons/flags/1x1/aw.svg);
 }
 
 .fi-ax {
-    background-image: url(/images/flagicons/flags/4x3/ax.svg);
+  background-image: url(/images/flagicons/flags/4x3/ax.svg);
 }
 
 .fi-ax.fis {
-    background-image: url(/images/flagicons/flags/1x1/ax.svg);
+  background-image: url(/images/flagicons/flags/1x1/ax.svg);
 }
 
 .fi-az {
-    background-image: url(/images/flagicons/flags/4x3/az.svg);
+  background-image: url(/images/flagicons/flags/4x3/az.svg);
 }
 
 .fi-az.fis {
-    background-image: url(/images/flagicons/flags/1x1/az.svg);
+  background-image: url(/images/flagicons/flags/1x1/az.svg);
 }
 
 .fi-ba {
-    background-image: url(/images/flagicons/flags/4x3/ba.svg);
+  background-image: url(/images/flagicons/flags/4x3/ba.svg);
 }
 
 .fi-ba.fis {
-    background-image: url(/images/flagicons/flags/1x1/ba.svg);
+  background-image: url(/images/flagicons/flags/1x1/ba.svg);
 }
 
 .fi-bb {
-    background-image: url(/images/flagicons/flags/4x3/bb.svg);
+  background-image: url(/images/flagicons/flags/4x3/bb.svg);
 }
 
 .fi-bb.fis {
-    background-image: url(/images/flagicons/flags/1x1/bb.svg);
+  background-image: url(/images/flagicons/flags/1x1/bb.svg);
 }
 
 .fi-bd {
-    background-image: url(/images/flagicons/flags/4x3/bd.svg);
+  background-image: url(/images/flagicons/flags/4x3/bd.svg);
 }
 
 .fi-bd.fis {
-    background-image: url(/images/flagicons/flags/1x1/bd.svg);
+  background-image: url(/images/flagicons/flags/1x1/bd.svg);
 }
 
 .fi-be {
-    background-image: url(/images/flagicons/flags/4x3/be.svg);
+  background-image: url(/images/flagicons/flags/4x3/be.svg);
 }
 
 .fi-be.fis {
-    background-image: url(/images/flagicons/flags/1x1/be.svg);
+  background-image: url(/images/flagicons/flags/1x1/be.svg);
 }
 
 .fi-bf {
-    background-image: url(/images/flagicons/flags/4x3/bf.svg);
+  background-image: url(/images/flagicons/flags/4x3/bf.svg);
 }
 
 .fi-bf.fis {
-    background-image: url(/images/flagicons/flags/1x1/bf.svg);
+  background-image: url(/images/flagicons/flags/1x1/bf.svg);
 }
 
 .fi-bg {
-    background-image: url(/images/flagicons/flags/4x3/bg.svg);
+  background-image: url(/images/flagicons/flags/4x3/bg.svg);
 }
 
 .fi-bg.fis {
-    background-image: url(/images/flagicons/flags/1x1/bg.svg);
+  background-image: url(/images/flagicons/flags/1x1/bg.svg);
 }
 
 .fi-bh {
-    background-image: url(/images/flagicons/flags/4x3/bh.svg);
+  background-image: url(/images/flagicons/flags/4x3/bh.svg);
 }
 
 .fi-bh.fis {
-    background-image: url(/images/flagicons/flags/1x1/bh.svg);
+  background-image: url(/images/flagicons/flags/1x1/bh.svg);
 }
 
 .fi-bi {
-    background-image: url(/images/flagicons/flags/4x3/bi.svg);
+  background-image: url(/images/flagicons/flags/4x3/bi.svg);
 }
 
 .fi-bi.fis {
-    background-image: url(/images/flagicons/flags/1x1/bi.svg);
+  background-image: url(/images/flagicons/flags/1x1/bi.svg);
 }
 
 .fi-bj {
-    background-image: url(/images/flagicons/flags/4x3/bj.svg);
+  background-image: url(/images/flagicons/flags/4x3/bj.svg);
 }
 
 .fi-bj.fis {
-    background-image: url(/images/flagicons/flags/1x1/bj.svg);
+  background-image: url(/images/flagicons/flags/1x1/bj.svg);
 }
 
 .fi-bl {
-    background-image: url(/images/flagicons/flags/4x3/bl.svg);
+  background-image: url(/images/flagicons/flags/4x3/bl.svg);
 }
 
 .fi-bl.fis {
-    background-image: url(/images/flagicons/flags/1x1/bl.svg);
+  background-image: url(/images/flagicons/flags/1x1/bl.svg);
 }
 
 .fi-bm {
-    background-image: url(/images/flagicons/flags/4x3/bm.svg);
+  background-image: url(/images/flagicons/flags/4x3/bm.svg);
 }
 
 .fi-bm.fis {
-    background-image: url(/images/flagicons/flags/1x1/bm.svg);
+  background-image: url(/images/flagicons/flags/1x1/bm.svg);
 }
 
 .fi-bn {
-    background-image: url(/images/flagicons/flags/4x3/bn.svg);
+  background-image: url(/images/flagicons/flags/4x3/bn.svg);
 }
 
 .fi-bn.fis {
-    background-image: url(/images/flagicons/flags/1x1/bn.svg);
+  background-image: url(/images/flagicons/flags/1x1/bn.svg);
 }
 
 .fi-bo {
-    background-image: url(/images/flagicons/flags/4x3/bo.svg);
+  background-image: url(/images/flagicons/flags/4x3/bo.svg);
 }
 
 .fi-bo.fis {
-    background-image: url(/images/flagicons/flags/1x1/bo.svg);
+  background-image: url(/images/flagicons/flags/1x1/bo.svg);
 }
 
 .fi-bq {
-    background-image: url(/images/flagicons/flags/4x3/bq.svg);
+  background-image: url(/images/flagicons/flags/4x3/bq.svg);
 }
 
 .fi-bq.fis {
-    background-image: url(/images/flagicons/flags/1x1/bq.svg);
+  background-image: url(/images/flagicons/flags/1x1/bq.svg);
 }
 
 .fi-br {
-    background-image: url(/images/flagicons/flags/4x3/br.svg);
+  background-image: url(/images/flagicons/flags/4x3/br.svg);
 }
 
 .fi-br.fis {
-    background-image: url(/images/flagicons/flags/1x1/br.svg);
+  background-image: url(/images/flagicons/flags/1x1/br.svg);
 }
 
 .fi-bs {
-    background-image: url(/images/flagicons/flags/4x3/bs.svg);
+  background-image: url(/images/flagicons/flags/4x3/bs.svg);
 }
 
 .fi-bs.fis {
-    background-image: url(/images/flagicons/flags/1x1/bs.svg);
+  background-image: url(/images/flagicons/flags/1x1/bs.svg);
 }
 
 .fi-bt {
-    background-image: url(/images/flagicons/flags/4x3/bt.svg);
+  background-image: url(/images/flagicons/flags/4x3/bt.svg);
 }
 
 .fi-bt.fis {
-    background-image: url(/images/flagicons/flags/1x1/bt.svg);
+  background-image: url(/images/flagicons/flags/1x1/bt.svg);
 }
 
 .fi-bv {
-    background-image: url(/images/flagicons/flags/4x3/bv.svg);
+  background-image: url(/images/flagicons/flags/4x3/bv.svg);
 }
 
 .fi-bv.fis {
-    background-image: url(/images/flagicons/flags/1x1/bv.svg);
+  background-image: url(/images/flagicons/flags/1x1/bv.svg);
 }
 
 .fi-bw {
-    background-image: url(/images/flagicons/flags/4x3/bw.svg);
+  background-image: url(/images/flagicons/flags/4x3/bw.svg);
 }
 
 .fi-bw.fis {
-    background-image: url(/images/flagicons/flags/1x1/bw.svg);
+  background-image: url(/images/flagicons/flags/1x1/bw.svg);
 }
 
 .fi-by {
-    background-image: url(/images/flagicons/flags/4x3/by.svg);
+  background-image: url(/images/flagicons/flags/4x3/by.svg);
 }
 
 .fi-by.fis {
-    background-image: url(/images/flagicons/flags/1x1/by.svg);
+  background-image: url(/images/flagicons/flags/1x1/by.svg);
 }
 
 .fi-bz {
-    background-image: url(/images/flagicons/flags/4x3/bz.svg);
+  background-image: url(/images/flagicons/flags/4x3/bz.svg);
 }
 
 .fi-bz.fis {
-    background-image: url(/images/flagicons/flags/1x1/bz.svg);
+  background-image: url(/images/flagicons/flags/1x1/bz.svg);
 }
 
 .fi-ca {
-    background-image: url(/images/flagicons/flags/4x3/ca.svg);
+  background-image: url(/images/flagicons/flags/4x3/ca.svg);
 }
 
 .fi-ca.fis {
-    background-image: url(/images/flagicons/flags/1x1/ca.svg);
+  background-image: url(/images/flagicons/flags/1x1/ca.svg);
 }
 
 .fi-cc {
-    background-image: url(/images/flagicons/flags/4x3/cc.svg);
+  background-image: url(/images/flagicons/flags/4x3/cc.svg);
 }
 
 .fi-cc.fis {
-    background-image: url(/images/flagicons/flags/1x1/cc.svg);
+  background-image: url(/images/flagicons/flags/1x1/cc.svg);
 }
 
 .fi-cd {
-    background-image: url(/images/flagicons/flags/4x3/cd.svg);
+  background-image: url(/images/flagicons/flags/4x3/cd.svg);
 }
 
 .fi-cd.fis {
-    background-image: url(/images/flagicons/flags/1x1/cd.svg);
+  background-image: url(/images/flagicons/flags/1x1/cd.svg);
 }
 
 .fi-cf {
-    background-image: url(/images/flagicons/flags/4x3/cf.svg);
+  background-image: url(/images/flagicons/flags/4x3/cf.svg);
 }
 
 .fi-cf.fis {
-    background-image: url(/images/flagicons/flags/1x1/cf.svg);
+  background-image: url(/images/flagicons/flags/1x1/cf.svg);
 }
 
 .fi-cg {
-    background-image: url(/images/flagicons/flags/4x3/cg.svg);
+  background-image: url(/images/flagicons/flags/4x3/cg.svg);
 }
 
 .fi-cg.fis {
-    background-image: url(/images/flagicons/flags/1x1/cg.svg);
+  background-image: url(/images/flagicons/flags/1x1/cg.svg);
 }
 
 .fi-ch {
-    background-image: url(/images/flagicons/flags/4x3/ch.svg);
+  background-image: url(/images/flagicons/flags/4x3/ch.svg);
 }
 
 .fi-ch.fis {
-    background-image: url(/images/flagicons/flags/1x1/ch.svg);
+  background-image: url(/images/flagicons/flags/1x1/ch.svg);
 }
 
 .fi-ci {
-    background-image: url(/images/flagicons/flags/4x3/ci.svg);
+  background-image: url(/images/flagicons/flags/4x3/ci.svg);
 }
 
 .fi-ci.fis {
-    background-image: url(/images/flagicons/flags/1x1/ci.svg);
+  background-image: url(/images/flagicons/flags/1x1/ci.svg);
 }
 
 .fi-ck {
-    background-image: url(/images/flagicons/flags/4x3/ck.svg);
+  background-image: url(/images/flagicons/flags/4x3/ck.svg);
 }
 
 .fi-ck.fis {
-    background-image: url(/images/flagicons/flags/1x1/ck.svg);
+  background-image: url(/images/flagicons/flags/1x1/ck.svg);
 }
 
 .fi-cl {
-    background-image: url(/images/flagicons/flags/4x3/cl.svg);
+  background-image: url(/images/flagicons/flags/4x3/cl.svg);
 }
 
 .fi-cl.fis {
-    background-image: url(/images/flagicons/flags/1x1/cl.svg);
+  background-image: url(/images/flagicons/flags/1x1/cl.svg);
 }
 
 .fi-cm {
-    background-image: url(/images/flagicons/flags/4x3/cm.svg);
+  background-image: url(/images/flagicons/flags/4x3/cm.svg);
 }
 
 .fi-cm.fis {
-    background-image: url(/images/flagicons/flags/1x1/cm.svg);
+  background-image: url(/images/flagicons/flags/1x1/cm.svg);
 }
 
 .fi-cn {
-    background-image: url(/images/flagicons/flags/4x3/cn.svg);
+  background-image: url(/images/flagicons/flags/4x3/cn.svg);
 }
 
 .fi-cn.fis {
-    background-image: url(/images/flagicons/flags/1x1/cn.svg);
+  background-image: url(/images/flagicons/flags/1x1/cn.svg);
 }
 
 .fi-co {
-    background-image: url(/images/flagicons/flags/4x3/co.svg);
+  background-image: url(/images/flagicons/flags/4x3/co.svg);
 }
 
 .fi-co.fis {
-    background-image: url(/images/flagicons/flags/1x1/co.svg);
+  background-image: url(/images/flagicons/flags/1x1/co.svg);
 }
 
 .fi-cr {
-    background-image: url(/images/flagicons/flags/4x3/cr.svg);
+  background-image: url(/images/flagicons/flags/4x3/cr.svg);
 }
 
 .fi-cr.fis {
-    background-image: url(/images/flagicons/flags/1x1/cr.svg);
+  background-image: url(/images/flagicons/flags/1x1/cr.svg);
 }
 
 .fi-cu {
-    background-image: url(/images/flagicons/flags/4x3/cu.svg);
+  background-image: url(/images/flagicons/flags/4x3/cu.svg);
 }
 
 .fi-cu.fis {
-    background-image: url(/images/flagicons/flags/1x1/cu.svg);
+  background-image: url(/images/flagicons/flags/1x1/cu.svg);
 }
 
 .fi-cv {
-    background-image: url(/images/flagicons/flags/4x3/cv.svg);
+  background-image: url(/images/flagicons/flags/4x3/cv.svg);
 }
 
 .fi-cv.fis {
-    background-image: url(/images/flagicons/flags/1x1/cv.svg);
+  background-image: url(/images/flagicons/flags/1x1/cv.svg);
 }
 
 .fi-cw {
-    background-image: url(/images/flagicons/flags/4x3/cw.svg);
+  background-image: url(/images/flagicons/flags/4x3/cw.svg);
 }
 
 .fi-cw.fis {
-    background-image: url(/images/flagicons/flags/1x1/cw.svg);
+  background-image: url(/images/flagicons/flags/1x1/cw.svg);
 }
 
 .fi-cx {
-    background-image: url(/images/flagicons/flags/4x3/cx.svg);
+  background-image: url(/images/flagicons/flags/4x3/cx.svg);
 }
 
 .fi-cx.fis {
-    background-image: url(/images/flagicons/flags/1x1/cx.svg);
+  background-image: url(/images/flagicons/flags/1x1/cx.svg);
 }
 
 .fi-cy {
-    background-image: url(/images/flagicons/flags/4x3/cy.svg);
+  background-image: url(/images/flagicons/flags/4x3/cy.svg);
 }
 
 .fi-cy.fis {
-    background-image: url(/images/flagicons/flags/1x1/cy.svg);
+  background-image: url(/images/flagicons/flags/1x1/cy.svg);
 }
 
 .fi-cz {
-    background-image: url(/images/flagicons/flags/4x3/cz.svg);
+  background-image: url(/images/flagicons/flags/4x3/cz.svg);
 }
 
 .fi-cz.fis {
-    background-image: url(/images/flagicons/flags/1x1/cz.svg);
+  background-image: url(/images/flagicons/flags/1x1/cz.svg);
 }
 
 .fi-de {
-    background-image: url(/images/flagicons/flags/4x3/de.svg);
+  background-image: url(/images/flagicons/flags/4x3/de.svg);
 }
 
 .fi-de.fis {
-    background-image: url(/images/flagicons/flags/1x1/de.svg);
+  background-image: url(/images/flagicons/flags/1x1/de.svg);
 }
 
 .fi-dj {
-    background-image: url(/images/flagicons/flags/4x3/dj.svg);
+  background-image: url(/images/flagicons/flags/4x3/dj.svg);
 }
 
 .fi-dj.fis {
-    background-image: url(/images/flagicons/flags/1x1/dj.svg);
+  background-image: url(/images/flagicons/flags/1x1/dj.svg);
 }
 
 .fi-dk {
-    background-image: url(/images/flagicons/flags/4x3/dk.svg);
+  background-image: url(/images/flagicons/flags/4x3/dk.svg);
 }
 
 .fi-dk.fis {
-    background-image: url(/images/flagicons/flags/1x1/dk.svg);
+  background-image: url(/images/flagicons/flags/1x1/dk.svg);
 }
 
 .fi-dm {
-    background-image: url(/images/flagicons/flags/4x3/dm.svg);
+  background-image: url(/images/flagicons/flags/4x3/dm.svg);
 }
 
 .fi-dm.fis {
-    background-image: url(/images/flagicons/flags/1x1/dm.svg);
+  background-image: url(/images/flagicons/flags/1x1/dm.svg);
 }
 
 .fi-do {
-    background-image: url(/images/flagicons/flags/4x3/do.svg);
+  background-image: url(/images/flagicons/flags/4x3/do.svg);
 }
 
 .fi-do.fis {
-    background-image: url(/images/flagicons/flags/1x1/do.svg);
+  background-image: url(/images/flagicons/flags/1x1/do.svg);
 }
 
 .fi-dz {
-    background-image: url(/images/flagicons/flags/4x3/dz.svg);
+  background-image: url(/images/flagicons/flags/4x3/dz.svg);
 }
 
 .fi-dz.fis {
-    background-image: url(/images/flagicons/flags/1x1/dz.svg);
+  background-image: url(/images/flagicons/flags/1x1/dz.svg);
 }
 
 .fi-ec {
-    background-image: url(/images/flagicons/flags/4x3/ec.svg);
+  background-image: url(/images/flagicons/flags/4x3/ec.svg);
 }
 
 .fi-ec.fis {
-    background-image: url(/images/flagicons/flags/1x1/ec.svg);
+  background-image: url(/images/flagicons/flags/1x1/ec.svg);
 }
 
 .fi-ee {
-    background-image: url(/images/flagicons/flags/4x3/ee.svg);
+  background-image: url(/images/flagicons/flags/4x3/ee.svg);
 }
 
 .fi-ee.fis {
-    background-image: url(/images/flagicons/flags/1x1/ee.svg);
+  background-image: url(/images/flagicons/flags/1x1/ee.svg);
 }
 
 .fi-eg {
-    background-image: url(/images/flagicons/flags/4x3/eg.svg);
+  background-image: url(/images/flagicons/flags/4x3/eg.svg);
 }
 
 .fi-eg.fis {
-    background-image: url(/images/flagicons/flags/1x1/eg.svg);
+  background-image: url(/images/flagicons/flags/1x1/eg.svg);
 }
 
 .fi-eh {
-    background-image: url(/images/flagicons/flags/4x3/eh.svg);
+  background-image: url(/images/flagicons/flags/4x3/eh.svg);
 }
 
 .fi-eh.fis {
-    background-image: url(/images/flagicons/flags/1x1/eh.svg);
+  background-image: url(/images/flagicons/flags/1x1/eh.svg);
 }
 
 .fi-er {
-    background-image: url(/images/flagicons/flags/4x3/er.svg);
+  background-image: url(/images/flagicons/flags/4x3/er.svg);
 }
 
 .fi-er.fis {
-    background-image: url(/images/flagicons/flags/1x1/er.svg);
+  background-image: url(/images/flagicons/flags/1x1/er.svg);
 }
 
 .fi-es {
-    background-image: url(/images/flagicons/flags/4x3/es.svg);
+  background-image: url(/images/flagicons/flags/4x3/es.svg);
 }
 
 .fi-es.fis {
-    background-image: url(/images/flagicons/flags/1x1/es.svg);
+  background-image: url(/images/flagicons/flags/1x1/es.svg);
 }
 
 .fi-et {
-    background-image: url(/images/flagicons/flags/4x3/et.svg);
+  background-image: url(/images/flagicons/flags/4x3/et.svg);
 }
 
 .fi-et.fis {
-    background-image: url(/images/flagicons/flags/1x1/et.svg);
+  background-image: url(/images/flagicons/flags/1x1/et.svg);
 }
 
 .fi-fi {
-    background-image: url(/images/flagicons/flags/4x3/fi.svg);
+  background-image: url(/images/flagicons/flags/4x3/fi.svg);
 }
 
 .fi-fi.fis {
-    background-image: url(/images/flagicons/flags/1x1/fi.svg);
+  background-image: url(/images/flagicons/flags/1x1/fi.svg);
 }
 
 .fi-fj {
-    background-image: url(/images/flagicons/flags/4x3/fj.svg);
+  background-image: url(/images/flagicons/flags/4x3/fj.svg);
 }
 
 .fi-fj.fis {
-    background-image: url(/images/flagicons/flags/1x1/fj.svg);
+  background-image: url(/images/flagicons/flags/1x1/fj.svg);
 }
 
 .fi-fk {
-    background-image: url(/images/flagicons/flags/4x3/fk.svg);
+  background-image: url(/images/flagicons/flags/4x3/fk.svg);
 }
 
 .fi-fk.fis {
-    background-image: url(/images/flagicons/flags/1x1/fk.svg);
+  background-image: url(/images/flagicons/flags/1x1/fk.svg);
 }
 
 .fi-fm {
-    background-image: url(/images/flagicons/flags/4x3/fm.svg);
+  background-image: url(/images/flagicons/flags/4x3/fm.svg);
 }
 
 .fi-fm.fis {
-    background-image: url(/images/flagicons/flags/1x1/fm.svg);
+  background-image: url(/images/flagicons/flags/1x1/fm.svg);
 }
 
 .fi-fo {
-    background-image: url(/images/flagicons/flags/4x3/fo.svg);
+  background-image: url(/images/flagicons/flags/4x3/fo.svg);
 }
 
 .fi-fo.fis {
-    background-image: url(/images/flagicons/flags/1x1/fo.svg);
+  background-image: url(/images/flagicons/flags/1x1/fo.svg);
 }
 
 .fi-fr {
-    background-image: url(/images/flagicons/flags/4x3/fr.svg);
+  background-image: url(/images/flagicons/flags/4x3/fr.svg);
 }
 
 .fi-fr.fis {
-    background-image: url(/images/flagicons/flags/1x1/fr.svg);
+  background-image: url(/images/flagicons/flags/1x1/fr.svg);
 }
 
 .fi-ga {
-    background-image: url(/images/flagicons/flags/4x3/ga.svg);
+  background-image: url(/images/flagicons/flags/4x3/ga.svg);
 }
 
 .fi-ga.fis {
-    background-image: url(/images/flagicons/flags/1x1/ga.svg);
+  background-image: url(/images/flagicons/flags/1x1/ga.svg);
 }
 
 .fi-gb {
-    background-image: url(/images/flagicons/flags/4x3/gb.svg);
+  background-image: url(/images/flagicons/flags/4x3/gb.svg);
 }
 
 .fi-gb.fis {
-    background-image: url(/images/flagicons/flags/1x1/gb.svg);
+  background-image: url(/images/flagicons/flags/1x1/gb.svg);
 }
 
 .fi-gd {
-    background-image: url(/images/flagicons/flags/4x3/gd.svg);
+  background-image: url(/images/flagicons/flags/4x3/gd.svg);
 }
 
 .fi-gd.fis {
-    background-image: url(/images/flagicons/flags/1x1/gd.svg);
+  background-image: url(/images/flagicons/flags/1x1/gd.svg);
 }
 
 .fi-ge {
-    background-image: url(/images/flagicons/flags/4x3/ge.svg);
+  background-image: url(/images/flagicons/flags/4x3/ge.svg);
 }
 
 .fi-ge.fis {
-    background-image: url(/images/flagicons/flags/1x1/ge.svg);
+  background-image: url(/images/flagicons/flags/1x1/ge.svg);
 }
 
 .fi-gf {
-    background-image: url(/images/flagicons/flags/4x3/gf.svg);
+  background-image: url(/images/flagicons/flags/4x3/gf.svg);
 }
 
 .fi-gf.fis {
-    background-image: url(/images/flagicons/flags/1x1/gf.svg);
+  background-image: url(/images/flagicons/flags/1x1/gf.svg);
 }
 
 .fi-gg {
-    background-image: url(/images/flagicons/flags/4x3/gg.svg);
+  background-image: url(/images/flagicons/flags/4x3/gg.svg);
 }
 
 .fi-gg.fis {
-    background-image: url(/images/flagicons/flags/1x1/gg.svg);
+  background-image: url(/images/flagicons/flags/1x1/gg.svg);
 }
 
 .fi-gh {
-    background-image: url(/images/flagicons/flags/4x3/gh.svg);
+  background-image: url(/images/flagicons/flags/4x3/gh.svg);
 }
 
 .fi-gh.fis {
-    background-image: url(/images/flagicons/flags/1x1/gh.svg);
+  background-image: url(/images/flagicons/flags/1x1/gh.svg);
 }
 
 .fi-gi {
-    background-image: url(/images/flagicons/flags/4x3/gi.svg);
+  background-image: url(/images/flagicons/flags/4x3/gi.svg);
 }
 
 .fi-gi.fis {
-    background-image: url(/images/flagicons/flags/1x1/gi.svg);
+  background-image: url(/images/flagicons/flags/1x1/gi.svg);
 }
 
 .fi-gl {
-    background-image: url(/images/flagicons/flags/4x3/gl.svg);
+  background-image: url(/images/flagicons/flags/4x3/gl.svg);
 }
 
 .fi-gl.fis {
-    background-image: url(/images/flagicons/flags/1x1/gl.svg);
+  background-image: url(/images/flagicons/flags/1x1/gl.svg);
 }
 
 .fi-gm {
-    background-image: url(/images/flagicons/flags/4x3/gm.svg);
+  background-image: url(/images/flagicons/flags/4x3/gm.svg);
 }
 
 .fi-gm.fis {
-    background-image: url(/images/flagicons/flags/1x1/gm.svg);
+  background-image: url(/images/flagicons/flags/1x1/gm.svg);
 }
 
 .fi-gn {
-    background-image: url(/images/flagicons/flags/4x3/gn.svg);
+  background-image: url(/images/flagicons/flags/4x3/gn.svg);
 }
 
 .fi-gn.fis {
-    background-image: url(/images/flagicons/flags/1x1/gn.svg);
+  background-image: url(/images/flagicons/flags/1x1/gn.svg);
 }
 
 .fi-gp {
-    background-image: url(/images/flagicons/flags/4x3/gp.svg);
+  background-image: url(/images/flagicons/flags/4x3/gp.svg);
 }
 
 .fi-gp.fis {
-    background-image: url(/images/flagicons/flags/1x1/gp.svg);
+  background-image: url(/images/flagicons/flags/1x1/gp.svg);
 }
 
 .fi-gq {
-    background-image: url(/images/flagicons/flags/4x3/gq.svg);
+  background-image: url(/images/flagicons/flags/4x3/gq.svg);
 }
 
 .fi-gq.fis {
-    background-image: url(/images/flagicons/flags/1x1/gq.svg);
+  background-image: url(/images/flagicons/flags/1x1/gq.svg);
 }
 
 .fi-gr {
-    background-image: url(/images/flagicons/flags/4x3/gr.svg);
+  background-image: url(/images/flagicons/flags/4x3/gr.svg);
 }
 
 .fi-gr.fis {
-    background-image: url(/images/flagicons/flags/1x1/gr.svg);
+  background-image: url(/images/flagicons/flags/1x1/gr.svg);
 }
 
 .fi-gs {
-    background-image: url(/images/flagicons/flags/4x3/gs.svg);
+  background-image: url(/images/flagicons/flags/4x3/gs.svg);
 }
 
 .fi-gs.fis {
-    background-image: url(/images/flagicons/flags/1x1/gs.svg);
+  background-image: url(/images/flagicons/flags/1x1/gs.svg);
 }
 
 .fi-gt {
-    background-image: url(/images/flagicons/flags/4x3/gt.svg);
+  background-image: url(/images/flagicons/flags/4x3/gt.svg);
 }
 
 .fi-gt.fis {
-    background-image: url(/images/flagicons/flags/1x1/gt.svg);
+  background-image: url(/images/flagicons/flags/1x1/gt.svg);
 }
 
 .fi-gu {
-    background-image: url(/images/flagicons/flags/4x3/gu.svg);
+  background-image: url(/images/flagicons/flags/4x3/gu.svg);
 }
 
 .fi-gu.fis {
-    background-image: url(/images/flagicons/flags/1x1/gu.svg);
+  background-image: url(/images/flagicons/flags/1x1/gu.svg);
 }
 
 .fi-gw {
-    background-image: url(/images/flagicons/flags/4x3/gw.svg);
+  background-image: url(/images/flagicons/flags/4x3/gw.svg);
 }
 
 .fi-gw.fis {
-    background-image: url(/images/flagicons/flags/1x1/gw.svg);
+  background-image: url(/images/flagicons/flags/1x1/gw.svg);
 }
 
 .fi-gy {
-    background-image: url(/images/flagicons/flags/4x3/gy.svg);
+  background-image: url(/images/flagicons/flags/4x3/gy.svg);
 }
 
 .fi-gy.fis {
-    background-image: url(/images/flagicons/flags/1x1/gy.svg);
+  background-image: url(/images/flagicons/flags/1x1/gy.svg);
 }
 
 .fi-hk {
-    background-image: url(/images/flagicons/flags/4x3/hk.svg);
+  background-image: url(/images/flagicons/flags/4x3/hk.svg);
 }
 
 .fi-hk.fis {
-    background-image: url(/images/flagicons/flags/1x1/hk.svg);
+  background-image: url(/images/flagicons/flags/1x1/hk.svg);
 }
 
 .fi-hm {
-    background-image: url(/images/flagicons/flags/4x3/hm.svg);
+  background-image: url(/images/flagicons/flags/4x3/hm.svg);
 }
 
 .fi-hm.fis {
-    background-image: url(/images/flagicons/flags/1x1/hm.svg);
+  background-image: url(/images/flagicons/flags/1x1/hm.svg);
 }
 
 .fi-hn {
-    background-image: url(/images/flagicons/flags/4x3/hn.svg);
+  background-image: url(/images/flagicons/flags/4x3/hn.svg);
 }
 
 .fi-hn.fis {
-    background-image: url(/images/flagicons/flags/1x1/hn.svg);
+  background-image: url(/images/flagicons/flags/1x1/hn.svg);
 }
 
 .fi-hr {
-    background-image: url(/images/flagicons/flags/4x3/hr.svg);
+  background-image: url(/images/flagicons/flags/4x3/hr.svg);
 }
 
 .fi-hr.fis {
-    background-image: url(/images/flagicons/flags/1x1/hr.svg);
+  background-image: url(/images/flagicons/flags/1x1/hr.svg);
 }
 
 .fi-ht {
-    background-image: url(/images/flagicons/flags/4x3/ht.svg);
+  background-image: url(/images/flagicons/flags/4x3/ht.svg);
 }
 
 .fi-ht.fis {
-    background-image: url(/images/flagicons/flags/1x1/ht.svg);
+  background-image: url(/images/flagicons/flags/1x1/ht.svg);
 }
 
 .fi-hu {
-    background-image: url(/images/flagicons/flags/4x3/hu.svg);
+  background-image: url(/images/flagicons/flags/4x3/hu.svg);
 }
 
 .fi-hu.fis {
-    background-image: url(/images/flagicons/flags/1x1/hu.svg);
+  background-image: url(/images/flagicons/flags/1x1/hu.svg);
 }
 
 .fi-id {
-    background-image: url(/images/flagicons/flags/4x3/id.svg);
+  background-image: url(/images/flagicons/flags/4x3/id.svg);
 }
 
 .fi-id.fis {
-    background-image: url(/images/flagicons/flags/1x1/id.svg);
+  background-image: url(/images/flagicons/flags/1x1/id.svg);
 }
 
 .fi-ie {
-    background-image: url(/images/flagicons/flags/4x3/ie.svg);
+  background-image: url(/images/flagicons/flags/4x3/ie.svg);
 }
 
 .fi-ie.fis {
-    background-image: url(/images/flagicons/flags/1x1/ie.svg);
+  background-image: url(/images/flagicons/flags/1x1/ie.svg);
 }
 
 .fi-il {
-    background-image: url(/images/flagicons/flags/4x3/il.svg);
+  background-image: url(/images/flagicons/flags/4x3/il.svg);
 }
 
 .fi-il.fis {
-    background-image: url(/images/flagicons/flags/1x1/il.svg);
+  background-image: url(/images/flagicons/flags/1x1/il.svg);
 }
 
 .fi-im {
-    background-image: url(/images/flagicons/flags/4x3/im.svg);
+  background-image: url(/images/flagicons/flags/4x3/im.svg);
 }
 
 .fi-im.fis {
-    background-image: url(/images/flagicons/flags/1x1/im.svg);
+  background-image: url(/images/flagicons/flags/1x1/im.svg);
 }
 
 .fi-in {
-    background-image: url(/images/flagicons/flags/4x3/in.svg);
+  background-image: url(/images/flagicons/flags/4x3/in.svg);
 }
 
 .fi-in.fis {
-    background-image: url(/images/flagicons/flags/1x1/in.svg);
+  background-image: url(/images/flagicons/flags/1x1/in.svg);
 }
 
 .fi-io {
-    background-image: url(/images/flagicons/flags/4x3/io.svg);
+  background-image: url(/images/flagicons/flags/4x3/io.svg);
 }
 
 .fi-io.fis {
-    background-image: url(/images/flagicons/flags/1x1/io.svg);
+  background-image: url(/images/flagicons/flags/1x1/io.svg);
 }
 
 .fi-iq {
-    background-image: url(/images/flagicons/flags/4x3/iq.svg);
+  background-image: url(/images/flagicons/flags/4x3/iq.svg);
 }
 
 .fi-iq.fis {
-    background-image: url(/images/flagicons/flags/1x1/iq.svg);
+  background-image: url(/images/flagicons/flags/1x1/iq.svg);
 }
 
 .fi-ir {
-    background-image: url(/images/flagicons/flags/4x3/ir.svg);
+  background-image: url(/images/flagicons/flags/4x3/ir.svg);
 }
 
 .fi-ir.fis {
-    background-image: url(/images/flagicons/flags/1x1/ir.svg);
+  background-image: url(/images/flagicons/flags/1x1/ir.svg);
 }
 
 .fi-is {
-    background-image: url(/images/flagicons/flags/4x3/is.svg);
+  background-image: url(/images/flagicons/flags/4x3/is.svg);
 }
 
 .fi-is.fis {
-    background-image: url(/images/flagicons/flags/1x1/is.svg);
+  background-image: url(/images/flagicons/flags/1x1/is.svg);
 }
 
 .fi-it {
-    background-image: url(/images/flagicons/flags/4x3/it.svg);
+  background-image: url(/images/flagicons/flags/4x3/it.svg);
 }
 
 .fi-it.fis {
-    background-image: url(/images/flagicons/flags/1x1/it.svg);
+  background-image: url(/images/flagicons/flags/1x1/it.svg);
 }
 
 .fi-je {
-    background-image: url(/images/flagicons/flags/4x3/je.svg);
+  background-image: url(/images/flagicons/flags/4x3/je.svg);
 }
 
 .fi-je.fis {
-    background-image: url(/images/flagicons/flags/1x1/je.svg);
+  background-image: url(/images/flagicons/flags/1x1/je.svg);
 }
 
 .fi-jm {
-    background-image: url(/images/flagicons/flags/4x3/jm.svg);
+  background-image: url(/images/flagicons/flags/4x3/jm.svg);
 }
 
 .fi-jm.fis {
-    background-image: url(/images/flagicons/flags/1x1/jm.svg);
+  background-image: url(/images/flagicons/flags/1x1/jm.svg);
 }
 
 .fi-jo {
-    background-image: url(/images/flagicons/flags/4x3/jo.svg);
+  background-image: url(/images/flagicons/flags/4x3/jo.svg);
 }
 
 .fi-jo.fis {
-    background-image: url(/images/flagicons/flags/1x1/jo.svg);
+  background-image: url(/images/flagicons/flags/1x1/jo.svg);
 }
 
 .fi-jp {
-    background-image: url(/images/flagicons/flags/4x3/jp.svg);
+  background-image: url(/images/flagicons/flags/4x3/jp.svg);
 }
 
 .fi-jp.fis {
-    background-image: url(/images/flagicons/flags/1x1/jp.svg);
+  background-image: url(/images/flagicons/flags/1x1/jp.svg);
 }
 
 .fi-ke {
-    background-image: url(/images/flagicons/flags/4x3/ke.svg);
+  background-image: url(/images/flagicons/flags/4x3/ke.svg);
 }
 
 .fi-ke.fis {
-    background-image: url(/images/flagicons/flags/1x1/ke.svg);
+  background-image: url(/images/flagicons/flags/1x1/ke.svg);
 }
 
 .fi-kg {
-    background-image: url(/images/flagicons/flags/4x3/kg.svg);
+  background-image: url(/images/flagicons/flags/4x3/kg.svg);
 }
 
 .fi-kg.fis {
-    background-image: url(/images/flagicons/flags/1x1/kg.svg);
+  background-image: url(/images/flagicons/flags/1x1/kg.svg);
 }
 
 .fi-kh {
-    background-image: url(/images/flagicons/flags/4x3/kh.svg);
+  background-image: url(/images/flagicons/flags/4x3/kh.svg);
 }
 
 .fi-kh.fis {
-    background-image: url(/images/flagicons/flags/1x1/kh.svg);
+  background-image: url(/images/flagicons/flags/1x1/kh.svg);
 }
 
 .fi-ki {
-    background-image: url(/images/flagicons/flags/4x3/ki.svg);
+  background-image: url(/images/flagicons/flags/4x3/ki.svg);
 }
 
 .fi-ki.fis {
-    background-image: url(/images/flagicons/flags/1x1/ki.svg);
+  background-image: url(/images/flagicons/flags/1x1/ki.svg);
 }
 
 .fi-km {
-    background-image: url(/images/flagicons/flags/4x3/km.svg);
+  background-image: url(/images/flagicons/flags/4x3/km.svg);
 }
 
 .fi-km.fis {
-    background-image: url(/images/flagicons/flags/1x1/km.svg);
+  background-image: url(/images/flagicons/flags/1x1/km.svg);
 }
 
 .fi-kn {
-    background-image: url(/images/flagicons/flags/4x3/kn.svg);
+  background-image: url(/images/flagicons/flags/4x3/kn.svg);
 }
 
 .fi-kn.fis {
-    background-image: url(/images/flagicons/flags/1x1/kn.svg);
+  background-image: url(/images/flagicons/flags/1x1/kn.svg);
 }
 
 .fi-kp {
-    background-image: url(/images/flagicons/flags/4x3/kp.svg);
+  background-image: url(/images/flagicons/flags/4x3/kp.svg);
 }
 
 .fi-kp.fis {
-    background-image: url(/images/flagicons/flags/1x1/kp.svg);
+  background-image: url(/images/flagicons/flags/1x1/kp.svg);
 }
 
 .fi-kr {
-    background-image: url(/images/flagicons/flags/4x3/kr.svg);
+  background-image: url(/images/flagicons/flags/4x3/kr.svg);
 }
 
 .fi-kr.fis {
-    background-image: url(/images/flagicons/flags/1x1/kr.svg);
+  background-image: url(/images/flagicons/flags/1x1/kr.svg);
 }
 
 .fi-kw {
-    background-image: url(/images/flagicons/flags/4x3/kw.svg);
+  background-image: url(/images/flagicons/flags/4x3/kw.svg);
 }
 
 .fi-kw.fis {
-    background-image: url(/images/flagicons/flags/1x1/kw.svg);
+  background-image: url(/images/flagicons/flags/1x1/kw.svg);
 }
 
 .fi-ky {
-    background-image: url(/images/flagicons/flags/4x3/ky.svg);
+  background-image: url(/images/flagicons/flags/4x3/ky.svg);
 }
 
 .fi-ky.fis {
-    background-image: url(/images/flagicons/flags/1x1/ky.svg);
+  background-image: url(/images/flagicons/flags/1x1/ky.svg);
 }
 
 .fi-kz {
-    background-image: url(/images/flagicons/flags/4x3/kz.svg);
+  background-image: url(/images/flagicons/flags/4x3/kz.svg);
 }
 
 .fi-kz.fis {
-    background-image: url(/images/flagicons/flags/1x1/kz.svg);
+  background-image: url(/images/flagicons/flags/1x1/kz.svg);
 }
 
 .fi-la {
-    background-image: url(/images/flagicons/flags/4x3/la.svg);
+  background-image: url(/images/flagicons/flags/4x3/la.svg);
 }
 
 .fi-la.fis {
-    background-image: url(/images/flagicons/flags/1x1/la.svg);
+  background-image: url(/images/flagicons/flags/1x1/la.svg);
 }
 
 .fi-lb {
-    background-image: url(/images/flagicons/flags/4x3/lb.svg);
+  background-image: url(/images/flagicons/flags/4x3/lb.svg);
 }
 
 .fi-lb.fis {
-    background-image: url(/images/flagicons/flags/1x1/lb.svg);
+  background-image: url(/images/flagicons/flags/1x1/lb.svg);
 }
 
 .fi-lc {
-    background-image: url(/images/flagicons/flags/4x3/lc.svg);
+  background-image: url(/images/flagicons/flags/4x3/lc.svg);
 }
 
 .fi-lc.fis {
-    background-image: url(/images/flagicons/flags/1x1/lc.svg);
+  background-image: url(/images/flagicons/flags/1x1/lc.svg);
 }
 
 .fi-li {
-    background-image: url(/images/flagicons/flags/4x3/li.svg);
+  background-image: url(/images/flagicons/flags/4x3/li.svg);
 }
 
 .fi-li.fis {
-    background-image: url(/images/flagicons/flags/1x1/li.svg);
+  background-image: url(/images/flagicons/flags/1x1/li.svg);
 }
 
 .fi-lk {
-    background-image: url(/images/flagicons/flags/4x3/lk.svg);
+  background-image: url(/images/flagicons/flags/4x3/lk.svg);
 }
 
 .fi-lk.fis {
-    background-image: url(/images/flagicons/flags/1x1/lk.svg);
+  background-image: url(/images/flagicons/flags/1x1/lk.svg);
 }
 
 .fi-lr {
-    background-image: url(/images/flagicons/flags/4x3/lr.svg);
+  background-image: url(/images/flagicons/flags/4x3/lr.svg);
 }
 
 .fi-lr.fis {
-    background-image: url(/images/flagicons/flags/1x1/lr.svg);
+  background-image: url(/images/flagicons/flags/1x1/lr.svg);
 }
 
 .fi-ls {
-    background-image: url(/images/flagicons/flags/4x3/ls.svg);
+  background-image: url(/images/flagicons/flags/4x3/ls.svg);
 }
 
 .fi-ls.fis {
-    background-image: url(/images/flagicons/flags/1x1/ls.svg);
+  background-image: url(/images/flagicons/flags/1x1/ls.svg);
 }
 
 .fi-lt {
-    background-image: url(/images/flagicons/flags/4x3/lt.svg);
+  background-image: url(/images/flagicons/flags/4x3/lt.svg);
 }
 
 .fi-lt.fis {
-    background-image: url(/images/flagicons/flags/1x1/lt.svg);
+  background-image: url(/images/flagicons/flags/1x1/lt.svg);
 }
 
 .fi-lu {
-    background-image: url(/images/flagicons/flags/4x3/lu.svg);
+  background-image: url(/images/flagicons/flags/4x3/lu.svg);
 }
 
 .fi-lu.fis {
-    background-image: url(/images/flagicons/flags/1x1/lu.svg);
+  background-image: url(/images/flagicons/flags/1x1/lu.svg);
 }
 
 .fi-lv {
-    background-image: url(/images/flagicons/flags/4x3/lv.svg);
+  background-image: url(/images/flagicons/flags/4x3/lv.svg);
 }
 
 .fi-lv.fis {
-    background-image: url(/images/flagicons/flags/1x1/lv.svg);
+  background-image: url(/images/flagicons/flags/1x1/lv.svg);
 }
 
 .fi-ly {
-    background-image: url(/images/flagicons/flags/4x3/ly.svg);
+  background-image: url(/images/flagicons/flags/4x3/ly.svg);
 }
 
 .fi-ly.fis {
-    background-image: url(/images/flagicons/flags/1x1/ly.svg);
+  background-image: url(/images/flagicons/flags/1x1/ly.svg);
 }
 
 .fi-ma {
-    background-image: url(/images/flagicons/flags/4x3/ma.svg);
+  background-image: url(/images/flagicons/flags/4x3/ma.svg);
 }
 
 .fi-ma.fis {
-    background-image: url(/images/flagicons/flags/1x1/ma.svg);
+  background-image: url(/images/flagicons/flags/1x1/ma.svg);
 }
 
 .fi-mc {
-    background-image: url(/images/flagicons/flags/4x3/mc.svg);
+  background-image: url(/images/flagicons/flags/4x3/mc.svg);
 }
 
 .fi-mc.fis {
-    background-image: url(/images/flagicons/flags/1x1/mc.svg);
+  background-image: url(/images/flagicons/flags/1x1/mc.svg);
 }
 
 .fi-md {
-    background-image: url(/images/flagicons/flags/4x3/md.svg);
+  background-image: url(/images/flagicons/flags/4x3/md.svg);
 }
 
 .fi-md.fis {
-    background-image: url(/images/flagicons/flags/1x1/md.svg);
+  background-image: url(/images/flagicons/flags/1x1/md.svg);
 }
 
 .fi-me {
-    background-image: url(/images/flagicons/flags/4x3/me.svg);
+  background-image: url(/images/flagicons/flags/4x3/me.svg);
 }
 
 .fi-me.fis {
-    background-image: url(/images/flagicons/flags/1x1/me.svg);
+  background-image: url(/images/flagicons/flags/1x1/me.svg);
 }
 
 .fi-mf {
-    background-image: url(/images/flagicons/flags/4x3/mf.svg);
+  background-image: url(/images/flagicons/flags/4x3/mf.svg);
 }
 
 .fi-mf.fis {
-    background-image: url(/images/flagicons/flags/1x1/mf.svg);
+  background-image: url(/images/flagicons/flags/1x1/mf.svg);
 }
 
 .fi-mg {
-    background-image: url(/images/flagicons/flags/4x3/mg.svg);
+  background-image: url(/images/flagicons/flags/4x3/mg.svg);
 }
 
 .fi-mg.fis {
-    background-image: url(/images/flagicons/flags/1x1/mg.svg);
+  background-image: url(/images/flagicons/flags/1x1/mg.svg);
 }
 
 .fi-mh {
-    background-image: url(/images/flagicons/flags/4x3/mh.svg);
+  background-image: url(/images/flagicons/flags/4x3/mh.svg);
 }
 
 .fi-mh.fis {
-    background-image: url(/images/flagicons/flags/1x1/mh.svg);
+  background-image: url(/images/flagicons/flags/1x1/mh.svg);
 }
 
 .fi-mk {
-    background-image: url(/images/flagicons/flags/4x3/mk.svg);
+  background-image: url(/images/flagicons/flags/4x3/mk.svg);
 }
 
 .fi-mk.fis {
-    background-image: url(/images/flagicons/flags/1x1/mk.svg);
+  background-image: url(/images/flagicons/flags/1x1/mk.svg);
 }
 
 .fi-ml {
-    background-image: url(/images/flagicons/flags/4x3/ml.svg);
+  background-image: url(/images/flagicons/flags/4x3/ml.svg);
 }
 
 .fi-ml.fis {
-    background-image: url(/images/flagicons/flags/1x1/ml.svg);
+  background-image: url(/images/flagicons/flags/1x1/ml.svg);
 }
 
 .fi-mm {
-    background-image: url(/images/flagicons/flags/4x3/mm.svg);
+  background-image: url(/images/flagicons/flags/4x3/mm.svg);
 }
 
 .fi-mm.fis {
-    background-image: url(/images/flagicons/flags/1x1/mm.svg);
+  background-image: url(/images/flagicons/flags/1x1/mm.svg);
 }
 
 .fi-mn {
-    background-image: url(/images/flagicons/flags/4x3/mn.svg);
+  background-image: url(/images/flagicons/flags/4x3/mn.svg);
 }
 
 .fi-mn.fis {
-    background-image: url(/images/flagicons/flags/1x1/mn.svg);
+  background-image: url(/images/flagicons/flags/1x1/mn.svg);
 }
 
 .fi-mo {
-    background-image: url(/images/flagicons/flags/4x3/mo.svg);
+  background-image: url(/images/flagicons/flags/4x3/mo.svg);
 }
 
 .fi-mo.fis {
-    background-image: url(/images/flagicons/flags/1x1/mo.svg);
+  background-image: url(/images/flagicons/flags/1x1/mo.svg);
 }
 
 .fi-mp {
-    background-image: url(/images/flagicons/flags/4x3/mp.svg);
+  background-image: url(/images/flagicons/flags/4x3/mp.svg);
 }
 
 .fi-mp.fis {
-    background-image: url(/images/flagicons/flags/1x1/mp.svg);
+  background-image: url(/images/flagicons/flags/1x1/mp.svg);
 }
 
 .fi-mq {
-    background-image: url(/images/flagicons/flags/4x3/mq.svg);
+  background-image: url(/images/flagicons/flags/4x3/mq.svg);
 }
 
 .fi-mq.fis {
-    background-image: url(/images/flagicons/flags/1x1/mq.svg);
+  background-image: url(/images/flagicons/flags/1x1/mq.svg);
 }
 
 .fi-mr {
-    background-image: url(/images/flagicons/flags/4x3/mr.svg);
+  background-image: url(/images/flagicons/flags/4x3/mr.svg);
 }
 
 .fi-mr.fis {
-    background-image: url(/images/flagicons/flags/1x1/mr.svg);
+  background-image: url(/images/flagicons/flags/1x1/mr.svg);
 }
 
 .fi-ms {
-    background-image: url(/images/flagicons/flags/4x3/ms.svg);
+  background-image: url(/images/flagicons/flags/4x3/ms.svg);
 }
 
 .fi-ms.fis {
-    background-image: url(/images/flagicons/flags/1x1/ms.svg);
+  background-image: url(/images/flagicons/flags/1x1/ms.svg);
 }
 
 .fi-mt {
-    background-image: url(/images/flagicons/flags/4x3/mt.svg);
+  background-image: url(/images/flagicons/flags/4x3/mt.svg);
 }
 
 .fi-mt.fis {
-    background-image: url(/images/flagicons/flags/1x1/mt.svg);
+  background-image: url(/images/flagicons/flags/1x1/mt.svg);
 }
 
 .fi-mu {
-    background-image: url(/images/flagicons/flags/4x3/mu.svg);
+  background-image: url(/images/flagicons/flags/4x3/mu.svg);
 }
 
 .fi-mu.fis {
-    background-image: url(/images/flagicons/flags/1x1/mu.svg);
+  background-image: url(/images/flagicons/flags/1x1/mu.svg);
 }
 
 .fi-mv {
-    background-image: url(/images/flagicons/flags/4x3/mv.svg);
+  background-image: url(/images/flagicons/flags/4x3/mv.svg);
 }
 
 .fi-mv.fis {
-    background-image: url(/images/flagicons/flags/1x1/mv.svg);
+  background-image: url(/images/flagicons/flags/1x1/mv.svg);
 }
 
 .fi-mw {
-    background-image: url(/images/flagicons/flags/4x3/mw.svg);
+  background-image: url(/images/flagicons/flags/4x3/mw.svg);
 }
 
 .fi-mw.fis {
-    background-image: url(/images/flagicons/flags/1x1/mw.svg);
+  background-image: url(/images/flagicons/flags/1x1/mw.svg);
 }
 
 .fi-mx {
-    background-image: url(/images/flagicons/flags/4x3/mx.svg);
+  background-image: url(/images/flagicons/flags/4x3/mx.svg);
 }
 
 .fi-mx.fis {
-    background-image: url(/images/flagicons/flags/1x1/mx.svg);
+  background-image: url(/images/flagicons/flags/1x1/mx.svg);
 }
 
 .fi-my {
-    background-image: url(/images/flagicons/flags/4x3/my.svg);
+  background-image: url(/images/flagicons/flags/4x3/my.svg);
 }
 
 .fi-my.fis {
-    background-image: url(/images/flagicons/flags/1x1/my.svg);
+  background-image: url(/images/flagicons/flags/1x1/my.svg);
 }
 
 .fi-mz {
-    background-image: url(/images/flagicons/flags/4x3/mz.svg);
+  background-image: url(/images/flagicons/flags/4x3/mz.svg);
 }
 
 .fi-mz.fis {
-    background-image: url(/images/flagicons/flags/1x1/mz.svg);
+  background-image: url(/images/flagicons/flags/1x1/mz.svg);
 }
 
 .fi-na {
-    background-image: url(/images/flagicons/flags/4x3/na.svg);
+  background-image: url(/images/flagicons/flags/4x3/na.svg);
 }
 
 .fi-na.fis {
-    background-image: url(/images/flagicons/flags/1x1/na.svg);
+  background-image: url(/images/flagicons/flags/1x1/na.svg);
 }
 
 .fi-nc {
-    background-image: url(/images/flagicons/flags/4x3/nc.svg);
+  background-image: url(/images/flagicons/flags/4x3/nc.svg);
 }
 
 .fi-nc.fis {
-    background-image: url(/images/flagicons/flags/1x1/nc.svg);
+  background-image: url(/images/flagicons/flags/1x1/nc.svg);
 }
 
 .fi-ne {
-    background-image: url(/images/flagicons/flags/4x3/ne.svg);
+  background-image: url(/images/flagicons/flags/4x3/ne.svg);
 }
 
 .fi-ne.fis {
-    background-image: url(/images/flagicons/flags/1x1/ne.svg);
+  background-image: url(/images/flagicons/flags/1x1/ne.svg);
 }
 
 .fi-nf {
-    background-image: url(/images/flagicons/flags/4x3/nf.svg);
+  background-image: url(/images/flagicons/flags/4x3/nf.svg);
 }
 
 .fi-nf.fis {
-    background-image: url(/images/flagicons/flags/1x1/nf.svg);
+  background-image: url(/images/flagicons/flags/1x1/nf.svg);
 }
 
 .fi-ng {
-    background-image: url(/images/flagicons/flags/4x3/ng.svg);
+  background-image: url(/images/flagicons/flags/4x3/ng.svg);
 }
 
 .fi-ng.fis {
-    background-image: url(/images/flagicons/flags/1x1/ng.svg);
+  background-image: url(/images/flagicons/flags/1x1/ng.svg);
 }
 
 .fi-ni {
-    background-image: url(/images/flagicons/flags/4x3/ni.svg);
+  background-image: url(/images/flagicons/flags/4x3/ni.svg);
 }
 
 .fi-ni.fis {
-    background-image: url(/images/flagicons/flags/1x1/ni.svg);
+  background-image: url(/images/flagicons/flags/1x1/ni.svg);
 }
 
 .fi-nl {
-    background-image: url(/images/flagicons/flags/4x3/nl.svg);
+  background-image: url(/images/flagicons/flags/4x3/nl.svg);
 }
 
 .fi-nl.fis {
-    background-image: url(/images/flagicons/flags/1x1/nl.svg);
+  background-image: url(/images/flagicons/flags/1x1/nl.svg);
 }
 
 .fi-no {
-    background-image: url(/images/flagicons/flags/4x3/no.svg);
+  background-image: url(/images/flagicons/flags/4x3/no.svg);
 }
 
 .fi-no.fis {
-    background-image: url(/images/flagicons/flags/1x1/no.svg);
+  background-image: url(/images/flagicons/flags/1x1/no.svg);
 }
 
 .fi-np {
-    background-image: url(/images/flagicons/flags/4x3/np.svg);
+  background-image: url(/images/flagicons/flags/4x3/np.svg);
 }
 
 .fi-np.fis {
-    background-image: url(/images/flagicons/flags/1x1/np.svg);
+  background-image: url(/images/flagicons/flags/1x1/np.svg);
 }
 
 .fi-nr {
-    background-image: url(/images/flagicons/flags/4x3/nr.svg);
+  background-image: url(/images/flagicons/flags/4x3/nr.svg);
 }
 
 .fi-nr.fis {
-    background-image: url(/images/flagicons/flags/1x1/nr.svg);
+  background-image: url(/images/flagicons/flags/1x1/nr.svg);
 }
 
 .fi-nu {
-    background-image: url(/images/flagicons/flags/4x3/nu.svg);
+  background-image: url(/images/flagicons/flags/4x3/nu.svg);
 }
 
 .fi-nu.fis {
-    background-image: url(/images/flagicons/flags/1x1/nu.svg);
+  background-image: url(/images/flagicons/flags/1x1/nu.svg);
 }
 
 .fi-nz {
-    background-image: url(/images/flagicons/flags/4x3/nz.svg);
+  background-image: url(/images/flagicons/flags/4x3/nz.svg);
 }
 
 .fi-nz.fis {
-    background-image: url(/images/flagicons/flags/1x1/nz.svg);
+  background-image: url(/images/flagicons/flags/1x1/nz.svg);
 }
 
 .fi-om {
-    background-image: url(/images/flagicons/flags/4x3/om.svg);
+  background-image: url(/images/flagicons/flags/4x3/om.svg);
 }
 
 .fi-om.fis {
-    background-image: url(/images/flagicons/flags/1x1/om.svg);
+  background-image: url(/images/flagicons/flags/1x1/om.svg);
 }
 
 .fi-pa {
-    background-image: url(/images/flagicons/flags/4x3/pa.svg);
+  background-image: url(/images/flagicons/flags/4x3/pa.svg);
 }
 
 .fi-pa.fis {
-    background-image: url(/images/flagicons/flags/1x1/pa.svg);
+  background-image: url(/images/flagicons/flags/1x1/pa.svg);
 }
 
 .fi-pe {
-    background-image: url(/images/flagicons/flags/4x3/pe.svg);
+  background-image: url(/images/flagicons/flags/4x3/pe.svg);
 }
 
 .fi-pe.fis {
-    background-image: url(/images/flagicons/flags/1x1/pe.svg);
+  background-image: url(/images/flagicons/flags/1x1/pe.svg);
 }
 
 .fi-pf {
-    background-image: url(/images/flagicons/flags/4x3/pf.svg);
+  background-image: url(/images/flagicons/flags/4x3/pf.svg);
 }
 
 .fi-pf.fis {
-    background-image: url(/images/flagicons/flags/1x1/pf.svg);
+  background-image: url(/images/flagicons/flags/1x1/pf.svg);
 }
 
 .fi-pg {
-    background-image: url(/images/flagicons/flags/4x3/pg.svg);
+  background-image: url(/images/flagicons/flags/4x3/pg.svg);
 }
 
 .fi-pg.fis {
-    background-image: url(/images/flagicons/flags/1x1/pg.svg);
+  background-image: url(/images/flagicons/flags/1x1/pg.svg);
 }
 
 .fi-ph {
-    background-image: url(/images/flagicons/flags/4x3/ph.svg);
+  background-image: url(/images/flagicons/flags/4x3/ph.svg);
 }
 
 .fi-ph.fis {
-    background-image: url(/images/flagicons/flags/1x1/ph.svg);
+  background-image: url(/images/flagicons/flags/1x1/ph.svg);
 }
 
 .fi-pk {
-    background-image: url(/images/flagicons/flags/4x3/pk.svg);
+  background-image: url(/images/flagicons/flags/4x3/pk.svg);
 }
 
 .fi-pk.fis {
-    background-image: url(/images/flagicons/flags/1x1/pk.svg);
+  background-image: url(/images/flagicons/flags/1x1/pk.svg);
 }
 
 .fi-pl {
-    background-image: url(/images/flagicons/flags/4x3/pl.svg);
+  background-image: url(/images/flagicons/flags/4x3/pl.svg);
 }
 
 .fi-pl.fis {
-    background-image: url(/images/flagicons/flags/1x1/pl.svg);
+  background-image: url(/images/flagicons/flags/1x1/pl.svg);
 }
 
 .fi-pm {
-    background-image: url(/images/flagicons/flags/4x3/pm.svg);
+  background-image: url(/images/flagicons/flags/4x3/pm.svg);
 }
 
 .fi-pm.fis {
-    background-image: url(/images/flagicons/flags/1x1/pm.svg);
+  background-image: url(/images/flagicons/flags/1x1/pm.svg);
 }
 
 .fi-pn {
-    background-image: url(/images/flagicons/flags/4x3/pn.svg);
+  background-image: url(/images/flagicons/flags/4x3/pn.svg);
 }
 
 .fi-pn.fis {
-    background-image: url(/images/flagicons/flags/1x1/pn.svg);
+  background-image: url(/images/flagicons/flags/1x1/pn.svg);
 }
 
 .fi-pr {
-    background-image: url(/images/flagicons/flags/4x3/pr.svg);
+  background-image: url(/images/flagicons/flags/4x3/pr.svg);
 }
 
 .fi-pr.fis {
-    background-image: url(/images/flagicons/flags/1x1/pr.svg);
+  background-image: url(/images/flagicons/flags/1x1/pr.svg);
 }
 
 .fi-ps {
-    background-image: url(/images/flagicons/flags/4x3/ps.svg);
+  background-image: url(/images/flagicons/flags/4x3/ps.svg);
 }
 
 .fi-ps.fis {
-    background-image: url(/images/flagicons/flags/1x1/ps.svg);
+  background-image: url(/images/flagicons/flags/1x1/ps.svg);
 }
 
 .fi-pt {
-    background-image: url(/images/flagicons/flags/4x3/pt.svg);
+  background-image: url(/images/flagicons/flags/4x3/pt.svg);
 }
 
 .fi-pt.fis {
-    background-image: url(/images/flagicons/flags/1x1/pt.svg);
+  background-image: url(/images/flagicons/flags/1x1/pt.svg);
 }
 
 .fi-pw {
-    background-image: url(/images/flagicons/flags/4x3/pw.svg);
+  background-image: url(/images/flagicons/flags/4x3/pw.svg);
 }
 
 .fi-pw.fis {
-    background-image: url(/images/flagicons/flags/1x1/pw.svg);
+  background-image: url(/images/flagicons/flags/1x1/pw.svg);
 }
 
 .fi-py {
-    background-image: url(/images/flagicons/flags/4x3/py.svg);
+  background-image: url(/images/flagicons/flags/4x3/py.svg);
 }
 
 .fi-py.fis {
-    background-image: url(/images/flagicons/flags/1x1/py.svg);
+  background-image: url(/images/flagicons/flags/1x1/py.svg);
 }
 
 .fi-qa {
-    background-image: url(/images/flagicons/flags/4x3/qa.svg);
+  background-image: url(/images/flagicons/flags/4x3/qa.svg);
 }
 
 .fi-qa.fis {
-    background-image: url(/images/flagicons/flags/1x1/qa.svg);
+  background-image: url(/images/flagicons/flags/1x1/qa.svg);
 }
 
 .fi-re {
-    background-image: url(/images/flagicons/flags/4x3/re.svg);
+  background-image: url(/images/flagicons/flags/4x3/re.svg);
 }
 
 .fi-re.fis {
-    background-image: url(/images/flagicons/flags/1x1/re.svg);
+  background-image: url(/images/flagicons/flags/1x1/re.svg);
 }
 
 .fi-ro {
-    background-image: url(/images/flagicons/flags/4x3/ro.svg);
+  background-image: url(/images/flagicons/flags/4x3/ro.svg);
 }
 
 .fi-ro.fis {
-    background-image: url(/images/flagicons/flags/1x1/ro.svg);
+  background-image: url(/images/flagicons/flags/1x1/ro.svg);
 }
 
 .fi-rs {
-    background-image: url(/images/flagicons/flags/4x3/rs.svg);
+  background-image: url(/images/flagicons/flags/4x3/rs.svg);
 }
 
 .fi-rs.fis {
-    background-image: url(/images/flagicons/flags/1x1/rs.svg);
+  background-image: url(/images/flagicons/flags/1x1/rs.svg);
 }
 
 .fi-ru {
-    background-image: url(/images/flagicons/flags/4x3/ru.svg);
+  background-image: url(/images/flagicons/flags/4x3/ru.svg);
 }
 
 .fi-ru.fis {
-    background-image: url(/images/flagicons/flags/1x1/ru.svg);
+  background-image: url(/images/flagicons/flags/1x1/ru.svg);
 }
 
 .fi-rw {
-    background-image: url(/images/flagicons/flags/4x3/rw.svg);
+  background-image: url(/images/flagicons/flags/4x3/rw.svg);
 }
 
 .fi-rw.fis {
-    background-image: url(/images/flagicons/flags/1x1/rw.svg);
+  background-image: url(/images/flagicons/flags/1x1/rw.svg);
 }
 
 .fi-sa {
-    background-image: url(/images/flagicons/flags/4x3/sa.svg);
+  background-image: url(/images/flagicons/flags/4x3/sa.svg);
 }
 
 .fi-sa.fis {
-    background-image: url(/images/flagicons/flags/1x1/sa.svg);
+  background-image: url(/images/flagicons/flags/1x1/sa.svg);
 }
 
 .fi-sb {
-    background-image: url(/images/flagicons/flags/4x3/sb.svg);
+  background-image: url(/images/flagicons/flags/4x3/sb.svg);
 }
 
 .fi-sb.fis {
-    background-image: url(/images/flagicons/flags/1x1/sb.svg);
+  background-image: url(/images/flagicons/flags/1x1/sb.svg);
 }
 
 .fi-sc {
-    background-image: url(/images/flagicons/flags/4x3/sc.svg);
+  background-image: url(/images/flagicons/flags/4x3/sc.svg);
 }
 
 .fi-sc.fis {
-    background-image: url(/images/flagicons/flags/1x1/sc.svg);
+  background-image: url(/images/flagicons/flags/1x1/sc.svg);
 }
 
 .fi-sd {
-    background-image: url(/images/flagicons/flags/4x3/sd.svg);
+  background-image: url(/images/flagicons/flags/4x3/sd.svg);
 }
 
 .fi-sd.fis {
-    background-image: url(/images/flagicons/flags/1x1/sd.svg);
+  background-image: url(/images/flagicons/flags/1x1/sd.svg);
 }
 
 .fi-se {
-    background-image: url(/images/flagicons/flags/4x3/se.svg);
+  background-image: url(/images/flagicons/flags/4x3/se.svg);
 }
 
 .fi-se.fis {
-    background-image: url(/images/flagicons/flags/1x1/se.svg);
+  background-image: url(/images/flagicons/flags/1x1/se.svg);
 }
 
 .fi-sg {
-    background-image: url(/images/flagicons/flags/4x3/sg.svg);
+  background-image: url(/images/flagicons/flags/4x3/sg.svg);
 }
 
 .fi-sg.fis {
-    background-image: url(/images/flagicons/flags/1x1/sg.svg);
+  background-image: url(/images/flagicons/flags/1x1/sg.svg);
 }
 
 .fi-sh {
-    background-image: url(/images/flagicons/flags/4x3/sh.svg);
+  background-image: url(/images/flagicons/flags/4x3/sh.svg);
 }
 
 .fi-sh.fis {
-    background-image: url(/images/flagicons/flags/1x1/sh.svg);
+  background-image: url(/images/flagicons/flags/1x1/sh.svg);
 }
 
 .fi-si {
-    background-image: url(/images/flagicons/flags/4x3/si.svg);
+  background-image: url(/images/flagicons/flags/4x3/si.svg);
 }
 
 .fi-si.fis {
-    background-image: url(/images/flagicons/flags/1x1/si.svg);
+  background-image: url(/images/flagicons/flags/1x1/si.svg);
 }
 
 .fi-sj {
-    background-image: url(/images/flagicons/flags/4x3/sj.svg);
+  background-image: url(/images/flagicons/flags/4x3/sj.svg);
 }
 
 .fi-sj.fis {
-    background-image: url(/images/flagicons/flags/1x1/sj.svg);
+  background-image: url(/images/flagicons/flags/1x1/sj.svg);
 }
 
 .fi-sk {
-    background-image: url(/images/flagicons/flags/4x3/sk.svg);
+  background-image: url(/images/flagicons/flags/4x3/sk.svg);
 }
 
 .fi-sk.fis {
-    background-image: url(/images/flagicons/flags/1x1/sk.svg);
+  background-image: url(/images/flagicons/flags/1x1/sk.svg);
 }
 
 .fi-sl {
-    background-image: url(/images/flagicons/flags/4x3/sl.svg);
+  background-image: url(/images/flagicons/flags/4x3/sl.svg);
 }
 
 .fi-sl.fis {
-    background-image: url(/images/flagicons/flags/1x1/sl.svg);
+  background-image: url(/images/flagicons/flags/1x1/sl.svg);
 }
 
 .fi-sm {
-    background-image: url(/images/flagicons/flags/4x3/sm.svg);
+  background-image: url(/images/flagicons/flags/4x3/sm.svg);
 }
 
 .fi-sm.fis {
-    background-image: url(/images/flagicons/flags/1x1/sm.svg);
+  background-image: url(/images/flagicons/flags/1x1/sm.svg);
 }
 
 .fi-sn {
-    background-image: url(/images/flagicons/flags/4x3/sn.svg);
+  background-image: url(/images/flagicons/flags/4x3/sn.svg);
 }
 
 .fi-sn.fis {
-    background-image: url(/images/flagicons/flags/1x1/sn.svg);
+  background-image: url(/images/flagicons/flags/1x1/sn.svg);
 }
 
 .fi-so {
-    background-image: url(/images/flagicons/flags/4x3/so.svg);
+  background-image: url(/images/flagicons/flags/4x3/so.svg);
 }
 
 .fi-so.fis {
-    background-image: url(/images/flagicons/flags/1x1/so.svg);
+  background-image: url(/images/flagicons/flags/1x1/so.svg);
 }
 
 .fi-sr {
-    background-image: url(/images/flagicons/flags/4x3/sr.svg);
+  background-image: url(/images/flagicons/flags/4x3/sr.svg);
 }
 
 .fi-sr.fis {
-    background-image: url(/images/flagicons/flags/1x1/sr.svg);
+  background-image: url(/images/flagicons/flags/1x1/sr.svg);
 }
 
 .fi-ss {
-    background-image: url(/images/flagicons/flags/4x3/ss.svg);
+  background-image: url(/images/flagicons/flags/4x3/ss.svg);
 }
 
 .fi-ss.fis {
-    background-image: url(/images/flagicons/flags/1x1/ss.svg);
+  background-image: url(/images/flagicons/flags/1x1/ss.svg);
 }
 
 .fi-st {
-    background-image: url(/images/flagicons/flags/4x3/st.svg);
+  background-image: url(/images/flagicons/flags/4x3/st.svg);
 }
 
 .fi-st.fis {
-    background-image: url(/images/flagicons/flags/1x1/st.svg);
+  background-image: url(/images/flagicons/flags/1x1/st.svg);
 }
 
 .fi-sv {
-    background-image: url(/images/flagicons/flags/4x3/sv.svg);
+  background-image: url(/images/flagicons/flags/4x3/sv.svg);
 }
 
 .fi-sv.fis {
-    background-image: url(/images/flagicons/flags/1x1/sv.svg);
+  background-image: url(/images/flagicons/flags/1x1/sv.svg);
 }
 
 .fi-sx {
-    background-image: url(/images/flagicons/flags/4x3/sx.svg);
+  background-image: url(/images/flagicons/flags/4x3/sx.svg);
 }
 
 .fi-sx.fis {
-    background-image: url(/images/flagicons/flags/1x1/sx.svg);
+  background-image: url(/images/flagicons/flags/1x1/sx.svg);
 }
 
 .fi-sy {
-    background-image: url(/images/flagicons/flags/4x3/sy.svg);
+  background-image: url(/images/flagicons/flags/4x3/sy.svg);
 }
 
 .fi-sy.fis {
-    background-image: url(/images/flagicons/flags/1x1/sy.svg);
+  background-image: url(/images/flagicons/flags/1x1/sy.svg);
 }
 
 .fi-sz {
-    background-image: url(/images/flagicons/flags/4x3/sz.svg);
+  background-image: url(/images/flagicons/flags/4x3/sz.svg);
 }
 
 .fi-sz.fis {
-    background-image: url(/images/flagicons/flags/1x1/sz.svg);
+  background-image: url(/images/flagicons/flags/1x1/sz.svg);
 }
 
 .fi-tc {
-    background-image: url(/images/flagicons/flags/4x3/tc.svg);
+  background-image: url(/images/flagicons/flags/4x3/tc.svg);
 }
 
 .fi-tc.fis {
-    background-image: url(/images/flagicons/flags/1x1/tc.svg);
+  background-image: url(/images/flagicons/flags/1x1/tc.svg);
 }
 
 .fi-td {
-    background-image: url(/images/flagicons/flags/4x3/td.svg);
+  background-image: url(/images/flagicons/flags/4x3/td.svg);
 }
 
 .fi-td.fis {
-    background-image: url(/images/flagicons/flags/1x1/td.svg);
+  background-image: url(/images/flagicons/flags/1x1/td.svg);
 }
 
 .fi-tf {
-    background-image: url(/images/flagicons/flags/4x3/tf.svg);
+  background-image: url(/images/flagicons/flags/4x3/tf.svg);
 }
 
 .fi-tf.fis {
-    background-image: url(/images/flagicons/flags/1x1/tf.svg);
+  background-image: url(/images/flagicons/flags/1x1/tf.svg);
 }
 
 .fi-tg {
-    background-image: url(/images/flagicons/flags/4x3/tg.svg);
+  background-image: url(/images/flagicons/flags/4x3/tg.svg);
 }
 
 .fi-tg.fis {
-    background-image: url(/images/flagicons/flags/1x1/tg.svg);
+  background-image: url(/images/flagicons/flags/1x1/tg.svg);
 }
 
 .fi-th {
-    background-image: url(/images/flagicons/flags/4x3/th.svg);
+  background-image: url(/images/flagicons/flags/4x3/th.svg);
 }
 
 .fi-th.fis {
-    background-image: url(/images/flagicons/flags/1x1/th.svg);
+  background-image: url(/images/flagicons/flags/1x1/th.svg);
 }
 
 .fi-tj {
-    background-image: url(/images/flagicons/flags/4x3/tj.svg);
+  background-image: url(/images/flagicons/flags/4x3/tj.svg);
 }
 
 .fi-tj.fis {
-    background-image: url(/images/flagicons/flags/1x1/tj.svg);
+  background-image: url(/images/flagicons/flags/1x1/tj.svg);
 }
 
 .fi-tk {
-    background-image: url(/images/flagicons/flags/4x3/tk.svg);
+  background-image: url(/images/flagicons/flags/4x3/tk.svg);
 }
 
 .fi-tk.fis {
-    background-image: url(/images/flagicons/flags/1x1/tk.svg);
+  background-image: url(/images/flagicons/flags/1x1/tk.svg);
 }
 
 .fi-tl {
-    background-image: url(/images/flagicons/flags/4x3/tl.svg);
+  background-image: url(/images/flagicons/flags/4x3/tl.svg);
 }
 
 .fi-tl.fis {
-    background-image: url(/images/flagicons/flags/1x1/tl.svg);
+  background-image: url(/images/flagicons/flags/1x1/tl.svg);
 }
 
 .fi-tm {
-    background-image: url(/images/flagicons/flags/4x3/tm.svg);
+  background-image: url(/images/flagicons/flags/4x3/tm.svg);
 }
 
 .fi-tm.fis {
-    background-image: url(/images/flagicons/flags/1x1/tm.svg);
+  background-image: url(/images/flagicons/flags/1x1/tm.svg);
 }
 
 .fi-tn {
-    background-image: url(/images/flagicons/flags/4x3/tn.svg);
+  background-image: url(/images/flagicons/flags/4x3/tn.svg);
 }
 
 .fi-tn.fis {
-    background-image: url(/images/flagicons/flags/1x1/tn.svg);
+  background-image: url(/images/flagicons/flags/1x1/tn.svg);
 }
 
 .fi-to {
-    background-image: url(/images/flagicons/flags/4x3/to.svg);
+  background-image: url(/images/flagicons/flags/4x3/to.svg);
 }
 
 .fi-to.fis {
-    background-image: url(/images/flagicons/flags/1x1/to.svg);
+  background-image: url(/images/flagicons/flags/1x1/to.svg);
 }
 
 .fi-tr {
-    background-image: url(/images/flagicons/flags/4x3/tr.svg);
+  background-image: url(/images/flagicons/flags/4x3/tr.svg);
 }
 
 .fi-tr.fis {
-    background-image: url(/images/flagicons/flags/1x1/tr.svg);
+  background-image: url(/images/flagicons/flags/1x1/tr.svg);
 }
 
 .fi-tt {
-    background-image: url(/images/flagicons/flags/4x3/tt.svg);
+  background-image: url(/images/flagicons/flags/4x3/tt.svg);
 }
 
 .fi-tt.fis {
-    background-image: url(/images/flagicons/flags/1x1/tt.svg);
+  background-image: url(/images/flagicons/flags/1x1/tt.svg);
 }
 
 .fi-tv {
-    background-image: url(/images/flagicons/flags/4x3/tv.svg);
+  background-image: url(/images/flagicons/flags/4x3/tv.svg);
 }
 
 .fi-tv.fis {
-    background-image: url(/images/flagicons/flags/1x1/tv.svg);
+  background-image: url(/images/flagicons/flags/1x1/tv.svg);
 }
 
 .fi-tw {
-    background-image: url(/images/flagicons/flags/4x3/tw.svg);
+  background-image: url(/images/flagicons/flags/4x3/tw.svg);
 }
 
 .fi-tw.fis {
-    background-image: url(/images/flagicons/flags/1x1/tw.svg);
+  background-image: url(/images/flagicons/flags/1x1/tw.svg);
 }
 
 .fi-tz {
-    background-image: url(/images/flagicons/flags/4x3/tz.svg);
+  background-image: url(/images/flagicons/flags/4x3/tz.svg);
 }
 
 .fi-tz.fis {
-    background-image: url(/images/flagicons/flags/1x1/tz.svg);
+  background-image: url(/images/flagicons/flags/1x1/tz.svg);
 }
 
 .fi-ua {
-    background-image: url(/images/flagicons/flags/4x3/ua.svg);
+  background-image: url(/images/flagicons/flags/4x3/ua.svg);
 }
 
 .fi-ua.fis {
-    background-image: url(/images/flagicons/flags/1x1/ua.svg);
+  background-image: url(/images/flagicons/flags/1x1/ua.svg);
 }
 
 .fi-ug {
-    background-image: url(/images/flagicons/flags/4x3/ug.svg);
+  background-image: url(/images/flagicons/flags/4x3/ug.svg);
 }
 
 .fi-ug.fis {
-    background-image: url(/images/flagicons/flags/1x1/ug.svg);
+  background-image: url(/images/flagicons/flags/1x1/ug.svg);
 }
 
 .fi-um {
-    background-image: url(/images/flagicons/flags/4x3/um.svg);
+  background-image: url(/images/flagicons/flags/4x3/um.svg);
 }
 
 .fi-um.fis {
-    background-image: url(/images/flagicons/flags/1x1/um.svg);
+  background-image: url(/images/flagicons/flags/1x1/um.svg);
 }
 
 .fi-us {
-    background-image: url(/images/flagicons/flags/4x3/us.svg);
+  background-image: url(/images/flagicons/flags/4x3/us.svg);
 }
 
 .fi-us.fis {
-    background-image: url(/images/flagicons/flags/1x1/us.svg);
+  background-image: url(/images/flagicons/flags/1x1/us.svg);
 }
 
 .fi-uy {
-    background-image: url(/images/flagicons/flags/4x3/uy.svg);
+  background-image: url(/images/flagicons/flags/4x3/uy.svg);
 }
 
 .fi-uy.fis {
-    background-image: url(/images/flagicons/flags/1x1/uy.svg);
+  background-image: url(/images/flagicons/flags/1x1/uy.svg);
 }
 
 .fi-uz {
-    background-image: url(/images/flagicons/flags/4x3/uz.svg);
+  background-image: url(/images/flagicons/flags/4x3/uz.svg);
 }
 
 .fi-uz.fis {
-    background-image: url(/images/flagicons/flags/1x1/uz.svg);
+  background-image: url(/images/flagicons/flags/1x1/uz.svg);
 }
 
 .fi-va {
-    background-image: url(/images/flagicons/flags/4x3/va.svg);
+  background-image: url(/images/flagicons/flags/4x3/va.svg);
 }
 
 .fi-va.fis {
-    background-image: url(/images/flagicons/flags/1x1/va.svg);
+  background-image: url(/images/flagicons/flags/1x1/va.svg);
 }
 
 .fi-vc {
-    background-image: url(/images/flagicons/flags/4x3/vc.svg);
+  background-image: url(/images/flagicons/flags/4x3/vc.svg);
 }
 
 .fi-vc.fis {
-    background-image: url(/images/flagicons/flags/1x1/vc.svg);
+  background-image: url(/images/flagicons/flags/1x1/vc.svg);
 }
 
 .fi-ve {
-    background-image: url(/images/flagicons/flags/4x3/ve.svg);
+  background-image: url(/images/flagicons/flags/4x3/ve.svg);
 }
 
 .fi-ve.fis {
-    background-image: url(/images/flagicons/flags/1x1/ve.svg);
+  background-image: url(/images/flagicons/flags/1x1/ve.svg);
 }
 
 .fi-vg {
-    background-image: url(/images/flagicons/flags/4x3/vg.svg);
+  background-image: url(/images/flagicons/flags/4x3/vg.svg);
 }
 
 .fi-vg.fis {
-    background-image: url(/images/flagicons/flags/1x1/vg.svg);
+  background-image: url(/images/flagicons/flags/1x1/vg.svg);
 }
 
 .fi-vi {
-    background-image: url(/images/flagicons/flags/4x3/vi.svg);
+  background-image: url(/images/flagicons/flags/4x3/vi.svg);
 }
 
 .fi-vi.fis {
-    background-image: url(/images/flagicons/flags/1x1/vi.svg);
+  background-image: url(/images/flagicons/flags/1x1/vi.svg);
 }
 
 .fi-vn {
-    background-image: url(/images/flagicons/flags/4x3/vn.svg);
+  background-image: url(/images/flagicons/flags/4x3/vn.svg);
 }
 
 .fi-vn.fis {
-    background-image: url(/images/flagicons/flags/1x1/vn.svg);
+  background-image: url(/images/flagicons/flags/1x1/vn.svg);
 }
 
 .fi-vu {
-    background-image: url(/images/flagicons/flags/4x3/vu.svg);
+  background-image: url(/images/flagicons/flags/4x3/vu.svg);
 }
 
 .fi-vu.fis {
-    background-image: url(/images/flagicons/flags/1x1/vu.svg);
+  background-image: url(/images/flagicons/flags/1x1/vu.svg);
 }
 
 .fi-wf {
-    background-image: url(/images/flagicons/flags/4x3/wf.svg);
+  background-image: url(/images/flagicons/flags/4x3/wf.svg);
 }
 
 .fi-wf.fis {
-    background-image: url(/images/flagicons/flags/1x1/wf.svg);
+  background-image: url(/images/flagicons/flags/1x1/wf.svg);
 }
 
 .fi-ws {
-    background-image: url(/images/flagicons/flags/4x3/ws.svg);
+  background-image: url(/images/flagicons/flags/4x3/ws.svg);
 }
 
 .fi-ws.fis {
-    background-image: url(/images/flagicons/flags/1x1/ws.svg);
+  background-image: url(/images/flagicons/flags/1x1/ws.svg);
 }
 
 .fi-ye {
-    background-image: url(/images/flagicons/flags/4x3/ye.svg);
+  background-image: url(/images/flagicons/flags/4x3/ye.svg);
 }
 
 .fi-ye.fis {
-    background-image: url(/images/flagicons/flags/1x1/ye.svg);
+  background-image: url(/images/flagicons/flags/1x1/ye.svg);
 }
 
 .fi-yt {
-    background-image: url(/images/flagicons/flags/4x3/yt.svg);
+  background-image: url(/images/flagicons/flags/4x3/yt.svg);
 }
 
 .fi-yt.fis {
-    background-image: url(/images/flagicons/flags/1x1/yt.svg);
+  background-image: url(/images/flagicons/flags/1x1/yt.svg);
 }
 
 .fi-za {
-    background-image: url(/images/flagicons/flags/4x3/za.svg);
+  background-image: url(/images/flagicons/flags/4x3/za.svg);
 }
 
 .fi-za.fis {
-    background-image: url(/images/flagicons/flags/1x1/za.svg);
+  background-image: url(/images/flagicons/flags/1x1/za.svg);
 }
 
 .fi-zm {
-    background-image: url(/images/flagicons/flags/4x3/zm.svg);
+  background-image: url(/images/flagicons/flags/4x3/zm.svg);
 }
 
 .fi-zm.fis {
-    background-image: url(/images/flagicons/flags/1x1/zm.svg);
+  background-image: url(/images/flagicons/flags/1x1/zm.svg);
 }
 
 .fi-zw {
-    background-image: url(/images/flagicons/flags/4x3/zw.svg);
+  background-image: url(/images/flagicons/flags/4x3/zw.svg);
 }
 
 .fi-zw.fis {
-    background-image: url(/images/flagicons/flags/1x1/zw.svg);
+  background-image: url(/images/flagicons/flags/1x1/zw.svg);
 }
 
 .fi-arab {
-    background-image: url(/images/flagicons/flags/4x3/arab.svg);
+  background-image: url(/images/flagicons/flags/4x3/arab.svg);
 }
 
 .fi-arab.fis {
-    background-image: url(/images/flagicons/flags/1x1/arab.svg);
+  background-image: url(/images/flagicons/flags/1x1/arab.svg);
 }
 
 .fi-cefta {
-    background-image: url(/images/flagicons/flags/4x3/cefta.svg);
+  background-image: url(/images/flagicons/flags/4x3/cefta.svg);
 }
 
 .fi-cefta.fis {
-    background-image: url(/images/flagicons/flags/1x1/cefta.svg);
+  background-image: url(/images/flagicons/flags/1x1/cefta.svg);
 }
 
 .fi-cp {
-    background-image: url(/images/flagicons/flags/4x3/cp.svg);
+  background-image: url(/images/flagicons/flags/4x3/cp.svg);
 }
 
 .fi-cp.fis {
-    background-image: url(/images/flagicons/flags/1x1/cp.svg);
+  background-image: url(/images/flagicons/flags/1x1/cp.svg);
 }
 
 .fi-dg {
-    background-image: url(/images/flagicons/flags/4x3/dg.svg);
+  background-image: url(/images/flagicons/flags/4x3/dg.svg);
 }
 
 .fi-dg.fis {
-    background-image: url(/images/flagicons/flags/1x1/dg.svg);
+  background-image: url(/images/flagicons/flags/1x1/dg.svg);
 }
 
 .fi-eac {
-    background-image: url(/images/flagicons/flags/4x3/eac.svg);
+  background-image: url(/images/flagicons/flags/4x3/eac.svg);
 }
 
 .fi-eac.fis {
-    background-image: url(/images/flagicons/flags/1x1/eac.svg);
+  background-image: url(/images/flagicons/flags/1x1/eac.svg);
 }
 
 .fi-es-ct {
-    background-image: url(/images/flagicons/flags/4x3/es-ct.svg);
+  background-image: url(/images/flagicons/flags/4x3/es-ct.svg);
 }
 
 .fi-es-ct.fis {
-    background-image: url(/images/flagicons/flags/1x1/es-ct.svg);
+  background-image: url(/images/flagicons/flags/1x1/es-ct.svg);
 }
 
 .fi-es-ga {
-    background-image: url(/images/flagicons/flags/4x3/es-ga.svg);
+  background-image: url(/images/flagicons/flags/4x3/es-ga.svg);
 }
 
 .fi-es-ga.fis {
-    background-image: url(/images/flagicons/flags/1x1/es-ga.svg);
+  background-image: url(/images/flagicons/flags/1x1/es-ga.svg);
 }
 
 .fi-es-pv {
-    background-image: url(/images/flagicons/flags/4x3/es-pv.svg);
+  background-image: url(/images/flagicons/flags/4x3/es-pv.svg);
 }
 
 .fi-es-pv.fis {
-    background-image: url(/images/flagicons/flags/1x1/es-pv.svg);
+  background-image: url(/images/flagicons/flags/1x1/es-pv.svg);
 }
 
 .fi-eu {
-    background-image: url(/images/flagicons/flags/4x3/eu.svg);
+  background-image: url(/images/flagicons/flags/4x3/eu.svg);
 }
 
 .fi-eu.fis {
-    background-image: url(/images/flagicons/flags/1x1/eu.svg);
+  background-image: url(/images/flagicons/flags/1x1/eu.svg);
 }
 
 .fi-gb-eng {
-    background-image: url(/images/flagicons/flags/4x3/gb-eng.svg);
+  background-image: url(/images/flagicons/flags/4x3/gb-eng.svg);
 }
 
 .fi-gb-eng.fis {
-    background-image: url(/images/flagicons/flags/1x1/gb-eng.svg);
+  background-image: url(/images/flagicons/flags/1x1/gb-eng.svg);
 }
 
 .fi-gb-nir {
-    background-image: url(/images/flagicons/flags/4x3/gb-nir.svg);
+  background-image: url(/images/flagicons/flags/4x3/gb-nir.svg);
 }
 
 .fi-gb-nir.fis {
-    background-image: url(/images/flagicons/flags/1x1/gb-nir.svg);
+  background-image: url(/images/flagicons/flags/1x1/gb-nir.svg);
 }
 
 .fi-gb-sct {
-    background-image: url(/images/flagicons/flags/4x3/gb-sct.svg);
+  background-image: url(/images/flagicons/flags/4x3/gb-sct.svg);
 }
 
 .fi-gb-sct.fis {
-    background-image: url(/images/flagicons/flags/1x1/gb-sct.svg);
+  background-image: url(/images/flagicons/flags/1x1/gb-sct.svg);
 }
 
 .fi-gb-wls {
-    background-image: url(/images/flagicons/flags/4x3/gb-wls.svg);
+  background-image: url(/images/flagicons/flags/4x3/gb-wls.svg);
 }
 
 .fi-gb-wls.fis {
-    background-image: url(/images/flagicons/flags/1x1/gb-wls.svg);
+  background-image: url(/images/flagicons/flags/1x1/gb-wls.svg);
 }
 
 .fi-ic {
-    background-image: url(/images/flagicons/flags/4x3/ic.svg);
+  background-image: url(/images/flagicons/flags/4x3/ic.svg);
 }
 
 .fi-ic.fis {
-    background-image: url(/images/flagicons/flags/1x1/ic.svg);
+  background-image: url(/images/flagicons/flags/1x1/ic.svg);
 }
 
 .fi-pc {
-    background-image: url(/images/flagicons/flags/4x3/pc.svg);
+  background-image: url(/images/flagicons/flags/4x3/pc.svg);
 }
 
 .fi-pc.fis {
-    background-image: url(/images/flagicons/flags/1x1/pc.svg);
+  background-image: url(/images/flagicons/flags/1x1/pc.svg);
 }
 
 .fi-sh-ac {
-    background-image: url(/images/flagicons/flags/4x3/sh-ac.svg);
+  background-image: url(/images/flagicons/flags/4x3/sh-ac.svg);
 }
 
 .fi-sh-ac.fis {
-    background-image: url(/images/flagicons/flags/1x1/sh-ac.svg);
+  background-image: url(/images/flagicons/flags/1x1/sh-ac.svg);
 }
 
 .fi-sh-hl {
-    background-image: url(/images/flagicons/flags/4x3/sh-hl.svg);
+  background-image: url(/images/flagicons/flags/4x3/sh-hl.svg);
 }
 
 .fi-sh-hl.fis {
-    background-image: url(/images/flagicons/flags/1x1/sh-hl.svg);
+  background-image: url(/images/flagicons/flags/1x1/sh-hl.svg);
 }
 
 .fi-sh-ta {
-    background-image: url(/images/flagicons/flags/4x3/sh-ta.svg);
+  background-image: url(/images/flagicons/flags/4x3/sh-ta.svg);
 }
 
 .fi-sh-ta.fis {
-    background-image: url(/images/flagicons/flags/1x1/sh-ta.svg);
+  background-image: url(/images/flagicons/flags/1x1/sh-ta.svg);
 }
 
 .fi-un {
-    background-image: url(/images/flagicons/flags/4x3/un.svg);
+  background-image: url(/images/flagicons/flags/4x3/un.svg);
 }
 
 .fi-un.fis {
-    background-image: url(/images/flagicons/flags/1x1/un.svg);
+  background-image: url(/images/flagicons/flags/1x1/un.svg);
 }
 
 .fi-xk {
-    background-image: url(/images/flagicons/flags/4x3/xk.svg);
+  background-image: url(/images/flagicons/flags/4x3/xk.svg);
 }
 
 .fi-xk.fis {
-    background-image: url(/images/flagicons/flags/1x1/xk.svg);
+  background-image: url(/images/flagicons/flags/1x1/xk.svg);
 }
-
 
 /* Ticket availability update animation */
 
 .availability-updated {
-    animation: availability-pulse 0.6s ease-in-out;
+  animation: availability-pulse 0.6s ease-in-out;
 }
 
 @keyframes availability-pulse {
-    0% {
-        background-color: transparent;
-    }
-    30% {
-        background-color: rgba(59, 130, 246, 0.15);
-    }
-    100% {
-        background-color: transparent;
-    }
+  0% {
+    background-color: transparent;
+  }
+  30% {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
-
 
 /* Subtle badge border shine animation - Slate variant */
 
 @keyframes badge-shine-slate {
-    0% {
-        box-shadow: 0 0 0 0 rgba(148, 163, 184, 0);
-    }
-    50% {
-        box-shadow: 0 0 8px 2px rgba(148, 163, 184, 0.5);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(148, 163, 184, 0);
-    }
+  0% {
+    box-shadow: 0 0 0 0 rgba(148, 163, 184, 0);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(148, 163, 184, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(148, 163, 184, 0);
+  }
 }
 
 .animate-badge-shine-slate {
-    position: relative;
-    overflow: hidden;
+  position: relative;
+  overflow: hidden;
 }
 
 .group:hover .animate-badge-shine-slate {
-    animation: badge-shine-slate 2s ease-in-out infinite;
+  animation: badge-shine-slate 2s ease-in-out infinite;
 }
 
 .group:hover .animate-badge-shine-slate::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient( 90deg, transparent, rgba(148, 163, 184, 0.4), transparent);
-    animation: shine-sweep 3s ease-in-out infinite;
-    border-radius: inherit;
-    pointer-events: none;
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 163, 184, 0.4),
+    transparent
+  );
+  animation: shine-sweep 3s ease-in-out infinite;
+  border-radius: inherit;
+  pointer-events: none;
 }
-
 
 /* Subtle badge border shine animation - Emerald variant */
 
 @keyframes badge-shine-emerald {
-    0% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    }
-    50% {
-        box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.5);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    }
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
 .animate-badge-shine-emerald {
-    position: relative;
-    overflow: hidden;
+  position: relative;
+  overflow: hidden;
 }
 
 .group:hover .animate-badge-shine-emerald {
-    animation: badge-shine-emerald 2s ease-in-out infinite;
+  animation: badge-shine-emerald 2s ease-in-out infinite;
 }
 
 .group:hover .animate-badge-shine-emerald::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient( 90deg, transparent, rgba(16, 185, 129, 0.4), transparent);
-    animation: shine-sweep 3s ease-in-out infinite;
-    border-radius: inherit;
-    pointer-events: none;
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(16, 185, 129, 0.4),
+    transparent
+  );
+  animation: shine-sweep 3s ease-in-out infinite;
+  border-radius: inherit;
+  pointer-events: none;
 }
 
 /* Subtle badge border shine animation - Orange variant */
 
 @keyframes badge-shine-orange {
-    0% {
-        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
-    }
-    50% {
-        box-shadow: 0 0 8px 2px rgba(249, 115, 22, 0.5);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
-    }
+  0% {
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+  }
+  50% {
+    box-shadow: 0 0 8px 2px rgba(249, 115, 22, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+  }
 }
 
 .animate-badge-shine-orange {
-    position: relative;
-    overflow: hidden;
+  position: relative;
+  overflow: hidden;
 }
 
 .group:hover .animate-badge-shine-orange {
-    animation: badge-shine-orange 2s ease-in-out infinite;
+  animation: badge-shine-orange 2s ease-in-out infinite;
 }
 
 .group:hover .animate-badge-shine-orange::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient( 90deg, transparent, rgba(249, 115, 22, 0.4), transparent);
-    animation: shine-sweep 3s ease-in-out infinite;
-    border-radius: inherit;
-    pointer-events: none;
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(249, 115, 22, 0.4),
+    transparent
+  );
+  animation: shine-sweep 3s ease-in-out infinite;
+  border-radius: inherit;
+  pointer-events: none;
 }
 
 @keyframes shine-sweep {
-    0% {
-        left: -100%;
-    }
-    50% {
-        left: 100%;
-    }
-    100% {
-        left: 100%;
-    }
+  0% {
+    left: -100%;
+  }
+  50% {
+    left: 100%;
+  }
+  100% {
+    left: 100%;
+  }
 }
-
 
 /* Skeleton shimmer for loading placeholders */
 
 .skeleton-shimmer {
-    position: relative;
-    overflow: hidden;
+  position: relative;
+  overflow: hidden;
 }
 
 .skeleton-shimmer::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    transform: translateX(-100%);
-    background: linear-gradient( 90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
-    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.65),
+    transparent
+  );
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes skeleton-shimmer {
-    100% {
-        transform: translateX(100%);
-    }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .skeleton-shimmer::after {
-        animation: none;
-    }
+  .skeleton-shimmer::after {
+    animation: none;
+  }
 }
-
 
 /* Ticket checkout quantity feedback */
 
 @keyframes ticket-qty-pop {
-    0% {
-        transform: scale(1);
-    }
-    40% {
-        transform: scale(1.2);
-    }
-    100% {
-        transform: scale(1);
-    }
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 @keyframes ticket-qty-reject {
-    0%,
-    100% {
-        transform: translateX(0);
-    }
-    20%,
-    60% {
-        transform: translateX(-4px);
-    }
-    40%,
-    80% {
-        transform: translateX(4px);
-    }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
 }
 
 .ticket-qty-pop {
-    display: inline-block;
-    animation: ticket-qty-pop 150ms ease-out;
+  display: inline-block;
+  animation: ticket-qty-pop 150ms ease-out;
 }
 
 .ticket-qty-reject {
-    display: inline-block;
-    animation: ticket-qty-reject 300ms ease-in-out;
+  display: inline-block;
+  animation: ticket-qty-reject 300ms ease-in-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .ticket-qty-pop,
-    .ticket-qty-reject {
-        animation: none;
-    }
+  .ticket-qty-pop,
+  .ticket-qty-reject {
+    animation: none;
+  }
 }
-
 
 /* Hero text shadows for better legibility - only on sm+ screens where text overlays image */
 
 @media (min-width: 640px) {
-    .hero-title-shadow {
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    }
-    .hero-description-shadow {
-        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-    }
+  .hero-title-shadow {
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .hero-description-shadow {
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
 }
 
-
 /* Clear Lake Booking Information Tab Styles */
-
 
 /* Details/Summary accordion styles */
 
 details summary::-webkit-details-marker {
-    display: none;
+  display: none;
 }
 
 details summary .chevron-icon {
-    transition: transform 0.2s ease-in-out;
+  transition: transform 0.2s ease-in-out;
 }
 
 details[open] summary .chevron-icon {
-    transform: rotate(180deg);
+  transform: rotate(180deg);
 }
-
 
 /* Print-friendly styles for Clear Lake booking information */
 
 @media print {
-    details {
-        border: 1px solid #ccc !important;
-        page-break-inside: avoid;
-    }
-    details[open] {
-        display: block !important;
-    }
-    details summary {
-        display: block !important;
-        cursor: default !important;
-    }
-    .image-carousel-container,
-    .sticky-nav,
-    button,
-    a[href^="http"]:after {
-        display: none !important;
-    }
-    .lg\:col-span-2 {
-        grid-column: span 2;
-    }
+  details {
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
+  }
+  details[open] {
+    display: block !important;
+  }
+  details summary {
+    display: block !important;
+    cursor: default !important;
+  }
+  .image-carousel-container,
+  .sticky-nav,
+  button,
+  a[href^="http"]:after {
+    display: none !important;
+  }
+  .lg\:col-span-2 {
+    grid-column: span 2;
+  }
 }
-
 
 /* Datalist dropdown indicator alignment */
 
-
 /* Ensure inputs with datalist have proper right padding for the dropdown indicator */
-
 
 /* This provides space for the native browser dropdown indicator and helps with vertical centering */
 
 input[type="text"][list],
 input[type="search"][list] {
-    padding-right: 2.5rem;
+  padding-right: 2.5rem;
 }
 
-
 /* === TICKET QR CAROUSEL === */
-
 
 /* Hide scrollbar on the scroll-snap viewport across all browsers */
 
 [data-slider-viewport] {
-    -webkit-overflow-scrolling: touch;
-    -ms-overflow-style: none;
-    /* IE and Edge */
-    scrollbar-width: none;
-    /* Firefox */
+  -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 [data-slider-viewport]::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
-
 
 /* Avatar cropper modal */
 
 cropper-canvas {
-    height: 400px;
+  height: 400px;
 }
 
 @media (max-width: 640px) {
-    cropper-canvas {
-        height: 300px;
-    }
+  cropper-canvas {
+    height: 300px;
+  }
 }
-
 
 /* Nordic avatar identity treatments (dev showcase + future rollout) */
 
 .avatar-identity-ring {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 .avatar-identity-peek {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 .avatar-identity-badge img {
-    display: block;
+  display: block;
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# preflight.sh - Run all CI checks locally (compile, format, credo, sobelow, audit, tests)
+# preflight.sh - Run all CI checks locally (compile, format, credo, dialyzer,
+# notification samples, sobelow, audit, tests)
 # shellcheck source-path=SCRIPTDIR
 
 set -euo pipefail
@@ -22,7 +23,7 @@ echo "${GREEN}✓ PostgreSQL is ready${RESET}"
 echo ""
 
 step=0
-total=8
+total=10
 next_step() {
   step=$((step + 1))
   echo "${BOLD}[$step/$total] $1${RESET}"
@@ -66,6 +67,22 @@ if ! mix credo --strict; then
   exit 1
 fi
 echo "${GREEN}✓ Credo checks passed${RESET}"
+echo ""
+
+next_step "Linting notification preview samples..."
+if ! mix lint_notification_samples; then
+  echo "${RED}✗ Notification sample lint failed. Update priv/dev/notification_preview_samples.exs${RESET}"
+  exit 1
+fi
+echo "${GREEN}✓ Notification preview samples OK${RESET}"
+echo ""
+
+next_step "Running Dialyzer..."
+if ! mix dialyzer; then
+  echo "${RED}✗ Dialyzer failed${RESET}"
+  exit 1
+fi
+echo "${GREEN}✓ Dialyzer passed${RESET}"
 echo ""
 
 next_step "Running Sobelow (security audit)..."

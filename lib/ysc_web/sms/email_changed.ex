@@ -7,6 +7,10 @@ defmodule YscWeb.Sms.EmailChanged do
 
   alias YscWeb.Sms.Template
 
+  @preview_keys [:first_name, :new_email]
+
+  def preview_keys, do: @preview_keys
+
   @doc """
   Gets the template name.
   """

@@ -6092,7 +6092,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp retry_invoice_link_help_message do
-    "This payment link didn't work — it may have expired. Open Membership in your account menu to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
+    "This payment link didn't work — it may have expired. Click your name in the top-right corner and open Membership to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
   end
 
   defp subscription_items_contain_price?(subscription, price_id) do

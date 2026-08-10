@@ -15,6 +15,10 @@ Welcome! This document provides an overview of all the documentation available t
   - Stripe testing tips
   - Git workflow
   - IEx tips
+- **[EMAIL_TESTING_GUIDE.md](EMAIL_TESTING_GUIDE.md)** - Preview email & SMS templates
+  - `/dev/notifications` catalog and `/dev/mailbox`
+  - Sample data + `mix lint_notification_samples`
+  - PR screenshot CI
 
 ### 🔀 Contributing
 - **[LIFE_OF_A_CHANGESET.md](LIFE_OF_A_CHANGESET.md)** - How to contribute in detail
@@ -171,9 +175,18 @@ Exported shell vars override `.env`. Never commit `.env`.
 
 ## Email in development
 
-Emails are not sent externally. They are stored in memory and viewable at [http://localhost:4000/dev/mailbox](http://localhost:4000/dev/mailbox) while the server runs (cleared on restart).
+Emails are **not** sent externally in development. You have two preview tools:
 
-Adapter: `Swoosh.Adapters.Local` in dev. Trigger flows by registering a user, resetting a password, or buying a ticket, then open the mailbox.
+| Tool | URL | When to use |
+|------|-----|-------------|
+| **Notification catalog** | http://localhost:4000/dev/notifications | Review every email/SMS template with sample data (no app flow needed) |
+| **Swoosh mailbox** | http://localhost:4000/dev/mailbox | Inspect emails actually sent by workers/controllers |
+
+Adapter: `Swoosh.Adapters.Local`. Mailbox contents clear when the server restarts.
+
+**Sample assigns** live in `priv/dev/notification_preview_samples.exs`. After changing a template, update that file and run `mix lint_notification_samples` (also in `mix precommit`).
+
+Full guide: [EMAIL_TESTING_GUIDE.md](EMAIL_TESTING_GUIDE.md).
 
 ## Newsletter (IEx)
 

@@ -42,15 +42,13 @@ defmodule YscWeb.PasskeyRegistrationLiveTest do
       # The cancel button is inside the ReauthComponent (phx-target={@myself}).
       # The component sends :reauth_cancelled to the parent via send/2 (async),
       # which is then processed in handle_info and calls push_navigate.
-      # The LiveView process exits after the navigate. Calling render/1 after this
-      # raises an exit, which we catch.
-      view
-      |> element("button[phx-click='cancel_reauth']")
-      |> render_click()
-
-      # render/1 processes the queued :reauth_cancelled + push_navigate exit.
-      # The GenServer exits, so the call raises. We just verify it navigated.
+      # The LiveView process exits after the navigate, so render_click/1 or render/1
+      # may raise an exit depending on when the async message is processed.
       try do
+        view
+        |> element("button[phx-click='cancel_reauth']")
+        |> render_click()
+
         render(view)
       catch
         :exit, _ -> :ok

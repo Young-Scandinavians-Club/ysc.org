@@ -22,6 +22,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     MembershipPaymentFailure,
     MembershipRenewalPaymentMethodReminder,
     MembershipRenewalReminder,
+    MembershipEnded,
     MembershipRenewalSuccess,
     OutageNotification,
     BookingCancellationCabinMasterNotification,
@@ -245,6 +246,65 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       html = ConductViolationConfirmation.render(assigns)
       assert is_binary(html)
       assert html =~ "Sam"
+    end
+  end
+
+  describe "MembershipEnded" do
+    test "renders with assigns" do
+      assigns = %{
+        first_name: "Freja",
+        end_date: "August 7, 2026",
+        membership_url: "https://example.com/users/membership",
+        upcoming_events_url: "https://example.com/events"
+      }
+
+      html = MembershipEnded.render(assigns)
+      assert is_binary(html)
+
+      doc = LazyHTML.from_document(html)
+      text = LazyHTML.text(doc)
+      assert text =~ "Freja"
+      assert text =~ "Your Membership Has Ended"
+      assert MembershipEnded.get_template_name() == "membership_ended"
+      assert MembershipEnded.get_subject() == "Your YSC Membership Has Ended"
+    end
+
+    test "prepare_email_data returns correct data" do
+      user = user_fixture()
+
+      ends_at =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :day)
+        |> DateTime.truncate(:second)
+
+      subscription = %{
+        ends_at: ends_at,
+        current_period_end: ends_at,
+        cancel_at_period_end: true
+      }
+
+      data = MembershipEnded.prepare_email_data(user, subscription)
+
+      assert data.first_name == user.first_name
+      assert data.end_date =~ ~r/\w+ \d+, \d{4}/
+      assert data.membership_url =~ "/users/membership"
+    end
+
+    test "prepare_email_data uses current_period_end when ends_at is absent" do
+      user = user_fixture()
+
+      period_end =
+        DateTime.utc_now()
+        |> DateTime.add(-3, :day)
+        |> DateTime.truncate(:second)
+
+      data =
+        MembershipEnded.prepare_email_data(user, %{
+          current_period_end: period_end,
+          cancel_at_period_end: true
+        })
+
+      assert data.end_date =~ ~r/\w+ \d+, \d{4}/
     end
   end
 

@@ -700,6 +700,7 @@ defmodule YscWeb.SecurityAuditTest do
           place_of_birth: "Oslo",
           citizenship: "Norwegian",
           most_connected_nordic_country: "Norway",
+          link_to_scandinavia: "Grandparents from Norway",
           agreed_to_bylaws: true,
           review_outcome: "approved",
           reviewed_at: ~U[2024-01-01 00:00:00Z],
@@ -1061,6 +1062,7 @@ defmodule YscWeb.SecurityAuditTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true
       }
     }
@@ -1732,24 +1734,30 @@ defmodule YscWeb.SecurityAuditTest do
 
     @kiosk_key "security-audit-kiosk-key"
 
+    setup do
+      original = KioskAPIKeyHelper.capture_kiosk_api_key!(@kiosk_key)
+
+      on_exit(fn -> KioskAPIKeyHelper.restore_kiosk_api_key!(original) end)
+
+      :ok
+    end
+
     test "rejects draft bookings at the kiosk check-in API", %{conn: conn} do
-      KioskAPIKeyHelper.with_kiosk_api_key(@kiosk_key, fn ->
-        booking = booking_fixture(%{status: :draft})
+      booking = booking_fixture(%{status: :draft})
 
-        conn =
-          conn
-          |> put_req_header("authorization", "Bearer #{@kiosk_key}")
-          |> put_req_header("content-type", "application/json")
-          |> post(~p"/api/v1/mobile/check-in", %{
-            property: "tahoe",
-            booking_ids: [to_string(booking.id)],
-            rules_agreed: true
-          })
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+        |> put_req_header("content-type", "application/json")
+        |> post(~p"/api/v1/mobile/check-in", %{
+          property: "tahoe",
+          booking_ids: [to_string(booking.id)],
+          rules_agreed: true
+        })
 
-        assert %{"error" => error} = json_response(conn, 422)
-        assert error =~ "not confirmed"
-        refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
-      end)
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "not confirmed"
+      refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
     end
   end
 
@@ -1765,36 +1773,42 @@ defmodule YscWeb.SecurityAuditTest do
 
     @kiosk_key "security-audit-kiosk-key"
 
+    setup do
+      original = KioskAPIKeyHelper.capture_kiosk_api_key!(@kiosk_key)
+
+      on_exit(fn -> KioskAPIKeyHelper.restore_kiosk_api_key!(original) end)
+
+      :ok
+    end
+
     test "omitted dates exclude bookings outside the default window", %{
       conn: conn
     } do
-      KioskAPIKeyHelper.with_kiosk_api_key(@kiosk_key, fn ->
-        {old_checkin, old_checkout} =
-          past_booking_dates_outside_default_window()
+      {old_checkin, old_checkout} =
+        past_booking_dates_outside_default_window()
 
-        {:ok, old_booking} =
-          %{
-            checkin_date: old_checkin,
-            checkout_date: old_checkout,
-            guests_count: 2,
-            property: :tahoe,
-            booking_mode: :buyout,
-            user_id: user_fixture().id,
-            status: :complete,
-            total_price: Money.new(200, :USD)
-          }
-          |> Ysc.Bookings.create_booking()
+      {:ok, old_booking} =
+        %{
+          checkin_date: old_checkin,
+          checkout_date: old_checkout,
+          guests_count: 2,
+          property: :tahoe,
+          booking_mode: :buyout,
+          user_id: user_fixture().id,
+          status: :complete,
+          total_price: Money.new(200, :USD)
+        }
+        |> Ysc.Bookings.create_booking()
 
-        conn =
-          conn
-          |> put_req_header("authorization", "Bearer #{@kiosk_key}")
-          |> put_req_header("accept", "application/json")
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+        |> put_req_header("accept", "application/json")
 
-        response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
-        assert %{"data" => bookings} = json_response(response, 200)
+      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+      assert %{"data" => bookings} = json_response(response, 200)
 
-        refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
-      end)
+      refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
     end
   end
 

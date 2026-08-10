@@ -928,7 +928,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </div>
                             <p class="text-sm text-zinc-600 pt-2 border-t border-zinc-200">
                               <strong>Children 5 and under stay free.</strong>
-                              Please do not include them when registering attendees.
+                              You don't need to count them in your guest total - only include people age 6 and up.
                             </p>
                             <!-- Done Button -->
                             <div class="pt-2">

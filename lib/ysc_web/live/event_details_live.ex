@@ -1064,9 +1064,9 @@ defmodule YscWeb.EventDetailsLive do
                             <% @current_user.state == :pending_approval -> %>
                               Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
                             <% @had_membership? -> %>
-                              Member tickets require an active paid membership. Your membership has expired — open Membership in your account menu to renew.
+                              Member tickets require an active paid membership. Your membership has expired — renew to buy tickets.
                             <% true -> %>
-                              Member tickets require an active paid membership. Open Membership in your account menu to pay dues or activate your membership.
+                              Member tickets require an active paid membership. Pay dues or activate your membership to buy tickets.
                           <% end %>
                         </p>
                         <.link
@@ -1114,10 +1114,10 @@ defmodule YscWeb.EventDetailsLive do
                         <%= if !@event.tickets_tbd do %>
                           <div class="w-full text-center py-2">
                             <p class="font-bold text-green-700 text-sm">
-                              No tickets to buy on this website
+                              Tickets aren't sold here
                             </p>
                             <p class="text-xs text-green-600 mt-1">
-                              Check the event details above for how to attend.
+                              See the event description above for how to RSVP or get tickets.
                             </p>
                           </div>
                         <% end %>
@@ -1283,7 +1283,7 @@ defmodule YscWeb.EventDetailsLive do
                         <% else %>
                           <%= if !@event.tickets_tbd do %>
                             <span class="text-xs font-black text-green-700 uppercase tracking-widest">
-                              No tickets to buy on this website
+                              Tickets aren't sold here
                             </span>
                           <% else %>
                             <%= if @current_user == nil do %>
@@ -6483,7 +6483,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "You need an active, paid YSC membership to buy these tickets. Open Membership in your account menu to renew or activate, then try again.",
+           "You need an active, paid YSC membership to buy these tickets. Click your name in the top-right corner and open Membership to renew or activate, then try again.",
            title: "Membership"
          )
          |> assign(:show_ticket_modal, false)}
@@ -6503,7 +6503,7 @@ defmodule YscWeb.EventDetailsLive do
         error_message =
           case changeset.errors do
             [user_id: {"active membership required to purchase tickets", _}] ->
-              "You need an active, paid YSC membership to buy these tickets. Open Membership in your account menu to renew or activate, then try again."
+              "You need an active, paid YSC membership to buy these tickets. Click your name in the top-right corner and open Membership to renew or activate, then try again."
 
             _ ->
               "We couldn't finish your ticket purchase. Please try again, or email info@ysc.org with the event name if this keeps happening."

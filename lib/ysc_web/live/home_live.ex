@@ -10,11 +10,10 @@ defmodule YscWeb.HomeLive do
     Bookings,
     Events,
     Newsletter,
-    PublicContentCache,
-    Tickets
+    PublicContentCache
   }
 
-  alias Ysc.Events.TicketTierHelpers
+  alias Ysc.Events.EventHelpers
 
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.{PropertyDisplay, Season}
@@ -766,7 +765,7 @@ defmodule YscWeb.HomeLive do
                       Just Added
                     </span>
                   <% end %>
-                  <%= if event_sold_out?(event) do %>
+                  <%= if EventHelpers.event_sold_out?(event) do %>
                     <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-bold uppercase tracking-widest rounded shadow-lg">
                       Sold Out
                     </span>
@@ -1527,28 +1526,28 @@ defmodule YscWeb.HomeLive do
                           <% end %>
                         </div>
                         <div class="flex flex-col gap-1.5">
-                          <%= if order_ids != [] do %>
-                            <div class="flex items-center gap-3">
-                              <.button
+                          <div class="flex items-center gap-3">
+                            <.button
+                              navigate={
+                                ~p"/events/#{event.id}/tickets/qr?return_to=/"
+                              }
+                              color="zinc"
+                              class="!py-1.5 whitespace-nowrap"
+                            >
+                              <.icon name="hero-qr-code" class="w-4 h-4" />
+                              Show event tickets
+                            </.button>
+                            <%= if length(order_ids) == 1 do %>
+                              <.link
                                 navigate={
-                                  ~p"/events/#{event.id}/tickets/qr?return_to=/"
+                                  ~p"/orders/#{List.first(order_ids)}/confirmation"
                                 }
-                                color="zinc"
-                                class="!py-1.5 whitespace-nowrap"
+                                class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                               >
-                                <.icon name="hero-qr-code" class="w-4 h-4" />
-                                Show event tickets
-                              </.button>
-                              <%= if length(order_ids) == 1 do %>
-                                <.link
-                                  navigate={
-                                    ~p"/orders/#{List.first(order_ids)}/confirmation"
-                                  }
-                                  class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
-                                >
-                                  View ticket details
-                                </.link>
-                              <% else %>
+                                View ticket details
+                              </.link>
+                            <% else %>
+                              <%= if length(order_ids) > 1 do %>
                                 <.link
                                   navigate={~p"/users/tickets"}
                                   class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
@@ -1556,12 +1555,8 @@ defmodule YscWeb.HomeLive do
                                   View all tickets
                                 </.link>
                               <% end %>
-                            </div>
-                          <% else %>
-                            <span class="text-xs font-bold text-zinc-400">
-                              No order
-                            </span>
-                          <% end %>
+                            <% end %>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1626,7 +1621,7 @@ defmodule YscWeb.HomeLive do
                   <%= for event <- @upcoming_events do %>
                     <.event_card
                       event={event}
-                      sold_out={event_sold_out?(event)}
+                      sold_out={EventHelpers.event_sold_out?(event)}
                       selling_fast={Map.get(event, :selling_fast, false)}
                     />
                   <% end %>
@@ -2586,95 +2581,6 @@ defmodule YscWeb.HomeLive do
     case Newsletter.get_subscriber_by_email(email) do
       %{subscribed: true} -> true
       _ -> false
-    end
-  end
-
-  defp event_sold_out?(event) do
-    # Get event ID (handle both structs and maps)
-    event_id = Map.get(event, :id) || Map.get(event, "id")
-
-    # Use preloaded ticket_tiers if available (from batch loading), otherwise fetch
-    ticket_tiers =
-      case Map.get(event, :ticket_tiers) do
-        nil -> Events.list_ticket_tiers_for_event(event_id)
-        tiers -> tiers
-      end
-
-    # Filter out donation tiers - donations don't count toward "sold out" status
-    non_donation_tiers =
-      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
-
-    # If there are no non-donation tiers, event is not sold out
-    if Enum.empty?(non_donation_tiers) do
-      false
-    else
-      # Filter out pre-sale tiers (tiers that haven't started selling yet)
-      # We want to check tiers that are on sale OR have ended their sale
-      relevant_tiers =
-        Enum.filter(non_donation_tiers, fn tier ->
-          # Include tiers that are on sale OR have ended their sale
-          # Exclude tiers that haven't started their sale yet (pre-sale)
-          TicketTierHelpers.tier_on_sale?(tier) ||
-            TicketTierHelpers.tier_sale_ended?(tier)
-        end)
-
-      # If there are no relevant tiers (all are pre-sale), event is not sold out
-      if Enum.empty?(relevant_tiers) do
-        false
-      else
-        # Check if all relevant non-donation tiers are sold out
-        # A tier is sold out if available == 0 (unlimited tiers never count as sold out)
-        all_tiers_sold_out =
-          Enum.all?(relevant_tiers, fn tier ->
-            available = get_available_quantity(tier)
-            available == 0
-          end)
-
-        # Also check event capacity if max_attendees is set (ticket_count excludes donations)
-        event_at_capacity =
-          case Map.get(event, :max_attendees) || Map.get(event, "max_attendees") do
-            nil ->
-              false
-
-            _ ->
-              # Use preloaded ticket_count if available, otherwise query
-              case Map.get(event, :ticket_count) do
-                nil ->
-                  Tickets.event_at_capacity?(event)
-
-                ticket_count ->
-                  max_attendees =
-                    Map.get(event, :max_attendees) ||
-                      Map.get(event, "max_attendees")
-
-                  ticket_count >= max_attendees
-              end
-          end
-
-        all_tiers_sold_out || event_at_capacity
-      end
-    end
-  end
-
-  defp get_available_quantity(ticket_tier) do
-    quantity =
-      Map.get(ticket_tier, :quantity) || Map.get(ticket_tier, "quantity")
-
-    sold_count =
-      Map.get(ticket_tier, :sold_tickets_count) ||
-        Map.get(ticket_tier, "sold_tickets_count") || 0
-
-    case quantity do
-      # Unlimited
-      nil ->
-        :unlimited
-
-      0 ->
-        :unlimited
-
-      qty ->
-        available = qty - sold_count
-        max(0, available)
     end
   end
 

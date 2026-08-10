@@ -1,312 +1,158 @@
-# Email Testing Documentation - Summary
+# Email & SMS notification previews
 
-## Overview
+How to review email and SMS templates in development, keep sample data in sync, and what CI posts on PRs.
 
-Added comprehensive documentation about email testing in development using the Phoenix dev inbox (Swoosh local adapter).
+## Quick start
 
-## Email in Development
+With `make dev` running:
 
-The YSC application uses **Swoosh** with the Local adapter in development. All emails are stored in memory and viewable in the browser.
+| What | URL |
+|------|-----|
+| **Template catalog** (all emails + SMS with sample data) | http://localhost:4000/dev/notifications |
+| **Swoosh mailbox** (emails actually sent by the app) | http://localhost:4000/dev/mailbox |
+| Single email HTML | http://localhost:4000/dev/preview-email/`template_name` |
 
-### Swoosh Mailbox (Dev Inbox)
+These routes exist only when `config :ysc, dev_routes: true` (default in `config/dev.exs`).
 
-**URL**: http://localhost:4000/dev/mailbox
+## Two ways to preview
 
-**Purpose**: View all emails sent by the YSC application in development
+### 1. Notification catalog (design review)
 
-**Emails Captured**:
-- User registration confirmations
-- Password reset emails
-- Account notifications
-- Membership-related emails
-- Event confirmations
-- Payment receipts
-- Ticket confirmations
-- All other app-generated emails
+Use this when you want to **see every template** without walking through app flows.
 
-**How it works**:
-```
-YSC App → Swoosh.Adapters.Local → In-memory storage → /dev/mailbox
-```
+1. Open http://localhost:4000/dev/notifications
+2. Use the **Emails** / **SMS** tabs in the sidebar
+3. Click a template name — emails load in an iframe; SMS show in a phone-style bubble
+4. Optional: **Open HTML** / **Send to mailbox** in the header for the selected email
 
-**Key characteristics**:
-- Built into Phoenix via Swoosh
-- Emails stored in memory (cleared on restart)
-- No external dependencies
-- Enabled in development by default
-- Accessible at `/dev/mailbox` endpoint
+Selection is shareable, e.g.  
+`/dev/notifications?type=email&name=membership_ended`
 
-## Documentation Added
+### 2. Swoosh mailbox (integration testing)
 
-### 1. README.md - "Testing Emails in Development" Section
+Use this when you want to verify **real send paths** (Oban workers, preferences, subjects, etc.).
 
-**Location**: Before "Newsletter subscriptions" section
-
-**Content**:
-- Introduction to Swoosh email testing
-- How to access Swoosh mailbox
-- Complete list of email types captured
-- Architecture diagram showing email flow
-- Step-by-step testing instructions for:
-  - User registration emails
-  - Password reset emails
-  - Event/ticket emails
-- Email preview features explanation
-- Email template testing workflow
-- Troubleshooting email testing issues
-
-**Updated**:
-- Useful Development Tools section - Added Swoosh mailbox link
-
-### 2. QUICKREF.md - Email Testing Section
-
-**Location**: After "Newsletter Testing" section
-
-**Content**:
-- Quick test flow for application emails
-- Common email test scenarios
-- Email systems comparison table
-- Tips for choosing the right tool
-
-**Updated**:
-- Useful URLs section - Added Swoosh mailbox entry with description
-
-### 3. DEVELOPMENT_ARCHITECTURE.md - Multiple Enhancements
-
-**Added**:
-
-#### Updated Port Reference Table
-Added Swoosh Mailbox entry showing it shares port 4000 with the app
-
-#### Testing Application Emails Section
-Complete guide under "Common Development Tasks":
-- How to view all sent emails
-- Testing registration emails
-- Testing password resets
-- Testing transactional emails
-- Email systems comparison table
-- Key email files reference
-
-## Key Information
-
-### Quick Access
+1. Trigger a flow (register, reset password, buy a ticket, …)
+2. Open http://localhost:4000/dev/mailbox
+3. Emails are in memory and clear when the server restarts
 
 ```
-All app emails in development:  http://localhost:4000/dev/mailbox
+App → Notifier / worker → Swoosh Local adapter → /dev/mailbox
 ```
 
-**Use the dev mailbox when testing:**
-- User registration/login flows
-- Password reset functionality
-- Account notification emails
-- Payment confirmations
-- Ticket confirmations
-- Event notifications
-- Any email sent by the YSC app
+## Sample data
 
-### Testing Workflows
+Previews use defaults from:
 
-#### Test Registration Email
+[`priv/dev/notification_preview_samples.exs`](../priv/dev/notification_preview_samples.exs)
+
+Structure:
+
+```elixir
+%{
+  emails: %{
+    "membership_ended" => %{first_name: "Astrid", end_date: "...", ...},
+    ...
+  },
+  sms: %{
+    "booking_checkin_reminder" => %{...},
+    ...
+  },
+  sms_auto_replies: %{
+    "opt_in" => "...",
+    "opt_out" => "...",
+    "help" => "..."
+  }
+}
+```
+
+- Use plain maps (no DB) so the catalog works without fixtures
+- Nested assigns like `@event.title` need nested maps with atom keys
+- When you add a new `@assign` in an MJML template, add it here too
+
+### Lint (required for precommit)
 
 ```bash
-# 1. Start dev server
+mix lint_notification_samples
+```
+
+Scans each email `.mjml.eex` (and SMS `preview_keys/0`) and fails if any path is missing from the sample file. Also runs as part of `mix precommit`.
+
+## Editing templates
+
+| Kind | Location |
+|------|----------|
+| Email modules | `lib/ysc_web/emails/*.ex` |
+| Email MJML | `lib/ysc_web/emails/templates/*.mjml.eex` |
+| Shared layout | `base_layout`, `header`, `footer` under the same dirs |
+| SMS modules | `lib/ysc_web/sms/*.ex` |
+| Registration maps | `YscWeb.Emails.Notifier` / `YscWeb.Sms.Notifier` |
+
+Workflow for a new email:
+
+1. Add module + MJML template
+2. Register in `Emails.Notifier` `@template_mappings`
+3. Add a sample entry under `emails` in `notification_preview_samples.exs`
+4. Run `mix lint_notification_samples`
+5. Open `/dev/notifications?type=email&name=your_template`
+
+For SMS, also expose `preview_keys/0` (list of assign atoms) so the linter can check the sample map.
+
+## Local render without the browser
+
+```bash
+# One or more templates → HTML files
+mix ci.email_previews --output-dir /tmp/email_previews \
+  --templates membership_ended,welcome_email
+
+# All registered templates (+ newsletter_edition)
+mix ci.email_previews --output-dir /tmp/email_previews --all
+```
+
+Requires the app to start (Postgres up) because templates call `Endpoint.url/0` via helpers.
+
+## PR screenshots (CI)
+
+On pull requests that change email templates, shared layout, helpers, or the sample file, CI:
+
+1. Detects which templates changed (or re-renders all if layout/samples changed)
+2. Renders HTML with the sample config
+3. Screenshots with Playwright
+4. Updates a **single sticky PR comment** (`<!-- ci-email-previews -->`) with the images
+5. Uploads PNG/HTML as workflow artifacts
+
+Images are hosted on branch `ci/email-preview/pr-<N>`. Fork PRs may skip the comment/branch push; artifacts still upload.
+
+Scripts: `etc/scripts/ci/pr_email_previews.sh`, `etc/scripts/ci/screenshot_email_previews.mjs`.
+
+## Common mailbox checks
+
+```bash
 make dev
 
-# 2. Register a user
-# Visit http://localhost:4000/users/register
-# Enter email: test@example.com
+# Registration
+# → http://localhost:4000/users/register → /dev/mailbox
 
-# 3. View confirmation email
-open http://localhost:4000/dev/mailbox
-```
+# Password reset
+# → http://localhost:4000/users/reset-password → /dev/mailbox
 
-#### Test Password Reset Email
-
-```bash
-# 1. Request password reset
-# Visit http://localhost:4000/users/reset-password
-
-# 2. Check mailbox for reset link
-open http://localhost:4000/dev/mailbox
-```
-
-#### Test Ticket Confirmation
-
-```bash
-# 1. Purchase a ticket
-# Complete checkout process
-
-# 2. Check mailbox for confirmation
-open http://localhost:4000/dev/mailbox
-```
-
-## Configuration
-
-### Swoosh Configuration
-
-Located in `config/config.exs`:
-
-```elixir
-config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Local
-```
-
-This configures Swoosh to use the Local adapter, which stores emails in memory.
-
-### Development Routes
-
-Located in `lib/ysc_web/router.ex`:
-
-```elixir
-if Application.compile_env(:ysc, :dev_routes) do
-  scope "/dev" do
-    pipe_through :browser
-    
-    forward "/mailbox", Plug.Swoosh.MailboxPreview
-  end
-end
-```
-
-The `/dev/mailbox` route is only available when `dev_routes` is enabled (default in development).
-
-## Important Behaviors
-
-### Swoosh Mailbox
-
-**Persists**: Only while Phoenix server is running
-**Cleared when**: Server restarts
-**Storage**: In-memory
-**External dependencies**: None
-
-**Implications**:
-- Fast and simple for development
-- No need for external SMTP server
-- Emails disappear on restart (regenerate as needed)
-- Perfect for rapid development and testing
-
-## Email Template Development
-
-When developing email templates (MJML):
-
-```bash
-# 1. Edit template
-# Example: lib/ysc_web/emails/templates/user_confirmation.mjml.eex
-
-# 2. Trigger the email
-# Perform action that sends email
-
-# 3. View in mailbox
-open http://localhost:4000/dev/mailbox
-
-# 4. Inspect HTML and text versions
-# Click email to see full preview
+# Tickets / bookings
+# → complete a purchase or booking → /dev/mailbox
 ```
 
 ## Troubleshooting
 
-### Emails Not Appearing in /dev/mailbox
+**`/dev/notifications` or `/dev/mailbox` 404**  
+Confirm `config :ysc, dev_routes: true` in `config/dev.exs` and that you restarted after changing it.
 
-**Check dev_routes configuration:**
-```elixir
-# Should be set in config/dev.exs
-config :ysc, dev_routes: true
-```
+**Lint fails after editing MJML**  
+Add the missing keys to `priv/dev/notification_preview_samples.exs` for that template name.
 
-**Verify Swoosh configuration:**
-```elixir
-# In config/config.exs
-config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Local
-```
+**Preview crashes / blank iframe**  
+Render locally with `mix ci.email_previews` to see the error. Often a missing nested key in the sample map.
 
-**Restart Phoenix server:**
-```bash
-# Press Ctrl+C twice
-make dev
-```
+**Mailbox empty**  
+Emails only appear after a real send path runs. Prefer the notification catalog if you only need visual review. Mailbox clears on server restart.
 
-### Mailbox Empty After Restart
-
-This is **expected behavior**:
-- Emails stored in memory
-- Cleared when server restarts
-- Simply trigger new test emails
-
-### Can't Access /dev/mailbox
-
-**Check you're in development mode:**
-```bash
-# Should be running with MIX_ENV=dev (default)
-echo $MIX_ENV  # Should be empty or "dev"
-```
-
-**Verify route exists:**
-```bash
-# Check router.ex has the forward directive
-# Look for: forward "/mailbox", Plug.Swoosh.MailboxPreview
-```
-
-## Comparison with Production
-
-### Development (Swoosh.Adapters.Local)
-- Emails stored in memory
-- Viewable at /dev/mailbox
-- No emails actually sent
-- Perfect for testing
-
-### Production (Different Adapter)
-- Uses real SMTP service (e.g., SendGrid, AWS SES)
-- Emails actually sent to recipients
-- No /dev/mailbox route available
-- Configured via environment variables
-
-## Benefits
-
-1. **No external dependencies** - Swoosh Local adapter works out of the box
-2. **Fast testing** - Immediate email preview without SMTP delays
-3. **Easy debugging** - See exactly what users will receive
-4. **Template testing** - Test both HTML and text versions
-5. **Safe development** - Never accidentally send emails to real addresses
-6. **Complete separation** - App emails and newsletter emails are separate
-7. **Clear organization** - Know where to look for each type of email
-
-## Testing in CI/CD
-
-In test environment, emails can be:
-- Stored in memory (same as dev)
-- Tested for content, recipients, subject
-- Verified without actually sending
-
-Example test:
-```elixir
-test "sends registration email" do
-  user = insert(:user)
-  
-  email = Ysc.Emails.user_confirmation_email(user)
-  
-  assert email.to == user.email
-  assert email.subject =~ "Confirm your account"
-end
-```
-
-## Summary
-
-Email testing documentation now provides:
-✅ Clear explanation of two email systems
-✅ Step-by-step testing workflows
-✅ Quick access URLs for both systems
-✅ Comparison table showing differences
-✅ Troubleshooting common issues
-✅ Email template development guide
-✅ Configuration details
-✅ When to use each system
-
-Developers now have complete understanding of:
-- How to test application emails (Swoosh)
-- How to test emails (dev mailbox)
-- Which tool to use for which purpose
-- How to debug email issues
-
----
-
-**Created**: 2026-02-04  
-**Purpose**: Help developers test emails in local development  
-**Status**: Complete ✅
+**SMS not in mailbox**  
+SMS is not stored in Swoosh. Use the SMS tab on `/dev/notifications`. In dev, Flowroute sends are no-ops unless `FLOWROUTE_FORCE_ENABLE=true`.

@@ -541,6 +541,24 @@ defmodule Ysc.BookingsTest do
       refute Enum.any?(without_canceled_refunded, &(&1.id == refunded.id))
     end
 
+    test "list_bookings/4 filters by exclude_booking_modes" do
+      room_booking = booking_fixture()
+
+      day_booking =
+        booking_fixture(%{
+          booking_mode: :day,
+          property: :clear_lake,
+          checkin_date: ~D[2036-09-01],
+          checkout_date: ~D[2036-09-02]
+        })
+
+      without_day =
+        Bookings.list_bookings(nil, nil, nil, exclude_booking_modes: [:day])
+
+      assert Enum.any?(without_day, &(&1.id == room_booking.id))
+      refute Enum.any?(without_day, &(&1.id == day_booking.id))
+    end
+
     test "get_booking!/1 returns the booking with given id" do
       booking = booking_fixture()
       found = Bookings.get_booking!(booking.id)

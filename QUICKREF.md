@@ -100,6 +100,10 @@ make dev-setup        # Set up everything from scratch
 ## Useful URLs
 
 - **Application**: http://localhost:4000
+- **Notification previews (dev)**: http://localhost:4000/dev/notifications
+  - Sidebar catalog of every email + SMS template with sample data
+  - Sample assigns: `priv/dev/notification_preview_samples.exs`
+  - Lint coverage: `mix lint_notification_samples` (also in `mix precommit`)
 - **Email Preview (Swoosh)**: http://localhost:4000/dev/mailbox
   - View all app emails (registration, notifications, tickets, etc.)
   - Emails stored in memory (cleared on restart)
@@ -196,45 +200,42 @@ Ysc.Newsletter.unsubscribe("test@example.com")
 
 ## Email Testing
 
-### Quick Test Flow
+Full guide: [docs/EMAIL_TESTING_GUIDE.md](docs/EMAIL_TESTING_GUIDE.md).
+
+### Preview all templates (no app flow)
 
 ```bash
-# 1. Start dev server
 make dev
+open http://localhost:4000/dev/notifications
+```
 
-# 2. Trigger an email (e.g., register a user)
-# Visit http://localhost:4000/users/register
+Sidebar lists every email and SMS with sample data. Deep link example:
 
-# 3. View email in Swoosh mailbox
+`http://localhost:4000/dev/notifications?type=email&name=membership_ended`
+
+### Preview emails the app actually sent
+
+```bash
+make dev
+# Trigger a flow (register, reset password, buy a ticket, …)
 open http://localhost:4000/dev/mailbox
 ```
 
-### Common Email Tests
+### Sample data & lint
 
-**Registration email:**
-
-```bash
-# Register at http://localhost:4000/users/register
-# Check http://localhost:4000/dev/mailbox
-```
-
-**Password reset:**
+Defaults: `priv/dev/notification_preview_samples.exs`
 
 ```bash
-# Go to http://localhost:4000/users/reset-password
-# Check /dev/mailbox for reset link
+mix lint_notification_samples   # also part of mix precommit
 ```
 
-**Event/Ticket confirmation:**
+When you add a new `@assign` in MJML, add it to the sample file and re-run the linter.
 
-```bash
-# Purchase ticket or register for event
-# Check /dev/mailbox for confirmation
-```
+### Common mailbox checks
 
-### Email in development
-
-All app emails (registration, notifications, tickets, etc.) are caught by the Swoosh local adapter and viewable at http://localhost:4000/dev/mailbox.
+**Registration:** http://localhost:4000/users/register → `/dev/mailbox`  
+**Password reset:** http://localhost:4000/users/reset-password → `/dev/mailbox`  
+**Tickets / bookings:** complete a purchase → `/dev/mailbox`
 
 ## Environment Variables
 

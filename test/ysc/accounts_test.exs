@@ -128,6 +128,18 @@ defmodule Ysc.AccountsTest do
     user
   end
 
+  defp backdate_subscription_start(user, days_offset) do
+    [subscription] = Subscriptions.list_subscriptions(user)
+
+    subscription
+    |> Ysc.Subscriptions.Subscription.changeset(%{
+      current_period_start:
+        DateTime.add(DateTime.utc_now(), days_offset, :day)
+        |> DateTime.truncate(:second)
+    })
+    |> Repo.update!()
+  end
+
   defp user_with_past_ends_at_subscription(attrs) do
     user = user_fixture(attrs)
 
@@ -903,6 +915,141 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "list_paginated_users/1,2 application_date sort" do
+    test "defaults to application_date desc when no explicit sort is given" do
+      older = user_fixture(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(older, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -10, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      newer = user_fixture(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(newer, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -1, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      params = %{"page" => "1", "page_size" => "50"}
+
+      assert {:ok, {users, meta}} = Accounts.list_paginated_users(params)
+
+      # application_date is injected ahead of Flop's own default_order
+      # ([:first_name, :last_name]), same restoration pattern as membership_type.
+      assert meta.flop.order_by == [:application_date, :first_name, :last_name]
+      assert meta.flop.order_directions == [:desc, :asc, :asc]
+
+      ids = Enum.map(users, & &1.id)
+
+      assert Enum.find_index(ids, &(&1 == newer.id)) <
+               Enum.find_index(ids, &(&1 == older.id))
+    end
+
+    test "defaults to application_date desc for atom-keyed params (no key-mixing crash)" do
+      _user = user_fixture(%{phone_number: unique_user_phone()})
+
+      assert {:ok, {_users, meta}} =
+               Accounts.list_paginated_users(%{page: 1, page_size: 10})
+
+      assert List.first(meta.flop.order_by) == :application_date
+      assert List.first(meta.flop.order_directions) == :desc
+    end
+
+    test "explicit application_date asc sort orders oldest first and restores meta" do
+      older = user_fixture(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(older, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -10, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      newer = user_fixture(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(newer, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -1, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "order_by" => ["application_date"],
+        "order_directions" => ["asc"]
+      }
+
+      assert {:ok, {users, meta}} = Accounts.list_paginated_users(params)
+
+      assert meta.flop.order_by == [:application_date, :first_name, :last_name]
+      assert meta.flop.order_directions == [:asc, :asc, :asc]
+
+      ids = Enum.map(users, & &1.id)
+
+      assert Enum.find_index(ids, &(&1 == older.id)) <
+               Enum.find_index(ids, &(&1 == newer.id))
+    end
+
+    test "falls back to reviewed_at, then inserted_at, when completed is missing" do
+      no_application = user_fixture(%{phone_number: unique_user_phone()})
+
+      reviewed_only = user_fixture(%{phone_number: unique_user_phone()})
+
+      app =
+        signup_application_fixture(reviewed_only, %{
+          reviewed_at:
+            DateTime.add(DateTime.utc_now(), -5, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      # `completed` has a DB-level `default: fragment("now()")` (see
+      # priv/repo/migrations/20240202172537_add_signup_application.exs), and
+      # Ecto omits nil struct fields from INSERT - so inserting with
+      # `completed: nil` doesn't actually persist NULL (Postgres' default
+      # fires instead). Force it to NULL via an explicit UPDATE instead.
+      app
+      |> Ecto.Changeset.change(completed: nil)
+      |> Repo.update!()
+
+      params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "order_by" => ["application_date"],
+        "order_directions" => ["desc"]
+      }
+
+      assert {:ok, {users, _meta}} = Accounts.list_paginated_users(params)
+
+      ids = Enum.map(users, & &1.id)
+      assert no_application.id in ids
+      assert reviewed_only.id in ids
+
+      # no_application falls back to inserted_at (just now) - newer than
+      # reviewed_only's reviewed_at fallback (5 days ago) - so it sorts first.
+      assert Enum.find_index(ids, &(&1 == no_application.id)) <
+               Enum.find_index(ids, &(&1 == reviewed_only.id))
+    end
+
+    test "search results rank by relevance, not application_date, when no explicit sort is given" do
+      user =
+        user_fixture(%{
+          first_name: "Searchrank",
+          last_name: "User",
+          phone_number: unique_user_phone()
+        })
+
+      params = %{"page" => "1", "page_size" => "10"}
+
+      assert {:ok, {users, _meta}} =
+               Accounts.list_paginated_users(params, "Searchrank")
+
+      assert Enum.any?(users, &(&1.id == user.id))
+    end
+  end
+
   describe "update_user_profile/2" do
     test "updates user profile" do
       user = user_fixture(%{phone_number: "+14159098268"})
@@ -1609,6 +1756,15 @@ defmodule Ysc.AccountsTest do
       assert %{
                agreed_to_bylaws: [
                  "Please check the box to confirm you agree to the bylaws"
+               ],
+               link_to_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               lived_in_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               spoken_languages: [
+                 "Please fill in at least one of these three fields"
                ]
              } =
                errors_on(changeset)
@@ -1627,6 +1783,7 @@ defmodule Ysc.AccountsTest do
           place_of_birth: "SE",
           citizenship: "SE",
           most_connected_nordic_country: "SE",
+          link_to_scandinavia: "Born in Stockholm",
           agreed_to_bylaws: true
         })
 
@@ -2387,6 +2544,146 @@ defmodule Ysc.AccountsTest do
       assert Enum.any?(Accounts.list_memberships(limit: 500), fn m ->
                m.primary_user.id == primary.id and m.type == :single
              end)
+    end
+
+    test "list_paginated_memberships/3 defaults to subscription_start desc, newest first" do
+      old_member =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      backdate_subscription_start(old_member, -60)
+
+      new_member =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      backdate_subscription_start(new_member, -1)
+
+      params = %{"page" => "1", "page_size" => "50"}
+
+      assert {:ok, {memberships, meta}} =
+               Accounts.list_paginated_memberships(params)
+
+      assert meta.flop.order_by == [
+               :subscription_start,
+               :first_name,
+               :last_name
+             ]
+
+      assert meta.flop.order_directions == [:desc, :asc, :asc]
+
+      ids = Enum.map(memberships, & &1.primary_user.id)
+
+      assert Enum.find_index(ids, &(&1 == new_member.id)) <
+               Enum.find_index(ids, &(&1 == old_member.id))
+    end
+
+    test "list_paginated_memberships/3 sorts lifetime members (no subscription) last regardless of direction" do
+      lifetime =
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+
+      subscribed =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      backdate_subscription_start(subscribed, -1)
+
+      desc_params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "order_by" => ["subscription_start"],
+        "order_directions" => ["desc"]
+      }
+
+      assert {:ok, {desc_memberships, _}} =
+               Accounts.list_paginated_memberships(desc_params)
+
+      desc_ids = Enum.map(desc_memberships, & &1.primary_user.id)
+
+      assert Enum.find_index(desc_ids, &(&1 == subscribed.id)) <
+               Enum.find_index(desc_ids, &(&1 == lifetime.id))
+
+      asc_params = put_in(desc_params, ["order_directions"], ["asc"])
+
+      assert {:ok, {asc_memberships, _}} =
+               Accounts.list_paginated_memberships(asc_params)
+
+      asc_ids = Enum.map(asc_memberships, & &1.primary_user.id)
+
+      assert Enum.find_index(asc_ids, &(&1 == subscribed.id)) <
+               Enum.find_index(asc_ids, &(&1 == lifetime.id))
+    end
+
+    test "list_paginated_memberships/3 search matches by name" do
+      target =
+        user_with_single_subscription(%{
+          first_name: "Membersearch",
+          last_name: "Target",
+          phone_number: unique_user_phone()
+        })
+
+      _other =
+        user_with_single_subscription(%{
+          first_name: "Other",
+          last_name: "Person",
+          phone_number: unique_user_phone()
+        })
+
+      params = %{"page" => "1", "page_size" => "50"}
+
+      assert {:ok, {memberships, _meta}} =
+               Accounts.list_paginated_memberships(params, "Membersearch")
+
+      ids = Enum.map(memberships, & &1.primary_user.id)
+      assert target.id in ids
+      refute Enum.any?(memberships, &(&1.primary_user.first_name == "Other"))
+    end
+
+    test "list_paginated_memberships/3 respects the :type option, same as list_memberships/1" do
+      lifetime =
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+
+      params = %{"page" => "1", "page_size" => "50"}
+
+      assert {:ok, {memberships, _meta}} =
+               Accounts.list_paginated_memberships(params, nil, type: :lifetime)
+
+      assert Enum.all?(memberships, &(&1.type == :lifetime))
+      assert Enum.any?(memberships, &(&1.primary_user.id == lifetime.id))
+    end
+
+    test "list_paginated_memberships/3 sorts by application_date when explicitly requested" do
+      older =
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(older, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -20, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      newer =
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(newer, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -1, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "order_by" => ["application_date"],
+        "order_directions" => ["desc"]
+      }
+
+      assert {:ok, {memberships, meta}} =
+               Accounts.list_paginated_memberships(params)
+
+      assert :application_date in meta.flop.order_by
+
+      ids = Enum.map(memberships, & &1.primary_user.id)
+
+      assert Enum.find_index(ids, &(&1 == newer.id)) <
+               Enum.find_index(ids, &(&1 == older.id))
     end
 
     test "list_memberships and get_membership_stats exclude primaries with only inactive subscriptions" do
@@ -3465,6 +3762,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3524,6 +3822,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3872,6 +4171,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3911,6 +4211,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }

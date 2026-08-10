@@ -50,5 +50,59 @@ defmodule YscWeb.AdminMembershipsLiveTest do
       assert html =~ ~s(id="memberships-filter-family")
       assert html =~ "bg-blue-600 text-white"
     end
+
+    test "shows Membership Started and Applied columns", %{conn: conn} do
+      {_view, html} = live_memberships(conn)
+
+      assert html =~ "Membership Started"
+      assert html =~ "Applied"
+    end
+
+    test "searches memberships by name", %{conn: conn} do
+      member =
+        user_fixture(%{
+          first_name: "Findablemember",
+          last_name: "Searchtarget",
+          phone_number: unique_user_phone()
+        })
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      _other =
+        user_fixture(%{
+          first_name: "Otherresult",
+          last_name: "Notmatching",
+          phone_number: unique_user_phone()
+        })
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      {view, _html} = live_memberships(conn)
+
+      html =
+        view
+        |> form("#membership-search-form", %{
+          search: %{query: "Findablemember"}
+        })
+        |> render_change()
+
+      assert html =~ member.last_name
+      refute html =~ "Notmatching"
+    end
+
+    test "clear-search patches away search params", %{conn: conn} do
+      qs = Plug.Conn.Query.encode(%{"search" => %{"query" => "Findable"}})
+      {view, _html} = live_memberships(conn, "/admin/memberships?" <> qs)
+
+      render_click(view, "clear-search", %{"input-id" => "membership-search"})
+      patched = assert_patch(view)
+      refute String.contains?(patched, "search")
+    end
   end
 end

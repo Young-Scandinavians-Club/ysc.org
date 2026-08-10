@@ -1414,20 +1414,27 @@ defmodule Ysc.Accounts do
 
   def list_paginated_users(params) do
     now = DateTime.utc_now()
+    params = maybe_default_order(params, "application_date")
     {membership_filters, other_params} = extract_membership_filters(params)
     {membership_sort, other_params} = extract_membership_sort(other_params)
+
+    {application_date_sort, other_params} =
+      extract_application_date_sort(other_params)
 
     base_query =
       from(u in User, where: u.state != :deleted)
       |> build_membership_query_filter(membership_filters, now)
       |> apply_membership_order_by(membership_sort, now)
+      |> apply_application_date_order_by(application_date_sort, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
         meta =
           restore_membership_filters(meta, membership_filters, membership_sort)
+          |> restore_application_date_sort(application_date_sort)
 
-        {:ok, {preload_active_subscriptions(users), meta}}
+        {:ok,
+         {preload_registration_forms(preload_active_subscriptions(users)), meta}}
 
       error ->
         error
@@ -1595,19 +1602,27 @@ defmodule Ysc.Accounts do
     {membership_filters, other_params} = extract_membership_filters(params)
     {membership_sort, other_params} = extract_membership_sort(other_params)
 
-    has_explicit_sort = explicit_sort?(other_params) or membership_sort != nil
+    {application_date_sort, other_params} =
+      extract_application_date_sort(other_params)
+
+    has_explicit_sort =
+      explicit_sort?(other_params) or membership_sort != nil or
+        application_date_sort != nil
 
     base_query =
       fuzzy_search_user(search_term, rank: !has_explicit_sort)
       |> build_membership_query_filter(membership_filters, now)
       |> apply_membership_order_by(membership_sort, now)
+      |> apply_application_date_order_by(application_date_sort, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
         meta =
           restore_membership_filters(meta, membership_filters, membership_sort)
+          |> restore_application_date_sort(application_date_sort)
 
-        {:ok, {preload_active_subscriptions(users), meta}}
+        {:ok,
+         {preload_registration_forms(preload_active_subscriptions(users)), meta}}
 
       error ->
         error
@@ -3081,6 +3096,129 @@ defmodule Ysc.Accounts do
     end
   end
 
+  # If the caller didn't ask for a specific sort, default to the given virtual
+  # field (desc) instead of the schema's own `default_order`. Runs before the
+  # membership/application-date extractors so it flows through their normal
+  # extract/apply/restore pipeline rather than needing a separate code path.
+  defp maybe_default_order(%{"order_by" => _} = params, _field), do: params
+  defp maybe_default_order(%{order_by: _} = params, _field), do: params
+
+  defp maybe_default_order(params, field) when is_map(params) do
+    # Normalize to string keys before injecting: the extract_*_sort/1
+    # functions only pattern-match on string "order_by", and Ecto.Changeset.cast
+    # (via Flop) rejects a map with mixed atom/string keys, so a params map
+    # using atom keys (as in tests/iex) must be fully stringified first.
+    params
+    |> Map.new(fn {k, v} -> {to_string(k), v} end)
+    |> Map.put("order_by", [field])
+    |> Map.put("order_directions", ["desc"])
+  end
+
+  defp maybe_default_order(params, _field), do: params
+
+  # Helper function to extract application_date sorting from params.
+  # Mirrors extract_membership_sort/1 - application_date is a computed,
+  # cross-table field (signup_applications), not a real column on User, so it
+  # has to be pulled out before Flop sees it and applied as a raw SQL sort.
+  defp extract_application_date_sort(params) do
+    case params do
+      %{"order_by" => order_by, "order_directions" => order_directions}
+      when is_list(order_by) and is_list(order_directions) ->
+        sort_index = Enum.find_index(order_by, &(&1 == "application_date"))
+
+        if sort_index do
+          direction =
+            order_directions
+            |> Enum.at(sort_index, "asc")
+            |> then(fn
+              "desc" -> :desc
+              _ -> :asc
+            end)
+
+          new_order_by = List.delete_at(order_by, sort_index)
+
+          new_order_directions =
+            List.delete_at(order_directions, sort_index)
+
+          new_params =
+            params
+            |> Map.put("order_by", new_order_by)
+            |> Map.put("order_directions", new_order_directions)
+
+          {{:application_date, direction, sort_index}, new_params}
+        else
+          {nil, params}
+        end
+
+      _ ->
+        {nil, params}
+    end
+  end
+
+  defp apply_application_date_order_by(query, nil, _now), do: query
+
+  defp apply_application_date_order_by(
+         query,
+         {:application_date, direction, _index},
+         _now
+       ) do
+    joined =
+      from u in query,
+        left_join: sa in SignupApplication,
+        on: sa.user_id == u.id
+
+    case direction do
+      :asc ->
+        from [u, sa] in joined,
+          order_by: [
+            asc_nulls_last:
+              fragment(
+                "COALESCE(?, ?, ?)",
+                sa.completed,
+                sa.reviewed_at,
+                u.inserted_at
+              )
+          ]
+
+      :desc ->
+        from [u, sa] in joined,
+          order_by: [
+            desc_nulls_last:
+              fragment(
+                "COALESCE(?, ?, ?)",
+                sa.completed,
+                sa.reviewed_at,
+                u.inserted_at
+              )
+          ]
+    end
+  end
+
+  defp restore_application_date_sort(meta, nil), do: meta
+
+  defp restore_application_date_sort(
+         %Flop.Meta{} = meta,
+         {:application_date, direction, index}
+       ) do
+    current_order_by = meta.flop.order_by || []
+    current_directions = meta.flop.order_directions || []
+
+    safe_index = min(index, length(current_order_by))
+
+    updated_flop = %{
+      meta.flop
+      | order_by:
+          List.insert_at(current_order_by, safe_index, :application_date),
+        order_directions:
+          List.insert_at(current_directions, safe_index, direction)
+    }
+
+    %{meta | flop: updated_flop}
+  end
+
+  defp preload_registration_forms(users),
+    do: Repo.preload(users, :registration_form)
+
   @doc """
   Marks a user's email as verified by setting the email_verified_at timestamp.
   """
@@ -3649,6 +3787,112 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Sortable, searchable, paginated membership list for the admin Memberships
+  page, mirroring `list_paginated_users/1,2`.
+
+  `search_term` matches against name/email/phone (via `fuzzy_search_user/2`);
+  when present with no explicit sort requested, results rank by match quality
+  (same as the Users list) rather than by the default sort below. `opts`
+  accepts `:type` to filter by membership type, same as `list_memberships/1`.
+
+  Defaults to sorting by the primary user's current subscription start date
+  (newest first) when there's no search term and no explicit sort requested.
+
+  ## Returns
+  `{:ok, {membership_rows, meta}}` (same row shape as `list_memberships/1`)
+  or `{:error, meta}`.
+  """
+  def list_paginated_memberships(params, search_term \\ nil, opts \\ [])
+
+  def list_paginated_memberships(params, nil, opts),
+    do: list_paginated_memberships_without_search(params, opts)
+
+  def list_paginated_memberships(params, search_term, opts)
+      when search_term == "",
+      do: list_paginated_memberships_without_search(params, opts)
+
+  def list_paginated_memberships(params, search_term, opts) do
+    now = DateTime.utc_now()
+
+    {application_date_sort, other_params} =
+      extract_application_date_sort(params)
+
+    {subscription_start_sort, other_params} =
+      extract_subscription_start_sort(other_params)
+
+    has_explicit_sort =
+      explicit_sort?(other_params) or application_date_sort != nil or
+        subscription_start_sort != nil
+
+    base_query =
+      fuzzy_search_user(search_term, rank: !has_explicit_sort)
+      |> active_membership_primary_user_filter(now)
+      |> apply_membership_type_filter(Keyword.get(opts, :type))
+      |> apply_application_date_order_by(application_date_sort, now)
+      |> apply_subscription_start_order_by(subscription_start_sort, now)
+
+    finish_paginated_memberships(
+      base_query,
+      other_params,
+      application_date_sort,
+      subscription_start_sort
+    )
+  end
+
+  defp list_paginated_memberships_without_search(params, opts) do
+    now = DateTime.utc_now()
+    params = maybe_default_order(params, "subscription_start")
+
+    {application_date_sort, other_params} =
+      extract_application_date_sort(params)
+
+    {subscription_start_sort, other_params} =
+      extract_subscription_start_sort(other_params)
+
+    base_query =
+      from(u in User, where: u.state != :deleted)
+      |> active_membership_primary_user_filter(now)
+      |> apply_membership_type_filter(Keyword.get(opts, :type))
+      |> apply_application_date_order_by(application_date_sort, now)
+      |> apply_subscription_start_order_by(subscription_start_sort, now)
+
+    finish_paginated_memberships(
+      base_query,
+      other_params,
+      application_date_sort,
+      subscription_start_sort
+    )
+  end
+
+  defp finish_paginated_memberships(
+         base_query,
+         other_params,
+         application_date_sort,
+         subscription_start_sort
+       ) do
+    case Flop.validate_and_run(base_query, other_params, for: User) do
+      {:ok, {primary_users, meta}} ->
+        meta =
+          meta
+          |> restore_application_date_sort(application_date_sort)
+          |> restore_subscription_start_sort(subscription_start_sort)
+
+        primary_users =
+          Repo.preload(primary_users, [
+            {:sub_accounts, :current_avatar},
+            :current_avatar,
+            :registration_form,
+            subscriptions: :subscription_items
+          ])
+
+        {:ok, {membership_rows_from_primaries(primary_users), meta}}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
   Returns membership counts by type for admin dashboard.
 
   Uses SQL `COUNT` queries instead of loading every active primary user.
@@ -3658,31 +3902,38 @@ defmodule Ysc.Accounts do
   """
   def get_membership_stats do
     base = active_membership_primary_users_query()
+    family_price_id = family_membership_price_id()
 
-    total = from(u in base, select: count(u.id)) |> Repo.one()
+    %{total: total, lifetime: lifetime, family: family} =
+      if family_price_id do
+        family_sub = active_family_membership_user_ids_query(family_price_id)
 
-    lifetime =
-      from(u in base,
-        where: not is_nil(u.lifetime_membership_awarded_at),
-        select: count(u.id)
-      )
-      |> Repo.one()
-
-    family =
-      case family_membership_price_id() do
-        nil ->
-          0
-
-        family_price_id ->
-          from(u in base,
-            where: is_nil(u.lifetime_membership_awarded_at),
-            where:
-              u.id in subquery(
-                active_family_membership_user_ids_query(family_price_id)
-              ),
-            select: count(u.id)
-          )
-          |> Repo.one()
+        from(u in base,
+          select: %{
+            total: count(u.id),
+            lifetime:
+              count(u.id)
+              |> filter(not is_nil(u.lifetime_membership_awarded_at)),
+            family:
+              count(u.id)
+              |> filter(
+                is_nil(u.lifetime_membership_awarded_at) and
+                  u.id in subquery(family_sub)
+              )
+          }
+        )
+        |> Repo.one()
+      else
+        from(u in base,
+          select: %{
+            total: count(u.id),
+            lifetime:
+              count(u.id)
+              |> filter(not is_nil(u.lifetime_membership_awarded_at)),
+            family: type(^0, :integer)
+          }
+        )
+        |> Repo.one()
       end
 
     %{
@@ -3693,9 +3944,9 @@ defmodule Ysc.Accounts do
     }
   end
 
-  defp active_membership_primary_users_query do
-    now = DateTime.utc_now()
-
+  # Composable so it can be layered on top of a plain `User` query or a
+  # fuzzy-search query (see list_paginated_memberships/3).
+  defp active_membership_primary_user_filter(query, now) do
     valid_subscription_user_ids =
       from(s in Subscription,
         where: s.stripe_status in ["active", "trialing"],
@@ -3705,13 +3956,120 @@ defmodule Ysc.Accounts do
         distinct: true
       )
 
-    from(u in User,
+    from(u in query,
       where: is_nil(u.primary_user_id),
       where: u.state == :active,
       where:
         not is_nil(u.lifetime_membership_awarded_at) or
           u.id in subquery(valid_subscription_user_ids)
     )
+  end
+
+  defp active_membership_primary_users_query do
+    active_membership_primary_user_filter(from(u in User), DateTime.utc_now())
+  end
+
+  # Helper function to extract subscription_start sorting from params.
+  # Mirrors extract_application_date_sort/1 - the primary user's current
+  # (active) subscription start, used as the Membership admin list's default
+  # sort.
+  defp extract_subscription_start_sort(params) do
+    case params do
+      %{"order_by" => order_by, "order_directions" => order_directions}
+      when is_list(order_by) and is_list(order_directions) ->
+        sort_index = Enum.find_index(order_by, &(&1 == "subscription_start"))
+
+        if sort_index do
+          direction =
+            order_directions
+            |> Enum.at(sort_index, "asc")
+            |> then(fn
+              "desc" -> :desc
+              _ -> :asc
+            end)
+
+          new_order_by = List.delete_at(order_by, sort_index)
+
+          new_order_directions =
+            List.delete_at(order_directions, sort_index)
+
+          new_params =
+            params
+            |> Map.put("order_by", new_order_by)
+            |> Map.put("order_directions", new_order_directions)
+
+          {{:subscription_start, direction, sort_index}, new_params}
+        else
+          {nil, params}
+        end
+
+      _ ->
+        {nil, params}
+    end
+  end
+
+  defp apply_subscription_start_order_by(query, nil, _now), do: query
+
+  # Lifetime members with no billed subscription have no current_period_start,
+  # so nulls sort last regardless of direction (same rule agreed for
+  # application_date, though that field never actually goes nil).
+  defp apply_subscription_start_order_by(
+         query,
+         {:subscription_start, direction, _index},
+         now
+       ) do
+    joined =
+      from u in query,
+        left_join:
+          css in subquery(current_active_subscription_start_subquery(now)),
+        on: css.user_id == u.id
+
+    case direction do
+      :asc ->
+        from [u, css] in joined,
+          order_by: [asc_nulls_last: css.subscription_start]
+
+      :desc ->
+        from [u, css] in joined,
+          order_by: [desc_nulls_last: css.subscription_start]
+    end
+  end
+
+  # MAX(current_period_start) per user matches "latest active subscription"
+  # (ORDER BY current_period_start DESC LIMIT 1) when multiple rows exist.
+  defp current_active_subscription_start_subquery(now) do
+    from(s in Subscription,
+      where: s.stripe_status in ["active", "trialing"],
+      where: s.current_period_end > ^now,
+      where: is_nil(s.ends_at) or s.ends_at > ^now,
+      group_by: s.user_id,
+      select: %{
+        user_id: s.user_id,
+        subscription_start: max(s.current_period_start)
+      }
+    )
+  end
+
+  defp restore_subscription_start_sort(meta, nil), do: meta
+
+  defp restore_subscription_start_sort(
+         %Flop.Meta{} = meta,
+         {:subscription_start, direction, index}
+       ) do
+    current_order_by = meta.flop.order_by || []
+    current_directions = meta.flop.order_directions || []
+
+    safe_index = min(index, length(current_order_by))
+
+    updated_flop = %{
+      meta.flop
+      | order_by:
+          List.insert_at(current_order_by, safe_index, :subscription_start),
+        order_directions:
+          List.insert_at(current_directions, safe_index, direction)
+    }
+
+    %{meta | flop: updated_flop}
   end
 
   defp active_family_membership_user_ids_query(family_price_id) do

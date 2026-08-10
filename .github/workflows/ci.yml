@@ -346,3 +346,148 @@ jobs:
           comment-id: ${{ steps.find.outputs.comment-id }}
           body-path: ${{ steps.explain.outputs.comment_path }}
           edit-mode: replace
+
+  # Sticky PR comment with screenshots when email templates change.
+  # Fork PRs: GITHUB_TOKEN cannot push the preview branch or always comment; artifacts still upload.
+  email_previews_detect:
+    name: PR Email Previews (detect)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      skip: ${{ steps.detect.outputs.skip }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Detect email template changes
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EMAIL_PREVIEWS_DETECT_ONLY: "true"
+        run: bash etc/scripts/ci/pr_email_previews.sh
+
+  email_previews_pr:
+    name: PR Email Previews
+    needs: email_previews_detect
+    if: needs.email_previews_detect.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: email-previews-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    services:
+      postgres:
+        image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Elixir
+        id: setup-beam
+        uses: ./.github/actions/setup-elixir
+
+      - name: Restore dependencies cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-email-previews-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-email-previews-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile
+        env:
+          MIX_ENV: test
+        run: mix compile --warnings-as-errors
+
+      - name: Prepare test database
+        env:
+          MIX_ENV: test
+        run: |
+          mix ecto.create --quiet
+          mix ecto.migrate --quiet
+          mix run priv/repo/test_seeds.exs
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Install Playwright Chromium
+        id: playwright
+        run: |
+          PW_DIR="${RUNNER_TEMP}/playwright-email-previews"
+          mkdir -p "$PW_DIR"
+          cd "$PW_DIR"
+          npm init -y >/dev/null
+          npm install --no-fund --no-audit playwright@1.52.0
+          npx playwright install chromium --with-deps
+          echo "dir=$PW_DIR" >>"$GITHUB_OUTPUT"
+
+      - name: Render and screenshot email previews
+        id: previews
+        env:
+          MIX_ENV: test
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CAN_PUSH_PREVIEW_BRANCH: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          PLAYWRIGHT_NODE_PATH: ${{ steps.playwright.outputs.dir }}/node_modules
+        run: bash etc/scripts/ci/pr_email_previews.sh
+
+      - name: Upload preview artifacts
+        if: steps.previews.outputs.skip != 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: email-previews-pr-${{ github.event.pull_request.number }}
+          path: |
+            ${{ steps.previews.outputs.previews_dir }}/*.png
+            ${{ steps.previews.outputs.previews_dir }}/*.html
+            ${{ steps.previews.outputs.previews_dir }}/manifest.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Find email-previews comment
+        id: find
+        if: steps.previews.outputs.skip != 'true'
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3.1.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: "<!-- ci-email-previews -->"
+
+      - name: Create or update PR comment
+        if: steps.previews.outputs.skip != 'true'
+        continue-on-error: true
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-id: ${{ steps.find.outputs.comment-id }}
+          body-path: ${{ steps.previews.outputs.comment_path }}
+          edit-mode: replace

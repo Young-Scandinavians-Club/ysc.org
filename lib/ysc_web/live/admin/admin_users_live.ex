@@ -589,7 +589,7 @@ defmodule YscWeb.AdminUsersLive do
             :if={is_nil(@meta)}
             id="admin-users-loading"
             rows={8}
-            columns={5}
+            columns={6}
           />
 
           <div :if={@meta}>
@@ -646,6 +646,14 @@ defmodule YscWeb.AdminUsersLive do
                             <% end %>
                           </div>
                       <% end %>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Applied:</span>
+                      <span class="text-sm text-zinc-900">
+                        {DateTimeDisplay.format_utc_date(
+                          UserDisplay.application_submitted_at(user)
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -724,6 +732,11 @@ defmodule YscWeb.AdminUsersLive do
                         <% end %>
                       </div>
                   <% end %>
+                </:col>
+                <:col :let={{_, user}} label="Applied" field={:application_date}>
+                  {DateTimeDisplay.format_utc_date(
+                    UserDisplay.application_submitted_at(user)
+                  )}
                 </:col>
                 <:action :let={{_, user}}>
                   <.user_actions_dropdown

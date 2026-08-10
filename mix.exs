@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.14.0",
+      version: "2.16.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -29,11 +29,13 @@ defmodule Ysc.MixProject do
         tool: ExCoveralls,
         ignore_modules: [
           Mix.Tasks.CheckQuickbooksSync,
+          Mix.Tasks.Ci.EmailPreviews,
           Mix.Tasks.Ci.QueryExplain,
           Mix.Tasks.CopyVendorAssets,
           Mix.Tasks.DebugEmails,
           Mix.Tasks.ExpireCheckoutSessions,
           Mix.Tasks.GenerateVideoPosters,
+          Mix.Tasks.LintNotificationSamples,
           Mix.Tasks.Message.Requeue,
           Mix.Tasks.Quickbooks.RetrySyncs,
           Mix.Tasks.Quickbooks.VerifySandbox,
@@ -226,7 +228,7 @@ defmodule Ysc.MixProject do
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
       {:floki, "~> 0.38"},
-      {:flop, "~> 0.26.5"},
+      {:flop, "~> 0.26.6"},
       {:flop_phoenix, "~> 0.26"},
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
@@ -268,7 +270,7 @@ defmodule Ysc.MixProject do
       {:remote_ip, "~> 1.2"},
       {:req, "~> 0.7"},
       {:retry_on, "~> 0.1"},
-      {:sentry, "~> 13.3"},
+      {:sentry, "~> 13.4"},
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+ (we use SES)
@@ -301,7 +303,8 @@ defmodule Ysc.MixProject do
         "compile --warnings-as-errors",
         "credo --strict",
         "dialyzer",
-        "shell_lint"
+        "shell_lint",
+        "lint_notification_samples"
       ],
       test: [
         "ecto.create --quiet",
