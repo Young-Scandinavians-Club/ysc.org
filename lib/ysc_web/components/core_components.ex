@@ -4267,7 +4267,7 @@ defmodule YscWeb.CoreComponents do
 
           <%= if @is_sub_account && @primary_user do %>
             <p class="text-sm text-green-900 mt-2">
-              As a family member, you share all membership benefits through your family membership manager.
+              As a family member, you share all membership benefits through <strong>{@primary_user.first_name} {@primary_user.last_name}</strong>.
             </p>
           <% end %>
 
@@ -4368,7 +4368,7 @@ defmodule YscWeb.CoreComponents do
                   <strong>{@primary_user.first_name} {@primary_user.last_name}</strong>
                   does not have an active membership. You need an active family membership to access YSC events and benefits.
                 <% else %>
-                  Your family membership manager does not have an active membership. You need an active family membership to access YSC events and benefits.
+                  The member who manages your family account does not have an active membership. You need an active family membership to access YSC events and benefits.
                 <% end %>
               <% else %>
                 You need an active membership to access YSC events and benefits.

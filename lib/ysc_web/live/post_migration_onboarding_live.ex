@@ -526,7 +526,11 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Family Membership
         <:subtitle>
-          Your membership benefits are shared with you by your family membership manager. You do not need to choose a plan or add a payment method.
+          <%= if @primary_user do %>
+            Your membership benefits are shared with you by {@primary_user.first_name} {@primary_user.last_name}. You do not need to choose a plan or add a payment method.
+          <% else %>
+            Your membership benefits are shared with you by the member who manages your family account. You do not need to choose a plan or add a payment method.
+          <% end %>
         </:subtitle>
       </.header>
 
@@ -538,14 +542,18 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           />
           <div>
             <h3 class="text-sm font-semibold text-blue-800">
-              Membership shared through your family membership manager
+              <%= if @primary_user do %>
+                Membership shared through {@primary_user.first_name} {@primary_user.last_name}
+              <% else %>
+                Membership shared through your family account
+              <% end %>
             </h3>
             <p class="text-sm text-blue-700 mt-1">
               You are a family member. You share membership benefits from <strong>
                 <%= if @primary_user do %>
                   {@primary_user.first_name} {@primary_user.last_name}
                 <% else %>
-                  your family membership manager
+                  the member who manages your family account
                 <% end %>
               </strong>. Family members cannot purchase or manage their own membership.
             </p>
@@ -1602,7 +1610,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :error,
-              "You're on a family membership and can't purchase a separate plan. Ask your family membership manager to make membership changes.",
+              "You're on a family membership and can't purchase a separate plan. Ask the member who manages your family account to make membership changes.",
               title: "Membership"
             )
 
