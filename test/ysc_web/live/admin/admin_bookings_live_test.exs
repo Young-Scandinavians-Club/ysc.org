@@ -26,6 +26,20 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
   defp section_label("pending_refunds"), do: "Pending Refunds"
   defp section_label("reservations"), do: "Reservations"
 
+  defp day_capacity_booked_for(property, days) do
+    alias Ysc.Bookings.PropertyInventory
+
+    days
+    |> Enum.map(fn day ->
+      Repo.one!(
+        from(pi in PropertyInventory,
+          where: pi.property == ^property and pi.day == ^day,
+          select: pi.capacity_booked
+        )
+      )
+    end)
+  end
+
   defp insert_pending_refund!(property) do
     user = user_fixture()
     booking = booking_fixture(%{user_id: user.id, property: property})
@@ -1529,6 +1543,162 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert updated.booking_mode == :day
       assert updated.guests_count == 4
       assert updated.status == :complete
+    end
+
+    test "edit day booking reconciles capacity_booked inventory", %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "Inventory"})
+
+      checkin = ~D[2036-09-10]
+      checkout = ~D[2036-09-13]
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=clear_lake&from_date=2036-09-01&to_date=2036-09-20"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2036-09-10",
+          "checkout_date" => "2036-09-13",
+          "guests_count" => "5",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "status" => "complete"
+        }
+      })
+      |> render_submit()
+
+      assert Bookings.get_booking!(booking.id).guests_count == 5
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [5, 5, 5]
+    end
+
+    test "edit complete day booking without inventory changes uses plain update path",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "Children"})
+
+      checkin = ~D[2036-09-20]
+      checkout = ~D[2036-09-23]
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            children_count: 0,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=clear_lake&from_date=2036-09-01&to_date=2036-09-30"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2036-09-20",
+          "checkout_date" => "2036-09-23",
+          "guests_count" => "2",
+          "children_count" => "1",
+          "booking_mode" => "day",
+          "status" => "complete"
+        }
+      })
+      |> render_submit()
+
+      updated = Bookings.get_booking!(booking.id)
+      assert updated.children_count == 1
+      assert updated.guests_count == 2
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+    end
+
+    test "edit complete day booking shows blackout conflict toast", %{
+      conn: conn
+    } do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "Blackout"})
+
+      checkin = ~D[2036-10-01]
+      checkout = ~D[2036-10-04]
+      new_checkin = ~D[2036-10-20]
+      new_checkout = ~D[2036-10-23]
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :clear_lake,
+                 start_date: new_checkin,
+                 end_date: new_checkout,
+                 reason: "Admin edit blackout conflict"
+               })
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=clear_lake&from_date=2036-10-01&to_date=2036-10-31"
+        )
+
+      html =
+        view
+        |> form("#booking-form", %{
+          "booking" => %{
+            "checkin_date" => "2036-10-20",
+            "checkout_date" => "2036-10-23",
+            "guests_count" => "2",
+            "children_count" => "0",
+            "booking_mode" => "day",
+            "status" => "complete"
+          }
+        })
+        |> render_submit()
+
+      assert html =~
+               "Cannot update booking: selected dates overlap a blackout period."
     end
 
     test "day bookings are not rendered on the Full Buyout calendar row", %{

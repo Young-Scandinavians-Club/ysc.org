@@ -69,7 +69,7 @@ defmodule YscWeb.PaymentSuccessLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "We couldn't confirm your payment from this link. Check My Bookings & Payments (under your account menu) or your email for a confirmation. If you were charged, email #{Ysc.EmailConfig.contact_email()} with the date and amount.",
+             "We couldn't confirm your payment from this link. Click your name in the top-right corner and open My Bookings & Payments, or check your email for a confirmation. If you were charged, email #{Ysc.EmailConfig.contact_email()} with the date and amount.",
              title: "Payment"
            )
            |> redirect(to: ~p"/")}
@@ -183,7 +183,7 @@ defmodule YscWeb.PaymentSuccessLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "We couldn't confirm your payment from this link. Check My Bookings & Payments (under your account menu) or your email for a confirmation. If you were charged, email #{Ysc.EmailConfig.contact_email()} with the date and amount.",
+           "We couldn't confirm your payment from this link. Click your name in the top-right corner and open My Bookings & Payments, or check your email for a confirmation. If you were charged, email #{Ysc.EmailConfig.contact_email()} with the date and amount.",
            title: "Payment"
          )
          |> redirect(to: ~p"/")}

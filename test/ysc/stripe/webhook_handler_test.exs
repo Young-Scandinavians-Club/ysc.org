@@ -1247,6 +1247,141 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       subscription = Ysc.Repo.reload(subscription)
       assert subscription.stripe_status == "incomplete"
     end
+
+    test "customer.subscription.updated syncs cancel_at_period_end when auto-renew is turned off" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{cancel_at_period_end: false})
+
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "active",
+          cancel_at_period_end: true,
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload(subscription).cancel_at_period_end == true
+    end
+
+    test "customer.subscription.updated clears cancel_at_period_end when auto-renew is re-enabled" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{cancel_at_period_end: true})
+
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "active",
+          cancel_at_period_end: false,
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload(subscription).cancel_at_period_end == false
+    end
+
+    test "customer.subscription.updated preserves cancel_at_period_end after Stripe cancels subscription" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{cancel_at_period_end: true})
+
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "canceled",
+          cancel_at_period_end: false,
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      updated = Ysc.Repo.reload(subscription)
+      assert updated.cancel_at_period_end == true
+      assert updated.stripe_status == "canceled"
+    end
+
+    test "customer.subscription.deleted schedules membership ended email for voluntary lapse" do
+      user = user_with_stripe_id()
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "active",
+          cancel_at_period_end: true,
+          ends_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "canceled"
+        )
+
+      event =
+        build_stripe_event("customer.subscription.deleted", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload(subscription).stripe_status == "cancelled"
+      assert_email_sent(subject: "Your YSC Membership Has Ended")
+    end
+
+    test "customer.subscription.deleted skips membership ended email without voluntary lapse" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user, %{cancel_at_period_end: false})
+
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "canceled"
+        )
+
+      event =
+        build_stripe_event("customer.subscription.deleted", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload(subscription).stripe_status == "cancelled"
+      refute_email_sent(subject: "Your YSC Membership Has Ended")
+    end
   end
 
   describe "payment method webhooks" do

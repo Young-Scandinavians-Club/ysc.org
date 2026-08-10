@@ -2668,6 +2668,331 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "admin_modify_complete_booking/3" do
+    test "reconciles Clear Lake day capacity when guests_count changes" do
+      user = user_fixture()
+      checkin = ~D[2036-10-05]
+      checkout = ~D[2036-10-08]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      assert day_capacity_booked(:clear_lake, stay_days) == [2, 2, 2]
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 5,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+
+      assert updated.guests_count == 5
+      assert day_capacity_booked(:clear_lake, stay_days) == [5, 5, 5]
+    end
+
+    test "returns invalid_status when booking is not complete" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      {checkin, checkout} = locker_room_dates(45, 3)
+
+      {:ok, hold} =
+        BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      assert {:error, :invalid_status} =
+               BookingLocker.admin_modify_complete_booking(hold, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 5,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+    end
+
+    test "returns blackout_conflict when new dates overlap a blackout" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      checkin = ~D[2036-11-05]
+      checkout = ~D[2036-11-08]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      new_checkin = ~D[2036-12-10]
+      new_checkout = ~D[2036-12-13]
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :clear_lake,
+                 start_date: new_checkin,
+                 end_date: new_checkout,
+                 reason: "Admin modify blackout conflict"
+               })
+
+      assert {:error, :blackout_conflict} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 checkin_date: new_checkin,
+                 checkout_date: new_checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+    end
+
+    test "reconciles inventory when stay dates change" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      checkin = ~D[2036-11-15]
+      checkout = ~D[2036-11-18]
+      new_checkin = ~D[2036-11-20]
+      new_checkout = ~D[2036-11-23]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 3,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      old_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      new_days =
+        Date.range(new_checkin, Date.add(new_checkout, -1)) |> Enum.to_list()
+
+      assert day_capacity_booked(:clear_lake, old_days) == [3, 3, 3]
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 checkin_date: new_checkin,
+                 checkout_date: new_checkout,
+                 guests_count: 3,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+
+      assert updated.checkin_date == new_checkin
+      assert day_capacity_booked(:clear_lake, old_days) == [0, 0, 0]
+      assert day_capacity_booked(:clear_lake, new_days) == [3, 3, 3]
+    end
+
+    test "reconciles buyout inventory when stay dates change" do
+      user = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(620)
+      new_checkin = Date.add(checkin, 14)
+      new_checkout = Date.add(checkout, 14)
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 4,
+            booking_mode: :buyout
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      old_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      new_days =
+        Date.range(new_checkin, Date.add(new_checkout, -1)) |> Enum.to_list()
+
+      assert buyout_booked?(:tahoe, old_days)
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 "checkin_date" => new_checkin,
+                 "checkout_date" => new_checkout,
+                 "guests_count" => 4,
+                 "children_count" => 0,
+                 "booking_mode" => :buyout
+               })
+
+      assert updated.checkin_date == new_checkin
+      refute buyout_booked?(:tahoe, old_days)
+      assert buyout_booked?(:tahoe, new_days)
+    end
+
+    test "returns changeset error for invalid stay dates" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      checkin = ~D[2036-12-01]
+      checkout = ~D[2036-12-04]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:error, %Ecto.Changeset{}} =
+               BookingLocker.admin_modify_complete_booking(booking, %{
+                 checkin_date: checkout,
+                 checkout_date: checkin,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+    end
+
+    test "reconciles room inventory when guest count changes", %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin modify room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = locker_room_dates(650, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(:USD, "400.00")
+      }
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(attrs,
+          rooms: [room],
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      nights = Date.diff(checkout, checkin)
+
+      booked_before =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout and ri.booked == true
+          ),
+          :count
+        )
+
+      assert booked_before == nights
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(
+                 booking,
+                 %{
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   guests_count: 3,
+                   children_count: 0,
+                   booking_mode: :room
+                 },
+                 rooms: [room]
+               )
+
+      assert updated.guests_count == 3
+
+      booked_after =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout and ri.booked == true
+          ),
+          :count
+        )
+
+      assert booked_after == nights
+    end
+
+    defp buyout_booked?(property, days) do
+      alias Ysc.Bookings.PropertyInventory
+
+      Enum.all?(days, fn day ->
+        Repo.one!(
+          from(pi in PropertyInventory,
+            where: pi.property == ^property and pi.day == ^day,
+            select: pi.buyout_booked
+          )
+        )
+      end)
+    end
+
+    defp day_capacity_booked(property, days) do
+      alias Ysc.Bookings.PropertyInventory
+
+      days
+      |> Enum.map(fn day ->
+        Repo.one!(
+          from(pi in PropertyInventory,
+            where: pi.property == ^property and pi.day == ^day,
+            select: pi.capacity_booked
+          )
+        )
+      end)
+    end
+  end
+
   describe "modify_complete_booking/3 error branches" do
     defp complete_buyout_booking_for_modify!(user, checkin, checkout) do
       {:ok, _} =

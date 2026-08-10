@@ -28,6 +28,47 @@ defmodule YscWeb.UserRegistrationLiveTest do
       assert html =~ "You only need to meet one to qualify"
     end
 
+    test "shows scandinavia connection header on additional questions step", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      render_change(form, %{
+        "user" => %{
+          "registration_form" => %{
+            "membership_type" => "single",
+            "membership_eligibility" => ["born_in_scandinavia"]
+          }
+        }
+      })
+
+      assert render_click(lv, "next-step") =~ "Account Information"
+
+      render_change(form, %{
+        "user" => %{
+          "email" => "header#{System.unique_integer()}@example.com",
+          "first_name" => "Header",
+          "last_name" => "Test",
+          "registration_form" => %{
+            "birth_date" => "1990-01-01",
+            "address" => "1 Main St",
+            "city" => "SF",
+            "region" => "CA",
+            "country" => "US",
+            "postal_code" => "94105"
+          }
+        }
+      })
+
+      html = render_click(lv, "next-step")
+
+      assert html =~
+               "Please specify your eligibility where appropriate (minimum one required)"
+
+      assert html =~ "Tell us about your connection to Scandinavia/the Nordics"
+    end
+
     test "completes full registration process successfully", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
 
@@ -705,6 +746,34 @@ defmodule YscWeb.UserRegistrationLiveTest do
       refute has_element?(lv, "#step-1-content.hidden")
     end
 
+    test "recover_wizard restores step 2 when only scandinavia connection fields are filled",
+         %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+
+      params = %{
+        "email" => "step2only#{System.unique_integer()}@example.com",
+        "first_name" => "Step",
+        "last_name" => "Two",
+        "registration_form" => %{
+          "membership_type" => "single",
+          "membership_eligibility" => ["born_in_scandinavia"],
+          "birth_date" => "1990-01-01",
+          "address" => "1 Recovery St",
+          "city" => "SF",
+          "region" => "CA",
+          "country" => "US",
+          "postal_code" => "94105",
+          "link_to_scandinavia" => "Born in Stockholm"
+        }
+      }
+
+      render_change(lv, "recover_wizard", %{"user" => params})
+
+      assert render(lv) =~ "Additional Questions"
+      assert has_element?(lv, "#step-2-content.flex")
+      refute has_element?(lv, "#step-2-content.hidden")
+    end
+
     test "set-step does not jump to additional questions when step 1 is invalid",
          %{
            conn: conn
@@ -838,7 +907,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
           "citizenship" => "SE",
           "most_connected_nordic_country" => "SE",
           "agreed_to_bylaws" => true,
-          "link_to_scandinavia" => "",
+          "link_to_scandinavia" => "Born in Stockholm",
           "lived_in_scandinavia" => "",
           "spoken_languages" => "",
           "hear_about_the_club" => ""
@@ -999,6 +1068,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
         "place_of_birth" => "SE",
         "citizenship" => "SE",
         "most_connected_nordic_country" => "SE",
+        "link_to_scandinavia" => "Born in Stockholm",
         "agreed_to_bylaws" => true
       }
     }

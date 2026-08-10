@@ -304,6 +304,54 @@ defmodule Ysc.SubscriptionsActivationTest do
       assert MembershipCache.get_active_membership(user)
     end
 
+    test "syncs incomplete local subscription to active when Stripe reports active after card retry" do
+      user =
+        user_fixture(%{state: :active})
+        |> then(fn user ->
+          user
+          |> Ysc.Accounts.User.update_user_changeset(%{
+            stripe_id: "cus_card_retry_#{System.unique_integer([:positive])}"
+          })
+          |> Ysc.Repo.update!()
+        end)
+
+      stripe_sub_id = "sub_card_retry_#{System.unique_integer([:positive])}"
+
+      {:ok, existing} =
+        %Subscriptions.Subscription{}
+        |> Subscriptions.Subscription.changeset(%{
+          user_id: user.id,
+          name: "Membership Subscription",
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete"
+        })
+        |> Ysc.Repo.insert()
+
+      now = System.os_time(:second)
+      period_end = now + 365 * 86_400
+
+      stripe_subscription =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "active",
+          start_date: now,
+          current_period_start: now,
+          current_period_end: period_end
+        )
+
+      assert {:ok, updated} =
+               Subscriptions.create_subscription_from_stripe(
+                 user,
+                 stripe_subscription
+               )
+
+      assert updated.id == existing.id
+      assert updated.stripe_status == "active"
+      assert updated.current_period_start != nil
+      assert updated.current_period_end != nil
+    end
+
     test "activates an existing incomplete local subscription on bank-account retry" do
       user =
         user_fixture(%{state: :active})

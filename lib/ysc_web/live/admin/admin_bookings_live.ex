@@ -6485,6 +6485,65 @@ defmodule YscWeb.AdminBookingsLive do
 
   defp save_existing_admin_booking(
          socket,
+         %{status: :complete} = existing_booking,
+         booking_params,
+         room_id,
+         rooms
+       ) do
+    inventory_attrs =
+      admin_booking_inventory_attrs(existing_booking, booking_params)
+
+    if admin_inventory_relevant_change?(
+         existing_booking,
+         inventory_attrs,
+         rooms
+       ) do
+      case BookingLocker.admin_modify_complete_booking(
+             existing_booking,
+             inventory_attrs,
+             rooms: rooms
+           ) do
+        {:ok, _booking} ->
+          {:noreply, admin_booking_save_success(socket, "updated")}
+
+        {:error, {:error, changeset}}
+        when is_struct(changeset, Ecto.Changeset) ->
+          {:noreply,
+           assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:noreply,
+           assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+        {:error, :blackout_conflict} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Cannot update booking: selected dates overlap a blackout period."
+           )}
+
+        {:error, reason} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to update booking: #{inspect(reason)}"
+           )}
+      end
+    else
+      do_save_existing_admin_booking(
+        socket,
+        existing_booking,
+        booking_params,
+        room_id,
+        rooms
+      )
+    end
+  end
+
+  defp do_save_existing_admin_booking(
+         socket,
          existing_booking,
          booking_params,
          room_id,
@@ -7763,6 +7822,53 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp parse_integer(_, default), do: default
+
+  defp admin_booking_inventory_attrs(existing_booking, booking_params) do
+    %{
+      checkin_date: parse_date(booking_params["checkin_date"]),
+      checkout_date: parse_date(booking_params["checkout_date"]),
+      guests_count:
+        parse_integer(
+          booking_params["guests_count"],
+          existing_booking.guests_count
+        ),
+      children_count:
+        parse_integer(
+          booking_params["children_count"],
+          existing_booking.children_count || 0
+        ),
+      booking_mode:
+        booking_params["booking_mode"] || existing_booking.booking_mode
+    }
+  end
+
+  defp admin_inventory_relevant_change?(booking, attrs, rooms) do
+    rooms_changed? =
+      case {booking.booking_mode, attrs.booking_mode} do
+        {:room, :room} ->
+          new_room_ids =
+            case rooms do
+              [_ | _] = room_list -> Enum.map(room_list, & &1.id)
+              _ -> Enum.map(booking.rooms || [], & &1.id)
+            end
+
+          existing_room_ids = Enum.map(booking.rooms || [], & &1.id)
+
+          Enum.sort(new_room_ids) != Enum.sort(existing_room_ids)
+
+        {old_mode, new_mode} when old_mode != new_mode ->
+          true
+
+        _ ->
+          false
+      end
+
+    rooms_changed? or
+      booking.checkin_date != attrs.checkin_date or
+      booking.checkout_date != attrs.checkout_date or
+      booking.guests_count != attrs.guests_count or
+      booking.booking_mode != attrs.booking_mode
+  end
 
   defp preserve_reservation_params(query_params, reservation_params) do
     query_params

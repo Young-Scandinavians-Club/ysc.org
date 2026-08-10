@@ -1526,28 +1526,28 @@ defmodule YscWeb.HomeLive do
                           <% end %>
                         </div>
                         <div class="flex flex-col gap-1.5">
-                          <%= if order_ids != [] do %>
-                            <div class="flex items-center gap-3">
-                              <.button
+                          <div class="flex items-center gap-3">
+                            <.button
+                              navigate={
+                                ~p"/events/#{event.id}/tickets/qr?return_to=/"
+                              }
+                              color="zinc"
+                              class="!py-1.5 whitespace-nowrap"
+                            >
+                              <.icon name="hero-qr-code" class="w-4 h-4" />
+                              Show event tickets
+                            </.button>
+                            <%= if length(order_ids) == 1 do %>
+                              <.link
                                 navigate={
-                                  ~p"/events/#{event.id}/tickets/qr?return_to=/"
+                                  ~p"/orders/#{List.first(order_ids)}/confirmation"
                                 }
-                                color="zinc"
-                                class="!py-1.5 whitespace-nowrap"
+                                class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                               >
-                                <.icon name="hero-qr-code" class="w-4 h-4" />
-                                Show event tickets
-                              </.button>
-                              <%= if length(order_ids) == 1 do %>
-                                <.link
-                                  navigate={
-                                    ~p"/orders/#{List.first(order_ids)}/confirmation"
-                                  }
-                                  class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
-                                >
-                                  View ticket details
-                                </.link>
-                              <% else %>
+                                View ticket details
+                              </.link>
+                            <% else %>
+                              <%= if length(order_ids) > 1 do %>
                                 <.link
                                   navigate={~p"/users/tickets"}
                                   class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
@@ -1555,12 +1555,8 @@ defmodule YscWeb.HomeLive do
                                   View all tickets
                                 </.link>
                               <% end %>
-                            </div>
-                          <% else %>
-                            <span class="text-xs font-bold text-zinc-400">
-                              No order
-                            </span>
-                          <% end %>
+                            <% end %>
+                          </div>
                         </div>
                       </div>
                     </div>
