@@ -37,6 +37,22 @@ defmodule Ysc.AvatarsTest do
     end
   end
 
+  defmodule ServeOauthRedirectPlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(opts), do: opts
+
+    def call(conn, _opts) do
+      # A link-local/metadata-style target: if this were ever followed, it would
+      # be fetched without going through UrlFetchGuard.validate_url_for_server_fetch/1
+      # again (that check only runs once, against the original image_url).
+      conn
+      |> put_resp_header("location", "http://169.254.169.254/latest/meta-data/")
+      |> send_resp(302, "")
+    end
+  end
+
   describe "content_type_for_extension/1" do
     test "derives MIME type from allowed extensions" do
       assert Avatars.content_type_for_extension(".png") == "image/png"
@@ -588,6 +604,22 @@ defmodule Ysc.AvatarsTest do
 
       assert {:error, :download_failed} =
                Avatars.sync_oauth_avatar(user, image_url, :facebook)
+
+      assert Avatars.list_user_avatars(user) == []
+    end
+
+    test "does not follow a redirect response, so a malicious upstream can't bypass UrlFetchGuard" do
+      port =
+        Ysc.HttpTestServer.ensure_started(
+          ServeOauthRedirectPlug,
+          :avatars_oauth_redirect
+        )
+
+      user = user_fixture()
+      image_url = "http://127.0.0.1:#{port}/photo.png"
+
+      assert {:error, :download_failed} =
+               Avatars.sync_oauth_avatar(user, image_url, :google)
 
       assert Avatars.list_user_avatars(user) == []
     end

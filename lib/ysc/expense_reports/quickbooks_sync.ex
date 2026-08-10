@@ -810,10 +810,14 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
       secret_access_key_configured: secret_access_key_configured
     )
 
-    # Create temp file
+    # Create temp file. The caller's PID is embedded so tests can identify
+    # files this specific call could have created in the shared tmp dir,
+    # without racing other concurrently-running (async) downloads.
     temp_file =
       System.tmp_dir!()
-      |> Path.join("qb_upload_#{:rand.uniform(1_000_000_000)}")
+      |> Path.join(
+        "qb_upload_#{:erlang.phash2(self())}_#{:rand.uniform(1_000_000_000)}"
+      )
 
     # Fetches via a short-lived presigned URL instead of a signed
     # ExAws.S3.get_object request. The expense-reports bucket is private

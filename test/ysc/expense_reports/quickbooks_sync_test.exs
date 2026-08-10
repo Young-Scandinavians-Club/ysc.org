@@ -15,10 +15,14 @@ defmodule Ysc.ExpenseReports.QuickbooksSyncTest do
       assert {:error, :s3_download_failed} =
                QuickbooksSync.download_from_s3_to_temp_for_test(key)
 
+      # Scoped to this test's own PID so it can't be tripped up by another
+      # async test's in-flight download in the same shared tmp dir.
+      prefix = "qb_upload_#{:erlang.phash2(self())}_"
+
       tmp_files =
         System.tmp_dir!()
         |> File.ls!()
-        |> Enum.filter(&String.starts_with?(&1, "qb_upload_"))
+        |> Enum.filter(&String.starts_with?(&1, prefix))
 
       assert tmp_files == []
     end
