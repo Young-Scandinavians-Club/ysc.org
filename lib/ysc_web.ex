@@ -80,6 +80,7 @@ defmodule YscWeb do
 
       unquote(html_helpers())
       import YscWeb.AdminComponents
+
       import YscWeb.AdminFlopHelpers,
         only: [
           non_flop_params: 1,
@@ -89,6 +90,7 @@ defmodule YscWeb do
           compact_filter_params: 1,
           merge_title_filter_into_params: 2
         ]
+
       import YscWeb.AdminHelpComponents
 
       # Global event: "clear" is sent by the client-error flash in the layout when dismissed.

@@ -403,7 +403,10 @@ defmodule YscWeb.AdminEventsLive do
         "filters" => build_title_search_filter_params(socket.assigns.meta, q),
         "tab" => socket.assigns.active_tab
       }
-      |> merge_date_range_into_params(socket.assigns.date_from, socket.assigns.date_to)
+      |> merge_date_range_into_params(
+        socket.assigns.date_from,
+        socket.assigns.date_to
+      )
 
     {:noreply,
      socket

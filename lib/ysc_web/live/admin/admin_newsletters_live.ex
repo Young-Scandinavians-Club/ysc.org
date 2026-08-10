@@ -1372,7 +1372,10 @@ defmodule YscWeb.AdminNewslettersLive do
   def handle_event("search", %{"q" => q}, socket) do
     new_params =
       %{"filters" => build_title_search_filter_params(socket.assigns.meta, q)}
-      |> merge_date_range_into_params(socket.assigns.date_from, socket.assigns.date_to)
+      |> merge_date_range_into_params(
+        socket.assigns.date_from,
+        socket.assigns.date_to
+      )
 
     {:noreply, push_patch(socket, to: ~p"/admin/newsletters?#{new_params}")}
   end
