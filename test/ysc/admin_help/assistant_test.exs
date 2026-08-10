@@ -177,7 +177,10 @@ defmodule Ysc.AdminHelp.AssistantTest do
 
     test "clarify_step/5 returns invalid_json when the reply has no answer" do
       Application.put_env(:ysc, :open_router_client, ScriptedClient)
-      Process.put(:scripted_responses, [{:ok, Jason.encode!(%{"suggested_step" => 1})}])
+
+      Process.put(:scripted_responses, [
+        {:ok, Jason.encode!(%{"suggested_step" => 1})}
+      ])
 
       assert {:error, :invalid_json} =
                Assistant.clarify_step(PublishPost, 1, "help", :volunteer, uid())
@@ -241,8 +244,7 @@ defmodule Ysc.AdminHelp.AssistantTest do
         {:ok, "not valid json"}
       ])
 
-      assert {:ok,
-              %{guide_slug: "newsletters/send", step: nil, highlight: nil}} =
+      assert {:ok, %{guide_slug: "newsletters/send", step: nil, highlight: nil}} =
                Assistant.find_guide("send newsletter", :volunteer, uid())
     end
 
@@ -325,11 +327,18 @@ defmodule Ysc.AdminHelp.AssistantTest do
 
       Process.put(:scripted_responses, [
         {:ok, Jason.encode!(%{"read_docs" => ["totally-fake-doc"]})},
-        {:ok, Jason.encode!(%{"answer" => "no docs found", "suggested_step" => nil})}
+        {:ok,
+         Jason.encode!(%{"answer" => "no docs found", "suggested_step" => nil})}
       ])
 
       assert {:ok, %{answer: "no docs found"}} =
-               Assistant.clarify_step(PublishPost, 1, "obscure question", :volunteer, uid())
+               Assistant.clarify_step(
+                 PublishPost,
+                 1,
+                 "obscure question",
+                 :volunteer,
+                 uid()
+               )
     end
 
     test "skips reference docs for a role outside admin/volunteer" do
@@ -337,11 +346,21 @@ defmodule Ysc.AdminHelp.AssistantTest do
 
       Process.put(:scripted_responses, [
         {:ok, Jason.encode!(%{"read_docs" => ["posts"]})},
-        {:ok, Jason.encode!(%{"answer" => "no docs for this role", "suggested_step" => nil})}
+        {:ok,
+         Jason.encode!(%{
+           "answer" => "no docs for this role",
+           "suggested_step" => nil
+         })}
       ])
 
       assert {:ok, %{answer: "no docs for this role"}} =
-               Assistant.clarify_step(PublishPost, 1, "obscure question", :guest, uid())
+               Assistant.clarify_step(
+                 PublishPost,
+                 1,
+                 "obscure question",
+                 :guest,
+                 uid()
+               )
     end
   end
 

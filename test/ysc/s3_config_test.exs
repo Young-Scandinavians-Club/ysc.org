@@ -222,8 +222,18 @@ defmodule Ysc.S3ConfigTest do
       end)
 
       Application.put_env(:ysc, :s3_use_custom_domain, true)
-      Application.put_env(:ysc, :s3_media_public_url, "https://assets.example.com")
-      Application.put_env(:ysc, :s3_avatars_public_url, "https://avatars.example.com")
+
+      Application.put_env(
+        :ysc,
+        :s3_media_public_url,
+        "https://assets.example.com"
+      )
+
+      Application.put_env(
+        :ysc,
+        :s3_avatars_public_url,
+        "https://avatars.example.com"
+      )
 
       Application.put_env(
         :ysc,
@@ -788,7 +798,13 @@ defmodule Ysc.S3ConfigTest do
       end)
 
       Application.put_env(:ysc, :s3_use_custom_domain, true)
-      Application.put_env(:ysc, :s3_media_public_url, "https://assets.example.com")
+
+      Application.put_env(
+        :ysc,
+        :s3_media_public_url,
+        "https://assets.example.com"
+      )
+
       Application.put_env(:ysc, :s3_avatars_public_url, "   ")
       Application.delete_env(:ysc, :s3_expense_reports_public_url)
 
@@ -1000,7 +1016,9 @@ defmodule Ysc.S3ConfigTest do
               {:s3_bucket, previous_bucket},
               {:s3_media_public_url, previous_pub}
             ] do
-          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
         end
       end)
 
@@ -1023,7 +1041,9 @@ defmodule Ysc.S3ConfigTest do
               {:s3_bucket, previous_bucket},
               {:s3_media_public_url, previous_pub}
             ] do
-          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
         end
       end)
 
@@ -1047,7 +1067,9 @@ defmodule Ysc.S3ConfigTest do
               {:s3_bucket, previous_bucket},
               {:s3_media_public_url, previous_pub}
             ] do
-          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
         end
       end)
 
@@ -1070,7 +1092,9 @@ defmodule Ysc.S3ConfigTest do
               {:s3_use_custom_domain, previous_flag},
               {:s3_expense_reports_public_url, previous_pub}
             ] do
-          if v == nil, do: Application.delete_env(:ysc, k), else: Application.put_env(:ysc, k, v)
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
         end
       end)
 

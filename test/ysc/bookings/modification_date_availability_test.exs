@@ -680,7 +680,9 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
   defp next_summer_monday do
     Date.utc_today()
     |> Stream.iterate(&Date.add(&1, 1))
-    |> Enum.find(fn d -> Date.day_of_week(d, :monday) == 1 and d.month in 5..10 end)
+    |> Enum.find(fn d ->
+      Date.day_of_week(d, :monday) == 1 and d.month in 5..10
+    end)
   end
 
   defp first_saturday_on_or_after(date) do

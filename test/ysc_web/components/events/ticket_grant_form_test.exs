@@ -98,7 +98,11 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
         )
 
       {:noreply, socket} =
-        TicketGrantForm.handle_event("select-user", %{"id" => member.id}, socket)
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
 
       {:ok, socket} =
         TicketGrantForm.update(
@@ -179,14 +183,22 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
         )
 
       assert socket.assigns.user_search == "Searchable"
-      assert Enum.any?(socket.assigns.user_search_results, &(&1.id == member.id))
+
+      assert Enum.any?(
+               socket.assigns.user_search_results,
+               &(&1.id == member.id)
+             )
     end
 
     test "returns no results for queries shorter than 2 characters", %{
       socket: socket
     } do
       {:noreply, socket} =
-        TicketGrantForm.handle_event("search-users", %{"user_search" => "a"}, socket)
+        TicketGrantForm.handle_event(
+          "search-users",
+          %{"user_search" => "a"},
+          socket
+        )
 
       assert socket.assigns.user_search_results == []
     end
@@ -218,7 +230,11 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       member: member
     } do
       {:noreply, socket} =
-        TicketGrantForm.handle_event("select-user", %{"id" => member.id}, socket)
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
 
       assert socket.assigns.selected_user.id == member.id
       assert socket.assigns.user_search == ""
@@ -231,7 +247,11 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       member: member
     } do
       {:noreply, socket} =
-        TicketGrantForm.handle_event("select-user", %{"id" => member.id}, socket)
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
 
       {:noreply, socket} =
         TicketGrantForm.handle_event("clear-user", %{}, socket)
@@ -279,7 +299,11 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       member: member
     } do
       {:noreply, socket} =
-        TicketGrantForm.handle_event("select-user", %{"id" => member.id}, socket)
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
 
       {:noreply, socket} =
         TicketGrantForm.handle_event(
@@ -297,7 +321,11 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       member: member
     } do
       {:noreply, socket} =
-        TicketGrantForm.handle_event("select-user", %{"id" => member.id}, socket)
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
 
       {:noreply, _socket} =
         TicketGrantForm.handle_event(
@@ -312,8 +340,8 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
         )
 
       assert_received {:phoenix, :send_update,
-                        {{TicketTierManagement, "ticket-tier-management-" <> _},
-                         %{close_grant_modal: true, grant_success: grant_success}}}
+                       {{TicketTierManagement, "ticket-tier-management-" <> _},
+                        %{close_grant_modal: true, grant_success: grant_success}}}
 
       assert grant_success.quantity == 1
       assert grant_success.user_name =~ member.first_name
@@ -332,7 +360,11 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
         put_in(socket.assigns.ticket_tier_id, bad_tier_id)
 
       {:noreply, socket} =
-        TicketGrantForm.handle_event("select-user", %{"id" => member.id}, socket)
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
 
       {:noreply, socket} =
         TicketGrantForm.handle_event(

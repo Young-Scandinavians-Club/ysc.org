@@ -240,7 +240,9 @@ defmodule Ysc.GoogleWalletTest do
 
       image =
         %Ysc.Media.Image{user_id: user.id}
-        |> Ysc.Media.Image.add_image_changeset(%{raw_image_path: "/uploads/raw.jpg"})
+        |> Ysc.Media.Image.add_image_changeset(%{
+          raw_image_path: "/uploads/raw.jpg"
+        })
         |> Ysc.Repo.insert!()
         |> Ysc.Media.Image.processed_image_changeset(%{
           optimized_image_path: "/uploads/optimized.jpg"
@@ -273,7 +275,10 @@ defmodule Ysc.GoogleWalletTest do
 
         assert ticket_class["venue"] == %{
                  "name" => %{
-                   "defaultValue" => %{"language" => "en-US", "value" => "Clubhouse"}
+                   "defaultValue" => %{
+                     "language" => "en-US",
+                     "value" => "Clubhouse"
+                   }
                  },
                  "placeId" => "ChIJ123"
                }
@@ -312,10 +317,16 @@ defmodule Ysc.GoogleWalletTest do
 
         assert ticket_class["venue"] == %{
                  "name" => %{
-                   "defaultValue" => %{"language" => "en-US", "value" => "Clubhouse"}
+                   "defaultValue" => %{
+                     "language" => "en-US",
+                     "value" => "Clubhouse"
+                   }
                  },
                  "address" => %{
-                   "defaultValue" => %{"language" => "en-US", "value" => "123 Main St"}
+                   "defaultValue" => %{
+                     "language" => "en-US",
+                     "value" => "123 Main St"
+                   }
                  }
                }
 

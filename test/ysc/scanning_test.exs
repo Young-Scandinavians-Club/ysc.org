@@ -1574,7 +1574,8 @@ defmodule Ysc.ScanningTest do
       missing_user_id = Ecto.ULID.generate()
       token = QrToken.sign_membership(missing_user_id)
 
-      assert {:error, :invalid, _message} = Scanning.process_scan(session, token)
+      assert {:error, :invalid, _message} =
+               Scanning.process_scan(session, token)
     end
   end
 

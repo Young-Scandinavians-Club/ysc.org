@@ -677,7 +677,8 @@ defmodule YscWeb.AuthControllerTest do
     end
 
     test "ignores a profile image URL pointing at localhost", %{conn: conn} do
-      user = user_fixture(%{state: "active", email: "localhostavatar@example.com"})
+      user =
+        user_fixture(%{state: "active", email: "localhostavatar@example.com"})
 
       auth =
         build_oauth_auth_with_image(

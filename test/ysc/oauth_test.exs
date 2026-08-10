@@ -120,7 +120,9 @@ defmodule Ysc.OAuthTest do
       assert {:error, :invalid_redirect_uri} =
                OAuth.create_authorization(
                  admin,
-                 authorize_params(%{"redirect_uri" => "https://evil.example/cb"})
+                 authorize_params(%{
+                   "redirect_uri" => "https://evil.example/cb"
+                 })
                )
     end
 
@@ -270,7 +272,10 @@ defmodule Ysc.OAuthTest do
     } do
       assert {:error, :invalid_client} =
                OAuth.exchange_token(
-                 token_params(code, %{"client_id" => nil, "client_secret" => nil}),
+                 token_params(code, %{
+                   "client_id" => nil,
+                   "client_secret" => nil
+                 }),
                  nil,
                  nil
                )
@@ -365,7 +370,9 @@ defmodule Ysc.OAuthTest do
     end
 
     test "returns :invalid_grant for a well-formed but unknown code" do
-      bogus_code = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+      bogus_code =
+        Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+
       params = token_params(bogus_code)
 
       assert {:error, :invalid_grant} =
@@ -374,7 +381,8 @@ defmodule Ysc.OAuthTest do
 
     test "returns :invalid_grant when redirect_uri does not match the authorized one",
          %{code: code} do
-      params = token_params(code, %{"redirect_uri" => "http://localhost:4001/other"})
+      params =
+        token_params(code, %{"redirect_uri" => "http://localhost:4001/other"})
 
       assert {:error, :invalid_grant} =
                OAuth.exchange_token(params, @client_id, @client_secret)
@@ -412,7 +420,11 @@ defmodule Ysc.OAuthTest do
       |> Repo.update!()
 
       assert {:error, :invalid_grant} =
-               OAuth.exchange_token(token_params(code), @client_id, @client_secret)
+               OAuth.exchange_token(
+                 token_params(code),
+                 @client_id,
+                 @client_secret
+               )
     end
 
     test "falls back to 'Unknown' display name when the user has no name on file",
@@ -422,7 +434,11 @@ defmodule Ysc.OAuthTest do
       |> Repo.update!()
 
       assert {:ok, payload} =
-               OAuth.exchange_token(token_params(code), @client_id, @client_secret)
+               OAuth.exchange_token(
+                 token_params(code),
+                 @client_id,
+                 @client_secret
+               )
 
       assert payload["user"]["display_name"] == "Unknown"
     end
