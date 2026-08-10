@@ -11,6 +11,18 @@
       submission_date: "January 15, 2026",
       review_url: "http://localhost:4000/admin/applications/preview"
     },
+    "admin_membership_report" => %{
+      date_from: "2026-01-01",
+      date_to: "2026-01-31",
+      count_applied: 12,
+      count_accepted: 8,
+      count_rejected: 2,
+      count_pending: 2,
+      count_expired: 5,
+      count_purchased: 6,
+      generated_by: "Admin User",
+      report_url: "http://localhost:4000/admin/memberships/report"
+    },
     "application_approved" => %{
       first_name: "Astrid"
     },

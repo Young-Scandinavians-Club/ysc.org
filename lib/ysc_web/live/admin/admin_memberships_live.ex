@@ -81,6 +81,12 @@ defmodule YscWeb.AdminMembershipsLive do
               account holder; family/lifetime memberships include linked sub-accounts.
             </p>
           </div>
+          <.link
+            navigate={~p"/admin/memberships/report"}
+            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 transition-colors"
+          >
+            <.icon name="hero-document-chart-bar" class="w-4 h-4" /> Generate report
+          </.link>
         </div>
 
         <%!-- Stats cards --%>

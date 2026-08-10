@@ -55,6 +55,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "expense_report_confirmation" => :account,
     # Board/admin notifications (always sent, no user preference check)
     "admin_application_submitted" => :account,
+    "admin_membership_report" => :account,
     "conduct_violation_board_notification" => :account,
     "volunteer_board_notification" => :account,
     "contact_form_board_notification" => :account,
