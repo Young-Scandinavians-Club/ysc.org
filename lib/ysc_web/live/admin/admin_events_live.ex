@@ -349,8 +349,7 @@ defmodule YscWeb.AdminEventsLive do
              tab: active_tab
            ) do
         {:ok, {events, meta}} ->
-          title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
-          search_query = if title_filter, do: title_filter.value, else: ""
+          search_query = title_search_query(meta)
 
           event_ids = Enum.map(events, & &1.id)
 
@@ -399,40 +398,15 @@ defmodule YscWeb.AdminEventsLive do
   end
 
   def handle_event("search", %{"q" => q}, socket) do
-    existing_filters =
-      socket.assigns.meta.flop.filters
-      |> Enum.reject(&(&1.field == :title))
-
-    new_filters =
-      if q != "" do
-        [%Flop.Filter{field: :title, op: :ilike, value: q} | existing_filters]
-      else
-        existing_filters
-      end
-
-    filter_params =
-      new_filters
-      |> Enum.with_index()
-      |> Enum.into(%{}, fn {filter, idx} ->
-        {"#{idx}",
-         %{
-           "field" => "#{filter.field}",
-           "op" => "#{filter.op}",
-           "value" => "#{filter.value}"
-         }}
-      end)
-
-    date_from = socket.assigns.date_from
-    date_to = socket.assigns.date_to
-
     new_params =
-      %{"filters" => filter_params, "tab" => socket.assigns.active_tab}
-      |> then(fn p ->
-        if date_from != "", do: Map.put(p, "date_from", date_from), else: p
-      end)
-      |> then(fn p ->
-        if date_to != "", do: Map.put(p, "date_to", date_to), else: p
-      end)
+      %{
+        "filters" => build_title_search_filter_params(socket.assigns.meta, q),
+        "tab" => socket.assigns.active_tab
+      }
+      |> merge_date_range_into_params(
+        socket.assigns.date_from,
+        socket.assigns.date_to
+      )
 
     {:noreply,
      socket
@@ -458,44 +432,17 @@ defmodule YscWeb.AdminEventsLive do
       |> Map.delete("date_from")
       |> Map.delete("date_to")
 
-    updated_filters =
-      Enum.reduce(params["filters"] || %{}, %{}, fn {k, v}, acc ->
-        updated = maybe_update_filter(v)
-
-        if updated["value"] in ["", nil] do
-          acc
-        else
-          Map.put(acc, k, updated)
-        end
-      end)
-
-    title_filter =
-      Enum.find(socket.assigns.meta.flop.filters, &(&1.field == :title))
-
     final_filters =
-      if title_filter && title_filter.value != "" do
-        next_idx = map_size(updated_filters)
-
-        Map.put(updated_filters, "#{next_idx}", %{
-          "field" => "title",
-          "op" => "ilike",
-          "value" => title_filter.value
-        })
-      else
-        updated_filters
-      end
+      params["filters"]
+      |> compact_filter_params()
+      |> merge_title_filter_into_params(socket.assigns.meta)
 
     new_params =
       Map.merge(params, %{
         "filters" => final_filters,
         "tab" => socket.assigns.active_tab
       })
-      |> then(fn p ->
-        if date_from != "", do: Map.put(p, "date_from", date_from), else: p
-      end)
-      |> then(fn p ->
-        if date_to != "", do: Map.put(p, "date_to", date_to), else: p
-      end)
+      |> merge_date_range_into_params(date_from, date_to)
 
     {:noreply, push_patch(socket, to: ~p"/admin/events?#{new_params}")}
   end
@@ -540,11 +487,6 @@ defmodule YscWeb.AdminEventsLive do
      |> assign(:focus_search_input, input_id)
      |> push_patch(to: ~p"/admin/events?#{new_params}")}
   end
-
-  defp maybe_update_filter(%{"value" => [""]} = filter),
-    do: Map.replace(filter, "value", "")
-
-  defp maybe_update_filter(filter), do: filter
 
   defp parse_tab("drafts"), do: :drafts
   defp parse_tab("past"), do: :past
