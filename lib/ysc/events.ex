@@ -1939,7 +1939,14 @@ defmodule Ysc.Events do
       ticket_count: count(t.id),
       first_purchase: min(t.inserted_at)
     })
-    |> order_by([t], asc: min(t.inserted_at))
+    # `inserted_at` is second-precision (see Ticket's @timestamps_opts), so
+    # tickets purchased within the same second tie and sort arbitrarily.
+    # `id` is an Ecto.ULID (stored as uuid, which has no MIN/MAX aggregate in
+    # Postgres), and its hex-text form preserves the same byte ordering as
+    # the raw value -- so casting to text lets us order by it, which is
+    # lexicographically/chronologically sortable at millisecond precision
+    # and orders "first purchase" far more reliably.
+    |> order_by([t], asc: min(fragment("?::text", t.id)))
     |> Repo.all()
   end
 
