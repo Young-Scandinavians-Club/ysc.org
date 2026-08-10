@@ -1126,10 +1126,9 @@ defmodule YscWeb.EventDetailsLiveTest do
     test "remains active until same-day end_time when end_date is absent", %{
       conn: conn
     } do
-      now_pt = DateTime.now!("America/Los_Angeles")
-      today = DateTime.to_date(now_pt)
-      start_time = DateTime.to_time(now_pt) |> Time.add(-3600, :second)
-      end_time = DateTime.to_time(now_pt) |> Time.add(3600, :second)
+      today =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
 
       event =
         event_fixture(%{
@@ -1137,8 +1136,8 @@ defmodule YscWeb.EventDetailsLiveTest do
           state: :published,
           start_date: DateTime.new!(today, ~T[00:00:00], "Etc/UTC"),
           end_date: nil,
-          start_time: start_time,
-          end_time: end_time,
+          start_time: ~T[00:00:00],
+          end_time: ~T[23:59:59],
           published_at: DateTime.utc_now() |> DateTime.truncate(:second)
         })
 
