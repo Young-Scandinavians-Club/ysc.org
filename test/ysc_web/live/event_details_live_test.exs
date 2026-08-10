@@ -1126,19 +1126,23 @@ defmodule YscWeb.EventDetailsLiveTest do
     test "remains active until same-day end_time when end_date is absent", %{
       conn: conn
     } do
-      now_pt = DateTime.now!("America/Los_Angeles")
-      today = DateTime.to_date(now_pt)
-      start_time = DateTime.to_time(now_pt) |> Time.add(-3600, :second)
-      end_time = DateTime.to_time(now_pt) |> Time.add(3600, :second)
+      today =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
 
+      # Fixed full-day bounds (mirroring the "later today" test above) rather
+      # than `now +/- 1 hour` bare-Time arithmetic: near midnight Pacific,
+      # Time.add/2 wraps end_time past 23:59:59 back to ~00:2x:xx, which is
+      # *before* start_time, making event_ends_at (same-day as start_date
+      # when end_date is absent) compute an end instant already in the past.
       event =
         event_fixture(%{
           title: "No End Date Mixer",
           state: :published,
           start_date: DateTime.new!(today, ~T[00:00:00], "Etc/UTC"),
           end_date: nil,
-          start_time: start_time,
-          end_time: end_time,
+          start_time: ~T[00:00:00],
+          end_time: ~T[23:59:59],
           published_at: DateTime.utc_now() |> DateTime.truncate(:second)
         })
 
