@@ -5,6 +5,16 @@ defmodule YscWeb.MembershipHelpers do
   """
 
   @doc """
+  Human-readable membership type name for emails, payment descriptions, and receipts.
+
+  Returns "Single", "Family", or the generic "Membership" fallback for unknown types.
+  """
+  @spec membership_type_name(term()) :: String.t()
+  def membership_type_name(type) when type in [:single, "single"], do: "Single"
+  def membership_type_name(type) when type in [:family, "family"], do: "Family"
+  def membership_type_name(_), do: "Membership"
+
+  @doc """
   Builds a map of display details for the "My Membership QR" modal.
 
   Returns a map with type_label, plan_type, member_since, renewal_date,

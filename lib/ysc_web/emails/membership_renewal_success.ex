@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
     mjml_template: "templates/membership_renewal_success.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  alias YscWeb.MembershipHelpers
+
   import YscWeb.Emails.Helpers,
     only: [member_greeting_name: 1, format_date: 1, format_membership_money: 1]
 
@@ -48,7 +50,7 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
 
     # Ensure user has required fields
     first_name = member_greeting_name(user)
-    membership_type_name = get_membership_type_name(membership_type)
+    membership_type_name = MembershipHelpers.membership_type_name(membership_type)
 
     # Format amount
     amount_str = format_membership_money(amount)
@@ -61,7 +63,7 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
       if proration_details do
         old_type_name =
           if proration_details.old_membership_type do
-            get_membership_type_name(proration_details.old_membership_type)
+            MembershipHelpers.membership_type_name(proration_details.old_membership_type)
           else
             nil
           end
@@ -92,9 +94,4 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
     }
   end
 
-  defp get_membership_type_name(:single), do: "Single"
-  defp get_membership_type_name(:family), do: "Family"
-  defp get_membership_type_name("single"), do: "Single"
-  defp get_membership_type_name("family"), do: "Family"
-  defp get_membership_type_name(_), do: "Membership"
 end
