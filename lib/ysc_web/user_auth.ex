@@ -736,7 +736,13 @@ defmodule YscWeb.UserAuth do
       "javascript:",
       "data:",
       "vbscript:",
-      "://"
+      "://",
+      # Browsers strip ASCII tab/CR/LF when parsing a URL, so "/\t/evil.com"
+      # becomes "//evil.com" client-side even though it lacks a literal "//"
+      # here (CVE-2026-64941 / EEF-CVE-2026-64941 style bypass).
+      "\t",
+      "\n",
+      "\r"
     ])
   end
 
