@@ -65,6 +65,26 @@ defmodule Ysc.Accounts.UserDisplay do
 
   def birth_date_label(other), do: to_string(other)
 
+  @doc """
+  Returns the date a user's membership application was submitted.
+
+  Falls back to when the application was reviewed, then to the user's account
+  creation date, so this always returns a `DateTime` — never `nil` — even for
+  users with no completed application (e.g. staff-created accounts, family
+  sub-accounts, or abandoned signups).
+  """
+  def application_submitted_at(%{
+        registration_form: %{completed: %DateTime{} = c}
+      }),
+      do: c
+
+  def application_submitted_at(%{
+        registration_form: %{reviewed_at: %DateTime{} = r}
+      }),
+      do: r
+
+  def application_submitted_at(%{inserted_at: inserted_at}), do: inserted_at
+
   defp normalize_country_code(code) do
     code |> String.trim() |> String.upcase() |> String.slice(0, 2)
   end
