@@ -61,4 +61,41 @@ defmodule Ysc.Accounts.UserDisplayTest do
       assert UserDisplay.birth_date_label("unknown") == "unknown"
     end
   end
+
+  describe "application_submitted_at/1" do
+    test "prefers registration_form.completed over reviewed_at and inserted_at" do
+      completed = ~U[2024-06-01 12:00:00Z]
+      reviewed_at = ~U[2024-06-02 12:00:00Z]
+      inserted_at = ~U[2024-05-01 12:00:00Z]
+
+      user = %{
+        inserted_at: inserted_at,
+        registration_form: %{
+          completed: completed,
+          reviewed_at: reviewed_at
+        }
+      }
+
+      assert UserDisplay.application_submitted_at(user) == completed
+    end
+
+    test "falls back to reviewed_at when completed is absent" do
+      reviewed_at = ~U[2024-06-02 12:00:00Z]
+      inserted_at = ~U[2024-05-01 12:00:00Z]
+
+      user = %{
+        inserted_at: inserted_at,
+        registration_form: %{reviewed_at: reviewed_at}
+      }
+
+      assert UserDisplay.application_submitted_at(user) == reviewed_at
+    end
+
+    test "falls back to inserted_at when no application timestamps exist" do
+      inserted_at = ~U[2024-05-01 12:00:00Z]
+
+      assert UserDisplay.application_submitted_at(%{inserted_at: inserted_at}) ==
+               inserted_at
+    end
+  end
 end
