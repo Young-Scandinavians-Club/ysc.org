@@ -51,7 +51,9 @@ defmodule YscWeb.AdminFlopHelpers do
   @doc """
   Replaces any existing title filter with `query`, or removes it when empty.
   """
-  @spec build_title_search_filters([Flop.Filter.t()], String.t()) :: [Flop.Filter.t()]
+  @spec build_title_search_filters([Flop.Filter.t()], String.t()) :: [
+          Flop.Filter.t()
+        ]
   def build_title_search_filters(filters, query) when is_list(filters) do
     filters
     |> Enum.reject(&(&1.field == :title))
@@ -126,7 +128,8 @@ defmodule YscWeb.AdminFlopHelpers do
   Re-applies the current title search filter from `meta` onto `updated_filters`.
   """
   @spec merge_title_filter_into_params(map(), term()) :: map()
-  def merge_title_filter_into_params(updated_filters, meta) when is_map(updated_filters) do
+  def merge_title_filter_into_params(updated_filters, meta)
+      when is_map(updated_filters) do
     case title_filter(meta) do
       %{value: value} when is_binary(value) and value != "" ->
         next_idx = map_size(updated_filters)
