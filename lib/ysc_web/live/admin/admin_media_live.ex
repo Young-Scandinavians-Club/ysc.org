@@ -9,7 +9,7 @@ defmodule YscWeb.AdminMediaLive do
   alias Ysc.Media
   alias Ysc.Media.Timeline
   alias Ysc.S3Config
-  alias YscWeb.S3.SimpleS3Upload
+  alias YscWeb.{MediaGalleryCursor, S3.SimpleS3Upload}
 
   @impl true
   def render(assigns) do
@@ -724,7 +724,7 @@ defmodule YscWeb.AdminMediaLive do
         |> assign(:selected_year, year)
         |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
         |> assign(:stream_initialized?, true)
-        |> assign_cursor_from_images(images)
+        |> MediaGalleryCursor.assign_cursor_from_images(images)
         |> assign(:images_empty?, images == [])
         |> assign(:years_set, years_set)
         |> assign(:years_list, years_list)
@@ -751,7 +751,7 @@ defmodule YscWeb.AdminMediaLive do
         |> assign(:selected_year, nil)
         |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
         |> assign(:stream_initialized?, true)
-        |> assign_cursor_from_images(images)
+        |> MediaGalleryCursor.assign_cursor_from_images(images)
         |> assign(:images_empty?, images == [])
         |> assign(:years_set, years_set)
         |> assign(:years_list, years_list)
@@ -901,7 +901,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:selected_year, nil)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:images_empty?, images == [])
-     |> assign_cursor_from_images(images)
+     |> MediaGalleryCursor.assign_cursor_from_images(images)
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
      |> reset_image_sections(stream_items)}
@@ -932,7 +932,7 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:selected_year, year)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:images_empty?, images == [])
-     |> assign_cursor_from_images(images)
+     |> MediaGalleryCursor.assign_cursor_from_images(images)
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
      |> reset_image_sections(stream_items)}
@@ -1002,7 +1002,7 @@ defmodule YscWeb.AdminMediaLive do
               :end_of_timeline?,
               length(new_images) < socket.assigns.per_page
             )
-            |> assign_cursor_from_images(new_images)
+            |> MediaGalleryCursor.assign_cursor_from_images(new_images)
             |> assign(:years_set, updated_years)
             |> assign(:years_list, years_list)
             |> append_sections_from_load_more(new_images)
@@ -1030,7 +1030,7 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:years_list, years_list)
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
-      |> assign_cursor_from_images(images)
+      |> MediaGalleryCursor.assign_cursor_from_images(images)
       |> assign(:images_empty?, images == [])
       |> reset_image_sections(stream_items)
       |> push_patch(to: ~p"/admin/media")
@@ -1061,7 +1061,7 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:years_list, years_list)
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
-      |> assign_cursor_from_images(images)
+      |> MediaGalleryCursor.assign_cursor_from_images(images)
       |> assign(:images_empty?, images == [])
       |> reset_image_sections(stream_items)
       |> push_event("scroll-to-year", %{year: year_int})
@@ -1515,21 +1515,6 @@ defmodule YscWeb.AdminMediaLive do
     |> String.replace("]", "\\]")
     |> String.replace("(", "\\(")
     |> String.replace(")", "\\)")
-  end
-
-  defp assign_cursor_from_images(socket, []),
-    do: socket |> assign(:last_image_date, nil) |> assign(:last_image_id, nil)
-
-  defp assign_cursor_from_images(socket, images) do
-    case List.last(images) do
-      nil ->
-        assign_cursor_from_images(socket, [])
-
-      %{inserted_at: inserted_at, id: id} ->
-        socket
-        |> assign(:last_image_date, inserted_at)
-        |> assign(:last_image_id, id)
-    end
   end
 
   defp positive_image_dimension(value) when is_integer(value) and value > 0,

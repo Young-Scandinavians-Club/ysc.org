@@ -22,6 +22,7 @@ defmodule YscWeb.TrixImagePickerComponent do
   import YscWeb.AdminComponents
 
   alias Ysc.Media
+  alias YscWeb.MediaGalleryCursor
 
   @per_page 30
 
@@ -97,8 +98,8 @@ defmodule YscWeb.TrixImagePickerComponent do
   def handle_event("open-picker", _params, socket) do
     available_years = Media.get_available_years()
 
-    images =
-      Media.list_images_cursor(
+    {images, _} =
+      MediaGalleryCursor.list_page(
         limit: @per_page,
         search: socket.assigns.search,
         start_at_year: socket.assigns.selected_year
@@ -108,9 +109,7 @@ defmodule YscWeb.TrixImagePickerComponent do
      socket
      |> assign(:show_modal?, true)
      |> assign(:available_years, available_years)
-     |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign_cursor_from_images(images)
-     |> stream(:picker_images, images, reset: true)}
+     |> MediaGalleryCursor.apply_reset_page(images, @per_page, :picker_images)}
   end
 
   @impl true
@@ -120,51 +119,57 @@ defmodule YscWeb.TrixImagePickerComponent do
 
   @impl true
   def handle_event("search-media", %{"search" => search}, socket) do
-    images =
-      Media.list_images_cursor(
+    {images, _} =
+      MediaGalleryCursor.list_page(
         limit: @per_page,
         search: search,
         start_at_year: socket.assigns.selected_year
       )
 
     {:noreply,
-     socket
-     |> assign(:search, search)
-     |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign_cursor_from_images(images)
-     |> stream(:picker_images, images, reset: true)}
+     MediaGalleryCursor.apply_reset_page(
+       assign(socket, :search, search),
+       images,
+       @per_page,
+       :picker_images
+     )}
   end
 
   @impl true
   def handle_event("filter-year", %{"year" => ""}, socket) do
-    images =
-      Media.list_images_cursor(limit: @per_page, search: socket.assigns.search)
+    {images, _} =
+      MediaGalleryCursor.list_page(
+        limit: @per_page,
+        search: socket.assigns.search
+      )
 
     {:noreply,
-     socket
-     |> assign(:selected_year, nil)
-     |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign_cursor_from_images(images)
-     |> stream(:picker_images, images, reset: true)}
+     MediaGalleryCursor.apply_reset_page(
+       assign(socket, :selected_year, nil),
+       images,
+       @per_page,
+       :picker_images
+     )}
   end
 
   @impl true
   def handle_event("filter-year", %{"year" => year_str}, socket) do
     year = String.to_integer(year_str)
 
-    images =
-      Media.list_images_cursor(
+    {images, _} =
+      MediaGalleryCursor.list_page(
         limit: @per_page,
         search: socket.assigns.search,
         start_at_year: year
       )
 
     {:noreply,
-     socket
-     |> assign(:selected_year, year)
-     |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign_cursor_from_images(images)
-     |> stream(:picker_images, images, reset: true)}
+     MediaGalleryCursor.apply_reset_page(
+       assign(socket, :selected_year, year),
+       images,
+       @per_page,
+       :picker_images
+     )}
   end
 
   @impl true
@@ -174,15 +179,14 @@ defmodule YscWeb.TrixImagePickerComponent do
     else
       opts =
         [limit: @per_page, search: socket.assigns.search]
-        |> maybe_add_cursor(socket.assigns)
+        |> MediaGalleryCursor.cursor_opts_from_assigns(socket.assigns)
 
-      images = Media.list_images_cursor(opts)
+      {images, end_of_timeline?} = MediaGalleryCursor.list_page(opts)
 
       {:noreply,
        socket
-       |> assign(:end_of_timeline?, length(images) < @per_page)
-       |> assign_cursor_from_images(images)
-       |> stream(:picker_images, images)}
+       |> assign(:end_of_timeline?, end_of_timeline?)
+       |> MediaGalleryCursor.apply_append_page(images, :picker_images)}
     end
   end
 
@@ -191,57 +195,5 @@ defmodule YscWeb.TrixImagePickerComponent do
     image = Media.get_image!(image_id)
     send(self(), {__MODULE__, socket.assigns.id, image})
     {:noreply, assign(socket, :show_modal?, false)}
-  end
-
-  # --- Helpers ---
-
-  defp assign_cursor_from_images(socket, []),
-    do: socket |> assign(:last_image_date, nil) |> assign(:last_image_id, nil)
-
-  defp assign_cursor_from_images(socket, images) do
-    case List.last(images) do
-      nil ->
-        assign_cursor_from_images(socket, [])
-
-      %{inserted_at: inserted_at, id: id} ->
-        socket
-        |> assign(:last_image_date, inserted_at)
-        |> assign(:last_image_id, id)
-    end
-  end
-
-  defp maybe_add_cursor(opts, %{last_image_date: nil}), do: opts
-
-  defp maybe_add_cursor(opts, %{
-         last_image_date: date,
-         last_image_id: id,
-         selected_year: nil
-       })
-       when not is_nil(id) do
-    opts
-    |> Keyword.put(:before_date, date)
-    |> Keyword.put(:before_id, id)
-  end
-
-  defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: nil}),
-    do: Keyword.put(opts, :before_date, date)
-
-  defp maybe_add_cursor(opts, %{
-         last_image_date: date,
-         last_image_id: id,
-         selected_year: year
-       })
-       when not is_nil(year) and not is_nil(id) do
-    opts
-    |> Keyword.put(:before_date, date)
-    |> Keyword.put(:before_id, id)
-    |> Keyword.put(:start_at_year, year)
-  end
-
-  defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: year})
-       when not is_nil(year) do
-    opts
-    |> Keyword.put(:before_date, date)
-    |> Keyword.put(:start_at_year, year)
   end
 end
