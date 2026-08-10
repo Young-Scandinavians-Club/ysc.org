@@ -1,5 +1,5 @@
 defmodule YscWeb.AdminPostEditorLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Ecto.Query
   import Phoenix.LiveViewTest

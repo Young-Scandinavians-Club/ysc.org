@@ -1,5 +1,5 @@
 defmodule Ysc.ExpenseReports.QuickbooksSyncTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   alias Ysc.ExpenseReports.QuickbooksSync
   alias Ysc.S3Config

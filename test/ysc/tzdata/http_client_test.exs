@@ -1,5 +1,5 @@
 defmodule Ysc.Tzdata.HttpClientTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   alias Ysc.Tzdata.HttpClient
 

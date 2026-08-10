@@ -1,5 +1,5 @@
 defmodule YscWeb.TicketQrLiveTest do
-  use YscWeb.ConnCase
+  use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
