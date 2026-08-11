@@ -109,8 +109,10 @@ defmodule YscWeb.TrixUploadsController do
   defp handle_file_upload(conn, path, filename) do
     case FileValidator.validate_attachment(path, filename) do
       {:ok, mime} ->
+        storage_key = Media.trix_attachment_storage_key(filename)
+
         upload_result =
-          Media.upload_file_to_s3(path, filename, content_type: mime)
+          Media.upload_file_to_s3(path, storage_key, content_type: mime)
 
         conn
         |> put_status(201)
