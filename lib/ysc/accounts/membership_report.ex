@@ -258,7 +258,8 @@ defmodule Ysc.Accounts.MembershipReport do
         where: s2.user_id == parent_as(:candidate).user_id,
         where: not is_nil(s2.start_date),
         where: s2.start_date <= ^start_dt,
-        where: is_nil(s2.current_period_end) or s2.current_period_end >= ^start_dt
+        where:
+          is_nil(s2.current_period_end) or s2.current_period_end >= ^start_dt
       )
 
     prior_subscription =
