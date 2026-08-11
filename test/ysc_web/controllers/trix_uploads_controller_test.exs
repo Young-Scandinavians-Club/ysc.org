@@ -251,6 +251,49 @@ defmodule YscWeb.TrixUploadsControllerTest do
     end
   end
 
+  describe "create/2 — non-image attachments" do
+    test "stores attachments under an unpredictable S3 key", %{conn: conn} do
+      path = write_tmp("hello world", "report.pdf")
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "report.pdf")
+        })
+
+      assert %{"url" => url, "filename" => "report.pdf"} =
+               json_response(conn, 201)
+
+      refute String.match?(url, ~r{/media/report\.pdf$})
+      assert url =~ ~r{/attachments/[^/]+/report\.pdf$}
+    end
+
+    test "does not overwrite a prior upload that used the same client filename",
+         %{
+           conn: conn,
+           user: user
+         } do
+      path1 = write_tmp("first upload", "shared.pdf")
+      path2 = write_tmp("second upload", "shared.pdf")
+
+      conn1 =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path1, "shared.pdf")
+        })
+
+      conn2 =
+        user
+        |> build_logged_in_admin_conn()
+        |> post(~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path2, "shared.pdf")
+        })
+
+      url1 = json_response(conn1, 201)["url"]
+      url2 = json_response(conn2, 201)["url"]
+
+      assert url1 != url2
+    end
+  end
+
   describe "create/2 — image deduplication" do
     @tiny_png_path "test/support/fixtures/tiny.png"
 
