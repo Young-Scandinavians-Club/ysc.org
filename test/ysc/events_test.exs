@@ -1667,6 +1667,42 @@ defmodule Ysc.EventsTest do
       assert Map.get(data.ticket_counts, user2.id) == 2
       assert Enum.map(data.ticket_buyers, & &1.id) == [user1.id, user2.id]
     end
+
+    test "attendee_ticket_data_for_event/1 orders buyers by ticket ULID when inserted_at ties on the same second" do
+      {:ok, event} = create_event_fixture()
+      first_buyer = user_fixture()
+      second_buyer = user_fixture()
+
+      {:ok, tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      ticket_first =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: first_buyer.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed
+        })
+
+      ticket_second =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: second_buyer.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed
+        })
+
+      tied_at = ~U[2026-06-15 12:00:00Z]
+
+      Repo.update_all(
+        from(t in Ticket, where: t.id in ^[ticket_first.id, ticket_second.id]),
+        set: [inserted_at: tied_at, updated_at: tied_at]
+      )
+
+      data = Events.attendee_ticket_data_for_event(event.id)
+
+      assert Enum.map(data.ticket_buyers, & &1.id) == [first_buyer.id, second_buyer.id]
+    end
   end
 
   # Helper functions
