@@ -1653,6 +1653,51 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
                "Cannot update booking: selected dates overlap a blackout period."
     end
 
+    test "edit hold day booking without inventory changes uses plain update path",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "HoldChildren"})
+
+      checkin = ~D[2036-11-05]
+      checkout = ~D[2036-11-08]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert day_capacity_held_for(:clear_lake, stay_days) == [2, 2, 2]
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2036-11-01&to_date=2036-11-15"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2036-11-05",
+          "checkout_date" => "2036-11-08",
+          "guests_count" => "2",
+          "children_count" => "1",
+          "booking_mode" => "day",
+          "status" => "hold"
+        }
+      })
+      |> render_submit()
+
+      updated = Bookings.get_booking!(hold.id)
+      assert updated.children_count == 1
+      assert updated.guests_count == 2
+      assert day_capacity_held_for(:clear_lake, stay_days) == [2, 2, 2]
+    end
+
     test "edit day booking reconciles capacity_booked inventory", %{conn: conn} do
       ensure_clear_lake_pricing_rules!()
       user = user_fixture(%{first_name: "Spot", last_name: "Inventory"})
