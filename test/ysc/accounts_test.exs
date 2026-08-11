@@ -2585,7 +2585,8 @@ defmodule Ysc.AccountsTest do
       older_sub
       |> Ysc.Subscriptions.Subscription.changeset(%{
         current_period_start:
-          DateTime.add(DateTime.utc_now(), -90, :day) |> DateTime.truncate(:second)
+          DateTime.add(DateTime.utc_now(), -90, :day)
+          |> DateTime.truncate(:second)
       })
       |> Repo.update!()
 
@@ -2596,7 +2597,8 @@ defmodule Ysc.AccountsTest do
           stripe_status: "active",
           name: "Single Membership",
           current_period_start:
-            DateTime.add(DateTime.utc_now(), -2, :day) |> DateTime.truncate(:second),
+            DateTime.add(DateTime.utc_now(), -2, :day)
+            |> DateTime.truncate(:second),
           current_period_end: DateTime.add(DateTime.utc_now(), 363, :day)
         })
 

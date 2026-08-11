@@ -1701,7 +1701,10 @@ defmodule Ysc.EventsTest do
 
       data = Events.attendee_ticket_data_for_event(event.id)
 
-      assert Enum.map(data.ticket_buyers, & &1.id) == [first_buyer.id, second_buyer.id]
+      assert Enum.map(data.ticket_buyers, & &1.id) == [
+               first_buyer.id,
+               second_buyer.id
+             ]
     end
   end
 
