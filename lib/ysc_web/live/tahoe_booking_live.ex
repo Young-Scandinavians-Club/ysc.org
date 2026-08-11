@@ -5252,9 +5252,7 @@ defmodule YscWeb.TahoeBookingLive do
 
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:error, error_message,
-               title: "Booking"
-             )
+             |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
              |> assign(
                form_errors: format_errors(changeset),
                calculated_price: nil,
@@ -5268,9 +5266,7 @@ defmodule YscWeb.TahoeBookingLive do
 
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:error, error_message,
-               title: "Booking"
-             )
+             |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
              |> assign(
                form_errors: format_errors(changeset),
                calculated_price: nil,

@@ -1278,11 +1278,15 @@ defmodule YscWeb.ClearLakeBookingLive do
                               |> elem(1) %>
                           <div class="flex justify-between items-center text-zinc-600">
                             <span>
-                              Shared cabin stay ({@guests_count} {if @guests_count == 1,
-                                do: "adult",
-                                else: "adults"} × {nights} {if nights == 1,
-                                do: "night",
-                                else: "nights"})
+                              Shared cabin stay ({@guests_count} {if @guests_count ==
+                                                                       1,
+                                                                     do: "adult",
+                                                                     else: "adults"} × {nights} {if nights ==
+                                                                                                      1,
+                                                                                                    do:
+                                                                                                      "night",
+                                                                                                    else:
+                                                                                                      "nights"})
                             </span>
                             <span class="font-bold text-zinc-900">
                               {MoneyHelper.format_money!(line_gross)}
