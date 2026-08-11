@@ -54,6 +54,7 @@ import PasskeyAuth from "./passkey_auth";
 import ConfirmCloseModal from "./confirm_close_modal";
 import FooterRotator from "./footer_rotator";
 import HeroVideoControls from "./hero_video_controls";
+import HeroFlagGrid from "./hero_flag_grid";
 import AdminFloatingButton from "./admin_floating_button";
 import AutoResizeIframe from "./auto_resize_iframe";
 import AutoResizeTextarea from "./auto_resize_textarea";
@@ -98,6 +99,7 @@ let Hooks = {
     ConfirmCloseModal,
     FooterRotator,
     HeroVideoControls,
+    HeroFlagGrid,
     AdminFloatingButton,
     AutoResizeIframe,
     AutoResizeTextarea,

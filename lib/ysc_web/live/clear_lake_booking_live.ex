@@ -527,6 +527,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           wrapper_id="clear-lake-carousel-wrapper"
           carousel_id="about-the-clear-lake-cabin-carousel-logged-in"
           images={clear_lake_hero_carousel_images()}
+          flag_grid_id="clear-lake-hero-flag-grid-member"
         />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-16 pointer-events-none">
@@ -2414,6 +2415,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           wrapper_id="clear-lake-carousel-wrapper-nonuser"
           carousel_id="about-the-clear-lake-cabin-carousel"
           images={clear_lake_hero_carousel_images()}
+          flag_grid_id="clear-lake-hero-flag-grid-guest"
         />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-20 pointer-events-none">
