@@ -1853,10 +1853,11 @@ defmodule YscWeb.CoreComponents do
 
   attr :country, :string, required: true
   attr :class, :string, default: nil
+  attr :rest, :global
 
   def flag(%{country: "fi-" <> _} = assigns) do
     ~H"""
-    <span class={["fi", @country, @class]} />
+    <span class={["fi", @country, @class]} {@rest} />
     """
   end
 
@@ -4521,10 +4522,19 @@ defmodule YscWeb.CoreComponents do
     default: nil,
     doc: "Additional classes for the hero container"
 
+  attr :flag_grid, :boolean,
+    default: true,
+    doc:
+      "Show a subtle animated grid of Nordic flags blended over the media as background texture"
+
   slot :title, doc: "The main hero title"
   slot :subtitle, doc: "Secondary text below the title"
   slot :cta, doc: "Call-to-action buttons or links"
   slot :inner_block, doc: "Additional custom content"
+
+  @nordic_flags ["fi-se", "fi-no", "fi-dk", "fi-fi", "fi-is"]
+  @hero_flag_grid_cols 22
+  @hero_flag_grid_rows 12
 
   def hero(assigns) do
     bleed_src = assigns.poster || assigns.image
@@ -4549,6 +4559,8 @@ defmodule YscWeb.CoreComponents do
       style={"min-height: #{@height};"}
     >
       <div class="hero-media-stage">
+        <.hero_flag_grid :if={@flag_grid} id="hero-flag-grid" />
+
         <div :if={@bleed_src} class="hero-media-stage__bleed" aria-hidden="true">
           <img
             src={@bleed_src}
@@ -4652,6 +4664,71 @@ defmodule YscWeb.CoreComponents do
       </div>
     </section>
     """
+  end
+
+  @doc """
+  Renders a subtle, animated grid of Nordic flags (grayscale, occasionally
+  blooming into color) confined to the space around a hero's media. Meant to be
+  dropped inside any `.hero-media-stage` (as its first child, before
+  `.hero-media-stage__bleed`/`__inner`) so it sits behind the media and only shows
+  through in the margin space around it — see `hero/1` for the built-in usage.
+
+  Requires a unique `id` when a page renders more than one hero (e.g. separate
+  logged-in/logged-out hero sections).
+
+  ## Examples
+
+      <div class="hero-media-stage">
+        <.hero_flag_grid id="tahoe-hero-flag-grid" />
+        <div class="hero-media-stage__bleed">...</div>
+        <div class="hero-media-stage__inner">...</div>
+      </div>
+  """
+  attr :id, :string, required: true
+
+  def hero_flag_grid(assigns) do
+    flag_cells = hero_flag_cells(@hero_flag_grid_cols, @hero_flag_grid_rows, @nordic_flags)
+    assigns = assign(assigns, :flag_cells, flag_cells)
+
+    ~H"""
+    <div id={@id} phx-hook="HeroFlagGrid" class="hero-flag-grid" aria-hidden="true">
+      <div class="hero-flag-grid__tile">
+        <.flag :for={code <- @flag_cells} country={code} class="hero-flag-grid__cell" />
+      </div>
+    </div>
+    """
+  end
+
+  # Layout for the hero flag grid: a plain CSS Grid (cols x rows) with cells
+  # centered in their track, so rows and columns stay strictly aligned — this
+  # needs to read as an actual grid even when only a couple of columns are ever
+  # visible (peeking out from behind the hero media). Flag choice hashes each
+  # cell's position, nudging collisions so no cell repeats its left or top
+  # neighbor.
+  defp hero_flag_cells(cols, rows, flags) do
+    total = cols * rows
+    n = length(flags)
+
+    cells =
+      Enum.reduce(0..(total - 1), %{}, fn i, acc ->
+        row = div(i, cols)
+        col = rem(i, cols)
+        left = col > 0 && Map.fetch!(acc, i - 1)
+        top = row > 0 && Map.fetch!(acc, i - cols)
+        base = rem(:erlang.phash2({row, col, :hero_flag_grid}), n)
+        code = hero_flag_pick(flags, n, base, left, top)
+
+        Map.put(acc, i, code)
+      end)
+
+    Enum.map(0..(total - 1), &Map.fetch!(cells, &1))
+  end
+
+  defp hero_flag_pick(flags, n, base, left, top) do
+    Enum.find_value(0..(n - 1), fn offset ->
+      candidate = Enum.at(flags, rem(base + offset, n))
+      if candidate != left and candidate != top, do: candidate
+    end)
   end
 
   @doc """

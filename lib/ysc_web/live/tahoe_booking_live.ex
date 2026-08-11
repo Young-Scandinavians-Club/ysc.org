@@ -1098,6 +1098,7 @@ defmodule YscWeb.TahoeBookingLive do
         class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh] bg-white"
       >
         <div class="hero-media-stage">
+          <.hero_flag_grid id="tahoe-hero-flag-grid-member" />
           <div class="hero-media-stage__bleed" aria-hidden="true">
             <img
               src={~p"/images/tahoe/tahoe_cabin_main.webp"}
@@ -1145,6 +1146,7 @@ defmodule YscWeb.TahoeBookingLive do
         class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh] bg-white"
       >
         <div class="hero-media-stage">
+          <.hero_flag_grid id="tahoe-hero-flag-grid-guest" />
           <div class="hero-media-stage__bleed" aria-hidden="true">
             <img
               src={~p"/images/tahoe/tahoe_cabin_main.webp"}
