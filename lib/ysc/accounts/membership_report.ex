@@ -275,9 +275,30 @@ defmodule Ysc.Accounts.MembershipReport do
   # subscription that had already lapsed). Members who already had coverage
   # at the window's start date are dropped entirely, whether they're renewing
   # normally or repurchased after a lapse mid-window.
+  #
+  # Classification is pushed into SQL so we don't load every historical
+  # subscription row for each candidate user.
   defp list_purchases(start_dt, end_dt) do
-    candidates =
+    covered_at_start =
+      from(s2 in Subscription,
+        where: s2.user_id == parent_as(:candidate).user_id,
+        where: not is_nil(s2.start_date),
+        where: s2.start_date <= ^start_dt,
+        where:
+          is_nil(s2.current_period_end) or s2.current_period_end >= ^start_dt
+      )
+
+    prior_subscription =
+      from(s2 in Subscription,
+        where: s2.user_id == parent_as(:candidate).user_id,
+        where: s2.id != parent_as(:candidate).id,
+        where: not is_nil(s2.start_date),
+        where: s2.start_date < parent_as(:candidate).start_date
+      )
+
+    base_candidates =
       from(s in Subscription,
+        as: :candidate,
         join: u in User,
         on: u.id == s.user_id,
         join: sa in SignupApplication,
@@ -286,56 +307,22 @@ defmodule Ysc.Accounts.MembershipReport do
         where: s.stripe_status in ["active", "trialing"],
         where: not is_nil(s.start_date),
         where: s.start_date >= ^start_dt and s.start_date <= ^end_dt,
+        where: not exists(subquery(covered_at_start)),
         preload: [user: u],
         order_by: [asc: s.start_date]
       )
+
+    purchased =
+      base_candidates
+      |> where([s], not exists(subquery(prior_subscription)))
       |> Repo.all()
 
-    user_ids = candidates |> Enum.map(& &1.user_id) |> Enum.uniq()
-
-    subscriptions_by_user =
-      from(s in Subscription, where: s.user_id in ^user_ids)
+    returning =
+      base_candidates
+      |> where([s], exists(subquery(prior_subscription)))
       |> Repo.all()
-      |> Enum.group_by(& &1.user_id)
 
-    {purchased, returning} =
-      Enum.reduce(candidates, {[], []}, fn candidate,
-                                           {purchased_acc, returning_acc} ->
-        others = Map.get(subscriptions_by_user, candidate.user_id, [])
-
-        cond do
-          Enum.any?(others, &covers_start?(&1, start_dt)) ->
-            {purchased_acc, returning_acc}
-
-          Enum.any?(
-            others,
-            &(&1.id != candidate.id and started_before?(&1, candidate))
-          ) ->
-            {purchased_acc, [candidate | returning_acc]}
-
-          true ->
-            {[candidate | purchased_acc], returning_acc}
-        end
-      end)
-
-    %{purchased: Enum.reverse(purchased), returning: Enum.reverse(returning)}
-  end
-
-  defp covers_start?(%Subscription{start_date: nil}, _start_dt), do: false
-
-  defp covers_start?(%Subscription{} = subscription, start_dt) do
-    DateTime.compare(subscription.start_date, start_dt) != :gt and
-      (is_nil(subscription.current_period_end) or
-         DateTime.compare(subscription.current_period_end, start_dt) != :lt)
-  end
-
-  defp started_before?(%Subscription{start_date: nil}, _candidate), do: false
-
-  defp started_before?(
-         %Subscription{start_date: other_start},
-         %Subscription{start_date: candidate_start}
-       ) do
-    DateTime.compare(other_start, candidate_start) == :lt
+    %{purchased: purchased, returning: returning}
   end
 
   # Attaches each user's SignupApplication (if any) to their subscription struct

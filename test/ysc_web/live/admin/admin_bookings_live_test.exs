@@ -236,6 +236,18 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert html =~ "$222.00"
       refute html =~ "$111.00"
     end
+
+    test "select-property skips calendar reload when not on calendar section",
+         %{conn: conn} do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=config")
+
+      html =
+        render_click(view, "select-property", %{"property" => "clear_lake"})
+
+      assert html =~ "Configuration"
+      refute html =~ "Calendar Overview"
+    end
   end
 
   describe "navigation and calendar controls" do

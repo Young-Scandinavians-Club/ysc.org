@@ -4444,13 +4444,22 @@ defmodule YscWeb.AdminBookingsLive do
     door_codes = Bookings.list_door_codes(property_atom)
     active_door_code = Bookings.get_active_door_code(property_atom)
 
-    {:noreply,
-     socket
-     |> assign(:door_codes, door_codes)
-     |> assign(:active_door_code, active_door_code)
-     |> assign(:door_code_warning, nil)
-     |> load_property_reference_data(property_atom)
-     |> update_calendar_view(property_atom)}
+    socket =
+      socket
+      |> assign(:door_codes, door_codes)
+      |> assign(:active_door_code, active_door_code)
+      |> assign(:door_code_warning, nil)
+      |> load_property_reference_data(property_atom)
+
+    socket =
+      if socket.assigns.current_section == :calendar &&
+           socket.assigns.live_action == :index do
+        update_calendar_view(socket, property_atom)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event(

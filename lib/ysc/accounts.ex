@@ -4342,7 +4342,12 @@ defmodule Ysc.Accounts do
           price_to_type =
             Map.new(membership_plans, fn p -> {p.stripe_price_id, p.id} end)
 
-          sub = Repo.preload(sub, :subscription_items)
+          sub =
+            if Ecto.assoc_loaded?(sub.subscription_items) do
+              sub
+            else
+              Repo.preload(sub, :subscription_items)
+            end
 
           case sub.subscription_items do
             [item | _] ->
