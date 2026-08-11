@@ -1903,26 +1903,18 @@ defmodule YscWeb.HomeLive do
                   Newsletter
                 </h2>
 
-                <div
-                  :if={!@async_data_loaded}
-                  class="rounded-xl border border-zinc-200 bg-white px-5 py-5 animate-pulse"
-                >
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-zinc-200 shrink-0"></div>
-                    <div class="space-y-2 flex-1">
-                      <div class="h-4 w-32 bg-zinc-200 rounded"></div>
-                      <div class="h-3 w-40 bg-zinc-100 rounded"></div>
-                    </div>
+                <div :if={!@async_data_loaded} class="flex items-center gap-3 animate-pulse">
+                  <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
+                  <div class="space-y-2 flex-1">
+                    <div class="h-3.5 w-28 bg-zinc-200 rounded"></div>
+                    <div class="h-3 w-36 bg-zinc-100 rounded"></div>
                   </div>
                 </div>
 
-                <div
-                  :if={@async_data_loaded}
-                  class="rounded-xl border border-zinc-200 bg-white px-5 py-5"
-                >
+                <div :if={@async_data_loaded}>
                   <div class="flex items-center gap-3">
                     <div class={[
-                      "flex items-center justify-center w-10 h-10 rounded-full shrink-0",
+                      "flex items-center justify-center w-9 h-9 rounded-full shrink-0",
                       if(@newsletter_subscribed,
                         do: "bg-emerald-100",
                         else: "bg-zinc-100"
@@ -1936,7 +1928,7 @@ defmodule YscWeb.HomeLive do
                           )
                         }
                         class={[
-                          "w-5 h-5",
+                          "w-4 h-4",
                           if(@newsletter_subscribed,
                             do: "text-emerald-600",
                             else: "text-zinc-500"
@@ -1944,7 +1936,7 @@ defmodule YscWeb.HomeLive do
                         ]}
                       />
                     </div>
-                    <div class="min-w-0">
+                    <div class="min-w-0 flex-1">
                       <p class="font-semibold text-zinc-900 text-sm">
                         {if @newsletter_subscribed,
                           do: "Subscribed",
@@ -1956,23 +1948,17 @@ defmodule YscWeb.HomeLive do
                           else: "Get news & updates in your inbox."}
                       </p>
                     </div>
+                    <button
+                      phx-click="toggle_newsletter_subscription"
+                      phx-disable-with="Saving..."
+                      class="shrink-0 text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      {if @newsletter_subscribed, do: "Unsubscribe", else: "Subscribe"}
+                    </button>
                   </div>
-                  <.button
-                    phx-click="toggle_newsletter_subscription"
-                    class={
-                      if(@newsletter_subscribed,
-                        do:
-                          "w-full mt-4 !bg-white !text-zinc-700 border border-zinc-300 hover:!bg-zinc-100",
-                        else: "w-full mt-4"
-                      )
-                    }
-                    phx-disable-with="Saving..."
-                  >
-                    {if @newsletter_subscribed, do: "Unsubscribe", else: "Subscribe"}
-                  </.button>
                   <.link
                     navigate={~p"/newsletters"}
-                    class="mt-3 flex items-center justify-center gap-1 text-xs font-bold text-blue-600 hover:underline"
+                    class="mt-3 flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
                   >
                     Browse newsletter archive
                     <.icon name="hero-arrow-right" class="w-3 h-3" />
