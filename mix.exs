@@ -261,7 +261,7 @@ defmodule Ysc.MixProject do
       {:phoenix_test, "~> 0.11", only: :test, runtime: false},
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+
-      {:phoenix, "~> 1.8.9"},
+      {:phoenix, "~> 1.8.10"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},
