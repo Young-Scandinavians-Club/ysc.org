@@ -248,6 +248,169 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert report.returning == []
     end
 
+    test "a previously-accepted user rejected via a direct account-status edit shows as rejected" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{state: :active})
+
+      signup_application_fixture(user, %{
+        completed: DateTime.add(DateTime.utc_now(), -3, :day),
+        review_outcome: "approved",
+        reviewed_at: DateTime.add(DateTime.utc_now(), -3, :day)
+      })
+
+      assert {:ok, _updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "rejected",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 admin
+               )
+
+      today = Date.utc_today()
+
+      report =
+        MembershipReport.generate(Date.add(today, -5), Date.add(today, 1))
+
+      assert report.counts.rejected == 1
+      assert report.counts.accepted == 0
+      assert hd(report.rejected).user_id == user.id
+    end
+
+    test "a previously-accepted user reverted to pending approval shows as pending again" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{state: :active})
+
+      signup_application_fixture(user, %{
+        completed: DateTime.add(DateTime.utc_now(), -3, :day),
+        review_outcome: "approved",
+        reviewed_at: DateTime.add(DateTime.utc_now(), -3, :day)
+      })
+
+      assert {:ok, _updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "pending_approval",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 admin
+               )
+
+      today = Date.utc_today()
+
+      report =
+        MembershipReport.generate(Date.add(today, -5), Date.add(today, 1))
+
+      assert report.counts.pending == 1
+      assert report.counts.accepted == 0
+      assert hd(report.pending).user_id == user.id
+    end
+
+    test "a user moved outside the review pipeline (e.g. suspended) is excluded from the report" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{state: :active})
+
+      signup_application_fixture(user, %{
+        completed: DateTime.add(DateTime.utc_now(), -3, :day),
+        review_outcome: "approved",
+        reviewed_at: DateTime.add(DateTime.utc_now(), -3, :day)
+      })
+
+      assert {:ok, _updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "suspended",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 admin
+               )
+
+      today = Date.utc_today()
+
+      report =
+        MembershipReport.generate(Date.add(today, -5), Date.add(today, 1))
+
+      assert report.counts.pending == 0
+      assert report.counts.accepted == 0
+      assert report.counts.rejected == 0
+      assert report.pending == []
+      assert report.accepted == []
+      assert report.rejected == []
+    end
+
+    test "an application approved outside the report window is not reported as pending or accepted" do
+      user = user_fixture()
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-03-05 10:00:00Z],
+        review_outcome: "approved",
+        reviewed_at: ~U[2026-02-01 10:00:00Z]
+      })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.pending == 0
+      assert report.counts.accepted == 0
+      assert report.pending == []
+      assert report.accepted == []
+    end
+
+    test "a subscription with no start_date is ignored when classifying a later purchase" do
+      user = user_fixture()
+
+      {:ok, _undated_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_no_start_date_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Single Membership",
+          current_period_end: ~U[2025-06-01 10:00:00Z]
+        })
+
+      {:ok, _new_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_no_start_date_new_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-03-10 10:00:00Z],
+          current_period_end: ~U[2027-03-10 10:00:00Z]
+        })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.purchased == 1
+      assert report.counts.returning == 0
+      assert hd(report.purchased).user_id == user.id
+    end
+
     test "includes expired subscriptions recorded with the legacy 'cancelled' spelling" do
       user = user_fixture()
       period_end = ~U[2026-02-20 08:00:00Z]

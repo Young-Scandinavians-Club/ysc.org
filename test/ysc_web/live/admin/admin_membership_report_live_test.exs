@@ -220,6 +220,49 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       assert html =~ "Eligibility:"
     end
 
+    test "shows returning members with application details", %{conn: conn} do
+      user = user_fixture()
+
+      signup_application_fixture(user, %{
+        completed: ~U[2025-01-01 09:00:00Z],
+        review_outcome: "approved",
+        reviewed_at: ~U[2025-01-01 09:00:00Z],
+        membership_eligibility: ["born_in_scandinavia"],
+        link_to_scandinavia: "Family in Bergen"
+      })
+
+      {:ok, _old_sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_returning_live_old_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Single Membership",
+          start_date: ~U[2025-01-01 10:00:00Z],
+          current_period_end: ~U[2025-12-01 10:00:00Z]
+        })
+
+      {:ok, _new_sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_returning_live_new_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-04-06 10:00:00Z],
+          current_period_end: ~U[2027-04-06 10:00:00Z]
+        })
+
+      {view, html} =
+        live_report(
+          conn,
+          ~p"/admin/memberships/report?from=2026-04-01&to=2026-04-30"
+        )
+
+      assert has_element?(view, "#report-returning")
+      assert html =~ user.email
+      assert html =~ "Family in Bergen"
+      assert html =~ "Returning"
+    end
+
     test "download_csv is a no-op when report is not loaded", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/memberships/report")
 
