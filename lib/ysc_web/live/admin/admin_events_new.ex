@@ -1049,7 +1049,7 @@ defmodule YscWeb.AdminEventsNewLive do
               <.skeleton_block class="h-64 rounded-lg" />
             </div>
 
-            <div :if={!@statistics_loading?} id="event-statistics-content">
+            <div :if={!@statistics_loading?} id="event-statistics-content" class="space-y-8">
               <div
                 id="event-stats-kpis"
                 class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
@@ -1107,7 +1107,7 @@ defmodule YscWeb.AdminEventsNewLive do
               <div
                 :if={Money.positive?(@donations_total)}
                 id="stat-donations"
-                class="bg-purple-50 border border-purple-200 rounded-lg p-6"
+                class="bg-purple-50 shadow-sm border border-purple-100 rounded-lg p-6"
               >
                 <p class="text-xs font-black text-purple-400 uppercase tracking-[0.2em] mb-3">
                   Donations Collected
@@ -1120,7 +1120,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </p>
               </div>
 
-              <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div class="bg-white shadow-sm border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div>
                   <h2 class="text-xl font-bold">Sales Over Time</h2>
                   <p class="text-zinc-600 text-sm">
@@ -1186,7 +1186,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </div>
               </div>
 
-              <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div class="bg-white shadow-sm border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div>
                   <h2 class="text-xl font-bold">Sales by Ticket Tier</h2>
                   <p class="text-zinc-600 text-sm">
@@ -1229,7 +1229,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </table>
               </div>
 
-              <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div class="bg-white shadow-sm border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <h2 class="text-xl font-bold">Expense Reports</h2>
