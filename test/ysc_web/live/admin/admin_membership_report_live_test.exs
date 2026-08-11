@@ -165,6 +165,8 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       user = user_fixture()
       period_end = ~U[2026-02-20 08:00:00Z]
 
+      signup_application_fixture(user)
+
       {:ok, _subscription} =
         Ysc.Subscriptions.create_subscription(%{
           user_id: user.id,

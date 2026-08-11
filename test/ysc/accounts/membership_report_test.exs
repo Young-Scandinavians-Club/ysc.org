@@ -9,7 +9,7 @@ defmodule Ysc.Accounts.MembershipReportTest do
 
   describe "generate/2" do
     test "includes pending applications completed in the date range" do
-      user = user_fixture()
+      user = user_fixture(%{state: :pending_approval})
       completed_at = ~U[2026-03-15 12:00:00Z]
 
       signup_application_fixture(user, %{
@@ -58,6 +58,8 @@ defmodule Ysc.Accounts.MembershipReportTest do
     test "includes expired subscriptions in range" do
       user = user_fixture()
       period_end = ~U[2026-02-20 08:00:00Z]
+
+      signup_application_fixture(user)
 
       {:ok, _subscription} =
         Subscriptions.create_subscription(%{
@@ -188,6 +190,7 @@ defmodule Ysc.Accounts.MembershipReportTest do
 
     test "classifies a repurchase after a real lapse as returning, not purchased" do
       user = user_fixture()
+      signup_application_fixture(user)
 
       {:ok, _old_sub} =
         Subscriptions.create_subscription(%{
@@ -219,6 +222,7 @@ defmodule Ysc.Accounts.MembershipReportTest do
 
     test "excludes a repurchase when the member already had coverage at the report's start date" do
       user = user_fixture()
+      signup_application_fixture(user)
 
       {:ok, _covering_sub} =
         Subscriptions.create_subscription(%{
@@ -384,6 +388,7 @@ defmodule Ysc.Accounts.MembershipReportTest do
 
     test "a subscription with no start_date is ignored when classifying a later purchase" do
       user = user_fixture()
+      signup_application_fixture(user)
 
       {:ok, _undated_sub} =
         Subscriptions.create_subscription(%{
@@ -415,6 +420,8 @@ defmodule Ysc.Accounts.MembershipReportTest do
       user = user_fixture()
       period_end = ~U[2026-02-20 08:00:00Z]
 
+      signup_application_fixture(user)
+
       {:ok, _subscription} =
         Subscriptions.create_subscription(%{
           user_id: user.id,
@@ -430,11 +437,82 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert length(report.expired) == 1
       assert hd(report.expired).user_id == user.id
     end
+
+    test "excludes family sub-accounts even when they have their own application or subscription" do
+      primary = user_fixture()
+      sub_account = user_fixture()
+
+      sub_account
+      |> Ecto.Changeset.change(primary_user_id: primary.id)
+      |> Repo.update!()
+
+      signup_application_fixture(sub_account, %{
+        completed: ~U[2026-03-05 10:00:00Z],
+        review_outcome: "approved",
+        reviewed_at: ~U[2026-03-12 10:00:00Z]
+      })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: sub_account.id,
+          stripe_id: "sub_family_member_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-03-15 10:00:00Z],
+          current_period_end: ~U[2027-03-15 10:00:00Z]
+        })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.applied == 0
+      assert report.counts.accepted == 0
+      assert report.counts.purchased == 0
+      assert report.accepted == []
+      assert report.purchased == []
+    end
+
+    test "an application accepted before the audit trail existed shows as accepted, not pending" do
+      user = user_fixture(%{state: :active})
+      completed_at = ~U[2026-03-05 10:00:00Z]
+
+      signup_application_fixture(user, %{
+        completed: completed_at,
+        review_outcome: nil
+      })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.accepted == 1
+      assert report.counts.pending == 0
+      assert length(report.accepted) == 1
+      assert hd(report.accepted).user_id == user.id
+    end
+
+    test "excludes a subscription for a user with no signup application on file" do
+      user = user_fixture()
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_no_application_#{System.unique_integer()}",
+          stripe_status: "trialing",
+          name: "Family Membership",
+          start_date: ~U[2026-03-15 10:00:00Z],
+          current_period_end: ~U[2028-03-15 10:00:00Z]
+        })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.purchased == 0
+      assert report.counts.returning == 0
+      assert report.purchased == []
+      assert report.returning == []
+    end
   end
 
   describe "to_csv/1" do
     test "exports pending and purchased rows with expected columns" do
-      user = user_fixture()
+      user = user_fixture(%{state: :pending_approval})
 
       signup_application_fixture(user, %{
         completed: ~U[2026-04-01 09:00:00Z],
@@ -497,6 +575,8 @@ defmodule Ysc.Accounts.MembershipReportTest do
     test "exports expired rows without attached application details" do
       user = user_fixture()
       period_end = ~U[2026-04-10 08:00:00Z]
+
+      signup_application_fixture(user)
 
       {:ok, _subscription} =
         Subscriptions.create_subscription(%{
