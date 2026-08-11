@@ -1665,9 +1665,26 @@ defmodule Ysc.Accounts do
       previous_user = user
       user = maybe_update_board_position_history(user, params)
 
-      case user
-           |> User.update_user_with_address_changeset(params)
-           |> Repo.update() do
+      result =
+        Repo.transaction(fn ->
+          case user
+               |> User.update_user_with_address_changeset(params)
+               |> Repo.update() do
+            {:ok, updated_user} ->
+              maybe_log_state_change_event(
+                previous_user,
+                updated_user,
+                current_user
+              )
+
+              updated_user
+
+            {:error, changeset} ->
+              Repo.rollback(changeset)
+          end
+        end)
+
+      case result do
         {:ok, updated_user} ->
           updated_user =
             maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
@@ -1681,8 +1698,8 @@ defmodule Ysc.Accounts do
 
           {:ok, updated_user}
 
-        error ->
-          error
+        {:error, changeset} ->
+          {:error, changeset}
       end
     end
   end
@@ -1717,8 +1734,12 @@ defmodule Ysc.Accounts do
               case %UserNote{}
                    |> UserNote.changeset(note_attrs)
                    |> Repo.insert() do
-                {:ok, _note} -> updated_user
-                {:error, changeset} -> Repo.rollback(changeset)
+                {:ok, _note} ->
+                  maybe_log_state_change_event(user, updated_user, current_user)
+                  updated_user
+
+                {:error, changeset} ->
+                  Repo.rollback(changeset)
               end
 
             {:error, changeset} ->
@@ -1755,6 +1776,36 @@ defmodule Ysc.Accounts do
   end
 
   defp revoke_sessions_if_blocked(_user), do: :ok
+
+  # Audit-logs direct account-status edits (e.g. the admin Profile tab's
+  # "Account Status" dropdown) the same way record_application_outcome/4
+  # already does for the Approve/Deny buttons, so membership reporting can
+  # rely on a single UserEvent trail regardless of which admin flow changed
+  # a user's state.
+  defp maybe_log_state_change_event(
+         %User{state: state},
+         %User{state: state},
+         _current_user
+       ),
+       do: :ok
+
+  defp maybe_log_state_change_event(
+         %User{} = previous_user,
+         %User{} = updated_user,
+         %User{} = current_user
+       ) do
+    %UserEvent{}
+    |> UserEvent.new_user_event_changeset(%{
+      user_id: updated_user.id,
+      updated_by_user_id: current_user.id,
+      type: :state_update,
+      from: "#{previous_user.state}",
+      to: "#{updated_user.state}"
+    })
+    |> Repo.insert!()
+
+    :ok
+  end
 
   # When an account is soft-deleted, stop marketing/ops outbound channels:
   # unsubscribe newsletter and disable event/SMS preference flags. Session

@@ -151,6 +151,7 @@ defmodule YscWeb.AdminMembershipReportLive do
                 count_pending: report.counts.pending,
                 count_expired: report.counts.expired,
                 count_purchased: report.counts.purchased,
+                count_returning: report.counts.returning,
                 generated_by:
                   "#{current_user.first_name} #{current_user.last_name}",
                 report_url: report_url
@@ -270,7 +271,7 @@ defmodule YscWeb.AdminMembershipReportLive do
         <%!-- Report content --%>
         <div :if={@report} class="space-y-8">
           <%!-- Summary stats --%>
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <.admin_stat_card
               id="report-stat-applied"
               label="Applied"
@@ -306,6 +307,12 @@ defmodule YscWeb.AdminMembershipReportLive do
               label="Purchased"
               value={@report.counts.purchased}
               subtitle="New memberships"
+            />
+            <.admin_stat_card
+              id="report-stat-returning"
+              label="Returning"
+              value={@report.counts.returning}
+              subtitle="Rejoined after a lapse"
             />
           </div>
 
@@ -383,6 +390,26 @@ defmodule YscWeb.AdminMembershipReportLive do
                 date={sub.start_date}
                 badge_type={:sky}
                 badge_label="Purchased"
+                link={~p"/admin/users/#{sub.user_id}/details/membership"}
+                link_label="View membership"
+              />
+            </:card>
+          </.report_section>
+
+          <%!-- Returning --%>
+          <.report_section
+            id="report-returning"
+            title="Returning Members"
+            count={length(@report.returning)}
+            empty_msg="No returning members in this period."
+          >
+            <:card :for={sub <- @report.returning}>
+              <.application_card
+                user={sub.user}
+                application={sub.signup_application}
+                date={sub.start_date}
+                badge_type={:violet}
+                badge_label="Returning"
                 link={~p"/admin/users/#{sub.user_id}/details/membership"}
                 link_label="View membership"
               />

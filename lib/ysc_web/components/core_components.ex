@@ -2341,6 +2341,8 @@ defmodule YscWeb.CoreComponents do
   slot :inner_block, required: true
 
   def badge(assigns) do
+    assigns = assign(assigns, :type, to_string(assigns.type))
+
     ~H"""
     <span class={[
       "inline-block text-xs font-medium me-2 px-2 py-1 rounded whitespace-nowrap #{@class}",
@@ -2348,6 +2350,7 @@ defmodule YscWeb.CoreComponents do
       @type == "green" && "bg-green-100 text-green-800",
       @type == "yellow" && "bg-yellow-100 text-yellow-800",
       @type == "red" && "bg-red-100 text-red-800",
+      @type == "violet" && "bg-violet-100 text-violet-800",
       @type == "dark" && "bg-zinc-100 text-zinc-800",
       @type == "zinc" && "bg-zinc-100 text-zinc-800",
       @type == "default" && "bg-blue-100 text-blue-800"

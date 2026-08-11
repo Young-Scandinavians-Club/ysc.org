@@ -20,6 +20,7 @@
       count_pending: 2,
       count_expired: 5,
       count_purchased: 6,
+      count_returning: 3,
       generated_by: "Admin User",
       report_url: "http://localhost:4000/admin/memberships/report"
     },

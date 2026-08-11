@@ -39,8 +39,12 @@
         <td style="text-align: right;"><%= @count_expired %></td>
       </tr>
       <tr style="background-color: #f4f4f5;">
-        <td>Memberships purchased</td>
+        <td>Memberships purchased (new)</td>
         <td style="text-align: right;"><%= @count_purchased %></td>
+      </tr>
+      <tr>
+        <td>Returning members</td>
+        <td style="text-align: right;"><%= @count_returning %></td>
       </tr>
     </mj-table>
   </mj-column>

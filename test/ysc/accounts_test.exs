@@ -5,7 +5,7 @@ defmodule Ysc.AccountsTest do
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
-  alias Ysc.Accounts.{User, UserPasskey, UserToken, UserProfileCache}
+  alias Ysc.Accounts.{User, UserPasskey, UserToken, UserProfileCache, UserEvent}
   alias Ysc.Payments.PaymentMethod
   alias Ysc.Subscriptions
   alias Ysc.Newsletter
@@ -3941,6 +3941,90 @@ defmodule Ysc.AccountsTest do
       assert updated.state == :deleted
       refute updated.event_notifications
       refute Newsletter.get_subscriber_by_email(user.email).subscribed
+    end
+
+    test "update_user_with_address logs a UserEvent when state changes" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :pending_approval
+        })
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "active",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 admin
+               )
+
+      assert updated.state == :active
+
+      event = Repo.get_by(UserEvent, user_id: user.id, type: :state_update)
+      assert event.from == "pending_approval"
+      assert event.to == "active"
+      assert event.updated_by_user_id == admin.id
+    end
+
+    test "update_user_with_address does not log a UserEvent when state is unchanged" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{phone_number: unique_user_phone(), state: :active})
+
+      assert {:ok, _updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{"first_name" => "Updated", "last_name" => user.last_name},
+                 admin
+               )
+
+      refute Repo.get_by(UserEvent, user_id: user.id, type: :state_update)
+    end
+
+    test "update_user_with_address_and_rejection_override_note logs a UserEvent when reactivating a rejected user" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :rejected
+        })
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address_and_rejection_override_note(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "active",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 "Reactivated on appeal",
+                 admin
+               )
+
+      assert updated.state == :active
+
+      event = Repo.get_by(UserEvent, user_id: user.id, type: :state_update)
+      assert event.from == "rejected"
+      assert event.to == "active"
     end
 
     test "receives_outbound_comms?/1 is false only for deleted users" do

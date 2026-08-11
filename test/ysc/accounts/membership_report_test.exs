@@ -3,6 +3,7 @@ defmodule Ysc.Accounts.MembershipReportTest do
 
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts
   alias Ysc.Accounts.MembershipReport
   alias Ysc.Subscriptions
 
@@ -106,6 +107,165 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert report.counts.accepted == 1
       assert length(report.accepted) == 1
       assert hd(report.accepted).user_id == user.id
+    end
+
+    test "a user activated via a direct account-status edit shows as accepted, not pending" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{state: :pending_approval})
+
+      signup_application_fixture(user, %{
+        completed: DateTime.utc_now(),
+        review_outcome: nil
+      })
+
+      assert {:ok, _updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "active",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 admin
+               )
+
+      today = Date.utc_today()
+
+      report =
+        MembershipReport.generate(Date.add(today, -1), Date.add(today, 1))
+
+      assert report.counts.accepted == 1
+      assert report.counts.pending == 0
+      assert length(report.accepted) == 1
+      assert hd(report.accepted).user_id == user.id
+    end
+
+    test "a rejected user reactivated via the rejection-override flow shows as accepted, not rejected" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      user = user_fixture(%{state: :rejected})
+
+      signup_application_fixture(user, %{
+        completed: DateTime.add(DateTime.utc_now(), -2, :day),
+        review_outcome: "rejected",
+        reviewed_at: DateTime.add(DateTime.utc_now(), -2, :day)
+      })
+
+      assert {:ok, _updated} =
+               Accounts.update_user_with_address_and_rejection_override_note(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "active",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 "Reactivated on appeal",
+                 admin
+               )
+
+      today = Date.utc_today()
+
+      report =
+        MembershipReport.generate(Date.add(today, -5), Date.add(today, 1))
+
+      assert report.counts.accepted == 1
+      assert report.counts.rejected == 0
+      assert hd(report.accepted).user_id == user.id
+    end
+
+    test "classifies a repurchase after a real lapse as returning, not purchased" do
+      user = user_fixture()
+
+      {:ok, _old_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_returning_old_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Single Membership",
+          start_date: ~U[2025-01-01 10:00:00Z],
+          current_period_end: ~U[2025-12-01 10:00:00Z]
+        })
+
+      {:ok, _new_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_returning_new_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-03-10 10:00:00Z],
+          current_period_end: ~U[2027-03-10 10:00:00Z]
+        })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.returning == 1
+      assert report.counts.purchased == 0
+      assert length(report.returning) == 1
+      assert hd(report.returning).user_id == user.id
+    end
+
+    test "excludes a repurchase when the member already had coverage at the report's start date" do
+      user = user_fixture()
+
+      {:ok, _covering_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_excluded_old_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Single Membership",
+          start_date: ~U[2025-06-01 10:00:00Z],
+          current_period_end: ~U[2026-03-10 10:00:00Z]
+        })
+
+      {:ok, _new_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_excluded_new_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-03-15 10:00:00Z],
+          current_period_end: ~U[2027-03-15 10:00:00Z]
+        })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.purchased == 0
+      assert report.counts.returning == 0
+      assert report.purchased == []
+      assert report.returning == []
+    end
+
+    test "includes expired subscriptions recorded with the legacy 'cancelled' spelling" do
+      user = user_fixture()
+      period_end = ~U[2026-02-20 08:00:00Z]
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_cancelled_spelling_#{System.unique_integer()}",
+          stripe_status: "cancelled",
+          name: "Single Membership",
+          current_period_end: period_end
+        })
+
+      report = MembershipReport.generate(~D[2026-02-01], ~D[2026-02-28])
+
+      assert report.counts.expired == 1
+      assert length(report.expired) == 1
+      assert hd(report.expired).user_id == user.id
     end
   end
 
