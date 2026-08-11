@@ -45,7 +45,9 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
 
     # Ensure user has required fields
     first_name = member_greeting_name(user)
-    membership_type_name = MembershipHelpers.membership_type_name(membership_type)
+
+    membership_type_name =
+      MembershipHelpers.membership_type_name(membership_type)
 
     retry_url =
       if invoice_id do
@@ -64,5 +66,4 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
       retry_payment_url: retry_url
     }
   end
-
 end

@@ -37,7 +37,10 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
 
     paid_elsewhere = Keyword.get(opts, :paid_elsewhere, false)
     first_name = member_greeting_name(user)
-    membership_type_name = MembershipHelpers.membership_type_name(membership_type)
+
+    membership_type_name =
+      MembershipHelpers.membership_type_name(membership_type)
+
     amount_str = format_membership_money(amount)
     payment_date_str = format_date(payment_date)
 
@@ -49,5 +52,4 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
       paid_elsewhere: paid_elsewhere
     }
   end
-
 end

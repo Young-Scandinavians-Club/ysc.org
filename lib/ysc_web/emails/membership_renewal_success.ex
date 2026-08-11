@@ -50,7 +50,9 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
 
     # Ensure user has required fields
     first_name = member_greeting_name(user)
-    membership_type_name = MembershipHelpers.membership_type_name(membership_type)
+
+    membership_type_name =
+      MembershipHelpers.membership_type_name(membership_type)
 
     # Format amount
     amount_str = format_membership_money(amount)
@@ -63,7 +65,9 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
       if proration_details do
         old_type_name =
           if proration_details.old_membership_type do
-            MembershipHelpers.membership_type_name(proration_details.old_membership_type)
+            MembershipHelpers.membership_type_name(
+              proration_details.old_membership_type
+            )
           else
             nil
           end
@@ -93,5 +97,4 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
       has_proration: has_proration
     }
   end
-
 end
