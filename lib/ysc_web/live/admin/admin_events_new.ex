@@ -1049,7 +1049,11 @@ defmodule YscWeb.AdminEventsNewLive do
               <.skeleton_block class="h-64 rounded-lg" />
             </div>
 
-            <div :if={!@statistics_loading?} id="event-statistics-content" class="space-y-8">
+            <div
+              :if={!@statistics_loading?}
+              id="event-statistics-content"
+              class="space-y-8"
+            >
               <div
                 id="event-stats-kpis"
                 class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
