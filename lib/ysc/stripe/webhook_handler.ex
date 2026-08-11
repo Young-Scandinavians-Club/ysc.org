@@ -2382,28 +2382,20 @@ defmodule Ysc.Stripe.WebhookHandler do
     case proration_details do
       %{old_membership_type: old_type, is_upgrade: true}
       when not is_nil(old_type) ->
-        old_str = format_membership_type_for_description(old_type)
-        new_str = format_membership_type_for_description(membership_type)
+        old_str = YscWeb.MembershipHelpers.membership_type_name(old_type)
+        new_str = YscWeb.MembershipHelpers.membership_type_name(membership_type)
         "Prorated upgrade (#{old_str} to #{new_str})"
 
       %{old_membership_type: old_type, is_upgrade: false}
       when not is_nil(old_type) ->
-        old_str = format_membership_type_for_description(old_type)
-        new_str = format_membership_type_for_description(membership_type)
+        old_str = YscWeb.MembershipHelpers.membership_type_name(old_type)
+        new_str = YscWeb.MembershipHelpers.membership_type_name(membership_type)
         "Prorated change (#{old_str} to #{new_str})"
 
       _ ->
         "Prorated membership update"
     end
   end
-
-  defp format_membership_type_for_description(type)
-       when type in [:single, "single"], do: "Single"
-
-  defp format_membership_type_for_description(type)
-       when type in [:family, "family"], do: "Family"
-
-  defp format_membership_type_for_description(_), do: "Membership"
 
   # Helper function to extract proration details from a subscription_update invoice
   # This analyzes the line items to determine if it's an upgrade or downgrade

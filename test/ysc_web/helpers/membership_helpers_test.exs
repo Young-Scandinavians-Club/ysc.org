@@ -8,6 +8,23 @@ defmodule YscWeb.MembershipHelpersTest do
 
   alias YscWeb.MembershipHelpers
 
+  alias YscWeb.MembershipHelpers
+
+  describe "membership_type_name/1" do
+    test "returns short labels for known types" do
+      assert MembershipHelpers.membership_type_name(:single) == "Single"
+      assert MembershipHelpers.membership_type_name(:family) == "Family"
+      assert MembershipHelpers.membership_type_name("single") == "Single"
+      assert MembershipHelpers.membership_type_name("family") == "Family"
+    end
+
+    test "returns Membership for unknown types" do
+      assert MembershipHelpers.membership_type_name(:lifetime) == "Membership"
+      assert MembershipHelpers.membership_type_name(nil) == "Membership"
+      assert MembershipHelpers.membership_type_name("corporate") == "Membership"
+    end
+  end
+
   describe "build_membership_qr_details/1" do
     test "returns nil when assigns do not match" do
       assert MembershipHelpers.build_membership_qr_details(%{}) == nil

@@ -8,6 +8,8 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
     mjml_template: "templates/membership_payment_failure.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  alias YscWeb.MembershipHelpers
+
   import YscWeb.Emails.Helpers,
     only: [absolute_url: 1, member_greeting_name: 1, membership_url: 0]
 
@@ -43,7 +45,9 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
 
     # Ensure user has required fields
     first_name = member_greeting_name(user)
-    membership_type_name = get_membership_type_name(membership_type)
+
+    membership_type_name =
+      MembershipHelpers.membership_type_name(membership_type)
 
     retry_url =
       if invoice_id do
@@ -62,10 +66,4 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
       retry_payment_url: retry_url
     }
   end
-
-  defp get_membership_type_name(:single), do: "Single"
-  defp get_membership_type_name(:family), do: "Family"
-  defp get_membership_type_name("single"), do: "Single"
-  defp get_membership_type_name("family"), do: "Family"
-  defp get_membership_type_name(_), do: "Membership"
 end
