@@ -4454,6 +4454,46 @@ defmodule YscWeb.CoreComponents do
     subscription.current_period_end
   end
 
+  # Layout for the hero flag grid: a plain CSS Grid (cols x rows), but only every
+  # other cell in a checkerboard (row + col even) actually gets a flag, leaving
+  # the rest of the track empty — that's what produces the diamond/lattice look
+  # instead of a solid block. Cells stay strictly aligned to the grid (each flag
+  # is explicitly placed via grid-row/grid-column) so it still reads as a grid
+  # even when only a couple of columns are visible past the hero media's edge.
+  # Flag choice hashes each cell's position, nudging collisions so no cell
+  # repeats its nearest diamond neighbors (up-left, up-right).
+  defp hero_flag_cells(cols, rows, flags) do
+    n = length(flags)
+
+    cells =
+      for row <- 0..(rows - 1),
+          col <- 0..(cols - 1),
+          rem(row + col, 2) == 0,
+          reduce: %{} do
+        acc ->
+          up_left = row > 0 && col > 0 && Map.get(acc, {row - 1, col - 1})
+
+          up_right =
+            row > 0 && col < cols - 1 && Map.get(acc, {row - 1, col + 1})
+
+          base = rem(:erlang.phash2({row, col, :hero_flag_grid}), n)
+          code = hero_flag_pick(flags, n, base, up_left, up_right)
+
+          Map.put(acc, {row, col}, code)
+      end
+
+    for row <- 0..(rows - 1), col <- 0..(cols - 1), rem(row + col, 2) == 0 do
+      {Map.fetch!(cells, {row, col}), row, col}
+    end
+  end
+
+  defp hero_flag_pick(flags, n, base, left, top) do
+    Enum.find_value(0..(n - 1), fn offset ->
+      candidate = Enum.at(flags, rem(base + offset, n))
+      if candidate != left and candidate != top, do: candidate
+    end)
+  end
+
   @doc """
   Renders a hero section with a background image or video and optional overlay content.
 
@@ -4527,6 +4567,11 @@ defmodule YscWeb.CoreComponents do
     doc:
       "Show a subtle animated grid of Nordic flags blended over the media as background texture"
 
+  attr :flag_grid_id, :string,
+    default: "hero-flag-grid",
+    doc:
+      "DOM id for the flag grid; override if a page renders more than one hero"
+
   slot :title, doc: "The main hero title"
   slot :subtitle, doc: "Secondary text below the title"
   slot :cta, doc: "Call-to-action buttons or links"
@@ -4559,7 +4604,7 @@ defmodule YscWeb.CoreComponents do
       style={"min-height: #{@height};"}
     >
       <div class="hero-media-stage">
-        <.hero_flag_grid :if={@flag_grid} id="hero-flag-grid" />
+        <.hero_flag_grid :if={@flag_grid} id={@flag_grid_id} />
 
         <div :if={@bleed_src} class="hero-media-stage__bleed" aria-hidden="true">
           <img
@@ -4704,46 +4749,6 @@ defmodule YscWeb.CoreComponents do
       </div>
     </div>
     """
-  end
-
-  # Layout for the hero flag grid: a plain CSS Grid (cols x rows), but only every
-  # other cell in a checkerboard (row + col even) actually gets a flag, leaving
-  # the rest of the track empty — that's what produces the diamond/lattice look
-  # instead of a solid block. Cells stay strictly aligned to the grid (each flag
-  # is explicitly placed via grid-row/grid-column) so it still reads as a grid
-  # even when only a couple of columns are visible past the hero media's edge.
-  # Flag choice hashes each cell's position, nudging collisions so no cell
-  # repeats its nearest diamond neighbors (up-left, up-right).
-  defp hero_flag_cells(cols, rows, flags) do
-    n = length(flags)
-
-    cells =
-      for row <- 0..(rows - 1),
-          col <- 0..(cols - 1),
-          rem(row + col, 2) == 0,
-          reduce: %{} do
-        acc ->
-          up_left = row > 0 && col > 0 && Map.get(acc, {row - 1, col - 1})
-
-          up_right =
-            row > 0 && col < cols - 1 && Map.get(acc, {row - 1, col + 1})
-
-          base = rem(:erlang.phash2({row, col, :hero_flag_grid}), n)
-          code = hero_flag_pick(flags, n, base, up_left, up_right)
-
-          Map.put(acc, {row, col}, code)
-      end
-
-    for row <- 0..(rows - 1), col <- 0..(cols - 1), rem(row + col, 2) == 0 do
-      {Map.fetch!(cells, {row, col}), row, col}
-    end
-  end
-
-  defp hero_flag_pick(flags, n, base, left, top) do
-    Enum.find_value(0..(n - 1), fn offset ->
-      candidate = Enum.at(flags, rem(base + offset, n))
-      if candidate != left and candidate != top, do: candidate
-    end)
   end
 
   @doc """
