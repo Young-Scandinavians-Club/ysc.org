@@ -1703,6 +1703,69 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
+  @doc """
+  Updates a hold admin booking while reconciling inventory.
+
+  Member holds reserve `capacity_held` / `buyout_held` / room `held` flags.
+  Editing dates, guest count, or booking mode via a plain changeset leaves the
+  old reservation in place and checkout confirmation runs against stale
+  inventory. This releases the prior hold and places the new one atomically.
+  """
+  def admin_modify_hold_booking(%Booking{} = booking, attrs, opts \\ []) do
+    rooms = Keyword.get(opts, :rooms)
+
+    result =
+      Repo.transaction(fn ->
+        booking =
+          Repo.get!(Booking, booking.id)
+          |> Repo.preload([:rooms, :user])
+
+        if booking.status != :hold do
+          Repo.rollback({:error, :invalid_status})
+        end
+
+        parsed = normalize_admin_modify_attrs(attrs)
+
+        if Bookings.has_blackout?(
+             booking.property,
+             parsed.checkin_date,
+             parsed.checkout_date
+           ) do
+          Repo.rollback({:error, :blackout_conflict})
+        end
+
+        release_held_inventory_for_admin!(booking)
+
+        changeset_opts = admin_modify_changeset_opts(booking, parsed, rooms)
+
+        update_attrs = %{
+          checkin_date: parsed.checkin_date,
+          checkout_date: parsed.checkout_date,
+          guests_count: parsed.guests_count,
+          children_count: parsed.children_count,
+          booking_mode: parsed.booking_mode
+        }
+
+        case booking
+             |> Booking.changeset(update_attrs, changeset_opts)
+             |> Repo.update() do
+          {:ok, updated} ->
+            updated = Repo.preload(updated, [:rooms, :user])
+            update_held_inventory_for_admin_booking(updated)
+            updated
+
+          {:error, changeset} ->
+            Repo.rollback({:error, changeset})
+        end
+      end)
+
+    case result do
+      {:ok, updated} -> invalidate_availability_cache({:ok, updated})
+      {:error, {:error, reason}} -> {:error, reason}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # Updates inventory to mark dates as booked for an admin-created booking
   defp update_inventory_for_admin_booking(booking) do
     case booking.booking_mode do
@@ -1782,6 +1845,79 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
+  # Updates inventory to mark dates as held for an admin-edited hold booking
+  defp update_held_inventory_for_admin_booking(booking) do
+    case booking.booking_mode do
+      :buyout ->
+        {count, _} =
+          Repo.update_all(
+            from(pi in PropertyInventory,
+              where:
+                pi.property == ^booking.property and
+                  pi.day >= ^booking.checkin_date and
+                  pi.day < ^booking.checkout_date
+            ),
+            set: [
+              buyout_held: true,
+              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+            ]
+          )
+
+        if count == 0 do
+          ensure_inventory_exists_and_hold(booking)
+        else
+          :ok
+        end
+
+      :room ->
+        room_ids = Enum.map(booking.rooms, & &1.id)
+
+        if room_ids != [] do
+          {count, _} =
+            Repo.update_all(
+              from(ri in RoomInventory,
+                where:
+                  ri.room_id in ^room_ids and
+                    ri.day >= ^booking.checkin_date and
+                    ri.day < ^booking.checkout_date
+              ),
+              set: [
+                held: true,
+                booked: false,
+                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+              ]
+            )
+
+          if count == 0 do
+            ensure_room_inventory_exists_and_hold(booking, room_ids)
+          else
+            :ok
+          end
+        else
+          :ok
+        end
+
+      :day ->
+        ensure_property_inventory_for_days(
+          booking.property,
+          day_property_inventory_stay_days(booking)
+        )
+
+        updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+        Repo.update_all(
+          day_property_inventory_query(booking),
+          inc: [capacity_held: booking.guests_count],
+          set: [updated_at: updated_at]
+        )
+
+        :ok
+
+      _ ->
+        :ok
+    end
+  end
+
   # Ensures property inventory rows exist for the date range and marks as booked
   defp ensure_inventory_exists_and_book(booking) do
     dates =
@@ -1806,6 +1942,55 @@ defmodule Ysc.Bookings.BookingLocker do
         conflict_target: [:property, :day]
       )
     end)
+
+    :ok
+  end
+
+  # Ensures property inventory rows exist for the date range and marks as held
+  defp ensure_inventory_exists_and_hold(booking) do
+    dates =
+      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
+
+    Enum.each(dates, fn date ->
+      Repo.insert(
+        %PropertyInventory{
+          property: booking.property,
+          day: date,
+          buyout_booked: false,
+          buyout_held: true,
+          capacity_total:
+            if(booking.property == :clear_lake,
+              do: @default_capacity_clear_lake,
+              else: @default_capacity_tahoe
+            ),
+          capacity_held: 0,
+          capacity_booked: 0
+        },
+        on_conflict: {:replace, [:buyout_held, :updated_at]},
+        conflict_target: [:property, :day]
+      )
+    end)
+
+    :ok
+  end
+
+  # Ensures room inventory rows exist for the date range and marks as held
+  defp ensure_room_inventory_exists_and_hold(booking, room_ids) do
+    dates =
+      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
+
+    for room_id <- room_ids, date <- dates do
+      Repo.insert(
+        %RoomInventory{
+          room_id: room_id,
+          day: date,
+          booked: false,
+          held: true
+        },
+        on_conflict: {:replace, [:held, :booked, :updated_at]},
+        conflict_target: [:room_id, :day]
+      )
+    end
 
     :ok
   end
@@ -2933,6 +3118,55 @@ defmodule Ysc.Bookings.BookingLocker do
       true ->
         [skip_validation: true]
     end
+  end
+
+  defp release_held_inventory_for_admin!(%Booking{} = booking) do
+    days = day_property_inventory_stay_days(booking)
+    updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+    case booking.booking_mode do
+      :buyout ->
+        from(pi in PropertyInventory,
+          where: pi.property == ^booking.property and pi.day in ^days
+        )
+        |> Repo.update_all(set: [buyout_held: false, updated_at: updated_at])
+
+      :room ->
+        room_ids = Enum.map(booking.rooms, & &1.id)
+
+        if room_ids != [] do
+          from(ri in RoomInventory,
+            where: ri.room_id in ^room_ids and ri.day in ^days
+          )
+          |> Repo.update_all(set: [held: false, updated_at: updated_at])
+        end
+
+      :day ->
+        ensure_property_inventory_for_days(booking.property, days)
+
+        prop_inv =
+          Repo.all(
+            from(pi in PropertyInventory,
+              where: pi.property == ^booking.property and pi.day in ^days
+            )
+          )
+
+        Enum.each(prop_inv, fn pi ->
+          new_held = max(0, pi.capacity_held - booking.guests_count)
+
+          Repo.update_all(
+            from(pi2 in PropertyInventory,
+              where: pi2.property == ^pi.property and pi2.day == ^pi.day
+            ),
+            set: [capacity_held: new_held, updated_at: updated_at]
+          )
+        end)
+
+      _ ->
+        :ok
+    end
+
+    :ok
   end
 
   defp release_booked_inventory_for_admin!(%Booking{} = booking) do

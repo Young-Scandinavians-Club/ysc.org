@@ -6542,6 +6542,65 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
+  defp save_existing_admin_booking(
+         socket,
+         %{status: :hold} = existing_booking,
+         booking_params,
+         room_id,
+         rooms
+       ) do
+    inventory_attrs =
+      admin_booking_inventory_attrs(existing_booking, booking_params)
+
+    if admin_inventory_relevant_change?(
+         existing_booking,
+         inventory_attrs,
+         rooms
+       ) do
+      case BookingLocker.admin_modify_hold_booking(
+             existing_booking,
+             inventory_attrs,
+             rooms: rooms
+           ) do
+        {:ok, _booking} ->
+          {:noreply, admin_booking_save_success(socket, "updated")}
+
+        {:error, {:error, changeset}}
+        when is_struct(changeset, Ecto.Changeset) ->
+          {:noreply,
+           assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:noreply,
+           assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+        {:error, :blackout_conflict} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Cannot update booking: selected dates overlap a blackout period."
+           )}
+
+        {:error, reason} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to update booking: #{inspect(reason)}"
+           )}
+      end
+    else
+      do_save_existing_admin_booking(
+        socket,
+        existing_booking,
+        booking_params,
+        room_id,
+        rooms
+      )
+    end
+  end
+
   defp do_save_existing_admin_booking(
          socket,
          existing_booking,
