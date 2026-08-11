@@ -40,6 +40,20 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     end)
   end
 
+  defp day_capacity_held_for(property, days) do
+    alias Ysc.Bookings.PropertyInventory
+
+    days
+    |> Enum.map(fn day ->
+      Repo.one!(
+        from(pi in PropertyInventory,
+          where: pi.property == ^property and pi.day == ^day,
+          select: pi.capacity_held
+        )
+      )
+    end)
+  end
+
   defp insert_pending_refund!(property) do
     user = user_fixture()
     booking = booking_fixture(%{user_id: user.id, property: property})
@@ -1543,6 +1557,48 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert updated.booking_mode == :day
       assert updated.guests_count == 4
       assert updated.status == :complete
+    end
+
+    test "edit hold day booking reconciles capacity_held inventory", %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "HoldInventory"})
+
+      checkin = ~D[2036-09-25]
+      checkout = ~D[2036-09-28]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert day_capacity_held_for(:clear_lake, stay_days) == [2, 2, 2]
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2036-09-01&to_date=2036-09-30"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2036-09-25",
+          "checkout_date" => "2036-09-28",
+          "guests_count" => "5",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "status" => "hold"
+        }
+      })
+      |> render_submit()
+
+      assert Bookings.get_booking!(hold.id).guests_count == 5
+      assert day_capacity_held_for(:clear_lake, stay_days) == [5, 5, 5]
     end
 
     test "edit day booking reconciles capacity_booked inventory", %{conn: conn} do
