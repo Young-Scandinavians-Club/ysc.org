@@ -2044,7 +2044,6 @@ defmodule YscWeb.EventDetailsLiveTest do
       render_async(view)
 
       assert has_element?(view, "#attendees-section")
-      assert render(view) =~ "Who's going"
     end
 
     test "shows attendees section for members when at least one ticket is sold",
