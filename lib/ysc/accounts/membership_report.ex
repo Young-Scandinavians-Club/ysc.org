@@ -22,6 +22,15 @@ defmodule Ysc.Accounts.MembershipReport do
   subscription on record, or "purchased" if this is their first ever.
 
   Raw `counts` are unfiltered (for the stats summary at the top of the report).
+
+  Only primary account holders (`primary_user_id == nil`) are ever queried;
+  family sub-accounts never appear as their own row, even if they have their
+  own SignupApplication or Subscription on record.
+
+  Purchased/returning/expired subscriptions only count for users who have a
+  SignupApplication on file, so board-created or otherwise application-less
+  accounts (e.g. admins with a manually-attached subscription) don't appear
+  as memberships "purchased" through the normal intake pipeline.
   """
 
   import Ecto.Query, warn: false
@@ -125,6 +134,7 @@ defmodule Ysc.Accounts.MembershipReport do
     from(sa in SignupApplication,
       join: u in User,
       on: u.id == sa.user_id,
+      where: is_nil(u.primary_user_id),
       where: not is_nil(sa.completed),
       where: sa.completed >= ^start_dt and sa.completed <= ^end_dt,
       preload: [user: u],
@@ -171,6 +181,11 @@ defmodule Ysc.Accounts.MembershipReport do
     |> Map.new(&{&1.user_id, &1})
   end
 
+  # No UserEvent audit trail for this user (e.g. their state changed before
+  # the audit trail existed). Falls back to the SignupApplication's own
+  # review fields when present; otherwise trusts the user's current
+  # `state` directly rather than defaulting a since-accepted/rejected
+  # member to "pending" just because `review_outcome` was never backfilled.
   defp classify_application(app, nil, start_dt, end_dt) do
     cond do
       app.review_outcome == :approved and not is_nil(app.reviewed_at) and
@@ -181,7 +196,15 @@ defmodule Ysc.Accounts.MembershipReport do
           in_range?(app.reviewed_at, start_dt, end_dt) ->
         {:rejected, app}
 
-      is_nil(app.review_outcome) ->
+      is_nil(app.review_outcome) and app.user.state == :active ->
+        {:accepted,
+         %{app | reviewed_at: app.completed, review_outcome: :approved}}
+
+      is_nil(app.review_outcome) and app.user.state == :rejected ->
+        {:rejected,
+         %{app | reviewed_at: app.completed, review_outcome: :rejected}}
+
+      is_nil(app.review_outcome) and app.user.state == :pending_approval ->
         {:pending, app}
 
       true ->
@@ -232,6 +255,9 @@ defmodule Ysc.Accounts.MembershipReport do
     from(s in Subscription,
       join: u in User,
       on: u.id == s.user_id,
+      join: sa in SignupApplication,
+      on: sa.user_id == u.id,
+      where: is_nil(u.primary_user_id),
       where: s.stripe_status in ["canceled", "cancelled", "unpaid"],
       where: not is_nil(s.current_period_end),
       where:
@@ -254,6 +280,9 @@ defmodule Ysc.Accounts.MembershipReport do
       from(s in Subscription,
         join: u in User,
         on: u.id == s.user_id,
+        join: sa in SignupApplication,
+        on: sa.user_id == u.id,
+        where: is_nil(u.primary_user_id),
         where: s.stripe_status in ["active", "trialing"],
         where: not is_nil(s.start_date),
         where: s.start_date >= ^start_dt and s.start_date <= ^end_dt,
