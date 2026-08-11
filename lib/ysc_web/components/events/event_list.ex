@@ -521,53 +521,9 @@ defmodule YscWeb.EventsListLive do
 
   # Hero event helper functions (from EventsLive)
   defp get_hero_event_badges(event) do
-    badges = []
-
-    badges =
-      if Map.get(event, :tickets_tbd, false) do
-        [
-          %{
-            text: "Save the Date",
-            icon: "hero-ticket",
-            class: "bg-blue-600"
-          }
-          | badges
-        ]
-      else
-        badges
-      end
-
-    badges =
-      if EventHelpers.event_sold_out?(event) do
-        [%{text: "Sold Out", icon: "hero-ticket", class: "bg-red-600"} | badges]
-      else
-        badges
-      end
-
-    badges =
-      if Map.get(event, :selling_fast, false) do
-        [
-          %{text: "Going Fast!", icon: "hero-fire", class: "bg-emerald-600"}
-          | badges
-        ]
-      else
-        badges
-      end
-
-    badges =
-      if (Map.get(event, :state) || Map.get(event, "state")) in [
-           :cancelled,
-           "cancelled"
-         ] do
-        [
-          %{text: "Cancelled", icon: "hero-x-circle", class: "bg-zinc-600"}
-          | badges
-        ]
-      else
-        badges
-      end
-
-    Enum.reverse(badges)
+    event
+    |> YscWeb.EventBadgeHelpers.hero_badge_kinds()
+    |> YscWeb.EventBadgeHelpers.to_hero_badges()
   end
 
   defp badge_class_mobile(badge) do

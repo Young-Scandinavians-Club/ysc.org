@@ -11,8 +11,7 @@ defmodule YscWeb.Components.Events.EventCard do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
-  alias YscWeb.DateDisplay
-  alias YscWeb.PlainText
+  alias YscWeb.{DateDisplay, EventBadgeHelpers, PlainText}
 
   attr :event, :any, required: true
   attr :class, :string, default: nil
@@ -174,132 +173,14 @@ defmodule YscWeb.Components.Events.EventCard do
   end
 
   defp get_event_badges_for_card(event, sold_out, selling_fast) do
-    state = Map.get(event, :state) || Map.get(event, "state")
-
-    # If cancelled, only show "Cancelled" badge
-    if state == :cancelled or state == "cancelled" do
-      [%{text: "Cancelled", class: "bg-red-500 text-white", icon: nil}]
-    else
-      # If sold out (and not cancelled), only show "Sold Out" badge
-      if sold_out do
-        [%{text: "Sold Out", class: "bg-red-500 text-white", icon: nil}]
-      else
-        # Show active badges
-        get_active_badges_for_card(event, selling_fast)
-      end
-    end
-  end
-
-  defp get_active_badges_for_card(event, selling_fast) do
-    # Check if published_at exists (no badges for unpublished events)
-    published_at =
-      Map.get(event, :published_at) || Map.get(event, "published_at")
-
-    if published_at != nil do
-      badges = []
-
-      # Add "Save the Date" badge if applicable
-      tickets_tbd = Map.get(event, :tickets_tbd, false)
-
-      tbd_badge =
-        if tickets_tbd do
-          [
-            %{
-              text: "Save the Date",
-              class: "bg-blue-500 text-white",
-              icon: "hero-ticket"
-            }
-          ]
-        else
-          []
-        end
-
-      badges = badges ++ tbd_badge
-
-      # Add "Just Added" badge if applicable (within 48 hours of publishing)
-      just_added_badge =
-        if DateTime.diff(DateTime.utc_now(), published_at, :hour) <= 48 do
-          [%{text: "Just Added", class: "bg-zinc-600 text-white", icon: nil}]
-        else
-          []
-        end
-
-      badges = badges ++ just_added_badge
-
-      # Add "Today"/"Tomorrow"/"Days Left" badge based on how soon the event is
-      day_label = DateDisplay.event_day_label(event)
-      days_left = days_until_event_start(event)
-
-      proximity_badge =
-        cond do
-          day_label == :today ->
-            [
-              %{
-                text: "Today",
-                class: "bg-red-600 text-white animate-pulse",
-                icon: "hero-bolt-solid"
-              }
-            ]
-
-          day_label == :tomorrow ->
-            [%{text: "Tomorrow", class: "bg-orange-500 text-white", icon: nil}]
-
-          days_left != nil and days_left >= 2 and days_left <= 3 ->
-            [
-              %{
-                text: "#{days_left} days left",
-                class: "bg-sky-500 text-white",
-                icon: nil
-              }
-            ]
-
-          true ->
-            []
-        end
-
-      badges = badges ++ proximity_badge
-
-      # Add "Selling Fast!" badge if applicable
-      selling_fast_badge =
-        if selling_fast do
-          [
-            %{
-              text: "Going Fast!",
-              class: "bg-emerald-600 text-white",
-              icon: "hero-bolt-solid"
-            }
-          ]
-        else
-          []
-        end
-
-      badges ++ selling_fast_badge
-    else
-      []
-    end
+    event
+    |> EventBadgeHelpers.exclusive_badge_kinds(
+      sold_out: sold_out,
+      selling_fast: selling_fast,
+      proximity: :labels
+    )
+    |> EventBadgeHelpers.to_card_badges()
   end
 
   defp badge_class(%{class: class}), do: class
-
-  defp days_until_event_start(event) when is_map(event) do
-    start_date = Map.get(event, :start_date)
-
-    if start_date == nil do
-      nil
-    else
-      # Event start_date is a Pacific wall-clock calendar day — use the date
-      # component as-is, consistent with DateDisplay.event_day_label/1
-      event_date_only = DateTime.to_date(start_date)
-
-      now_date_only =
-        DateTime.utc_now()
-        |> DateTime.shift_zone!("America/Los_Angeles")
-        |> DateTime.to_date()
-
-      case Date.diff(event_date_only, now_date_only) do
-        diff when diff >= 0 -> diff
-        _ -> nil
-      end
-    end
-  end
 end
