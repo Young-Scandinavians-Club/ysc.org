@@ -4693,35 +4693,45 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div id={@id} phx-hook="HeroFlagGrid" class="hero-flag-grid" aria-hidden="true">
       <div class="hero-flag-grid__tile">
-        <.flag :for={code <- @flag_cells} country={code} class="hero-flag-grid__cell" />
+        <.flag
+          :for={{code, row, col} <- @flag_cells}
+          country={code}
+          class="hero-flag-grid__cell"
+          style={"grid-row: #{row + 1}; grid-column: #{col + 1};"}
+        />
       </div>
     </div>
     """
   end
 
-  # Layout for the hero flag grid: a plain CSS Grid (cols x rows) with cells
-  # centered in their track, so rows and columns stay strictly aligned — this
-  # needs to read as an actual grid even when only a couple of columns are ever
-  # visible (peeking out from behind the hero media). Flag choice hashes each
-  # cell's position, nudging collisions so no cell repeats its left or top
-  # neighbor.
+  # Layout for the hero flag grid: a plain CSS Grid (cols x rows), but only every
+  # other cell in a checkerboard (row + col even) actually gets a flag, leaving
+  # the rest of the track empty — that's what produces the diamond/lattice look
+  # instead of a solid block. Cells stay strictly aligned to the grid (each flag
+  # is explicitly placed via grid-row/grid-column) so it still reads as a grid
+  # even when only a couple of columns are visible past the hero media's edge.
+  # Flag choice hashes each cell's position, nudging collisions so no cell
+  # repeats its nearest diamond neighbors (up-left, up-right).
   defp hero_flag_cells(cols, rows, flags) do
-    total = cols * rows
     n = length(flags)
 
     cells =
-      Enum.reduce(0..(total - 1), %{}, fn i, acc ->
-        row = div(i, cols)
-        col = rem(i, cols)
-        left = col > 0 && Map.fetch!(acc, i - 1)
-        top = row > 0 && Map.fetch!(acc, i - cols)
-        base = rem(:erlang.phash2({row, col, :hero_flag_grid}), n)
-        code = hero_flag_pick(flags, n, base, left, top)
+      for row <- 0..(rows - 1),
+          col <- 0..(cols - 1),
+          rem(row + col, 2) == 0,
+          reduce: %{} do
+        acc ->
+          up_left = row > 0 && col > 0 && Map.get(acc, {row - 1, col - 1})
+          up_right = row > 0 && col < cols - 1 && Map.get(acc, {row - 1, col + 1})
+          base = rem(:erlang.phash2({row, col, :hero_flag_grid}), n)
+          code = hero_flag_pick(flags, n, base, up_left, up_right)
 
-        Map.put(acc, i, code)
-      end)
+          Map.put(acc, {row, col}, code)
+      end
 
-    Enum.map(0..(total - 1), &Map.fetch!(cells, &1))
+    for row <- 0..(rows - 1), col <- 0..(cols - 1), rem(row + col, 2) == 0 do
+      {Map.fetch!(cells, {row, col}), row, col}
+    end
   end
 
   defp hero_flag_pick(flags, n, base, left, top) do
