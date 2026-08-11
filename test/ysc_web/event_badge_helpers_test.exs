@@ -12,7 +12,7 @@ defmodule YscWeb.EventBadgeHelpersTest do
     DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
   end
 
-  defp base_event(overrides \\ %{}) do
+  defp base_event(overrides) do
     today = pacific_today()
 
     Map.merge(
@@ -22,7 +22,8 @@ defmodule YscWeb.EventBadgeHelpersTest do
         start_date: utc_midnight(Date.add(today, 7)),
         published_at: DateTime.utc_now() |> DateTime.truncate(:second),
         tickets_tbd: false,
-        selling_fast: false
+        selling_fast: false,
+        ticket_tiers: []
       },
       overrides
     )
@@ -63,7 +64,8 @@ defmodule YscWeb.EventBadgeHelpersTest do
           start_date: utc_midnight(pacific_today())
         })
 
-      assert EventBadgeHelpers.exclusive_badge_kinds(event, selling_fast: true) == []
+      assert EventBadgeHelpers.exclusive_badge_kinds(event, selling_fast: true) ==
+               []
     end
 
     test "card proximity includes today, tomorrow, and days left" do
@@ -97,10 +99,11 @@ defmodule YscWeb.EventBadgeHelpersTest do
 
     test "compact proximity uses days left for 1-3 days out" do
       today = pacific_today()
+      two_days = Date.add(today, 2)
 
-      assert [{:days_left, 1}] =
+      assert [{:days_left, 2}] =
                base_event(%{
-                 start_date: utc_midnight(today),
+                 start_date: utc_midnight(two_days),
                  published_at: DateTime.add(DateTime.utc_now(), -72, :hour)
                })
                |> EventBadgeHelpers.exclusive_badge_kinds(proximity: :days_only)
