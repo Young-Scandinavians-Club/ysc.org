@@ -1559,7 +1559,9 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert updated.status == :complete
     end
 
-    test "edit hold day booking reconciles capacity_held inventory", %{conn: conn} do
+    test "edit hold day booking reconciles capacity_held inventory", %{
+      conn: conn
+    } do
       ensure_clear_lake_pricing_rules!()
       user = user_fixture(%{first_name: "Spot", last_name: "HoldInventory"})
 

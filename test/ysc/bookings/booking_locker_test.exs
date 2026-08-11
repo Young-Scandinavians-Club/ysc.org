@@ -3232,7 +3232,9 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert day_capacity_held(:clear_lake, stay_days) == [5, 5, 5]
     end
 
-    test "reconciles buyout hold inventory when stay dates change", %{user: user} do
+    test "reconciles buyout hold inventory when stay dates change", %{
+      user: user
+    } do
       {checkin, checkout} = locker_buyout_dates(710)
       new_checkin = Date.add(checkin, 14)
       new_checkout = Date.add(checkout, 14)
@@ -3267,7 +3269,9 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert buyout_held?(:tahoe, new_days)
     end
 
-    test "reconciles room held inventory when guest count changes", %{user: user} do
+    test "reconciles room held inventory when guest count changes", %{
+      user: user
+    } do
       {:ok, _} =
         Bookings.create_pricing_rule(%{
           amount: Money.new(:USD, 100),
