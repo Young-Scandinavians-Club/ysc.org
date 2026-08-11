@@ -2576,6 +2576,48 @@ defmodule Ysc.AccountsTest do
                Enum.find_index(ids, &(&1 == old_member.id))
     end
 
+    test "list_paginated_memberships/3 subscription_start sort uses the latest active period when a user has multiple subscriptions" do
+      recent_renewal =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      [older_sub] = Subscriptions.list_subscriptions(recent_renewal)
+
+      older_sub
+      |> Ysc.Subscriptions.Subscription.changeset(%{
+        current_period_start:
+          DateTime.add(DateTime.utc_now(), -90, :day)
+          |> DateTime.truncate(:second)
+      })
+      |> Repo.update!()
+
+      {:ok, _renewal_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: recent_renewal.id,
+          stripe_id: "sub_renewal_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          current_period_start:
+            DateTime.add(DateTime.utc_now(), -2, :day)
+            |> DateTime.truncate(:second),
+          current_period_end: DateTime.add(DateTime.utc_now(), 363, :day)
+        })
+
+      older_only =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      backdate_subscription_start(older_only, -30)
+
+      params = %{"page" => "1", "page_size" => "50"}
+
+      assert {:ok, {memberships, _meta}} =
+               Accounts.list_paginated_memberships(params)
+
+      ids = Enum.map(memberships, & &1.primary_user.id)
+
+      assert Enum.find_index(ids, &(&1 == recent_renewal.id)) <
+               Enum.find_index(ids, &(&1 == older_only.id))
+    end
+
     test "list_paginated_memberships/3 sorts lifetime members (no subscription) last regardless of direction" do
       lifetime =
         user_with_lifetime_membership(%{phone_number: unique_user_phone()})
