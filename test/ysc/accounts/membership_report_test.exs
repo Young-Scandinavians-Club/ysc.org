@@ -488,6 +488,23 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert hd(report.accepted).user_id == user.id
     end
 
+    test "an application rejected before the audit trail existed shows as rejected, not pending" do
+      user = user_fixture(%{state: :rejected})
+      completed_at = ~U[2026-03-05 10:00:00Z]
+
+      signup_application_fixture(user, %{
+        completed: completed_at,
+        review_outcome: nil
+      })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.rejected == 1
+      assert report.counts.pending == 0
+      assert length(report.rejected) == 1
+      assert hd(report.rejected).user_id == user.id
+    end
+
     test "excludes a subscription for a user with no signup application on file" do
       user = user_fixture()
 
