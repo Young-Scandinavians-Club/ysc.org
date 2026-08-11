@@ -4687,7 +4687,9 @@ defmodule YscWeb.CoreComponents do
   attr :id, :string, required: true
 
   def hero_flag_grid(assigns) do
-    flag_cells = hero_flag_cells(@hero_flag_grid_cols, @hero_flag_grid_rows, @nordic_flags)
+    flag_cells =
+      hero_flag_cells(@hero_flag_grid_cols, @hero_flag_grid_rows, @nordic_flags)
+
     assigns = assign(assigns, :flag_cells, flag_cells)
 
     ~H"""
@@ -4722,7 +4724,10 @@ defmodule YscWeb.CoreComponents do
           reduce: %{} do
         acc ->
           up_left = row > 0 && col > 0 && Map.get(acc, {row - 1, col - 1})
-          up_right = row > 0 && col < cols - 1 && Map.get(acc, {row - 1, col + 1})
+
+          up_right =
+            row > 0 && col < cols - 1 && Map.get(acc, {row - 1, col + 1})
+
           base = rem(:erlang.phash2({row, col, :hero_flag_grid}), n)
           code = hero_flag_pick(flags, n, base, up_left, up_right)
 

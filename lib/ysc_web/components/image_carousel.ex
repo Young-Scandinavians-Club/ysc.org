@@ -48,8 +48,14 @@ defmodule YscWeb.Components.ImageCarousel do
         flag_grid_id="clear-lake-hero-flag-grid"
       />
   """
-  attr :wrapper_id, :string, required: true, doc: "Unique ID for the ImageCarouselAutoplay hook container"
-  attr :carousel_id, :string, required: true, doc: "Unique ID passed through to image_carousel/1"
+  attr :wrapper_id, :string,
+    required: true,
+    doc: "Unique ID for the ImageCarouselAutoplay hook container"
+
+  attr :carousel_id, :string,
+    required: true,
+    doc: "Unique ID passed through to image_carousel/1"
+
   attr :images, :list, required: true, doc: "See image_carousel/1"
 
   attr :overlay_class, :string,
