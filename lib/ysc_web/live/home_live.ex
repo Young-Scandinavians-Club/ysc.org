@@ -1903,7 +1903,10 @@ defmodule YscWeb.HomeLive do
                   Newsletter
                 </h2>
 
-                <div :if={!@async_data_loaded} class="flex items-center gap-3 animate-pulse">
+                <div
+                  :if={!@async_data_loaded}
+                  class="flex items-center gap-3 animate-pulse"
+                >
                   <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
                   <div class="space-y-2 flex-1">
                     <div class="h-3.5 w-28 bg-zinc-200 rounded"></div>
@@ -1953,7 +1956,9 @@ defmodule YscWeb.HomeLive do
                       phx-disable-with="Saving..."
                       class="shrink-0 text-xs font-bold text-blue-600 hover:underline"
                     >
-                      {if @newsletter_subscribed, do: "Unsubscribe", else: "Subscribe"}
+                      {if @newsletter_subscribed,
+                        do: "Unsubscribe",
+                        else: "Subscribe"}
                     </button>
                   </div>
                   <.link
