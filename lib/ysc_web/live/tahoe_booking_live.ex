@@ -5248,29 +5248,29 @@ defmodule YscWeb.TahoeBookingLive do
              )}
 
           {:error, %Ecto.Changeset{} = changeset} ->
+            error_message = booking_changeset_error_message(changeset)
+
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:error, "Please fix the errors above.",
-               title: "Booking"
-             )
+             |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
              |> assign(
                form_errors: format_errors(changeset),
                calculated_price: nil,
-               price_error: "Please fix the errors above",
+               price_error: error_message,
                show_confirm_modal: false
              )}
 
           {:error, {:error, %Ecto.Changeset{} = changeset}} ->
             # Nested error from Repo.rollback({:error, changeset}) in BookingLocker
+            error_message = booking_changeset_error_message(changeset)
+
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:error, "Please fix the errors above.",
-               title: "Booking"
-             )
+             |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")
              |> assign(
                form_errors: format_errors(changeset),
                calculated_price: nil,
-               price_error: "Please fix the errors above",
+               price_error: error_message,
                show_confirm_modal: false
              )}
 
@@ -6265,6 +6265,20 @@ defmodule YscWeb.TahoeBookingLive do
 
   defp format_errors(changeset),
     do: YscWeb.FormHelpers.changeset_errors(changeset)
+
+  defp booking_changeset_error_message(changeset) do
+    message =
+      YscWeb.FormHelpers.format_changeset_errors(changeset,
+        field_format: :humanize,
+        style: :flat
+      )
+
+    if message == "" do
+      "We couldn't calculate a price for this booking. Check your dates, guest count, and room selection, then try again."
+    else
+      message
+    end
+  end
 
   defp date_to_datetime_string(nil), do: nil
 

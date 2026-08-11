@@ -2967,7 +2967,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       render_async(view, @async_timeout_ms)
       html = render(view)
 
-      assert html =~ "Spot Rental"
+      assert html =~ "Shared cabin stay"
       assert html =~ "2 adults"
       assert html =~ "2 nights"
     end

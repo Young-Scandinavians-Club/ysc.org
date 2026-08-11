@@ -143,7 +143,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
       html = render(view)
       refute has_element?(view, "#family-member-modal")
       assert html =~ "Casey Lee"
-      assert html =~ "Invite pending"
+      assert html =~ "No account yet"
       assert has_element?(view, "#active-family-members-table")
     end
 

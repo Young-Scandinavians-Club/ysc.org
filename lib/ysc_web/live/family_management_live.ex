@@ -1046,7 +1046,7 @@ defmodule YscWeb.FamilyManagementLive do
           name: "#{member.first_name} #{member.last_name}",
           subtitle: subtitle,
           relationship: FamilyDisplay.relationship_label(member.type),
-          status_label: "Invite pending",
+          status_label: "No account yet",
           badge_type: "yellow"
         }
       end)
