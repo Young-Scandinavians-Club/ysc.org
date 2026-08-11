@@ -504,6 +504,12 @@ defmodule Ysc.Media do
   def upload_file_to_s3(path, key) when is_binary(key),
     do: upload_file_to_s3(path, key, [])
 
+  @doc false
+  def trix_attachment_storage_key(client_filename)
+      when is_binary(client_filename) do
+    "attachments/#{Ecto.ULID.generate()}/#{Path.basename(client_filename)}"
+  end
+
   def upload_file_to_s3(path, key, opts)
       when is_binary(key) and is_list(opts) do
     case Application.get_env(:ysc, :media_s3_uploader) do

@@ -26,6 +26,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
   Finding 27 (MEDIUM)   GET auto-login/passkey endpoints allowed login CSRF (session fixation to attacker account)
   Finding 28 (CRITICAL) Account setup auto-activation charged saved cards without owner session
+  Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2122,6 +2123,40 @@ defmodule YscWeb.SecurityAuditTest do
       })
 
       assert render(view) =~ "Too many verification attempts"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Trix editor attachments: predictable public S3 keys
+  # ---------------------------------------------------------------------------
+
+  describe "Trix attachment uploads use unpredictable S3 keys" do
+    test "non-image trix uploads do not use the client filename as the S3 object key",
+         %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      conn = log_in_user(conn, admin)
+
+      path =
+        Path.join(
+          System.tmp_dir!(),
+          "trix_security_#{System.unique_integer([:positive])}.txt"
+        )
+
+      File.write!(path, "attachment body")
+      on_exit(fn -> if File.exists?(path), do: File.rm(path) end)
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => %Plug.Upload{
+            path: path,
+            filename: "club-policy.pdf",
+            content_type: "application/pdf"
+          }
+        })
+
+      assert %{"url" => url} = json_response(conn, 201)
+      refute String.match?(url, ~r{/media/club-policy\.pdf$})
+      assert url =~ ~r{/attachments/[^/]+/club-policy\.pdf$}
     end
   end
 
