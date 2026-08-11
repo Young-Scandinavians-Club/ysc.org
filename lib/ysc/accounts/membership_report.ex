@@ -3,7 +3,23 @@ defmodule Ysc.Accounts.MembershipReport do
   Queries for generating membership activity reports over a date range.
 
   Each member appears in only one display list at the highest state they've
-  reached: purchased > accepted > rejected > pending.
+  reached: purchased/returning > accepted > rejected > pending.
+
+  Accepted/rejected/pending are derived from `User.state` (the field the rest
+  of the app treats as authoritative for access) as of `date_to`, using the
+  `Ysc.Accounts.UserEvent` audit trail to know when a state transition
+  happened. This keeps the report correct regardless of which admin flow
+  changed the user's status (the application-review Approve/Deny buttons, or
+  a direct account-status edit), and keeps a report for a past window stable
+  even if the user's status changes again after that window closes. Older
+  rows that predate the audit trail fall back to the SignupApplication's own
+  `review_outcome`/`reviewed_at`.
+
+  Purchased vs. returning: a subscription starting in the window is dropped
+  entirely if the member already had coverage at `date_to`'s window start
+  (so ordinary renewals and mid-window blips for existing members aren't
+  reported); otherwise it's "returning" if the member has an earlier
+  subscription on record, or "purchased" if this is their first ever.
 
   Raw `counts` are unfiltered (for the stats summary at the top of the report).
   """
@@ -11,7 +27,7 @@ defmodule Ysc.Accounts.MembershipReport do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
-  alias Ysc.Accounts.{User, SignupApplication}
+  alias Ysc.Accounts.{User, SignupApplication, UserEvent}
   alias Ysc.Subscriptions.Subscription
 
   @report_timezone "America/Los_Angeles"
@@ -22,13 +38,14 @@ defmodule Ysc.Accounts.MembershipReport do
     end_dt = DateTime.new!(date_to, ~T[23:59:59], @report_timezone)
 
     all_submitted = list_submitted(start_dt, end_dt)
-    accepted = list_accepted(start_dt, end_dt)
-    rejected = list_rejected(start_dt, end_dt)
-    expired = list_expired(start_dt, end_dt)
-    purchased = list_purchased(start_dt, end_dt)
 
-    # Pending = submitted with no review outcome
-    pending_raw = Enum.filter(all_submitted, &is_nil(&1.review_outcome))
+    %{pending: pending_raw, accepted: accepted, rejected: rejected} =
+      classify_applications(all_submitted, start_dt, end_dt)
+
+    expired = list_expired(start_dt, end_dt)
+
+    %{purchased: purchased, returning: returning} =
+      list_purchases(start_dt, end_dt)
 
     # Raw counts for the stats summary (unfiltered)
     counts = %{
@@ -37,18 +54,19 @@ defmodule Ysc.Accounts.MembershipReport do
       rejected: length(rejected),
       pending: length(pending_raw),
       expired: length(expired),
-      purchased: length(purchased)
+      purchased: length(purchased),
+      returning: length(returning)
     }
 
     # Deduplicate display lists: each user appears only in their highest category.
-    # Priority: purchased > accepted > rejected > pending
-    purchased_ids = MapSet.new(purchased, & &1.user_id)
+    # Priority: purchased/returning > accepted > rejected > pending
+    subscription_ids = MapSet.new(purchased ++ returning, & &1.user_id)
 
     accepted_display =
-      Enum.reject(accepted, &MapSet.member?(purchased_ids, &1.user_id))
+      Enum.reject(accepted, &MapSet.member?(subscription_ids, &1.user_id))
 
     excluded_from_pending =
-      purchased_ids
+      subscription_ids
       |> MapSet.union(MapSet.new(accepted_display, & &1.user_id))
       |> MapSet.union(MapSet.new(rejected, & &1.user_id))
 
@@ -66,6 +84,7 @@ defmodule Ysc.Accounts.MembershipReport do
       rejected: rejected,
       expired: expired,
       purchased: attach_applications(purchased),
+      returning: attach_applications(returning),
       counts: counts
     }
   end
@@ -92,6 +111,7 @@ defmodule Ysc.Accounts.MembershipReport do
         application_rows("Accepted", report.accepted) ++
         application_rows("Rejected", report.rejected) ++
         subscription_rows("Purchased", report.purchased, :start_date) ++
+        subscription_rows("Returning", report.returning, :start_date) ++
         subscription_rows("Expired", report.expired, :current_period_end)
 
     [header | rows]
@@ -99,7 +119,7 @@ defmodule Ysc.Accounts.MembershipReport do
     |> Enum.join()
   end
 
-  # --- Queries ---
+  # --- Application classification (pending / accepted / rejected) ---
 
   defp list_submitted(start_dt, end_dt) do
     from(sa in SignupApplication,
@@ -113,37 +133,106 @@ defmodule Ysc.Accounts.MembershipReport do
     |> Repo.all()
   end
 
-  defp list_accepted(start_dt, end_dt) do
-    from(sa in SignupApplication,
-      join: u in User,
-      on: u.id == sa.user_id,
-      where: sa.review_outcome == ^"approved",
-      where: not is_nil(sa.reviewed_at),
-      where: sa.reviewed_at >= ^start_dt and sa.reviewed_at <= ^end_dt,
-      preload: [user: u],
-      order_by: [asc: sa.reviewed_at]
-    )
-    |> Repo.all()
+  # For each submitted application, classifies the user as pending, accepted,
+  # or rejected based on their current User.state and the UserEvent audit
+  # trail as of end_dt (falling back to the application's own review fields
+  # for rows that predate the audit trail).
+  defp classify_applications(all_submitted, start_dt, end_dt) do
+    user_ids = all_submitted |> Enum.map(& &1.user_id) |> Enum.uniq()
+    events_by_user = latest_state_events_by_user(user_ids, end_dt)
+
+    all_submitted
+    |> Enum.reduce(%{pending: [], accepted: [], rejected: []}, fn app, acc ->
+      case classify_application(
+             app,
+             Map.get(events_by_user, app.user_id),
+             start_dt,
+             end_dt
+           ) do
+        {:pending, app} -> %{acc | pending: [app | acc.pending]}
+        {:accepted, app} -> %{acc | accepted: [app | acc.accepted]}
+        {:rejected, app} -> %{acc | rejected: [app | acc.rejected]}
+        :other -> acc
+      end
+    end)
+    |> Map.new(fn {key, apps} -> {key, Enum.reverse(apps)} end)
   end
 
-  defp list_rejected(start_dt, end_dt) do
-    from(sa in SignupApplication,
-      join: u in User,
-      on: u.id == sa.user_id,
-      where: sa.review_outcome == ^"rejected",
-      where: not is_nil(sa.reviewed_at),
-      where: sa.reviewed_at >= ^start_dt and sa.reviewed_at <= ^end_dt,
-      preload: [user: u],
-      order_by: [asc: sa.reviewed_at]
+  defp latest_state_events_by_user(user_ids, end_dt) do
+    from(e in UserEvent,
+      where: e.type == ^"state_update",
+      where: e.user_id in ^user_ids,
+      where: e.inserted_at <= ^end_dt,
+      distinct: e.user_id,
+      order_by: [asc: e.user_id, desc: e.inserted_at],
+      select: %{user_id: e.user_id, to: e.to, inserted_at: e.inserted_at}
     )
     |> Repo.all()
+    |> Map.new(&{&1.user_id, &1})
   end
+
+  defp classify_application(app, nil, start_dt, end_dt) do
+    cond do
+      app.review_outcome == :approved and not is_nil(app.reviewed_at) and
+          in_range?(app.reviewed_at, start_dt, end_dt) ->
+        {:accepted, app}
+
+      app.review_outcome == :rejected and not is_nil(app.reviewed_at) and
+          in_range?(app.reviewed_at, start_dt, end_dt) ->
+        {:rejected, app}
+
+      is_nil(app.review_outcome) ->
+        {:pending, app}
+
+      true ->
+        :other
+    end
+  end
+
+  defp classify_application(
+         app,
+         %{to: "active", inserted_at: ts},
+         start_dt,
+         end_dt
+       ) do
+    if in_range?(ts, start_dt, end_dt) do
+      {:accepted, %{app | reviewed_at: ts, review_outcome: :approved}}
+    else
+      :other
+    end
+  end
+
+  defp classify_application(
+         app,
+         %{to: "rejected", inserted_at: ts},
+         start_dt,
+         end_dt
+       ) do
+    if in_range?(ts, start_dt, end_dt) do
+      {:rejected, %{app | reviewed_at: ts, review_outcome: :rejected}}
+    else
+      :other
+    end
+  end
+
+  defp classify_application(app, %{to: "pending_approval"}, _start_dt, _end_dt) do
+    {:pending, app}
+  end
+
+  defp classify_application(_app, %{to: _other}, _start_dt, _end_dt), do: :other
+
+  defp in_range?(%DateTime{} = dt, start_dt, end_dt) do
+    DateTime.compare(dt, start_dt) != :lt and
+      DateTime.compare(dt, end_dt) != :gt
+  end
+
+  # --- Expired subscriptions ---
 
   defp list_expired(start_dt, end_dt) do
     from(s in Subscription,
       join: u in User,
       on: u.id == s.user_id,
-      where: s.stripe_status in ["canceled", "unpaid"],
+      where: s.stripe_status in ["canceled", "cancelled", "unpaid"],
       where: not is_nil(s.current_period_end),
       where:
         s.current_period_end >= ^start_dt and s.current_period_end <= ^end_dt,
@@ -153,21 +242,75 @@ defmodule Ysc.Accounts.MembershipReport do
     |> Repo.all()
   end
 
-  defp list_purchased(start_dt, end_dt) do
-    from(s in Subscription,
-      join: u in User,
-      on: u.id == s.user_id,
-      where: s.stripe_status in ["active", "trialing"],
-      where: not is_nil(s.start_date),
-      where: s.start_date >= ^start_dt and s.start_date <= ^end_dt,
-      preload: [user: u],
-      order_by: [asc: s.start_date]
-    )
-    |> Repo.all()
+  # --- Purchased / returning subscriptions ---
+
+  # Finds subscriptions that started in the window, then splits them into
+  # "purchased" (first membership ever) and "returning" (member had a prior
+  # subscription that had already lapsed). Members who already had coverage
+  # at the window's start date are dropped entirely, whether they're renewing
+  # normally or repurchased after a lapse mid-window.
+  defp list_purchases(start_dt, end_dt) do
+    candidates =
+      from(s in Subscription,
+        join: u in User,
+        on: u.id == s.user_id,
+        where: s.stripe_status in ["active", "trialing"],
+        where: not is_nil(s.start_date),
+        where: s.start_date >= ^start_dt and s.start_date <= ^end_dt,
+        preload: [user: u],
+        order_by: [asc: s.start_date]
+      )
+      |> Repo.all()
+
+    user_ids = candidates |> Enum.map(& &1.user_id) |> Enum.uniq()
+
+    subscriptions_by_user =
+      from(s in Subscription, where: s.user_id in ^user_ids)
+      |> Repo.all()
+      |> Enum.group_by(& &1.user_id)
+
+    {purchased, returning} =
+      Enum.reduce(candidates, {[], []}, fn candidate,
+                                           {purchased_acc, returning_acc} ->
+        others = Map.get(subscriptions_by_user, candidate.user_id, [])
+
+        cond do
+          Enum.any?(others, &covers_start?(&1, start_dt)) ->
+            {purchased_acc, returning_acc}
+
+          Enum.any?(
+            others,
+            &(&1.id != candidate.id and started_before?(&1, candidate))
+          ) ->
+            {purchased_acc, [candidate | returning_acc]}
+
+          true ->
+            {[candidate | purchased_acc], returning_acc}
+        end
+      end)
+
+    %{purchased: Enum.reverse(purchased), returning: Enum.reverse(returning)}
+  end
+
+  defp covers_start?(%Subscription{start_date: nil}, _start_dt), do: false
+
+  defp covers_start?(%Subscription{} = subscription, start_dt) do
+    DateTime.compare(subscription.start_date, start_dt) != :gt and
+      (is_nil(subscription.current_period_end) or
+         DateTime.compare(subscription.current_period_end, start_dt) != :lt)
+  end
+
+  defp started_before?(%Subscription{start_date: nil}, _candidate), do: false
+
+  defp started_before?(
+         %Subscription{start_date: other_start},
+         %Subscription{start_date: candidate_start}
+       ) do
+    DateTime.compare(other_start, candidate_start) == :lt
   end
 
   # Attaches each user's SignupApplication (if any) to their subscription struct
-  # so the report page can show application details for purchased memberships.
+  # so the report page can show application details for purchased/returning memberships.
   defp attach_applications([]), do: []
 
   defp attach_applications(subscriptions) do
