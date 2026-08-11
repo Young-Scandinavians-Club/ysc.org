@@ -145,21 +145,27 @@ defmodule Ysc.Bookings do
   current occurrence (see `Ysc.Bookings.SeasonWeekendAvailabilityWorker`).
 
   Doesn't invalidate the season cache — these fields don't affect any
-  booking/date logic, only notification bookkeeping.
+  booking/date logic, only notification bookkeeping. When the season was
+  already marked for the same cycle year, returns `{:ok, season}` without
+  updating timestamps.
   """
   def mark_weekend_notification_sent(
         %Season{} = season,
         cycle_year,
         recipient_count
       ) do
-    season
-    |> Ecto.Changeset.change(%{
-      weekend_notification_sent_cycle_year: cycle_year,
-      weekend_notification_sent_at:
-        DateTime.truncate(DateTime.utc_now(), :second),
-      weekend_notification_recipient_count: recipient_count
-    })
-    |> Repo.update()
+    if season.weekend_notification_sent_cycle_year == cycle_year do
+      {:ok, season}
+    else
+      season
+      |> Ecto.Changeset.change(%{
+        weekend_notification_sent_cycle_year: cycle_year,
+        weekend_notification_sent_at:
+          DateTime.truncate(DateTime.utc_now(), :second),
+        weekend_notification_recipient_count: recipient_count
+      })
+      |> Repo.update()
+    end
   end
 
   @doc """
