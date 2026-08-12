@@ -103,6 +103,19 @@ defmodule YscWeb.Api.BookingsControllerTest do
       assert %{"error" => _} = json_response(response, 400)
     end
 
+    test "returns 422 when explicit date range exceeds the maximum span", %{
+      conn: conn
+    } do
+      response =
+        get(
+          conn,
+          ~p"/api/v1/mobile/bookings?property=tahoe&start_date=2000-01-01&end_date=2099-12-31"
+        )
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "date range cannot exceed"
+    end
+
     test "filters bookings by date range", %{conn: conn} do
       booking = booking_fixture()
       far_future = Date.add(booking.checkout_date, 365)
