@@ -1391,7 +1391,9 @@ defmodule YscWeb.AccountSetupLive do
               if phone_changed do
                 VerificationCodes.issue(updated_user, :phone, suffix: "initial")
               else
-                VerificationCodes.ensure(updated_user, :phone, suffix: "initial")
+                VerificationCodes.ensure(updated_user, :phone,
+                  suffix: "initial"
+                )
               end
 
             YscWeb.Flash.send_toast(
