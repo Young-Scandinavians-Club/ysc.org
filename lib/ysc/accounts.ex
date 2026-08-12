@@ -1416,22 +1416,18 @@ defmodule Ysc.Accounts do
     now = DateTime.utc_now()
     params = maybe_default_order(params, "application_date")
     {membership_filters, other_params} = extract_membership_filters(params)
-    {membership_sort, other_params} = extract_membership_sort(other_params)
-
-    {application_date_sort, other_params} =
-      extract_application_date_sort(other_params)
+    {order_by, order_directions, other_params} = extract_full_order(other_params)
 
     base_query =
       from(u in User, where: u.state != :deleted)
       |> build_membership_query_filter(membership_filters, now)
-      |> apply_membership_order_by(membership_sort, now)
-      |> apply_application_date_order_by(application_date_sort, now)
+      |> apply_user_order_by(order_by, order_directions, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
         meta =
-          restore_membership_filters(meta, membership_filters, membership_sort)
-          |> restore_application_date_sort(application_date_sort)
+          restore_membership_filters(meta, membership_filters)
+          |> restore_full_order(order_by, order_directions)
 
         {:ok,
          {preload_registration_forms(preload_active_subscriptions(users)), meta}}
@@ -1600,26 +1596,20 @@ defmodule Ysc.Accounts do
   def list_paginated_users(params, search_term) do
     now = DateTime.utc_now()
     {membership_filters, other_params} = extract_membership_filters(params)
-    {membership_sort, other_params} = extract_membership_sort(other_params)
+    {order_by, order_directions, other_params} = extract_full_order(other_params)
 
-    {application_date_sort, other_params} =
-      extract_application_date_sort(other_params)
-
-    has_explicit_sort =
-      explicit_sort?(other_params) or membership_sort != nil or
-        application_date_sort != nil
+    has_explicit_sort = order_by != []
 
     base_query =
       fuzzy_search_user(search_term, rank: !has_explicit_sort)
       |> build_membership_query_filter(membership_filters, now)
-      |> apply_membership_order_by(membership_sort, now)
-      |> apply_application_date_order_by(application_date_sort, now)
+      |> apply_user_order_by(order_by, order_directions, now)
 
     case Flop.validate_and_run(base_query, other_params, for: User) do
       {:ok, {users, meta}} ->
         meta =
-          restore_membership_filters(meta, membership_filters, membership_sort)
-          |> restore_application_date_sort(application_date_sort)
+          restore_membership_filters(meta, membership_filters)
+          |> restore_full_order(order_by, order_directions)
 
         {:ok,
          {preload_registration_forms(preload_active_subscriptions(users)), meta}}
@@ -2811,12 +2801,9 @@ defmodule Ysc.Accounts do
     end)
   end
 
-  defp restore_membership_filters(meta, nil, nil), do: meta
+  defp restore_membership_filters(meta, nil), do: meta
 
-  defp restore_membership_filters(meta, nil, membership_sort),
-    do: restore_membership_sort(meta, membership_sort)
-
-  defp restore_membership_filters(meta, membership_values, membership_sort) do
+  defp restore_membership_filters(meta, membership_values) do
     membership_flop_filter = %Flop.Filter{
       field: :membership_type,
       op: :in,
@@ -2826,30 +2813,6 @@ defmodule Ysc.Accounts do
     updated_flop = %{
       meta.flop
       | filters: meta.flop.filters ++ [membership_flop_filter]
-    }
-
-    %{meta | flop: updated_flop}
-    |> restore_membership_sort(membership_sort)
-  end
-
-  defp restore_membership_sort(meta, nil), do: meta
-
-  defp restore_membership_sort(
-         %Flop.Meta{} = meta,
-         {:membership_type, direction, index}
-       ) do
-    current_order_by = meta.flop.order_by || []
-    current_directions = meta.flop.order_directions || []
-
-    # Clamp index to valid range in case other sorts were removed by Flop validation.
-    safe_index = min(index, length(current_order_by))
-
-    updated_flop = %{
-      meta.flop
-      | order_by:
-          List.insert_at(current_order_by, safe_index, :membership_type),
-        order_directions:
-          List.insert_at(current_directions, safe_index, direction)
     }
 
     %{meta | flop: updated_flop}
@@ -3008,46 +2971,90 @@ defmodule Ysc.Accounts do
   end
 
   # Helper function to get membership type for filtering
-  # Helper function to extract membership_type sorting from params
-  defp extract_membership_sort(params) do
+
+  # `first_name`/`application_date`/`state`/`membership_type`/etc. can appear
+  # in any order in `order_by`, and some of them (membership_type,
+  # application_date) aren't real columns Flop can sort by directly, so they
+  # can't just be handed to Flop. Pulling the "special" fields out of the
+  # list and applying their raw-SQL sorts before/after Flop's own order_by
+  # (as this module used to do) breaks multi-column sorts, because Ecto's
+  # order_by is additive across query composition: whichever clause is added
+  # to the query first wins precedence, regardless of the field's original
+  # position in `order_by`. So instead we take over ordering entirely here,
+  # applying every field - real or computed - as one query composition in
+  # the exact sequence the caller asked for, and tell Flop not to order at
+  # all (`order_by: []`) so it doesn't also append its own clause.
+  defp extract_full_order(params) do
     case params do
       %{"order_by" => order_by, "order_directions" => order_directions}
       when is_list(order_by) and is_list(order_directions) ->
-        membership_sort_index =
-          Enum.find_index(order_by, &(&1 == "membership_type"))
+        new_params =
+          params
+          |> Map.put("order_by", [])
+          |> Map.put("order_directions", [])
 
-        if membership_sort_index do
-          direction =
-            order_directions
-            |> Enum.at(membership_sort_index, "asc")
-            |> then(fn
-              "desc" -> :desc
-              _ -> :asc
-            end)
-
-          new_order_by = List.delete_at(order_by, membership_sort_index)
-
-          new_order_directions =
-            List.delete_at(order_directions, membership_sort_index)
-
-          new_params =
-            params
-            |> Map.put("order_by", new_order_by)
-            |> Map.put("order_directions", new_order_directions)
-
-          # Include the original index so it can be restored at the correct
-          # position in meta.flop.order_by after Flop processes the query.
-          {{:membership_type, direction, membership_sort_index}, new_params}
-        else
-          {nil, params}
-        end
+        {order_by, order_directions, new_params}
 
       _ ->
-        {nil, params}
+        {[], [], params}
     end
   end
 
-  defp apply_membership_order_by(query, nil, _now), do: query
+  @user_order_known_fields ~w(email first_name last_name state role membership_type application_date)
+  @user_order_native_fields ~w(email first_name last_name state role)
+
+  defp apply_user_order_by(query, order_by, order_directions, now) do
+    order_by
+    |> Enum.zip(order_directions || [])
+    |> Enum.reduce(query, fn {field, direction}, acc ->
+      direction = if direction in ["desc", :desc], do: :desc, else: :asc
+      apply_user_order_term(acc, field, direction, now)
+    end)
+  end
+
+  defp apply_user_order_term(query, "membership_type", direction, now),
+    do: apply_membership_order_by(query, {:membership_type, direction, 0}, now)
+
+  defp apply_user_order_term(query, "application_date", direction, now) do
+    apply_application_date_order_by(
+      query,
+      {:application_date, direction, 0},
+      now
+    )
+  end
+
+  defp apply_user_order_term(query, field, direction, _now)
+       when field in @user_order_native_fields do
+    atom = String.to_existing_atom(field)
+    from(u in query, order_by: [{^direction, field(u, ^atom)}])
+  end
+
+  defp apply_user_order_term(query, _field, _direction, _now), do: query
+
+  # Reconstructs the full requested sort in `meta.flop` (used to drive the
+  # column sort arrows in the UI) since Flop itself was never given an
+  # order_by to work with - see `extract_full_order/1`.
+  defp restore_full_order(meta, [], _order_directions), do: meta
+
+  defp restore_full_order(%Flop.Meta{} = meta, order_by, order_directions) do
+    {fields, directions} =
+      order_by
+      |> Enum.zip(order_directions)
+      |> Enum.filter(fn {field, _} -> field in @user_order_known_fields end)
+      |> Enum.unzip()
+
+    updated_flop = %{
+      meta.flop
+      | order_by: Enum.map(fields, &String.to_existing_atom/1),
+        order_directions:
+          Enum.map(directions, fn
+            "desc" -> :desc
+            _ -> :asc
+          end)
+    }
+
+    %{meta | flop: updated_flop}
+  end
 
   defp apply_membership_order_by(
          query,

@@ -875,6 +875,47 @@ defmodule Ysc.AccountsTest do
       assert meta.flop.order_directions == [:asc, :desc]
     end
 
+    test "multi-column order_by respects the requested column precedence, not extraction order" do
+      # first_name is a real, native-sortable column; application_date is a
+      # computed field pulled out of the query before Flop sees it. Regression
+      # test for a bug where the computed field's raw SQL sort always won
+      # precedence over native fields, regardless of where it appeared in
+      # order_by — so a `first_name` sort silently did nothing whenever it was
+      # combined with `application_date` (or any other extracted field).
+      amy = user_fixture(%{phone_number: unique_user_phone(), first_name: "Amy"})
+
+      signup_application_fixture(amy, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -10, :day) |> DateTime.truncate(:second)
+      })
+
+      zoe = user_fixture(%{phone_number: unique_user_phone(), first_name: "Zoe"})
+
+      signup_application_fixture(zoe, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
+      })
+
+      params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "order_by" => ["first_name", "application_date"],
+        "order_directions" => ["asc", "desc"]
+      }
+
+      assert {:ok, {users, meta}} = Accounts.list_paginated_users(params)
+
+      assert meta.flop.order_by == [:first_name, :application_date]
+      assert meta.flop.order_directions == [:asc, :desc]
+
+      ids = Enum.map(users, & &1.id)
+
+      # first_name asc must dominate even though application_date (desc)
+      # would put Zoe (newer application) ahead of Amy (older application).
+      assert Enum.find_index(ids, &(&1 == amy.id)) <
+               Enum.find_index(ids, &(&1 == zoe.id))
+    end
+
     test "membership_type sort-only restores metadata at index 0 ahead of Flop defaults" do
       _user = user_fixture(%{phone_number: "+14159098270"})
 
@@ -887,11 +928,10 @@ defmodule Ysc.AccountsTest do
 
       assert {:ok, {_users, meta}} = Accounts.list_paginated_users(params)
 
-      # With membership_type stripped, Flop falls back to its default order
-      # ([:first_name, :last_name]). After restoration, membership_type is
-      # prepended at index 0 to reflect the user's original sort intent.
-      assert meta.flop.order_by == [:membership_type, :first_name, :last_name]
-      assert meta.flop.order_directions == [:asc, :asc, :asc]
+      # membership_type is applied directly (no Flop default order tacked
+      # on) since it's the only field the caller asked for.
+      assert meta.flop.order_by == [:membership_type]
+      assert meta.flop.order_directions == [:asc]
     end
 
     test "list_paginated_users/1 returns error for invalid Flop params" do
@@ -937,10 +977,10 @@ defmodule Ysc.AccountsTest do
 
       assert {:ok, {users, meta}} = Accounts.list_paginated_users(params)
 
-      # application_date is injected ahead of Flop's own default_order
-      # ([:first_name, :last_name]), same restoration pattern as membership_type.
-      assert meta.flop.order_by == [:application_date, :first_name, :last_name]
-      assert meta.flop.order_directions == [:desc, :asc, :asc]
+      # application_date is applied directly (no Flop default order tacked
+      # on) since it's the only field being sorted on.
+      assert meta.flop.order_by == [:application_date]
+      assert meta.flop.order_directions == [:desc]
 
       ids = Enum.map(users, & &1.id)
 
@@ -984,8 +1024,8 @@ defmodule Ysc.AccountsTest do
 
       assert {:ok, {users, meta}} = Accounts.list_paginated_users(params)
 
-      assert meta.flop.order_by == [:application_date, :first_name, :last_name]
-      assert meta.flop.order_directions == [:asc, :asc, :asc]
+      assert meta.flop.order_by == [:application_date]
+      assert meta.flop.order_directions == [:asc]
 
       ids = Enum.map(users, & &1.id)
 
