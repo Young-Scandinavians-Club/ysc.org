@@ -144,7 +144,7 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
 
       Enum.each(subs, fn sub ->
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.Subscription.update(sub.stripe_id, params)
+               stripe_subscription_module().update(sub.stripe_id, params)
              end) do
           {:ok, _} ->
             if on_board? do
@@ -220,6 +220,10 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   def stripe_pause_collection_params(on_board?) do
     stripe_sync_params(on_board?)
     |> Map.take([:pause_collection])
+  end
+
+  defp stripe_subscription_module do
+    Application.get_env(:ysc, :stripe_subscription_module, Stripe.Subscription)
   end
 
   defp list_membership_subscriptions_for_pause(%User{} = primary) do

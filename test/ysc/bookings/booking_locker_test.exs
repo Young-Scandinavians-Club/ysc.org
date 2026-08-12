@@ -2431,6 +2431,113 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "modify_complete_booking/3 Clear Lake per-guest (day mode) happy path" do
+    setup do
+      ensure_clear_lake_day_pricing_rule()
+      :ok
+    end
+
+    test "books held days and applies overlap extra guests when confirming a held modification",
+         %{user: user} do
+      {checkin, checkout} = locker_room_dates(920, 2)
+
+      assert {:ok, hold} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+      assert booking.status == :complete
+
+      extended_checkout = Date.add(checkout, 1)
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Ysc.Bookings.place_modification_hold(booking, attrs)
+
+      assert {:ok, updated} =
+               BookingLocker.modify_complete_booking(held_booking, attrs)
+
+      assert updated.status == :complete
+      assert updated.checkin_date == checkin
+      assert updated.checkout_date == extended_checkout
+      assert updated.guests_count == 4
+      assert is_nil(updated.modification_hold_expires_at)
+      assert is_nil(updated.modification_hold_attrs)
+
+      # Overlap days (every night of the original stay): released from the
+      # old 2-guest booking, then rebooked via the overlap_extra_guests path
+      # using the held extra capacity.
+      Date.range(checkin, Date.add(checkout, -1))
+      |> Enum.each(fn day ->
+        overlap_inv =
+          Ysc.Repo.get_by!(PropertyInventory, property: :clear_lake, day: day)
+
+        assert overlap_inv.capacity_booked == 4
+        assert overlap_inv.capacity_held == 0
+      end)
+
+      # New day: entirely new to the stay, booked via the from_held path
+      # using the capacity reserved when the hold was placed.
+      new_day_inv =
+        Ysc.Repo.get_by!(PropertyInventory,
+          property: :clear_lake,
+          day: checkout
+        )
+
+      assert new_day_inv.capacity_booked == 4
+      assert new_day_inv.capacity_held == 0
+    end
+
+    test "confirms new inventory directly when no modification hold is active",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = locker_room_dates(921, 2)
+
+      assert {:ok, hold} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+      assert booking.status == :complete
+
+      assert {:ok, updated} =
+               BookingLocker.modify_complete_booking(booking, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 3,
+                 children_count: 0
+               })
+
+      assert updated.guests_count == 3
+
+      Date.range(checkin, Date.add(checkout, -1))
+      |> Enum.each(fn day ->
+        inv =
+          Ysc.Repo.get_by!(PropertyInventory, property: :clear_lake, day: day)
+
+        assert inv.capacity_booked == 3
+        assert inv.capacity_held == 0
+      end)
+    end
+  end
+
   describe "create_per_guest_booking pricing_items (price_per_guest_per_night)" do
     test "includes computed price_per_guest_per_night in pricing_items", %{
       user: user
