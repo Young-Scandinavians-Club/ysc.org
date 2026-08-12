@@ -1375,15 +1375,24 @@ defmodule YscWeb.AccountSetupLive do
     else
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
+      previous_phone = user.phone_number
 
       case Accounts.update_user_phone_and_sms(user, user_params) do
         {:ok, updated_user} ->
+          phone_changed = updated_user.phone_number != previous_phone
           updated_user_needs = compute_user_needs(updated_user)
           next_step = next_setup_step(updated_user_needs)
 
           if updated_user_needs.phone_verification do
+            # A resubmit of this step (reconnect, back button, retry) with the
+            # same number must not mint a fresh code — that would invalidate
+            # a code already texted to the user.
             {:ok, _} =
-              VerificationCodes.issue(updated_user, :phone, suffix: "initial")
+              if phone_changed do
+                VerificationCodes.issue(updated_user, :phone, suffix: "initial")
+              else
+                VerificationCodes.ensure(updated_user, :phone, suffix: "initial")
+              end
 
             YscWeb.Flash.send_toast(
               :info,
