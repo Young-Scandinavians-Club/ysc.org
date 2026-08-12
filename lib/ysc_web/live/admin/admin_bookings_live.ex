@@ -4558,40 +4558,56 @@ defmodule YscWeb.AdminBookingsLive do
     case release_inventory_before_delete(booking) do
       :ok ->
         booking = Bookings.get_booking!(id)
-        Bookings.delete_booking(booking)
 
-        # Remove from stream if we're on the reservations section
-        socket =
-          if socket.assigns[:current_section] == :reservations do
-            socket
-            |> stream_delete(:reservations, booking)
-          else
-            # If not on reservations section, preserve date range and navigate
-            query_params = %{property: socket.assigns.selected_property}
+        case Bookings.delete_booking(booking) do
+          {:ok, _deleted} ->
+            Bookings.send_admin_deletion_notifications(
+              booking,
+              socket.assigns.current_user
+            )
 
-            query_params =
-              if socket.assigns[:calendar_start_date] &&
-                   socket.assigns[:calendar_end_date] do
-                Map.merge(query_params, %{
-                  from_date: Date.to_string(socket.assigns.calendar_start_date),
-                  to_date: Date.to_string(socket.assigns.calendar_end_date)
-                })
+            # Remove from stream if we're on the reservations section
+            socket =
+              if socket.assigns[:current_section] == :reservations do
+                socket
+                |> stream_delete(:reservations, booking)
               else
-                query_params
+                # If not on reservations section, preserve date range and navigate
+                query_params = %{property: socket.assigns.selected_property}
+
+                query_params =
+                  if socket.assigns[:calendar_start_date] &&
+                       socket.assigns[:calendar_end_date] do
+                    Map.merge(query_params, %{
+                      from_date:
+                        Date.to_string(socket.assigns.calendar_start_date),
+                      to_date: Date.to_string(socket.assigns.calendar_end_date)
+                    })
+                  else
+                    query_params
+                  end
+
+                socket
+                |> push_patch(
+                  to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
+                )
+                |> update_calendar_view(socket.assigns.selected_property)
               end
 
-            socket
-            |> push_patch(
-              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
-            )
-            |> update_calendar_view(socket.assigns.selected_property)
-          end
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully",
+               title: "Booking"
+             )}
 
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully",
-           title: "Booking"
-         )}
+          {:error, reason} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Failed to delete booking: #{inspect(reason)}"
+             )}
+        end
 
       {:error, reason} ->
         {:noreply,
