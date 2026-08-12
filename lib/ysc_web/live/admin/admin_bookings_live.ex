@@ -6510,7 +6510,7 @@ defmodule YscWeb.AdminBookingsLive do
 
   defp save_existing_admin_booking(
          socket,
-         %{status: :complete} = existing_booking,
+         %{status: :complete},
          %{"status" => :hold},
          _room_id,
          _rooms
