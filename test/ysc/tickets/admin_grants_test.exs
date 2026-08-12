@@ -56,6 +56,7 @@ defmodule Ysc.Tickets.AdminGrantsTest do
 
       assert order.user_id == member.id
       assert order.event_id == event.id
+      assert order.status == :completed
       assert order.total_amount == Money.new(0, :USD)
       assert order.discount_amount == Money.new(0, :USD)
       assert order.granted_by_id == admin.id
@@ -86,10 +87,11 @@ defmodule Ysc.Tickets.AdminGrantsTest do
       assert order.admin_grant_notes == "Migrated from legacy system"
     end
 
-    test "sets expires_at from the event end date/time when both are present", %{
-      admin: admin,
-      member: member
-    } do
+    test "sets expires_at from the event end date/time when both are present",
+         %{
+           admin: admin,
+           member: member
+         } do
       event =
         event_fixture(%{
           end_date: DateTime.truncate(DateTime.utc_now(), :second),
@@ -104,6 +106,10 @@ defmodule Ysc.Tickets.AdminGrantsTest do
                })
 
       [ticket] = order.tickets
+
+      assert DateTime.to_date(ticket.expires_at) ==
+               DateTime.to_date(event.end_date)
+
       assert ticket.expires_at.hour == 18
     end
 
@@ -119,6 +125,7 @@ defmodule Ysc.Tickets.AdminGrantsTest do
                })
 
       [ticket] = order.tickets
+
       assert DateTime.diff(ticket.expires_at, DateTime.utc_now(), :day) in 363..366
     end
 
@@ -155,7 +162,8 @@ defmodule Ysc.Tickets.AdminGrantsTest do
         member_fixture(%{
           first_name: "Jamie",
           last_name: "Rivera",
-          email: "jamie.rivera.#{System.unique_integer([:positive])}@example.com"
+          email:
+            "jamie.rivera.#{System.unique_integer([:positive])}@example.com"
         })
 
       tier =
@@ -237,11 +245,12 @@ defmodule Ysc.Tickets.AdminGrantsTest do
                )
     end
 
-    test "returns invalid_ticket_tier when a tier does not belong to the event", %{
-      admin: admin,
-      member: member,
-      event: event
-    } do
+    test "returns invalid_ticket_tier when a tier does not belong to the event",
+         %{
+           admin: admin,
+           member: member,
+           event: event
+         } do
       other_tier = ticket_tier_fixture()
 
       assert {:error, :invalid_ticket_tier} =
@@ -325,7 +334,7 @@ defmodule Ysc.Tickets.AdminGrantsTest do
          %{admin: admin, member: member, event: event} do
       tier = ticket_tier_fixture(%{event_id: event.id, quantity: 1})
 
-      assert {:error, _reason} =
+      assert {:error, :tier_validation_failed} =
                AdminGrants.grant_admin_tickets(admin.id, member.id, event.id, %{
                  tier.id => 2
                })

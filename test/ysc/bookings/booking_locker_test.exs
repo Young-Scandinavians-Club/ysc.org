@@ -2475,13 +2475,17 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert is_nil(updated.modification_hold_expires_at)
       assert is_nil(updated.modification_hold_attrs)
 
-      # Overlap day: released from the old 2-guest booking, then rebooked
-      # via the overlap_extra_guests path using the held extra capacity.
-      overlap_inv =
-        Ysc.Repo.get_by!(PropertyInventory, property: :clear_lake, day: checkin)
+      # Overlap days (every night of the original stay): released from the
+      # old 2-guest booking, then rebooked via the overlap_extra_guests path
+      # using the held extra capacity.
+      Date.range(checkin, Date.add(checkout, -1))
+      |> Enum.each(fn day ->
+        overlap_inv =
+          Ysc.Repo.get_by!(PropertyInventory, property: :clear_lake, day: day)
 
-      assert overlap_inv.capacity_booked == 4
-      assert overlap_inv.capacity_held == 0
+        assert overlap_inv.capacity_booked == 4
+        assert overlap_inv.capacity_held == 0
+      end)
 
       # New day: entirely new to the stay, booked via the from_held path
       # using the capacity reserved when the hold was placed.
@@ -2495,9 +2499,10 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert new_day_inv.capacity_held == 0
     end
 
-    test "confirms new inventory directly when no modification hold is active", %{
-      user: user
-    } do
+    test "confirms new inventory directly when no modification hold is active",
+         %{
+           user: user
+         } do
       {checkin, checkout} = locker_room_dates(921, 2)
 
       assert {:ok, hold} =

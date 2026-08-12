@@ -572,6 +572,28 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
     test "syncs every household with a board member exactly once" do
       {user, subscription} = board_user_with_stripe_subscription_for_all()
 
+      sub_account =
+        %Ysc.Accounts.User{}
+        |> Ysc.Accounts.User.sub_account_registration_changeset(
+          %{
+            email: "sub-board-#{System.unique_integer()}@example.com",
+            password: valid_user_password(),
+            first_name: "Sub",
+            last_name: "Board",
+            phone_number: unique_user_phone(),
+            date_of_birth: ~D[1990-01-01]
+          },
+          user.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Ysc.Repo.insert!()
+
+      {:ok, _sub_account} =
+        Ysc.Accounts.assign_board_position(sub_account, :secretary)
+
+      # Both `user` and `sub_account` resolve to the same primary household,
+      # so sync_all_board_households/0 must de-duplicate and call Stripe once.
       expect(Stripe.SubscriptionMock, :update, fn stripe_id, _params ->
         {:ok, Ysc.Stripe.SubscriptionFixtures.subscription(id: stripe_id)}
       end)
