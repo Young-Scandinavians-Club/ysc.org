@@ -945,6 +945,33 @@ defmodule Ysc.AccountsTest do
       assert Keyword.has_key?(errors, :limit)
     end
 
+    test "list_paginated_users/1 returns a Flop validation error for an unknown order_by field" do
+      # Unrecognized fields must still surface a proper Flop validation error
+      # instead of being silently dropped from the sort.
+      params = %{
+        "page" => "1",
+        "page_size" => "10",
+        "order_by" => ["not_a_real_field"],
+        "order_directions" => ["asc"]
+      }
+
+      assert {:error, %Flop.Meta{}} = Accounts.list_paginated_users(params)
+    end
+
+    test "list_paginated_users/1 defaults a missing direction to asc when order_directions is shorter than order_by" do
+      params = %{
+        "page" => "1",
+        "page_size" => "10",
+        "order_by" => ["first_name", "last_name"],
+        "order_directions" => ["desc"]
+      }
+
+      assert {:ok, {_users, meta}} = Accounts.list_paginated_users(params)
+
+      assert meta.flop.order_by == [:first_name, :last_name]
+      assert meta.flop.order_directions == [:desc, :asc]
+    end
+
     test "list_paginated_users/2 with nil search_term delegates to list_paginated_users/1" do
       _user = user_fixture(%{phone_number: "+14159098273"})
       params = %{page: 1, page_size: 10}

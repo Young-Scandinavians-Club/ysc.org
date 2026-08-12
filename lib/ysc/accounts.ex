@@ -2976,6 +2976,9 @@ defmodule Ysc.Accounts do
 
   # Helper function to get membership type for filtering
 
+  @user_order_known_fields ~w(email first_name last_name state role membership_type application_date)
+  @user_order_native_fields ~w(email first_name last_name state role)
+
   # `first_name`/`application_date`/`state`/`membership_type`/etc. can appear
   # in any order in `order_by`, and some of them (membership_type,
   # application_date) aren't real columns Flop can sort by directly, so they
@@ -2988,24 +2991,37 @@ defmodule Ysc.Accounts do
   # applying every field - real or computed - as one query composition in
   # the exact sequence the caller asked for, and tell Flop not to order at
   # all (`order_by: []`) so it doesn't also append its own clause.
+  #
+  # Only do this once every field is recognized - otherwise leave
+  # order_by/order_directions untouched so Flop's own validation rejects the
+  # request with a proper Flop.Meta error, same as it always has. A missing
+  # direction for a given field defaults to "asc", matching Flop's own
+  # leniency about mismatched order_by/order_directions lengths.
   defp extract_full_order(params) do
     case params do
       %{"order_by" => order_by, "order_directions" => order_directions}
       when is_list(order_by) and is_list(order_directions) ->
-        new_params =
-          params
-          |> Map.put("order_by", [])
-          |> Map.put("order_directions", [])
+        if Enum.all?(order_by, &(&1 in @user_order_known_fields)) do
+          padded_directions =
+            Enum.map(
+              0..(length(order_by) - 1)//1,
+              &Enum.at(order_directions, &1, "asc")
+            )
 
-        {order_by, order_directions, new_params}
+          new_params =
+            params
+            |> Map.put("order_by", [])
+            |> Map.put("order_directions", [])
+
+          {order_by, padded_directions, new_params}
+        else
+          {[], [], params}
+        end
 
       _ ->
         {[], [], params}
     end
   end
-
-  @user_order_known_fields ~w(email first_name last_name state role membership_type application_date)
-  @user_order_native_fields ~w(email first_name last_name state role)
 
   defp apply_user_order_by(query, order_by, order_directions, now) do
     order_by
