@@ -788,11 +788,15 @@ defmodule Ysc.Bookings.BookingLockerTest do
                    skip_reminders: true
                  )
 
+        cabin_master_email = Ysc.EmailConfig.booking_reply_to(:tahoe)
+
         assert_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
           args: %{
             "template" => "booking_confirmation",
-            "idempotency_key" => "booking_confirmation_#{booking.id}"
+            "idempotency_key" => "booking_confirmation_#{booking.id}",
+            "reply_to" => cabin_master_email,
+            "cc" => cabin_master_email
           }
         )
       end)
@@ -1729,6 +1733,38 @@ defmodule Ysc.Bookings.BookingLockerTest do
         assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
         assert confirmed.status == :complete
         assert Repo.get!(Booking, hold.id).status == :complete
+      end)
+    end
+
+    test "CCs cabin master and sets reply-to on confirmation email", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(416)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          4
+        )
+
+      cabin_master_email = Ysc.EmailConfig.booking_reply_to(:clear_lake)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
+        assert confirmed.status == :complete
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "booking_confirmation",
+            "idempotency_key" => "booking_confirmation_#{confirmed.id}",
+            "reply_to" => cabin_master_email,
+            "cc" => cabin_master_email
+          }
+        )
       end)
     end
   end
