@@ -2085,6 +2085,11 @@ defmodule Ysc.Bookings.BookingLocker do
         # Generate idempotency key
         idempotency_key = "booking_confirmation_#{booking.id}"
 
+        # Cabin master email for this property (cl@ysc.org / tahoe@ysc.org).
+        # CC'd so the cabin master receives the confirmation, and set as
+        # reply-to so a user reply (or reply-all) reaches them too.
+        cabin_master_email = Ysc.EmailConfig.booking_reply_to(booking.property)
+
         # Schedule email
         result =
           booking_confirmation_email_notifier().schedule_email(
@@ -2095,7 +2100,8 @@ defmodule Ysc.Bookings.BookingLocker do
             email_data,
             "",
             booking.user_id,
-            Ysc.EmailConfig.booking_reply_to(booking.property)
+            reply_to: cabin_master_email,
+            cc: cabin_master_email
           )
 
         case result do
