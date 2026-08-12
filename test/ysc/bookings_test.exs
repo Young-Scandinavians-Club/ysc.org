@@ -4735,6 +4735,38 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "send_admin_deletion_notifications/2" do
+    test "enqueues user confirmation and cabin master notification emails" do
+      deactivate_tahoe_buyout_refund_policies()
+
+      guest = user_fixture()
+      _cabin_master = assign_board!(user_fixture(), :tahoe_cabin_master)
+      admin = user_fixture()
+
+      checkin = Date.utc_today() |> Date.add(100) |> first_monday_on_or_after()
+      checkout = Date.add(checkin, 3)
+
+      booking =
+        complete_buyout_booking_with_stripe_payment!(guest, checkin, checkout)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Bookings.send_admin_deletion_notifications(booking, admin)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{"template" => "booking_cancellation_confirmation"}
+        )
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "booking_cancellation_cabin_master_notification"
+          }
+        )
+      end)
+    end
+  end
+
   describe "sync_hold_checkout_pricing/2" do
     test "updates pricing fields on an active hold" do
       booking =
