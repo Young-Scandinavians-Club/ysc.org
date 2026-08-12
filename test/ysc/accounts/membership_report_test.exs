@@ -252,6 +252,38 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert report.returning == []
     end
 
+    test "excludes a mid-window subscription when prior coverage had no current_period_end" do
+      user = user_fixture()
+      signup_application_fixture(user)
+
+      {:ok, _open_ended_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_open_ended_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2025-01-01 10:00:00Z],
+          current_period_end: nil
+        })
+
+      {:ok, _new_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_open_ended_new_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-03-15 10:00:00Z],
+          current_period_end: ~U[2027-03-15 10:00:00Z]
+        })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.purchased == 0
+      assert report.counts.returning == 0
+      assert report.purchased == []
+      assert report.returning == []
+    end
+
     test "a previously-accepted user rejected via a direct account-status edit shows as rejected" do
       admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
       user = user_fixture(%{state: :active})

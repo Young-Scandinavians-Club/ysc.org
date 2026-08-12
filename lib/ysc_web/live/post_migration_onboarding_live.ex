@@ -1085,13 +1085,24 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         socket =
           socket
           |> assign(:user, updated_user)
+          |> assign(:original_phone, updated_user.phone_number)
 
         cond do
           phone_needs_verification ->
+            # Re-saving the profile (e.g. a resubmit or reconnect) while the
+            # phone is still unverified must not mint a fresh code when the
+            # number hasn't actually changed — that silently invalidates a
+            # code already texted to the user and sitting in their inbox.
             {:ok, _} =
-              VerificationCodes.issue(updated_user, :phone,
-                suffix: "onboarding_initial"
-              )
+              if phone_changed do
+                VerificationCodes.issue(updated_user, :phone,
+                  suffix: "onboarding_initial"
+                )
+              else
+                VerificationCodes.ensure(updated_user, :phone,
+                  suffix: "onboarding_initial"
+                )
+              end
 
             YscWeb.Flash.send_toast(
               :info,

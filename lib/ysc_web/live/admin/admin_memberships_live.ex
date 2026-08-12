@@ -34,9 +34,14 @@ defmodule YscWeb.AdminMembershipsLive do
       )
       |> stream(:memberships, [], reset: true)
 
-    if connected?(socket) do
-      send(self(), :load_membership_stats)
-    end
+    socket =
+      if connected?(socket) do
+        start_async(socket, :load_membership_stats, fn ->
+          Accounts.get_membership_stats()
+        end)
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -94,11 +99,15 @@ defmodule YscWeb.AdminMembershipsLive do
   end
 
   @impl true
-  def handle_info(:load_membership_stats, socket) do
+  def handle_async(:load_membership_stats, {:ok, stats}, socket) do
     {:noreply,
      socket
-     |> assign(:stats, Accounts.get_membership_stats())
+     |> assign(:stats, stats)
      |> assign(:loading_stats?, false)}
+  end
+
+  def handle_async(:load_membership_stats, {:exit, _reason}, socket) do
+    {:noreply, assign(socket, :loading_stats?, false)}
   end
 
   @impl true
