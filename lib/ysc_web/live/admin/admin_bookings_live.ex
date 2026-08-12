@@ -6494,6 +6494,37 @@ defmodule YscWeb.AdminBookingsLive do
 
   defp save_existing_admin_booking(
          socket,
+         %{status: :hold} = existing_booking,
+         %{"status" => :complete} = booking_params,
+         room_id,
+         rooms
+       ) do
+    confirm_existing_admin_hold_booking(
+      socket,
+      existing_booking,
+      booking_params,
+      room_id,
+      rooms
+    )
+  end
+
+  defp save_existing_admin_booking(
+         socket,
+         %{status: :complete},
+         %{"status" => :hold},
+         _room_id,
+         _rooms
+       ) do
+    {:noreply,
+     YscWeb.Flash.put_toast(
+       socket,
+       :error,
+       "Cannot mark a complete booking as hold. Cancel the booking instead."
+     )}
+  end
+
+  defp save_existing_admin_booking(
+         socket,
          %{status: :complete} = existing_booking,
          booking_params,
          room_id,
@@ -6669,6 +6700,110 @@ defmodule YscWeb.AdminBookingsLive do
   # Cancel/refund releases inventory for the booking's *current* dates, so any
   # other field edits submitted in the same form (dates, guest counts, etc.)
   # are discarded - they'd be meaningless on a booking that's being canceled.
+  defp confirm_existing_admin_hold_booking(
+         socket,
+         booking,
+         booking_params,
+         room_id,
+         rooms
+       ) do
+    inventory_attrs = admin_booking_inventory_attrs(booking, booking_params)
+
+    booking_result =
+      if admin_inventory_relevant_change?(booking, inventory_attrs, rooms) do
+        BookingLocker.admin_modify_hold_booking(
+          booking,
+          inventory_attrs,
+          rooms: rooms
+        )
+      else
+        maybe_update_admin_hold_non_inventory_fields(
+          booking,
+          booking_params,
+          room_id,
+          rooms
+        )
+      end
+
+    case booking_result do
+      {:ok, updated_booking} ->
+        case BookingLocker.confirm_booking(updated_booking.id) do
+          {:ok, _confirmed} ->
+            {:noreply,
+             admin_booking_save_success(
+               socket,
+               "updated",
+               "Booking confirmed successfully."
+             )}
+
+          {:error, {:error, changeset}}
+          when is_struct(changeset, Ecto.Changeset) ->
+            {:noreply,
+             assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            {:noreply,
+             assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+          {:error, reason} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Failed to confirm booking: #{inspect(reason)}"
+             )}
+        end
+
+      {:error, {:error, changeset}}
+      when is_struct(changeset, Ecto.Changeset) ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, :blackout_conflict} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Cannot confirm booking: selected dates overlap a blackout period."
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to update booking before confirmation: #{inspect(reason)}"
+         )}
+    end
+  end
+
+  defp maybe_update_admin_hold_non_inventory_fields(
+         booking,
+         booking_params,
+         _room_id,
+         _rooms
+       ) do
+    children_count =
+      parse_integer(
+        booking_params["children_count"],
+        booking.children_count || 0
+      )
+
+    if children_count == (booking.children_count || 0) do
+      {:ok, booking}
+    else
+      Bookings.update_booking(
+        booking,
+        %{children_count: children_count},
+        skip_validation: true
+      )
+    end
+  end
+
   defp cancel_or_refund_existing_admin_booking(
          socket,
          %{status: :hold} = booking,
