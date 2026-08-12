@@ -21,6 +21,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 21 (HIGH)     Paid ticket checkout bypassed via checkout=free URL / confirm-free-tickets
   Finding 22 (MEDIUM)   Kiosk check-in API accepted ineligible bookings (draft/canceled/future)
   Finding 23 (MEDIUM)   Kiosk bookings index exported full history without date bounds
+  Finding 29 (MEDIUM)   Kiosk bookings index/calendar bypassed date window via explicit wide ranges
   Finding 24 (MEDIUM)   Ticket payment intents did not bind metadata to order/user
   Finding 25 (MEDIUM)   User settings verification lacks attempt rate limits; phone change lacks step-up reauth
   Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
@@ -1810,6 +1811,57 @@ defmodule YscWeb.SecurityAuditTest do
       assert %{"data" => bookings} = json_response(response, 200)
 
       refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 29 (MEDIUM): Explicit kiosk date ranges must not bypass the bounded window
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 29: kiosk bookings explicit date range cap" do
+    import Ysc.BookingsFixtures
+    import Ysc.AccountsFixtures
+
+    @kiosk_key "security-audit-kiosk-key"
+
+    setup do
+      original = KioskAPIKeyHelper.capture_kiosk_api_key!(@kiosk_key)
+
+      on_exit(fn -> KioskAPIKeyHelper.restore_kiosk_api_key!(original) end)
+
+      :ok
+    end
+
+    test "index rejects an explicit multi-year date range", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+        |> put_req_header("accept", "application/json")
+
+      response =
+        get(
+          conn,
+          ~p"/api/v1/mobile/bookings?property=tahoe&start_date=2000-01-01&end_date=2099-12-31"
+        )
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "date range cannot exceed"
+    end
+
+    test "calendar rejects an explicit multi-year date range", %{conn: conn} do
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+        |> put_req_header("accept", "application/json")
+
+      response =
+        get(
+          conn,
+          ~p"/api/v1/mobile/bookings/calendar?property=tahoe&start_date=2000-01-01&end_date=2099-12-31"
+        )
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "date range cannot exceed"
     end
   end
 
