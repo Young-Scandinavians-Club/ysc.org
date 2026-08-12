@@ -64,7 +64,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       html = render_click(lv, "next-step")
 
       assert html =~
-               "Please specify your eligibility where appropriate (minimum one required)"
+               "Tell us about your connection to Scandinavia (answer at least one)"
 
       assert html =~ "Tell us about your connection to Scandinavia/the Nordics"
     end

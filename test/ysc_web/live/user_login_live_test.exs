@@ -64,7 +64,7 @@ defmodule YscWeb.UserLoginLiveTest do
       {:ok, lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Having trouble signing in?"
-      assert html =~ "Try another sign-in option below"
+      assert html =~ "Try email and password below, or use Google, Facebook, or passkey above"
       assert html =~ "Reset your password"
       assert html =~ "Contact us for help"
       assert has_element?(lv, "#failed-login-banner")

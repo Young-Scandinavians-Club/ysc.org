@@ -466,7 +466,7 @@ defmodule YscWeb.FamilyManagementLive do
           Add their details first, then send an invite so they can sign in.
         </p>
         <p id="family-member-limit" class="text-xs text-zinc-500 mt-2">
-          Limit: 1 spouse, up to 9 children
+          Limit: 1 spouse or partner, up to 9 children
         </p>
       </div>
       <.button

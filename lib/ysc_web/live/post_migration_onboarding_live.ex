@@ -236,7 +236,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Welcome back — let's make sure your details are up to date
         <:subtitle>
-          Welcome back! Please review your contact details below and update anything that's out of date. This helps us keep your membership and bookings on track.
+          Please review your contact details and update anything that's out of date. This helps us keep your membership and bookings on track.
         </:subtitle>
       </.header>
 

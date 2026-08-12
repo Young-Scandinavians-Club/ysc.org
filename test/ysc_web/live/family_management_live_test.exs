@@ -95,7 +95,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
       assert has_element?(
                view,
                "#family-member-limit",
-               "Limit: 1 spouse, up to 9 children"
+               "Limit: 1 spouse or partner, up to 9 children"
              )
 
       assert has_element?(view, "#add-family-member-button")

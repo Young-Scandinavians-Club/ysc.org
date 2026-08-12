@@ -336,7 +336,7 @@ defmodule YscWeb.UserRegistrationLive do
                   required
                 />
                 <.header class="text-left pt-4">
-                  Please specify your eligibility where appropriate (minimum one required)
+                  Tell us about your connection to Scandinavia (answer at least one)
                 </.header>
                 <.input
                   field={rf[:link_to_scandinavia]}
