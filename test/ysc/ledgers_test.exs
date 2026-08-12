@@ -6483,6 +6483,139 @@ defmodule Ysc.LedgersTest do
 
       assert row.description == "Free Tickets: Lake Day Gala"
     end
+
+    test "list_all_user_payments/1 enriches a paid event payment with its ticket order and event title",
+         %{user: user} do
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture(%{title: "Winter Formal"})
+
+      {:ok, tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "General Admission",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 20,
+          event_id: event.id
+        })
+
+      assert {:ok, ticket_order} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 2})
+
+      assert {:ok, {payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: Money.new(10_000, :USD),
+                 entity_type: :event,
+                 entity_id: event.id,
+                 external_payment_id:
+                   "pi_event_enrich_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(100, :USD),
+                 description: "Event tickets",
+                 property: nil,
+                 payment_method_id: nil
+               })
+
+      ticket_order
+      |> Ecto.Changeset.change(payment_id: payment.id)
+      |> Repo.update!()
+
+      items = Ledgers.list_all_user_payments(user.id)
+
+      row =
+        Enum.find(items, fn row ->
+          row.payment && row.payment.id == payment.id
+        end)
+
+      assert row.type == :ticket
+      assert row.event.id == event.id
+      assert row.description == "Winter Formal - 2 tickets"
+    end
+
+    test "list_all_user_payments/1 enriches a booking payment with the booking and property name",
+         %{user: user} do
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      assert {:ok, {payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: Money.new(20_000, :USD),
+                 entity_type: :booking,
+                 entity_id: booking.id,
+                 external_payment_id:
+                   "pi_booking_enrich_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(200, :USD),
+                 description: "Cabin booking",
+                 property: :tahoe,
+                 payment_method_id: nil
+               })
+
+      items = Ledgers.list_all_user_payments(user.id)
+
+      row =
+        Enum.find(items, fn row ->
+          row.payment && row.payment.id == payment.id
+        end)
+
+      assert row.booking.id == booking.id
+      assert row.description == "Tahoe Booking"
+    end
+
+    test "list_all_user_payments/1 enriches a membership payment with the subscription plan",
+         %{user: user} do
+      single_plan =
+        :ysc
+        |> Application.fetch_env!(:membership_plans)
+        |> Enum.find(&(&1.id == :single))
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_ledger_enrich_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership"
+        })
+
+      {:ok, _item} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_ledger_enrich_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_single",
+          stripe_price_id: single_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      assert {:ok, {payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: Money.new(5_000, :USD),
+                 entity_type: :membership,
+                 entity_id: subscription.id,
+                 external_payment_id:
+                   "pi_membership_enrich_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(50, :USD),
+                 description: "Membership renewal",
+                 property: nil,
+                 payment_method_id: nil
+               })
+
+      items = Ledgers.list_all_user_payments(user.id)
+
+      row =
+        Enum.find(items, fn row ->
+          row.payment && row.payment.id == payment.id
+        end)
+
+      assert row.type == :membership
+      assert row.subscription.id == subscription.id
+      assert row.description == "Membership Payment - Single"
+    end
   end
 end
 
