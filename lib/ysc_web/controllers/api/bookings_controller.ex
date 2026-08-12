@@ -16,6 +16,9 @@ defmodule YscWeb.Api.BookingsController do
   # Prevents unbounded export of full booking history if the shared bearer token leaks.
   @default_index_past_days 7
   @default_index_future_days 30
+  # Explicit start_date/end_date are capped so a leaked bearer token cannot page through
+  # decades of booking history in one request (Finding 23 follow-up).
+  @max_date_range_days 90
 
   @doc """
   List bookings for a given property and optional date range.
@@ -31,8 +34,8 @@ defmodule YscWeb.Api.BookingsController do
     default_end = Date.add(today, @default_index_future_days)
 
     with {:ok, property} <- parse_property(params),
-         {:ok, start_date} <- parse_date(params, "start_date", default_start),
-         {:ok, end_date} <- parse_date(params, "end_date", default_end) do
+         {:ok, {start_date, end_date}} <-
+           parse_date_range(params, default_start, default_end) do
       bookings =
         Bookings.list_bookings(property, start_date, end_date,
           preload: [
@@ -61,8 +64,8 @@ defmodule YscWeb.Api.BookingsController do
     default_end = Date.add(today, 30)
 
     with {:ok, property} <- parse_property(params),
-         {:ok, start_date} <- parse_date(params, "start_date", default_start),
-         {:ok, end_date} <- parse_date(params, "end_date", default_end) do
+         {:ok, {start_date, end_date}} <-
+           parse_date_range(params, default_start, default_end) do
       bookings =
         Bookings.list_bookings(property, start_date, end_date,
           preload: [
@@ -117,6 +120,15 @@ defmodule YscWeb.Api.BookingsController do
     {:error, :missing_property}
   end
 
+  defp parse_date_range(params, default_start, default_end) do
+    with {:ok, start_date} <- parse_date(params, "start_date", default_start),
+         {:ok, end_date} <- parse_date(params, "end_date", default_end),
+         :ok <- validate_date_order(start_date, end_date),
+         :ok <- validate_date_range_span(start_date, end_date) do
+      {:ok, {start_date, end_date}}
+    end
+  end
+
   defp parse_date(params, key, default) do
     case Map.get(params, key) do
       nil ->
@@ -130,6 +142,23 @@ defmodule YscWeb.Api.BookingsController do
           {:ok, date} -> {:ok, date}
           {:error, _} -> {:error, {:invalid_date, key}}
         end
+    end
+  end
+
+  defp validate_date_order(start_date, end_date) do
+    if Date.compare(start_date, end_date) == :gt do
+      {:error, "start_date must be on or before end_date"}
+    else
+      :ok
+    end
+  end
+
+  defp validate_date_range_span(start_date, end_date) do
+    if Date.diff(end_date, start_date) > @max_date_range_days do
+      {:error,
+       "date range cannot exceed #{@max_date_range_days} days. Omit dates to use the default window."}
+    else
+      :ok
     end
   end
 end
