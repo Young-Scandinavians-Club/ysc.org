@@ -2077,6 +2077,42 @@ defmodule Ysc.Bookings do
     result
   end
 
+  @doc """
+  Sends the booking cancellation confirmation (to the booking owner) and the
+  cabin master/treasurer notifications for a booking an admin is deleting
+  directly from the admin panel, bypassing the normal `cancel_booking/3`
+  refund flow.
+
+  Unlike `cancel_booking/3`, this does not change the booking's status or
+  process any refund — it only reuses the existing cancellation emails so
+  the owner and cabin master aren't left in the dark when a booking
+  disappears. Call this before the booking row is deleted.
+  """
+  def send_admin_deletion_notifications(%Booking{} = booking, admin) do
+    payment =
+      case get_booking_payment(booking) do
+        {:ok, payment} -> payment
+        _ -> nil
+      end
+
+    reason =
+      if admin && admin.email do
+        "Booking deleted by administrator (#{admin.email})"
+      else
+        "Booking deleted by administrator"
+      end
+
+    send_booking_cancellation_confirmation_email(
+      booking,
+      payment,
+      Money.new(0, :USD),
+      false,
+      reason
+    )
+
+    send_booking_cancellation_notifications(booking, payment, nil, reason)
+  end
+
   ## Booking Guests
 
   @doc """

@@ -4558,6 +4558,12 @@ defmodule YscWeb.AdminBookingsLive do
     case release_inventory_before_delete(booking) do
       :ok ->
         booking = Bookings.get_booking!(id)
+
+        Bookings.send_admin_deletion_notifications(
+          booking,
+          socket.assigns.current_user
+        )
+
         Bookings.delete_booking(booking)
 
         # Remove from stream if we're on the reservations section
