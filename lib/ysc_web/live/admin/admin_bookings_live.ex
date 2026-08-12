@@ -7314,23 +7314,42 @@ defmodule YscWeb.AdminBookingsLive do
 
     calendar_dates = generate_calendar_dates(start_date, end_date)
 
-    # Parallelize blackouts and bookings queries for better performance
-    [filtered_blackouts, bookings_in_range] =
-      Task.await_many(
-        [
-          Task.async(fn ->
-            Bookings.list_blackouts(property, start_date, end_date)
-          end),
-          Task.async(fn ->
-            Bookings.list_bookings(property, start_date, end_date,
-              preload: [:rooms, user: :current_avatar],
-              exclude_statuses: [:canceled, :refunded],
-              exclude_booking_modes: [:day]
-            )
-          end)
-        ],
-        :infinity
-      )
+    # Parallelize blackouts, bookings, and (for Clear Lake) daily availability
+    calendar_tasks =
+      [
+        Task.async(fn ->
+          Bookings.list_blackouts(property, start_date, end_date)
+        end),
+        Task.async(fn ->
+          Bookings.list_bookings(property, start_date, end_date,
+            preload: [:rooms, user: :current_avatar],
+            exclude_statuses: [:canceled, :refunded],
+            exclude_booking_modes: [:day]
+          )
+        end)
+      ] ++
+        if property == :clear_lake do
+          [
+            Task.async(fn ->
+              Bookings.get_clear_lake_daily_availability(start_date, end_date)
+            end)
+          ]
+        else
+          []
+        end
+
+    calendar_results = Task.await_many(calendar_tasks, :infinity)
+
+    {filtered_blackouts, bookings_in_range, daily_availability} =
+      case property do
+        :clear_lake ->
+          [blackouts, bookings, availability] = calendar_results
+          {blackouts, bookings, availability}
+
+        _ ->
+          [blackouts, bookings] = calendar_results
+          {blackouts, bookings, %{}}
+      end
 
     # Separate room bookings from buyout bookings.
     # Day/spot bookings (Clear Lake) are shown via daily_availability, not the buyout row.
@@ -7343,14 +7362,6 @@ defmodule YscWeb.AdminBookingsLive do
       Enum.filter(bookings_in_range, fn booking ->
         booking.booking_mode == :buyout
       end)
-
-    # Calculate daily availability for Clear Lake (per guest/day mode)
-    daily_availability =
-      if property == :clear_lake do
-        Bookings.get_clear_lake_daily_availability(start_date, end_date)
-      else
-        %{}
-      end
 
     socket
     |> assign(:filtered_rooms, filtered_rooms)

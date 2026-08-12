@@ -4319,6 +4319,52 @@ defmodule Ysc.AccountsTest do
 
       assert Enum.any?(users, &(&1.id == user.id))
     end
+
+    test "search path respects multi-column sort precedence for native + computed fields" do
+      amy =
+        user_fixture(%{
+          first_name: "SortAmy",
+          last_name: "Searchable",
+          phone_number: unique_user_phone()
+        })
+
+      signup_application_fixture(amy, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -10, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      zoe =
+        user_fixture(%{
+          first_name: "SortZoe",
+          last_name: "Searchable",
+          phone_number: unique_user_phone()
+        })
+
+      signup_application_fixture(zoe, %{
+        completed:
+          DateTime.add(DateTime.utc_now(), -1, :day)
+          |> DateTime.truncate(:second)
+      })
+
+      params = %{
+        "page" => "1",
+        "page_size" => "50",
+        "order_by" => ["first_name", "application_date"],
+        "order_directions" => ["asc", "desc"]
+      }
+
+      assert {:ok, {users, meta}} =
+               Accounts.list_paginated_users(params, "Searchable")
+
+      assert meta.flop.order_by == [:first_name, :application_date]
+      assert meta.flop.order_directions == [:asc, :desc]
+
+      ids = Enum.map(users, & &1.id)
+
+      assert Enum.find_index(ids, &(&1 == amy.id)) <
+               Enum.find_index(ids, &(&1 == zoe.id))
+    end
   end
 
   describe "coverage — get_user_by_phone_number/1 and update_newsletter_on_email_change/3" do
