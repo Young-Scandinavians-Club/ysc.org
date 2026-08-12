@@ -2887,6 +2887,32 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert state.socket.assigns.form_errors.general =~
                "couldn't book with the option you selected"
     end
+
+    test "price breakdown labels day bookings as shared cabin stay", %{
+      conn: conn
+    } do
+      ensure_clear_lake_pricing_rules!()
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {checkin, checkout} = clear_lake_booking_dates(35, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "2",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+        )
+
+      render_async(view, 5_000)
+      assert render(view) =~ "Shared cabin stay"
+    end
   end
 
   # Helper function for finding next weekday

@@ -1766,4 +1766,59 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert version_after_availability != version_after_rooms
     end
   end
+
+  describe "create-booking changeset errors" do
+    test "shows validation message when dates are inverted on submit", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      tahoe_rooms =
+        Bookings.list_rooms(:tahoe)
+        |> Enum.filter(& &1.is_active)
+
+      if tahoe_rooms != [] do
+        room = List.first(tahoe_rooms)
+        {checkin, checkout} = tahoe_booking_dates(45)
+
+        params = %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout),
+          "booking_mode" => "room",
+          "room_id" => Integer.to_string(room.id),
+          "guests" => "2"
+        }
+
+        {:ok, view, _html} =
+          live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+        :sys.replace_state(view.pid, fn %{socket: socket} = state ->
+          assigns =
+            Map.merge(socket.assigns, %{
+              checkin_date: checkout,
+              checkout_date: checkin
+            })
+
+          %{state | socket: %{socket | assigns: assigns}}
+        end)
+
+        render_async(view, 5_000)
+        render_click(view, "create-booking", %{})
+        state = :sys.get_state(view.pid)
+
+        assert state.socket.assigns.price_error =~
+                 "check-out date must be on or after check-in date"
+      end
+    end
+  end
 end

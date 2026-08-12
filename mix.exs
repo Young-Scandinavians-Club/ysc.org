@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.18.0",
+      version: "2.19.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -229,7 +229,7 @@ defmodule Ysc.MixProject do
       {:finch, "~> 0.21"},
       {:floki, "~> 0.38"},
       {:flop, "~> 0.26.6"},
-      {:flop_phoenix, "~> 0.26"},
+      {:flop_phoenix, "~> 0.26.2"},
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
       {:goth, "~> 1.4"},
@@ -261,7 +261,7 @@ defmodule Ysc.MixProject do
       {:phoenix_test, "~> 0.11", only: :test, runtime: false},
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+
-      {:phoenix, "~> 1.8.10"},
+      {:phoenix, "~> 1.8.11"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},

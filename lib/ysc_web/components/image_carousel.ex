@@ -36,27 +36,47 @@ defmodule YscWeb.Components.ImageCarousel do
   Wraps `image_carousel/1` in the `ImageCarouselAutoplay` hook container used on
   booking page hero sections.
 
+  Pass `flag_grid_id` to also render `YscWeb.CoreComponents.hero_flag_grid/1` behind
+  the media (same treatment as the plain `hero/1` component).
+
   ## Examples
 
       <.image_carousel_hero_background
         wrapper_id="clear-lake-carousel-wrapper"
         carousel_id="about-the-clear-lake-cabin-carousel"
         images={clear_lake_hero_carousel_images()}
+        flag_grid_id="clear-lake-hero-flag-grid"
       />
   """
+  attr :wrapper_id, :string,
+    required: true,
+    doc: "Unique ID for the ImageCarouselAutoplay hook container"
+
+  attr :carousel_id, :string,
+    required: true,
+    doc: "Unique ID passed through to image_carousel/1"
+
+  attr :images, :list, required: true, doc: "See image_carousel/1"
+
+  attr :overlay_class, :string,
+    default: "absolute inset-0 z-[5] bg-black/40 pointer-events-none",
+    doc: "Overrides the default dark overlay classes"
+
+  attr :flag_grid_id, :string,
+    default: nil,
+    doc: "If set, renders hero_flag_grid/1 with this id behind the media"
+
   def image_carousel_hero_background(assigns) do
     first = List.first(assigns.images) || %{}
 
     assigns =
       assigns
-      |> assign_new(:overlay_class, fn ->
-        "absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-      end)
       |> assign(:bleed_src, first[:src] || first["src"])
       |> assign(:bleed_srcset, first[:srcset] || first["srcset"])
 
     ~H"""
     <div id={@wrapper_id} phx-hook="ImageCarouselAutoplay" class="hero-media-stage">
+      <YscWeb.CoreComponents.hero_flag_grid :if={@flag_grid_id} id={@flag_grid_id} />
       <div :if={@bleed_src} class="hero-media-stage__bleed" aria-hidden="true">
         <img
           src={@bleed_src}

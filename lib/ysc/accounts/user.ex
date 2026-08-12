@@ -417,7 +417,10 @@ defmodule Ysc.Accounts.User do
            true <- PhoneNumber.possible_phone_number?(phone_number),
            true <- PhoneNumber.valid_phone_number?(phone_number) do
         phone_number = PhoneNumber.format_phone_number(phone_number, :e164)
-        put_change(changeset, :phone_number, phone_number)
+
+        changeset
+        |> put_change(:phone_number, phone_number)
+        |> reset_phone_verification_if_number_changed()
       else
         {:error, message} ->
           add_error(changeset, :phone_number, message)
@@ -442,7 +445,10 @@ defmodule Ysc.Accounts.User do
            true <- PhoneNumber.possible_phone_number?(phone_number),
            true <- PhoneNumber.valid_phone_number?(phone_number) do
         phone_number = PhoneNumber.format_phone_number(phone_number, :e164)
-        put_change(changeset, :phone_number, phone_number)
+
+        changeset
+        |> put_change(:phone_number, phone_number)
+        |> reset_phone_verification_if_number_changed()
       else
         {:error, message} ->
           add_error(changeset, :phone_number, message)
@@ -454,6 +460,21 @@ defmodule Ysc.Accounts.User do
             "Sorry, that does not look like a valid phone number"
           )
       end
+    end
+  end
+
+  # A verified stamp only vouches for the number it was set on. If the
+  # normalized number differs from what's persisted, the new number hasn't
+  # been verified yet, so any stale timestamp from a prior number must not
+  # carry over.
+  defp reset_phone_verification_if_number_changed(changeset) do
+    new_number = get_change(changeset, :phone_number)
+    original_number = changeset.data.phone_number
+
+    if new_number && new_number != original_number do
+      put_change(changeset, :phone_verified_at, nil)
+    else
+      changeset
     end
   end
 

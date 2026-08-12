@@ -16,6 +16,22 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     %{conn: log_in_user(conn, user), admin: user}
   end
 
+  # Opening the calendar focuses the visible month on the event's existing
+  # start_date, not on today - so any date button computed relative to
+  # `Date.utc_today()` may fall outside that view whenever the event's start
+  # date and "today" land in different calendar months (which depends on
+  # what day of the month the suite happens to run on). Jump to the current
+  # month via the picker's own "Today" button before looking for such a
+  # button, mirroring how a real user would navigate there. The button is
+  # disabled (a no-op click) when already showing the current month.
+  defp go_to_today(view, id \\ "event_date") do
+    if has_element?(view, ~s|##{id}-go-to-today:not([disabled])|) do
+      view |> element(~s|##{id}-go-to-today|) |> render_click()
+    end
+
+    view
+  end
+
   describe "mount" do
     setup [:create_admin]
 
@@ -107,6 +123,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert has_element?(view, "#event_date_calendar")
 
+      go_to_today(view)
+
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
       |> render_click()
@@ -166,6 +184,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
 
+      go_to_today(view)
+
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
       |> render_click()
@@ -210,6 +230,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       view
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
+
+      go_to_today(view)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
@@ -275,6 +297,10 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       |> element(~s|#event_date_calendar button[phx-value-date="#{later_iso}"]|)
       |> render_click()
 
+      # The calendar is still showing `later`'s month; jump to today's month
+      # before looking for `earlier`'s button.
+      go_to_today(view)
+
       assert has_element?(
                view,
                ~s|#event_date_calendar button[phx-value-date="#{earlier_iso}"]:not([disabled])|
@@ -328,6 +354,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       view
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
+
+      go_to_today(view)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
@@ -386,6 +414,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       view
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
+
+      go_to_today(view)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)

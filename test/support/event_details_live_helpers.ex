@@ -13,6 +13,43 @@ defmodule EventDetailsLiveHelpers do
 
   alias Ysc.Repo
 
+  @pacific_timezone "America/Los_Angeles"
+
+  @doc """
+  Builds event fixture attrs for an event that is live at the current Pacific time.
+
+  Brackets wall clock with start/end times on today's Pacific calendar date so CI
+  does not flake near midnight (Time.add/2 wrap) or at day boundaries.
+  """
+  def live_pacific_event_fixture_attrs(overrides \\ %{}) do
+    pacific_now = DateTime.now!(@pacific_timezone)
+    today = DateTime.to_date(pacific_now)
+    now_time = DateTime.to_time(pacific_now)
+
+    {start_time, end_time} =
+      cond do
+        Time.compare(now_time, ~T[02:00:00]) == :lt ->
+          {~T[00:00:00], ~T[23:59:59]}
+
+        Time.compare(now_time, ~T[22:00:00]) != :lt ->
+          {~T[00:00:00], ~T[23:59:59]}
+
+        true ->
+          {Time.add(now_time, -2, :hour), Time.add(now_time, 2, :hour)}
+      end
+
+    Map.merge(
+      %{
+        state: :published,
+        start_date: DateTime.new!(today, ~T[00:00:00], "Etc/UTC"),
+        start_time: start_time,
+        end_time: end_time,
+        published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      },
+      overrides
+    )
+  end
+
   @doc """
   Builds a Stripe PaymentIntent for testing.
 

@@ -527,6 +527,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           wrapper_id="clear-lake-carousel-wrapper"
           carousel_id="about-the-clear-lake-cabin-carousel-logged-in"
           images={clear_lake_hero_carousel_images()}
+          flag_grid_id="clear-lake-hero-flag-grid-member"
         />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-16 pointer-events-none">
@@ -1278,11 +1279,15 @@ defmodule YscWeb.ClearLakeBookingLive do
                               |> elem(1) %>
                           <div class="flex justify-between items-center text-zinc-600">
                             <span>
-                              Spot Rental ({@guests_count} {if @guests_count == 1,
-                                do: "adult",
-                                else: "adults"} × {nights} {if nights == 1,
-                                do: "night",
-                                else: "nights"})
+                              Shared cabin stay ({@guests_count} {if @guests_count ==
+                                                                       1,
+                                                                     do: "adult",
+                                                                     else: "adults"} × {nights} {if nights ==
+                                                                                                      1,
+                                                                                                    do:
+                                                                                                      "night",
+                                                                                                    else:
+                                                                                                      "nights"})
                             </span>
                             <span class="font-bold text-zinc-900">
                               {MoneyHelper.format_money!(line_gross)}
@@ -2410,6 +2415,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           wrapper_id="clear-lake-carousel-wrapper-nonuser"
           carousel_id="about-the-clear-lake-cabin-carousel"
           images={clear_lake_hero_carousel_images()}
+          flag_grid_id="clear-lake-hero-flag-grid-guest"
         />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-20 pointer-events-none">
@@ -2861,7 +2867,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         form_errors = format_errors(changeset)
-        error_message = "Please fix the errors above and try again."
+        error_message = booking_changeset_error_message(changeset)
 
         {:noreply,
          socket
@@ -2869,13 +2875,13 @@ defmodule YscWeb.ClearLakeBookingLive do
          |> assign(
            form_errors: form_errors,
            calculated_price: nil,
-           price_error: "Please fix the errors above"
+           price_error: error_message
          )}
 
       {:error, {:error, %Ecto.Changeset{} = changeset}} ->
         # Handle nested error from Repo.rollback({:error, changeset})
         form_errors = format_errors(changeset)
-        error_message = "Please fix the errors above and try again."
+        error_message = booking_changeset_error_message(changeset)
 
         {:noreply,
          socket
@@ -2883,7 +2889,7 @@ defmodule YscWeb.ClearLakeBookingLive do
          |> assign(
            form_errors: form_errors,
            calculated_price: nil,
-           price_error: "Please fix the errors above"
+           price_error: error_message
          )}
 
       {:error, {:error, reason}} when is_atom(reason) ->
@@ -3209,6 +3215,20 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp format_errors(changeset),
     do: YscWeb.FormHelpers.changeset_errors(changeset)
+
+  defp booking_changeset_error_message(changeset) do
+    message =
+      YscWeb.FormHelpers.format_changeset_errors(changeset,
+        field_format: :humanize,
+        style: :flat
+      )
+
+    if message == "" do
+      "We couldn't complete this booking. Check your dates and guest details, then try again."
+    else
+      message
+    end
+  end
 
   defp check_booking_eligibility(nil) do
     sign_in_path = ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"

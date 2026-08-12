@@ -753,7 +753,7 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "text-zinc-400"
                             )
                           }>
-                            Spot Rental
+                            Shared cabin stay
                             ({@price_breakdown.guests_count} {if @price_breakdown.guests_count ==
                                                                    1,
                                                                  do: "adult",

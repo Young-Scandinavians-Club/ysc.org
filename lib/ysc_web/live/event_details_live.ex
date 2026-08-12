@@ -754,7 +754,7 @@ defmodule YscWeb.EventDetailsLive do
                 length(unique_attendees) - length(attendees_to_show) %>
               <section id="attendees-section" class="space-y-5">
                 <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
-                  <span class="w-8 h-px bg-zinc-200"></span> Attendees
+                  <span class="w-8 h-px bg-zinc-200"></span> Who's going
                 </h3>
                 <div id="attendees-list" class="flex flex-wrap gap-5">
                   <%= for attendee <- attendees_to_show do %>
@@ -1775,7 +1775,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div :if={!is_donation && is_event_at_capacity} class="mt-2">
                     <p class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-200">
                       <.icon name="hero-users" class="w-4 h-4 inline me-1" />
-                      Event is at capacity ({@event.max_attendees} attendees). All tickets are sold out.
+                      This event is full ({@event.max_attendees} people). All tickets are sold out.
                     </p>
                   </div>
                 </div>
@@ -3526,7 +3526,7 @@ defmodule YscWeb.EventDetailsLive do
             <% end %>
           <% else %>
             <div class="text-center py-8">
-              <p class="text-zinc-500">No attendees found.</p>
+              <p class="text-zinc-500">No one has signed up yet.</p>
             </div>
           <% end %>
         </div>

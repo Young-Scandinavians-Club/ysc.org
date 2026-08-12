@@ -696,6 +696,53 @@ defmodule Ysc.Accounts.UserTest do
       refute changeset.valid?
       assert changeset.errors[:phone_number] != nil
     end
+
+    test "clears phone_verified_at when the phone number changes" do
+      verified_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      user = %User{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        phone_number: @valid_phone,
+        phone_verified_at: verified_at
+      }
+
+      attrs = %{
+        first_name: "John",
+        last_name: "Doe",
+        phone_number: "+14155552672"
+      }
+
+      changeset = User.profile_changeset(user, attrs)
+
+      assert changeset.valid?
+      assert changeset.changes.phone_number == "+14155552672"
+      assert changeset.changes.phone_verified_at == nil
+    end
+
+    test "keeps phone_verified_at when the phone number is resubmitted unchanged" do
+      verified_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      user = %User{
+        email: @valid_email,
+        first_name: "John",
+        last_name: "Doe",
+        phone_number: @valid_phone,
+        phone_verified_at: verified_at
+      }
+
+      attrs = %{
+        first_name: "Jane",
+        last_name: "Doe",
+        phone_number: @valid_phone
+      }
+
+      changeset = User.profile_changeset(user, attrs)
+
+      assert changeset.valid?
+      refute Map.has_key?(changeset.changes, :phone_verified_at)
+    end
   end
 
   describe "notification_preferences_changeset/2" do
