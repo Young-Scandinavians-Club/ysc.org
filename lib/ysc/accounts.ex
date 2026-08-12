@@ -1416,7 +1416,9 @@ defmodule Ysc.Accounts do
     now = DateTime.utc_now()
     params = maybe_default_order(params, "application_date")
     {membership_filters, other_params} = extract_membership_filters(params)
-    {order_by, order_directions, other_params} = extract_full_order(other_params)
+
+    {order_by, order_directions, other_params} =
+      extract_full_order(other_params)
 
     base_query =
       from(u in User, where: u.state != :deleted)
@@ -1596,7 +1598,9 @@ defmodule Ysc.Accounts do
   def list_paginated_users(params, search_term) do
     now = DateTime.utc_now()
     {membership_filters, other_params} = extract_membership_filters(params)
-    {order_by, order_directions, other_params} = extract_full_order(other_params)
+
+    {order_by, order_directions, other_params} =
+      extract_full_order(other_params)
 
     has_explicit_sort = order_by != []
 
@@ -3005,7 +3009,7 @@ defmodule Ysc.Accounts do
 
   defp apply_user_order_by(query, order_by, order_directions, now) do
     order_by
-    |> Enum.zip(order_directions || [])
+    |> Enum.zip(order_directions)
     |> Enum.reduce(query, fn {field, direction}, acc ->
       direction = if direction in ["desc", :desc], do: :desc, else: :asc
       apply_user_order_term(acc, field, direction, now)

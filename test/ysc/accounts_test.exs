@@ -882,18 +882,22 @@ defmodule Ysc.AccountsTest do
       # precedence over native fields, regardless of where it appeared in
       # order_by — so a `first_name` sort silently did nothing whenever it was
       # combined with `application_date` (or any other extracted field).
-      amy = user_fixture(%{phone_number: unique_user_phone(), first_name: "Amy"})
+      amy =
+        user_fixture(%{phone_number: unique_user_phone(), first_name: "Amy"})
 
       signup_application_fixture(amy, %{
         completed:
-          DateTime.add(DateTime.utc_now(), -10, :day) |> DateTime.truncate(:second)
+          DateTime.add(DateTime.utc_now(), -10, :day)
+          |> DateTime.truncate(:second)
       })
 
-      zoe = user_fixture(%{phone_number: unique_user_phone(), first_name: "Zoe"})
+      zoe =
+        user_fixture(%{phone_number: unique_user_phone(), first_name: "Zoe"})
 
       signup_application_fixture(zoe, %{
         completed:
-          DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
+          DateTime.add(DateTime.utc_now(), -1, :day)
+          |> DateTime.truncate(:second)
       })
 
       params = %{
