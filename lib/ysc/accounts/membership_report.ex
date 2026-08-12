@@ -46,15 +46,14 @@ defmodule Ysc.Accounts.MembershipReport do
     start_dt = DateTime.new!(date_from, ~T[00:00:00], @report_timezone)
     end_dt = DateTime.new!(date_to, ~T[23:59:59], @report_timezone)
 
-    all_submitted = list_submitted(start_dt, end_dt)
+    %{
+      submitted: all_submitted,
+      expired: expired,
+      purchases: %{purchased: purchased, returning: returning}
+    } = fetch_report_sources(start_dt, end_dt)
 
     %{pending: pending_raw, accepted: accepted, rejected: rejected} =
       classify_applications(all_submitted, start_dt, end_dt)
-
-    expired = list_expired(start_dt, end_dt)
-
-    %{purchased: purchased, returning: returning} =
-      list_purchases(start_dt, end_dt)
 
     # Raw counts for the stats summary (unfiltered)
     counts = %{
@@ -85,6 +84,17 @@ defmodule Ysc.Accounts.MembershipReport do
         &MapSet.member?(excluded_from_pending, &1.user_id)
       )
 
+    purchased_ids = MapSet.new(purchased, & &1.id)
+
+    subscriptions_with_apps =
+      attach_applications(purchased ++ returning)
+
+    {purchased_with_apps, returning_with_apps} =
+      Enum.split_with(
+        subscriptions_with_apps,
+        &MapSet.member?(purchased_ids, &1.id)
+      )
+
     %{
       date_from: date_from,
       date_to: date_to,
@@ -92,10 +102,43 @@ defmodule Ysc.Accounts.MembershipReport do
       accepted: accepted_display,
       rejected: rejected,
       expired: expired,
-      purchased: attach_applications(purchased),
-      returning: attach_applications(returning),
+      purchased: purchased_with_apps,
+      returning: returning_with_apps,
       counts: counts
     }
+  end
+
+  # list_submitted, list_expired, and list_purchases are independent; run them
+  # concurrently to cut report wall time on wide date ranges.
+  defp fetch_report_sources(start_dt, end_dt) do
+    parent = self()
+
+    [
+      {:submitted, fn -> list_submitted(start_dt, end_dt) end},
+      {:expired, fn -> list_expired(start_dt, end_dt) end},
+      {:purchases, fn -> list_purchases(start_dt, end_dt) end}
+    ]
+    |> Task.async_stream(
+      fn {key, fun} ->
+        allow_async_repo_access(parent)
+        {key, fun.()}
+      end,
+      timeout: :infinity,
+      max_concurrency: 3
+    )
+    |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
+      Map.put(acc, key, value)
+    end)
+  end
+
+  defp allow_async_repo_access(owner_pid) do
+    if Application.get_env(:ysc, :sql_sandbox) do
+      try do
+        Ecto.Adapters.SQL.Sandbox.allow(Ysc.Repo, self(), owner_pid)
+      rescue
+        _ -> :ok
+      end
+    end
   end
 
   @spec to_csv(map()) :: String.t()

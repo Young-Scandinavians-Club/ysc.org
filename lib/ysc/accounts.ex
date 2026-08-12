@@ -3956,12 +3956,7 @@ defmodule Ysc.Accounts do
           |> restore_subscription_start_sort(subscription_start_sort)
 
         primary_users =
-          Repo.preload(primary_users, [
-            {:sub_accounts, :current_avatar},
-            :current_avatar,
-            :registration_form,
-            subscriptions: :subscription_items
-          ])
+          Repo.preload(primary_users, membership_list_preloads())
 
         {:ok, {membership_rows_from_primaries(primary_users), meta}}
 
@@ -4220,12 +4215,30 @@ defmodule Ysc.Accounts do
     |> order_by([u], asc: u.last_name, asc: u.first_name)
     |> limit(^limit)
     |> offset(^offset)
-    |> preload([
+    |> preload(^membership_list_preloads())
+    |> Repo.all()
+  end
+
+  # Only load currently active subscriptions (not full Stripe history) when
+  # rendering the admin memberships list — get_membership_type_for_primary/1
+  # only needs valid/active rows.
+  defp membership_list_preloads do
+    [
       {:sub_accounts, :current_avatar},
       :current_avatar,
-      subscriptions: :subscription_items
-    ])
-    |> Repo.all()
+      :registration_form,
+      subscriptions: {active_subscriptions_query(), :subscription_items}
+    ]
+  end
+
+  defp active_subscriptions_query do
+    now = DateTime.utc_now()
+
+    from(s in Subscription,
+      where: s.stripe_status in ["active", "trialing"],
+      where: s.current_period_end > ^now,
+      where: is_nil(s.ends_at) or s.ends_at > ^now
+    )
   end
 
   defp membership_rows_from_primaries(primary_users) do
