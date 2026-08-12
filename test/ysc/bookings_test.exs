@@ -4706,15 +4706,13 @@ defmodule Ysc.BookingsTest do
         )
       end)
     end
-  end
 
-  describe "send_admin_deletion_notifications/2" do
-    test "enqueues user confirmation and cabin master notification emails" do
+    test "send_admin_deletion_notifications/2 enqueues cancellation emails with admin reason" do
       deactivate_tahoe_buyout_refund_policies()
 
       guest = user_fixture()
+      admin = user_fixture(%{email: "admin@example.com"})
       _cabin_master = assign_board!(user_fixture(), :tahoe_cabin_master)
-      admin = user_fixture()
 
       checkin = Date.utc_today() |> Date.add(100) |> first_monday_on_or_after()
       checkout = Date.add(checkin, 3)
