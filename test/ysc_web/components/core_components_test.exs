@@ -250,6 +250,81 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "callout/1" do
+    test "renders default warning callout" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout type="warning">
+          Development mode: photos are saved locally.
+        </.callout>
+        """)
+
+      assert html =~ "border-amber-200"
+      assert html =~ "bg-amber-50"
+      assert html =~ "Development mode: photos are saved locally."
+    end
+
+    test "renders error callout with icon and title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout type="error" icon="hero-exclamation-triangle" role="alert">
+          <:title>We couldn't upload everything</:title>
+          File is too large.
+        </.callout>
+        """)
+
+      assert html =~ "hero-exclamation-triangle"
+      assert html =~ "We couldn't upload everything"
+      assert html =~ "File is too large."
+      assert html =~ ~s(role="alert")
+    end
+
+    test "renders banner layout with actions slot" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout
+          type="info"
+          layout="banner"
+          icon="hero-question-mark-circle"
+          id="help-banner"
+        >
+          <:title>Volunteer guides</:title>
+          Step-by-step help for posts, events, newsletters, media, and check-in.
+          <:actions>
+            <a href="/admin/help">Open Help</a>
+          </:actions>
+        </.callout>
+        """)
+
+      assert html =~ ~s(id="help-banner")
+      assert html =~ "hero-question-mark-circle"
+      assert html =~ "Volunteer guides"
+      assert html =~ "Open Help"
+      assert html =~ "items-center justify-between"
+    end
+
+    test "merges custom class onto container" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout type="neutral" class="p-6 custom-callout">
+          Neutral notice.
+        </.callout>
+        """)
+
+      assert html =~ "custom-callout"
+      assert html =~ "border-zinc-200"
+      assert html =~ "Neutral notice."
+    end
+  end
+
   describe "dropdown JS helpers" do
     test "toggle_dropdown/1 toggles visibility, aria-expanded, and dropdown-open class" do
       js = toggle_dropdown("#test-dropdown")

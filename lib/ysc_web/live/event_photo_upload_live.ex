@@ -97,12 +97,9 @@ defmodule YscWeb.EventPhotoUploadLive do
   def render(assigns) do
     ~H"""
     <div id="event-photo-upload-page" class="space-y-8">
-      <div
-        :if={@dev_stub?}
-        class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-      >
+      <.callout :if={@dev_stub?} type="warning" class="px-4 py-3 text-amber-900">
         Development mode: photos are saved locally and are not sent to Google Photos.
-      </div>
+      </.callout>
 
       <.event_thanks_header
         event={@event}
@@ -133,9 +130,9 @@ defmodule YscWeb.EventPhotoUploadLive do
         </p>
 
         <%= if not @uploads_available? do %>
-          <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <.callout type="error" class="px-4 py-3">
             Uploads are temporarily unavailable. Please try again later.
-          </div>
+          </.callout>
         <% else %>
           <form
             id="event-photo-upload-form"
@@ -164,30 +161,21 @@ defmodule YscWeb.EventPhotoUploadLive do
               <.live_file_input upload={@uploads.photos} class="hidden" />
             </label>
 
-            <div
+            <.callout
               :if={@upload_errors != [] or upload_errors(@uploads.photos) != []}
-              class="flex gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+              type="error"
+              icon="hero-exclamation-triangle"
+              class="px-4 py-3"
               role="alert"
             >
-              <.icon
-                name="hero-exclamation-triangle"
-                class="h-5 w-5 shrink-0 text-red-500"
-              />
-              <div class="space-y-1">
-                <p class="text-sm font-semibold text-red-800">
-                  We couldn't upload everything
-                </p>
-                <p
-                  :for={err <- upload_errors(@uploads.photos)}
-                  class="text-sm text-red-700"
-                >
-                  {YscWeb.UploadErrors.error_to_string(err, :event_photo)}
-                </p>
-                <p :for={msg <- @upload_errors} class="text-sm text-red-700">
-                  {msg}
-                </p>
-              </div>
-            </div>
+              <:title>We couldn't upload everything</:title>
+              <p :for={err <- upload_errors(@uploads.photos)} class="text-red-700">
+                {YscWeb.UploadErrors.error_to_string(err, :event_photo)}
+              </p>
+              <p :for={msg <- @upload_errors} class="text-red-700">
+                {msg}
+              </p>
+            </.callout>
 
             <div :if={@uploads.photos.entries != []} class="space-y-3">
               <p class="text-sm font-medium text-zinc-700">

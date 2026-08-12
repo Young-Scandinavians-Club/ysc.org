@@ -1447,6 +1447,147 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @callout_type_classes %{
+    "info" => "border-blue-200 bg-blue-50 text-blue-800",
+    "warning" => "border-amber-200 bg-amber-50 text-amber-800",
+    "error" => "border-red-200 bg-red-50 text-red-800",
+    "success" => "border-green-200 bg-green-50 text-green-800",
+    "neutral" => "border-zinc-200 bg-zinc-50 text-zinc-700"
+  }
+
+  @callout_icon_classes %{
+    "info" => "text-blue-600",
+    "warning" => "text-amber-600",
+    "error" => "text-red-500",
+    "success" => "text-green-600",
+    "neutral" => "text-zinc-500"
+  }
+
+  @doc ~S"""
+  Renders a bordered callout box for notices, warnings, and contextual messages.
+
+  Use `layout="banner"` for a horizontal row with optional `:actions` on the right
+  (admin help banners, etc.). Pass `icon` to show a hero icon beside the content.
+
+  ## Examples
+
+      <.callout type="warning">
+        Development mode: photos are saved locally.
+      </.callout>
+
+      <.callout type="error" role="alert">
+        Uploads are temporarily unavailable.
+      </.callout>
+
+      <.callout type="info" layout="banner" icon="hero-question-mark-circle" id="help-banner">
+        <:title>Volunteer guides</:title>
+        Step-by-step help for posts, events, newsletters, media, and check-in.
+        <:actions>
+          <.link navigate={~p"/admin/help"}>Open Help</.link>
+        </:actions>
+      </.callout>
+  """
+  attr :id, :string, default: nil
+
+  attr :type, :string,
+    default: "info",
+    values: ~w(info warning error success neutral)
+
+  attr :layout, :string,
+    default: "default",
+    values: ~w(default banner),
+    doc:
+      "default is a padded box; banner is a horizontal row with optional actions"
+
+  attr :icon, :string,
+    default: nil,
+    doc: "optional heroicon name shown before content"
+
+  attr :class, :any, default: nil
+  attr :rest, :global, include: ~w(role aria-label aria-live)
+
+  slot :inner_block, required: true
+  slot :title
+  slot :actions
+
+  def callout(assigns) do
+    type = to_string(assigns.type)
+    layout = to_string(assigns.layout)
+
+    assigns =
+      assigns
+      |> assign(:type_classes, Map.fetch!(@callout_type_classes, type))
+      |> assign(:icon_classes, Map.fetch!(@callout_icon_classes, type))
+      |> assign(:banner?, layout == "banner")
+      |> assign(:has_title?, assigns.title != [])
+      |> assign(:has_actions?, assigns.actions != [])
+
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "rounded-lg border text-sm",
+        @type_classes,
+        @banner? &&
+          "rounded-xl px-5 py-4 flex flex-wrap items-center justify-between gap-3",
+        !@banner? && "p-4",
+        @class
+      ]}
+      {@rest}
+    >
+      <div class={[
+        @banner? && "flex items-start gap-3 min-w-0",
+        @icon && !@banner? && "flex gap-3"
+      ]}>
+        <.icon
+          :if={@icon}
+          name={@icon}
+          class={[
+            "shrink-0",
+            @icon_classes,
+            @banner? && "w-6 h-6 mt-0.5",
+            !@banner? && "h-5 w-5"
+          ]}
+        />
+        <div class={[@banner? && "min-w-0", @icon && !@banner? && "space-y-1"]}>
+          <p
+            :if={@has_title?}
+            class={[
+              @banner? && "font-semibold",
+              !@banner? && "font-medium",
+              @type == "info" && "text-blue-900",
+              @type == "warning" &&
+                ((@banner? && "text-amber-900") || "text-amber-800"),
+              @type == "error" && "text-red-800",
+              @type == "success" && "text-green-800",
+              @type == "neutral" && "text-zinc-800",
+              @banner? && "mt-0",
+              !@banner? && "mb-1"
+            ]}
+          >
+            {render_slot(@title)}
+          </p>
+          <div class={[
+            @banner? && "text-sm text-blue-800/90 mt-0.5",
+            @type == "warning" && @banner? && "text-amber-800/90",
+            @type == "error" && @banner? && "text-red-700",
+            @type == "success" && @banner? && "text-green-800/90",
+            @type == "neutral" && @banner? && "text-zinc-700"
+          ]}>
+            {render_slot(@inner_block)}
+          </div>
+        </div>
+      </div>
+      <div
+        :if={@has_actions?}
+        class={["shrink-0", !@banner? && "mt-3 flex flex-wrap gap-2"]}
+      >
+        {render_slot(@actions)}
+      </div>
+    </div>
+    """
+  end
+
   @doc ~S"""
   Renders a table with generic styling.
 

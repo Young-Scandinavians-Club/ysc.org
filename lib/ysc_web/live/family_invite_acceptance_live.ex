@@ -235,8 +235,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
 
         <%!-- Logged in with matching email: show Join button --%>
         <div :if={@can_link_existing} class="mt-8">
-          <div class="rounded-lg border border-blue-200 bg-blue-50 p-6">
-            <p class="text-sm text-blue-800 mb-4">
+          <.callout type="info" class="p-6">
+            <p class="text-blue-800 mb-4">
               You're logged in as <strong>{@current_user.email}</strong>. Click below to join <strong>{@invite.primary_user.first_name}</strong>'s family membership.
             </p>
             <.button
@@ -246,13 +246,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
             >
               Join Family Membership
             </.button>
-          </div>
+          </.callout>
         </div>
 
         <%!-- Not logged in but email exists: prompt to log in --%>
         <div :if={@existing_user && !@current_user} class="mt-8">
-          <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-6">
-            <p class="text-sm text-zinc-700 mb-4">
+          <.callout type="neutral" class="p-6">
+            <p class="mb-4">
               You already have an account with this email. Log in to accept this invitation.
             </p>
             <.link
@@ -266,7 +266,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
             <p class="mt-4 text-xs text-zinc-500">
               After logging in, you'll be redirected back to complete the invitation.
             </p>
-          </div>
+          </.callout>
         </div>
 
         <%!-- Create new account form (when email doesn't exist, or user not logged in) --%>
