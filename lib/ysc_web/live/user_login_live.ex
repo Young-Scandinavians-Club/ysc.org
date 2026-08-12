@@ -192,7 +192,7 @@ defmodule YscWeb.UserLoginLive do
             </h3>
             <div class="mt-2 text-sm text-amber-800">
               <p class="mb-2">
-                You've had several failed sign-in attempts. Try another sign-in option below, reset your password if you use one, or contact us for help.
+                You've had several failed sign-in attempts. Try email and password below, or use Google, Facebook, or passkey above. You can also reset your password or contact us for help.
               </p>
               <div class="flex flex-col sm:flex-row gap-2">
                 <.link

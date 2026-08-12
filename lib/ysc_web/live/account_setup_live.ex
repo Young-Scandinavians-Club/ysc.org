@@ -199,7 +199,7 @@ defmodule YscWeb.AccountSetupLive do
                 navigate={~p"/users/membership"}
                 class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-blue-700 hover:underline"
               >
-                Or pay from membership settings
+                Or pay from Membership
               </.link>
             </div>
           <% else %>
@@ -1738,7 +1738,7 @@ defmodule YscWeb.AccountSetupLive do
         {:error, _reason} ->
           YscWeb.Flash.send_toast(
             :error,
-            "We couldn't activate your membership. Please try again or pay from membership settings.",
+            "We couldn't activate your membership. Please try again or pay from Membership.",
             title: "Membership"
           )
 
