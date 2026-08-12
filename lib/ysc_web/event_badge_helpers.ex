@@ -42,7 +42,10 @@ defmodule YscWeb.EventBadgeHelpers do
           []
         else
           []
-          |> maybe_append(:save_the_date, include_save_the_date && get_field(event, :tickets_tbd))
+          |> maybe_append(
+            :save_the_date,
+            include_save_the_date && get_field(event, :tickets_tbd)
+          )
           |> maybe_append(:just_added, just_added?(published_at))
           |> append_proximity(event, proximity)
           |> maybe_append(:going_fast, selling_fast)
@@ -59,7 +62,10 @@ defmodule YscWeb.EventBadgeHelpers do
     |> maybe_append(:save_the_date, get_field(event, :tickets_tbd))
     |> maybe_append(:sold_out, EventHelpers.event_sold_out?(event))
     |> maybe_append(:going_fast, get_field(event, :selling_fast))
-    |> maybe_append(:cancelled, get_field(event, :state) in [:cancelled, "cancelled"])
+    |> maybe_append(
+      :cancelled,
+      get_field(event, :state) in [:cancelled, "cancelled"]
+    )
   end
 
   @doc """
@@ -138,7 +144,11 @@ defmodule YscWeb.EventBadgeHelpers do
     do: %{text: "Sold Out", class: "bg-red-500 text-white", icon: nil}
 
   defp card_badge(:save_the_date),
-    do: %{text: "Save the Date", class: "bg-blue-500 text-white", icon: "hero-ticket"}
+    do: %{
+      text: "Save the Date",
+      class: "bg-blue-500 text-white",
+      icon: "hero-ticket"
+    }
 
   defp card_badge(:just_added),
     do: %{text: "Just Added", class: "bg-zinc-600 text-white", icon: nil}
