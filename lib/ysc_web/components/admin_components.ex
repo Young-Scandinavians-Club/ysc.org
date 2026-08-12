@@ -8,6 +8,7 @@ defmodule YscWeb.AdminComponents do
   """
   use Phoenix.Component
   use Gettext, backend: YscWeb.Gettext
+  use YscWeb, :verified_routes
 
   alias Phoenix.LiveView.JS
   alias YscWeb.FormHelpers
@@ -1397,6 +1398,54 @@ defmodule YscWeb.AdminComponents do
     >
       {render_slot(@inner_block)}
     </button>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_volunteer_help_banner
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Blue help banner shown to volunteer admins on the dashboard and in ghost previews.
+
+  ## Examples
+
+      <.admin_volunteer_help_banner :if={@admin_role == :volunteer} />
+
+      <%!-- Ghost preview uses a non-link action stub --%>
+      <.admin_volunteer_help_banner interactive?={false} />
+  """
+  attr :id, :string, default: "volunteer-help-banner"
+  attr :class, :any, default: "mb-6"
+  attr :interactive?, :boolean, default: true
+
+  def admin_volunteer_help_banner(assigns) do
+    ~H"""
+    <.callout
+      id={@id}
+      type="info"
+      layout="banner"
+      icon="hero-question-mark-circle"
+      class={@class}
+    >
+      <:title>Volunteer guides</:title>
+      Step-by-step help for posts, events, newsletters, media, and check-in.
+      <:actions>
+        <.link
+          :if={@interactive?}
+          navigate={~p"/admin/help"}
+          class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shrink-0"
+        >
+          Open Help <.icon name="hero-arrow-right" class="w-4 h-4" />
+        </.link>
+        <span
+          :if={!@interactive?}
+          class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shrink-0"
+        >
+          Open Help <.icon name="hero-arrow-right" class="w-4 h-4" />
+        </span>
+      </:actions>
+    </.callout>
     """
   end
 

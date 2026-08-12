@@ -111,16 +111,16 @@ defmodule YscWeb.UserRegistrationLive do
               }
             >
               <.header class="text-left">Account Information</.header>
-              <div
+              <.callout
                 :if={@email_already_taken}
-                class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+                type="warning"
                 role="alert"
               >
-                <p class="font-medium">This email is already registered.</p>
-                <p class="mt-1 text-amber-700">
+                <:title>This email is already registered.</:title>
+                <p class="text-amber-700">
                   If this is you, sign in to your account. Forgot your password? Use the link below.
                 </p>
-                <div class="mt-3 flex flex-wrap gap-2">
+                <:actions>
                   <.link
                     navigate={~p"/users/log-in"}
                     class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500"
@@ -133,8 +133,8 @@ defmodule YscWeb.UserRegistrationLive do
                   >
                     Forgot password
                   </.link>
-                </div>
-              </div>
+                </:actions>
+              </.callout>
               <.input
                 field={@form[:email]}
                 type="email"

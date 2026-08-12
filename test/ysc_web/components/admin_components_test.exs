@@ -458,4 +458,33 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ "font-mono text-xs"
     end
   end
+
+  describe "admin_volunteer_help_banner/1" do
+    test "renders interactive help link by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_volunteer_help_banner />
+        """)
+
+      assert html =~ ~s(id="volunteer-help-banner")
+      assert html =~ "Volunteer guides"
+      assert html =~ ~s(href="/admin/help")
+      assert html =~ "Open Help"
+    end
+
+    test "renders non-interactive stub for ghost previews" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_volunteer_help_banner interactive?={false} />
+        """)
+
+      assert html =~ "Volunteer guides"
+      assert html =~ "Open Help"
+      refute html =~ ~s(href="/admin/help")
+    end
+  end
 end

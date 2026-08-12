@@ -196,26 +196,7 @@ defmodule YscWeb.AdminGhostComponents do
         </div>
       </div>
 
-      <div
-        id="volunteer-help-banner"
-        class="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 flex flex-wrap items-center justify-between gap-3"
-      >
-        <div class="flex items-start gap-3 min-w-0">
-          <.icon
-            name="hero-question-mark-circle"
-            class="w-6 h-6 text-blue-600 shrink-0 mt-0.5"
-          />
-          <div>
-            <p class="font-semibold text-blue-900">Volunteer guides</p>
-            <p class="text-sm text-blue-800/90 mt-0.5">
-              Step-by-step help for posts, events, newsletters, media, and check-in.
-            </p>
-          </div>
-        </div>
-        <span class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shrink-0">
-          Open Help <.icon name="hero-arrow-right" class="w-4 h-4" />
-        </span>
-      </div>
+      <.admin_volunteer_help_banner interactive?={false} />
 
       <div
         id="volunteer-stats-row"
