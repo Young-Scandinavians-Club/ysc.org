@@ -20,9 +20,12 @@ defmodule Ysc.BookingsTest do
   alias Ysc.Ledgers
 
   import Ecto.Query
+  import Mox
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
+
+  alias Ysc.Test.EnvHelper
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -2494,6 +2497,139 @@ defmodule Ysc.BookingsTest do
 
       assert updated.status == :approved
       assert updated.reviewed_by_id == admin.id
+    end
+
+    test "approve_pending_refund/4 creates the refund via the real Stripe module outside test env" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+
+      Application.put_env(
+        :ysc,
+        :stripe_client,
+        Ysc.StripeRefundApproveTestClient
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
+      user = user_fixture()
+      admin = user_fixture(%{role: :admin})
+      booking = booking_fixture(%{user_id: user.id})
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_approve_dev_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: Money.new(5000, :USD),
+          status: :pending
+        })
+        |> Ysc.Repo.insert()
+
+      expect(Stripe.RefundMock, :create, fn params, opts ->
+        assert params.charge == "ch_test_#{payment.external_payment_id}"
+        assert params.amount == 500_000
+
+        assert opts[:idempotency_key] =~
+                 Ysc.Stripe.Idempotency.key("approve_pending_refund_#{pr.id}")
+
+        {:ok,
+         %Stripe.Refund{id: "re_dev_#{System.unique_integer([:positive])}"}}
+      end)
+
+      assert {:ok, updated, stripe_refund_id} =
+               EnvHelper.with_environment("dev", fn ->
+                 Bookings.approve_pending_refund(pr, nil, "Approved", admin)
+               end)
+
+      assert updated.status == :approved
+      assert stripe_refund_id =~ "re_dev_"
+    end
+
+    test "approve_pending_refund/4 resets the pending refund when Stripe rejects the request" do
+      previous_stripe = Application.get_env(:ysc, :stripe_client)
+
+      Application.put_env(
+        :ysc,
+        :stripe_client,
+        Ysc.StripeRefundApproveTestClient
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous_stripe)
+      end)
+
+      user = user_fixture()
+      admin = user_fixture(%{role: :admin})
+      booking = booking_fixture(%{user_id: user.id})
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_approve_dev_fail_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: Money.new(5000, :USD),
+          status: :pending
+        })
+        |> Ysc.Repo.insert()
+
+      expect(Stripe.RefundMock, :create, fn _params, _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message: "Charge already refunded",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      assert {:error, {:refund_failed, "Charge already refunded"}} =
+               EnvHelper.with_environment("dev", fn ->
+                 Bookings.approve_pending_refund(pr, nil, "Approved", admin)
+               end)
+
+      reloaded = Ysc.Repo.get!(PendingRefund, pr.id)
+      assert reloaded.status == :pending
     end
 
     test "approve_pending_refund/4 approves $0 policy refund without Stripe or ledger refund" do

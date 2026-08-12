@@ -3041,6 +3041,79 @@ defmodule Ysc.EventsTest do
       refute Events.registration_required?(Ecto.ULID.generate())
       refute Events.registration_required?(:not_a_ticket)
     end
+
+    test "registration_required?/1 loads an unpreloaded ticket_tier association",
+         %{user: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          requires_registration: true
+        })
+
+      member = user_fixture()
+
+      {:ok, ticket} =
+        %Ticket{}
+        |> Ticket.admin_grant_changeset(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: member.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.truncate(:second)
+            |> DateTime.add(1, :day)
+        })
+        |> Repo.insert()
+
+      # Repo.get/2 does not preload associations, so ticket_tier comes back
+      # as %Ecto.Association.NotLoaded{} here.
+      unpreloaded_ticket = Repo.get!(Ysc.Events.Ticket, ticket.id)
+
+      assert match?(
+               %Ecto.Association.NotLoaded{},
+               unpreloaded_ticket.ticket_tier
+             )
+
+      assert Events.registration_required?(unpreloaded_ticket)
+    end
+
+    test "registration_required?/1 returns false when ticket_tier is nil" do
+      refute Events.registration_required?(%Ysc.Events.Ticket{ticket_tier: nil})
+    end
+  end
+
+  describe "get_ticket_reservation/1" do
+    test "returns nil when the reservation does not exist" do
+      assert is_nil(Events.get_ticket_reservation(Ecto.ULID.generate()))
+    end
+
+    test "returns the reservation with associations preloaded", %{user: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      member = user_fixture()
+
+      assert {:ok, reservation} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 1,
+                 expires_at:
+                   DateTime.utc_now()
+                   |> DateTime.truncate(:second)
+                   |> DateTime.add(1, :day)
+               })
+
+      found = Events.get_ticket_reservation(reservation.id)
+
+      assert found.id == reservation.id
+      assert found.ticket_tier.id == tier.id
+      assert found.user.id == member.id
+      assert found.created_by.id == admin.id
+    end
   end
 
   describe "list_events_paginated tab and date filter edge cases" do

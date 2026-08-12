@@ -3041,6 +3041,63 @@ defmodule Ysc.AccountsTest do
       end
     end
 
+    test "admin_link_user_to_family/3 links child when primary's subscriptions association is not preloaded" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      user = user_fixture(%{phone_number: "+14159098510"})
+
+      if family_plan do
+        {:ok, subscription} =
+          Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_test_unpreloaded_#{System.unique_integer()}",
+            stripe_status: "active",
+            name: "Family Membership",
+            current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+          })
+
+        {:ok, _item} =
+          Subscriptions.create_subscription_item(%{
+            subscription_id: subscription.id,
+            stripe_price_id: family_plan.stripe_price_id,
+            stripe_product_id:
+              "prod_test_unpreloaded_#{System.unique_integer()}",
+            stripe_id: "si_test_unpreloaded_#{System.unique_integer()}",
+            quantity: 1
+          })
+
+        # Refetch without preloading :subscriptions, so has_family_or_lifetime_membership?/1
+        # takes the %Ecto.Association.NotLoaded{} branch and queries fresh via
+        # Subscriptions.list_subscriptions/1.
+        primary = Accounts.get_user!(user.id)
+        assert match?(%Ecto.Association.NotLoaded{}, primary.subscriptions)
+
+        victim = user_fixture(%{phone_number: "+14159098511"})
+
+        assert {:ok, linked} =
+                 Accounts.admin_link_user_to_family(primary, victim)
+
+        assert linked.primary_user_id == primary.id
+      end
+    end
+
+    test "admin_link_user_to_family/3 returns primary_must_have_family_or_lifetime when primary has only a single-plan subscription" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      if single_plan && family_plan do
+        primary =
+          user_with_single_subscription(%{phone_number: "+14159098512"})
+
+        victim = user_fixture(%{phone_number: "+14159098513"})
+
+        assert {:error, :primary_must_have_family_or_lifetime} =
+                 Accounts.admin_link_user_to_family(primary, victim)
+      end
+    end
+
     test "admin_link_user_to_family/3 returns max_spouses_reached when a spouse already exists" do
       primary = user_with_lifetime_membership(%{phone_number: "+14159098506"})
       s1 = user_fixture(%{phone_number: "+14159098507"})
