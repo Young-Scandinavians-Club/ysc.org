@@ -2442,84 +2442,18 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  # Returns a list of {type, text} tuples for badges to display
-  # Handles both Event structs and maps from queries
   defp get_event_badges(event, sold_out, selling_fast) when is_map(event) do
-    # Check for cancelled state first - if cancelled, only show "Cancelled" badge
-    state = Map.get(event, :state) || Map.get(event, "state")
-
-    if state == :cancelled or state == "cancelled" do
-      [{"red", "Cancelled"}]
-    else
-      # If sold out (and not cancelled), only show "Sold Out" badge
-      if sold_out do
-        [{"red", "Sold Out"}]
-      else
-        get_event_badges_continue(event, sold_out, selling_fast)
-      end
-    end
+    event
+    |> YscWeb.EventBadgeHelpers.exclusive_badge_kinds(
+      sold_out: sold_out,
+      selling_fast: selling_fast,
+      proximity: :days_only,
+      include_save_the_date: false
+    )
+    |> YscWeb.EventBadgeHelpers.to_core_badges()
   end
 
   defp get_event_badges(_, _, _), do: []
-
-  defp get_event_badges_continue(event, sold_out, selling_fast) do
-    # Check if published_at is nil (no badge for unpublished events)
-    published_at =
-      Map.get(event, :published_at) || Map.get(event, "published_at")
-
-    if published_at == nil do
-      []
-    else
-      get_event_badges_active(event, sold_out, selling_fast)
-    end
-  end
-
-  defp get_event_badges_active(event, _sold_out, selling_fast) do
-    badges = []
-
-    # Add "Just Added" badge first if applicable (within 48 hours of publishing)
-    published_at =
-      Map.get(event, :published_at) || Map.get(event, "published_at")
-
-    just_added_badge =
-      case published_at do
-        nil ->
-          []
-
-        pub_at ->
-          if DateTime.diff(DateTime.utc_now(), pub_at, :hour) <= 48 do
-            [{"green", "Just Added"}]
-          else
-            []
-          end
-      end
-
-    badges = badges ++ just_added_badge
-
-    # Add "Days Left" badge if applicable (1-3 days remaining)
-    days_left = days_until_event_start(event)
-
-    days_left_badge =
-      if days_left != nil and days_left >= 1 and days_left <= 3 do
-        text = "#{days_left} #{if days_left == 1, do: "day", else: "days"} left"
-        [{"sky", text}]
-      else
-        []
-      end
-
-    badges = badges ++ days_left_badge
-
-    # Add "Selling Fast!" badge if applicable (always show when true)
-    selling_fast_badge =
-      if selling_fast do
-        [{"yellow", "Going Fast!"}]
-      else
-        []
-      end
-
-    badges = badges ++ selling_fast_badge
-    badges
-  end
 
   attr :event, :any, required: true
   attr :class, :string, default: nil
@@ -2537,71 +2471,6 @@ defmodule YscWeb.CoreComponents do
 
   def news_card(assigns) do
     YscWeb.Components.News.NewsCard.news_card(assigns)
-  end
-
-  # Helper function to calculate days until event starts
-  # Handles both Event structs and maps (structs are maps in Elixir)
-  defp days_until_event_start(event) when is_map(event) do
-    start_date = Map.get(event, :start_date)
-    start_time = Map.get(event, :start_time)
-
-    if start_date == nil do
-      nil
-    else
-      today = Date.utc_today()
-
-      cond do
-        start_time == nil and is_struct(start_date, Date) ->
-          if Date.compare(today, start_date) == :gt do
-            nil
-          else
-            max(0, Date.diff(start_date, today))
-          end
-
-        true ->
-          now = DateTime.utc_now()
-          event_datetime = combine_date_time_for_event(start_date, start_time)
-
-          if event_datetime == nil do
-            nil
-          else
-            if DateTime.compare(now, event_datetime) == :gt do
-              nil
-            else
-              event_date_only = DateTime.to_date(event_datetime)
-              now_date_only = DateTime.to_date(now)
-              diff = Date.diff(event_date_only, now_date_only)
-              max(0, diff)
-            end
-          end
-      end
-    end
-  end
-
-  defp combine_date_time_for_event(date, time) do
-    case {date, time} do
-      {%DateTime{} = dt, %Time{} = t} ->
-        naive_date = DateTime.to_naive(dt)
-        date_part = NaiveDateTime.to_date(naive_date)
-        naive_datetime = NaiveDateTime.new!(date_part, t)
-        DateTime.from_naive!(naive_datetime, "Etc/UTC")
-
-      {%DateTime{} = dt, nil} ->
-        dt
-
-      {date, time} when not is_nil(date) and not is_nil(time) ->
-        NaiveDateTime.new!(date, time)
-        |> DateTime.from_naive!("Etc/UTC")
-
-      {date, nil} when is_struct(date, Date) ->
-        DateTime.from_naive!(
-          NaiveDateTime.new!(date, ~T[00:00:00]),
-          "Etc/UTC"
-        )
-
-      _ ->
-        nil
-    end
   end
 
   @doc """
