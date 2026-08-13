@@ -11,6 +11,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
+  alias Ysc.Accounts.VerificationCodes
   alias Ysc.Payments
   alias Ysc.Subscriptions
 
@@ -757,6 +758,37 @@ defmodule YscWeb.AccountSetupLiveTest do
       })
 
       assert has_element?(view, "#phone_verification_form")
+    end
+
+    test "resubmitting the same phone number keeps the existing verification code", %{
+      conn: conn,
+      user: user
+    } do
+      phone = "+12065559876"
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
+
+      render_submit(view, "save_phone", %{
+        "user" => %{"phone_number" => phone, "sms_opt_in" => "false"}
+      })
+
+      assert has_element?(view, "#phone_verification_form")
+
+      updated_user = Accounts.get_user!(user.id)
+      original_code = VerificationCodes.get(updated_user, :phone)
+      assert original_code
+
+      render_click(view, "change_phone_number", %{})
+
+      assert has_element?(view, "#phone_form")
+
+      render_submit(view, "save_phone", %{
+        "user" => %{"phone_number" => phone, "sms_opt_in" => "false"}
+      })
+
+      assert has_element?(view, "#phone_verification_form")
+      assert VerificationCodes.get(updated_user, :phone) == original_code
     end
 
     test "empty phone number submission shows validation error", %{
