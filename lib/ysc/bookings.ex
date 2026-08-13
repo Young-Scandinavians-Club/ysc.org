@@ -2045,15 +2045,35 @@ defmodule Ysc.Bookings do
             other -> other
           end
 
-        %{
-          "type" => "buyout",
-          "nights" => nights,
-          "guests_count" => booking.guests_count,
-          "price_per_night" => price_per_night_map,
-          "subtotal" => money_map(priced.subtotal),
-          "total" => total_map
-        }
+        segments =
+          Map.get(breakdown, :segments) || Map.get(breakdown, "segments")
+
+        buyout_items =
+          %{
+            "type" => "buyout",
+            "nights" => nights,
+            "guests_count" => booking.guests_count,
+            "price_per_night" => price_per_night_map,
+            "subtotal" => money_map(priced.subtotal),
+            "total" => total_map
+          }
+
+        case segments do
+          [_ | _] -> Map.put(buyout_items, "segments", encode_buyout_segments(segments))
+          _ -> buyout_items
+        end
     end
+  end
+
+  defp encode_buyout_segments(segments) when is_list(segments) do
+    Enum.map(segments, fn segment ->
+      %{
+        "season_name" => segment.season_name,
+        "nights" => segment.nights,
+        "price_per_night" => money_map(segment.price_per_night),
+        "total" => money_map(segment.total)
+      }
+    end)
   end
 
   defp money_map(%Money{} = money) do

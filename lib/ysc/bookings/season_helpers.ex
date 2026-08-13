@@ -237,7 +237,7 @@ defmodule Ysc.Bookings.SeasonHelpers do
     {_season_start, season_end} = get_season_date_range(current_season, today)
 
     resolve_unlimited_chain(
-      current_season,
+      MapSet.new([current_season.id]),
       current_season,
       today,
       seasons,
@@ -249,12 +249,11 @@ defmodule Ysc.Bookings.SeasonHelpers do
   # extending `max_date` past each season's own end while that season also
   # has no advance-booking limit of its own. Stops (and applies the limit)
   # at the first season with a real `advance_booking_days`. If the chain
-  # loops back to `origin_season` without ever finding one, no season in the
-  # property's rotation restricts advance booking at all, so the calendar is
-  # capped at a practical horizon (`@unlimited_horizon_days`) instead of
-  # literally forever.
+  # revisits a season without ever finding one, no season in the property's
+  # rotation restricts advance booking at all, so the calendar is capped at a
+  # practical horizon (`@unlimited_horizon_days`) instead of literally forever.
   defp resolve_unlimited_chain(
-         origin_season,
+         visited_season_ids,
          current_season,
          today,
          seasons,
@@ -266,7 +265,7 @@ defmodule Ysc.Bookings.SeasonHelpers do
       next_season == nil ->
         Date.add(today, @unlimited_horizon_days)
 
-      next_season.id == origin_season.id ->
+      MapSet.member?(visited_season_ids, next_season.id) ->
         Date.add(today, @unlimited_horizon_days)
 
       next_season.advance_booking_days && next_season.advance_booking_days > 0 ->
@@ -285,7 +284,7 @@ defmodule Ysc.Bookings.SeasonHelpers do
             else: max_date
 
         resolve_unlimited_chain(
-          origin_season,
+          MapSet.put(visited_season_ids, next_season.id),
           next_season,
           today,
           seasons,
