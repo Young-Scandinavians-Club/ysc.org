@@ -2387,21 +2387,6 @@ defmodule YscWeb.BookingReceiptLive do
   # Helper to convert money map (with string amount) back to Money struct
   defp parse_money_from_map(nil), do: nil
 
-  defp parse_buyout_segments(nil), do: nil
-
-  defp parse_buyout_segments(segments) when is_list(segments) do
-    Enum.map(segments, fn segment ->
-      %{
-        season_name: Map.get(segment, "season_name"),
-        nights: Map.get(segment, "nights"),
-        price_per_night: parse_money_from_map(Map.get(segment, "price_per_night")),
-        total: parse_money_from_map(Map.get(segment, "total"))
-      }
-    end)
-  end
-
-  defp parse_buyout_segments(_), do: nil
-
   defp parse_money_from_map(%{
          "amount" => amount_str,
          "currency" => currency_str
@@ -2416,6 +2401,21 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp parse_money_from_map(_), do: nil
+
+  defp parse_buyout_segments(nil), do: nil
+
+  defp parse_buyout_segments(segments) when is_list(segments) do
+    Enum.map(segments, fn segment ->
+      %{
+        season_name: Map.get(segment, "season_name"),
+        nights: Map.get(segment, "nights"),
+        price_per_night: parse_money_from_map(Map.get(segment, "price_per_night")),
+        total: parse_money_from_map(Map.get(segment, "total"))
+      }
+    end)
+  end
+
+  defp parse_buyout_segments(_), do: nil
 
   defp build_payment_method_summary(payment) do
     summary = payment_method_summary_from_db(payment)
