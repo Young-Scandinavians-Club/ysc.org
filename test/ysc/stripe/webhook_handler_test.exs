@@ -3601,6 +3601,8 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
   describe "relink_payout_transactions/1 does not duplicate an existing QuickBooks deposit" do
     import Mox
 
+    setup :verify_on_exit!
+
     setup do
       Ledgers.ensure_basic_accounts()
 
@@ -3651,15 +3653,18 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       # No payments/refunds are linked to this payout, so there's nothing
       # for the diff to find missing - Sync.sync_payout/1 should still ask
-      # QuickBooks first, though, so stub it to confirm that and return a
-      # deposit with no lines.
-      stub(
+      # QuickBooks first, though. expect/3 (not stub/3) so the test fails if
+      # that read is ever skipped, and deny/3 create_deposit so it fails if
+      # the code ever falls back to re-creating instead of diffing.
+      expect(
         Ysc.Quickbooks.ClientMock,
         :get_deposit_by_id,
         fn "dep_existing_123" ->
           {:ok, %{"Id" => "dep_existing_123", "SyncToken" => "0", "Line" => []}}
         end
       )
+
+      deny(Ysc.Quickbooks.ClientMock, :create_deposit, 2)
 
       _ = WebhookHandler.relink_payout_transactions(synced_payout)
 

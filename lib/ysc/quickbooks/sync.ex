@@ -259,11 +259,19 @@ defmodule Ysc.Quickbooks.Sync do
         # already flipped sync_status to "pending" before enqueueing this
         # check. Since there's nothing to fix, the payout IS accurately
         # synced - say so, rather than leaving it stuck at "pending" with a
-        # perfectly good deposit.
+        # perfectly good deposit. Uses update_sync_status_payout/4 (not
+        # update_sync_success_payout/3) specifically because it leaves
+        # quickbooks_synced_at untouched - that field is what
+        # payout_deposit_fresh_enough_to_autoupdate?/1 keys off, and bumping
+        # it here would make an old, already-reconciled Deposit look "fresh"
+        # again the next time a payment happens to link, letting a much
+        # later auto-update slip past the safety window it's meant to
+        # enforce.
         if payout.quickbooks_sync_status != "synced" do
-          update_sync_success_payout(
+          update_sync_status_payout(
             payout,
-            payout.quickbooks_deposit_id,
+            "synced",
+            nil,
             payout.quickbooks_response
           )
         end

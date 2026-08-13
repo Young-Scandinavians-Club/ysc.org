@@ -209,9 +209,18 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
         [DateTime.truncate(backdated, :second), to_uuid(payout.id)]
       )
 
-      # No Stripe stubs are configured: if the worker tried to relink this
-      # payout, Mox would raise for the unexpected call and fail the test.
+      # attempt_payout_relink/2 wraps its body in `rescue`, so a raised Mox
+      # error wouldn't actually fail this test - assert explicitly instead
+      # of relying on that.
+      test_pid = self()
+
+      stub(Ysc.StripeMock, :retrieve_payout, fn id, _opts ->
+        send(test_pid, {:unexpected_retrieve_payout, id})
+        {:error, :not_stubbed}
+      end)
+
       assert {:ok, _report} = ReconciliationWorker.perform(@job)
+      refute_received {:unexpected_retrieve_payout, ^stripe_payout_id}
 
       untouched_payout =
         Ledgers.get_payout!(payout.id) |> Repo.preload(:payments)

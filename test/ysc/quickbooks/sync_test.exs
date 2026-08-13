@@ -2521,6 +2521,108 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert reloaded.quickbooks_deposit_id == "qb_deposit_noop"
     end
 
+    test "restoring a payout from pending to synced does not reset the deposit's freshness clock",
+         %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_pending_restore_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "2.19"),
+          description: "Membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_pending_restore", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment)
+      payment = Repo.reload!(payment)
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "62.81"),
+          stripe_payout_id:
+            "po_pending_restore_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+
+      # The Deposit was actually created 45 days ago (older than the 30-day
+      # autoupdate window) and has since been marked "pending" by a caller
+      # (e.g. enqueue_quickbooks_sync_payout_if_ready/1) even though nothing
+      # about it is actually wrong.
+      old_synced_at =
+        DateTime.utc_now()
+        |> DateTime.add(-45, :day)
+        |> DateTime.truncate(:second)
+
+      payout =
+        payout
+        |> Payout.changeset(%{
+          quickbooks_sync_status: "pending",
+          quickbooks_deposit_id: "qb_deposit_pending_restore",
+          quickbooks_synced_at: old_synced_at
+        })
+        |> Repo.update!()
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      expect(ClientMock, :get_deposit_by_id, fn "qb_deposit_pending_restore" ->
+        {:ok,
+         %{
+           "Id" => "qb_deposit_pending_restore",
+           "SyncToken" => "0",
+           "Line" => [
+             %{
+               "Amount" => 65.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "qb_sr_pending_restore",
+                   "TxnType" => "SalesReceipt"
+                 }
+               ]
+             }
+           ]
+         }}
+      end)
+
+      assert {:ok, %{"Id" => "qb_deposit_pending_restore"}} =
+               Sync.sync_payout(payout)
+
+      reloaded = Repo.reload!(payout)
+      assert reloaded.quickbooks_sync_status == "synced"
+
+      # The bug this guards against: restoring status to "synced" must not
+      # bump quickbooks_synced_at, or a much-later payment linking to this
+      # same payout would see a falsely "fresh" 45-day-old Deposit and
+      # auto-update it instead of alerting, past the safety window meant to
+      # protect an already-reconciled Deposit from being rewritten.
+      assert DateTime.compare(reloaded.quickbooks_synced_at, old_synced_at) ==
+               :eq
+    end
+
     test "sparse-updates the deposit when a payment links after it was created",
          %{user: user} do
       setup_default_mocks()

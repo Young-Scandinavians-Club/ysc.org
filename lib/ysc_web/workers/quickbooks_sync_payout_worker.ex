@@ -28,7 +28,12 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
   @non_retriable_errors [
     :quickbooks_accounts_not_configured,
     :payout_not_found,
-    :invalid_bank_account
+    :invalid_bank_account,
+    # A stale SyncToken means the Deposit was edited elsewhere (most likely
+    # a human, in QuickBooks) - Sync already sent a Discord alert for it.
+    # Retrying just re-reads the same conflicted Deposit and re-alerts up to
+    # max_attempts times for the same one-time event.
+    :stale_object
   ]
 
   @impl Oban.Worker

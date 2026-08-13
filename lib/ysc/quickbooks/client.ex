@@ -747,6 +747,15 @@ defmodule Ysc.Quickbooks.Client do
               {:error, :invalid_response}
           end
 
+        {:error, {:rate_limited, _resp}} ->
+          Ysc.Logging.warning("QuickBooks rate limit exceeded after retries",
+            endpoint: "deposit",
+            deposit_id: deposit_id,
+            max_retries: max_429_retries()
+          )
+
+          {:error, :rate_limited}
+
         {:ok, %Finch.Response{status: 401, body: _}} ->
           case refresh_access_token() do
             {:ok, new_access_token} ->
@@ -812,14 +821,7 @@ defmodule Ysc.Quickbooks.Client do
       total_amt =
         merged_lines
         |> Enum.reduce(Decimal.new(0), fn line, acc ->
-          amount =
-            case line["Amount"] do
-              %Decimal{} = d -> d
-              n when is_number(n) -> Decimal.from_float(n / 1)
-              _ -> Decimal.new(0)
-            end
-
-          Decimal.add(acc, amount)
+          Decimal.add(acc, deposit_line_amount_to_decimal(line["Amount"]))
         end)
         |> Decimal.round(2)
         |> Decimal.to_float()
@@ -884,6 +886,46 @@ defmodule Ysc.Quickbooks.Client do
 
         {:error, {:rate_limited, _resp}} ->
           {:error, :rate_limited}
+
+        {:ok, %Finch.Response{status: 401, body: _}} ->
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:post, url, headers, Jason.encode!(body))
+
+              case Finch.request(request, Ysc.Finch) do
+                {:ok, %Finch.Response{status: s, body: retry_body}}
+                when s in 200..299 ->
+                  case Jason.decode(retry_body) do
+                    {:ok, data} -> {:ok, get_response_entity(data, "Deposit")}
+                    _ -> {:error, :invalid_response}
+                  end
+
+                {:ok, %Finch.Response{status: s, body: retry_body}} ->
+                  error = parse_error_response(retry_body)
+
+                  Ysc.Logging.error(
+                    "QuickBooks API error updating Deposit after token refresh",
+                    deposit_id: deposit_id,
+                    status: s,
+                    error: error
+                  )
+
+                  {:error, error}
+
+                {:error, error} ->
+                  Ysc.Logging.error(
+                    "Failed to update QuickBooks Deposit after token refresh",
+                    deposit_id: deposit_id,
+                    error: inspect(error)
+                  )
+
+                  {:error, :request_failed}
+              end
+
+            error ->
+              error
+          end
 
         {:ok, %Finch.Response{status: status, body: response_body}} ->
           error = parse_error_response(response_body)
