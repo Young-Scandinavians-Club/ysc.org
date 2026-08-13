@@ -2596,7 +2596,12 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">QuickBooks Deposit ID</p>
                 <a
-                  href={quickbooks_entity_url("deposit", @selected_payout.quickbooks_deposit_id)}
+                  href={
+                    quickbooks_entity_url(
+                      "deposit",
+                      @selected_payout.quickbooks_deposit_id
+                    )
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-zinc-900 hover:text-blue-600 font-mono text-xs transition-colors underline decoration-dotted"
@@ -3538,7 +3543,12 @@ defmodule YscWeb.AdminMoneyLive do
               <div>
                 <p class="font-medium text-zinc-700">QuickBooks Bill ID</p>
                 <a
-                  href={quickbooks_entity_url("bill", @selected_expense_report.quickbooks_bill_id)}
+                  href={
+                    quickbooks_entity_url(
+                      "bill",
+                      @selected_expense_report.quickbooks_bill_id
+                    )
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-zinc-900 hover:text-blue-600 font-mono text-xs transition-colors underline decoration-dotted"
