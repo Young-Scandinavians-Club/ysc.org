@@ -1168,7 +1168,8 @@ defmodule YscWeb.EventDetailsLive do
                 </p>
                 <p
                   :if={
-                    @current_user != nil && !@active_membership? && @has_ticket_tiers &&
+                    @current_user != nil && !@active_membership? &&
+                      @has_ticket_tiers &&
                       !event_in_past?(@event)
                   }
                   class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
