@@ -1252,7 +1252,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <div class="space-y-2 text-sm">
                         <span :if={@selected_booking_mode == :day}>
                           <% nights = Date.diff(@checkout_date, @checkin_date) %>
-                          <% segments = (@price_breakdown && @price_breakdown[:segments]) || [] %>
+                          <% segments =
+                            (@price_breakdown && @price_breakdown[:segments]) || [] %>
                           <%= if length(segments) > 1 do %>
                             <div class="text-xs text-zinc-500 mb-1">
                               Shared cabin stay ({@guests_count} {if @guests_count ==
@@ -1265,14 +1266,17 @@ defmodule YscWeb.ClearLakeBookingLive do
                                                                                                     else:
                                                                                                       "nights"}) · rate varies by season
                             </div>
-                            <div :for={segment <- segments} class="flex justify-between items-center text-zinc-600 text-xs">
+                            <div
+                              :for={segment <- segments}
+                              class="flex justify-between items-center text-zinc-600 text-xs"
+                            >
                               <span>
                                 {segment.season_name || "Unnamed season"} — {segment.nights} {if segment.nights ==
-                                                                                                     1,
-                                                                                                   do:
-                                                                                                     "night",
-                                                                                                   else:
-                                                                                                     "nights"} @ {MoneyHelper.format_money!(
+                                                                                                   1,
+                                                                                                 do:
+                                                                                                   "night",
+                                                                                                 else:
+                                                                                                   "nights"} @ {MoneyHelper.format_money!(
                                   segment.price_per_guest_per_night
                                 )}/guest/night
                               </span>
@@ -1311,12 +1315,13 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 Shared cabin stay ({@guests_count} {if @guests_count ==
                                                                          1,
                                                                        do: "adult",
-                                                                       else: "adults"} × {nights} {if nights ==
-                                                                                                        1,
-                                                                                                      do:
-                                                                                                        "night",
-                                                                                                      else:
-                                                                                                        "nights"})
+                                                                       else:
+                                                                         "adults"} × {nights} {if nights ==
+                                                                                                    1,
+                                                                                                  do:
+                                                                                                    "night",
+                                                                                                  else:
+                                                                                                    "nights"})
                               </span>
                               <span class="font-bold text-zinc-900">
                                 {MoneyHelper.format_money!(line_gross)}

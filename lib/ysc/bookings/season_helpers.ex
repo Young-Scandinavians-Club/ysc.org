@@ -236,7 +236,13 @@ defmodule Ysc.Bookings.SeasonHelpers do
   defp calculate_max_booking_date_no_limit(current_season, today, seasons) do
     {_season_start, season_end} = get_season_date_range(current_season, today)
 
-    resolve_unlimited_chain(current_season, current_season, today, seasons, season_end)
+    resolve_unlimited_chain(
+      current_season,
+      current_season,
+      today,
+      seasons,
+      season_end
+    )
   end
 
   # Walks forward through the season chain starting after `current_season`,
@@ -247,7 +253,13 @@ defmodule Ysc.Bookings.SeasonHelpers do
   # property's rotation restricts advance booking at all, so the calendar is
   # capped at a practical horizon (`@unlimited_horizon_days`) instead of
   # literally forever.
-  defp resolve_unlimited_chain(origin_season, current_season, today, seasons, max_date) do
+  defp resolve_unlimited_chain(
+         origin_season,
+         current_season,
+         today,
+         seasons,
+         max_date
+       ) do
     next_season = get_next_season(current_season, today, seasons)
 
     cond do
@@ -259,12 +271,26 @@ defmodule Ysc.Bookings.SeasonHelpers do
 
       next_season.advance_booking_days && next_season.advance_booking_days > 0 ->
         next_season_max = Date.add(today, next_season.advance_booking_days)
-        if Date.compare(next_season_max, max_date) == :gt, do: next_season_max, else: max_date
+
+        if Date.compare(next_season_max, max_date) == :gt,
+          do: next_season_max,
+          else: max_date
 
       true ->
         {_next_start, next_end} = get_season_date_range(next_season, today)
-        new_max = if Date.compare(next_end, max_date) == :gt, do: next_end, else: max_date
-        resolve_unlimited_chain(origin_season, next_season, today, seasons, new_max)
+
+        new_max =
+          if Date.compare(next_end, max_date) == :gt,
+            do: next_end,
+            else: max_date
+
+        resolve_unlimited_chain(
+          origin_season,
+          next_season,
+          today,
+          seasons,
+          new_max
+        )
     end
   end
 

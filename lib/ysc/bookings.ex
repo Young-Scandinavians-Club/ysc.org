@@ -3451,7 +3451,8 @@ defmodule Ysc.Bookings do
     # season boundary, so each night's rate is looked up individually
     # (mirroring calculate_buyout_price/4) rather than pricing the whole
     # stay off the check-in date's season alone.
-    date_range = Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
+    date_range =
+      Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
 
     nightly_rates =
       Enum.map(date_range, fn date ->

@@ -378,8 +378,16 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       assert breakdown.price_per_guest_per_night == nil
 
       assert [
-               %{season_name: summer_name, nights: 3, price_per_guest_per_night: summer_rate},
-               %{season_name: winter_name, nights: 2, price_per_guest_per_night: winter_rate}
+               %{
+                 season_name: summer_name,
+                 nights: 3,
+                 price_per_guest_per_night: summer_rate
+               },
+               %{
+                 season_name: winter_name,
+                 nights: 2,
+                 price_per_guest_per_night: winter_rate
+               }
              ] = breakdown.segments
 
       assert summer_name =~ "Summer"

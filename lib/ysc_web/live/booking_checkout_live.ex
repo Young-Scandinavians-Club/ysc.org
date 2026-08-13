@@ -2649,7 +2649,9 @@ defmodule YscWeb.BookingCheckoutLive do
                 {MoneyHelper.format_money!(segment.price_per_guest_per_night)}/guest/night
               </div>
               <div class="text-zinc-400 text-xs">
-                × {segment.nights} {if segment.nights == 1, do: "night", else: "nights"}
+                × {segment.nights} {if segment.nights == 1,
+                  do: "night",
+                  else: "nights"}
               </div>
               <div class="text-right font-medium tabular-nums">
                 {MoneyHelper.format_money!(segment.total)}
