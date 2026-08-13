@@ -5355,10 +5355,33 @@ defmodule YscWeb.AdminBookingsLive do
 
       case result do
         {:ok, _refund} ->
-          # Optionally release booking availability
-          if release_availability do
-            Bookings.update_booking(booking, %{status: :refunded})
-          end
+          release_result =
+            if release_availability do
+              release_booking_availability_after_refund(booking)
+            else
+              :ok
+            end
+
+          flash_message =
+            case release_result do
+              :ok ->
+                if release_availability do
+                  "Refund processed successfully and booking dates released"
+                else
+                  "Refund processed successfully"
+                end
+
+              {:error, reason} ->
+                require Ysc.Logging
+
+                Ysc.Logging.warning(
+                  "Refund processed but failed to release booking availability",
+                  booking_id: booking.id,
+                  reason: reason
+                )
+
+                "Refund processed successfully (warning: failed to release availability)"
+            end
 
           # Preserve date range if available
           query_params = %{property: socket.assigns.selected_property}
@@ -5376,9 +5399,7 @@ defmodule YscWeb.AdminBookingsLive do
 
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:info, "Refund processed successfully",
-             title: "Refund"
-           )
+           |> YscWeb.Flash.put_toast(:info, flash_message, title: "Refund")
            |> assign(:show_refund_modal, false)
            |> push_patch(
              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
@@ -6483,6 +6504,31 @@ defmodule YscWeb.AdminBookingsLive do
     do: :ok
 
   defp normalize_release_result({:error, reason}), do: {:error, reason}
+
+  # Mirrors admin_money_live's release_availability_for_payment/1: a plain status
+  # update would leave PropertyInventory/RoomInventory stuck as held/booked.
+  defp release_booking_availability_after_refund(%{status: :complete} = booking) do
+    case BookingLocker.refund_complete_booking(booking.id, true) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp release_booking_availability_after_refund(%{status: :hold} = booking) do
+    case BookingLocker.release_hold(booking.id) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp release_booking_availability_after_refund(booking) do
+    case Bookings.update_booking(booking, %{status: :refunded},
+           skip_validation: true
+         ) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   # Status transitions away from :hold/:complete hold real PropertyInventory /
   # RoomInventory reservations. Editing `status` via the plain changeset path

@@ -1938,6 +1938,79 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     end
   end
 
+  describe "booking refund modal" do
+    setup [:create_admin]
+
+    test "process refund with release availability releases day capacity inventory",
+         %{
+           conn: conn
+         } do
+      ensure_clear_lake_pricing_rules!()
+      guest = user_fixture(%{first_name: "Refund", last_name: "Release"})
+
+      checkin = ~D[2037-05-10]
+      checkout = ~D[2037-05-13]
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_admin_booking(
+          %{
+            user_id: guest.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day,
+            total_price: Money.new(400, :USD)
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:ok, {payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: guest.id,
+                 amount: booking.total_price,
+                 entity_type: :booking,
+                 entity_id: booking.id,
+                 external_payment_id:
+                   "pi_admin_refund_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(100, :USD),
+                 description: "Booking payment",
+                 property: booking.property,
+                 payment_method_id: nil
+               })
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+
+      refund_amount =
+        payment.amount
+        |> Money.to_decimal()
+        |> Decimal.to_string(:normal)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/bookings/#{booking.id}")
+
+      assert has_element?(view, "button[phx-click='show-booking-refund-modal']")
+
+      view |> render_click("show-booking-refund-modal")
+
+      assert has_element?(view, "#booking-refund-form")
+
+      view
+      |> form("#booking-refund-form", %{
+        "refund" => %{
+          "amount" => refund_amount,
+          "reason" => "Admin refund test",
+          "release_availability" => "true"
+        }
+      })
+      |> render_submit()
+
+      assert Bookings.get_booking!(booking.id).status == :refunded
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+    end
+  end
+
   defp insert_pricing_rule!(attrs) do
     default_attrs = %{
       amount: Money.new(100, :USD),
