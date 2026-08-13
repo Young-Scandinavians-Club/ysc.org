@@ -2595,9 +2595,20 @@ defmodule YscWeb.AdminMoneyLive do
             <%= if @selected_payout.quickbooks_deposit_id do %>
               <div>
                 <p class="font-medium text-zinc-700">QuickBooks Deposit ID</p>
-                <p class="text-zinc-900 font-mono text-xs">
+                <a
+                  href={
+                    quickbooks_entity_url(
+                      "deposit",
+                      @selected_payout.quickbooks_deposit_id
+                    )
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-zinc-900 hover:text-blue-600 font-mono text-xs transition-colors underline decoration-dotted"
+                  title="View in QuickBooks"
+                >
                   {@selected_payout.quickbooks_deposit_id}
-                </p>
+                </a>
               </div>
             <% end %>
             <%= if @selected_payout.quickbooks_synced_at do %>
@@ -3104,9 +3115,20 @@ defmodule YscWeb.AdminMoneyLive do
               <%= if @selected_payment.quickbooks_sales_receipt_id do %>
                 <div>
                   <p class="font-medium text-zinc-700">Sales Receipt ID</p>
-                  <p class="text-zinc-900 font-mono text-xs">
+                  <a
+                    href={
+                      quickbooks_entity_url(
+                        "salesreceipt",
+                        @selected_payment.quickbooks_sales_receipt_id
+                      )
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-zinc-900 hover:text-blue-600 font-mono text-xs transition-colors underline decoration-dotted"
+                    title="View in QuickBooks"
+                  >
                     {@selected_payment.quickbooks_sales_receipt_id}
-                  </p>
+                  </a>
                 </div>
               <% end %>
               <%= if @selected_payment.quickbooks_synced_at do %>
@@ -3520,9 +3542,20 @@ defmodule YscWeb.AdminMoneyLive do
             <%= if @selected_expense_report.quickbooks_bill_id do %>
               <div>
                 <p class="font-medium text-zinc-700">QuickBooks Bill ID</p>
-                <p class="text-zinc-900 font-mono text-xs">
+                <a
+                  href={
+                    quickbooks_entity_url(
+                      "bill",
+                      @selected_expense_report.quickbooks_bill_id
+                    )
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-zinc-900 hover:text-blue-600 font-mono text-xs transition-colors underline decoration-dotted"
+                  title="View in QuickBooks"
+                >
                   {@selected_expense_report.quickbooks_bill_id}
-                </p>
+                </a>
               </div>
             <% end %>
             <%= if @selected_expense_report.quickbooks_vendor_id do %>
@@ -3787,6 +3820,18 @@ defmodule YscWeb.AdminMoneyLive do
 
   defp format_datetime(nil, _timezone, _format), do: "—"
   defp format_datetime(_, _timezone, _format), do: "—"
+
+  defp quickbooks_entity_url(entity, txn_id) do
+    qb = Application.get_env(:ysc, :quickbooks) || %{}
+    base_url = to_string(qb[:url] || "")
+
+    host =
+      if String.contains?(base_url, "sandbox"),
+        do: "https://app.sandbox.qbo.intuit.com",
+        else: "https://app.qbo.intuit.com"
+
+    "#{host}/app/#{entity}?txnId=#{URI.encode_www_form(to_string(txn_id))}"
+  end
 
   defp get_payment_type_color(payment_type) do
     case payment_type do
