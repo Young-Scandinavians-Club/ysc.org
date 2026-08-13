@@ -102,6 +102,15 @@ defmodule Ysc.Quickbooks.ClientTest do
     test "query_class_by_name/1 accepts name parameter" do
       assert function_exported?(Client, :query_class_by_name, 1)
     end
+
+    test "get_deposit_by_id/1 accepts a deposit id" do
+      assert function_exported?(Client, :get_deposit_by_id, 1)
+    end
+
+    test "update_deposit/2 and /3 accept a deposit id, new lines, and opts" do
+      assert function_exported?(Client, :update_deposit, 2)
+      assert function_exported?(Client, :update_deposit, 3)
+    end
   end
 
   describe "error handling" do
@@ -469,6 +478,41 @@ defmodule Ysc.Quickbooks.ClientTest do
              }
 
       assert body["TotalAmt"] == 50.0
+    end
+
+    test "omits DepositLineDetail entirely when line has LinkedTxn (QuickBooks validation)" do
+      # Regression test: a Deposit line linked to a SalesReceipt/RefundReceipt
+      # via LinkedTxn must be sent as ONLY Amount + LinkedTxn (+ Description) -
+      # no DepositLineDetail/AccountRef/ClassRef at all. QuickBooks silently
+      # drops DepositLineDetail from these lines on read (confirmed against a
+      # real Deposit in production), and sending one back on a sparse update
+      # gets rejected with a generic 6000 "business validation error" - even
+      # though create_deposit/2 tolerates it. Caught when the first
+      # production payout hit update_deposit/3 with a real missing line.
+      line =
+        Client.test_normalize_deposit_line_item(%{
+          amount: 65.0,
+          detail_type: "DepositLineDetail",
+          deposit_line_detail: %{
+            account_ref: %{value: "uf_1"},
+            class_ref: %{value: "class_1"}
+          },
+          linked_txn: [%{txn_id: "sr_1", txn_type: "SalesReceipt"}],
+          description: "Payment PMT-1"
+        })
+
+      refute Map.has_key?(line, "DepositLineDetail")
+      refute Map.has_key?(line, "DetailType")
+      assert line["Amount"] == 65.0
+      assert line["Description"] == "Payment PMT-1"
+
+      assert line["LinkedTxn"] == [
+               %{
+                 "TxnId" => "sr_1",
+                 "TxnType" => "SalesReceipt",
+                 "TxnLineId" => "0"
+               }
+             ]
     end
 
     test "TotalAmt is sum of line amounts rounded in Decimal (avoids float drift)" do

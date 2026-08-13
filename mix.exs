@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.19.0",
+      version: "2.20.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -255,7 +255,7 @@ defmodule Ysc.MixProject do
       {:phoenix_ecto, "~> 4.7"},
       {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_html, "~> 4.3"},
-      {:phoenix_live_dashboard, "~> 0.8"},
+      {:phoenix_live_dashboard, "~> 0.9"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
       {:phoenix_live_view, "~> 1.2"},
       {:phoenix_test, "~> 0.11", only: :test, runtime: false},

@@ -2608,19 +2608,22 @@ defmodule YscWeb.AdminBookingsLive do
                   </span>
                 </:col>
                 <:action :let={{_, booking}}>
-                  <div class="flex flex-wrap gap-2 items-center">
-                    <.button
-                      type="button"
-                      variant="outline"
-                      color="blue"
+                  <.row_actions_dropdown
+                    id={"reservation-actions-#{booking.id}"}
+                    label="Reservation actions"
+                  >
+                    <.dropdown_menu_item
+                      id={"reservation-view-#{booking.id}"}
+                      icon="hero-eye"
                       phx-click="view-booking"
                       phx-value-booking-id={booking.id}
                       phx-disable-with="Opening..."
-                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       View
-                    </.button>
-                    <.button
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      id={"reservation-edit-#{booking.id}"}
+                      icon="hero-pencil-square"
                       patch={
                         query_params = %{
                           "property" => Atom.to_string(@selected_property),
@@ -2632,25 +2635,21 @@ defmodule YscWeb.AdminBookingsLive do
                           URI.encode_query(query_params)
                       }
                       phx-disable-with="Loading..."
-                      variant="outline"
-                      color="blue"
-                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       Edit
-                    </.button>
-                    <.button
-                      type="button"
-                      variant="outline"
-                      color="red"
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      id={"reservation-delete-#{booking.id}"}
+                      icon="hero-trash"
+                      tone={:danger}
                       phx-click="delete-booking"
                       phx-value-id={booking.id}
                       data-confirm="Are you sure you want to delete this booking?"
                       phx-disable-with="Deleting..."
-                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       Delete
-                    </.button>
-                  </div>
+                    </.dropdown_menu_item>
+                  </.row_actions_dropdown>
                 </:action>
               </Flop.Phoenix.table>
 
@@ -4557,15 +4556,13 @@ defmodule YscWeb.AdminBookingsLive do
 
     case release_inventory_before_delete(booking) do
       :ok ->
-        booking = Bookings.get_booking!(id)
+        Bookings.send_admin_deletion_notifications(
+          booking,
+          socket.assigns.current_user
+        )
 
         case Bookings.delete_booking(booking) do
           {:ok, _deleted} ->
-            Bookings.send_admin_deletion_notifications(
-              booking,
-              socket.assigns.current_user
-            )
-
             # Remove from stream if we're on the reservations section
             socket =
               if socket.assigns[:current_section] == :reservations do
@@ -4591,7 +4588,7 @@ defmodule YscWeb.AdminBookingsLive do
                 |> push_patch(
                   to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
                 )
-                |> update_calendar_view(socket.assigns.selected_property)
+                |> maybe_update_calendar_view(socket.assigns.selected_property)
               end
 
             {:noreply,
@@ -5355,10 +5352,33 @@ defmodule YscWeb.AdminBookingsLive do
 
       case result do
         {:ok, _refund} ->
-          # Optionally release booking availability
-          if release_availability do
-            Bookings.update_booking(booking, %{status: :refunded})
-          end
+          release_result =
+            if release_availability do
+              release_booking_availability_after_refund(booking)
+            else
+              :ok
+            end
+
+          flash_message =
+            case release_result do
+              :ok ->
+                if release_availability do
+                  "Refund processed successfully and booking dates released"
+                else
+                  "Refund processed successfully"
+                end
+
+              {:error, reason} ->
+                require Ysc.Logging
+
+                Ysc.Logging.warning(
+                  "Refund processed but failed to release booking availability",
+                  booking_id: booking.id,
+                  reason: reason
+                )
+
+                "Refund processed successfully (warning: failed to release availability)"
+            end
 
           # Preserve date range if available
           query_params = %{property: socket.assigns.selected_property}
@@ -5376,9 +5396,7 @@ defmodule YscWeb.AdminBookingsLive do
 
           {:noreply,
            socket
-           |> YscWeb.Flash.put_toast(:info, "Refund processed successfully",
-             title: "Refund"
-           )
+           |> YscWeb.Flash.put_toast(:info, flash_message, title: "Refund")
            |> assign(:show_refund_modal, false)
            |> push_patch(
              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
@@ -6484,6 +6502,31 @@ defmodule YscWeb.AdminBookingsLive do
 
   defp normalize_release_result({:error, reason}), do: {:error, reason}
 
+  # Mirrors admin_money_live's release_availability_for_payment/1: a plain status
+  # update would leave PropertyInventory/RoomInventory stuck as held/booked.
+  defp release_booking_availability_after_refund(%{status: :complete} = booking) do
+    case BookingLocker.refund_complete_booking(booking.id, true) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp release_booking_availability_after_refund(%{status: :hold} = booking) do
+    case BookingLocker.release_hold(booking.id) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp release_booking_availability_after_refund(booking) do
+    case Bookings.update_booking(booking, %{status: :refunded},
+           skip_validation: true
+         ) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # Status transitions away from :hold/:complete hold real PropertyInventory /
   # RoomInventory reservations. Editing `status` via the plain changeset path
   # below would leave that inventory permanently stuck as held/booked, so
@@ -6992,7 +7035,15 @@ defmodule YscWeb.AdminBookingsLive do
     socket
     |> YscWeb.Flash.put_toast(:info, message)
     |> push_patch(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
-    |> update_calendar_view(socket.assigns.selected_property)
+    |> maybe_update_calendar_view(socket.assigns.selected_property)
+  end
+
+  defp maybe_update_calendar_view(socket, property) do
+    if socket.assigns[:current_section] == :calendar do
+      update_calendar_view(socket, property)
+    else
+      socket
+    end
   end
 
   defp translate_errors(changeset) do

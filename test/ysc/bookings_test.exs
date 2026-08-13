@@ -4872,6 +4872,57 @@ defmodule Ysc.BookingsTest do
         )
       end)
     end
+
+    test "send_admin_deletion_notifications/2 uses preloaded user without reloading row" do
+      deactivate_tahoe_buyout_refund_policies()
+
+      guest = user_fixture()
+      admin = user_fixture(%{email: "admin@example.com"})
+      _cabin_master = assign_board!(user_fixture(), :tahoe_cabin_master)
+
+      checkin = Date.utc_today() |> Date.add(100) |> first_monday_on_or_after()
+      checkout = Date.add(checkin, 3)
+
+      booking =
+        complete_buyout_booking_with_stripe_payment!(guest, checkin, checkout)
+
+      booking = Bookings.get_booking!(booking.id)
+      assert {:ok, deleted} = Bookings.delete_booking(booking)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Bookings.send_admin_deletion_notifications(deleted, admin)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{"template" => "booking_cancellation_confirmation"}
+        )
+      end)
+    end
+
+    test "send_admin_deletion_notifications/2 cannot notify after delete without preloaded user" do
+      deactivate_tahoe_buyout_refund_policies()
+
+      guest = user_fixture()
+      admin = user_fixture(%{email: "admin@example.com"})
+
+      checkin = Date.utc_today() |> Date.add(100) |> first_monday_on_or_after()
+      checkout = Date.add(checkin, 3)
+
+      booking =
+        complete_buyout_booking_with_stripe_payment!(guest, checkin, checkout)
+
+      booking = Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id)
+      assert {:ok, deleted} = Bookings.delete_booking(booking)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Bookings.send_admin_deletion_notifications(deleted, admin)
+
+        refute_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{"template" => "booking_cancellation_confirmation"}
+        )
+      end)
+    end
   end
 
   describe "sync_hold_checkout_pricing/2" do

@@ -42,6 +42,192 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
+  import Mox
+
+  @job %Oban.Job{
+    id: 1,
+    args: %{},
+    worker: "Ysc.Ledgers.ReconciliationWorker",
+    queue: "maintenance",
+    state: "available",
+    attempt: 1
+  }
+
+  describe "perform/1 - payout auto-heal" do
+    setup do
+      Ledgers.ensure_basic_accounts()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        if previous_client do
+          Application.put_env(:ysc, :stripe_client, previous_client)
+        else
+          Application.delete_env(:ysc, :stripe_client)
+        end
+      end)
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+      :ok
+    end
+
+    test "relinks a payout whose charge's payment was created after the payout closed" do
+      uniq = System.unique_integer([:positive])
+      stripe_payout_id = "po_autoheal_#{uniq}"
+      pi_id = "pi_autoheal_#{uniq}"
+      ch_id = "ch_autoheal_#{uniq}"
+
+      # Simulates the production bug: the payout was already processed (e.g.
+      # via the `payout.paid` webhook) with nothing to link, because the ACH
+      # charge it contains hadn't produced a local Payment yet. Payout amount
+      # is net of the $2.19 processing fee stubbed on the charge below.
+      {:ok, {_payout_payment, _transaction, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "62.81"),
+          stripe_payout_id: stripe_payout_id,
+          description: "Test payout - autoheal",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now()
+        })
+
+      before_report = Reconciliation.reconcile_payouts()
+
+      assert Enum.any?(before_report.discrepancies, fn d ->
+               d.stripe_payout_id == stripe_payout_id and
+                 Enum.any?(
+                   d.issues,
+                   &String.starts_with?(&1, "Payout composition mismatch")
+                 )
+             end)
+
+      # The charge's Payment record shows up later (e.g. once the ACH debit
+      # actually settles and `invoice.payment_succeeded` finally arrives).
+      payment =
+        Ysc.LedgersFixtures.payment_fixture(
+          external_payment_id: pi_id,
+          amount: Money.new(:USD, "65.00")
+        )
+
+      stub(Ysc.StripeMock, :retrieve_payout, fn ^stripe_payout_id, _opts ->
+        {:ok,
+         %Stripe.Payout{
+           id: stripe_payout_id,
+           object: "payout",
+           amount: 6500,
+           currency: "usd",
+           status: "paid",
+           arrival_date: System.os_time(:second),
+           description: "Test payout - autoheal",
+           balance_transaction: %Stripe.BalanceTransaction{
+             id: "txn_payout_#{uniq}",
+             type: "payout",
+             fee: 0,
+             amount: -6500,
+             net: -6500,
+             currency: "usd"
+           }
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :list_balance_transactions, fn params, _opts ->
+        assert params.payout == stripe_payout_id
+
+        {:ok,
+         %Stripe.List{
+           object: "list",
+           data: [
+             %Stripe.BalanceTransaction{
+               id: "txn_charge_#{uniq}",
+               object: "balance_transaction",
+               type: "charge",
+               reporting_category: "charge",
+               amount: 6500,
+               fee: 219,
+               net: 6281,
+               currency: "usd",
+               description: "Subscription creation",
+               source: %{
+                 id: ch_id,
+                 object: "charge",
+                 amount: 6500,
+                 payment_intent: pi_id,
+                 invoice: nil
+               }
+             },
+             %Stripe.BalanceTransaction{
+               id: "txn_payout_#{uniq}",
+               object: "balance_transaction",
+               type: "payout",
+               reporting_category: "payout",
+               amount: -6500,
+               fee: 0,
+               net: -6500,
+               currency: "usd",
+               description: "Test payout - autoheal",
+               source: stripe_payout_id
+             }
+           ],
+           has_more: false,
+           url: "/v1/balance_transactions"
+         }}
+      end)
+
+      assert {:ok, _report} = ReconciliationWorker.perform(@job)
+
+      healed_payout =
+        Ledgers.get_payout!(payout.id) |> Repo.preload(:payments)
+
+      assert Enum.any?(healed_payout.payments, &(&1.id == payment.id))
+
+      after_report = Reconciliation.reconcile_payouts()
+
+      refute Enum.any?(after_report.discrepancies, fn d ->
+               d.stripe_payout_id == stripe_payout_id
+             end)
+    end
+
+    test "does not attempt to relink payouts older than the lookback window" do
+      uniq = System.unique_integer([:positive])
+      stripe_payout_id = "po_autoheal_old_#{uniq}"
+
+      {:ok, {_payout_payment, _transaction, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "65.00"),
+          stripe_payout_id: stripe_payout_id,
+          description: "Test payout - too old to autoheal",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now()
+        })
+
+      backdated = DateTime.add(DateTime.utc_now(), -60, :day)
+
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "UPDATE payouts SET inserted_at = $1 WHERE id = $2",
+        [DateTime.truncate(backdated, :second), to_uuid(payout.id)]
+      )
+
+      # attempt_payout_relink/2 wraps its body in `rescue`, so a raised Mox
+      # error wouldn't actually fail this test - assert explicitly instead
+      # of relying on that.
+      test_pid = self()
+
+      stub(Ysc.StripeMock, :retrieve_payout, fn id, _opts ->
+        send(test_pid, {:unexpected_retrieve_payout, id})
+        {:error, :not_stubbed}
+      end)
+
+      assert {:ok, _report} = ReconciliationWorker.perform(@job)
+      refute_received {:unexpected_retrieve_payout, ^stripe_payout_id}
+
+      untouched_payout =
+        Ledgers.get_payout!(payout.id) |> Repo.preload(:payments)
+
+      assert untouched_payout.payments == []
+    end
+  end
 
   describe "perform/1 - payment discrepancies" do
     setup do

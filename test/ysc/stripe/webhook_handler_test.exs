@@ -3590,6 +3590,92 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Relinking an already-deposited payout must never re-trigger a QuickBooks
+  # *create*. Sync.sync_payout/1 always checks an already-deposited payout
+  # against QuickBooks for drift (a payment can link after the deposit was
+  # created) rather than blindly re-creating - see
+  # Ysc.Quickbooks.SyncTest's "sync_payout/1" describe block for the
+  # create/update/no-op/conflict dispatch itself. This just proves the
+  # webhook_handler.ex -> Sync wiring doesn't regress into re-creating.
+  # ---------------------------------------------------------------------------
+  describe "relink_payout_transactions/1 does not duplicate an existing QuickBooks deposit" do
+    import Mox
+
+    setup :verify_on_exit!
+
+    setup do
+      Ledgers.ensure_basic_accounts()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      on_exit(fn ->
+        if previous_client do
+          Application.put_env(:ysc, :stripe_client, previous_client)
+        else
+          Application.delete_env(:ysc, :stripe_client)
+        end
+      end)
+
+      :ok
+    end
+
+    test "leaves an already-synced payout's QuickBooks state untouched" do
+      payout = Ysc.LedgersFixtures.payout_fixture()
+
+      synced_payout =
+        payout
+        |> Ledgers.Payout.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_deposit_id: "dep_existing_123",
+          fee_total: Money.new(0, :USD)
+        })
+        |> Ysc.Repo.update!()
+
+      stub(Ysc.StripeMock, :retrieve_payout, fn _id, _opts ->
+        {:ok,
+         %Stripe.Payout{
+           id: synced_payout.stripe_payout_id,
+           object: "payout",
+           balance_transaction: nil
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :list_balance_transactions, fn _params, _opts ->
+        {:ok,
+         %Stripe.List{
+           object: "list",
+           data: [],
+           has_more: false,
+           url: "/v1/balance_transactions"
+         }}
+      end)
+
+      # No payments/refunds are linked to this payout, so there's nothing
+      # for the diff to find missing - Sync.sync_payout/1 should still ask
+      # QuickBooks first, though. expect/3 (not stub/3) so the test fails if
+      # that read is ever skipped, and deny/3 create_deposit so it fails if
+      # the code ever falls back to re-creating instead of diffing.
+      expect(
+        Ysc.Quickbooks.ClientMock,
+        :get_deposit_by_id,
+        fn "dep_existing_123" ->
+          {:ok, %{"Id" => "dep_existing_123", "SyncToken" => "0", "Line" => []}}
+        end
+      )
+
+      deny(Ysc.Quickbooks.ClientMock, :create_deposit, 2)
+
+      _ = WebhookHandler.relink_payout_transactions(synced_payout)
+
+      reloaded = Ledgers.get_payout!(payout.id)
+
+      assert reloaded.quickbooks_sync_status == "synced"
+      assert reloaded.quickbooks_deposit_id == "dep_existing_123"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Full mixed payout integration.
   #
   # Shape follows Stripe Dashboard payout po_1TyL7dIZd8GkARoBdw1Ipxew:

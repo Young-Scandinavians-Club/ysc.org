@@ -716,6 +716,254 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   @doc """
+  Fetches a Deposit by ID from QuickBooks.
+  """
+  @spec get_deposit_by_id(String.t()) :: {:ok, map()} | {:error, atom()}
+  def get_deposit_by_id(deposit_id) do
+    with {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      url = build_url(company_id, "deposit/#{deposit_id}", [])
+      headers = build_headers(access_token)
+      request = Finch.build(:get, url, headers)
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          case Jason.decode(response_body) do
+            {:ok, data} ->
+              {:ok, get_response_entity(data, "Deposit")}
+
+            {:error, error} ->
+              Ysc.Logging.error("Failed to parse get_deposit_by_id response",
+                error: inspect(error),
+                response: response_body
+              )
+
+              {:error, :invalid_response}
+          end
+
+        {:error, {:rate_limited, _resp}} ->
+          Ysc.Logging.warning("QuickBooks rate limit exceeded after retries",
+            endpoint: "deposit",
+            deposit_id: deposit_id,
+            max_retries: max_429_retries()
+          )
+
+          {:error, :rate_limited}
+
+        {:ok, %Finch.Response{status: 401, body: _}} ->
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:get, url, headers)
+
+              case Finch.request(request, Ysc.Finch) do
+                {:ok, %Finch.Response{status: s, body: body}}
+                when s in 200..299 ->
+                  case Jason.decode(body) do
+                    {:ok, data} -> {:ok, get_response_entity(data, "Deposit")}
+                    _ -> {:error, :invalid_response}
+                  end
+
+                _ ->
+                  {:error, :request_failed}
+              end
+
+            error ->
+              error
+          end
+
+        {:ok, %Finch.Response{status: status, body: response_body}} ->
+          Ysc.Logging.error("get_deposit_by_id failed",
+            deposit_id: deposit_id,
+            status: status,
+            response: response_body
+          )
+
+          {:error, :request_failed}
+
+        {:error, error} ->
+          {:error, error}
+      end
+    end
+  end
+
+  @doc """
+  Sparse-updates an existing Deposit in QuickBooks, appending `new_line_items`
+  (same shape as `create_deposit/2`'s `:line` param) to whatever lines the
+  Deposit already has.
+
+  Reads the Deposit first to get its current SyncToken and Line array -
+  QuickBooks Line arrays are replaced wholesale on update, not merged
+  server-side, so the existing lines have to be resent alongside the new
+  ones. Returns `{:error, :stale_object}` if the Deposit was edited elsewhere
+  since the read (QuickBooks error 5010) - callers should not blindly retry
+  that, since it means something else (a human, most likely) touched this
+  Deposit and force-overwriting it would clobber that change.
+  """
+  @spec update_deposit(String.t(), [map()], keyword()) ::
+          {:ok, map()} | {:error, atom() | String.t()}
+  def update_deposit(deposit_id, new_line_items, opts \\ [])
+      when is_list(new_line_items) do
+    with {:ok, existing} <- get_deposit_by_id(deposit_id),
+         {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      normalized_new_lines =
+        Enum.map(new_line_items, &normalize_deposit_line_item/1)
+
+      merged_lines = (existing["Line"] || []) ++ normalized_new_lines
+
+      total_amt =
+        merged_lines
+        |> Enum.reduce(Decimal.new(0), fn line, acc ->
+          Decimal.add(acc, deposit_line_amount_to_decimal(line["Amount"]))
+        end)
+        |> Decimal.round(2)
+        |> Decimal.to_float()
+
+      body =
+        %{
+          "Id" => existing["Id"],
+          "SyncToken" => existing["SyncToken"],
+          "sparse" => true,
+          "DepositToAccountRef" => existing["DepositToAccountRef"],
+          "Line" => merged_lines,
+          "TotalAmt" => total_amt
+        }
+
+      idempotency_key =
+        case Keyword.get(opts, :idempotency_key) do
+          nil -> Keyword.get(opts, :requestid)
+          key -> key
+        end
+
+      url_opts = if idempotency_key, do: [requestid: idempotency_key], else: []
+      url = build_url(company_id, "deposit", url_opts)
+      headers = build_headers(access_token)
+
+      Ysc.Logging.info("Updating QuickBooks Deposit",
+        deposit_id: deposit_id,
+        added_lines: length(normalized_new_lines),
+        total_lines: length(merged_lines),
+        total_amt: total_amt
+      )
+
+      request = Finch.build(:post, url, headers, Jason.encode!(body))
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          case Jason.decode(response_body) do
+            {:ok, data} ->
+              deposit = get_response_entity(data, "Deposit")
+
+              Ysc.Logging.info("Successfully updated QuickBooks Deposit",
+                deposit_id: deposit_id,
+                total_amt: Map.get(deposit, "TotalAmt")
+              )
+
+              {:ok, deposit}
+
+            {:error, error} ->
+              Ysc.Logging.error(
+                "Failed to parse QuickBooks update_deposit response",
+                error: inspect(error),
+                response: response_body
+              )
+
+              {:error, :invalid_response}
+          end
+
+        {:error, {:rate_limited, _resp}} ->
+          {:error, :rate_limited}
+
+        {:ok, %Finch.Response{status: 401, body: _}} ->
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:post, url, headers, Jason.encode!(body))
+
+              case Finch.request(request, Ysc.Finch) do
+                {:ok, %Finch.Response{status: s, body: retry_body}}
+                when s in 200..299 ->
+                  case Jason.decode(retry_body) do
+                    {:ok, data} -> {:ok, get_response_entity(data, "Deposit")}
+                    _ -> {:error, :invalid_response}
+                  end
+
+                {:ok, %Finch.Response{status: s, body: retry_body}} ->
+                  error = parse_error_response(retry_body)
+
+                  Ysc.Logging.error(
+                    "QuickBooks API error updating Deposit after token refresh",
+                    deposit_id: deposit_id,
+                    status: s,
+                    error: error
+                  )
+
+                  {:error, error}
+
+                {:error, error} ->
+                  Ysc.Logging.error(
+                    "Failed to update QuickBooks Deposit after token refresh",
+                    deposit_id: deposit_id,
+                    error: inspect(error)
+                  )
+
+                  {:error, :request_failed}
+              end
+
+            error ->
+              error
+          end
+
+        {:ok, %Finch.Response{status: status, body: response_body}} ->
+          error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
+          error_code = get_primary_error_code(error_details)
+
+          if error_code == "5010" do
+            Ysc.Logging.warning(
+              "QuickBooks Deposit was modified elsewhere since it was read (stale object) - not overwriting",
+              deposit_id: deposit_id,
+              status: status,
+              error: error
+            )
+
+            {:error, :stale_object}
+          else
+            Ysc.Logging.error("QuickBooks API error updating Deposit",
+              deposit_id: deposit_id,
+              status: status,
+              error: error,
+              error_details: error_details
+            )
+
+            {:error, error}
+          end
+
+        {:error, error} ->
+          Ysc.Logging.error("Failed to update QuickBooks Deposit",
+            deposit_id: deposit_id,
+            error: inspect(error)
+          )
+
+          {:error, :request_failed}
+      end
+    end
+  end
+
+  @doc """
   Creates a Customer in QuickBooks.
 
   ## Parameters
@@ -1982,64 +2230,14 @@ defmodule Ysc.Quickbooks.Client do
         _ -> 0
       end
 
-    # Do not put DetailType on base yet: lines that include LinkedTxn must omit
-    # top-level DetailType — QuickBooks otherwise returns validation errors (often
-    # reported as 6000 / "invalid bank account") when DetailType is forced to
-    # DepositLineDetail alongside LinkedTxn. See Intuit/community deposit examples.
     base = %{"Amount" => amount_value}
 
     case item.detail_type do
       "DepositLineDetail" ->
-        detail = item.deposit_line_detail
-        detail_map = %{}
-
-        # AccountRef: expense/source account. Also support entity_ref with type "Account" (legacy).
-        detail_map =
-          cond do
-            detail[:account_ref] ->
-              Map.put(
-                detail_map,
-                "AccountRef",
-                normalize_ref(detail.account_ref)
-              )
-
-            detail[:entity_ref] && detail[:entity_ref][:type] == "Account" ->
-              Map.put(
-                detail_map,
-                "AccountRef",
-                normalize_ref(detail.entity_ref)
-              )
-
-            true ->
-              detail_map
-          end
-
-        detail_map =
-          if detail[:class_ref] do
-            class_ref_map =
-              normalize_class_ref_for_sales_detail(detail.class_ref)
-
-            if class_ref_map do
-              Map.put(detail_map, "ClassRef", class_ref_map)
-            else
-              detail_map
-            end
-          else
-            detail_map
-          end
-
-        # NOTE: PaymentMethodRef is NOT a valid field for DepositLineDetail
-        # It's only valid for SalesReceipt and RefundReceipt entities
-        # Do not include it to prevent QuickBooks validation error (code 2010)
-
-        result = Map.put(base, "DepositLineDetail", detail_map)
-
-        # Add LinkedTxn at the line level (not inside DepositLineDetail)
-        # This is the correct way to link deposits to SalesReceipts/RefundReceipts
-        {result, has_linked?} =
+        {linked_txn_list, has_linked?} =
           case item[:linked_txn] do
             [_ | _] = linked_txns ->
-              linked_txn_list =
+              list =
                 Enum.map(linked_txns, fn txn ->
                   txn_line_id =
                     case txn[:txn_line_id] do
@@ -2054,17 +2252,70 @@ defmodule Ysc.Quickbooks.Client do
                   }
                 end)
 
-              {Map.put(result, "LinkedTxn", linked_txn_list), true}
+              {list, true}
 
             _ ->
-              {result, false}
+              {nil, false}
           end
 
         result =
           if has_linked? do
-            result
+            # A line linked to an existing SalesReceipt/RefundReceipt via
+            # LinkedTxn must be sent as ONLY Amount + LinkedTxn (+
+            # Description) - no top-level DetailType and no
+            # DepositLineDetail/AccountRef/ClassRef at all. The account/class
+            # are inherited from the linked transaction; QuickBooks silently
+            # drops DepositLineDetail from these lines on read (confirmed
+            # against a real Deposit), and sending one back on a sparse
+            # update (create_deposit/2's path, oddly, tolerates it) gets
+            # rejected with a generic 6000 "business validation error".
+            Map.put(base, "LinkedTxn", linked_txn_list)
           else
-            Map.put(result, "DetailType", "DepositLineDetail")
+            detail = item.deposit_line_detail
+            detail_map = %{}
+
+            # AccountRef: expense/source account. Also support entity_ref with type "Account" (legacy).
+            detail_map =
+              cond do
+                detail[:account_ref] ->
+                  Map.put(
+                    detail_map,
+                    "AccountRef",
+                    normalize_ref(detail.account_ref)
+                  )
+
+                detail[:entity_ref] && detail[:entity_ref][:type] == "Account" ->
+                  Map.put(
+                    detail_map,
+                    "AccountRef",
+                    normalize_ref(detail.entity_ref)
+                  )
+
+                true ->
+                  detail_map
+              end
+
+            detail_map =
+              if detail[:class_ref] do
+                class_ref_map =
+                  normalize_class_ref_for_sales_detail(detail.class_ref)
+
+                if class_ref_map do
+                  Map.put(detail_map, "ClassRef", class_ref_map)
+                else
+                  detail_map
+                end
+              else
+                detail_map
+              end
+
+            # NOTE: PaymentMethodRef is NOT a valid field for DepositLineDetail
+            # It's only valid for SalesReceipt and RefundReceipt entities
+            # Do not include it to prevent QuickBooks validation error (code 2010)
+
+            base
+            |> Map.put("DepositLineDetail", detail_map)
+            |> Map.put("DetailType", "DepositLineDetail")
           end
 
         maybe_put(result, "Description", item[:description])
@@ -5494,6 +5745,11 @@ defmodule Ysc.Quickbooks.Client do
     @doc false
     def test_build_deposit_body(params) do
       build_deposit_body(params)
+    end
+
+    @doc false
+    def test_normalize_deposit_line_item(item) do
+      normalize_deposit_line_item(item)
     end
   end
 end
