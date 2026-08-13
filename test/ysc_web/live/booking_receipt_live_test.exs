@@ -2833,6 +2833,57 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "× 3"
     end
 
+    test "renders multi-season buyout segments when pricing_items include segments",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :buyout
+        })
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "buyout",
+            "nights" => 5,
+            "segments" => [
+              %{
+                "season_name" => "Summer",
+                "nights" => 2,
+                "price_per_night" => %{"amount" => "400", "currency" => "USD"},
+                "total" => %{"amount" => "800", "currency" => "USD"}
+              },
+              %{
+                "season_name" => "Winter",
+                "nights" => 3,
+                "price_per_night" => %{"amount" => "300", "currency" => "USD"},
+                "total" => %{"amount" => "900", "currency" => "USD"}
+              }
+            ],
+            "total" => %{"amount" => "1700", "currency" => "USD"}
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(1700, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+
+      assert has_element?(view, "#payment-summary-buyout-segment-2", "Summer")
+      assert has_element?(view, "#payment-summary-buyout-segment-3", "Winter")
+      assert has_element?(view, "#payment-summary-buyout-segment-2", "$800.00")
+      assert has_element?(view, "#payment-summary-buyout-segment-3", "$900.00")
+    end
+
     test "buyout line amount matches nights × rate when subtotal_price is stale",
          %{
            conn: conn
