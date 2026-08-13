@@ -2913,6 +2913,55 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       render_async(view, 5_000)
       assert render(view) =~ "Shared cabin stay"
     end
+
+    test "switching booking mode with dates already selected recalculates the price immediately",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      # A larger offset (vs. the 35 used elsewhere in this file) keeps the
+      # checkin date safely in the future of the real clock: switching mode
+      # triggers push_patch -> handle_params, which re-validates dates
+      # against `cabin_today()`, and the fixed test anchor can otherwise
+      # drift into the past as real time passes.
+      {checkin, checkout} = clear_lake_booking_dates(400, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "2",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+        )
+
+      render_async(view, 5_000)
+      assert :sys.get_state(view.pid).socket.assigns.calculated_price != nil
+
+      # Switch to buyout without touching the dates - the price should update
+      # right away instead of staying nil until the user reselects dates.
+      render_click(view, "booking-mode-changed", %{"booking_mode" => "buyout"})
+      render_async(view, 5_000)
+
+      buyout_state = :sys.get_state(view.pid)
+      assert buyout_state.socket.assigns.selected_booking_mode == :buyout
+      assert buyout_state.socket.assigns.checkin_date == checkin
+      assert buyout_state.socket.assigns.checkout_date == checkout
+      assert buyout_state.socket.assigns.calculated_price != nil
+
+      # Switch back to day - same expectation in the other direction.
+      render_click(view, "booking-mode-changed", %{"booking_mode" => "day"})
+      render_async(view, 5_000)
+
+      day_state = :sys.get_state(view.pid)
+      assert day_state.socket.assigns.selected_booking_mode == :day
+      assert day_state.socket.assigns.calculated_price != nil
+    end
   end
 
   # Helper function for finding next weekday

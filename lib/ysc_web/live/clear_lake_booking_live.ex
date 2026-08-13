@@ -1331,30 +1331,64 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </span>
                         <span :if={@selected_booking_mode == :buyout}>
                           <% nights = Date.diff(@checkout_date, @checkin_date) %>
-                          <% price_per_night =
-                            if @price_breakdown && @price_breakdown.price_per_night do
-                              @price_breakdown.price_per_night
-                            else
-                              if nights > 0 do
-                                {:ok, price} = Money.div(@calculated_price, nights)
-                                price
-                              else
-                                Money.new(0, :USD)
-                              end
-                            end %>
-                          <% buyout_gross =
-                            @price_breakdown[:entitlement_subtotal] ||
-                              Money.mult(price_per_night, nights) |> elem(1) %>
-                          <div class="flex justify-between items-center text-zinc-600">
-                            <span>
+                          <% buyout_segments =
+                            (@price_breakdown && @price_breakdown[:segments]) || [] %>
+                          <%= if length(buyout_segments) > 1 do %>
+                            <div class="text-xs text-zinc-500 mb-1">
                               Entire cabin ({nights} night{if nights != 1,
                                 do: "s",
-                                else: ""})
-                            </span>
-                            <span class="font-bold text-zinc-900">
-                              {MoneyHelper.format_money!(buyout_gross)}
-                            </span>
-                          </div>
+                                else: ""}) · rate varies by season
+                            </div>
+                            <div
+                              :for={segment <- buyout_segments}
+                              class="flex justify-between items-center text-zinc-600 text-xs"
+                            >
+                              <span>
+                                {segment.season_name || "Unnamed season"} — {segment.nights} {if segment.nights ==
+                                                                                                   1,
+                                                                                                 do:
+                                                                                                   "night",
+                                                                                                 else:
+                                                                                                   "nights"}
+                                <%= if segment.price_per_night do %>
+                                  @ {MoneyHelper.format_money!(
+                                    segment.price_per_night
+                                  )}/night
+                                <% end %>
+                              </span>
+                              <span class="font-semibold text-zinc-900">
+                                {MoneyHelper.format_money!(segment.total)}
+                              </span>
+                            </div>
+                          <% else %>
+                            <% price_per_night =
+                              if @price_breakdown &&
+                                   @price_breakdown.price_per_night do
+                                @price_breakdown.price_per_night
+                              else
+                                if nights > 0 do
+                                  {:ok, price} =
+                                    Money.div(@calculated_price, nights)
+
+                                  price
+                                else
+                                  Money.new(0, :USD)
+                                end
+                              end %>
+                            <% buyout_gross =
+                              @price_breakdown[:entitlement_subtotal] ||
+                                Money.mult(price_per_night, nights) |> elem(1) %>
+                            <div class="flex justify-between items-center text-zinc-600">
+                              <span>
+                                Entire cabin ({nights} night{if nights != 1,
+                                  do: "s",
+                                  else: ""})
+                              </span>
+                              <span class="font-bold text-zinc-900">
+                                {MoneyHelper.format_money!(buyout_gross)}
+                              </span>
+                            </div>
+                          <% end %>
                         </span>
                       </div>
 
@@ -2639,14 +2673,32 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   def handle_event("booking-mode-changed", %{"booking_mode" => "day"}, socket) do
+    # Dates may already be selected from the previous mode - recompute
+    # availability and price for :day immediately instead of leaving the
+    # summary blank until the user reselects dates (mirrors the date-change
+    # handler's recalculation at `:availability_calendar_date_changed`).
+    availability_error =
+      if socket.assigns.checkin_date && socket.assigns.checkout_date &&
+           socket.assigns.guests_count do
+        validate_guests_against_availability(
+          socket.assigns.checkin_date,
+          socket.assigns.checkout_date,
+          socket.assigns.guests_count,
+          socket.assigns
+        )
+      else
+        nil
+      end
+
     socket =
       socket
       |> assign(
         selected_booking_mode: :day,
         calculated_price: nil,
         price_error: nil,
-        availability_error: nil
+        availability_error: availability_error
       )
+      |> calculate_price_if_ready()
       |> update_url_with_booking_mode()
 
     {:noreply, socket}
@@ -2657,6 +2709,8 @@ defmodule YscWeb.ClearLakeBookingLive do
         %{"booking_mode" => "buyout"},
         socket
       ) do
+    # Same as above for :buyout - :day's availability_error doesn't apply
+    # here (buyout has no per-guest capacity check), so it's just cleared.
     socket =
       socket
       |> assign(
@@ -2665,6 +2719,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         price_error: nil,
         availability_error: nil
       )
+      |> calculate_price_if_ready()
       |> update_url_with_booking_mode()
 
     {:noreply, socket}

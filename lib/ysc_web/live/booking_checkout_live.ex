@@ -2692,24 +2692,52 @@ defmodule YscWeb.BookingCheckoutLive do
         <% end %>
       <% else %>
         <!-- Buyout booking -->
-        <%= if @price_breakdown[:nights] do %>
-          <div class="flex justify-between text-sm">
-            <span class="text-zinc-400">
-              {@price_breakdown.nights} {if @price_breakdown.nights == 1,
-                do: "night",
-                else: "nights"}
-            </span>
-            <span class="font-medium">
-              {MoneyHelper.format_money!(
-                if(
-                  @price_breakdown[:entitlement_discount] &&
-                    Money.positive?(@price_breakdown[:entitlement_discount]),
-                  do: @price_breakdown[:entitlement_subtotal] || @total_price,
-                  else: @total_price
-                )
-              )}
-            </span>
+        <% buyout_segments = @price_breakdown[:segments] || [] %>
+        <%= if length(buyout_segments) > 1 do %>
+          <!-- Stay spans more than one season: show a line per season -->
+          <div class="text-xs text-zinc-500 mb-1">
+            Entire cabin · rate varies by season
           </div>
+          <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
+            <%= for segment <- buyout_segments do %>
+              <div class="text-zinc-400">
+                {segment.season_name || "Unnamed season"}
+              </div>
+              <div class="text-right text-zinc-500 text-xs tabular-nums">
+                <%= if segment.price_per_night do %>
+                  {MoneyHelper.format_money!(segment.price_per_night)}/night
+                <% end %>
+              </div>
+              <div class="text-zinc-400 text-xs">
+                × {segment.nights} {if segment.nights == 1,
+                  do: "night",
+                  else: "nights"}
+              </div>
+              <div class="text-right font-medium tabular-nums">
+                {MoneyHelper.format_money!(segment.total)}
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <%= if @price_breakdown[:nights] do %>
+            <div class="flex justify-between text-sm">
+              <span class="text-zinc-400">
+                {@price_breakdown.nights} {if @price_breakdown.nights == 1,
+                  do: "night",
+                  else: "nights"}
+              </span>
+              <span class="font-medium">
+                {MoneyHelper.format_money!(
+                  if(
+                    @price_breakdown[:entitlement_discount] &&
+                      Money.positive?(@price_breakdown[:entitlement_discount]),
+                    do: @price_breakdown[:entitlement_subtotal] || @total_price,
+                    else: @total_price
+                  )
+                )}
+              </span>
+            </div>
+          <% end %>
         <% end %>
       <% end %>
     <% end %>

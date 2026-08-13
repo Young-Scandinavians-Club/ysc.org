@@ -3054,13 +3054,14 @@ defmodule Ysc.Bookings do
 
   defp calculate_buyout_price(property, checkin_date, checkout_date, _nights) do
     # For buyouts, we need to check the season for each night
-    # and sum up the prices
+    # and sum up the prices. Nights without a configured pricing rule
+    # contribute $0 (matches prior behavior) rather than erroring, since a
+    # buyout can be requested before every season has buyout pricing set up.
     date_range =
       Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
 
-    {total, price_per_night} =
-      Enum.reduce(date_range, {Money.new(:USD, 0), nil}, fn date,
-                                                            {acc, price_acc} ->
+    nightly_rates =
+      Enum.map(date_range, fn date ->
         season = Season.for_date(property, date)
         season_id = if season, do: season.id, else: nil
 
@@ -3074,23 +3075,59 @@ defmodule Ysc.Bookings do
             :buyout_fixed
           )
 
-        if pricing_rule do
-          # Capture price per night if not yet captured
-          new_price_acc = price_acc || pricing_rule.amount
-          add_pricing_rule_amount(acc, pricing_rule.amount, new_price_acc)
-        else
-          {acc, price_acc}
+        {season, pricing_rule}
+      end)
+
+    segments = build_buyout_price_segments(nightly_rates)
+
+    total =
+      Enum.reduce(segments, Money.new(:USD, 0), fn segment, acc ->
+        case Money.add(acc, segment.total) do
+          {:ok, new_total} -> new_total
+          {:error, _} -> acc
         end
       end)
 
-    nights = length(date_range)
+    uniform_rate =
+      case segments do
+        [%{price_per_night: rate}] when not is_nil(rate) -> rate
+        _ -> nil
+      end
 
     breakdown = %{
-      nights: nights,
-      price_per_night: price_per_night
+      nights: length(date_range),
+      price_per_night: uniform_rate,
+      segments: segments
     }
 
     {:ok, total, breakdown}
+  end
+
+  # Groups consecutive nights that share the same buyout rate into segments,
+  # so a buyout spanning a season boundary prices (and can display) each
+  # part at its own season's rate instead of one blended figure.
+  defp build_buyout_price_segments(nightly_rates) do
+    nightly_rates
+    |> Enum.chunk_by(fn {_season, rule} -> rule && rule.id end)
+    |> Enum.map(fn chunk ->
+      [{season, rule} | _] = chunk
+      nights = length(chunk)
+
+      total =
+        if rule do
+          {:ok, amount} = Money.mult(rule.amount, nights)
+          amount
+        else
+          Money.new(:USD, 0)
+        end
+
+      %{
+        season_name: season && season.name,
+        nights: nights,
+        price_per_night: rule && rule.amount,
+        total: total
+      }
+    end)
   end
 
   defp calculate_room_price(
@@ -5755,13 +5792,6 @@ defmodule Ysc.Bookings do
     case Ecto.ULID.dump(room_id) do
       {:ok, binary} -> binary
       _ -> room_id
-    end
-  end
-
-  defp add_pricing_rule_amount(acc, amount, new_price_acc) do
-    case Money.add(acc, amount) do
-      {:ok, new_total} -> {new_total, new_price_acc}
-      {:error, _} -> {acc, new_price_acc}
     end
   end
 

@@ -128,6 +128,102 @@ defmodule Ysc.Bookings.PricingCalculationTest do
 
       assert total == Money.new(:USD, 1000)
     end
+
+    test "single-season stay returns exactly one segment" do
+      assert {:ok, _total, breakdown} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_3n,
+                 :buyout
+               )
+
+      assert [%{nights: 3, price_per_night: rate, total: total}] =
+               breakdown.segments
+
+      assert rate == Money.new(:USD, 500)
+      assert total == Money.new(:USD, 1500)
+    end
+  end
+
+  describe "buyout pricing across a season boundary" do
+    setup do
+      clear_seasons!()
+
+      {:ok, summer} =
+        Bookings.create_season(%{
+          name: "Test Summer #{System.unique_integer()}",
+          property: :clear_lake,
+          start_date: ~D[2026-05-01],
+          end_date: ~D[2026-10-31]
+        })
+
+      {:ok, winter} =
+        Bookings.create_season(%{
+          name: "Test Winter #{System.unique_integer()}",
+          property: :clear_lake,
+          start_date: ~D[2026-11-01],
+          end_date: ~D[2027-04-30]
+        })
+
+      Ysc.Bookings.SeasonCache.invalidate()
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 300),
+          booking_mode: :buyout,
+          price_unit: :buyout_fixed,
+          property: :clear_lake,
+          season_id: summer.id
+        })
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 500),
+          booking_mode: :buyout,
+          price_unit: :buyout_fixed,
+          property: :clear_lake,
+          season_id: winter.id
+        })
+
+      :ok
+    end
+
+    test "prices each night at its own season's rate, not just the check-in night's" do
+      # 3 nights in Summer (Oct 29-31) + 2 nights in Winter (Nov 1-2):
+      # 3 * 300 + 2 * 500 = 900 + 1000 = 1900
+      assert {:ok, total, breakdown} =
+               Bookings.calculate_booking_price(
+                 :clear_lake,
+                 ~D[2026-10-29],
+                 ~D[2026-11-03],
+                 :buyout
+               )
+
+      assert total == Money.new(:USD, 1900)
+      assert breakdown.nights == 5
+      # Uniform per-night rate is undefined when a stay spans seasons -
+      # callers must use `segments` instead of a single blended figure.
+      assert breakdown.price_per_night == nil
+
+      assert [
+               %{
+                 season_name: summer_name,
+                 nights: 3,
+                 price_per_night: summer_rate
+               },
+               %{
+                 season_name: winter_name,
+                 nights: 2,
+                 price_per_night: winter_rate
+               }
+             ] = breakdown.segments
+
+      assert summer_name =~ "Summer"
+      assert winter_name =~ "Winter"
+      assert summer_rate == Money.new(:USD, 300)
+      assert winter_rate == Money.new(:USD, 500)
+    end
   end
 
   # ─── Room (per-person-per-night) ────────────────────────────────────────────
