@@ -4557,15 +4557,13 @@ defmodule YscWeb.AdminBookingsLive do
 
     case release_inventory_before_delete(booking) do
       :ok ->
-        booking = Bookings.get_booking!(id)
+        Bookings.send_admin_deletion_notifications(
+          booking,
+          socket.assigns.current_user
+        )
 
         case Bookings.delete_booking(booking) do
           {:ok, _deleted} ->
-            Bookings.send_admin_deletion_notifications(
-              booking,
-              socket.assigns.current_user
-            )
-
             # Remove from stream if we're on the reservations section
             socket =
               if socket.assigns[:current_section] == :reservations do
@@ -4591,7 +4589,7 @@ defmodule YscWeb.AdminBookingsLive do
                 |> push_patch(
                   to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
                 )
-                |> update_calendar_view(socket.assigns.selected_property)
+                |> maybe_update_calendar_view(socket.assigns.selected_property)
               end
 
             {:noreply,
@@ -7038,7 +7036,15 @@ defmodule YscWeb.AdminBookingsLive do
     socket
     |> YscWeb.Flash.put_toast(:info, message)
     |> push_patch(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
-    |> update_calendar_view(socket.assigns.selected_property)
+    |> maybe_update_calendar_view(socket.assigns.selected_property)
+  end
+
+  defp maybe_update_calendar_view(socket, property) do
+    if socket.assigns[:current_section] == :calendar do
+      update_calendar_view(socket, property)
+    else
+      socket
+    end
   end
 
   defp translate_errors(changeset) do
