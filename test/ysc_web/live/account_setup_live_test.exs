@@ -760,10 +760,11 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert has_element?(view, "#phone_verification_form")
     end
 
-    test "resubmitting the same phone number keeps the existing verification code", %{
-      conn: conn,
-      user: user
-    } do
+    test "resubmitting the same phone number keeps the existing verification code",
+         %{
+           conn: conn,
+           user: user
+         } do
       phone = "+12065559876"
 
       {:ok, view, _html} =
