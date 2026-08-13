@@ -188,6 +188,59 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert hd(report.accepted).user_id == user.id
     end
 
+    test "places purchased and returning subscriptions in separate lists with signup applications" do
+      purchased_user = user_fixture()
+      signup_application_fixture(purchased_user)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: purchased_user.id,
+          stripe_id: "sub_report_purchased_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-03-10 10:00:00Z],
+          current_period_end: ~U[2027-03-10 10:00:00Z]
+        })
+
+      returning_user = user_fixture()
+      signup_application_fixture(returning_user)
+
+      {:ok, _old_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: returning_user.id,
+          stripe_id: "sub_report_returning_old_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Single Membership",
+          start_date: ~U[2025-01-01 10:00:00Z],
+          current_period_end: ~U[2025-12-01 10:00:00Z]
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: returning_user.id,
+          stripe_id: "sub_report_returning_new_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: ~U[2026-03-15 10:00:00Z],
+          current_period_end: ~U[2027-03-15 10:00:00Z]
+        })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.purchased == 1
+      assert report.counts.returning == 1
+      assert length(report.purchased) == 1
+      assert length(report.returning) == 1
+
+      purchased_row = hd(report.purchased)
+      returning_row = hd(report.returning)
+
+      assert purchased_row.user_id == purchased_user.id
+      assert returning_row.user_id == returning_user.id
+      assert purchased_row.signup_application.user_id == purchased_user.id
+      assert returning_row.signup_application.user_id == returning_user.id
+    end
+
     test "classifies a repurchase after a real lapse as returning, not purchased" do
       user = user_fixture()
       signup_application_fixture(user)
