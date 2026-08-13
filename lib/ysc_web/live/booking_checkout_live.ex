@@ -2634,35 +2634,59 @@ defmodule YscWeb.BookingCheckoutLive do
         <% nights = @price_breakdown.nights %>
         <% guests_count = @price_breakdown[:guests_count] || 0 %>
         <% price_per_guest_per_night = @price_breakdown[:price_per_guest_per_night] %>
-        <%= if guests_count > 0 && price_per_guest_per_night do %>
+        <% segments = @price_breakdown[:segments] || [] %>
+        <%= if guests_count > 0 && length(segments) > 1 do %>
+          <!-- Stay spans more than one season: show a line per season -->
+          <div class="text-xs text-zinc-500 mb-1">
+            {guests_count} {if guests_count == 1, do: "guest", else: "guests"} · rate varies by season
+          </div>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-            <div class="text-zinc-400">
-              {guests_count} {if guests_count == 1,
-                do: "guest",
-                else: "guests"}
-            </div>
-            <div class="text-right text-zinc-500 text-xs tabular-nums">
-              {MoneyHelper.format_money!(price_per_guest_per_night)}/night
-            </div>
-            <div class="text-zinc-400 text-xs">
-              × {nights} {if nights == 1, do: "night", else: "nights"}
-            </div>
-            <div class="text-right font-medium tabular-nums">
-              <% {:ok, total} =
-                Money.mult(price_per_guest_per_night, guests_count * nights) %>
-              {MoneyHelper.format_money!(total)}
-            </div>
+            <%= for segment <- segments do %>
+              <div class="text-zinc-400">
+                {segment.season_name || "Unnamed season"}
+              </div>
+              <div class="text-right text-zinc-500 text-xs tabular-nums">
+                {MoneyHelper.format_money!(segment.price_per_guest_per_night)}/guest/night
+              </div>
+              <div class="text-zinc-400 text-xs">
+                × {segment.nights} {if segment.nights == 1, do: "night", else: "nights"}
+              </div>
+              <div class="text-right font-medium tabular-nums">
+                {MoneyHelper.format_money!(segment.total)}
+              </div>
+            <% end %>
           </div>
         <% else %>
-          <!-- Fallback if price_per_guest_per_night not available -->
-          <div class="flex justify-between text-sm">
-            <span class="text-zinc-400">
-              {nights} {if nights == 1, do: "night", else: "nights"}
-            </span>
-            <span class="font-medium">
-              {MoneyHelper.format_money!(@total_price)}
-            </span>
-          </div>
+          <%= if guests_count > 0 && price_per_guest_per_night do %>
+            <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
+              <div class="text-zinc-400">
+                {guests_count} {if guests_count == 1,
+                  do: "guest",
+                  else: "guests"}
+              </div>
+              <div class="text-right text-zinc-500 text-xs tabular-nums">
+                {MoneyHelper.format_money!(price_per_guest_per_night)}/night
+              </div>
+              <div class="text-zinc-400 text-xs">
+                × {nights} {if nights == 1, do: "night", else: "nights"}
+              </div>
+              <div class="text-right font-medium tabular-nums">
+                <% {:ok, total} =
+                  Money.mult(price_per_guest_per_night, guests_count * nights) %>
+                {MoneyHelper.format_money!(total)}
+              </div>
+            </div>
+          <% else %>
+            <!-- Fallback if price_per_guest_per_night not available -->
+            <div class="flex justify-between text-sm">
+              <span class="text-zinc-400">
+                {nights} {if nights == 1, do: "night", else: "nights"}
+              </span>
+              <span class="font-medium">
+                {MoneyHelper.format_money!(@total_price)}
+              </span>
+            </div>
+          <% end %>
         <% end %>
       <% else %>
         <!-- Buyout booking -->

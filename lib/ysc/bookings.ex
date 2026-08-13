@@ -3442,45 +3442,84 @@ defmodule Ysc.Bookings do
   defp calculate_day_price(
          property,
          checkin_date,
-         _checkout_date,
+         checkout_date,
          guests_count,
-         nights
+         _nights
        ) do
-    # For day bookings, price is per guest per day
-    # Clear Lake uses this model
+    # For day bookings, price is per guest per day. Clear Lake uses this
+    # model. Pricing rules can be season-specific, and a stay may span a
+    # season boundary, so each night's rate is looked up individually
+    # (mirroring calculate_buyout_price/4) rather than pricing the whole
+    # stay off the check-in date's season alone.
+    date_range = Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
 
-    # Determine season for checkin date to find correct pricing rule
-    # This is important because pricing rules might be season-specific (e.g., Summer only)
-    season = Season.for_date(property, checkin_date)
-    season_id = if season, do: season.id, else: nil
+    nightly_rates =
+      Enum.map(date_range, fn date ->
+        season = Season.for_date(property, date)
+        season_id = if season, do: season.id, else: nil
 
-    pricing_rule =
-      PricingRule.find_most_specific(
-        property,
-        season_id,
-        nil,
-        nil,
-        :day,
-        :per_guest_per_day
-      )
+        pricing_rule =
+          PricingRule.find_most_specific(
+            property,
+            season_id,
+            nil,
+            nil,
+            :day,
+            :per_guest_per_day
+          )
 
-    if pricing_rule do
-      total_days = nights
-      total_guests = guests_count
+        {season, pricing_rule}
+      end)
 
-      case Money.mult(pricing_rule.amount, total_days * total_guests) do
-        {:ok, total} ->
-          breakdown = %{
-            nights: nights,
-            guests_count: guests_count,
-            price_per_guest_per_night: pricing_rule.amount
-          }
-
-          {:ok, total, breakdown}
-      end
-    else
+    if Enum.any?(nightly_rates, fn {_season, rule} -> is_nil(rule) end) do
       {:error, :pricing_rule_not_found}
+    else
+      segments = build_day_price_segments(nightly_rates, guests_count)
+
+      total =
+        Enum.reduce(segments, Money.new(:USD, 0), fn segment, acc ->
+          case Money.add(acc, segment.total) do
+            {:ok, new_total} -> new_total
+            {:error, _} -> acc
+          end
+        end)
+
+      uniform_rate =
+        case segments do
+          [%{price_per_guest_per_night: rate}] -> rate
+          _ -> nil
+        end
+
+      breakdown = %{
+        nights: length(date_range),
+        guests_count: guests_count,
+        price_per_guest_per_night: uniform_rate,
+        segments: segments
+      }
+
+      {:ok, total, breakdown}
     end
+  end
+
+  # Groups consecutive nights that share the same per-guest nightly rate into
+  # segments, so a stay spanning a season boundary prices (and can display)
+  # each part at its own season's rate instead of one blended figure.
+  defp build_day_price_segments(nightly_rates, guests_count) do
+    nightly_rates
+    |> Enum.chunk_by(fn {_season, rule} -> rule.id end)
+    |> Enum.map(fn chunk ->
+      [{season, rule} | _] = chunk
+      nights = length(chunk)
+
+      {:ok, segment_total} = Money.mult(rule.amount, nights * guests_count)
+
+      %{
+        season_name: season && season.name,
+        nights: nights,
+        price_per_guest_per_night: rule.amount,
+        total: segment_total
+      }
+    end)
   end
 
   ## Door Codes

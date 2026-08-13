@@ -313,6 +313,97 @@ defmodule Ysc.Bookings.PricingCalculationTest do
     end
   end
 
+  describe "day pricing across a season boundary" do
+    setup do
+      clear_seasons!()
+
+      {:ok, summer} =
+        Bookings.create_season(%{
+          name: "Test Summer #{System.unique_integer()}",
+          property: :clear_lake,
+          start_date: ~D[2026-05-01],
+          end_date: ~D[2026-10-31]
+        })
+
+      {:ok, winter} =
+        Bookings.create_season(%{
+          name: "Test Winter #{System.unique_integer()}",
+          property: :clear_lake,
+          start_date: ~D[2026-11-01],
+          end_date: ~D[2027-04-30]
+        })
+
+      Ysc.Bookings.SeasonCache.invalidate()
+
+      # Summer rate: $30/guest/night
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 30),
+          booking_mode: :day,
+          price_unit: :per_guest_per_day,
+          property: :clear_lake,
+          season_id: summer.id
+        })
+
+      # Winter rate: $20/guest/night
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 20),
+          booking_mode: :day,
+          price_unit: :per_guest_per_day,
+          property: :clear_lake,
+          season_id: winter.id
+        })
+
+      :ok
+    end
+
+    test "prices each night at its own season's rate, not just the check-in night's" do
+      # 3 nights in Summer (Oct 29-31) + 2 nights in Winter (Nov 1-2), 2 guests:
+      # (3 * 30 + 2 * 20) * 2 = (90 + 40) * 2 = 260
+      assert {:ok, total, breakdown} =
+               Bookings.calculate_booking_price(
+                 :clear_lake,
+                 ~D[2026-10-29],
+                 ~D[2026-11-03],
+                 :day,
+                 guests_count: 2
+               )
+
+      assert total == Money.new(:USD, 260)
+      assert breakdown.nights == 5
+      assert breakdown.guests_count == 2
+      # Uniform per-night rate is undefined when a stay spans seasons -
+      # callers must use `segments` instead of a single blended figure.
+      assert breakdown.price_per_guest_per_night == nil
+
+      assert [
+               %{season_name: summer_name, nights: 3, price_per_guest_per_night: summer_rate},
+               %{season_name: winter_name, nights: 2, price_per_guest_per_night: winter_rate}
+             ] = breakdown.segments
+
+      assert summer_name =~ "Summer"
+      assert winter_name =~ "Winter"
+      assert summer_rate == Money.new(:USD, 30)
+      assert winter_rate == Money.new(:USD, 20)
+    end
+
+    test "a stay fully within one season still returns a single segment with a uniform rate" do
+      assert {:ok, total, breakdown} =
+               Bookings.calculate_booking_price(
+                 :clear_lake,
+                 ~D[2026-07-01],
+                 ~D[2026-07-03],
+                 :day,
+                 guests_count: 2
+               )
+
+      assert total == Money.new(:USD, 120)
+      assert breakdown.price_per_guest_per_night == Money.new(:USD, 30)
+      assert [%{nights: 2}] = breakdown.segments
+    end
+  end
+
   # ─── Error cases ────────────────────────────────────────────────────────────
 
   describe "calculate_booking_price/5 error cases" do

@@ -13,6 +13,12 @@ defmodule Ysc.Bookings.SeasonHelpers do
 
   @cabin_timezone "America/Los_Angeles"
 
+  # When no season anywhere in a property's chain has an advance-booking
+  # limit, the calendar has no natural cutoff. A LiveView calendar still
+  # needs a finite window to render, so "no limit" is translated into this
+  # practical horizon instead of literally forever.
+  @unlimited_horizon_days 730
+
   @doc """
   Today's calendar date in the cabin timezone (`America/Los_Angeles`).
 
@@ -230,22 +236,35 @@ defmodule Ysc.Bookings.SeasonHelpers do
   defp calculate_max_booking_date_no_limit(current_season, today, seasons) do
     {_season_start, season_end} = get_season_date_range(current_season, today)
 
+    resolve_unlimited_chain(current_season, current_season, today, seasons, season_end)
+  end
+
+  # Walks forward through the season chain starting after `current_season`,
+  # extending `max_date` past each season's own end while that season also
+  # has no advance-booking limit of its own. Stops (and applies the limit)
+  # at the first season with a real `advance_booking_days`. If the chain
+  # loops back to `origin_season` without ever finding one, no season in the
+  # property's rotation restricts advance booking at all, so the calendar is
+  # capped at a practical horizon (`@unlimited_horizon_days`) instead of
+  # literally forever.
+  defp resolve_unlimited_chain(origin_season, current_season, today, seasons, max_date) do
     next_season = get_next_season(current_season, today, seasons)
 
-    max_date = season_end
+    cond do
+      next_season == nil ->
+        Date.add(today, @unlimited_horizon_days)
 
-    if next_season && next_season.advance_booking_days &&
-         next_season.advance_booking_days > 0 do
-      # Next season has a limit - we can book up to that limit
-      next_season_max = Date.add(today, next_season.advance_booking_days)
-      # Use the later of: end of current season or next season's limit
-      if Date.compare(next_season_max, max_date) == :gt do
-        next_season_max
-      else
-        max_date
-      end
-    else
-      max_date
+      next_season.id == origin_season.id ->
+        Date.add(today, @unlimited_horizon_days)
+
+      next_season.advance_booking_days && next_season.advance_booking_days > 0 ->
+        next_season_max = Date.add(today, next_season.advance_booking_days)
+        if Date.compare(next_season_max, max_date) == :gt, do: next_season_max, else: max_date
+
+      true ->
+        {_next_start, next_end} = get_season_date_range(next_season, today)
+        new_max = if Date.compare(next_end, max_date) == :gt, do: next_end, else: max_date
+        resolve_unlimited_chain(origin_season, next_season, today, seasons, new_max)
     end
   end
 

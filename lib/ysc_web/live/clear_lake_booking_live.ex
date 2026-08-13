@@ -1252,33 +1252,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <div class="space-y-2 text-sm">
                         <span :if={@selected_booking_mode == :day}>
                           <% nights = Date.diff(@checkout_date, @checkin_date) %>
-                          <% price_per_guest_per_night =
-                            if @price_breakdown &&
-                                 @price_breakdown.price_per_guest_per_night do
-                              @price_breakdown.price_per_guest_per_night
-                            else
-                              if nights > 0 && @guests_count > 0 do
-                                {:ok, price} =
-                                  Money.div(
-                                    @calculated_price,
-                                    nights * @guests_count
-                                  )
-
-                                price
-                              else
-                                Money.new(0, :USD)
-                              end
-                            end %>
-                          <% total_guest_nights = nights * @guests_count %>
-                          <% line_gross =
-                            @price_breakdown[:entitlement_subtotal] ||
-                              Money.mult(
-                                price_per_guest_per_night,
-                                total_guest_nights
-                              )
-                              |> elem(1) %>
-                          <div class="flex justify-between items-center text-zinc-600">
-                            <span>
+                          <% segments = (@price_breakdown && @price_breakdown[:segments]) || [] %>
+                          <%= if length(segments) > 1 do %>
+                            <div class="text-xs text-zinc-500 mb-1">
                               Shared cabin stay ({@guests_count} {if @guests_count ==
                                                                        1,
                                                                      do: "adult",
@@ -1287,12 +1263,66 @@ defmodule YscWeb.ClearLakeBookingLive do
                                                                                                     do:
                                                                                                       "night",
                                                                                                     else:
-                                                                                                      "nights"})
-                            </span>
-                            <span class="font-bold text-zinc-900">
-                              {MoneyHelper.format_money!(line_gross)}
-                            </span>
-                          </div>
+                                                                                                      "nights"}) · rate varies by season
+                            </div>
+                            <div :for={segment <- segments} class="flex justify-between items-center text-zinc-600 text-xs">
+                              <span>
+                                {segment.season_name || "Unnamed season"} — {segment.nights} {if segment.nights ==
+                                                                                                     1,
+                                                                                                   do:
+                                                                                                     "night",
+                                                                                                   else:
+                                                                                                     "nights"} @ {MoneyHelper.format_money!(
+                                  segment.price_per_guest_per_night
+                                )}/guest/night
+                              </span>
+                              <span class="font-semibold text-zinc-900">
+                                {MoneyHelper.format_money!(segment.total)}
+                              </span>
+                            </div>
+                          <% else %>
+                            <% price_per_guest_per_night =
+                              if @price_breakdown &&
+                                   @price_breakdown.price_per_guest_per_night do
+                                @price_breakdown.price_per_guest_per_night
+                              else
+                                if nights > 0 && @guests_count > 0 do
+                                  {:ok, price} =
+                                    Money.div(
+                                      @calculated_price,
+                                      nights * @guests_count
+                                    )
+
+                                  price
+                                else
+                                  Money.new(0, :USD)
+                                end
+                              end %>
+                            <% total_guest_nights = nights * @guests_count %>
+                            <% line_gross =
+                              @price_breakdown[:entitlement_subtotal] ||
+                                Money.mult(
+                                  price_per_guest_per_night,
+                                  total_guest_nights
+                                )
+                                |> elem(1) %>
+                            <div class="flex justify-between items-center text-zinc-600">
+                              <span>
+                                Shared cabin stay ({@guests_count} {if @guests_count ==
+                                                                         1,
+                                                                       do: "adult",
+                                                                       else: "adults"} × {nights} {if nights ==
+                                                                                                        1,
+                                                                                                      do:
+                                                                                                        "night",
+                                                                                                      else:
+                                                                                                        "nights"})
+                              </span>
+                              <span class="font-bold text-zinc-900">
+                                {MoneyHelper.format_money!(line_gross)}
+                              </span>
+                            </div>
+                          <% end %>
                         </span>
                         <span :if={@selected_booking_mode == :buyout}>
                           <% nights = Date.diff(@checkout_date, @checkin_date) %>

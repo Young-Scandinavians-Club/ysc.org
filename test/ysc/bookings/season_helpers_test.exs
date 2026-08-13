@@ -155,6 +155,44 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
 
       assert SeasonHelpers.calculate_max_booking_date(:tahoe, today) == expected
     end
+
+    test "when no season anywhere in the property's chain has a limit, extends past the current season's end instead of capping there" do
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Summer",
+          property: :clear_lake,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-10-31],
+          max_nights: 30,
+          advance_booking_days: nil
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Winter",
+          property: :clear_lake,
+          start_date: ~D[2024-11-01],
+          end_date: ~D[2025-04-30],
+          max_nights: 30,
+          advance_booking_days: nil
+        })
+        |> Repo.insert()
+
+      Ysc.Bookings.SeasonCache.invalidate()
+
+      today = ~D[2026-08-13]
+
+      max_date = SeasonHelpers.calculate_max_booking_date(:clear_lake, today)
+
+      # Must not cap at the current (Summer) season's own end date - both
+      # seasons cover the full year with no advance_booking_days limit, so
+      # the property is effectively bookable indefinitely into the future.
+      refute max_date == ~D[2026-10-31]
+      assert Date.compare(max_date, ~D[2026-10-31]) == :gt
+    end
   end
 
   describe "date_selectable?/3" do
