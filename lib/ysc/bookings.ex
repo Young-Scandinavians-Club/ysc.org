@@ -5301,6 +5301,14 @@ defmodule Ysc.Bookings do
     end
   end
 
+  defp ensure_booking_with_user(%Booking{} = booking) do
+    if Ecto.assoc_loaded?(booking.user) do
+      booking
+    else
+      Repo.get(Booking, booking.id) |> Repo.preload(:user)
+    end
+  end
+
   defp send_booking_cancellation_notifications(
          booking,
          payment,
@@ -5311,9 +5319,7 @@ defmodule Ysc.Bookings do
     import Ecto.Query
 
     try do
-      # Reload booking with user association
-      booking =
-        Repo.get(Ysc.Bookings.Booking, booking.id) |> Repo.preload(:user)
+      booking = ensure_booking_with_user(booking)
 
       if booking && booking.user do
         # Get cabin master for the property
@@ -5540,9 +5546,7 @@ defmodule Ysc.Bookings do
     require Ysc.Logging
 
     try do
-      # Reload booking with user association
-      booking =
-        Repo.get(Ysc.Bookings.Booking, booking.id) |> Repo.preload(:user)
+      booking = ensure_booking_with_user(booking)
 
       if booking && booking.user && booking.user.email do
         # Prepare email data
