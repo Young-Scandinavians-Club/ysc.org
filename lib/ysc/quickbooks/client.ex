@@ -2230,64 +2230,14 @@ defmodule Ysc.Quickbooks.Client do
         _ -> 0
       end
 
-    # Do not put DetailType on base yet: lines that include LinkedTxn must omit
-    # top-level DetailType — QuickBooks otherwise returns validation errors (often
-    # reported as 6000 / "invalid bank account") when DetailType is forced to
-    # DepositLineDetail alongside LinkedTxn. See Intuit/community deposit examples.
     base = %{"Amount" => amount_value}
 
     case item.detail_type do
       "DepositLineDetail" ->
-        detail = item.deposit_line_detail
-        detail_map = %{}
-
-        # AccountRef: expense/source account. Also support entity_ref with type "Account" (legacy).
-        detail_map =
-          cond do
-            detail[:account_ref] ->
-              Map.put(
-                detail_map,
-                "AccountRef",
-                normalize_ref(detail.account_ref)
-              )
-
-            detail[:entity_ref] && detail[:entity_ref][:type] == "Account" ->
-              Map.put(
-                detail_map,
-                "AccountRef",
-                normalize_ref(detail.entity_ref)
-              )
-
-            true ->
-              detail_map
-          end
-
-        detail_map =
-          if detail[:class_ref] do
-            class_ref_map =
-              normalize_class_ref_for_sales_detail(detail.class_ref)
-
-            if class_ref_map do
-              Map.put(detail_map, "ClassRef", class_ref_map)
-            else
-              detail_map
-            end
-          else
-            detail_map
-          end
-
-        # NOTE: PaymentMethodRef is NOT a valid field for DepositLineDetail
-        # It's only valid for SalesReceipt and RefundReceipt entities
-        # Do not include it to prevent QuickBooks validation error (code 2010)
-
-        result = Map.put(base, "DepositLineDetail", detail_map)
-
-        # Add LinkedTxn at the line level (not inside DepositLineDetail)
-        # This is the correct way to link deposits to SalesReceipts/RefundReceipts
-        {result, has_linked?} =
+        {linked_txn_list, has_linked?} =
           case item[:linked_txn] do
             [_ | _] = linked_txns ->
-              linked_txn_list =
+              list =
                 Enum.map(linked_txns, fn txn ->
                   txn_line_id =
                     case txn[:txn_line_id] do
@@ -2302,17 +2252,70 @@ defmodule Ysc.Quickbooks.Client do
                   }
                 end)
 
-              {Map.put(result, "LinkedTxn", linked_txn_list), true}
+              {list, true}
 
             _ ->
-              {result, false}
+              {nil, false}
           end
 
         result =
           if has_linked? do
-            result
+            # A line linked to an existing SalesReceipt/RefundReceipt via
+            # LinkedTxn must be sent as ONLY Amount + LinkedTxn (+
+            # Description) - no top-level DetailType and no
+            # DepositLineDetail/AccountRef/ClassRef at all. The account/class
+            # are inherited from the linked transaction; QuickBooks silently
+            # drops DepositLineDetail from these lines on read (confirmed
+            # against a real Deposit), and sending one back on a sparse
+            # update (create_deposit/2's path, oddly, tolerates it) gets
+            # rejected with a generic 6000 "business validation error".
+            Map.put(base, "LinkedTxn", linked_txn_list)
           else
-            Map.put(result, "DetailType", "DepositLineDetail")
+            detail = item.deposit_line_detail
+            detail_map = %{}
+
+            # AccountRef: expense/source account. Also support entity_ref with type "Account" (legacy).
+            detail_map =
+              cond do
+                detail[:account_ref] ->
+                  Map.put(
+                    detail_map,
+                    "AccountRef",
+                    normalize_ref(detail.account_ref)
+                  )
+
+                detail[:entity_ref] && detail[:entity_ref][:type] == "Account" ->
+                  Map.put(
+                    detail_map,
+                    "AccountRef",
+                    normalize_ref(detail.entity_ref)
+                  )
+
+                true ->
+                  detail_map
+              end
+
+            detail_map =
+              if detail[:class_ref] do
+                class_ref_map =
+                  normalize_class_ref_for_sales_detail(detail.class_ref)
+
+                if class_ref_map do
+                  Map.put(detail_map, "ClassRef", class_ref_map)
+                else
+                  detail_map
+                end
+              else
+                detail_map
+              end
+
+            # NOTE: PaymentMethodRef is NOT a valid field for DepositLineDetail
+            # It's only valid for SalesReceipt and RefundReceipt entities
+            # Do not include it to prevent QuickBooks validation error (code 2010)
+
+            base
+            |> Map.put("DepositLineDetail", detail_map)
+            |> Map.put("DetailType", "DepositLineDetail")
           end
 
         maybe_put(result, "Description", item[:description])
@@ -5742,6 +5745,11 @@ defmodule Ysc.Quickbooks.Client do
     @doc false
     def test_build_deposit_body(params) do
       build_deposit_body(params)
+    end
+
+    @doc false
+    def test_normalize_deposit_line_item(item) do
+      normalize_deposit_line_item(item)
     end
   end
 end
