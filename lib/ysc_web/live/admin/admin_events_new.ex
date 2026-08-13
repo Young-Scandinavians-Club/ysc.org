@@ -12,6 +12,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.Events.Event
   alias Ysc.Events.EventUpdate
   alias Ysc.ExpenseReports
+  alias YscWeb.AdminBadgeHelpers
   alias YscWeb.AdminCheckInPaths
   alias Ysc.Media.Image
 
@@ -1279,7 +1280,9 @@ defmodule YscWeb.AdminEventsNewLive do
                       <td class="py-2 pr-4 text-zinc-800">{report.purpose}</td>
                       <td class="py-2 pr-4">
                         <.badge type={
-                          expense_report_status_badge_type(report.status)
+                          AdminBadgeHelpers.expense_report_status_badge_type(
+                            report.status
+                          )
                         }>
                           {String.capitalize(report.status || "unknown")}
                         </.badge>
@@ -1713,17 +1716,6 @@ defmodule YscWeb.AdminEventsNewLive do
         titles = Enum.map_join(updates, ", ", &(&1.title || "Event update"))
 
         "Update sent: #{titles} (#{Calendar.strftime(date, "%b %-d, %Y")})"
-    end
-  end
-
-  defp expense_report_status_badge_type(status) do
-    case String.downcase(to_string(status || "")) do
-      "draft" -> "dark"
-      "submitted" -> "default"
-      "approved" -> "green"
-      "rejected" -> "red"
-      "paid" -> "sky"
-      _ -> "dark"
     end
   end
 
