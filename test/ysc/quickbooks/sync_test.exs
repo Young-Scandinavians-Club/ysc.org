@@ -2343,10 +2343,30 @@ defmodule Ysc.Quickbooks.SyncTest do
         payout
         |> Payout.changeset(%{
           quickbooks_sync_status: "synced",
-          quickbooks_deposit_id: "qb_deposit_existing_456"
+          quickbooks_deposit_id: "qb_deposit_existing_456",
+          quickbooks_synced_at: DateTime.utc_now()
         })
         |> Repo.update!()
-        |> Repo.reload!()
+        |> Repo.preload([:payments, :refunds])
+
+      # Deposit already reflects the linked payment's Sales Receipt, so
+      # sync_payout should find nothing missing and return without writing.
+      expect(ClientMock, :get_deposit_by_id, fn "qb_deposit_existing_456" ->
+        {:ok,
+         %{
+           "Id" => "qb_deposit_existing_456",
+           "SyncToken" => "0",
+           "Line" => [
+             %{
+               "Amount" => 100.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{"TxnId" => "qb_sr_for_payout", "TxnType" => "SalesReceipt"}
+               ]
+             }
+           ]
+         }}
+      end)
 
       assert {:ok, %{"Id" => "qb_deposit_existing_456"}} =
                Sync.sync_payout(payout)
@@ -2411,6 +2431,561 @@ defmodule Ysc.Quickbooks.SyncTest do
       payout = Repo.reload!(payout)
       assert payout.quickbooks_sync_status == "failed"
       assert payout.quickbooks_sync_error != nil
+    end
+
+    test "leaves the deposit alone when it already reflects every linked payment",
+         %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_noop_check_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "2.19"),
+          description: "Membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      # process_payment/1 enqueues its own inline QuickBooks sync on
+      # creation (absorbed by setup_default_mocks/0's stub) - reset first so
+      # the explicit Sync.sync_payment/1 call below is the only one that
+      # consumes the expect/4 below.
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_noop", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment)
+      payment = Repo.reload!(payment)
+      assert payment.quickbooks_sales_receipt_id == "qb_sr_noop"
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "62.81"),
+          stripe_payout_id:
+            "po_noop_check_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+
+      payout =
+        payout
+        |> Payout.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_deposit_id: "qb_deposit_noop",
+          quickbooks_synced_at: DateTime.utc_now()
+        })
+        |> Repo.update!()
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      expect(ClientMock, :get_deposit_by_id, fn "qb_deposit_noop" ->
+        {:ok,
+         %{
+           "Id" => "qb_deposit_noop",
+           "SyncToken" => "0",
+           "Line" => [
+             %{
+               "Amount" => 65.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{"TxnId" => "qb_sr_noop", "TxnType" => "SalesReceipt"}
+               ]
+             }
+           ]
+         }}
+      end)
+
+      # update_deposit is intentionally not stubbed - if the code calls it,
+      # Mox raises and the test fails, proving nothing was touched.
+      assert {:ok, %{"Id" => "qb_deposit_noop"}} = Sync.sync_payout(payout)
+
+      reloaded = Repo.reload!(payout)
+      assert reloaded.quickbooks_deposit_id == "qb_deposit_noop"
+    end
+
+    test "restoring a payout from pending to synced does not reset the deposit's freshness clock",
+         %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_pending_restore_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "2.19"),
+          description: "Membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_pending_restore", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment)
+      payment = Repo.reload!(payment)
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "62.81"),
+          stripe_payout_id:
+            "po_pending_restore_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+
+      # The Deposit was actually created 45 days ago (older than the 30-day
+      # autoupdate window) and has since been marked "pending" by a caller
+      # (e.g. enqueue_quickbooks_sync_payout_if_ready/1) even though nothing
+      # about it is actually wrong.
+      old_synced_at =
+        DateTime.utc_now()
+        |> DateTime.add(-45, :day)
+        |> DateTime.truncate(:second)
+
+      payout =
+        payout
+        |> Payout.changeset(%{
+          quickbooks_sync_status: "pending",
+          quickbooks_deposit_id: "qb_deposit_pending_restore",
+          quickbooks_synced_at: old_synced_at
+        })
+        |> Repo.update!()
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      expect(ClientMock, :get_deposit_by_id, fn "qb_deposit_pending_restore" ->
+        {:ok,
+         %{
+           "Id" => "qb_deposit_pending_restore",
+           "SyncToken" => "0",
+           "Line" => [
+             %{
+               "Amount" => 65.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "qb_sr_pending_restore",
+                   "TxnType" => "SalesReceipt"
+                 }
+               ]
+             }
+           ]
+         }}
+      end)
+
+      assert {:ok, %{"Id" => "qb_deposit_pending_restore"}} =
+               Sync.sync_payout(payout)
+
+      reloaded = Repo.reload!(payout)
+      assert reloaded.quickbooks_sync_status == "synced"
+
+      # The bug this guards against: restoring status to "synced" must not
+      # bump quickbooks_synced_at, or a much-later payment linking to this
+      # same payout would see a falsely "fresh" 45-day-old Deposit and
+      # auto-update it instead of alerting, past the safety window meant to
+      # protect an already-reconciled Deposit from being rewritten.
+      assert DateTime.compare(reloaded.quickbooks_synced_at, old_synced_at) ==
+               :eq
+    end
+
+    test "sparse-updates the deposit when a payment links after it was created",
+         %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment1, _tx1, _entries1}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_update_first_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "2.19"),
+          description: "First membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment1
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_first", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment1)
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "127.29"),
+          stripe_payout_id: "po_update_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment1)
+
+      payout =
+        payout
+        |> Payout.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_deposit_id: "qb_deposit_update",
+          quickbooks_synced_at: DateTime.utc_now()
+        })
+        |> Repo.update!()
+
+      # A second payment links to the SAME payout after the deposit already
+      # exists - the race this feature exists to fix (e.g. an ACH payment
+      # that settles days after the payout it's part of already closed).
+      {:ok, {payment2, _tx2, _entries2}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_update_second_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "0.52"),
+          description: "Second membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment2
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_second", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment2)
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment2)
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      expect(ClientMock, :get_deposit_by_id, fn "qb_deposit_update" ->
+        {:ok,
+         %{
+           "Id" => "qb_deposit_update",
+           "SyncToken" => "1",
+           "DepositToAccountRef" => %{"value" => "bank_account_123"},
+           "Line" => [
+             %{
+               "Amount" => 65.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{"TxnId" => "qb_sr_first", "TxnType" => "SalesReceipt"}
+               ]
+             }
+           ]
+         }}
+      end)
+
+      expect(ClientMock, :update_deposit, fn "qb_deposit_update",
+                                             new_lines,
+                                             _opts ->
+        assert length(new_lines) == 1
+        line = List.first(new_lines)
+        assert Decimal.equal?(line.amount, Decimal.new("65.00"))
+        assert List.first(line.linked_txn).txn_id == "qb_sr_second"
+
+        {:ok,
+         %{
+           "Id" => "qb_deposit_update",
+           "SyncToken" => "2",
+           "TotalAmt" => "130.00"
+         }}
+      end)
+
+      assert {:ok, updated} = Sync.sync_payout(payout)
+      assert updated["Id"] == "qb_deposit_update"
+
+      reloaded = Repo.reload!(payout)
+      assert reloaded.quickbooks_deposit_id == "qb_deposit_update"
+      assert reloaded.quickbooks_sync_status == "synced"
+    end
+
+    test "alerts instead of auto-updating a deposit past the safety window",
+         %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment1, _tx1, _entries1}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_stale_first_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "2.19"),
+          description: "First membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment1
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_stale_first", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment1)
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "127.29"),
+          stripe_payout_id: "po_stale_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment1)
+
+      backdated =
+        DateTime.utc_now()
+        |> DateTime.add(-40, :day)
+        |> DateTime.truncate(:second)
+
+      payout =
+        payout
+        |> Payout.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_deposit_id: "qb_deposit_stale",
+          quickbooks_synced_at: backdated
+        })
+        |> Repo.update!()
+
+      {:ok, {payment2, _tx2, _entries2}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_stale_second_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "0.52"),
+          description: "Second membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment2
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_stale_second", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment2)
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment2)
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      expect(ClientMock, :get_deposit_by_id, fn "qb_deposit_stale" ->
+        {:ok,
+         %{
+           "Id" => "qb_deposit_stale",
+           "SyncToken" => "0",
+           "Line" => [
+             %{
+               "Amount" => 65.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{"TxnId" => "qb_sr_stale_first", "TxnType" => "SalesReceipt"}
+               ]
+             }
+           ]
+         }}
+      end)
+
+      # update_deposit is intentionally not stubbed - the deposit is past the
+      # safety window, so the code must alert instead of touching it.
+      assert {:ok, %{"Id" => "qb_deposit_stale"}} = Sync.sync_payout(payout)
+
+      reloaded = Repo.reload!(payout)
+      assert reloaded.quickbooks_deposit_id == "qb_deposit_stale"
+      assert DateTime.compare(reloaded.quickbooks_synced_at, backdated) == :eq
+    end
+
+    test "does not overwrite a deposit that changed elsewhere (stale SyncToken)",
+         %{user: user} do
+      setup_default_mocks()
+
+      {:ok, {payment1, _tx1, _entries1}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_conflict_first_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "2.19"),
+          description: "First membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment1
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_conflict_first", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment1)
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "127.29"),
+          stripe_payout_id: "po_conflict_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment1)
+
+      payout =
+        payout
+        |> Payout.changeset(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_deposit_id: "qb_deposit_conflict",
+          quickbooks_synced_at: DateTime.utc_now()
+        })
+        |> Repo.update!()
+
+      {:ok, {payment2, _tx2, _entries2}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "65.00"),
+          external_payment_id:
+            "pi_conflict_second_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "0.52"),
+          description: "Second membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment2
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "pending",
+        quickbooks_sales_receipt_id: nil
+      })
+      |> Repo.update!()
+
+      expect(ClientMock, :create_sales_receipt, fn _params, _opts ->
+        {:ok, %{"Id" => "qb_sr_conflict_second", "TotalAmt" => "65.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payment(payment2)
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment2)
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      expect(ClientMock, :get_deposit_by_id, fn "qb_deposit_conflict" ->
+        {:ok,
+         %{
+           "Id" => "qb_deposit_conflict",
+           "SyncToken" => "0",
+           "Line" => [
+             %{
+               "Amount" => 65.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "qb_sr_conflict_first",
+                   "TxnType" => "SalesReceipt"
+                 }
+               ]
+             }
+           ]
+         }}
+      end)
+
+      expect(ClientMock, :update_deposit, fn "qb_deposit_conflict",
+                                             _new_lines,
+                                             _opts ->
+        {:error, :stale_object}
+      end)
+
+      assert {:error, :stale_object} = Sync.sync_payout(payout)
+
+      # Status/deposit id untouched - we must not have "succeeded" our way
+      # past a conflict we couldn't safely resolve.
+      reloaded = Repo.reload!(payout)
+      assert reloaded.quickbooks_deposit_id == "qb_deposit_conflict"
     end
   end
 

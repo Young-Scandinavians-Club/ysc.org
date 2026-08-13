@@ -4194,51 +4194,60 @@ defmodule Ysc.Stripe.WebhookHandler do
         do: all_payments_synced && all_refunds_synced,
         else: true
 
-    if fee_total_populated && linking_complete do
-      Ysc.Logging.info("Payout ready for QuickBooks sync - all conditions met",
-        payout_id: payout.id,
-        payments_count: length(payout.payments),
-        refunds_count: length(payout.refunds),
-        fee_total:
-          if(payout.fee_total,
-            do: Money.to_string!(payout.fee_total),
-            else: "not set"
-          ),
-        all_payments_synced: all_payments_synced,
-        all_refunds_synced: all_refunds_synced
-      )
+    # Enqueueing here is safe even for a payout that already has a
+    # QuickBooks deposit: Sync.sync_payout/1 checks quickbooks_deposit_id
+    # itself and, when one exists, diffs it against QuickBooks before
+    # deciding whether to leave it alone, sparse-update it, or (if it's too
+    # old to safely auto-correct) alert instead of touching it. It never
+    # blindly re-creates.
+    cond do
+      fee_total_populated && linking_complete ->
+        Ysc.Logging.info(
+          "Payout ready for QuickBooks sync - all conditions met",
+          payout_id: payout.id,
+          payments_count: length(payout.payments),
+          refunds_count: length(payout.refunds),
+          fee_total:
+            if(payout.fee_total,
+              do: Money.to_string!(payout.fee_total),
+              else: "not set"
+            ),
+          all_payments_synced: all_payments_synced,
+          all_refunds_synced: all_refunds_synced
+        )
 
-      # Mark payout as pending sync
-      payout
-      |> Ledgers.Payout.changeset(%{quickbooks_sync_status: "pending"})
-      |> Ysc.Repo.update()
+        # Mark payout as pending sync
+        payout
+        |> Ledgers.Payout.changeset(%{quickbooks_sync_status: "pending"})
+        |> Ysc.Repo.update()
 
-      # Enqueue sync job
-      %{payout_id: to_string(payout.id)}
-      |> YscWeb.Workers.QuickbooksSyncPayoutWorker.new()
-      |> Oban.insert()
+        # Enqueue sync job
+        %{payout_id: to_string(payout.id)}
+        |> YscWeb.Workers.QuickbooksSyncPayoutWorker.new()
+        |> Oban.insert()
 
-      :ok
-    else
-      unsynced_payments =
-        Enum.count(payout.payments, &(&1.quickbooks_sync_status != "synced"))
+        :ok
 
-      unsynced_refunds =
-        Enum.count(payout.refunds, &(&1.quickbooks_sync_status != "synced"))
+      true ->
+        unsynced_payments =
+          Enum.count(payout.payments, &(&1.quickbooks_sync_status != "synced"))
 
-      Ysc.Logging.info(
-        "Payout not ready for QuickBooks sync - waiting for conditions to be met",
-        payout_id: payout.id,
-        fee_total_populated: fee_total_populated,
-        unsynced_payments: unsynced_payments,
-        unsynced_refunds: unsynced_refunds,
-        total_payments: length(payout.payments),
-        total_refunds: length(payout.refunds),
-        all_payments_synced: all_payments_synced,
-        all_refunds_synced: all_refunds_synced
-      )
+        unsynced_refunds =
+          Enum.count(payout.refunds, &(&1.quickbooks_sync_status != "synced"))
 
-      :ok
+        Ysc.Logging.info(
+          "Payout not ready for QuickBooks sync - waiting for conditions to be met",
+          payout_id: payout.id,
+          fee_total_populated: fee_total_populated,
+          unsynced_payments: unsynced_payments,
+          unsynced_refunds: unsynced_refunds,
+          total_payments: length(payout.payments),
+          total_refunds: length(payout.refunds),
+          all_payments_synced: all_payments_synced,
+          all_refunds_synced: all_refunds_synced
+        )
+
+        :ok
     end
   rescue
     error ->

@@ -28,7 +28,12 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
   @non_retriable_errors [
     :quickbooks_accounts_not_configured,
     :payout_not_found,
-    :invalid_bank_account
+    :invalid_bank_account,
+    # A stale SyncToken means the Deposit was edited elsewhere (most likely
+    # a human, in QuickBooks) - Sync already sent a Discord alert for it.
+    # Retrying just re-reads the same conflicted Deposit and re-alerts up to
+    # max_attempts times for the same one-time event.
+    :stale_object
   ]
 
   @impl Oban.Worker
@@ -52,11 +57,11 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
         nil ->
           Repo.rollback(:payout_not_found)
 
-        %Payout{quickbooks_sync_status: "synced", quickbooks_deposit_id: dep_id}
-        when not is_nil(dep_id) ->
-          {:already_synced, dep_id}
-
         payout ->
+          # Sync.sync_payout/1 is the single source of truth for create vs.
+          # update vs. no-op - it checks quickbooks_deposit_id itself and, if
+          # one already exists, diffs it against QuickBooks before deciding
+          # whether there's anything to do. No pre-check needed here.
           payout = Repo.preload(payout, [:payments, :refunds])
           Sync.sync_payout(payout)
       end
@@ -77,14 +82,6 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
 
   defp handle_result(result, payout_id) do
     case result do
-      {:ok, {:already_synced, deposit_id}} ->
-        Ysc.Logging.info("Payout already synced (checked under lock)",
-          payout_id: payout_id,
-          deposit_id: deposit_id
-        )
-
-        :ok
-
       {:ok, {:ok, deposit}} ->
         Ysc.Logging.info("Successfully synced payout to QuickBooks",
           payout_id: payout_id,

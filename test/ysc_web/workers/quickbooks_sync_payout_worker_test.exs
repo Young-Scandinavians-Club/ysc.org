@@ -102,10 +102,36 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
         payout
         |> Payout.changeset(%{
           quickbooks_sync_status: "synced",
-          quickbooks_deposit_id: "dep_123"
+          quickbooks_deposit_id: "dep_123",
+          quickbooks_synced_at: DateTime.utc_now()
         })
         |> Repo.update!()
         |> Repo.reload!()
+
+      # Sync.sync_payout/1 always checks an already-deposited payout against
+      # QuickBooks for drift now (a payment can link after the deposit was
+      # created); here the deposit already reflects the only linked payment,
+      # so it should come back a no-op with no write. expect/3 (not stub/3)
+      # so the test fails if that read is ever skipped, and deny/3
+      # create_deposit so it fails if the code ever re-creates instead.
+      expect(Ysc.Quickbooks.ClientMock, :get_deposit_by_id, fn "dep_123" ->
+        {:ok,
+         %{
+           "Id" => "dep_123",
+           "SyncToken" => "0",
+           "Line" => [
+             %{
+               "Amount" => 100.00,
+               "DetailType" => "DepositLineDetail",
+               "LinkedTxn" => [
+                 %{"TxnId" => "sr_1", "TxnType" => "SalesReceipt"}
+               ]
+             }
+           ]
+         }}
+      end)
+
+      deny(Ysc.Quickbooks.ClientMock, :create_deposit, 2)
 
       job = %Oban.Job{
         id: 1,
@@ -117,6 +143,9 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
       }
 
       assert :ok = QuickbooksSyncPayoutWorker.perform(job)
+
+      reloaded = Repo.reload!(payout)
+      assert reloaded.quickbooks_deposit_id == "dep_123"
     end
 
     test "returns ok when sync succeeds", %{user: user} do
