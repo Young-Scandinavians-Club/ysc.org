@@ -5779,7 +5779,7 @@ defmodule Ysc.Bookings do
         end
 
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Refund.create(refund_params, stripe_opts)
+             stripe_refund_module().create(refund_params, stripe_opts)
            end) do
         {:ok, refund} ->
           Ysc.Logging.info("Stripe refund created successfully",
@@ -5807,6 +5807,10 @@ defmodule Ysc.Bookings do
           {:error, "Failed to create refund in Stripe"}
       end
     end
+  end
+
+  defp stripe_refund_module do
+    Application.get_env(:ysc, :stripe_refund_module, Stripe.Refund)
   end
 
   @doc false

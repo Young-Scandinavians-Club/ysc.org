@@ -523,5 +523,58 @@ defmodule Ysc.Webhooks.ReprocessorTest do
       assert Enum.any?(summary.would_process, &(&1.id == ev.id))
       assert Repo.get!(WebhookEvent, ev.id).state == :pending
     end
+
+    test "reprocesses matching webhooks and returns a summary of the results" do
+      webhooks =
+        for n <- 1..2 do
+          Webhooks.create_webhook_event!(%{
+            provider: "quickbooks",
+            event_id: "evt_#{Ecto.UUID.generate()}",
+            event_type: "bulk.ok.#{n}",
+            payload: %{"eventNotifications" => []},
+            state: :pending
+          })
+        end
+
+      # Wrong provider: excluded by the :provider filter.
+      other_provider =
+        Webhooks.create_webhook_event!(%{
+          provider: "stripe",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "bulk.wrong_provider",
+          payload: %{"data" => %{"object" => %{}}},
+          state: :pending
+        })
+
+      # Wrong state: excluded by list_pending_or_processing_webhooks/1's state filter.
+      already_processed =
+        Webhooks.create_webhook_event!(%{
+          provider: "quickbooks",
+          event_id: "evt_#{Ecto.UUID.generate()}",
+          event_type: "bulk.already_done",
+          payload: %{"eventNotifications" => []},
+          state: :processed
+        })
+
+      summary =
+        Reprocessor.reprocess_all_pending_or_processing_webhooks(
+          provider: "quickbooks",
+          limit: 20
+        )
+
+      assert summary.total_found == 2
+      assert summary.successful == 2
+      assert summary.failed == 0
+      assert length(summary.results) == 2
+      assert Enum.all?(summary.results, &match?({:ok, _}, &1))
+      assert summary.summary == "Processed 2 webhooks successfully, 0 failed"
+
+      Enum.each(webhooks, fn w ->
+        assert Repo.get!(WebhookEvent, w.id).state == :processed
+      end)
+
+      assert Repo.get!(WebhookEvent, other_provider.id).state == :pending
+      assert Repo.get!(WebhookEvent, already_processed.id).state == :processed
+    end
   end
 end
