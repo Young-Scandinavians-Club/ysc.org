@@ -8,23 +8,9 @@ on:
       - main
 
 jobs:
-  test:
-    name: Tests
+  build_test:
+    name: Build (test env)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -51,6 +37,92 @@ jobs:
           mix clean
           mix deps.compile
           mix compile --warnings-as-errors
+
+      # Shared with test/query_explain_pr/email_previews_pr so the test-env compile
+      # only happens once per run instead of once per job.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-test-${{ github.run_id }}
+          path: |
+            deps
+            _build/test
+          retention-days: 1
+
+  build_dev:
+    name: Build (dev env)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Elixir
+        id: setup-beam
+        uses: ./.github/actions/setup-elixir
+
+      - name: Restore dependencies cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-dev-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-dev-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile
+        run: mix compile --warnings-as-errors
+
+      # Shared with credo/dialyzer/security so the dev-env compile only happens
+      # once per run instead of once per job.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-dev-${{ github.run_id }}
+          path: |
+            deps
+            _build/dev
+          retention-days: 1
+
+  test:
+    name: Tests
+    needs: build_test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Elixir
+        id: setup-beam
+        uses: ./.github/actions/setup-elixir
+
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: build-test-${{ github.run_id }}
+
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
+      - name: Install dependencies
+        run: mix deps.get
 
       # GHA service containers do not pass `server /data` to the MinIO image, so the
       # container exits immediately (help text only) and the health check never passes.
@@ -151,6 +223,7 @@ jobs:
 
   credo:
     name: Code Quality (Credo)
+    needs: build_dev
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -160,27 +233,23 @@ jobs:
         id: setup-beam
         uses: ./.github/actions/setup-elixir
 
-      - name: Restore dependencies cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-credo-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-credo-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+          name: build-dev-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
-
-      - name: Compile
-        run: mix compile --warnings-as-errors
 
       - name: Run Credo
         run: mix credo --strict
 
   dialyzer:
     name: Dialyzer
+    needs: build_dev
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -198,21 +267,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dialyzer-plt-${{ steps.setup-beam.outputs.otp-version }}-${{ steps.setup-beam.outputs.elixir-version }}-
 
-      - name: Restore dependencies cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-dialyzer-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-dialyzer-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+          name: build-dev-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
-
-      - name: Compile
-        run: mix compile --warnings-as-errors
 
       - name: Run Dialyzer
         run: |
@@ -222,6 +286,7 @@ jobs:
 
   security:
     name: Security Checks
+    needs: build_dev
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -231,24 +296,19 @@ jobs:
         id: setup-beam
         uses: ./.github/actions/setup-elixir
 
-      - name: Restore dependencies cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-security-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-security-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+          name: build-dev-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
 
       - name: Hex audit (retired packages and advisories)
         run: mix hex.audit
-
-      - name: Compile
-        run: mix compile --warnings-as-errors
 
       - name: Sobelow (security)
         run: mix sobelow --skip --exit
@@ -263,6 +323,7 @@ jobs:
   # you use a PAT secret or a different trigger. Same-repo PRs work with defaults.
   query_explain_pr:
     name: PR Query EXPLAIN
+    needs: build_test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -291,23 +352,16 @@ jobs:
         id: setup-beam
         uses: ./.github/actions/setup-elixir
 
-      - name: Restore dependencies cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-query-explain-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-query-explain-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+          name: build-test-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
-
-      - name: Compile
-        env:
-          MIX_ENV: test
-        run: mix compile --warnings-as-errors
 
       - name: Prepare test database
         env:
@@ -372,7 +426,7 @@ jobs:
 
   email_previews_pr:
     name: PR Email Previews
-    needs: email_previews_detect
+    needs: [email_previews_detect, build_test]
     if: needs.email_previews_detect.outputs.skip != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -405,23 +459,16 @@ jobs:
         id: setup-beam
         uses: ./.github/actions/setup-elixir
 
-      - name: Restore dependencies cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-email-previews-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-email-previews-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+          name: build-test-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
-
-      - name: Compile
-        env:
-          MIX_ENV: test
-        run: mix compile --warnings-as-errors
 
       - name: Prepare test database
         env:

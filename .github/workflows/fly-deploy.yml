@@ -27,23 +27,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests
+  build_test:
+    name: Build (test env)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -69,6 +55,90 @@ jobs:
         run: |
           mix deps.compile
           mix compile --warnings-as-errors
+
+      # Shared with the test job so the test-env compile only happens once per run.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-test-${{ github.run_id }}
+          path: |
+            deps
+            _build/test
+          retention-days: 1
+
+  build_dev:
+    name: Build (dev env)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Elixir
+        id: setup-beam
+        uses: ./.github/actions/setup-elixir
+
+      - name: Restore dependencies cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-dev-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-dev-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile
+        run: mix compile --warnings-as-errors
+
+      # Shared with credo/security so the dev-env compile only happens once per run.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: build-dev-${{ github.run_id }}
+          path: |
+            deps
+            _build/dev
+          retention-days: 1
+
+  test:
+    name: Tests
+    needs: build_test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set up Elixir
+        id: setup-beam
+        uses: ./.github/actions/setup-elixir
+
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: build-test-${{ github.run_id }}
+
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
+      - name: Install dependencies
+        run: mix deps.get
 
       # GHA service containers do not pass `server /data` to the MinIO image, so the
       # container exits immediately (help text only) and the health check never passes.
@@ -141,6 +211,7 @@ jobs:
 
   credo:
     name: Code Quality (Credo)
+    needs: build_dev
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -150,27 +221,23 @@ jobs:
         id: setup-beam
         uses: ./.github/actions/setup-elixir
 
-      - name: Restore dependencies cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-credo-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-credo-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+          name: build-dev-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
-
-      - name: Compile
-        run: mix compile --warnings-as-errors
 
       - name: Run Credo
         run: mix credo --strict
 
   security:
     name: Security Checks
+    needs: build_dev
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -180,24 +247,19 @@ jobs:
         id: setup-beam
         uses: ./.github/actions/setup-elixir
 
-      - name: Restore dependencies cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - name: Download build artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-security-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-security-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
+          name: build-dev-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
 
       - name: Hex audit (retired packages and advisories)
         run: mix hex.audit
-
-      - name: Compile
-        run: mix compile --warnings-as-errors
 
       - name: Sobelow (security)
         run: mix sobelow --skip --exit
@@ -255,10 +317,13 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-sandbox
-      - name: Deploy to Fly.io sandbox
+
+      - name: Compute version and check staleness
+        id: version
         run: |
           git fetch origin main
           if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Stale run — main has moved on, skipping sandbox deploy."
             exit 0
           fi
@@ -271,9 +336,57 @@ jobs:
           else
             VERSION="unknown-${GIT_HASH}"
           fi
-          flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.version.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # `flyctl auth docker` tokens expire after 5 minutes, and a cold-cache build of
+      # this Dockerfile can take longer than that. Build (and warm the GHA layer cache)
+      # here, before authenticating, so the later push always replays from a warm
+      # cache and finishes in seconds regardless of how long this step took.
+      - name: Build image (warm cache)
+        if: steps.version.outputs.skip != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: etc/docker/Dockerfile
+          push: false
+          build-args: |
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha,scope=main-app
+          cache-to: type=gha,mode=max,scope=main-app
+
+      - name: Log in to Fly registry
+        if: steps.version.outputs.skip != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+        run: flyctl auth docker
+
+      - name: Push image
+        if: steps.version.outputs.skip != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: etc/docker/Dockerfile
+          push: true
+          tags: registry.fly.io/ysc-sandbox:${{ steps.version.outputs.version }}
+          build-args: |
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha,scope=main-app
+
+      - name: Deploy to Fly.io sandbox
+        if: steps.version.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl deploy \
+            --image registry.fly.io/ysc-sandbox:${{ steps.version.outputs.version }} \
+            -a ysc-sandbox \
+            -c etc/fly/fly-sandbox.toml \
+            --image-label "${{ steps.version.outputs.version }}"
 
   deploy_query_console_sandbox:
     name: Deploy query console sandbox
@@ -296,10 +409,13 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console-sandbox
-      - name: Deploy query console to Fly.io sandbox
+
+      - name: Compute version and check staleness
+        id: version
         run: |
           git fetch origin main
           if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Stale run — main has moved on, skipping query console sandbox deploy."
             exit 0
           fi
@@ -312,6 +428,55 @@ jobs:
           else
             VERSION="unknown-${GIT_HASH}"
           fi
-          flyctl deploy -a ysc-query-console-sandbox -c fly.sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.version.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # `flyctl auth docker` tokens expire after 5 minutes, and a cold-cache build of
+      # this Dockerfile can take longer than that. Build (and warm the GHA layer cache)
+      # here, before authenticating, so the later push always replays from a warm
+      # cache and finishes in seconds regardless of how long this step took.
+      - name: Build image (warm cache)
+        if: steps.version.outputs.skip != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: query_console
+          file: query_console/Dockerfile
+          push: false
+          build-args: |
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha,scope=query-console
+          cache-to: type=gha,mode=max,scope=query-console
+
+      - name: Log in to Fly registry
+        if: steps.version.outputs.skip != 'true'
+        working-directory: .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+        run: flyctl auth docker
+
+      - name: Push image
+        if: steps.version.outputs.skip != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: query_console
+          file: query_console/Dockerfile
+          push: true
+          tags: registry.fly.io/ysc-query-console-sandbox:${{ steps.version.outputs.version }}
+          build-args: |
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha,scope=query-console
+
+      - name: Deploy query console to Fly.io sandbox
+        if: steps.version.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl deploy \
+            --image registry.fly.io/ysc-query-console-sandbox:${{ steps.version.outputs.version }} \
+            -a ysc-query-console-sandbox \
+            -c fly.sandbox.toml \
+            --image-label "${{ steps.version.outputs.version }}"
