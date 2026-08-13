@@ -134,6 +134,12 @@ jobs:
         with:
           name: build-test-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
+      - name: Install dependencies
+        run: mix deps.get
+
       # GHA service containers do not pass `server /data` to the MinIO image, so the
       # container exits immediately (help text only) and the health check never passes.
       # Start MinIO explicitly on the runner (same image as etc/docker/docker-compose).
@@ -220,6 +226,12 @@ jobs:
         with:
           name: build-dev-${{ github.run_id }}
 
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
+      - name: Install dependencies
+        run: mix deps.get
+
       - name: Run Credo
         run: mix credo --strict
 
@@ -239,6 +251,12 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: build-dev-${{ github.run_id }}
+
+      # deps/_build come from the artifact, but Mix's dependency freshness check
+      # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
+      # fast no-op verification here since nothing actually needs re-fetching.
+      - name: Install dependencies
+        run: mix deps.get
 
       - name: Hex audit (retired packages and advisories)
         run: mix hex.audit
