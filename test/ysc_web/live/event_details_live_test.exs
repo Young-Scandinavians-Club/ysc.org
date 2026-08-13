@@ -552,7 +552,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert has_element?(
                view,
                ~s(a[href="/users/membership"]),
-               "View Membership"
+               "Membership options"
              )
 
       refute has_element?(view, "button", "Get Tickets")

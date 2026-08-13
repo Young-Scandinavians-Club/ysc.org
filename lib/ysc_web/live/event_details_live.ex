@@ -5,6 +5,7 @@ defmodule YscWeb.EventDetailsLive do
 
   @attendees_preview_count 10
   @availability_refresh_debounce_ms 300
+  @ticket_checkout_timeout_message "Your ticket checkout timed out and your selected tickets were released. Choose your tickets again if any are still available. If you see a charge on your card, email info@ysc.org with the date and amount."
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -1165,6 +1166,22 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   Sign in with your YSC account to buy tickets. An active, paid membership is required.
                 </p>
+                <p
+                  :if={
+                    @current_user != nil && !@active_membership? && @has_ticket_tiers &&
+                      !event_in_past?(@event)
+                  }
+                  class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
+                >
+                  <%= cond do %>
+                    <% @current_user.state == :pending_approval -> %>
+                      Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
+                    <% @had_membership? -> %>
+                      Member tickets require an active, paid membership. Renew your membership to buy tickets.
+                    <% true -> %>
+                      Member tickets require an active, paid membership. Pay dues or activate your membership to buy tickets.
+                  <% end %>
+                </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
                   <%= if event_in_past?(@event) do %>
                     <div class="flex-1 text-center">
@@ -1276,7 +1293,7 @@ defmodule YscWeb.EventDetailsLive do
                                 <.icon
                                   name="hero-identification"
                                   class="w-5 h-5"
-                                />View Membership
+                                />Membership options
                               </.button>
                             <% end %>
                           <% end %>
@@ -4423,7 +4440,7 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "Your ticket checkout timed out. Please choose your tickets again.",
+              @ticket_checkout_timeout_message,
               title: "Tickets"
             )
             |> push_patch(to: ~p"/events/#{event_id}")
@@ -4456,7 +4473,7 @@ defmodule YscWeb.EventDetailsLive do
                 "You've already completed this purchase. Check your tickets."
 
               :expired ->
-                "Your ticket checkout timed out. Please choose your tickets again."
+                @ticket_checkout_timeout_message
 
               _ ->
                 "We couldn't resume your checkout. Please choose your tickets again."
@@ -4528,7 +4545,7 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "Your ticket checkout timed out. Please choose your tickets again.",
+              @ticket_checkout_timeout_message,
               title: "Tickets"
             )
           else
@@ -4565,7 +4582,7 @@ defmodule YscWeb.EventDetailsLive do
                 "You've already completed this purchase. Check your tickets."
 
               :expired ->
-                "Your ticket checkout timed out. Please choose your tickets again."
+                @ticket_checkout_timeout_message
 
               _ ->
                 "We couldn't resume your checkout. Please choose your tickets again."
@@ -7420,7 +7437,7 @@ defmodule YscWeb.EventDetailsLive do
       DateTime.compare(now, ticket_order.expires_at) == :gt ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Your ticket checkout timed out.",
+         |> YscWeb.Flash.put_toast(:error, @ticket_checkout_timeout_message,
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7547,7 +7564,7 @@ defmodule YscWeb.EventDetailsLive do
     do: "Payment is required to complete this ticket purchase."
 
   defp free_ticket_confirm_error_message(:order_expired),
-    do: "Your ticket checkout timed out."
+    do: @ticket_checkout_timeout_message
 
   defp free_ticket_confirm_error_message(:order_not_pending),
     do: "This ticket checkout is no longer available."
