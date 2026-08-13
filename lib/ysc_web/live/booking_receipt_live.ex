@@ -729,11 +729,11 @@ defmodule YscWeb.BookingReceiptLive do
                               {segment.season_name || "Unnamed season"}
                               <%= if segment.price_per_night do %>
                                 ({MoneyHelper.format_money!(segment.price_per_night)} × {segment.nights} {if segment.nights ==
-                                                                                                              1,
-                                                                                                            do:
-                                                                                                              "night",
-                                                                                                            else:
-                                                                                                              "nights"})
+                                                                                                               1,
+                                                                                                             do:
+                                                                                                               "night",
+                                                                                                             else:
+                                                                                                               "nights"})
                               <% end %>
                             </span>
                             <span class={
@@ -748,36 +748,36 @@ defmodule YscWeb.BookingReceiptLive do
                         <% end %>
                       <% else %>
                         <%= if @price_breakdown.nights && @price_breakdown.price_per_night do %>
-                        <div
-                          id="payment-summary-buyout-line"
-                          class="flex justify-between"
-                        >
-                          <span class={
-                            if(@booking.status == :canceled,
-                              do: "text-zinc-600",
-                              else: "text-zinc-400"
-                            )
-                          }>
-                            Entire cabin
-                            ({MoneyHelper.format_money!(
-                              @price_breakdown.price_per_night
-                            )} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                 1,
-                                                               do: "night",
-                                                               else: "nights"})
-                          </span>
-                          <span class={
-                            if(@booking.status == :canceled,
-                              do: "text-zinc-700",
-                              else: "text-zinc-300"
-                            )
-                          }>
-                            {MoneyHelper.format_money!(
-                              buyout_line_amount(@price_breakdown, @booking)
-                            )}
-                          </span>
-                        </div>
-                      <% end %>
+                          <div
+                            id="payment-summary-buyout-line"
+                            class="flex justify-between"
+                          >
+                            <span class={
+                              if(@booking.status == :canceled,
+                                do: "text-zinc-600",
+                                else: "text-zinc-400"
+                              )
+                            }>
+                              Entire cabin
+                              ({MoneyHelper.format_money!(
+                                @price_breakdown.price_per_night
+                              )} × {@price_breakdown.nights} {if @price_breakdown.nights ==
+                                                                   1,
+                                                                 do: "night",
+                                                                 else: "nights"})
+                            </span>
+                            <span class={
+                              if(@booking.status == :canceled,
+                                do: "text-zinc-700",
+                                else: "text-zinc-300"
+                              )
+                            }>
+                              {MoneyHelper.format_money!(
+                                buyout_line_amount(@price_breakdown, @booking)
+                              )}
+                            </span>
+                          </div>
+                        <% end %>
                       <% end %>
                     <% :day -> %>
                       <%= if @price_breakdown.nights && @price_breakdown.price_per_guest_per_night && @price_breakdown.guests_count do %>
@@ -2409,7 +2409,8 @@ defmodule YscWeb.BookingReceiptLive do
       %{
         season_name: Map.get(segment, "season_name"),
         nights: Map.get(segment, "nights"),
-        price_per_night: parse_money_from_map(Map.get(segment, "price_per_night")),
+        price_per_night:
+          parse_money_from_map(Map.get(segment, "price_per_night")),
         total: parse_money_from_map(Map.get(segment, "total"))
       }
     end)

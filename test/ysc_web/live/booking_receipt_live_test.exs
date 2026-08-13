@@ -2833,9 +2833,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "× 3"
     end
 
-    test "renders multi-season buyout segments when pricing_items include segments", %{
-      conn: conn
-    } do
+    test "renders multi-season buyout segments when pricing_items include segments",
+         %{
+           conn: conn
+         } do
       user = user_fixture()
       conn = log_in_user(conn, user)
 

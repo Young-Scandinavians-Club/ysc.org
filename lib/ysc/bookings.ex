@@ -2059,8 +2059,11 @@ defmodule Ysc.Bookings do
           }
 
         case segments do
-          [_ | _] -> Map.put(buyout_items, "segments", encode_buyout_segments(segments))
-          _ -> buyout_items
+          [_ | _] ->
+            Map.put(buyout_items, "segments", encode_buyout_segments(segments))
+
+          _ ->
+            buyout_items
         end
     end
   end
