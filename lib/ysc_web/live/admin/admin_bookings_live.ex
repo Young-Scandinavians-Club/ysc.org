@@ -2608,19 +2608,22 @@ defmodule YscWeb.AdminBookingsLive do
                   </span>
                 </:col>
                 <:action :let={{_, booking}}>
-                  <div class="flex flex-wrap gap-2 items-center">
-                    <.button
-                      type="button"
-                      variant="outline"
-                      color="blue"
+                  <.row_actions_dropdown
+                    id={"reservation-actions-#{booking.id}"}
+                    label="Reservation actions"
+                  >
+                    <.dropdown_menu_item
+                      id={"reservation-view-#{booking.id}"}
+                      icon="hero-eye"
                       phx-click="view-booking"
                       phx-value-booking-id={booking.id}
                       phx-disable-with="Opening..."
-                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       View
-                    </.button>
-                    <.button
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      id={"reservation-edit-#{booking.id}"}
+                      icon="hero-pencil-square"
                       patch={
                         query_params = %{
                           "property" => Atom.to_string(@selected_property),
@@ -2632,25 +2635,21 @@ defmodule YscWeb.AdminBookingsLive do
                           URI.encode_query(query_params)
                       }
                       phx-disable-with="Loading..."
-                      variant="outline"
-                      color="blue"
-                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       Edit
-                    </.button>
-                    <.button
-                      type="button"
-                      variant="outline"
-                      color="red"
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      id={"reservation-delete-#{booking.id}"}
+                      icon="hero-trash"
+                      tone={:danger}
                       phx-click="delete-booking"
                       phx-value-id={booking.id}
                       data-confirm="Are you sure you want to delete this booking?"
                       phx-disable-with="Deleting..."
-                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       Delete
-                    </.button>
-                  </div>
+                    </.dropdown_menu_item>
+                  </.row_actions_dropdown>
                 </:action>
               </Flop.Phoenix.table>
 

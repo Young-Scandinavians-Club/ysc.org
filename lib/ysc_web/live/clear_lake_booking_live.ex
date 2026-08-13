@@ -1202,24 +1202,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Shared cabin
                     </div>
                   </div>
-                  <!-- Sunday Morning Parking Tip -->
-                  <div
-                    :if={@checkin_date && @checkout_date}
-                    class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl"
-                  >
-                    <div class="flex items-start gap-2">
-                      <.icon
-                        name="hero-truck"
-                        class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"
-                      />
-                      <div class="flex-1">
-                        <p class="text-xs text-amber-800 leading-relaxed">
-                          <strong>Parking Tip:</strong>
-                          If you plan to leave early Sunday, don't park in the back or you may find yourself blocked in!
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                   <!-- Availability Error Alert -->
                   <div
                     :if={@availability_error}
@@ -1993,18 +1975,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                           <span class="font-semibold">Pack Linens & Bedding</span>
                           <p class="text-xs text-zinc-400 mt-1">
                             Sheets, pillowcases, comforter or sleeping bag, and towels
-                          </p>
-                        </div>
-                      </li>
-                      <li class="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          class="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
-                        />
-                        <div>
-                          <span class="font-semibold">Review Parking Tip</span>
-                          <p class="text-xs text-zinc-400 mt-1">
-                            Leave early Sunday? Don't park in the back
                           </p>
                         </div>
                       </li>
