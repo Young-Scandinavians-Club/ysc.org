@@ -4194,31 +4194,13 @@ defmodule Ysc.Stripe.WebhookHandler do
         do: all_payments_synced && all_refunds_synced,
         else: true
 
-    # QuickbooksSyncPayoutWorker/Sync.sync_payout only know how to create a
-    # Deposit, not update one - if we flip an already-deposited payout back
-    # to "pending" here, the worker loads it as "pending" (not "synced"), so
-    # its already-synced guard never fires, and sync_payout creates a SECOND
-    # Deposit for the same bank payout instead of reflecting newly-linked
-    # payments (e.g. from ReconciliationWorker's auto-heal) on the existing
-    # one. Until an update-in-place path exists, leave an already-synced
-    # payout's QuickBooks state alone and only log the drift.
-    already_has_deposit = payout.quickbooks_deposit_id != nil
-
+    # Enqueueing here is safe even for a payout that already has a
+    # QuickBooks deposit: Sync.sync_payout/1 checks quickbooks_deposit_id
+    # itself and, when one exists, diffs it against QuickBooks before
+    # deciding whether to leave it alone, sparse-update it, or (if it's too
+    # old to safely auto-correct) alert instead of touching it. It never
+    # blindly re-creates.
     cond do
-      already_has_deposit ->
-        Ysc.Logging.warning(
-          "Payout already has a QuickBooks deposit; skipping re-sync to avoid " <>
-            "creating a duplicate deposit. Newly-linked payments/refunds are " <>
-            "not reflected in QuickBooks - correct the deposit manually.",
-          payout_id: payout.id,
-          stripe_payout_id: payout.stripe_payout_id,
-          quickbooks_deposit_id: payout.quickbooks_deposit_id,
-          payments_count: length(payout.payments),
-          refunds_count: length(payout.refunds)
-        )
-
-        :ok
-
       fee_total_populated && linking_complete ->
         Ysc.Logging.info(
           "Payout ready for QuickBooks sync - all conditions met",

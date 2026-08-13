@@ -102,6 +102,15 @@ defmodule Ysc.Quickbooks.ClientTest do
     test "query_class_by_name/1 accepts name parameter" do
       assert function_exported?(Client, :query_class_by_name, 1)
     end
+
+    test "get_deposit_by_id/1 accepts a deposit id" do
+      assert function_exported?(Client, :get_deposit_by_id, 1)
+    end
+
+    test "update_deposit/2 and /3 accept a deposit id, new lines, and opts" do
+      assert function_exported?(Client, :update_deposit, 2)
+      assert function_exported?(Client, :update_deposit, 3)
+    end
   end
 
   describe "error handling" do

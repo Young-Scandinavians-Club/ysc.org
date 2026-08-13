@@ -3591,10 +3591,12 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
   # ---------------------------------------------------------------------------
   # Relinking an already-deposited payout must never re-trigger a QuickBooks
-  # create. QuickbooksSyncPayoutWorker/Sync.sync_payout only know how to
-  # create a Deposit; if relinking flips an already-"synced" payout back to
-  # "pending", the worker would create a SECOND Deposit for the same bank
-  # payout instead of leaving the existing one alone.
+  # *create*. Sync.sync_payout/1 always checks an already-deposited payout
+  # against QuickBooks for drift (a payment can link after the deposit was
+  # created) rather than blindly re-creating - see
+  # Ysc.Quickbooks.SyncTest's "sync_payout/1" describe block for the
+  # create/update/no-op/conflict dispatch itself. This just proves the
+  # webhook_handler.ex -> Sync wiring doesn't regress into re-creating.
   # ---------------------------------------------------------------------------
   describe "relink_payout_transactions/1 does not duplicate an existing QuickBooks deposit" do
     import Mox
@@ -3646,6 +3648,18 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
            url: "/v1/balance_transactions"
          }}
       end)
+
+      # No payments/refunds are linked to this payout, so there's nothing
+      # for the diff to find missing - Sync.sync_payout/1 should still ask
+      # QuickBooks first, though, so stub it to confirm that and return a
+      # deposit with no lines.
+      stub(
+        Ysc.Quickbooks.ClientMock,
+        :get_deposit_by_id,
+        fn "dep_existing_123" ->
+          {:ok, %{"Id" => "dep_existing_123", "SyncToken" => "0", "Line" => []}}
+        end
+      )
 
       _ = WebhookHandler.relink_payout_transactions(synced_payout)
 

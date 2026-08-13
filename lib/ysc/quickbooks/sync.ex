@@ -14,8 +14,16 @@ defmodule Ysc.Quickbooks.Sync do
   alias Ysc.Accounts.User
   alias Ysc.Bookings
   alias Ysc.Subscriptions
+  alias Ysc.Alerts.Discord
   alias YscWeb.Workers.QuickbooksSyncPayoutWorker
   import Ecto.Query
+
+  # How long after a Deposit is created/last-updated we'll keep automatically
+  # correcting it when a newly-linked payment/refund shows up. Past this, a
+  # human has likely already bank-reconciled it in QuickBooks, so we alert
+  # instead of silently rewriting it. Matches the window
+  # Ysc.Ledgers.ReconciliationWorker uses for retrying local payout linking.
+  @payout_deposit_autoupdate_window_days 30
 
   # Helper to get the configured QuickBooks client module (for testing with mocks)
   defp client_module do
@@ -36,6 +44,29 @@ defmodule Ysc.Quickbooks.Sync do
 
   defp build_qb_idempotency_key("dep_payout", %Payout{id: id}),
     do: "dep_payout_#{id}"
+
+  # Varies with *which* lines are being added so a genuine retry of the same
+  # attempt (e.g. a network blip) reuses the key, but a later attempt with a
+  # different missing set (a different payment showed up) gets a new one -
+  # reusing "dep_payout_<id>" here would risk QuickBooks returning the
+  # cached *create* response instead of processing the update.
+  defp build_qb_idempotency_key({"dep_payout_update", missing_lines}, %Payout{
+         id: id
+       }) do
+    fingerprint =
+      missing_lines
+      |> Enum.map(&missing_line_txn_id/1)
+      |> Enum.sort()
+      |> Enum.join(",")
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+      |> String.slice(0, 16)
+
+    "dep_payout_update_#{id}_#{fingerprint}"
+  end
+
+  defp missing_line_txn_id(%{linked_txn: [%{txn_id: txn_id} | _]}), do: txn_id
+  defp missing_line_txn_id(_), do: "unknown"
 
   # QuickBooks Account and Class mappings
   # Account names match production chart of accounts (leaf Name or FullyQualifiedName).
@@ -193,22 +224,202 @@ defmodule Ysc.Quickbooks.Sync do
       arrival_date: payout.arrival_date
     )
 
-    # Check if already synced
-    if payout.quickbooks_sync_status == "synced" && payout.quickbooks_deposit_id do
-      Ysc.Logging.info("[QB Sync] Payout already synced to QuickBooks",
-        payout_id: payout.id,
-        deposit_id: payout.quickbooks_deposit_id
-      )
-
-      {:ok, %{"Id" => payout.quickbooks_deposit_id}}
-    else
+    # Deposit presence, not quickbooks_sync_status, decides create vs. update:
+    # a payout can be "synced" with a deposit that's since drifted (a payment
+    # linked after the deposit was created), and status alone can't tell us
+    # that - only asking QuickBooks what the Deposit actually contains can.
+    if is_nil(payout.quickbooks_deposit_id) do
       Ysc.Logging.debug("[QB Sync] Payout not yet synced, proceeding with sync",
         payout_id: payout.id,
         current_status: payout.quickbooks_sync_status
       )
 
       do_sync_payout(payout)
+    else
+      reconcile_payout_deposit(payout)
     end
+  end
+
+  # Diffs the payout's currently-linked payments/refunds against what the
+  # QuickBooks Deposit actually contains, and either leaves it alone (nothing
+  # missing), sparse-updates it (missing + recent enough), or alerts a human
+  # (missing + too old to safely auto-correct).
+  defp reconcile_payout_deposit(%Payout{} = payout) do
+    payout = Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+    case missing_payout_deposit_lines(payout) do
+      {:ok, []} ->
+        Ysc.Logging.debug(
+          "[QB Sync] Payout deposit already reflects all linked transactions",
+          payout_id: payout.id,
+          quickbooks_deposit_id: payout.quickbooks_deposit_id
+        )
+
+        # A caller (e.g. enqueue_quickbooks_sync_payout_if_ready/1) may have
+        # already flipped sync_status to "pending" before enqueueing this
+        # check. Since there's nothing to fix, the payout IS accurately
+        # synced - say so, rather than leaving it stuck at "pending" with a
+        # perfectly good deposit.
+        if payout.quickbooks_sync_status != "synced" do
+          update_sync_success_payout(
+            payout,
+            payout.quickbooks_deposit_id,
+            payout.quickbooks_response
+          )
+        end
+
+        {:ok, %{"Id" => payout.quickbooks_deposit_id}}
+
+      {:ok, missing_lines} ->
+        if payout_deposit_fresh_enough_to_autoupdate?(payout) do
+          do_update_payout_deposit(payout, missing_lines)
+        else
+          alert_stale_payout_deposit_drift(payout, missing_lines)
+          {:ok, %{"Id" => payout.quickbooks_deposit_id}}
+        end
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "[QB Sync] Could not check payout deposit for drift, leaving it alone",
+          payout_id: payout.id,
+          quickbooks_deposit_id: payout.quickbooks_deposit_id,
+          error: inspect(reason)
+        )
+
+        {:error, reason}
+    end
+  end
+
+  # Returns the currently-linked-but-not-yet-in-QuickBooks line items for this
+  # payout's Deposit, by comparing the Deposit's actual LinkedTxn references
+  # against build_payout_line_items/1 (which already only includes
+  # payments/refunds whose own Sales/Refund Receipt has synced).
+  defp missing_payout_deposit_lines(
+         %Payout{quickbooks_deposit_id: deposit_id} = payout
+       ) do
+    case client_module().get_deposit_by_id(deposit_id) do
+      {:ok, deposit} ->
+        existing_txn_ids =
+          (deposit["Line"] || [])
+          |> Enum.flat_map(&(&1["LinkedTxn"] || []))
+          |> MapSet.new(& &1["TxnId"])
+
+        missing =
+          payout
+          |> build_payout_line_items()
+          |> Enum.reject(fn line ->
+            MapSet.member?(existing_txn_ids, missing_line_txn_id(line))
+          end)
+
+        {:ok, missing}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp payout_deposit_fresh_enough_to_autoupdate?(%Payout{
+         quickbooks_synced_at: nil
+       }),
+       do: true
+
+  defp payout_deposit_fresh_enough_to_autoupdate?(%Payout{
+         quickbooks_synced_at: synced_at
+       }) do
+    cutoff =
+      DateTime.add(
+        DateTime.utc_now(),
+        -@payout_deposit_autoupdate_window_days,
+        :day
+      )
+
+    DateTime.compare(synced_at, cutoff) != :lt
+  end
+
+  defp do_update_payout_deposit(%Payout{} = payout, missing_lines) do
+    idempotency_key =
+      qb_idempotency_key({"dep_payout_update", missing_lines}, payout)
+
+    case client_module().update_deposit(
+           payout.quickbooks_deposit_id,
+           missing_lines,
+           idempotency_key: idempotency_key
+         ) do
+      {:ok, deposit} ->
+        deposit_id = Map.get(deposit, "Id") || payout.quickbooks_deposit_id
+        update_sync_success_payout(payout, deposit_id, deposit)
+
+        Ysc.Logging.info(
+          "[QB Sync] Updated payout deposit with newly-linked transactions",
+          payout_id: payout.id,
+          quickbooks_deposit_id: deposit_id,
+          added_lines: length(missing_lines)
+        )
+
+        {:ok, deposit}
+
+      {:error, :stale_object} = error ->
+        alert_stale_payout_deposit_sync_conflict(payout, missing_lines)
+        error
+
+      {:error, reason} = error ->
+        Ysc.Logging.warning("[QB Sync] Failed to update payout deposit",
+          payout_id: payout.id,
+          quickbooks_deposit_id: payout.quickbooks_deposit_id,
+          error: inspect(reason)
+        )
+
+        error
+    end
+  end
+
+  defp alert_stale_payout_deposit_drift(%Payout{} = payout, missing_lines) do
+    message =
+      "QuickBooks Deposit #{payout.quickbooks_deposit_id} for payout " <>
+        "#{payout.stripe_payout_id} is missing #{length(missing_lines)} " <>
+        "linked transaction(s), but it's older than " <>
+        "#{@payout_deposit_autoupdate_window_days} days so it was left " <>
+        "alone instead of being auto-corrected (likely already " <>
+        "bank-reconciled). Correct it manually in QuickBooks."
+
+    Ysc.Logging.warning(message,
+      payout_id: payout.id,
+      quickbooks_deposit_id: payout.quickbooks_deposit_id,
+      missing_line_descriptions: Enum.map(missing_lines, & &1.description)
+    )
+
+    Discord.send_warning(message,
+      fields: [
+        %{name: "Payout", value: payout.stripe_payout_id},
+        %{name: "Deposit ID", value: payout.quickbooks_deposit_id},
+        %{name: "Missing lines", value: to_string(length(missing_lines))}
+      ]
+    )
+  end
+
+  defp alert_stale_payout_deposit_sync_conflict(
+         %Payout{} = payout,
+         missing_lines
+       ) do
+    message =
+      "QuickBooks Deposit #{payout.quickbooks_deposit_id} for payout " <>
+        "#{payout.stripe_payout_id} was edited elsewhere (stale SyncToken) " <>
+        "while trying to add #{length(missing_lines)} missing linked " <>
+        "transaction(s) - not overwriting it. Check the Deposit in " <>
+        "QuickBooks and reconcile manually if needed."
+
+    Ysc.Logging.warning(message,
+      payout_id: payout.id,
+      quickbooks_deposit_id: payout.quickbooks_deposit_id
+    )
+
+    Discord.send_warning(message,
+      fields: [
+        %{name: "Payout", value: payout.stripe_payout_id},
+        %{name: "Deposit ID", value: payout.quickbooks_deposit_id},
+        %{name: "Missing lines", value: to_string(length(missing_lines))}
+      ]
+    )
   end
 
   # Private functions

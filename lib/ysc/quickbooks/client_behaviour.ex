@@ -22,6 +22,23 @@ defmodule Ysc.Quickbooks.ClientBehaviour do
               {:ok, map()} | {:error, atom() | String.t()}
 
   @doc """
+  Fetches a Deposit by ID from QuickBooks.
+  """
+  @callback get_deposit_by_id(String.t()) :: {:ok, map()} | {:error, atom()}
+
+  @doc """
+  Sparse-updates an existing Deposit's Line array in QuickBooks, adding the
+  given line items to whatever lines it already has. Reads the deposit first
+  to get its current SyncToken and Line array, so callers only need to pass
+  the new lines to append.
+  """
+  @callback update_deposit(String.t(), [map()]) ::
+              {:ok, map()} | {:error, atom()}
+
+  @callback update_deposit(String.t(), [map()], keyword()) ::
+              {:ok, map()} | {:error, atom()}
+
+  @doc """
   Creates a Customer in QuickBooks.
   """
   @callback create_customer(map()) ::
