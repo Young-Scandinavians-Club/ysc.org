@@ -715,9 +715,9 @@ defmodule YscWeb.BookingReceiptLive do
                         <div class="text-xs text-zinc-500 mb-1">
                           Entire cabin · rate varies by season
                         </div>
-                        <%= for segment <- @price_breakdown.segments do %>
+                        <%= for {segment, index} <- Enum.with_index(@price_breakdown.segments) do %>
                           <div
-                            id={"payment-summary-buyout-segment-#{segment.nights}"}
+                            id={"payment-summary-buyout-segment-#{index}"}
                             class="flex justify-between"
                           >
                             <span class={
