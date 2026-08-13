@@ -3320,7 +3320,7 @@ defmodule YscWeb.CoreComponents do
   @account_settings_nav_keys [
     {:profile, "Profile", "hero-user"},
     {:membership, "Membership", "hero-heart"},
-    {:payments, "Bookings & Payments", "hero-wallet"},
+    {:payments, "My Bookings & Payments", "hero-wallet"},
     {:family, "Family", "hero-user-group"},
     {:security, "Security", "hero-shield-check"},
     {:notifications, "Notifications", "hero-bell-alert"}

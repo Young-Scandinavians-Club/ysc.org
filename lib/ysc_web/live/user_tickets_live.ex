@@ -363,7 +363,7 @@ defmodule YscWeb.UserTicketsLive do
              |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
              |> YscWeb.Flash.put_toast(
                :info,
-               "Reservation cancelled. Your tickets were released.",
+               "Ticket checkout cancelled. Your selected tickets were released and are available for others to buy.",
                title: "Order"
              )}
 

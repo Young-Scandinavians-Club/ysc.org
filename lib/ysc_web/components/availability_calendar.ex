@@ -1264,7 +1264,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         "Other members already have reservations on this date. Choose different dates or book a group or room stay instead."
 
       true ->
-        "Booking already exists"
+        "Another member has already booked this date. Try different dates, or choose a shared stay if that's available."
     end
   end
 
