@@ -26,12 +26,26 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
     max_attempts: 3
 
   require Ysc.Logging
+  alias Ysc.Ledgers
   alias Ysc.Ledgers.Reconciliation
   alias Ysc.Alerts.Discord
+  alias Ysc.Stripe.WebhookHandler
+
+  # Payout linking (payments/refunds -> payout) only runs once, when the
+  # `payout.paid` webhook arrives. A charge that settles into a payout before
+  # its own Payment record exists locally (e.g. an ACH/us_bank_account charge,
+  # which can take several days to clear) is silently skipped and never
+  # retried - see docs/REPROCESS_PAYOUTS.md, previously a manual-only fix via
+  # `WebhookHandler.relink_payout_transactions/1`. Re-attempt linking here for
+  # recently-created payouts before alerting, so the common "payment showed up
+  # late" case self-heals instead of paging a human every night.
+  @payout_autoheal_lookback_days 30
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
     Ysc.Logging.info("Starting scheduled financial reconciliation")
+
+    autoheal_payout_links()
 
     # Note: run_full_reconciliation/0 currently always returns {:ok, report}
     # even when discrepancies are found. Discrepancies are indicated via
@@ -52,10 +66,64 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
   def run_now do
     Ysc.Logging.info("Manually triggering reconciliation")
 
+    autoheal_payout_links()
+
     {:ok, report} = Reconciliation.run_full_reconciliation()
     # Print formatted report to console
     Ysc.Logging.info(Reconciliation.format_report(report))
     handle_reconciliation_results(report)
+  end
+
+  # Finds payouts whose linked payments/refunds/fees don't sum to the payout
+  # amount ("composition mismatch" - i.e. a charge in the payout has no
+  # locally-linked payment/refund yet) and retries linking via the Stripe
+  # BalanceTransaction API. Skips payouts older than
+  # @payout_autoheal_lookback_days: a payout that's stayed unreconciled that
+  # long isn't waiting on a late-settling charge, it needs a human to look at
+  # `docs/REPROCESS_PAYOUTS.md`, so we don't hit Stripe for it every night.
+  defp autoheal_payout_links do
+    cutoff =
+      DateTime.add(DateTime.utc_now(), -@payout_autoheal_lookback_days, :day)
+
+    %{discrepancies: discrepancies} = Reconciliation.reconcile_payouts()
+
+    discrepancies
+    |> Enum.filter(&composition_mismatch?/1)
+    |> Enum.each(&attempt_payout_relink(&1, cutoff))
+  end
+
+  defp composition_mismatch?(%{issues: issues}) do
+    Enum.any?(issues, &String.starts_with?(&1, "Payout composition mismatch"))
+  end
+
+  defp attempt_payout_relink(
+         %{payout_id: payout_id, stripe_payout_id: stripe_payout_id},
+         cutoff
+       ) do
+    payout = Ledgers.get_payout!(payout_id)
+
+    if DateTime.compare(payout.inserted_at, cutoff) == :lt do
+      Ysc.Logging.debug(
+        "Skipping payout auto-heal: payout older than lookback window",
+        payout_id: payout_id,
+        stripe_payout_id: stripe_payout_id
+      )
+    else
+      Ysc.Logging.info(
+        "Auto-healing payout link before reconciliation alert",
+        payout_id: payout_id,
+        stripe_payout_id: stripe_payout_id
+      )
+
+      WebhookHandler.relink_payout_transactions(payout)
+    end
+  rescue
+    error ->
+      Ysc.Logging.error("Payout auto-heal failed",
+        payout_id: payout_id,
+        stripe_payout_id: stripe_payout_id,
+        error: Exception.format(:error, error, __STACKTRACE__)
+      )
   end
 
   @doc """
