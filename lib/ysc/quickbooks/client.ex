@@ -31,12 +31,20 @@ defmodule Ysc.Quickbooks.Client do
 
   require Ysc.Logging
 
+  alias Ysc.Repo
+  alias Ysc.SiteSettings.SiteSetting
+
   # Default base URL (production)
   @default_api_base_url "https://quickbooks.api.intuit.com/v3"
   @token_url "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
   # Latest minor version as of 2024
   @minor_version "65"
   @request_id_max_length 255
+  # Arbitrary bigint key for a Postgres advisory lock guarding QuickBooks
+  # refresh-token rotation. QuickBooks refresh tokens are single-use, but the
+  # token cache (Cachex) is local to each node, so without this lock two
+  # nodes can race to refresh with the same token and only one succeeds.
+  @quickbooks_refresh_lock_key 918_273_645
 
   @doc """
   Creates a SalesReceipt in QuickBooks.
@@ -3380,8 +3388,44 @@ defmodule Ysc.Quickbooks.Client do
       "[QB Client] refresh_access_token: Starting token refresh"
     )
 
-    # Step 1: Check cache for refresh token
-    cached_refresh_token = get_cached_refresh_token()
+    # Snapshot the access token as seen before we wait for the lock. If
+    # another node/process rotated it while we waited, we can reuse that
+    # result instead of rotating the (single-use) refresh token a second
+    # time.
+    access_token_before_lock = get_latest_access_token_from_db()
+
+    # Hold a Postgres advisory lock for the duration of the refresh so that
+    # only one node at a time can rotate the (single-use) QuickBooks refresh
+    # token. Other nodes/processes calling refresh_access_token concurrently
+    # will block here until the lock is released.
+    {:ok, result} =
+      Repo.transaction(fn ->
+        Repo.query!("SELECT pg_advisory_xact_lock($1)", [
+          @quickbooks_refresh_lock_key
+        ])
+
+        case get_latest_access_token_from_db() do
+          current when current == access_token_before_lock or is_nil(current) ->
+            do_refresh_access_token()
+
+          current_access_token ->
+            Ysc.Logging.info(
+              "[QB Client] refresh_access_token: Another node already refreshed while we waited for the lock, reusing its token"
+            )
+
+            {:ok, current_access_token}
+        end
+      end)
+
+    result
+  end
+
+  defp do_refresh_access_token do
+    # Step 1: Read the refresh token straight from the DB (bypassing every
+    # Cachex layer, including Ysc.Settings' own per-setting cache, not just
+    # the QuickBooks-specific one) since another node may have rotated it
+    # while we were waiting for the advisory lock above.
+    cached_refresh_token = get_latest_refresh_token_from_db()
     # Step 2: Get original refresh token from config (env variable) as fallback
     original_refresh_token = get_original_refresh_token()
 
@@ -3687,40 +3731,33 @@ defmodule Ysc.Quickbooks.Client do
     end
   end
 
-  defp get_cached_refresh_token do
-    case Cachex.get(:ysc_cache, "quickbooks:refresh_token") do
-      {:ok, nil} ->
-        # Cache is empty, try loading from SiteSettings DB, then fall back to config
-        load_refresh_token_from_db_or_config()
-
-      {:ok, token} ->
-        token
-
-      {:error, _reason} ->
-        # Cache error - try loading from SiteSettings DB, then fall back to config
-        load_refresh_token_from_db_or_config()
-    end
-  end
-
-  defp load_refresh_token_from_db_or_config do
-    # First try loading from DB
-    case Ysc.Settings.get_setting_safe("quickbooks_refresh_token") do
-      nil ->
-        # Not in DB, fall back to config (env variables)
-        fallback_to_config_refresh_token()
-
+  defp get_latest_refresh_token_from_db do
+    # Bypass Cachex entirely — including Ysc.Settings.get_setting_safe/1's own
+    # per-node cache, which would otherwise silently reintroduce the same
+    # staleness this function exists to avoid — and read the DB (source of
+    # truth shared by all nodes) directly, refreshing the local cache with
+    # whatever it finds.
+    case get_site_setting_value_from_db("quickbooks_refresh_token") do
       token when is_binary(token) ->
-        # Found token in DB, cache it for future use (without persisting back to DB)
-        Ysc.Logging.debug(
-          "[QB Client] load_refresh_token_from_db_or_config: Loaded token from DB, caching it"
-        )
-
         Cachex.put(:ysc_cache, "quickbooks:refresh_token", token)
         token
 
       _ ->
-        # Invalid value in DB, fall back to config
         fallback_to_config_refresh_token()
+    end
+  end
+
+  defp get_latest_access_token_from_db do
+    case get_site_setting_value_from_db("quickbooks_access_token") do
+      token when is_binary(token) -> token
+      _ -> nil
+    end
+  end
+
+  defp get_site_setting_value_from_db(name) do
+    case Repo.get_by(SiteSetting, name: name) do
+      nil -> nil
+      setting -> setting.value
     end
   end
 
