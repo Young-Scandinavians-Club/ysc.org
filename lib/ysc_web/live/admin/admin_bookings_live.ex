@@ -2457,6 +2457,12 @@ defmodule YscWeb.AdminBookingsLive do
                 items={@streams.reservations}
                 meta={@reservation_meta}
                 path={@reservations_path}
+                row_click={
+                  fn {_, booking} ->
+                    JS.push("view-booking", value: %{"booking-id" => booking.id})
+                  end
+                }
+                opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
               >
                 <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                   <.badge type="default" class="whitespace-nowrap">
