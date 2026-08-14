@@ -381,12 +381,15 @@ defmodule Ysc.Bookings.ModifyBookingTest do
 
       # Overlapping booking on the same room starting the day before checkout
       _other_booking =
-        complete_room_booking!(
-          other_user,
-          room,
-          Date.add(checkin, 1),
-          Date.add(checkout, 2)
-        )
+        booking_fixture(%{
+          user_id: other_user.id,
+          property: :tahoe,
+          booking_mode: :room,
+          checkin_date: Date.add(checkin, 1),
+          checkout_date: Date.add(checkout, 2),
+          status: :complete,
+          rooms: [room]
+        })
 
       extended_checkout = Date.add(checkout, 1)
 
