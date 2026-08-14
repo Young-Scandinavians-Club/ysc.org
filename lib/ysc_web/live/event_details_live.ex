@@ -1063,11 +1063,11 @@ defmodule YscWeb.EventDetailsLive do
                           />
                           <%= cond do %>
                             <% @current_user.state == :pending_approval -> %>
-                              Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
+                              Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (membership payment may still be required).
                             <% @had_membership? -> %>
                               Member tickets require an active paid membership. Your membership has expired — renew to buy tickets.
                             <% true -> %>
-                              Member tickets require an active paid membership. Pay dues or activate your membership to buy tickets.
+                              Member tickets require an active paid membership. Activate or renew your membership to buy tickets.
                           <% end %>
                         </p>
                         <.link
@@ -1176,11 +1176,11 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   <%= cond do %>
                     <% @current_user.state == :pending_approval -> %>
-                      Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
+                      Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (membership payment may still be required).
                     <% @had_membership? -> %>
                       Member tickets require an active, paid membership. Renew your membership to buy tickets.
                     <% true -> %>
-                      Member tickets require an active, paid membership. Pay dues or activate your membership to buy tickets.
+                      Member tickets require an active, paid membership. Activate or renew your membership to buy tickets.
                   <% end %>
                 </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
@@ -1421,13 +1421,13 @@ defmodule YscWeb.EventDetailsLive do
                       nil
 
                     is_pre_sale && ticket_tier.start_date && ticket_tier.end_date ->
-                      "On sale #{DateDisplay.format_event_date_range(ticket_tier, with_year: true)}"
+                      "On sale #{DateDisplay.format_sale_window_range(ticket_tier, with_year: true)}"
 
                     is_pre_sale && ticket_tier.start_date ->
-                      "Sale starts #{DateDisplay.format_datetime_display(ticket_tier.start_date)}"
+                      "Sale starts #{DateDisplay.format_pacific_date(ticket_tier.start_date)}"
 
                     ticket_tier.end_date ->
-                      "Sale ends #{DateDisplay.format_datetime_display(ticket_tier.end_date)}"
+                      "Sale ends #{DateDisplay.format_pacific_date(ticket_tier.end_date)}"
 
                     true ->
                       nil
@@ -1739,7 +1739,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div :if={!is_donation && is_sale_ended} class="mt-2">
                     <p class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-200">
                       <.icon name="hero-x-circle" class="w-4 h-4 inline me-1" />
-                      Sale ended on {DateDisplay.format_datetime_display(
+                      Sale ended on {DateDisplay.format_pacific_date(
                         ticket_tier.end_date
                       )}
                     </p>

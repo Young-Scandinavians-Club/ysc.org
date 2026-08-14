@@ -131,7 +131,8 @@ defmodule Ysc.Bookings.PricingHelpers do
            socket.assigns.checkout_date,
            :buyout,
            guests_count: guests_count,
-           children_count: children_count
+           children_count: children_count,
+           seasons: Map.get(socket.assigns, :seasons)
          ) do
       {:ok, base_price, base_breakdown} ->
         {socket, calculated_price, price_breakdown} =
@@ -245,7 +246,8 @@ defmodule Ysc.Bookings.PricingHelpers do
            socket.assigns.checkin_date,
            socket.assigns.checkout_date,
            :day,
-           guests_count: guests_count
+           guests_count: guests_count,
+           seasons: Map.get(socket.assigns, :seasons)
          ) do
       {:ok, base_price, base_breakdown} ->
         {socket, calculated_price, price_breakdown} =

@@ -923,6 +923,117 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert booking.checkin_date == checkin
       assert booking.checkout_date == checkout
     end
+
+    test "rejects overlapping admin buyout bookings for the same dates", %{
+      user: user
+    } do
+      user2 = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(15)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      assert {:ok, %Booking{}} =
+               BookingLocker.create_admin_booking(attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      overlap_attrs = Map.put(attrs, :user_id, user2.id)
+
+      assert {:error, {:error, :stale_inventory}} =
+               BookingLocker.create_admin_booking(overlap_attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      overlapping_bookings =
+        Ysc.Repo.aggregate(
+          from(b in Ysc.Bookings.Booking,
+            where:
+              b.property == :tahoe and b.booking_mode == :buyout and
+                b.checkin_date == ^checkin and b.checkout_date == ^checkout and
+                b.status == :complete
+          ),
+          :count
+        )
+
+      assert overlapping_bookings == 1
+    end
+
+    test "concurrent admin buyout bookings allow only one winner on new inventory rows",
+         %{sandbox_owner: owner} do
+      user1 = user_fixture()
+      user2 = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(16)
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      Ysc.Repo.delete_all(
+        from(pi in Ysc.Bookings.PropertyInventory,
+          where: pi.property == :tahoe and pi.day in ^stay_days
+        )
+      )
+
+      booking_attrs = fn user ->
+        %{
+          user_id: user.id,
+          property: :tahoe,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          booking_mode: :buyout,
+          guests_count: 4,
+          total_price: Money.new(:USD, "500.00")
+        }
+      end
+
+      results =
+        [user1, user2]
+        |> Task.async_stream(
+          fn user ->
+            Ysc.DataCase.allow_sandbox(self(), owner)
+
+            BookingLocker.create_admin_booking(
+              booking_attrs.(user),
+              skip_email: true,
+              skip_reminders: true
+            )
+          end,
+          max_concurrency: 2,
+          timeout: 5_000
+        )
+        |> Enum.to_list()
+
+      successes = Enum.count(results, &match?({:ok, {:ok, _}}, &1))
+
+      stale_failures =
+        Enum.count(
+          results,
+          &match?({:ok, {:error, {:error, :stale_inventory}}}, &1)
+        )
+
+      assert successes == 1
+      assert stale_failures == 1
+
+      overlapping_bookings =
+        Ysc.Repo.aggregate(
+          from(b in Ysc.Bookings.Booking,
+            where:
+              b.property == :tahoe and b.booking_mode == :buyout and
+                b.checkin_date == ^checkin and b.checkout_date == ^checkout and
+                b.status == :complete
+          ),
+          :count
+        )
+
+      assert overlapping_bookings == 1
+    end
   end
 
   describe "refund_complete_booking/2" do

@@ -1613,9 +1613,13 @@ defmodule Ysc.Bookings.BookingLocker do
           booking = Repo.preload(booking, [:rooms, :user])
 
           # Update inventory based on booking mode
-          update_inventory_for_admin_booking(booking)
+          case safe_update_inventory_for_admin_booking(booking) do
+            :ok ->
+              booking
 
-          booking
+            {:error, reason} ->
+              Repo.rollback({:error, reason})
+          end
 
         {:error, changeset} ->
           Repo.rollback({:error, changeset})
@@ -1768,55 +1772,20 @@ defmodule Ysc.Bookings.BookingLocker do
 
   # Updates inventory to mark dates as booked for an admin-created booking
   defp update_inventory_for_admin_booking(booking) do
+    days = stay_night_dates(booking.checkin_date, booking.checkout_date)
+
     case booking.booking_mode do
       :buyout ->
-        # Set buyout_booked = true for all days
-        {count, _} =
-          Repo.update_all(
-            from(pi in PropertyInventory,
-              where:
-                pi.property == ^booking.property and
-                  pi.day >= ^booking.checkin_date and
-                  pi.day < ^booking.checkout_date
-            ),
-            set: [
-              buyout_booked: true,
-              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
-            ]
-          )
-
-        # Ensure inventory rows exist first if count is 0
-        if count == 0 do
-          ensure_inventory_exists_and_book(booking)
-        else
-          :ok
-        end
+        # Route through the same optimistic-locking path as member/modify flows.
+        # A blind update_all could mark already-booked buyout days again and allow
+        # overlapping exclusive buyouts for the same property dates.
+        book_buyout_days!(booking, days, MapSet.new())
 
       :room ->
         room_ids = Enum.map(booking.rooms, & &1.id)
 
         if room_ids != [] do
-          {count, _} =
-            Repo.update_all(
-              from(ri in RoomInventory,
-                where:
-                  ri.room_id in ^room_ids and
-                    ri.day >= ^booking.checkin_date and
-                    ri.day < ^booking.checkout_date
-              ),
-              set: [
-                booked: true,
-                held: false,
-                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
-              ]
-            )
-
-          # Ensure inventory rows exist first if count is 0
-          if count == 0 do
-            ensure_room_inventory_exists_and_book(booking, room_ids)
-          else
-            :ok
-          end
+          book_room_days!(booking, room_ids, days, MapSet.new())
         else
           :ok
         end
@@ -1842,6 +1811,15 @@ defmodule Ysc.Bookings.BookingLocker do
 
       _ ->
         :ok
+    end
+  end
+
+  defp safe_update_inventory_for_admin_booking(booking) do
+    try do
+      update_inventory_for_admin_booking(booking)
+      :ok
+    rescue
+      _e in Ecto.StaleEntryError -> {:error, :stale_inventory}
     end
   end
 
@@ -1918,34 +1896,6 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  # Ensures property inventory rows exist for the date range and marks as booked
-  defp ensure_inventory_exists_and_book(booking) do
-    dates =
-      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
-
-    Enum.each(dates, fn date ->
-      Repo.insert(
-        %PropertyInventory{
-          property: booking.property,
-          day: date,
-          buyout_booked: true,
-          buyout_held: false,
-          capacity_total:
-            if(booking.property == :clear_lake,
-              do: @default_capacity_clear_lake,
-              else: @default_capacity_tahoe
-            ),
-          capacity_held: 0,
-          capacity_booked: 0
-        },
-        on_conflict: {:replace, [:buyout_booked, :updated_at]},
-        conflict_target: [:property, :day]
-      )
-    end)
-
-    :ok
-  end
-
   # Ensures property inventory rows exist for the date range and marks as held
   defp ensure_inventory_exists_and_hold(booking) do
     dates =
@@ -1988,27 +1938,6 @@ defmodule Ysc.Bookings.BookingLocker do
           held: true
         },
         on_conflict: {:replace, [:held, :booked, :updated_at]},
-        conflict_target: [:room_id, :day]
-      )
-    end
-
-    :ok
-  end
-
-  # Ensures room inventory rows exist for the date range and marks as booked
-  defp ensure_room_inventory_exists_and_book(booking, room_ids) do
-    dates =
-      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
-
-    for room_id <- room_ids, date <- dates do
-      Repo.insert(
-        %RoomInventory{
-          room_id: room_id,
-          day: date,
-          booked: true,
-          held: false
-        },
-        on_conflict: {:replace, [:booked, :held, :updated_at]},
         conflict_target: [:room_id, :day]
       )
     end
@@ -3413,6 +3342,8 @@ defmodule Ysc.Bookings.BookingLocker do
 
   @dialyzer {:nowarn_function, book_buyout_days!: 3}
   defp book_buyout_days!(booking, days, held_days) do
+    ensure_property_inventory_for_days(booking.property, days)
+
     prop_inv =
       Repo.all(
         from pi in PropertyInventory,
@@ -3420,55 +3351,63 @@ defmodule Ysc.Bookings.BookingLocker do
       )
 
     if length(prop_inv) != length(days) do
-      ensure_inventory_exists_and_book(booking)
-    else
-      update_results =
-        Enum.map(prop_inv, fn pi ->
-          from_held = MapSet.member?(held_days, pi.day)
+      raise_stale_inventory!(%PropertyInventory{
+        property: booking.property,
+        day: List.first(days)
+      })
+    end
 
-          query =
-            if from_held do
-              from(pi2 in PropertyInventory,
-                where:
-                  pi2.property == ^booking.property and pi2.day == ^pi.day and
-                    pi2.lock_version == ^pi.lock_version and
-                    pi2.buyout_held == true
-              )
-            else
-              from(pi2 in PropertyInventory,
-                where:
-                  pi2.property == ^booking.property and pi2.day == ^pi.day and
-                    pi2.lock_version == ^pi.lock_version and
-                    pi2.buyout_held == false and
-                    pi2.buyout_booked == false and
-                    (type(^booking.property, Ysc.Bookings.BookingProperty) !=
-                       :clear_lake or
-                       (pi2.capacity_held == 0 and pi2.capacity_booked == 0))
-              )
-            end
+    update_results =
+      Enum.map(prop_inv, fn pi ->
+        from_held = MapSet.member?(held_days, pi.day)
 
-          {count, _} =
-            Repo.update_all(
-              query,
-              set: [
-                buyout_booked: true,
-                buyout_held: false,
-                lock_version: pi.lock_version + 1,
-                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
-              ]
+        query =
+          if from_held do
+            from(pi2 in PropertyInventory,
+              where:
+                pi2.property == ^booking.property and pi2.day == ^pi.day and
+                  pi2.lock_version == ^pi.lock_version and
+                  pi2.buyout_held == true
             )
+          else
+            from(pi2 in PropertyInventory,
+              where:
+                pi2.property == ^booking.property and pi2.day == ^pi.day and
+                  pi2.lock_version == ^pi.lock_version and
+                  pi2.buyout_held == false and pi2.buyout_booked == false and
+                  (type(^booking.property, Ysc.Bookings.BookingProperty) !=
+                     :clear_lake or
+                     (pi2.capacity_held == 0 and pi2.capacity_booked == 0))
+            )
+          end
 
-          if count == 1, do: {:ok, :updated}, else: {:error, :stale_inventory}
-        end)
+        {count, _} =
+          Repo.update_all(
+            query,
+            set: [
+              buyout_booked: true,
+              buyout_held: false,
+              lock_version: pi.lock_version + 1,
+              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+            ]
+          )
 
-      if Enum.any?(update_results, &match?({:error, _}, &1)) do
-        raise_stale_inventory!(List.first(prop_inv))
-      end
+        if count == 1, do: {:ok, :updated}, else: {:error, :stale_inventory}
+      end)
+
+    if Enum.any?(update_results, &match?({:error, _}, &1)) do
+      raise_stale_inventory!(List.first(prop_inv))
     end
   end
 
   @dialyzer {:nowarn_function, book_room_days!: 4}
-  defp book_room_days!(booking, room_ids, days, held_days) do
+  defp book_room_days!(_booking, room_ids, days, held_days) do
+    Enum.each(room_ids, fn room_id ->
+      Enum.each(days, fn day ->
+        ensure_room_inventory_row(room_id, day)
+      end)
+    end)
+
     room_inv =
       Repo.all(
         from ri in RoomInventory,
@@ -3478,45 +3417,48 @@ defmodule Ysc.Bookings.BookingLocker do
     expected = length(room_ids) * length(days)
 
     if length(room_inv) != expected do
-      ensure_room_inventory_exists_and_book(booking, room_ids)
-    else
-      update_results =
-        Enum.map(room_inv, fn ri ->
-          from_held = MapSet.member?(held_days, ri.day)
+      raise_stale_inventory!(%RoomInventory{
+        room_id: List.first(room_ids),
+        day: List.first(days)
+      })
+    end
 
-          query =
-            if from_held do
-              from(ri2 in RoomInventory,
-                where:
-                  ri2.room_id == ^ri.room_id and ri2.day == ^ri.day and
-                    ri2.lock_version == ^ri.lock_version and ri2.held == true
-              )
-            else
-              from(ri2 in RoomInventory,
-                where:
-                  ri2.room_id == ^ri.room_id and ri2.day == ^ri.day and
-                    ri2.lock_version == ^ri.lock_version and ri2.held == false and
-                    ri2.booked == false
-              )
-            end
+    update_results =
+      Enum.map(room_inv, fn ri ->
+        from_held = MapSet.member?(held_days, ri.day)
 
-          {count, _} =
-            Repo.update_all(
-              query,
-              set: [
-                booked: true,
-                held: false,
-                lock_version: ri.lock_version + 1,
-                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
-              ]
+        query =
+          if from_held do
+            from(ri2 in RoomInventory,
+              where:
+                ri2.room_id == ^ri.room_id and ri2.day == ^ri.day and
+                  ri2.lock_version == ^ri.lock_version and ri2.held == true
             )
+          else
+            from(ri2 in RoomInventory,
+              where:
+                ri2.room_id == ^ri.room_id and ri2.day == ^ri.day and
+                  ri2.lock_version == ^ri.lock_version and ri2.held == false and
+                  ri2.booked == false
+            )
+          end
 
-          if count == 1, do: {:ok, :updated}, else: {:error, :stale_inventory}
-        end)
+        {count, _} =
+          Repo.update_all(
+            query,
+            set: [
+              booked: true,
+              held: false,
+              lock_version: ri.lock_version + 1,
+              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+            ]
+          )
 
-      if Enum.any?(update_results, &match?({:error, _}, &1)) do
-        raise_stale_inventory!(List.first(room_inv))
-      end
+        if count == 1, do: {:ok, :updated}, else: {:error, :stale_inventory}
+      end)
+
+    if Enum.any?(update_results, &match?({:error, _}, &1)) do
+      raise_stale_inventory!(List.first(room_inv))
     end
   end
 
@@ -3608,7 +3550,8 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp raise_stale_inventory!(struct) do
-    raise Ecto.StaleEntryError, struct: struct, action: :update
+    changeset = struct |> Ecto.Changeset.change() |> Map.put(:action, :update)
+    raise Ecto.StaleEntryError, changeset: changeset, action: :update
   end
 
   defp fetch_property_inventory_days(property, days) do

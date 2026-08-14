@@ -4,7 +4,7 @@ defmodule Ysc.ResendRateLimiter do
 
   Provides rate limiting functionality to prevent spam and abuse of resend operations.
   Uses cache with TTL to track rate limit state, written through
-  `Ysc.RateLimitCache` so state stays replicated across all nodes.
+  `Ysc.DistributedCache` so state stays replicated across all nodes.
   """
 
   @default_rate_limit_seconds 60
@@ -61,7 +61,7 @@ defmodule Ysc.ResendRateLimiter do
     cache_key = cache_key(identifier, type)
     ttl_ms = :timer.seconds(rate_limit_seconds)
 
-    case Ysc.RateLimitCache.put(:ysc_cache, cache_key, true, expire: ttl_ms) do
+    case Ysc.DistributedCache.put(:ysc_cache, cache_key, true, expire: ttl_ms) do
       {:ok, _} ->
         :ok
 

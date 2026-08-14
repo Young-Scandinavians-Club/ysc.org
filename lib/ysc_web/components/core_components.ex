@@ -4228,7 +4228,7 @@ defmodule YscWeb.CoreComponents do
                 </strong>
                 has been canceled.
               <% else %>
-                The primary account membership has been canceled.
+                Your family membership has been canceled.
               <% end %>
             <% else %>
               Your membership has been canceled.
@@ -4335,7 +4335,7 @@ defmodule YscWeb.CoreComponents do
                 </strong>
                 will not automatically renew.
               <% else %>
-                The primary account membership will not automatically renew.
+                Your family membership will not automatically renew.
               <% end %>
             <% else %>
               Your <strong>{get_membership_type(@current_membership)}</strong>

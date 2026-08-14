@@ -3,6 +3,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
   import Ecto.Query
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
 
   alias Ysc.Bookings
 
@@ -389,12 +390,15 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     booking = complete_room_booking!(user, room, checkin, checkout)
 
     _other =
-      complete_room_booking!(
-        other_user,
-        room,
-        Date.add(checkin, 1),
-        Date.add(checkout, 2)
-      )
+      booking_fixture(%{
+        user_id: other_user.id,
+        property: :tahoe,
+        booking_mode: :room,
+        checkin_date: Date.add(checkin, 1),
+        checkout_date: Date.add(checkout, 2),
+        status: :complete,
+        rooms: [room]
+      })
 
     calendar = ModificationDateAvailability.calendar_context(booking)
 

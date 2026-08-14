@@ -1795,7 +1795,9 @@ defmodule YscWeb.AdminMoneyLive do
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
                     <.badge type={
-                      get_expense_report_status_badge_type(expense_report.status)
+                      AdminBadgeHelpers.expense_report_status_badge_type(
+                        expense_report.status
+                      )
                     }>
                       {String.capitalize(expense_report.status || "unknown")}
                     </.badge>
@@ -3444,7 +3446,7 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="font-medium text-zinc-700">Status</p>
               <p class="text-zinc-900">
                 <.badge type={
-                  get_expense_report_status_badge_type(
+                  AdminBadgeHelpers.expense_report_status_badge_type(
                     @selected_expense_report.status
                   )
                 }>
@@ -4009,17 +4011,6 @@ defmodule YscWeb.AdminMoneyLive do
       "rejected",
       "paid"
     ])
-  end
-
-  defp get_expense_report_status_badge_type(status) do
-    case String.downcase(to_string(status || "")) do
-      "draft" -> "dark"
-      "submitted" -> "default"
-      "approved" -> "green"
-      "rejected" -> "red"
-      "paid" -> "sky"
-      _ -> "dark"
-    end
   end
 
   # Helper function to release availability for a payment (booking or ticket order)

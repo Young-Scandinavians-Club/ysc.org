@@ -95,6 +95,34 @@ defmodule YscWeb.AdminBadgeHelpersTest do
     end
   end
 
+  describe "expense_report_status_badge_type/1" do
+    test "maps known expense report statuses" do
+      assert AdminBadgeHelpers.expense_report_status_badge_type("draft") ==
+               "dark"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("submitted") ==
+               "default"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("approved") ==
+               "green"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("rejected") ==
+               "red"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("paid") == "sky"
+    end
+
+    test "accepts atoms and defaults unknown statuses" do
+      assert AdminBadgeHelpers.expense_report_status_badge_type(:approved) ==
+               "green"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type(nil) == "dark"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("unknown") ==
+               "dark"
+    end
+  end
+
   describe "payout_status_badge_type/1" do
     test "maps known Stripe payout statuses" do
       assert AdminBadgeHelpers.payout_status_badge_type("paid") == "green"

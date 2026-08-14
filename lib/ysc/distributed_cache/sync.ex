@@ -1,8 +1,8 @@
-defmodule Ysc.RateLimitCache.Sync do
+defmodule Ysc.DistributedCache.Sync do
   @moduledoc """
-  Subscribes to `Ysc.RateLimitCache` writes broadcast by other nodes and
-  applies them to this node's local `Cachex` store, keeping rate-limit
-  state converged across the cluster.
+  Subscribes to `Ysc.DistributedCache` writes broadcast by other nodes and
+  applies them to this node's local `Cachex` store, keeping cache state
+  converged across the cluster.
   """
   use GenServer
 
@@ -12,13 +12,13 @@ defmodule Ysc.RateLimitCache.Sync do
 
   @impl true
   def init(_opts) do
-    Phoenix.PubSub.subscribe(Ysc.PubSub, Ysc.RateLimitCache.topic())
+    Phoenix.PubSub.subscribe(Ysc.PubSub, Ysc.DistributedCache.topic())
     {:ok, nil}
   end
 
   @impl true
   def handle_info(
-        {:rate_limit_cache_put, from_node, cache_name, key, value, opts},
+        {:distributed_cache_put, from_node, cache_name, key, value, opts},
         state
       ) do
     # Same-node writers already updated this node's Cachex table directly;
