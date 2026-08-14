@@ -381,10 +381,13 @@ defmodule YscWeb.Components.DateRangePicker do
 
   @impl true
   def handle_event("close-calendar", _, socket) do
-    range_start = to_datetime(socket.assigns.range_start)
+    range_start = finalize_date(socket.assigns.range_start, socket.assigns)
 
     range_end =
-      to_datetime(socket.assigns.range_end || socket.assigns.range_start)
+      finalize_date(
+        socket.assigns.range_end || socket.assigns.range_start,
+        socket.assigns
+      )
 
     {range_start, range_end} = normalize_sorted_range(range_start, range_end)
 
@@ -694,11 +697,14 @@ defmodule YscWeb.Components.DateRangePicker do
     end
   end
 
+  # Callers only ever reach this clause with the already-finalized DateTime (or
+  # nil) produced by finalize_date/to_datetime, so it's stored as-is. Rebuilding
+  # it from just the calendar date (as this used to do via `Date.to_string/1`)
+  # silently dropped the time-of-day/timezone anchoring — e.g. it turned an
+  # end-of-day Pacific instant back into plain midnight UTC of a possibly
+  # different calendar day.
   defp set_field_value(assigns, field, value) do
     if Map.has_key?(assigns, field) and is_map(assigns[field]) do
-      {:ok, value, _} =
-        DateTime.from_iso8601(Date.to_string(value) <> "T00:00:00Z")
-
       Map.put(assigns[field], :value, value)
     else
       nil
@@ -1156,7 +1162,27 @@ defmodule YscWeb.Components.DateRangePicker do
     {range_start, range_end}
   end
 
-  defp to_datetime(nil), do: nil
+  # Converts a freshly-picked calendar day into the DateTime persisted to the
+  # form. Only bare `%Date{}` values (a brand-new pick) are anchored using the
+  # caller's `:timezone`/`:end_of_day?` assigns — a `%DateTime{}` already
+  # carries its own instant (e.g. reloaded from the DB, or picked on a prior
+  # cycle) and is passed straight to `to_datetime/1` unchanged, so this stays
+  # idempotent across repeated form submits.
+  defp finalize_date(nil, _assigns), do: nil
+
+  defp finalize_date(%Date{} = date, assigns) do
+    timezone = Map.get(assigns, :timezone) || "Etc/UTC"
+
+    time =
+      if Map.get(assigns, :end_of_day?, false), do: ~T[23:59:59], else: ~T[00:00:00]
+
+    date
+    |> DateTime.new!(time, timezone)
+    |> DateTime.shift_zone!("Etc/UTC")
+  end
+
+  defp finalize_date(value, _assigns), do: to_datetime(value)
+
   defp to_datetime(%DateTime{} = dt), do: DateTime.truncate(dt, :second)
 
   defp to_datetime(%Date{} = date) do
