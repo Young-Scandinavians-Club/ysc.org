@@ -1,5 +1,6 @@
 defmodule Ysc.ScanRateLimitTest do
-  use ExUnit.Case, async: true
+  # Hammer ETS state is shared across processes; keep this module serial.
+  use ExUnit.Case, async: false
 
   describe "check/1" do
     test "allows requests within the configured limit" do
