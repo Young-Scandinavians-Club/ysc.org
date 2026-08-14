@@ -3639,7 +3639,7 @@ defmodule YscWeb.AdminBookingsLive do
        pricing_rules,
        refund_policies
      )
-     |> update_calendar_view(selected_property)}
+     |> maybe_update_calendar_view(selected_property)}
   end
 
   @impl true
@@ -3791,11 +3791,13 @@ defmodule YscWeb.AdminBookingsLive do
             socket
           end
 
-        # Update calendar view only if dates or property changed (avoid duplicate queries on initial mount)
+        # Update calendar view when dates/property change, or when switching
+        # to the calendar tab (deferred from :load_bookings_data for other tabs).
         socket =
-          if (dates_changed || property_changed) &&
-               socket.assigns.live_action == :index do
-            update_calendar_view(socket, socket.assigns.selected_property)
+          if socket.assigns.live_action == :index &&
+               ((section_changed && socket.assigns.current_section == :calendar) ||
+                  dates_changed || property_changed) do
+            maybe_update_calendar_view(socket, socket.assigns.selected_property)
           else
             socket
           end

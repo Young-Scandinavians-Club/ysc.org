@@ -2979,6 +2979,7 @@ defmodule Ysc.Bookings do
     - `:children_count` - Number of children (default: 0)
     - `:exclude_booking_id` - Optional booking ID to exclude (for updates)
     - `:use_actual_guests` - Whether to use actual guests count (default: false)
+    - `:seasons` - Optional preloaded seasons list (avoids per-night cache lookups)
 
   ## Returns
   - `{:ok, %Money{}}` with the total price
@@ -2999,7 +3000,8 @@ defmodule Ysc.Bookings do
       room_id: Keyword.get(opts, :room_id),
       guests_count: Keyword.get(opts, :guests_count, 1),
       children_count: Keyword.get(opts, :children_count, 0),
-      use_actual_guests: Keyword.get(opts, :use_actual_guests, false)
+      use_actual_guests: Keyword.get(opts, :use_actual_guests, false),
+      seasons: Keyword.get(opts, :seasons)
     }
 
     calculate_booking_price_impl(params)
@@ -3015,7 +3017,8 @@ defmodule Ysc.Bookings do
             params.property,
             params.checkin_date,
             params.checkout_date,
-            nights
+            nights,
+            params.seasons
           )
 
         :room ->
@@ -3036,7 +3039,8 @@ defmodule Ysc.Bookings do
             params.checkin_date,
             params.checkout_date,
             params.guests_count,
-            nights
+            nights,
+            params.seasons
           )
 
         _ ->
@@ -3075,7 +3079,66 @@ defmodule Ysc.Bookings do
   defp validate_booking_mode(:room, nil), do: {:error, :room_id_required}
   defp validate_booking_mode(_booking_mode, _room_id), do: {:ok, :valid}
 
-  defp calculate_buyout_price(property, checkin_date, checkout_date, _nights) do
+  defp seasons_for_pricing(_property, seasons) when is_list(seasons),
+    do: seasons
+
+  defp seasons_for_pricing(property, _seasons) do
+    if Application.get_env(:ysc, :season_cache_enabled, true) do
+      SeasonCache.get_all_for_property(property)
+    else
+      Season.list_all_for_property_db(property)
+    end
+  end
+
+  # Resolves season + pricing rule for each night, but looks up pricing rules
+  # once per consecutive season segment instead of once per night. Callers with
+  # seasons already loaded (e.g. Clear Lake booking LiveView) should pass them
+  # via calculate_booking_price/5 opts to avoid repeated SeasonCache lookups on
+  # long multi-season stays (up to 730 nights after #1002).
+  defp nightly_rates_for_range(
+         property,
+         date_range,
+         booking_mode,
+         price_unit,
+         seasons
+       ) do
+    seasons = seasons_for_pricing(property, seasons)
+
+    date_range
+    |> Enum.map(fn date ->
+      {date, Season.find_season_for_date(seasons, date)}
+    end)
+    |> Enum.chunk_by(fn {_date, season} ->
+      case season do
+        nil -> :no_season
+        %{id: id} -> id
+      end
+    end)
+    |> Enum.flat_map(fn chunk ->
+      [{_date, season} | _] = chunk
+      season_id = if season, do: season.id, else: nil
+
+      pricing_rule =
+        PricingRule.find_most_specific(
+          property,
+          season_id,
+          nil,
+          nil,
+          booking_mode,
+          price_unit
+        )
+
+      Enum.map(chunk, fn {_date, s} -> {s, pricing_rule} end)
+    end)
+  end
+
+  defp calculate_buyout_price(
+         property,
+         checkin_date,
+         checkout_date,
+         _nights,
+         seasons
+       ) do
     # For buyouts, we need to check the season for each night
     # and sum up the prices. Nights without a configured pricing rule
     # contribute $0 (matches prior behavior) rather than erroring, since a
@@ -3084,22 +3147,13 @@ defmodule Ysc.Bookings do
       Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
 
     nightly_rates =
-      Enum.map(date_range, fn date ->
-        season = Season.for_date(property, date)
-        season_id = if season, do: season.id, else: nil
-
-        pricing_rule =
-          PricingRule.find_most_specific(
-            property,
-            season_id,
-            nil,
-            nil,
-            :buyout,
-            :buyout_fixed
-          )
-
-        {season, pricing_rule}
-      end)
+      nightly_rates_for_range(
+        property,
+        date_range,
+        :buyout,
+        :buyout_fixed,
+        seasons
+      )
 
     segments = build_buyout_price_segments(nightly_rates)
 
@@ -3504,7 +3558,8 @@ defmodule Ysc.Bookings do
          checkin_date,
          checkout_date,
          guests_count,
-         _nights
+         _nights,
+         seasons
        ) do
     # For day bookings, price is per guest per day. Clear Lake uses this
     # model. Pricing rules can be season-specific, and a stay may span a
@@ -3515,22 +3570,13 @@ defmodule Ysc.Bookings do
       Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
 
     nightly_rates =
-      Enum.map(date_range, fn date ->
-        season = Season.for_date(property, date)
-        season_id = if season, do: season.id, else: nil
-
-        pricing_rule =
-          PricingRule.find_most_specific(
-            property,
-            season_id,
-            nil,
-            nil,
-            :day,
-            :per_guest_per_day
-          )
-
-        {season, pricing_rule}
-      end)
+      nightly_rates_for_range(
+        property,
+        date_range,
+        :day,
+        :per_guest_per_day,
+        seasons
+      )
 
     if Enum.any?(nightly_rates, fn {_season, rule} -> is_nil(rule) end) do
       {:error, :pricing_rule_not_found}
