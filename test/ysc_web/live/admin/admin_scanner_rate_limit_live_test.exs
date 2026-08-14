@@ -30,7 +30,10 @@ defmodule YscWeb.AdminScannerRateLimitLiveTest do
 
   setup :create_admin
 
-  test "scan_result is rate limited after many scans", %{conn: conn, admin: admin} do
+  test "scan_result is rate limited after many scans", %{
+    conn: conn,
+    admin: admin
+  } do
     {:ok, view, _html} = live(conn, ~p"/admin/scanner")
     view |> element("button[phx-value-mode='membership']") |> render_click()
 
