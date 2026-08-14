@@ -133,7 +133,9 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       previous = Application.get_env(:ysc, :season_cache_enabled)
       Application.put_env(:ysc, :season_cache_enabled, false)
 
-      on_exit(fn -> Application.put_env(:ysc, :season_cache_enabled, previous) end)
+      on_exit(fn ->
+        Application.put_env(:ysc, :season_cache_enabled, previous)
+      end)
 
       assert {:ok, total, _} =
                Bookings.calculate_booking_price(
