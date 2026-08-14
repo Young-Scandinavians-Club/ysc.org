@@ -49,21 +49,29 @@ defmodule Ysc.Webhooks do
 
       case Repo.one(query) do
         nil ->
+          # No row returned either because it doesn't exist, or because
+          # SKIP LOCKED skipped it while another transaction holds its
+          # lock - in which case a plain read here can still see it as
+          # :pending (that transaction hasn't committed the flip yet
+          # under READ COMMITTED). Either way it's unavailable to us.
           case Repo.get(WebhookEvent, event_id) do
             nil ->
               Repo.rollback(:not_found)
 
-            %WebhookEvent{state: state} when state != :pending ->
+            %WebhookEvent{} ->
               Repo.rollback(:already_processing)
           end
 
         webhook_event ->
-          {:ok, updated} =
+          update_result =
             webhook_event
             |> Ecto.Changeset.change(%{state: :processing})
             |> Repo.update()
 
-          updated
+          case update_result do
+            {:ok, updated} -> updated
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
       end
     end)
   end
@@ -171,21 +179,27 @@ defmodule Ysc.Webhooks do
 
       case Repo.one(query) do
         nil ->
+          # See lock_webhook_event/1 - a row here (even one that still
+          # reads as :pending under our snapshot) means it's locked by
+          # another in-flight transaction, not available to us.
           case get_webhook_event_by_provider_and_event_id(provider, event_id) do
             nil ->
               Repo.rollback(:not_found)
 
-            %WebhookEvent{state: state} when state != :pending ->
+            %WebhookEvent{} ->
               Repo.rollback(:already_processing)
           end
 
         webhook_event ->
-          {:ok, updated} =
+          update_result =
             webhook_event
             |> Ecto.Changeset.change(%{state: :processing})
             |> Repo.update()
 
-          updated
+          case update_result do
+            {:ok, updated} -> updated
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
       end
     end)
   end
