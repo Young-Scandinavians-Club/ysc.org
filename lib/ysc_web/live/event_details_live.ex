@@ -1063,11 +1063,11 @@ defmodule YscWeb.EventDetailsLive do
                           />
                           <%= cond do %>
                             <% @current_user.state == :pending_approval -> %>
-                              Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
+                              Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (membership payment may still be required).
                             <% @had_membership? -> %>
                               Member tickets require an active paid membership. Your membership has expired — renew to buy tickets.
                             <% true -> %>
-                              Member tickets require an active paid membership. Pay dues or activate your membership to buy tickets.
+                              Member tickets require an active paid membership. Activate or renew your membership to buy tickets.
                           <% end %>
                         </p>
                         <.link
@@ -1176,11 +1176,11 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   <%= cond do %>
                     <% @current_user.state == :pending_approval -> %>
-                      Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
+                      Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (membership payment may still be required).
                     <% @had_membership? -> %>
                       Member tickets require an active, paid membership. Renew your membership to buy tickets.
                     <% true -> %>
-                      Member tickets require an active, paid membership. Pay dues or activate your membership to buy tickets.
+                      Member tickets require an active, paid membership. Activate or renew your membership to buy tickets.
                   <% end %>
                 </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">

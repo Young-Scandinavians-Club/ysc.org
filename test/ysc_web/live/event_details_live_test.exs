@@ -541,7 +541,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert html =~ event.title
       assert html =~ "Member tickets require an active paid membership"
-      assert html =~ "Pay dues or activate your membership to buy tickets"
+      assert html =~ "Activate or renew your membership to buy tickets"
 
       assert has_element?(
                view,
