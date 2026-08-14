@@ -87,6 +87,47 @@ defmodule YscWeb.DateDisplay do
   end
 
   @doc """
+  Formats a ticket tier sale window (real UTC instants, e.g. `start_date`/
+  `end_date` on a `TicketTier`) as a date range.
+
+  Unlike `format_event_date_range/2`, boundaries are shifted to
+  `America/Los_Angeles` before formatting, since sale windows are anchored to
+  a specific moment in time rather than a Pacific wall-clock calendar day.
+
+  ## Options
+
+    * `:default` — when start date is missing (default `""`)
+    * `:with_year` — include year on single-day labels and on the end of ranges
+      (default `false`)
+  """
+  def format_sale_window_range(tier, opts \\ [])
+
+  def format_sale_window_range(%{} = tier, opts) do
+    start_date = Map.get(tier, :start_date) || Map.get(tier, "start_date")
+    end_date = Map.get(tier, :end_date) || Map.get(tier, "end_date")
+    default = Keyword.get(opts, :default, "")
+    with_year? = Keyword.get(opts, :with_year, false)
+
+    case pacific_calendar_date(start_date) do
+      nil ->
+        default
+
+      start ->
+        case pacific_calendar_date(end_date) do
+          end_date when not is_nil(end_date) ->
+            if Date.compare(start, end_date) == :eq do
+              format_event_single_date(start, with_year?, default)
+            else
+              format_event_date_span(start, end_date, with_year?)
+            end
+
+          _ ->
+            format_event_single_date(start, with_year?, default)
+        end
+    end
+  end
+
+  @doc """
   Formats a date as a short month/day/year label (e.g. `"Mar 15, 2024"`).
 
   Returns `default` for nil or other non-date values.
@@ -246,4 +287,12 @@ defmodule YscWeb.DateDisplay do
   defp calendar_date(%DateTime{} = dt), do: DateTime.to_date(dt)
   defp calendar_date(%Date{} = date), do: date
   defp calendar_date(_), do: nil
+
+  defp pacific_calendar_date(nil), do: nil
+
+  defp pacific_calendar_date(%DateTime{} = dt),
+    do: dt |> DateTime.shift_zone!(@pacific_timezone) |> DateTime.to_date()
+
+  defp pacific_calendar_date(%Date{} = date), do: date
+  defp pacific_calendar_date(_), do: nil
 end

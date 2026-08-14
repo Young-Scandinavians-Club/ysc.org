@@ -36,6 +36,18 @@ defmodule YscWeb.AdminComponents do
   attr(:errors, :list, default: [])
   attr(:form, :any)
 
+  attr(:timezone, :string,
+    default: "Etc/UTC",
+    doc:
+      "timezone used to anchor a freshly-picked calendar day into a DateTime instant"
+  )
+
+  attr(:end_of_day?, :boolean,
+    default: false,
+    doc:
+      "when true, a freshly-picked date is anchored at 23:59:59 (in :timezone) instead of 00:00:00 — use for fields whose selected day should remain valid through its end, e.g. a sale end date"
+  )
+
   def date_picker(assigns) do
     ~H"""
     <.live_component
@@ -48,6 +60,8 @@ defmodule YscWeb.AdminComponents do
       readonly={@readonly}
       is_range?={false}
       min={@min}
+      timezone={@timezone}
+      end_of_day?={@end_of_day?}
     />
     <div :if={Phoenix.Component.used_input?(@start_date_field)}>
       <.error :for={msg <- @start_date_field.errors}>
