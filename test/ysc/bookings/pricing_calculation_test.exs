@@ -129,6 +129,23 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       assert total == Money.new(:USD, 1000)
     end
 
+    test "loads seasons from db when season cache is disabled" do
+      previous = Application.get_env(:ysc, :season_cache_enabled)
+      Application.put_env(:ysc, :season_cache_enabled, false)
+
+      on_exit(fn -> Application.put_env(:ysc, :season_cache_enabled, previous) end)
+
+      assert {:ok, total, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_2n,
+                 :buyout
+               )
+
+      assert total == Money.new(:USD, 1000)
+    end
+
     test "single-season stay returns exactly one segment" do
       assert {:ok, _total, breakdown} =
                Bookings.calculate_booking_price(
