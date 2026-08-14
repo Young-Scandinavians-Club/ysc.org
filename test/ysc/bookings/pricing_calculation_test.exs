@@ -148,6 +148,30 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       assert total == Money.new(:USD, 1000)
     end
 
+    test "preloaded seasons opt matches default tahoe buyout pricing" do
+      seasons = Ysc.Bookings.Season.list_all_for_property_db(:tahoe)
+
+      assert {:ok, default_total, default_breakdown} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_3n,
+                 :buyout
+               )
+
+      assert {:ok, seasons_total, seasons_breakdown} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_3n,
+                 :buyout,
+                 seasons: seasons
+               )
+
+      assert seasons_total == default_total
+      assert seasons_breakdown.segments == default_breakdown.segments
+    end
+
     test "single-season stay returns exactly one segment" do
       assert {:ok, _total, breakdown} =
                Bookings.calculate_booking_price(
