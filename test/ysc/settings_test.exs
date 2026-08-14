@@ -238,10 +238,10 @@ defmodule Ysc.SettingsTest do
       # update_setting!/3 run.
       assert Settings.settings() != []
 
-      Phoenix.PubSub.subscribe(Ysc.PubSub, Ysc.RateLimitCache.topic())
+      Phoenix.PubSub.subscribe(Ysc.PubSub, Ysc.DistributedCache.topic())
 
       on_exit(fn ->
-        Phoenix.PubSub.unsubscribe(Ysc.PubSub, Ysc.RateLimitCache.topic())
+        Phoenix.PubSub.unsubscribe(Ysc.PubSub, Ysc.DistributedCache.topic())
       end)
 
       {:ok, _} = Settings.update_setting("replicated", "new")
@@ -249,10 +249,10 @@ defmodule Ysc.SettingsTest do
       this_node = node()
       key = "site-settings:replicated"
 
-      assert_receive {:rate_limit_cache_put, ^this_node, :ysc_cache, ^key,
+      assert_receive {:distributed_cache_put, ^this_node, :ysc_cache, ^key,
                       "new", _opts}
 
-      assert_receive {:rate_limit_cache_put, ^this_node, :ysc_cache,
+      assert_receive {:distributed_cache_put, ^this_node, :ysc_cache,
                       "all-site-settings", updated_settings, _opts}
 
       assert Enum.any?(

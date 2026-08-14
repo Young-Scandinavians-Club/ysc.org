@@ -214,11 +214,11 @@ defmodule Ysc.Settings do
     case SiteSetting.site_setting_changeset(current_setting, %{value: value})
          |> Repo.update() do
       {:ok, updated} ->
-        # Update both caches. Routed through Ysc.RateLimitCache so the write
+        # Update both caches. Routed through Ysc.DistributedCache so the write
         # replicates to every node — settings entries have no TTL, so a plain
         # local Cachex.put here would leave other nodes serving the old value
         # indefinitely instead of just until the next expiry.
-        Ysc.RateLimitCache.put(:ysc_cache, setting_cache_key(name), value)
+        Ysc.DistributedCache.put(:ysc_cache, setting_cache_key(name), value)
 
         case Cachex.get(:ysc_cache, @settings_cache_key) do
           {:ok, settings} when is_list(settings) ->
@@ -227,7 +227,7 @@ defmodule Ysc.Settings do
                 if setting.name == name, do: updated, else: setting
               end)
 
-            Ysc.RateLimitCache.put(
+            Ysc.DistributedCache.put(
               :ysc_cache,
               @settings_cache_key,
               updated_settings
