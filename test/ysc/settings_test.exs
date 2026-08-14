@@ -230,6 +230,36 @@ defmodule Ysc.SettingsTest do
       assert {:ok, _} = Settings.update_setting("malformed_agg", "y")
       assert Settings.get_setting("malformed_agg") == "y"
     end
+
+    test "broadcasts both cache writes so other nodes replicate them" do
+      %SiteSetting{name: "replicated", value: "old"} |> Repo.insert!()
+
+      # Populate the aggregate cache so both Cachex.put call sites in
+      # update_setting!/3 run.
+      assert Settings.settings() != []
+
+      Phoenix.PubSub.subscribe(Ysc.PubSub, Ysc.RateLimitCache.topic())
+
+      on_exit(fn ->
+        Phoenix.PubSub.unsubscribe(Ysc.PubSub, Ysc.RateLimitCache.topic())
+      end)
+
+      {:ok, _} = Settings.update_setting("replicated", "new")
+
+      this_node = node()
+      key = "site-settings:replicated"
+
+      assert_receive {:rate_limit_cache_put, ^this_node, :ysc_cache, ^key,
+                      "new", _opts}
+
+      assert_receive {:rate_limit_cache_put, ^this_node, :ysc_cache,
+                      "all-site-settings", updated_settings, _opts}
+
+      assert Enum.any?(
+               updated_settings,
+               &(&1.name == "replicated" and &1.value == "new")
+             )
+    end
   end
 
   describe "get_or_create_setting/3" do
