@@ -11,6 +11,7 @@ defmodule YscWeb.AdminComponents do
   use YscWeb, :verified_routes
 
   alias Phoenix.LiveView.JS
+  alias YscWeb.AdminBookingEntitlementHelpers, as: EntitlementHelpers
   alias YscWeb.FormHelpers
 
   import Flop.Phoenix
@@ -431,6 +432,130 @@ defmodule YscWeb.AdminComponents do
   """
   def newsletter_subscriber_status_label(true), do: "Active"
   def newsletter_subscriber_status_label(false), do: "Inactive"
+
+  # ---------------------------------------------------------------------------
+  # Booking entitlement grant form (admin user detail + entitlements list)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Shared benefit-type radios, property/expires inputs, and conditional value fields
+  for admin grant-entitlement forms.
+
+  Wrap in a `<.form>`; submit button stays in the parent so each page can set its own id.
+
+  ## Examples
+
+      <.form for={@entitlement_form} id="grant-entitlement-form" ...>
+        <.admin_grant_entitlement_fields form={@entitlement_form} />
+        <.button type="submit" id="grant-entitlement-submit">Grant benefit</.button>
+      </.form>
+  """
+  attr :form, :any, required: true
+
+  attr :fieldset_class, :any,
+    default: nil,
+    doc:
+      "Extra classes for the benefit-type fieldset (e.g. `mt-4` when member search precedes it)"
+
+  def admin_grant_entitlement_fields(assigns) do
+    benefit_kind = EntitlementHelpers.benefit_kind_form_value(assigns.form)
+
+    assigns =
+      assigns
+      |> assign(:benefit_kind, benefit_kind)
+      |> assign(
+        :benefit_kind_options,
+        EntitlementHelpers.grant_benefit_kind_options()
+      )
+      |> assign(
+        :property_options,
+        EntitlementHelpers.grant_property_select_options()
+      )
+
+    ~H"""
+    <fieldset class={@fieldset_class}>
+      <legend class="text-sm font-medium text-zinc-700 mb-2">
+        Benefit type
+      </legend>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <label
+          :for={{value, title, description} <- @benefit_kind_options}
+          class={[
+            "flex flex-col gap-0.5 rounded-md border p-3 cursor-pointer transition-colors",
+            if(@benefit_kind == value,
+              do: "border-zinc-800 bg-zinc-50 ring-1 ring-zinc-800",
+              else: "border-zinc-200 hover:border-zinc-300"
+            )
+          ]}
+        >
+          <input
+            type="radio"
+            name="entitlement[benefit_kind]"
+            value={value}
+            checked={@benefit_kind == value}
+            class="sr-only"
+          />
+          <span class="text-sm font-semibold text-zinc-800">{title}</span>
+          <span class="text-xs text-zinc-500">{description}</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+      <.input
+        field={@form[:property]}
+        type="select"
+        label="Property"
+        options={@property_options}
+      />
+      <.input
+        field={@form[:expires_on]}
+        type="date"
+        label="Expires (optional)"
+      />
+
+      <%= if @benefit_kind == "free_nights" do %>
+        <.input
+          field={@form[:free_nights]}
+          type="number"
+          label="Free nights count"
+        />
+        <.input
+          field={@form[:max_guests]}
+          type="number"
+          label="Max guests (optional)"
+        />
+      <% end %>
+
+      <%= if @benefit_kind == "percent_off" do %>
+        <.input
+          field={@form[:percent_off]}
+          type="text"
+          label="Percent off (e.g. 50)"
+        />
+        <.input
+          field={@form[:buyout_max_discount]}
+          type="text"
+          label="Buyout max discount (USD)"
+        />
+      <% end %>
+
+      <%= if @benefit_kind == "fixed_amount_off" do %>
+        <.input
+          field={@form[:amount_off]}
+          type="text"
+          label="Fixed amount off (USD)"
+        />
+      <% end %>
+    </div>
+    <.input
+      field={@form[:internal_note]}
+      type="textarea"
+      label="Internal note (optional)"
+      class="mt-3 w-full min-h-[4rem] border border-zinc-300 rounded-md px-3 py-2 text-sm"
+    />
+    """
+  end
 
   # ---------------------------------------------------------------------------
   # QuickBooks sync status (admin money / ledgers)

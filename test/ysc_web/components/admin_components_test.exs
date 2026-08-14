@@ -352,6 +352,61 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_grant_entitlement_fields/1" do
+    test "renders benefit type radios and default percent_off fields" do
+      form =
+        Phoenix.Component.to_form(
+          %{
+            "benefit_kind" => "percent_off",
+            "property" => "",
+            "expires_on" => "",
+            "percent_off" => "",
+            "buyout_max_discount" => "",
+            "internal_note" => ""
+          },
+          as: :entitlement
+        )
+
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &admin_grant_entitlement_fields/1,
+          %{form: form}
+        )
+
+      assert html =~ "Benefit type"
+      assert html =~ "Percent off stay"
+      assert html =~ "Percent off (e.g. 50)"
+      assert html =~ "Buyout max discount (USD)"
+      assert html =~ "Internal note (optional)"
+      refute html =~ "Free nights count"
+    end
+
+    test "renders free nights fields when benefit kind is free_nights" do
+      form =
+        Phoenix.Component.to_form(
+          %{
+            "benefit_kind" => "free_nights",
+            "property" => "",
+            "expires_on" => "",
+            "free_nights" => "",
+            "max_guests" => "",
+            "internal_note" => ""
+          },
+          as: :entitlement
+        )
+
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &admin_grant_entitlement_fields/1,
+          %{form: form}
+        )
+
+      assert html =~ "Free nights count"
+      assert html =~ "Max guests (optional)"
+      refute html =~ "Buyout max discount (USD)"
+    end
+  end
+
   describe "admin_table_message/1" do
     test "renders centered table status text with optional id" do
       assigns = %{}
