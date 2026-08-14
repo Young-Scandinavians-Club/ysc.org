@@ -35,31 +35,37 @@ defmodule Ysc.Webhooks do
   if the event is already being processed.
   """
   def lock_webhook_event(event_id) do
-    # Use FOR UPDATE SKIP LOCKED to handle concurrent processing attempts
-    query =
-      from(w in WebhookEvent,
-        where: w.id == ^event_id and w.state == :pending,
-        lock: "FOR UPDATE SKIP LOCKED"
-      )
+    # The SELECT ... FOR UPDATE SKIP LOCKED and the state flip to :processing
+    # must happen in the same transaction - otherwise the row lock is released
+    # (auto-committed) as soon as the SELECT statement finishes, leaving a gap
+    # before the UPDATE where a second caller's SKIP LOCKED select can find the
+    # same still-:pending row and also "win" the lock.
+    Repo.transaction(fn ->
+      query =
+        from(w in WebhookEvent,
+          where: w.id == ^event_id and w.state == :pending,
+          lock: "FOR UPDATE SKIP LOCKED"
+        )
 
-    case Repo.one(query) do
-      nil ->
-        case Repo.get(WebhookEvent, event_id) do
-          nil ->
-            {:error, :not_found}
+      case Repo.one(query) do
+        nil ->
+          case Repo.get(WebhookEvent, event_id) do
+            nil ->
+              Repo.rollback(:not_found)
 
-          %WebhookEvent{state: state} when state != :pending ->
-            {:error, :already_processing}
-        end
+            %WebhookEvent{state: state} when state != :pending ->
+              Repo.rollback(:already_processing)
+          end
 
-      webhook_event ->
-        {:ok, _updated} =
-          webhook_event
-          |> Ecto.Changeset.change(%{state: :processing})
-          |> Repo.update()
+        webhook_event ->
+          {:ok, updated} =
+            webhook_event
+            |> Ecto.Changeset.change(%{state: :processing})
+            |> Repo.update()
 
-        {:ok, webhook_event}
-    end
+          updated
+      end
+    end)
   end
 
   @doc """
@@ -151,33 +157,37 @@ defmodule Ysc.Webhooks do
   or {:error, :already_processing} if already being processed.
   """
   def lock_webhook_event_by_provider_and_event_id(provider, event_id) do
-    # Use FOR UPDATE SKIP LOCKED to handle concurrent processing attempts
-    query =
-      from(w in WebhookEvent,
-        where:
-          w.provider == ^provider and w.event_id == ^event_id and
-            w.state == :pending,
-        lock: "FOR UPDATE SKIP LOCKED"
-      )
+    # See lock_webhook_event/1 - the select-for-update and the state flip to
+    # :processing must share a transaction or the row lock is released before
+    # the update runs, letting two concurrent callers both lock the same event.
+    Repo.transaction(fn ->
+      query =
+        from(w in WebhookEvent,
+          where:
+            w.provider == ^provider and w.event_id == ^event_id and
+              w.state == :pending,
+          lock: "FOR UPDATE SKIP LOCKED"
+        )
 
-    case Repo.one(query) do
-      nil ->
-        case get_webhook_event_by_provider_and_event_id(provider, event_id) do
-          nil ->
-            {:error, :not_found}
+      case Repo.one(query) do
+        nil ->
+          case get_webhook_event_by_provider_and_event_id(provider, event_id) do
+            nil ->
+              Repo.rollback(:not_found)
 
-          %WebhookEvent{state: state} when state != :pending ->
-            {:error, :already_processing}
-        end
+            %WebhookEvent{state: state} when state != :pending ->
+              Repo.rollback(:already_processing)
+          end
 
-      webhook_event ->
-        {:ok, _updated} =
-          webhook_event
-          |> Ecto.Changeset.change(%{state: :processing})
-          |> Repo.update()
+        webhook_event ->
+          {:ok, updated} =
+            webhook_event
+            |> Ecto.Changeset.change(%{state: :processing})
+            |> Repo.update()
 
-        {:ok, webhook_event}
-    end
+          updated
+      end
+    end)
   end
 
   @doc """
