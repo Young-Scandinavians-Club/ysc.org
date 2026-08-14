@@ -113,9 +113,13 @@ defmodule YscWeb.AdminBadgeHelpersTest do
     end
 
     test "accepts atoms and defaults unknown statuses" do
-      assert AdminBadgeHelpers.expense_report_status_badge_type(:approved) == "green"
+      assert AdminBadgeHelpers.expense_report_status_badge_type(:approved) ==
+               "green"
+
       assert AdminBadgeHelpers.expense_report_status_badge_type(nil) == "dark"
-      assert AdminBadgeHelpers.expense_report_status_badge_type("unknown") == "dark"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("unknown") ==
+               "dark"
     end
   end
 
