@@ -60,8 +60,8 @@ defmodule Ysc.Application do
         {Finch, name: Ysc.Finch},
         # Start cache
         {Cachex, name: :ysc_cache},
-        # Replicate Ysc.RateLimitCache writes to this node's local cache
-        Ysc.RateLimitCache.Sync,
+        # Replicate Ysc.DistributedCache writes to this node's local cache
+        Ysc.DistributedCache.Sync,
         # Warm site settings cache on boot (avoids cold DB hits on public pages)
         {Ysc.Settings, []},
         # Auth rate limiting (credential stuffing protection)

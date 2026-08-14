@@ -33,7 +33,7 @@ defmodule Ysc.Bookings.BlackoutListCache do
     new_version = System.unique_integer([:monotonic, :positive])
 
     if Ysc.ProcessCache.enabled?() do
-      Cachex.put(@cache_name, @cache_version_key, new_version)
+      Ysc.DistributedCache.put(@cache_name, @cache_version_key, new_version)
     end
 
     # Clear Lake availability maps depend on blackouts.

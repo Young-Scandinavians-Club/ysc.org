@@ -7,7 +7,7 @@ defmodule Ysc.SmsRateLimit do
   - 5 SMS per minute per phone number
 
   Uses a sliding window approach by storing timestamps for each phone number.
-  Writes go through `Ysc.RateLimitCache` so the timestamp list stays
+  Writes go through `Ysc.DistributedCache` so the timestamp list stays
   replicated across all nodes.
   """
   require Ysc.Logging
@@ -114,7 +114,7 @@ defmodule Ysc.SmsRateLimit do
       end
 
     # Store back in cache with TTL, replicated to other nodes
-    Ysc.RateLimitCache.put(@cache_name, cache_key, timestamps,
+    Ysc.DistributedCache.put(@cache_name, cache_key, timestamps,
       expire: @cache_ttl_ms
     )
 
