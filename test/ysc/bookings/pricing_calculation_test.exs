@@ -506,6 +506,32 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       assert breakdown.price_per_guest_per_night == Money.new(:USD, 30)
       assert [%{nights: 2}] = breakdown.segments
     end
+
+    test "preloaded seasons opt matches default pricing for multi-season stays" do
+      seasons = Ysc.Bookings.Season.list_all_for_property_db(:clear_lake)
+
+      assert {:ok, default_total, default_breakdown} =
+               Bookings.calculate_booking_price(
+                 :clear_lake,
+                 ~D[2026-10-29],
+                 ~D[2026-11-03],
+                 :day,
+                 guests_count: 2
+               )
+
+      assert {:ok, seasons_total, seasons_breakdown} =
+               Bookings.calculate_booking_price(
+                 :clear_lake,
+                 ~D[2026-10-29],
+                 ~D[2026-11-03],
+                 :day,
+                 guests_count: 2,
+                 seasons: seasons
+               )
+
+      assert seasons_total == default_total
+      assert seasons_breakdown.segments == default_breakdown.segments
+    end
   end
 
   # ─── Error cases ────────────────────────────────────────────────────────────
