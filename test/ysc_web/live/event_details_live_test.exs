@@ -567,7 +567,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       render_async(view)
 
       assert html =~ "Your application is under board review"
-      assert html =~ "dues may still be required"
+      assert html =~ "membership payment may still be required"
       refute html =~ "membership has expired"
       refute has_element?(view, "button", "Get Tickets")
     end
