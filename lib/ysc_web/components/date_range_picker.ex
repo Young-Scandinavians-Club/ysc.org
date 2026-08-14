@@ -1174,7 +1174,9 @@ defmodule YscWeb.Components.DateRangePicker do
     timezone = Map.get(assigns, :timezone) || "Etc/UTC"
 
     time =
-      if Map.get(assigns, :end_of_day?, false), do: ~T[23:59:59], else: ~T[00:00:00]
+      if Map.get(assigns, :end_of_day?, false),
+        do: ~T[23:59:59],
+        else: ~T[00:00:00]
 
     date
     |> DateTime.new!(time, timezone)
