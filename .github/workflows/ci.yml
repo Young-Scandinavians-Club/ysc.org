@@ -118,6 +118,14 @@ jobs:
         with:
           name: build-test-${{ github.run_id }}
 
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles (warning: redefining module, since the old .beam
+      # is already loaded from the artifact). Touch the restored files so their
+      # mtimes win and Mix's compile manifest treats them as up to date.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
+
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
       # fast no-op verification here since nothing actually needs re-fetching.
@@ -238,6 +246,14 @@ jobs:
         with:
           name: build-dev-${{ github.run_id }}
 
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles (warning: redefining module, since the old .beam
+      # is already loaded from the artifact). Touch the restored files so their
+      # mtimes win and Mix's compile manifest treats them as up to date.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
+
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
       # fast no-op verification here since nothing actually needs re-fetching.
@@ -272,6 +288,14 @@ jobs:
         with:
           name: build-dev-${{ github.run_id }}
 
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles (warning: redefining module, since the old .beam
+      # is already loaded from the artifact). Touch the restored files so their
+      # mtimes win and Mix's compile manifest treats them as up to date.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
+
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
       # fast no-op verification here since nothing actually needs re-fetching.
@@ -300,6 +324,14 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: build-dev-${{ github.run_id }}
+
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles (warning: redefining module, since the old .beam
+      # is already loaded from the artifact). Touch the restored files so their
+      # mtimes win and Mix's compile manifest treats them as up to date.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
 
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
@@ -356,6 +388,14 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: build-test-${{ github.run_id }}
+
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles (warning: redefining module, since the old .beam
+      # is already loaded from the artifact). Touch the restored files so their
+      # mtimes win and Mix's compile manifest treats them as up to date.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
 
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
@@ -463,6 +503,14 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: build-test-${{ github.run_id }}
+
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles (warning: redefining module, since the old .beam
+      # is already loaded from the artifact). Touch the restored files so their
+      # mtimes win and Mix's compile manifest treats them as up to date.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
 
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
