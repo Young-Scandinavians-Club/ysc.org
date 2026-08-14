@@ -28,7 +28,8 @@ defmodule Ysc.RateLimitCacheTest do
 
       RateLimitCache.put(:ysc_cache, key, true, [])
 
-      assert_receive {:rate_limit_cache_put, from_node, :ysc_cache, ^key, true, []},
+      assert_receive {:rate_limit_cache_put, from_node, :ysc_cache, ^key, true,
+                      []},
                      1000
 
       assert from_node == node()
@@ -46,9 +47,10 @@ defmodule Ysc.RateLimitCacheTest do
       assert {:ok, :from_remote} = await_cache_value(key, :from_remote)
     end
 
-    test "ignores same-node broadcasts to avoid clobbering newer local writes", %{
-      key: key
-    } do
+    test "ignores same-node broadcasts to avoid clobbering newer local writes",
+         %{
+           key: key
+         } do
       Phoenix.PubSub.subscribe(Ysc.PubSub, RateLimitCache.topic())
 
       Cachex.put(:ysc_cache, key, :current)
@@ -61,7 +63,9 @@ defmodule Ysc.RateLimitCacheTest do
         {:rate_limit_cache_put, this_node, :ysc_cache, key, :stale, []}
       )
 
-      assert_receive {:rate_limit_cache_put, ^this_node, :ysc_cache, ^key, :stale, []}, 1000
+      assert_receive {:rate_limit_cache_put, ^this_node, :ysc_cache, ^key,
+                      :stale, []},
+                     1000
 
       assert {:ok, :current} = Cachex.get(:ysc_cache, key)
     end
