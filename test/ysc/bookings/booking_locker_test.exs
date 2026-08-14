@@ -1011,8 +1011,12 @@ defmodule Ysc.Bookings.BookingLockerTest do
         |> Enum.to_list()
 
       successes = Enum.count(results, &match?({:ok, {:ok, _}}, &1))
+
       stale_failures =
-        Enum.count(results, &match?({:ok, {:error, {:error, :stale_inventory}}}, &1))
+        Enum.count(
+          results,
+          &match?({:ok, {:error, {:error, :stale_inventory}}}, &1)
+        )
 
       assert successes == 1
       assert stale_failures == 1
