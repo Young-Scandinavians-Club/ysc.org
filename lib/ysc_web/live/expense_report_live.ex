@@ -79,7 +79,7 @@ defmodule YscWeb.ExpenseReportLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Expense reports are only available to approved members in good standing. If you think you should have access, contact info@ysc.org.",
+         "Expense reports are only available to approved members with an active membership and no unpaid dues. If you think you should have access, contact info@ysc.org.",
          title: "Expense report"
        )
        |> redirect(to: ~p"/")}
@@ -3037,7 +3037,7 @@ defmodule YscWeb.ExpenseReportLive do
                         <ul class="list-disc list-inside space-y-1 ml-2">
                           <li>Look at the bottom of your check</li>
                           <li>
-                            You'll see a line of numbers printed in magnetic ink (MICR line)
+                            You'll see a line of numbers along the bottom of the check
                           </li>
                           <li>
                             The first 9-digit number is your
@@ -3115,10 +3115,10 @@ defmodule YscWeb.ExpenseReportLive do
                             </div>
                           </div>
                         </div>
-                        <!-- MICR Line (Bottom of Check) - This is where the numbers are -->
+                        <!-- Number line at bottom of check -->
                         <div class="mt-4 pt-3 border-t-2 border-zinc-400 bg-zinc-50 rounded px-3 py-2">
                           <div class="text-xs text-zinc-500 mb-2 font-medium">
-                            Bottom of check (MICR line):
+                            Bottom of check (number line):
                           </div>
                           <div class="flex items-center gap-2 font-mono text-sm">
                             <!-- Routing Number -->
