@@ -90,7 +90,8 @@ defmodule YscWeb.AdminBadgeHelpers do
   @doc """
   Badge `type` for expense report status in admin money and event views.
   """
-  @spec expense_report_status_badge_type(String.t() | atom() | nil) :: String.t()
+  @spec expense_report_status_badge_type(String.t() | atom() | nil) ::
+          String.t()
   def expense_report_status_badge_type(status) do
     case String.downcase(to_string(status || "")) do
       "draft" -> "dark"
