@@ -45,7 +45,7 @@ defmodule Ysc.Bookings.SeasonCache do
     # is called multiple times within the same second (e.g. in tests). Second-
     # resolution versions were a no-op and leaked rolled-back Season structs.
     new_version = System.unique_integer([:monotonic, :positive])
-    Cachex.put(@cache_name, @cache_version_key, new_version)
+    Ysc.DistributedCache.put(@cache_name, @cache_version_key, new_version)
 
     # Broadcast invalidation event via PubSub
     if Process.whereis(Ysc.PubSub) do

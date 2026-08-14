@@ -78,7 +78,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
     new_version = System.unique_integer([:monotonic, :positive])
 
     # Try to update cache version, but don't fail if cache isn't initialized
-    case Cachex.put(@cache_name, @cache_version_key, new_version) do
+    case Ysc.DistributedCache.put(@cache_name, @cache_version_key, new_version) do
       {:ok, _} ->
         Ysc.Logging.debug("Refund policy cache invalidated",
           version: new_version

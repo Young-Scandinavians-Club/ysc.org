@@ -47,7 +47,7 @@ defmodule Ysc.Events.EventListCache do
   def invalidate do
     if Ysc.ProcessCache.enabled?() do
       new_version = System.unique_integer([:monotonic, :positive])
-      Ysc.RateLimitCache.put(@cache_name, @cache_version_key, new_version)
+      Ysc.DistributedCache.put(@cache_name, @cache_version_key, new_version)
 
       if Process.whereis(Ysc.PubSub) do
         Phoenix.PubSub.broadcast(

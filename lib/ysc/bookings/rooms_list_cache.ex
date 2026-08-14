@@ -28,7 +28,7 @@ defmodule Ysc.Bookings.RoomsListCache do
     new_version = System.unique_integer([:monotonic, :positive])
 
     if Ysc.ProcessCache.enabled?() do
-      Cachex.put(@cache_name, @cache_version_key, new_version)
+      Ysc.DistributedCache.put(@cache_name, @cache_version_key, new_version)
     end
 
     # Always notify LiveViews so in-memory assigns rebuild even when Cachex is off.

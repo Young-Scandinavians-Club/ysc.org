@@ -198,7 +198,7 @@ defmodule Ysc.Bookings.PricingRuleCache do
     # bump the global version (unix seconds alone matched embedded entry versions
     # and served stale rules after DB deletes — see pricing_calculation_test setup).
     new_version = next_cache_version()
-    Cachex.put(@cache_name, @cache_version_key, new_version)
+    Ysc.DistributedCache.put(@cache_name, @cache_version_key, new_version)
 
     # Broadcast invalidation event via PubSub
     if Process.whereis(Ysc.PubSub) do

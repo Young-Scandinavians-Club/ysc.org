@@ -211,7 +211,7 @@ defmodule Ysc.PublicContentCache do
   defp bump_version(domain) do
     version_key = version_key(domain)
     new_version = System.unique_integer([:monotonic, :positive])
-    Ysc.RateLimitCache.put(@cache_name, version_key, new_version)
+    Ysc.DistributedCache.put(@cache_name, version_key, new_version)
 
     if Process.whereis(Ysc.PubSub) do
       Phoenix.PubSub.broadcast(
