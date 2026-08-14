@@ -97,10 +97,18 @@ defmodule YscWeb.AdminBadgeHelpersTest do
 
   describe "expense_report_status_badge_type/1" do
     test "maps known expense report statuses" do
-      assert AdminBadgeHelpers.expense_report_status_badge_type("draft") == "dark"
-      assert AdminBadgeHelpers.expense_report_status_badge_type("submitted") == "default"
-      assert AdminBadgeHelpers.expense_report_status_badge_type("approved") == "green"
-      assert AdminBadgeHelpers.expense_report_status_badge_type("rejected") == "red"
+      assert AdminBadgeHelpers.expense_report_status_badge_type("draft") ==
+               "dark"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("submitted") ==
+               "default"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("approved") ==
+               "green"
+
+      assert AdminBadgeHelpers.expense_report_status_badge_type("rejected") ==
+               "red"
+
       assert AdminBadgeHelpers.expense_report_status_badge_type("paid") == "sky"
     end
 
