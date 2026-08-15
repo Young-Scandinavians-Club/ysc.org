@@ -721,6 +721,31 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert render(view) =~ unique
     end
 
+    test "clicking a reservation row opens the booking modal", %{conn: conn} do
+      unique = "RowClick#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      html = render(view)
+      assert html =~ "cursor-pointer"
+
+      view
+      |> render_click("view-booking", %{"booking-id" => booking.id})
+
+      assert_patch(view)
+      assert has_element?(view, "#booking-modal")
+      assert render(view) =~ unique
+    end
+
     test "reservations table shows checked-in status when booking.checked_in is true",
          %{
            conn: conn
