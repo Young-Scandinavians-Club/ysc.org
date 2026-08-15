@@ -968,6 +968,72 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert overlapping_bookings == 1
     end
 
+    test "rejects overlapping admin room bookings for the same dates", %{
+      user: user
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin room overlap",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      user2 = user_fixture()
+      {checkin, checkout} = locker_room_dates(17, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(:USD, "200.00")
+      }
+
+      assert {:ok, %Booking{}} =
+               BookingLocker.create_admin_booking(attrs,
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      overlap_attrs = Map.put(attrs, :user_id, user2.id)
+
+      assert {:error, {:error, :stale_inventory}} =
+               BookingLocker.create_admin_booking(overlap_attrs,
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      overlapping_bookings =
+        Ysc.Repo.aggregate(
+          from(b in Ysc.Bookings.Booking,
+            join: br in Ysc.Bookings.BookingRoom,
+            on: br.booking_id == b.id,
+            where:
+              br.room_id == ^room.id and b.checkin_date == ^checkin and
+                b.checkout_date == ^checkout and b.status == :complete
+          ),
+          :count
+        )
+
+      assert overlapping_bookings == 1
+    end
+
     test "concurrent admin buyout bookings allow only one winner on new inventory rows",
          %{sandbox_owner: owner} do
       user1 = user_fixture()
@@ -3617,7 +3683,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
                  booking_mode: :buyout
                })
 
-      booked_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      booked_days =
+        Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
 
       assert Enum.all?(booked_days, fn day ->
                Repo.one!(
@@ -3708,6 +3775,51 @@ defmodule Ysc.Bookings.BookingLockerTest do
         )
 
       assert booked_count == nights
+    end
+
+    test "rejects admin hold date change onto already-booked day capacity dates", %{
+      user: user
+    } do
+      ensure_clear_lake_day_pricing_rule()
+      user2 = user_fixture()
+      {checkin, checkout} = locker_room_dates(770, 2)
+      {hold_checkin, hold_checkout} = locker_room_dates(780, 2)
+
+      assert {:ok, _complete} =
+               BookingLocker.create_admin_booking(
+                 %{
+                   user_id: user.id,
+                   property: :clear_lake,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   guests_count: 12,
+                   booking_mode: :day
+                 },
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {:ok, hold} =
+        BookingLocker.create_per_guest_booking(
+          user2.id,
+          :clear_lake,
+          hold_checkin,
+          hold_checkout,
+          2
+        )
+
+      assert {:error, :stale_inventory} =
+               BookingLocker.admin_modify_hold_booking(hold, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert day_capacity_booked(:clear_lake, stay_days) == [12, 12]
+      assert day_capacity_held(:clear_lake, stay_days) == [0, 0]
     end
 
     test "returns changeset error for invalid stay dates" do
