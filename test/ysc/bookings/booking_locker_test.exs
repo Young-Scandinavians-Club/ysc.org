@@ -3643,6 +3643,60 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert room_held?(room.id, checkin, checkout)
     end
 
+    test "reconciles room held inventory when stay dates change", %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin hold room date change",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = locker_room_dates(795, 2)
+      new_checkin = Date.add(checkin, 14)
+      new_checkout = Date.add(checkout, 14)
+
+      {:ok, hold} =
+        BookingLocker.create_room_booking(
+          user.id,
+          room.id,
+          checkin,
+          checkout,
+          2
+        )
+
+      hold = Ysc.Repo.preload(hold, :rooms)
+      assert room_held?(room.id, checkin, checkout)
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_hold_booking(
+                 hold,
+                 %{
+                   checkin_date: new_checkin,
+                   checkout_date: new_checkout,
+                   guests_count: 2,
+                   children_count: 0,
+                   booking_mode: :room
+                 },
+                 rooms: [room]
+               )
+
+      assert updated.checkin_date == new_checkin
+      refute room_held?(room.id, checkin, checkout)
+      assert room_held?(room.id, new_checkin, new_checkout)
+    end
+
     test "rejects admin hold date change onto already-booked buyout dates", %{
       user: user
     } do
