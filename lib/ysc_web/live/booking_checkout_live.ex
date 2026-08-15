@@ -2,7 +2,7 @@ defmodule YscWeb.BookingCheckoutLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, BookingLocker, Entitlements}
+  alias Ysc.Bookings.{Booking, BookingLocker, Entitlements, SeasonCache}
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Stripe.PaymentIntentHelpers
@@ -1767,6 +1767,7 @@ defmodule YscWeb.BookingCheckoutLive do
   @dialyzer {:nowarn_function, calculate_booking_price: 1}
   defp calculate_booking_price(booking) do
     nights = Date.diff(booking.checkout_date, booking.checkin_date)
+    seasons = SeasonCache.get_all_for_property(booking.property)
 
     room_opts = fn ->
       room_ids =
@@ -1791,7 +1792,8 @@ defmodule YscWeb.BookingCheckoutLive do
                booking.checkout_date,
                :buyout,
                guests_count: booking.guests_count,
-               children_count: 0
+               children_count: 0,
+               seasons: seasons
              ) do
           {:ok, total, breakdown} ->
             with {:ok, priced} <-
@@ -1841,7 +1843,8 @@ defmodule YscWeb.BookingCheckoutLive do
                  room_ids,
                  booking.guests_count,
                  children_count,
-                 nights
+                 nights,
+                 seasons
                ) do
             {:ok, recalculated_total, breakdown} ->
               with {:ok, priced} <-
@@ -1881,7 +1884,8 @@ defmodule YscWeb.BookingCheckoutLive do
                booking.checkout_date,
                :day,
                guests_count: booking.guests_count,
-               children_count: 0
+               children_count: 0,
+               seasons: seasons
              ) do
           {:ok, total, breakdown} ->
             with {:ok, priced} <-
@@ -2279,7 +2283,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
   # Helper to calculate price for multiple rooms (fallback)
   # For per-guest pricing, calculate once for total guests regardless of room count
-  @dialyzer {:nowarn_function, calculate_multi_room_price_for_checkout: 7}
+  @dialyzer {:nowarn_function, calculate_multi_room_price_for_checkout: 8}
   defp calculate_multi_room_price_for_checkout(
          property,
          checkin_date,
@@ -2287,7 +2291,8 @@ defmodule YscWeb.BookingCheckoutLive do
          room_ids,
          guests_count,
          children_count,
-         nights
+         nights,
+         seasons
        ) do
     # For per-guest pricing, calculate price once using the first room
     # The number of rooms doesn't affect the price - only total guests matter
@@ -2300,7 +2305,8 @@ defmodule YscWeb.BookingCheckoutLive do
            :room,
            room_id: first_room_id,
            guests_count: guests_count,
-           children_count: children_count
+           children_count: children_count,
+           seasons: seasons
          ) do
       {:ok, total, breakdown} when is_map(breakdown) ->
         breakdown_map =
