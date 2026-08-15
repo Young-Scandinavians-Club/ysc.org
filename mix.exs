@@ -258,7 +258,7 @@ defmodule Ysc.MixProject do
       {:phoenix_live_dashboard, "~> 0.9"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
       {:phoenix_live_view, "~> 1.2"},
-      {:phoenix_test, "~> 0.11", only: :test, runtime: false},
+      {:phoenix_test, "~> 0.12", only: :test, runtime: false},
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+
       {:phoenix, "~> 1.8.11"},
