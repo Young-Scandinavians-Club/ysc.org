@@ -3777,9 +3777,10 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert booked_count == nights
     end
 
-    test "rejects admin hold date change onto already-booked day capacity dates", %{
-      user: user
-    } do
+    test "rejects admin hold date change onto already-booked day capacity dates",
+         %{
+           user: user
+         } do
       ensure_clear_lake_day_pricing_rule()
       user2 = user_fixture()
       {checkin, checkout} = locker_room_dates(770, 2)
