@@ -1034,6 +1034,52 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert overlapping_bookings == 1
     end
 
+    test "rejects overlapping admin day bookings when capacity is exhausted", %{
+      user: user
+    } do
+      ensure_clear_lake_day_pricing_rule()
+      user2 = user_fixture()
+      {checkin, checkout} = locker_room_dates(18, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :clear_lake,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :day,
+        guests_count: 12
+      }
+
+      assert {:ok, %Booking{}} =
+               BookingLocker.create_admin_booking(attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      overlap_attrs =
+        Map.put(attrs, :user_id, user2.id) |> Map.put(:guests_count, 1)
+
+      assert {:error, {:error, :stale_inventory}} =
+               BookingLocker.create_admin_booking(overlap_attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      booked_counts =
+        Enum.map(stay_days, fn day ->
+          Repo.one!(
+            from(pi in Ysc.Bookings.PropertyInventory,
+              where: pi.property == :clear_lake and pi.day == ^day,
+              select: pi.capacity_booked
+            )
+          )
+        end)
+
+      assert booked_counts == [12, 12]
+    end
+
     test "concurrent admin buyout bookings allow only one winner on new inventory rows",
          %{sandbox_owner: owner} do
       user1 = user_fixture()
