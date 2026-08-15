@@ -221,6 +221,60 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert render(view) =~ "Calendar"
     end
 
+    test "initial reservations mount skips seasons and pricing reference queries",
+         %{conn: conn} do
+      reference_pattern =
+        ~r/FROM "(seasons|pricing_rules|refund_policies|rooms|room_categories|door_codes)"/i
+
+      {{:ok, view, _initial_html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, initial_html} =
+              live(
+                conn,
+                ~p"/admin/bookings?property=tahoe&section=reservations"
+              )
+
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+            render(view)
+            {:ok, view, initial_html}
+          end,
+          pattern: reference_pattern,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+      assert has_element?(view, "#admin_reservations_list")
+    end
+
+    test "switching to calendar from reservations lazy-loads reference data",
+         %{conn: conn} do
+      unique = "LazyCal#{System.unique_integer([:positive])}"
+
+      {:ok, _room} =
+        %Ysc.Bookings.Room{}
+        |> Ysc.Bookings.Room.changeset(%{
+          name: unique,
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      refute render(view) =~ "Calendar Overview"
+
+      view
+      |> element("button[phx-value-section=calendar]", "Calendar")
+      |> render_click()
+
+      html = render(view)
+      assert html =~ "Calendar Overview"
+      assert html =~ unique
+    end
+
     test "configuration section shows only pricing rules for selected property",
          %{conn: conn} do
       _tahoe_rule =
