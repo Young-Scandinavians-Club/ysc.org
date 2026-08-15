@@ -1183,6 +1183,21 @@ defmodule YscWeb.Components.DateRangePicker do
     |> DateTime.shift_zone!("Etc/UTC")
   end
 
+  defp finalize_date(%DateTime{} = dt, assigns) do
+    # Calendar picks arrive as UTC-midnight DateTimes (`…T00:00:00Z`). When the
+    # caller opts into a non-UTC timezone (ticket tier sale windows), re-anchor
+    # from the picked calendar day instead of preserving the UTC instant.
+    case Map.get(assigns, :timezone, "Etc/UTC") do
+      "Etc/UTC" ->
+        to_datetime(dt)
+
+      _timezone ->
+        dt
+        |> DateTime.to_date()
+        |> finalize_date(assigns)
+    end
+  end
+
   defp finalize_date(value, _assigns), do: to_datetime(value)
 
   defp to_datetime(%DateTime{} = dt), do: DateTime.truncate(dt, :second)
