@@ -3577,6 +3577,139 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert room_held?(room.id, checkin, checkout)
     end
 
+    test "rejects admin hold date change onto already-booked buyout dates", %{
+      user: user
+    } do
+      user2 = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(730)
+      {hold_checkin, hold_checkout} = locker_buyout_dates(740)
+
+      assert {:ok, _complete} =
+               BookingLocker.create_admin_booking(
+                 %{
+                   user_id: user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   booking_mode: :buyout,
+                   guests_count: 4,
+                   total_price: Money.new(:USD, "500.00")
+                 },
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user2.id,
+          :tahoe,
+          hold_checkin,
+          hold_checkout,
+          4
+        )
+
+      assert {:error, :stale_inventory} =
+               BookingLocker.admin_modify_hold_booking(hold, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 4,
+                 children_count: 0,
+                 booking_mode: :buyout
+               })
+
+      booked_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      assert Enum.all?(booked_days, fn day ->
+               Repo.one!(
+                 from(pi in PropertyInventory,
+                   where: pi.property == :tahoe and pi.day == ^day,
+                   select: {pi.buyout_booked, pi.buyout_held}
+                 )
+               ) == {true, false}
+             end)
+    end
+
+    test "rejects admin hold date change onto already-booked room dates", %{
+      user: user
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin hold overlap room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      user2 = user_fixture()
+      {checkin, checkout} = locker_room_dates(750, 2)
+      {hold_checkin, hold_checkout} = locker_room_dates(760, 2)
+
+      assert {:ok, _complete} =
+               BookingLocker.create_admin_booking(
+                 %{
+                   user_id: user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   booking_mode: :room,
+                   guests_count: 2,
+                   total_price: Money.new(:USD, "200.00")
+                 },
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {:ok, hold} =
+        BookingLocker.create_room_booking(
+          user2.id,
+          room.id,
+          hold_checkin,
+          hold_checkout,
+          2
+        )
+
+      hold = Ysc.Repo.preload(hold, :rooms)
+
+      assert {:error, :stale_inventory} =
+               BookingLocker.admin_modify_hold_booking(
+                 hold,
+                 %{
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   guests_count: 2,
+                   children_count: 0,
+                   booking_mode: :room
+                 },
+                 rooms: [room]
+               )
+
+      nights = Date.diff(checkout, checkin)
+
+      booked_count =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout and ri.booked == true and ri.held == false
+          ),
+          :count
+        )
+
+      assert booked_count == nights
+    end
+
     test "returns changeset error for invalid stay dates" do
       ensure_clear_lake_day_pricing_rule()
       user = user_fixture()
