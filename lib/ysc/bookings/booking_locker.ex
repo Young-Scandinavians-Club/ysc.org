@@ -1852,13 +1852,6 @@ defmodule Ysc.Bookings.BookingLocker do
               where: pi.property == ^booking.property and pi.day in ^days
           )
 
-        if length(prop_inv) != length(days) do
-          raise_stale_inventory!(%PropertyInventory{
-            property: booking.property,
-            day: List.first(days)
-          })
-        end
-
         update_property_inventory_for_buyout(prop_inv, booking.property)
 
       :room ->
@@ -1876,15 +1869,6 @@ defmodule Ysc.Bookings.BookingLocker do
               from ri in RoomInventory,
                 where: ri.room_id in ^room_ids and ri.day in ^days
             )
-
-          expected = length(room_ids) * length(days)
-
-          if length(room_inv) != expected do
-            raise_stale_inventory!(%RoomInventory{
-              room_id: List.first(room_ids),
-              day: List.first(days)
-            })
-          end
 
           update_room_inventory_for_booking(room_inv)
         else
