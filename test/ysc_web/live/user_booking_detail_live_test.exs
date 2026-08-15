@@ -941,6 +941,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
       assert html =~ "Cancellation Policy"
       assert html =~ "will not receive a refund"
+      assert html =~ "Lake Tahoe Cabin Master"
+      refute html =~ "cabin volunteer contact"
     end
 
     test "shows full refund policy line when rule has 100% refund percentage",
