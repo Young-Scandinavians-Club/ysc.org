@@ -118,10 +118,13 @@ defmodule YscWeb.NewsLiveTest do
         |> DateTime.add(10_000, :day)
         |> DateTime.truncate(:second)
 
+      # Clear shared Cachex state before mount (see news_live_pagination_test).
+      Ysc.PublicContentCache.invalidate_posts()
+
       {:ok, view, _html} = live(conn, ~p"/news")
       render_news_async(view)
 
-      assert {:ok, _post} =
+      assert {:ok, post} =
                Posts.create_post(
                  %{
                    "title" => title,
@@ -134,8 +137,10 @@ defmodule YscWeb.NewsLiveTest do
                  author
                )
 
+      assert Enum.any?(Posts.list_posts(10), &(&1.id == post.id))
+
       # Process the PubSub invalidation message before asserting on the stream.
-      render(view)
+      refresh_news_content(view)
       assert has_element?(view, "a[href='/posts/#{url_name}']", title)
     end
 
