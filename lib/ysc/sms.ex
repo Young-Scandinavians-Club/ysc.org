@@ -38,18 +38,39 @@ defmodule Ysc.Sms do
   processing for the same message.
   """
   def get_sms_message(id, opts \\ []) do
-    query = from(m in SmsMessage, where: m.id == ^id)
-    query = if opts[:lock], do: lock(query, "FOR UPDATE"), else: query
-    Repo.one(query)
+    if flowroute_test_force_missing_sms_message?() do
+      nil
+    else
+      query = from(m in SmsMessage, where: m.id == ^id)
+      query = if opts[:lock], do: lock(query, "FOR UPDATE"), else: query
+      Repo.one(query)
+    end
   end
 
   @doc """
   Updates an SMS message status.
   """
   def update_sms_message_status(sms_message, status) do
-    sms_message
-    |> Ecto.Changeset.change(status: status)
-    |> Repo.update()
+    case flowroute_test_forced_status_update_result() do
+      {:error, _} = error ->
+        error
+
+      _ ->
+        sms_message
+        |> Ecto.Changeset.change(status: status)
+        |> Repo.update()
+    end
+  end
+
+  defp flowroute_test_force_missing_sms_message? do
+    Application.get_env(:ysc, :flowroute_test_inject_enabled) &&
+      Application.get_env(:ysc, :flowroute_test_force_missing_sms_message)
+  end
+
+  defp flowroute_test_forced_status_update_result do
+    if Application.get_env(:ysc, :flowroute_test_inject_enabled) do
+      Application.get_env(:ysc, :flowroute_test_force_status_update_result)
+    end
   end
 
   ## SMS Received (Inbound)

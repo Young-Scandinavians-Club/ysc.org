@@ -1404,3 +1404,100 @@ defmodule YscWeb.FlowrouteWebhookControllerSmsSendErrorTest do
     }
   end
 end
+
+defmodule YscWeb.FlowrouteWebhookControllerDlrEdgeCaseTest do
+  @moduledoc """
+  DLR status-update edge cases that require test-only SMS hooks (async: false).
+  """
+  use YscWeb.ConnCase, async: false
+
+  alias Ysc.Sms
+  alias Ysc.Sms.SmsMessage
+  alias YscWeb.FlowrouteWebhookController
+
+  setup do
+    on_exit(fn ->
+      Application.delete_env(:ysc, :flowroute_test_force_missing_sms_message)
+      Application.delete_env(:ysc, :flowroute_test_force_status_update_result)
+    end)
+
+    :ok
+  end
+
+  describe "handle_delivery_receipt/2 DLR status edge cases" do
+    test "still returns 200 when linked SMS message row is missing during status apply",
+         %{conn: conn} do
+      mid = "mdr2-dlr-missing-msg-#{System.unique_integer([:positive])}"
+
+      {:ok, _sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :sent
+        })
+
+      Application.put_env(:ysc, :flowroute_test_force_missing_sms_message, true)
+
+      payload = %{
+        "data" => %{
+          "id" => mid,
+          "attributes" => %{
+            "status" => "delivered",
+            "status_code" => "0"
+          }
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
+    test "still returns 200 when DLR status update fails", %{conn: conn} do
+      mid = "mdr2-dlr-update-fail-#{System.unique_integer([:positive])}"
+
+      {:ok, _sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :sent
+        })
+
+      failed_changeset =
+        %SmsMessage{}
+        |> Ecto.Changeset.change()
+        |> Ecto.Changeset.add_error(:status, "forced test failure")
+
+      Application.put_env(
+        :ysc,
+        :flowroute_test_force_status_update_result,
+        {:error, failed_changeset}
+      )
+
+      payload = %{
+        "data" => %{
+          "id" => mid,
+          "attributes" => %{
+            "status" => "delivered",
+            "status_code" => "0"
+          }
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+
+      sms = Sms.get_sms_message_by_provider_id(:flowroute, mid)
+      assert sms.status == :sent
+    end
+  end
+end

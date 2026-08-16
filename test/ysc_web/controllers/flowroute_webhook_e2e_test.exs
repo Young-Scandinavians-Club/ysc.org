@@ -582,10 +582,45 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
     end
   end
 
+  describe "webhook rate limiting" do
+    setup do
+      Application.put_env(:ysc, Ysc.FlowrouteWebhookRateLimit, ip_limit: 2)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, Ysc.FlowrouteWebhookRateLimit, ip_limit: 60)
+      end)
+
+      :ok
+    end
+
+    test "returns 429 when the same IP exceeds the webhook rate limit", %{conn: conn} do
+      assert conn |> post_webhook("sms", rate_limit_probe_payload(1)) |> Map.get(:status) == 200
+
+      assert build_conn() |> post_webhook("sms", rate_limit_probe_payload(2)) |> Map.get(:status) ==
+               200
+
+      resp = build_conn() |> post_webhook("sms", rate_limit_probe_payload(3))
+
+      assert resp.status == 429
+      [retry_after] = get_resp_header(resp, "retry-after")
+      assert String.to_integer(retry_after) > 0
+      assert resp.resp_body == "Too many requests"
+    end
+  end
+
   defp post_webhook(conn, kind, payload) do
     conn
     |> put_req_header("content-type", "application/json")
     |> post("/webhooks/flowroute/#{@token}/#{kind}", payload)
+  end
+
+  defp rate_limit_probe_payload(n) do
+    inbound_message_payload(
+      message_id: "mdr2-e2e-ratelimit-#{n}-#{unique_key()}",
+      from: "14155551234",
+      to: "12061231234",
+      body: "rate limit probe #{n}"
+    )
   end
 
   defp unique_key, do: System.unique_integer([:positive, :monotonic])
