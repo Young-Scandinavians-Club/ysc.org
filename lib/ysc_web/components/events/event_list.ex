@@ -22,7 +22,7 @@ defmodule YscWeb.EventsListLive do
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <%= for _i <- 1..4 do %>
             <div class="bg-white rounded-xl p-2 border border-zinc-100 animate-pulse">
-              <div class="aspect-[16/10] rounded-lg mb-4 bg-zinc-200"></div>
+              <div class="aspect-video rounded-lg mb-4 bg-zinc-200"></div>
               <div class="space-y-3">
                 <div class="h-4 bg-zinc-200 rounded w-1/4"></div>
                 <div class="h-6 bg-zinc-200 rounded w-3/4"></div>
