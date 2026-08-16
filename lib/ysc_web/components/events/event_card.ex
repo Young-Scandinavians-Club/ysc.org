@@ -105,7 +105,7 @@ defmodule YscWeb.Components.Events.EventCard do
         </div>
         <.link navigate={~p"/events/#{@event.id}"} class="block">
           <h3 class={[
-            "text-2xl font-black tracking-tight leading-tight mb-4 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-[4rem]",
+            "text-2xl font-black tracking-tight leading-tight mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-[4rem]",
             if(@variant == "dark", do: "text-white", else: "text-zinc-900")
           ]}>
             {@event.title}
