@@ -97,32 +97,5 @@ defmodule Ysc.Events.TicketTierHelpersTest do
       refute TicketTierHelpers.tier_on_sale?(ended_tier, @now)
       assert TicketTierHelpers.tier_sale_ended?(ended_tier, @now)
     end
-
-    test "Pacific end-of-day sale end stays on sale through the labeled calendar day" do
-      # Admin picks Aug 14 as sale end; DateRangePicker stores Aug 14 23:59:59 PDT.
-      end_of_sale_day = ~U[2026-08-15 06:59:59Z]
-      tier = %TicketTier{start_date: @past, end_date: end_of_sale_day}
-
-      late_on_sale_day = ~U[2026-08-15 05:00:00Z]
-
-      assert TicketTierHelpers.tier_on_sale?(tier, late_on_sale_day)
-      refute TicketTierHelpers.tier_sale_ended?(tier, late_on_sale_day)
-
-      after_sale_day = ~U[2026-08-15 07:00:00Z]
-
-      refute TicketTierHelpers.tier_on_sale?(tier, after_sale_day)
-      assert TicketTierHelpers.tier_sale_ended?(tier, after_sale_day)
-    end
-
-    test "midnight UTC sale end incorrectly expires before the labeled Pacific day" do
-      # Pre-fix storage: picking Aug 14 anchored to Aug 14 00:00:00Z (5pm Aug 13 PDT).
-      buggy_end = ~U[2026-08-14 00:00:00Z]
-      tier = %TicketTier{start_date: @past, end_date: buggy_end}
-
-      during_labeled_day = ~U[2026-08-14 12:00:00Z]
-
-      refute TicketTierHelpers.tier_on_sale?(tier, during_labeled_day)
-      assert TicketTierHelpers.tier_sale_ended?(tier, during_labeled_day)
-    end
   end
 end

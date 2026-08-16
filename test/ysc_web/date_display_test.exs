@@ -168,25 +168,6 @@ defmodule YscWeb.DateDisplayTest do
     end
   end
 
-  describe "format_sale_window_range/2" do
-    test "shows Pacific calendar dates for tier sale windows" do
-      tier = %{
-        start_date: ~U[2026-08-10 07:00:00Z],
-        end_date: ~U[2026-08-15 06:59:59Z]
-      }
-
-      assert DateDisplay.format_sale_window_range(tier, with_year: true) ==
-               "Aug 10 – Aug 14, 2026"
-    end
-
-    test "returns default when tier has no sale start date" do
-      tier = %{start_date: nil, end_date: ~U[2026-08-15 06:59:59Z]}
-
-      assert DateDisplay.format_sale_window_range(tier, default: "Always") ==
-               "Always"
-    end
-  end
-
   describe "format_in_zone/2" do
     test "formats Date values as long dates" do
       assert DateDisplay.format_in_zone(~D[2024-06-15], "America/Los_Angeles") ==

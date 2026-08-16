@@ -350,6 +350,22 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       assert Sms.get_sms_received_by_provider_id(:flowroute, message_id) != nil
     end
 
+    test "START from an unknown number still returns 200", %{conn: conn} do
+      resp =
+        conn
+        |> post_webhook(
+          "sms",
+          inbound_message_payload(
+            from: "19998887777",
+            to: "12061231234",
+            body: "START"
+          )
+        )
+
+      assert resp.status == 200
+      assert resp.resp_body == "OK"
+    end
+
     test "STOP via the real route opts the user out and sends a real opt-out SMS reply",
          %{conn: conn} do
       user = user_fixture(%{phone_number: unique_user_phone()})
@@ -450,6 +466,17 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
   end
 
   describe "webhook token auth" do
+    test "a request with an empty token segment is rejected with 401", %{
+      conn: conn
+    } do
+      resp =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/flowroute//sms", %{})
+
+      assert resp.status == 401
+    end
+
     test "a request with a wrong token is rejected with 401 and not processed",
          %{conn: conn} do
       message_id = "mdr2-e2e-badtoken-#{unique_key()}"

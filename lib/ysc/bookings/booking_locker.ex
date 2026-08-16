@@ -403,7 +403,7 @@ defmodule Ysc.Bookings.BookingLocker do
     if failed_updates != [] do
       # At least one update failed - this means another transaction modified the inventory
       # Raise Ecto.StaleEntryError so retry_on_stale can catch it and retry
-      raise_stale_inventory!(List.first(prop_inv))
+      raise Ecto.StaleEntryError, struct: List.first(prop_inv), action: :update
     end
   end
 
@@ -926,7 +926,7 @@ defmodule Ysc.Bookings.BookingLocker do
     if failed_updates != [] do
       # At least one update failed - this means another transaction modified the inventory
       # Raise Ecto.StaleEntryError so retry_on_stale can catch it and retry
-      raise_stale_inventory!(List.first(room_inv))
+      raise Ecto.StaleEntryError, struct: List.first(room_inv), action: :update
     end
   end
 
@@ -1265,7 +1265,7 @@ defmodule Ysc.Bookings.BookingLocker do
     if failed_updates != [] do
       # At least one update failed - this means another transaction modified the inventory
       # Raise Ecto.StaleEntryError so retry_on_stale can catch it and retry
-      raise_stale_inventory!(List.first(prop_inv))
+      raise Ecto.StaleEntryError, struct: List.first(prop_inv), action: :update
     end
   end
 
@@ -1755,11 +1755,8 @@ defmodule Ysc.Bookings.BookingLocker do
              |> Repo.update() do
           {:ok, updated} ->
             updated = Repo.preload(updated, [:rooms, :user])
-
-            case safe_update_held_inventory_for_admin_booking(updated) do
-              :ok -> updated
-              {:error, reason} -> Repo.rollback({:error, reason})
-            end
+            update_held_inventory_for_admin_booking(updated)
+            updated
 
           {:error, changeset} ->
             Repo.rollback({:error, changeset})
@@ -1826,63 +1823,126 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  defp safe_update_held_inventory_for_admin_booking(booking) do
-    try do
-      update_held_inventory_for_admin_booking(booking)
-      :ok
-    rescue
-      _e in Ecto.StaleEntryError -> {:error, :stale_inventory}
-    end
-  end
-
-  # Updates inventory to mark dates as held for an admin-edited hold booking.
-  # Route through the same optimistic-locking paths as member holds — a blind
-  # update_all could mark already-booked buyout days as held or clear room
-  # booked flags, allowing overlapping exclusive reservations.
+  # Updates inventory to mark dates as held for an admin-edited hold booking
   defp update_held_inventory_for_admin_booking(booking) do
-    days = stay_night_dates(booking.checkin_date, booking.checkout_date)
-
     case booking.booking_mode do
       :buyout ->
-        ensure_property_inventory_for_days(booking.property, days)
-
-        prop_inv =
-          Repo.all(
-            from pi in PropertyInventory,
-              where: pi.property == ^booking.property and pi.day in ^days
+        {count, _} =
+          Repo.update_all(
+            from(pi in PropertyInventory,
+              where:
+                pi.property == ^booking.property and
+                  pi.day >= ^booking.checkin_date and
+                  pi.day < ^booking.checkout_date
+            ),
+            set: [
+              buyout_held: true,
+              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+            ]
           )
 
-        update_property_inventory_for_buyout(prop_inv, booking.property)
+        if count == 0 do
+          ensure_inventory_exists_and_hold(booking)
+        else
+          :ok
+        end
 
       :room ->
         room_ids = Enum.map(booking.rooms, & &1.id)
 
         if room_ids != [] do
-          Enum.each(room_ids, fn room_id ->
-            Enum.each(days, fn day ->
-              ensure_room_inventory_row(room_id, day)
-            end)
-          end)
-
-          room_inv =
-            Repo.all(
-              from ri in RoomInventory,
-                where: ri.room_id in ^room_ids and ri.day in ^days
+          {count, _} =
+            Repo.update_all(
+              from(ri in RoomInventory,
+                where:
+                  ri.room_id in ^room_ids and
+                    ri.day >= ^booking.checkin_date and
+                    ri.day < ^booking.checkout_date
+              ),
+              set: [
+                held: true,
+                booked: false,
+                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+              ]
             )
 
-          update_room_inventory_for_booking(room_inv)
+          if count == 0 do
+            ensure_room_inventory_exists_and_hold(booking, room_ids)
+          else
+            :ok
+          end
         else
           :ok
         end
 
       :day ->
-        days = day_property_inventory_stay_days(booking)
-        ensure_property_inventory_for_days(booking.property, days)
-        hold_day_capacity!(booking.property, days, booking.guests_count)
+        ensure_property_inventory_for_days(
+          booking.property,
+          day_property_inventory_stay_days(booking)
+        )
+
+        updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+        Repo.update_all(
+          day_property_inventory_query(booking),
+          inc: [capacity_held: booking.guests_count],
+          set: [updated_at: updated_at]
+        )
+
+        :ok
 
       _ ->
         :ok
     end
+  end
+
+  # Ensures property inventory rows exist for the date range and marks as held
+  defp ensure_inventory_exists_and_hold(booking) do
+    dates =
+      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
+
+    Enum.each(dates, fn date ->
+      Repo.insert(
+        %PropertyInventory{
+          property: booking.property,
+          day: date,
+          buyout_booked: false,
+          buyout_held: true,
+          capacity_total:
+            if(booking.property == :clear_lake,
+              do: @default_capacity_clear_lake,
+              else: @default_capacity_tahoe
+            ),
+          capacity_held: 0,
+          capacity_booked: 0
+        },
+        on_conflict: {:replace, [:buyout_held, :updated_at]},
+        conflict_target: [:property, :day]
+      )
+    end)
+
+    :ok
+  end
+
+  # Ensures room inventory rows exist for the date range and marks as held
+  defp ensure_room_inventory_exists_and_hold(booking, room_ids) do
+    dates =
+      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
+
+    for room_id <- room_ids, date <- dates do
+      Repo.insert(
+        %RoomInventory{
+          room_id: room_id,
+          day: date,
+          booked: false,
+          held: true
+        },
+        on_conflict: {:replace, [:held, :booked, :updated_at]},
+        conflict_target: [:room_id, :day]
+      )
+    end
+
+    :ok
   end
 
   defp schedule_checkin_reminder(booking) do

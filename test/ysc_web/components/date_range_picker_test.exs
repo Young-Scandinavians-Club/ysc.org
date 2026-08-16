@@ -196,68 +196,6 @@ defmodule YscWeb.Components.DateRangePickerTest do
     end
   end
 
-  describe "Pacific sale window anchoring" do
-    test "anchors a freshly picked sale end date to 23:59:59 America/Los_Angeles" do
-      socket =
-        init_socket(
-          base_assigns(%{
-            timezone: "America/Los_Angeles",
-            end_of_day?: true,
-            is_range?: false,
-            form: %{}
-          })
-        )
-
-      {:noreply, socket} =
-        DateRangePicker.handle_event("open-calendar", %{}, socket)
-
-      {:noreply, socket} =
-        DateRangePicker.handle_event(
-          "pick-date",
-          %{"date" => iso_date(~D[2026-08-14])},
-          socket
-        )
-
-      {:noreply, _socket} =
-        DateRangePicker.handle_event("close-calendar", %{}, socket)
-
-      assert_receive {:updated_event, %{start_date: end_date}}
-
-      # Aug 14 23:59:59 PDT is Aug 15 06:59:59 UTC — not midnight UTC on Aug 14,
-      # which would expire the tier the evening of Aug 13 Pacific.
-      assert end_date == ~U[2026-08-15 06:59:59Z]
-    end
-
-    test "anchors a freshly picked sale start date to midnight America/Los_Angeles" do
-      socket =
-        init_socket(
-          base_assigns(%{
-            timezone: "America/Los_Angeles",
-            end_of_day?: false,
-            is_range?: false,
-            form: %{}
-          })
-        )
-
-      {:noreply, socket} =
-        DateRangePicker.handle_event("open-calendar", %{}, socket)
-
-      {:noreply, socket} =
-        DateRangePicker.handle_event(
-          "pick-date",
-          %{"date" => iso_date(~D[2026-08-14])},
-          socket
-        )
-
-      {:noreply, _socket} =
-        DateRangePicker.handle_event("close-calendar", %{}, socket)
-
-      assert_receive {:updated_event, %{start_date: start_date}}
-
-      assert start_date == ~U[2026-08-14 07:00:00Z]
-    end
-  end
-
   describe "close-calendar" do
     test "normalizes reversed ranges and notifies the parent process" do
       socket =

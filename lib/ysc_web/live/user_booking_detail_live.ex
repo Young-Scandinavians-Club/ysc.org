@@ -218,9 +218,7 @@ defmodule YscWeb.UserBookingDetailLive do
                       <p class="font-semibold mb-2">Need help?</p>
                       <div class="text-sm text-blue-800">
                         <p>
-                          See your confirmation email, or email the {PropertyDisplay.medium_name(
-                            @booking.property
-                          )} Cabin Master at
+                          See your confirmation email, or email our cabin volunteer contact at
                           <.link
                             href={"mailto:#{get_cabin_master_email(@booking.property)}"}
                             class="text-blue-900 hover:text-blue-700 underline font-medium"
@@ -239,9 +237,7 @@ defmodule YscWeb.UserBookingDetailLive do
                     Important: Even if the cancellation policy does not provide a refund, canceling your booking will free up the room for other members to book.
                   </p>
                   <p>
-                    If you need to cancel due to weather conditions or have other inquiries, please email the {PropertyDisplay.medium_name(
-                      @booking.property
-                    )} Cabin Master at <.link
+                    If you need to cancel due to weather conditions or have other inquiries, please email our cabin volunteer contact at <.link
                       href={"mailto:#{get_cabin_master_email(@booking.property)}"}
                       class="text-blue-900 hover:text-blue-700 underline font-medium"
                     >

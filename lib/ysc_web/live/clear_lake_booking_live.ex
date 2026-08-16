@@ -1131,7 +1131,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <aside class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto">
               <div class="bg-white rounded-xl border-2 border-teal-600 overflow-hidden">
                 <div class="bg-teal-600 p-4 text-white text-center">
-                  <h3 class="text-lg font-bold">Booking Summary</h3>
+                  <h3 class="text-lg font-bold">Reservation Summary</h3>
                 </div>
                 <div class="p-6 space-y-4">
                   <!-- Dates -->
@@ -1468,7 +1468,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     class="text-center py-8"
                   >
                     <p class="text-sm text-zinc-500">
-                      Select dates to see your booking summary
+                      Select dates to see your reservation summary
                     </p>
                   </div>
                   <!-- Submit Button -->
@@ -1714,7 +1714,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </h2>
                   <div>
                     <h3 class="font-semibold text-zinc-900 mb-3">
-                      Booking steps
+                      Making a Reservation
                     </h3>
                     <ul class="space-y-2 text-zinc-700">
                       <li>
@@ -1730,7 +1730,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         Complete your booking and payment <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
                       </li>
                       <li>
-                        After booking, you can view and manage your booking from your booking details page (link in your confirmation email).
+                        After booking, you can view and manage your reservation from your booking details page (link in your confirmation email).
                       </li>
                       <li>
                         For cancellation policies and refund information, see the

@@ -177,7 +177,7 @@ defmodule YscWeb.EventsListLive do
                   </div>
 
                   <%= if description_preview = PlainText.normalize_preview(@hero_event.description) do %>
-                    <p class="text-zinc-600 sm:text-zinc-200 text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-prose hero-description-shadow">
+                    <p class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-prose hero-description-shadow">
                       {description_preview}
                     </p>
                   <% end %>

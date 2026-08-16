@@ -3477,7 +3477,6 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:selected_property, selected_property)
       |> assign(:current_section, current_section)
       |> assign(:loading_bookings_data, true)
-      |> assign(:reference_data_loaded?, false)
       # Placeholder values - will be populated when connected
       |> assign(:seasons, [])
       |> assign(:pricing_rules, [])
@@ -3599,18 +3598,48 @@ defmodule YscWeb.AdminBookingsLive do
   @impl true
   def handle_info(:load_bookings_data, socket) do
     selected_property = socket.assigns.selected_property
-    current_section = socket.assigns.current_section
 
-    socket =
-      if section_needs_reference_data?(current_section) do
-        socket
-        |> load_property_reference_data_bundle(selected_property)
-        |> assign(:loading_bookings_data, false)
-      else
-        assign(socket, :loading_bookings_data, false)
-      end
+    # Load critical data first (needed for calendar view)
+    # Parallelize independent queries for better performance
+    tasks = [
+      Task.async(fn ->
+        load_property_reference_data_tasks(selected_property)
+      end),
+      Task.async(fn -> Bookings.list_room_categories() end),
+      Task.async(fn -> Bookings.list_door_codes(selected_property) end),
+      Task.async(fn -> Bookings.get_active_door_code(selected_property) end)
+    ]
 
-    {:noreply, maybe_update_calendar_view(socket, selected_property)}
+    # Await all tasks concurrently
+    results = Task.await_many(tasks, :infinity)
+
+    [
+      property_reference_data,
+      room_categories,
+      door_codes,
+      active_door_code
+    ] =
+      results
+
+    [seasons, pricing_rules, refund_policies, rooms] = property_reference_data
+
+    {:noreply,
+     socket
+     |> assign(:loading_bookings_data, false)
+     |> assign(:seasons, seasons)
+     |> assign(:pricing_rules, pricing_rules)
+     |> assign(:room_categories, room_categories)
+     |> assign(:rooms, rooms)
+     |> assign(:refund_policies, refund_policies)
+     |> assign(:door_codes, door_codes)
+     |> assign(:active_door_code, active_door_code)
+     |> assign_filtered_data(
+       selected_property,
+       seasons,
+       pricing_rules,
+       refund_policies
+     )
+     |> maybe_update_calendar_view(selected_property)}
   end
 
   @impl true
@@ -3718,11 +3747,8 @@ defmodule YscWeb.AdminBookingsLive do
           socket
           |> assign(:selected_property, property_atom)
           |> then(fn socket ->
-            if connected?(socket) && property_changed &&
-                 section_needs_reference_data?(socket.assigns.current_section) do
-              socket
-              |> load_property_reference_data(property_atom)
-              |> assign(:reference_data_loaded?, true)
+            if connected?(socket) && property_changed do
+              load_property_reference_data(socket, property_atom)
             else
               assign_filtered_data(
                 socket,
@@ -3744,28 +3770,23 @@ defmodule YscWeb.AdminBookingsLive do
     socket =
       if connected?(socket) do
         socket =
-          if property_changed && socket.assigns.current_section == :config do
+          if property_changed do
+            door_codes =
+              Bookings.list_door_codes(socket.assigns.selected_property)
+
+            active_door_code =
+              Bookings.get_active_door_code(socket.assigns.selected_property)
+
             door_code_form =
               %Ysc.Bookings.DoorCode{}
               |> Ysc.Bookings.DoorCode.changeset(%{})
               |> to_form(as: "door_code")
 
             socket
+            |> assign(:door_codes, door_codes)
+            |> assign(:active_door_code, active_door_code)
             |> assign(:door_code_warning, nil)
             |> assign(:door_code_form, door_code_form)
-          else
-            socket
-          end
-
-        # Lazy-load seasons, rooms, and pricing config when switching to calendar
-        # or configuration (skipped on initial connect for reservations/refunds tabs).
-        socket =
-          if section_changed &&
-               section_needs_reference_data?(socket.assigns.current_section) do
-            maybe_load_property_reference_data(
-              socket,
-              socket.assigns.selected_property
-            )
           else
             socket
           end
@@ -4426,14 +4447,16 @@ defmodule YscWeb.AdminBookingsLive do
   def handle_event("select-property", %{"property" => property}, socket) do
     property_atom = String.to_existing_atom(property)
 
+    # Reload door codes and property-scoped reference data for the new property
+    door_codes = Bookings.list_door_codes(property_atom)
+    active_door_code = Bookings.get_active_door_code(property_atom)
+
     socket =
-      if section_needs_reference_data?(socket.assigns.current_section) do
-        socket
-        |> load_property_reference_data_bundle(property_atom)
-        |> assign(:door_code_warning, nil)
-      else
-        assign(socket, :selected_property, property_atom)
-      end
+      socket
+      |> assign(:door_codes, door_codes)
+      |> assign(:active_door_code, active_door_code)
+      |> assign(:door_code_warning, nil)
+      |> load_property_reference_data(property_atom)
 
     socket =
       if socket.assigns.current_section == :calendar &&
@@ -7065,57 +7088,16 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:filtered_rooms, filtered_rooms)
   end
 
-  defp section_needs_reference_data?(section)
-       when section in [:calendar, :config],
-       do: true
-
-  defp section_needs_reference_data?(_section), do: false
-
-  defp maybe_load_property_reference_data(socket, property) do
-    if socket.assigns[:reference_data_loaded?] do
-      socket
-    else
-      socket
-      |> load_property_reference_data_bundle(property)
-      |> assign(:reference_data_loaded?, true)
-    end
-  end
-
   defp load_property_reference_data(socket, property) do
+    [seasons, pricing_rules, refund_policies, rooms] =
+      load_property_reference_data_tasks(property)
+
     socket
-    |> load_property_reference_data_bundle(property)
     |> assign(:selected_property, property)
-  end
-
-  defp load_property_reference_data_bundle(socket, property) do
-    tasks = [
-      Task.async(fn -> load_property_reference_data_tasks(property) end),
-      Task.async(fn -> Bookings.list_room_categories() end),
-      Task.async(fn -> Bookings.list_door_codes(property) end),
-      Task.async(fn -> Bookings.get_active_door_code(property) end)
-    ]
-
-    results = Task.await_many(tasks, :infinity)
-
-    [
-      property_reference_data,
-      room_categories,
-      door_codes,
-      active_door_code
-    ] =
-      results
-
-    [seasons, pricing_rules, refund_policies, rooms] = property_reference_data
-
-    socket
     |> assign(:seasons, seasons)
     |> assign(:pricing_rules, pricing_rules)
-    |> assign(:room_categories, room_categories)
-    |> assign(:rooms, rooms)
     |> assign(:refund_policies, refund_policies)
-    |> assign(:door_codes, door_codes)
-    |> assign(:active_door_code, active_door_code)
-    |> assign(:reference_data_loaded?, true)
+    |> assign(:rooms, rooms)
     |> assign_filtered_data(property, seasons, pricing_rules, refund_policies)
   end
 
