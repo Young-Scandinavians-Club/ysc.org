@@ -98,6 +98,18 @@ defmodule Ysc.Media do
   end
 
   @doc """
+  Returns inclusive UTC `DateTime` bounds for a calendar year.
+
+  Used by year-scoped image queries in this context and admin media views.
+  """
+  @spec year_utc_range(integer()) :: {DateTime.t(), DateTime.t()}
+  def year_utc_range(year) when is_integer(year) do
+    start_date = DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
+    end_date = DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
+    {start_date, end_date}
+  end
+
+  @doc """
   Lists images with cursor-based pagination.
   Uses inserted_at and id as cursor for efficient pagination.
 
@@ -163,10 +175,7 @@ defmodule Ysc.Media do
   defp apply_images_cursor_year_filter(query, nil), do: query
 
   defp apply_images_cursor_year_filter(query, year) do
-    start_date = DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
-
-    end_date =
-      DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
+    {start_date, end_date} = year_utc_range(year)
 
     from i in query,
       where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date
@@ -183,11 +192,7 @@ defmodule Ysc.Media do
 
     query =
       if year do
-        start_date =
-          DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
-
-        end_date =
-          DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
+        {start_date, end_date} = year_utc_range(year)
 
         from i in query,
           where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date
