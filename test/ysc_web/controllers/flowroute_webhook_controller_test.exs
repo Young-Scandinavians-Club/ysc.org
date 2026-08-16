@@ -5,8 +5,11 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
   Tests inbound SMS handling, delivery receipt processing,
   user matching, and opt-in/opt-out commands.
 
-  Note: These tests call controller functions directly since the routes
-  may not be configured yet. In production, routes would be added to router.ex.
+  Note: These tests call controller functions directly to exercise edge
+  cases (malformed payloads, duplicate detection, status normalization)
+  without the overhead of a full HTTP round trip. For tests that go
+  through the actual routes in router.ex end-to-end, see
+  flowroute_webhook_e2e_test.exs.
   """
   use YscWeb.ConnCase, async: true
 

@@ -655,5 +655,21 @@ defmodule YscWeb.Router do
 
     post "/quickbooks", QuickbooksWebhookController, :webhook
     post "/ses", SesWebhookController, :webhook
+
+    # FlowRoute callback URLs are configured per-type in the FlowRoute portal
+    # (Account > Messaging Webhooks). Inbound MMS is delivered in the same
+    # v2.1 payload shape as inbound SMS (differentiated by `is_mms`), and
+    # SMS/MMS DLRs share the same delivery-receipt payload shape, so both
+    # pairs of routes reuse the same controller actions.
+    post "/flowroute/sms", FlowrouteWebhookController, :handle_inbound_sms
+    post "/flowroute/mms", FlowrouteWebhookController, :handle_inbound_sms
+
+    post "/flowroute/sms_dlr",
+         FlowrouteWebhookController,
+         :handle_delivery_receipt
+
+    post "/flowroute/mms_dlr",
+         FlowrouteWebhookController,
+         :handle_delivery_receipt
   end
 end
