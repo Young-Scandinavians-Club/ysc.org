@@ -1351,7 +1351,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "What Happens Next?"
 
       assert html =~ "Enter the names of everyone else staying with you"
-      assert html =~ "already included in the reservation"
+      assert html =~ "already included in the booking"
 
       assert html =~ "held temporarily"
       assert html =~ "not confirmed yet"

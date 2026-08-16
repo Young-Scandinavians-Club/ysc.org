@@ -1508,8 +1508,7 @@ defmodule YscWeb.TahoeBookingLive do
                     </p>
                     <div class="text-xs text-zinc-700 space-y-0.5">
                       <p>
-                        Single membership: up to <strong>1 room</strong>
-                        per booking
+                        Single membership: up to <strong>1 room</strong> per booking
                       </p>
                       <p>
                         Family membership (and lifetime members): up to
