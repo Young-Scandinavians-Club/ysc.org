@@ -152,7 +152,8 @@ defmodule YscWeb.NewsLive do
         >
           <%= for _i <- 1..4 do %>
             <div class="flex flex-col bg-white rounded-xl p-2 ring-1 ring-zinc-100 shadow-sm animate-pulse">
-              <div class="aspect-video sm:aspect-[16/10] rounded-lg mb-4 bg-zinc-200"></div>
+              <div class="aspect-video sm:aspect-[16/10] rounded-lg mb-4 bg-zinc-200">
+              </div>
               <div class="px-4 pb-4 space-y-4">
                 <div class="flex items-center gap-3">
                   <div class="w-16 h-3 bg-zinc-200 rounded"></div>
