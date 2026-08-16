@@ -5,8 +5,11 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
   Tests inbound SMS handling, delivery receipt processing,
   user matching, and opt-in/opt-out commands.
 
-  Note: These tests call controller functions directly since the routes
-  may not be configured yet. In production, routes would be added to router.ex.
+  Note: These tests call controller functions directly to exercise edge
+  cases (malformed payloads, duplicate detection, status normalization)
+  without the overhead of a full HTTP round trip. For tests that go
+  through the actual routes in router.ex end-to-end, see
+  flowroute_webhook_e2e_test.exs.
   """
   use YscWeb.ConnCase, async: true
 
@@ -266,12 +269,15 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       conn1 = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
       assert conn1.status == 200
 
-      # Second request with same message_id should fail
+      # Second request with same message_id is a duplicate delivery (e.g. a
+      # FlowRoute retry) — acknowledged with 200 rather than treated as a
+      # failure, so FlowRoute doesn't keep retrying, but no second record
+      # is created and the SMS command (if any) isn't reprocessed.
       conn2 =
         FlowrouteWebhookController.handle_inbound_sms(build_conn(), payload)
 
-      assert conn2.status == 400
-      assert conn2.resp_body == "Failed to process"
+      assert conn2.status == 200
+      assert conn2.resp_body == "OK"
     end
 
     test "stores MMS flag correctly", %{conn: conn} do
@@ -643,6 +649,25 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert conn.resp_body == "Invalid payload"
     end
 
+    test "returns 400 for a genuine (non-duplicate) validation failure", %{
+      conn: conn
+    } do
+      # Attributes present (passes the payload-shape check) but missing the
+      # required :from/:to fields — a real changeset validation error, not a
+      # unique-constraint hit, so this must NOT be acknowledged as a duplicate.
+      conn =
+        FlowrouteWebhookController.handle_inbound_sms(conn, %{
+          "data" => %{
+            "id" =>
+              "mdr2-missing-from-to-#{System.unique_integer([:positive])}",
+            "attributes" => %{"body" => "hi"}
+          }
+        })
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
+    end
+
     test "returns 200 when opt-in cannot update prefs but still sends opt-in SMS",
          %{
            conn: conn
@@ -695,6 +720,23 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       assert conn.status == 200
       assert conn.resp_body == "OK"
+    end
+
+    test "returns 400 when required inbound fields are missing", %{conn: conn} do
+      payload = %{
+        "data" => %{
+          "id" => "mdr2-missing-from-#{System.unique_integer([:positive])}",
+          "attributes" => %{
+            "to" => "12061231234",
+            "body" => "hello"
+          }
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
     end
 
     test "defaults inbound direction when direction key is absent", %{
@@ -980,10 +1022,42 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert updated.status == :sent
     end
 
-    test "updates SMS message status to buffered from message buffered DLR", %{
-      conn: conn
-    } do
+    test "updates SMS message status to buffered from message buffered DLR",
+         %{
+           conn: conn
+         } do
       mid = "mdr2-buffered-sms-#{System.unique_integer([:positive])}"
+
+      {:ok, sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :buffered
+        })
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "message buffered"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      updated = Sms.get_sms_message_by_provider_id(:flowroute, mid)
+      assert updated.id == sms_message.id
+      assert updated.status == :buffered
+    end
+
+    test "does not regress SMS message status when a late/out-of-order DLR reports an earlier stage",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-no-regress-#{System.unique_integer([:positive])}"
 
       {:ok, sms_message} =
         Sms.create_sms_message(%{
@@ -1007,7 +1081,7 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       updated = Sms.get_sms_message_by_provider_id(:flowroute, mid)
       assert updated.id == sms_message.id
-      assert updated.status == :buffered
+      assert updated.status == :sent
     end
 
     test "returns 400 for invalid delivery receipt payload", %{conn: conn} do
@@ -1118,6 +1192,27 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert conn.resp_body == "Invalid payload"
     end
 
+    test "returns 400 for a genuine (non-duplicate) validation failure", %{
+      conn: conn
+    } do
+      # `level` is an :integer field — a non-numeric value fails Ecto's type
+      # cast, producing a real changeset error rather than a unique-constraint
+      # hit, so this must NOT be acknowledged as a duplicate.
+      conn =
+        FlowrouteWebhookController.handle_delivery_receipt(conn, %{
+          "data" => %{
+            "id" => "mdr2-dlr-bad-level-#{System.unique_integer([:positive])}",
+            "attributes" => %{
+              "status" => "delivered",
+              "level" => "not-a-number"
+            }
+          }
+        })
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
+    end
+
     test "stores nil provider_timestamp when DLR timestamp is invalid ISO8601",
          %{
            conn: conn
@@ -1139,7 +1234,7 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert hd(receipts).provider_timestamp == nil
     end
 
-    test "returns 400 when duplicate delivery receipt for same id and timestamp",
+    test "acknowledges a duplicate delivery receipt for same id and timestamp with 200",
          %{
            conn: conn
          } do
@@ -1156,14 +1251,37 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert FlowrouteWebhookController.handle_delivery_receipt(conn, payload).status ==
                200
 
+      # Same event (same id + timestamp) delivered again — a FlowRoute retry.
+      # Acknowledged with 200 so FlowRoute stops retrying, but no second
+      # receipt row is created.
       conn2 =
         FlowrouteWebhookController.handle_delivery_receipt(
           build_conn(),
           payload
         )
 
-      assert conn2.status == 400
-      assert conn2.resp_body == "Failed to process"
+      assert conn2.status == 200
+      assert conn2.resp_body == "OK"
+
+      assert length(Sms.list_delivery_receipts_for_message(:flowroute, mid)) ==
+               1
+    end
+
+    test "returns 400 when delivery receipt is missing required status", %{
+      conn: conn
+    } do
+      payload = %{
+        "data" => %{
+          "id" =>
+            "mdr2-dlr-missing-status-#{System.unique_integer([:positive])}",
+          "attributes" => %{}
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
     end
 
     test "accepts atom status in delivery receipt attributes (normalize atom pass-through)",
@@ -1284,5 +1402,102 @@ defmodule YscWeb.FlowrouteWebhookControllerSmsSendErrorTest do
         }
       }
     }
+  end
+end
+
+defmodule YscWeb.FlowrouteWebhookControllerDlrEdgeCaseTest do
+  @moduledoc """
+  DLR status-update edge cases that require test-only SMS hooks (async: false).
+  """
+  use YscWeb.ConnCase, async: false
+
+  alias Ysc.Sms
+  alias Ysc.Sms.SmsMessage
+  alias YscWeb.FlowrouteWebhookController
+
+  setup do
+    on_exit(fn ->
+      Application.delete_env(:ysc, :flowroute_test_force_missing_sms_message)
+      Application.delete_env(:ysc, :flowroute_test_force_status_update_result)
+    end)
+
+    :ok
+  end
+
+  describe "handle_delivery_receipt/2 DLR status edge cases" do
+    test "still returns 200 when linked SMS message row is missing during status apply",
+         %{conn: conn} do
+      mid = "mdr2-dlr-missing-msg-#{System.unique_integer([:positive])}"
+
+      {:ok, _sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :sent
+        })
+
+      Application.put_env(:ysc, :flowroute_test_force_missing_sms_message, true)
+
+      payload = %{
+        "data" => %{
+          "id" => mid,
+          "attributes" => %{
+            "status" => "delivered",
+            "status_code" => "0"
+          }
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+    end
+
+    test "still returns 200 when DLR status update fails", %{conn: conn} do
+      mid = "mdr2-dlr-update-fail-#{System.unique_integer([:positive])}"
+
+      {:ok, _sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :sent
+        })
+
+      failed_changeset =
+        %SmsMessage{}
+        |> Ecto.Changeset.change()
+        |> Ecto.Changeset.add_error(:status, "forced test failure")
+
+      Application.put_env(
+        :ysc,
+        :flowroute_test_force_status_update_result,
+        {:error, failed_changeset}
+      )
+
+      payload = %{
+        "data" => %{
+          "id" => mid,
+          "attributes" => %{
+            "status" => "delivered",
+            "status_code" => "0"
+          }
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+
+      sms = Sms.get_sms_message_by_provider_id(:flowroute, mid)
+      assert sms.status == :sent
+    end
   end
 end

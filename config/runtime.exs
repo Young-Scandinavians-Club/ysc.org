@@ -41,10 +41,16 @@ config :stripity_stripe,
 # Configure FlowRoute API settings for all environments at runtime.
 # These must be set at runtime for releases to work properly.
 # In lower environments (dev, test, sandbox), the client will operate as a no-op.
-config :ysc, :flowroute,
-  access_key: System.get_env("FLOWROUTE_ACCESS_KEY"),
-  secret_key: System.get_env("FLOWROUTE_SECRET_KEY"),
-  from_number: System.get_env("FLOWROUTE_FROM_NUMBER")
+# Not applied in :test so `mix test` keeps config/test.exs's fixed from_number
+# and webhook_token instead of resetting them to nil when the FLOWROUTE_* env
+# vars aren't set in the shell/CI.
+if config_env() != :test do
+  config :ysc, :flowroute,
+    access_key: System.get_env("FLOWROUTE_ACCESS_KEY"),
+    secret_key: System.get_env("FLOWROUTE_SECRET_KEY"),
+    from_number: System.get_env("FLOWROUTE_FROM_NUMBER"),
+    webhook_token: System.get_env("FLOWROUTE_WEBHOOK_TOKEN")
+end
 
 # Radar Maps — publishable key must be resolved at runtime so release builds pick up RADAR_PUBLIC_KEY
 # from the host (Fly secrets, etc.). Reading it only in config.exs would bake in the dev default at compile time.
