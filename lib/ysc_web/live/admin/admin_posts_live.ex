@@ -1,4 +1,5 @@
 defmodule YscWeb.AdminPostsLive do
+  alias Ysc.Accounts.UserDisplay
   alias Ysc.Posts.Post
   alias YscWeb.AdminBadgeHelpers
 
@@ -129,7 +130,7 @@ defmodule YscWeb.AdminPostsLive do
                       </h3>
                       <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-sm text-zinc-600">
-                          {"#{Ysc.title_case(post.author.first_name)} #{Ysc.title_case(post.author.last_name)}"}
+                          {UserDisplay.full_name(post.author)}
                         </span>
                         <span class="text-zinc-400">•</span>
                         <span class="text-sm text-zinc-600">
@@ -221,7 +222,7 @@ defmodule YscWeb.AdminPostsLive do
                 </:col>
 
                 <:col :let={{_, post}} label="Author" field={:author_name}>
-                  {"#{Ysc.title_case(post.author.first_name)} #{Ysc.title_case(post.author.last_name)}"}
+                  {UserDisplay.full_name(post.author)}
                 </:col>
 
                 <:col :let={{_, post}} label="State" field={:state}>

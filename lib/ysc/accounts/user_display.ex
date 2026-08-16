@@ -85,6 +85,56 @@ defmodule Ysc.Accounts.UserDisplay do
 
   def application_submitted_at(%{inserted_at: inserted_at}), do: inserted_at
 
+  @doc """
+  Returns a title-cased full name from a user struct or map with `first_name` and `last_name`.
+
+  When both names are blank, returns `opts[:fallback]` (default `nil`).
+
+  ## Examples
+
+      iex> UserDisplay.full_name(%{first_name: "jane", last_name: "doe"})
+      "Jane Doe"
+
+      iex> UserDisplay.full_name(%{first_name: "jane", last_name: nil})
+      "Jane"
+
+      iex> UserDisplay.full_name(%{first_name: nil, last_name: nil}, fallback: "Unknown")
+      "Unknown"
+  """
+  def full_name(user_or_map, opts \\ []) when is_map(user_or_map) do
+    first = title_case_name(Map.get(user_or_map, :first_name))
+    last = title_case_name(Map.get(user_or_map, :last_name))
+    fallback = Keyword.get(opts, :fallback)
+
+    cond do
+      first != "" and last != "" -> "#{first} #{last}"
+      first != "" -> first
+      last != "" -> last
+      true -> fallback
+    end
+  end
+
+  @doc """
+  Returns a title-cased first name for greetings and short labels.
+  """
+  def first_name_label(nil), do: ""
+
+  def first_name_label(%{first_name: name}), do: title_case_name(name)
+
+  def first_name_label(name) when is_binary(name), do: title_case_name(name)
+
+  defp title_case_name(nil), do: ""
+
+  defp title_case_name(name) do
+    name
+    |> to_string()
+    |> String.trim()
+    |> case do
+      "" -> ""
+      trimmed -> Ysc.title_case(trimmed)
+    end
+  end
+
   defp normalize_country_code(code) do
     code |> String.trim() |> String.upcase() |> String.slice(0, 2)
   end

@@ -6,6 +6,7 @@ defmodule YscWeb.NewsLive do
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.{Accounts, Posts, PublicContentCache}
+  alias Ysc.Accounts.UserDisplay
   alias YscWeb.{DateDisplay, PlainText}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
@@ -123,8 +124,7 @@ defmodule YscWeb.NewsLive do
                     />
                     <div>
                       <p class="text-sm font-black text-zinc-900 sm:text-white leading-tight">
-                        {Ysc.title_case(@featured.author.first_name || "")}
-                        {Ysc.title_case(@featured.author.last_name || "")}
+                        {UserDisplay.full_name(@featured.author)}
                       </p>
                       <p
                         :if={@featured.board_position_at_publish}
@@ -229,8 +229,7 @@ defmodule YscWeb.NewsLive do
                   />
                   <div>
                     <p class="text-sm font-black text-zinc-500 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
-                      {Ysc.title_case(post.author.first_name || "")}
-                      {Ysc.title_case(post.author.last_name || "")}
+                      {UserDisplay.full_name(post.author)}
                     </p>
                     <p
                       :if={post.board_position_at_publish}

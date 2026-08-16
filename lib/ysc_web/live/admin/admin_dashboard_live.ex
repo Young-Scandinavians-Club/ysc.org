@@ -6,6 +6,7 @@ defmodule YscWeb.AdminDashboardLive do
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.{Posts, Events, Accounts, Bookings, BuildVersion, Newsletter}
+  alias Ysc.Accounts.UserDisplay
   alias Ysc.Scanning
   alias YscWeb.{AdminCheckInPaths, AdminMembershipHelpers}
 
@@ -20,7 +21,7 @@ defmodule YscWeb.AdminDashboardLive do
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-6 mb-8">
         <div>
           <.admin_page_title>
-            Welcome back, {Ysc.title_case(@current_user.first_name)}
+            Welcome back, {UserDisplay.first_name_label(@current_user)}
           </.admin_page_title>
           <p class="text-xs text-zinc-500 font-medium mt-1 flex items-center gap-2">
             <span class="relative inline-flex w-2 h-2">

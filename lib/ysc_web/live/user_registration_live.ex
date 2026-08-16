@@ -3,7 +3,15 @@ defmodule YscWeb.UserRegistrationLive do
   use YscWeb, :live_view
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.{FamilyInvites, FamilyMember, SignupApplication, User}
+
+  alias Ysc.Accounts.{
+    FamilyInvites,
+    FamilyMember,
+    SignupApplication,
+    User,
+    UserDisplay
+  }
+
   alias YscWeb.Workers.CreateStripeCustomerWorker
 
   def render(assigns) do
@@ -602,8 +610,7 @@ defmodule YscWeb.UserRegistrationLive do
               "New Membership Application Received - Action Needed",
               "admin_application_submitted",
               %{
-                applicant_name:
-                  "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
+                applicant_name: UserDisplay.full_name(user),
                 submission_date:
                   Timex.format!(
                     Timex.now("America/Los_Angeles"),
