@@ -1509,12 +1509,12 @@ defmodule YscWeb.TahoeBookingLive do
                     <div class="text-xs text-zinc-700 space-y-0.5">
                       <p>
                         Single membership: up to <strong>1 room</strong>
-                        per reservation
+                        per booking
                       </p>
                       <p>
                         Family membership (and lifetime members): up to
                         <strong>2 rooms</strong>
-                        per reservation
+                        per booking
                       </p>
                     </div>
                   </div>
@@ -1898,7 +1898,7 @@ defmodule YscWeb.TahoeBookingLive do
                   <div class="ms-2 flex-1">
                     <p class="text-sm text-blue-800">
                       <strong>Booking a second room:</strong>
-                      Family memberships can include up to two rooms in one trip (4 nights total). Your second room must overlap the dates of your first reservation. Choose dates within the highlighted range, or change your first booking if you need different dates.
+                      Family memberships can include up to two rooms in one trip (4 nights total). Your second room must overlap the dates of your first booking. Choose dates within the highlighted range, or change your first booking if you need different dates.
                     </p>
                   </div>
                 </div>
@@ -1935,7 +1935,7 @@ defmodule YscWeb.TahoeBookingLive do
                     />
                     <p class="text-sm text-blue-900 font-medium">
                       <strong>Family Membership Benefit:</strong>
-                      You can book up to {max_rooms_for_user(assigns)} rooms in the same reservation.
+                      You can book up to {max_rooms_for_user(assigns)} rooms in the same booking.
                     </p>
                   </div>
                 </div>
@@ -2723,7 +2723,7 @@ defmodule YscWeb.TahoeBookingLive do
                           @selected_booking_mode == :buyout &&
                           @date_validation_errors[:availability]
                       }>
-                        Entire-cabin reservation isn't available for these dates. Try different dates or book individual rooms.
+                        Entire-cabin booking isn't available for these dates. Try different dates or book individual rooms.
                       </li>
                       <li :if={@form_errors && map_size(@form_errors) > 0}>
                         Complete the required fields above
@@ -2775,7 +2775,7 @@ defmodule YscWeb.TahoeBookingLive do
                       }
                     >
                       <span class="flex items-center justify-center gap-2">
-                        <.icon name="hero-check-circle-solid" class="w-5 h-5" />Confirm Booking
+                        <.icon name="hero-check-circle-solid" class="w-5 h-5" />Review booking
                       </span>
                     </.button>
                     <p
@@ -3000,10 +3000,10 @@ defmodule YscWeb.TahoeBookingLive do
                         </p>
                       </div>
                     </div>
-                    <!-- Reservations & Rates -->
+                    <!-- Bookings & Rates -->
                     <div>
                       <h4 class="text-lg font-bold text-zinc-900 mb-2">
-                        📝 Reservations & Rates
+                        📝 Bookings & Rates
                       </h4>
                       <div class="space-y-2 ml-4">
                         <p>
@@ -3011,8 +3011,8 @@ defmodule YscWeb.TahoeBookingLive do
                           All stays must be booked and paid in advance via the website.
                         </p>
                         <p>
-                          <strong>Active Stays:</strong>
-                          Only one active reservation is allowed per membership. You may book your next stay once your current one is completed.
+                          <strong>Active stays:</strong>
+                          Only one active booking is allowed per membership. You may book your next stay once your current one is completed.
                         </p>
                         <div>
                           <p class="font-semibold mb-1">
@@ -3803,10 +3803,10 @@ defmodule YscWeb.TahoeBookingLive do
                     />
                     <div class="flex-1">
                       <h2 class="text-xl font-bold text-blue-900 mb-2">
-                        Winter Season {@winter_season_label} Reservations
+                        Winter Season {@winter_season_label} Bookings
                       </h2>
                       <p class="text-blue-800 font-semibold mb-3">
-                        Reservations for winter season {@winter_season_label} are open!
+                        Bookings for winter season {@winter_season_label} are open!
                       </p>
                       <div class="bg-white rounded-xl p-4 border border-blue-200 space-y-3">
                         <div class="flex items-start gap-2">
@@ -3842,18 +3842,18 @@ defmodule YscWeb.TahoeBookingLive do
                   <div class="space-y-4">
                     <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
                       <h3 class="font-semibold text-zinc-900 mb-2">
-                        Reservation Requirements
+                        Booking requirements
                       </h3>
                       <ul class="list-disc list-inside space-y-2 text-zinc-700">
                         <li>
-                          All reservations must be made and paid in advance on the website
+                          All bookings must be made and paid in advance on the website
                         </li>
                         <li>
                           You are only allowed to have
-                          <strong>one active reservation per membership</strong>
+                          <strong>one active booking per membership</strong>
                         </li>
                         <li>
-                          When your current stay is completed, another reservation can be made
+                          When your current stay is completed, you can book another stay
                         </li>
                       </ul>
                     </div>
@@ -3908,7 +3908,7 @@ defmodule YscWeb.TahoeBookingLive do
                         />
                         <p class="text-sm text-red-800">
                           <strong>Board Authority:</strong>
-                          The board reserves the right to cancel reservations that are in violation of these rules.
+                          The board reserves the right to cancel bookings that are in violation of these rules.
                         </p>
                       </div>
                     </div>
@@ -3968,8 +3968,8 @@ defmodule YscWeb.TahoeBookingLive do
                               Room limits
                             </td>
                             <td class="py-3 px-4">
-                              Single membership: 1 room per reservation<br />
-                              Family membership (and lifetime members): 2 rooms per reservation
+                              Single membership: 1 room per booking<br />
+                              Family membership (and lifetime members): 2 rooms per booking
                             </td>
                           </tr>
                           <tr class="hover:bg-white">
@@ -4497,7 +4497,7 @@ defmodule YscWeb.TahoeBookingLive do
                             <%= if season.name == "Winter" do %>
                               Individual room bookings only
                             <% else %>
-                              Full-cabin or room reservations allowed (up to 17 guests)
+                              Full-cabin or room bookings allowed (up to 17 guests)
                             <% end %>
                           </li>
                         <% end %>
@@ -6756,7 +6756,7 @@ defmodule YscWeb.TahoeBookingLive do
           Map.put(
             errors,
             :availability,
-            "You cannot rent the entire cabin while you have an active or future reservation. Please complete or cancel your existing reservation first."
+            "You cannot rent the entire cabin while you have an active or future booking. Please complete or cancel your existing booking first."
           )
         else
           # 2. Check for blackouts
@@ -6885,7 +6885,7 @@ defmodule YscWeb.TahoeBookingLive do
           Map.put(
             errors,
             :active_booking,
-            "Your family group can only have one active reservation at a time. Please complete the existing reservation first."
+            "Your family group can only have one active booking at a time. Please complete the existing booking first."
           )
         else
           errors
@@ -7022,7 +7022,7 @@ defmodule YscWeb.TahoeBookingLive do
     {
       false,
       "Your family already has the entire cabin booked",
-      "Someone in your family already has a reservation for the entire cabin. You can book again after checkout on #{formatted_date}, or if that reservation is cancelled."
+      "Someone in your family already has the entire cabin booked. You can book again after checkout on #{formatted_date}, or if that booking is cancelled."
     }
   end
 
@@ -7035,7 +7035,7 @@ defmodule YscWeb.TahoeBookingLive do
       {
         false,
         "Maximum rooms reached",
-        "Your family group has reached the maximum of 2 rooms for your #{String.capitalize("#{membership_type}")} membership. You can make a new reservation once the current stay is complete (after #{formatted_date}) or if the existing booking is cancelled."
+        "Your family group has reached the maximum of 2 rooms for your #{String.capitalize("#{membership_type}")} membership. You can make a new booking once the current stay is complete (after #{formatted_date}) or if the existing booking is cancelled."
       }
     else
       {true, nil, nil}
@@ -7728,7 +7728,7 @@ defmodule YscWeb.TahoeBookingLive do
 
       # Too far in future
       Date.compare(context.date, context.max_date) == :gt ->
-        "Reservations are not open for this date yet"
+        "Bookings are not open for this date yet"
 
       # Season restrictions (check if date is selectable based on season rules)
       not SeasonHelpers.date_selectable?(

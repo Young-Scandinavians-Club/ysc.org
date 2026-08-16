@@ -479,7 +479,7 @@ defmodule YscWeb.BookingChangeLive do
           navigate={~p"/bookings/#{@booking.id}/receipt"}
           class="text-sm text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
         >
-          <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to your reservation
+          <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to your booking
         </.link>
       </div>
 
