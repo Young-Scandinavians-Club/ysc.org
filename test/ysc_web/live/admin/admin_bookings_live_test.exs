@@ -1874,7 +1874,10 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     test "edit hold day booking shows error when new dates overlap booked capacity",
          %{conn: conn} do
       ensure_clear_lake_pricing_rules!()
-      booked_user = user_fixture(%{first_name: "Spot", last_name: "BookedCapacity"})
+
+      booked_user =
+        user_fixture(%{first_name: "Spot", last_name: "BookedCapacity"})
+
       hold_user = user_fixture(%{first_name: "Spot", last_name: "HoldOverlap"})
 
       checkin = ~D[2036-11-10]
@@ -1905,7 +1908,9 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
           2
         )
 
-      booked_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      booked_days =
+        Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
       hold_days =
         Date.range(hold_checkin, Date.add(hold_checkout, -1)) |> Enum.to_list()
 
@@ -1943,7 +1948,9 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
          %{conn: conn} do
       allow_far_future_booking_dates()
       booked_user = user_fixture(%{first_name: "Buyout", last_name: "Booked"})
-      hold_user = user_fixture(%{first_name: "Buyout", last_name: "HoldOverlap"})
+
+      hold_user =
+        user_fixture(%{first_name: "Buyout", last_name: "HoldOverlap"})
 
       {checkin, checkout} = locker_buyout_dates(850)
       {hold_checkin, hold_checkout} = locker_buyout_dates(860)
@@ -2006,6 +2013,7 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     test "edit hold room booking shows error when new dates overlap booked room",
          %{conn: conn} do
       allow_far_future_booking_dates()
+
       insert_pricing_rule!(%{
         property: :tahoe,
         booking_mode: :room,
