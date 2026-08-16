@@ -260,9 +260,6 @@ defmodule YscWeb.FlowrouteWebhookController do
       )
       |> Repo.one()
       |> case do
-        nil ->
-          :ok
-
         %{status: current} when current in [:delivered, :failed] ->
           :ok
 
@@ -281,6 +278,10 @@ defmodule YscWeb.FlowrouteWebhookController do
     end)
   end
 
+  # `:token` is always a non-empty string here: it's a required path segment
+  # (router.ex's `/flowroute/:token/...`), and Phoenix's path params always
+  # take precedence when merged into conn.params, so there's no way for a
+  # matched request to reach this plug with a missing/blank token.
   defp verify_webhook_token(conn, _opts) do
     configured_token = Application.get_env(:ysc, :flowroute)[:webhook_token]
     provided_token = conn.params["token"]
@@ -288,10 +289,6 @@ defmodule YscWeb.FlowrouteWebhookController do
     cond do
       is_nil(configured_token) or configured_token == "" ->
         Ysc.Logging.warning("FlowRoute webhook token not configured")
-        conn |> send_resp(401, "Unauthorized") |> halt()
-
-      is_nil(provided_token) or provided_token == "" ->
-        Ysc.Logging.warning("FlowRoute webhook request missing token")
         conn |> send_resp(401, "Unauthorized") |> halt()
 
       Plug.Crypto.secure_compare(configured_token, provided_token) ->

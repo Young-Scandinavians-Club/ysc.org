@@ -649,6 +649,25 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert conn.resp_body == "Invalid payload"
     end
 
+    test "returns 400 for a genuine (non-duplicate) validation failure", %{
+      conn: conn
+    } do
+      # Attributes present (passes the payload-shape check) but missing the
+      # required :from/:to fields — a real changeset validation error, not a
+      # unique-constraint hit, so this must NOT be acknowledged as a duplicate.
+      conn =
+        FlowrouteWebhookController.handle_inbound_sms(conn, %{
+          "data" => %{
+            "id" =>
+              "mdr2-missing-from-to-#{System.unique_integer([:positive])}",
+            "attributes" => %{"body" => "hi"}
+          }
+        })
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
+    end
+
     test "returns 200 when opt-in cannot update prefs but still sends opt-in SMS",
          %{
            conn: conn
@@ -1122,6 +1141,27 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       assert conn.status == 400
       assert conn.resp_body == "Invalid payload"
+    end
+
+    test "returns 400 for a genuine (non-duplicate) validation failure", %{
+      conn: conn
+    } do
+      # `level` is an :integer field — a non-numeric value fails Ecto's type
+      # cast, producing a real changeset error rather than a unique-constraint
+      # hit, so this must NOT be acknowledged as a duplicate.
+      conn =
+        FlowrouteWebhookController.handle_delivery_receipt(conn, %{
+          "data" => %{
+            "id" => "mdr2-dlr-bad-level-#{System.unique_integer([:positive])}",
+            "attributes" => %{
+              "status" => "delivered",
+              "level" => "not-a-number"
+            }
+          }
+        })
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
     end
 
     test "stores nil provider_timestamp when DLR timestamp is invalid ISO8601",
