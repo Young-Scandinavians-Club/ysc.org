@@ -595,7 +595,9 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       :ok
     end
 
-    test "returns 429 when the same IP exceeds the webhook rate limit", %{conn: conn} do
+    test "returns 429 when the same IP exceeds the webhook rate limit", %{
+      conn: conn
+    } do
       conn = Map.put(conn, :remote_ip, @rate_limit_ip)
 
       assert conn
