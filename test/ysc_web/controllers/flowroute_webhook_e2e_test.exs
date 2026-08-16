@@ -583,6 +583,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
   end
 
   describe "webhook rate limiting" do
+    @rate_limit_ip {198, 51, 100, 42}
+
     setup do
       Application.put_env(:ysc, Ysc.FlowrouteWebhookRateLimit, ip_limit: 2)
 
@@ -593,19 +595,23 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       :ok
     end
 
-    test "returns 429 when the same IP exceeds the webhook rate limit", %{
-      conn: conn
-    } do
+    test "returns 429 when the same IP exceeds the webhook rate limit", %{conn: conn} do
+      conn = Map.put(conn, :remote_ip, @rate_limit_ip)
+
       assert conn
              |> post_webhook("sms", rate_limit_probe_payload(1))
              |> Map.get(:status) == 200
 
       assert build_conn()
+             |> Map.put(:remote_ip, @rate_limit_ip)
              |> post_webhook("sms", rate_limit_probe_payload(2))
              |> Map.get(:status) ==
                200
 
-      resp = build_conn() |> post_webhook("sms", rate_limit_probe_payload(3))
+      resp =
+        build_conn()
+        |> Map.put(:remote_ip, @rate_limit_ip)
+        |> post_webhook("sms", rate_limit_probe_payload(3))
 
       assert resp.status == 429
       [retry_after] = get_resp_header(resp, "retry-after")
