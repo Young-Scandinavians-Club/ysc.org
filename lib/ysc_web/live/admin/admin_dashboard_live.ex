@@ -7,7 +7,7 @@ defmodule YscWeb.AdminDashboardLive do
 
   alias Ysc.{Posts, Events, Accounts, Bookings, BuildVersion, Newsletter}
   alias Ysc.Scanning
-  alias YscWeb.AdminCheckInPaths
+  alias YscWeb.{AdminCheckInPaths, AdminMembershipHelpers}
 
   @impl true
   def render(assigns) do
@@ -976,7 +976,9 @@ defmodule YscWeb.AdminDashboardLive do
                   Plan
                 </p>
                 <p class="font-bold text-zinc-700">
-                  {get_membership_type_display(user)}
+                  {AdminMembershipHelpers.registration_form_membership_type_label(
+                    user
+                  )}
                 </p>
               </div>
               <.button
@@ -1540,18 +1542,6 @@ defmodule YscWeb.AdminDashboardLive do
     case hours_waiting(user) do
       h when is_integer(h) and h > 48 -> "Review Now"
       _ -> "Review"
-    end
-  end
-
-  defp get_membership_type_display(user) do
-    if user.registration_form && user.registration_form.membership_type do
-      case user.registration_form.membership_type do
-        :family -> "Family"
-        :single -> "Single"
-        _ -> "N/A"
-      end
-    else
-      "N/A"
     end
   end
 
