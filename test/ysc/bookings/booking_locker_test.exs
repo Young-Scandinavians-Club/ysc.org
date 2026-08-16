@@ -3290,7 +3290,9 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert second.checkin_date == checkin2
 
       first_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
-      second_days = Date.range(checkin2, Date.add(checkout2, -1)) |> Enum.to_list()
+
+      second_days =
+        Date.range(checkin2, Date.add(checkout2, -1)) |> Enum.to_list()
 
       assert buyout_booked?(:tahoe, first_days)
       assert buyout_booked?(:tahoe, second_days)
