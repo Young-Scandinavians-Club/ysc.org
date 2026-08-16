@@ -1692,8 +1692,11 @@ defmodule Ysc.Bookings.BookingLocker do
              |> Repo.update() do
           {:ok, updated} ->
             updated = Repo.preload(updated, [:rooms, :user])
-            update_inventory_for_admin_booking(updated)
-            updated
+
+            case safe_update_inventory_for_admin_booking(updated) do
+              :ok -> updated
+              {:error, reason} -> Repo.rollback({:error, reason})
+            end
 
           {:error, changeset} ->
             Repo.rollback({:error, changeset})
