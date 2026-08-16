@@ -1624,6 +1624,19 @@ defmodule Ysc.BookingsTest do
       assert Ecto.assoc_loaded?(loaded.booking_guests)
     end
 
+    test "get_booking_for_admin_edit!/1 skips check-in preloads" do
+      booking = booking_fixture()
+
+      edit_loaded = Bookings.get_booking_for_admin_edit!(booking.id)
+      view_loaded = Bookings.get_booking_for_admin_view!(booking.id)
+
+      assert Ecto.assoc_loaded?(edit_loaded.rooms)
+      assert Ecto.assoc_loaded?(edit_loaded.booking_guests)
+      refute Ecto.assoc_loaded?(edit_loaded.check_ins)
+
+      assert Ecto.assoc_loaded?(view_loaded.check_ins)
+    end
+
     test "mark_booking_checked_in/1 marks booking as checked in" do
       booking = booking_fixture()
       refute booking.checked_in

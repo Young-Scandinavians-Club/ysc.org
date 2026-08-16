@@ -726,9 +726,7 @@ defmodule Ysc.Bookings.BookingLocker do
     end
 
     # Ensure room_inventory rows exist for all rooms
-    for day <- days, room_id <- room_ids do
-      ensure_room_inventory_row(room_id, day)
-    end
+    ensure_room_inventory_rows(room_ids, days)
   end
 
   defp fetch_room_inventory(room_ids, checkin_date, checkout_date) do
@@ -1858,11 +1856,7 @@ defmodule Ysc.Bookings.BookingLocker do
         room_ids = Enum.map(booking.rooms, & &1.id)
 
         if room_ids != [] do
-          Enum.each(room_ids, fn room_id ->
-            Enum.each(days, fn day ->
-              ensure_room_inventory_row(room_id, day)
-            end)
-          end)
+          ensure_room_inventory_rows(room_ids, days)
 
           room_inv =
             Repo.all(
@@ -3342,11 +3336,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
   @dialyzer {:nowarn_function, book_room_days!: 4}
   defp book_room_days!(_booking, room_ids, days, held_days) do
-    Enum.each(room_ids, fn room_id ->
-      Enum.each(days, fn day ->
-        ensure_room_inventory_row(room_id, day)
-      end)
-    end)
+    ensure_room_inventory_rows(room_ids, days)
 
     room_inv =
       Repo.all(
@@ -3796,21 +3786,28 @@ defmodule Ysc.Bookings.BookingLocker do
     )
   end
 
-  defp ensure_room_inventory_row(room_id, day) do
-    Repo.insert_all(
-      RoomInventory,
-      [
+  defp ensure_room_inventory_rows(room_ids, days) do
+    updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+    rows =
+      for room_id <- room_ids, day <- days do
         %{
           room_id: room_id,
           day: day,
           held: false,
           booked: false,
-          updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+          updated_at: updated_at
         }
-      ],
-      on_conflict: :nothing,
-      conflict_target: [:room_id, :day]
-    )
+      end
+
+    if rows != [] do
+      Repo.insert_all(
+        RoomInventory,
+        rows,
+        on_conflict: :nothing,
+        conflict_target: [:room_id, :day]
+      )
+    end
   end
 
   @dialyzer {:nowarn_function, build_room_pricing_items: 6}
