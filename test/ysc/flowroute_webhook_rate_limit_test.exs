@@ -49,7 +49,9 @@ defmodule Ysc.FlowrouteWebhookRateLimitTest do
 
       assert :ok = FlowrouteWebhookRateLimit.check_ip(ip1)
       assert :ok = FlowrouteWebhookRateLimit.check_ip(ip1)
-      assert {:error, :rate_limited, _} = FlowrouteWebhookRateLimit.check_ip(ip1)
+
+      assert {:error, :rate_limited, _} =
+               FlowrouteWebhookRateLimit.check_ip(ip1)
 
       assert :ok = FlowrouteWebhookRateLimit.check_ip(ip2)
       assert :ok = FlowrouteWebhookRateLimit.check_ip(ip2)
@@ -58,7 +60,9 @@ defmodule Ysc.FlowrouteWebhookRateLimitTest do
     test "trims whitespace from IP strings" do
       assert :ok = FlowrouteWebhookRateLimit.check_ip("192.168.200.6")
       assert :ok = FlowrouteWebhookRateLimit.check_ip(" 192.168.200.6 ")
-      assert {:error, :rate_limited, _} = FlowrouteWebhookRateLimit.check_ip("192.168.200.6")
+
+      assert {:error, :rate_limited, _} =
+               FlowrouteWebhookRateLimit.check_ip("192.168.200.6")
     end
   end
 end
