@@ -30,6 +30,19 @@ defmodule Ysc.SentryScrubberTest do
       assert SentryScrubber.scrub_url(conn) ==
                "http://www.example.com/events?filter=upcoming&page=2"
     end
+
+    test "redacts the FlowRoute webhook token from the URL path" do
+      conn =
+        Plug.Test.conn(
+          :post,
+          "/webhooks/flowroute/super-secret-webhook-token/sms_dlr"
+        )
+
+      url = SentryScrubber.scrub_url(conn)
+
+      refute url =~ "super-secret-webhook-token"
+      assert url =~ "/webhooks/flowroute/[REDACTED]/sms_dlr"
+    end
   end
 
   describe "scrub_params/1" do

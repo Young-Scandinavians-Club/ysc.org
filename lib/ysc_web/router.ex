@@ -124,6 +124,10 @@ defmodule YscWeb.Router do
     plug YscWeb.Plugs.MobileAPIRateLimitPlug
   end
 
+  pipeline :flowroute_webhook_rate_limit do
+    plug YscWeb.Plugs.FlowrouteWebhookRateLimitPlug
+  end
+
   pipeline :mobile_api do
     plug :accepts, ["json"]
     plug YscWeb.Plugs.MobileAPIAuth
@@ -655,18 +659,23 @@ defmodule YscWeb.Router do
 
     post "/quickbooks", QuickbooksWebhookController, :webhook
     post "/ses", SesWebhookController, :webhook
+  end
 
-    # FlowRoute callback URLs are configured per-type in the FlowRoute portal
-    # (Account > Messaging Webhooks). Inbound MMS is delivered in the same
-    # v2.1 payload shape as inbound SMS (differentiated by `is_mms`), and
-    # SMS/MMS DLRs share the same delivery-receipt payload shape, so both
-    # pairs of routes reuse the same controller actions.
-    #
-    # FlowRoute has no HMAC webhook-signing mechanism, so `:token` is a
-    # shared secret (FLOWROUTE_WEBHOOK_TOKEN) baked into the callback URL
-    # itself and checked by FlowrouteWebhookController's `verify_webhook_token`
-    # plug — this is the only thing standing between this endpoint and anyone
-    # who guesses the URL.
+  # FlowRoute callback URLs are configured per-type in the FlowRoute portal
+  # (Account > Messaging Webhooks). Inbound MMS is delivered in the same
+  # v2.1 payload shape as inbound SMS (differentiated by `is_mms`), and
+  # SMS/MMS DLRs share the same delivery-receipt payload shape, so both
+  # pairs of routes reuse the same controller actions.
+  #
+  # FlowRoute has no HMAC webhook-signing mechanism, so `:token` is a
+  # shared secret (FLOWROUTE_WEBHOOK_TOKEN) baked into the callback URL
+  # itself and checked by FlowrouteWebhookController's `verify_webhook_token`
+  # plug, plus :flowroute_webhook_rate_limit below to blunt brute-forcing —
+  # this is the only thing standing between this endpoint and anyone who
+  # guesses the URL.
+  scope "/webhooks", YscWeb do
+    pipe_through [:api, :flowroute_webhook_rate_limit]
+
     post "/flowroute/:token/sms",
          FlowrouteWebhookController,
          :handle_inbound_sms

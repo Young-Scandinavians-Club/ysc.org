@@ -1022,10 +1022,42 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert updated.status == :sent
     end
 
-    test "updates SMS message status to buffered from message buffered DLR", %{
-      conn: conn
-    } do
+    test "updates SMS message status to buffered from message buffered DLR",
+         %{
+           conn: conn
+         } do
       mid = "mdr2-buffered-sms-#{System.unique_integer([:positive])}"
+
+      {:ok, sms_message} =
+        Sms.create_sms_message(%{
+          provider: :flowroute,
+          provider_message_id: mid,
+          to: "14155551234",
+          from: "12061231234",
+          body: "Test message",
+          status: :buffered
+        })
+
+      payload =
+        build_delivery_receipt_payload(
+          message_id: mid,
+          status: "message buffered"
+        )
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 200
+
+      updated = Sms.get_sms_message_by_provider_id(:flowroute, mid)
+      assert updated.id == sms_message.id
+      assert updated.status == :buffered
+    end
+
+    test "does not regress SMS message status when a late/out-of-order DLR reports an earlier stage",
+         %{
+           conn: conn
+         } do
+      mid = "mdr2-no-regress-#{System.unique_integer([:positive])}"
 
       {:ok, sms_message} =
         Sms.create_sms_message(%{
@@ -1049,7 +1081,7 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       updated = Sms.get_sms_message_by_provider_id(:flowroute, mid)
       assert updated.id == sms_message.id
-      assert updated.status == :buffered
+      assert updated.status == :sent
     end
 
     test "returns 400 for invalid delivery receipt payload", %{conn: conn} do

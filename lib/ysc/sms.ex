@@ -29,6 +29,21 @@ defmodule Ysc.Sms do
   end
 
   @doc """
+  Gets an SMS message by ID.
+
+  Pass `lock: true` to select the row `FOR UPDATE` - callers that read the
+  message and then conditionally write a new status based on it (e.g. the
+  FlowRoute delivery-receipt webhook handler) should do so inside a
+  `Repo.transaction/1` with `lock: true` to serialize concurrent webhook
+  processing for the same message.
+  """
+  def get_sms_message(id, opts \\ []) do
+    query = from(m in SmsMessage, where: m.id == ^id)
+    query = if opts[:lock], do: lock(query, "FOR UPDATE"), else: query
+    Repo.one(query)
+  end
+
+  @doc """
   Updates an SMS message status.
   """
   def update_sms_message_status(sms_message, status) do
