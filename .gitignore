@@ -6,7 +6,6 @@
 etc/docker/volume/*
 priv/static/exports/*.csv
 .cursor/
-wp_migration_export/
 backup/
 tmp/
 
@@ -23,9 +22,6 @@ priv/static/assets/*.{gz,br,zst}
 .query-explain/
 
 __pycache__/
-
-# migration backups
-wp_backup/
 
 # PHOENIX
 

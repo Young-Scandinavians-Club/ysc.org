@@ -49,4 +49,19 @@ defmodule YscWeb.AdminMembershipHelpers do
 
   def membership_type_label(_, :short), do: "Member"
   def membership_type_label(_, :full), do: "Membership"
+
+  @doc """
+  Membership type label from a user's signup registration form (admin review queue).
+
+  Returns `"N/A"` when the form or membership type is missing.
+  """
+  @spec registration_form_membership_type_label(map()) :: String.t()
+  def registration_form_membership_type_label(%{
+        registration_form: %{membership_type: type}
+      })
+      when not is_nil(type) do
+    membership_type_label(type, :short)
+  end
+
+  def registration_form_membership_type_label(_), do: "N/A"
 end

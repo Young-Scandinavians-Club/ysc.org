@@ -50,4 +50,24 @@ defmodule YscWeb.AdminMembershipHelpersTest do
                "Membership"
     end
   end
+
+  describe "registration_form_membership_type_label/1" do
+    test "returns short label from registration form membership type" do
+      user = %{registration_form: %{membership_type: :family}}
+
+      assert AdminMembershipHelpers.registration_form_membership_type_label(
+               user
+             ) ==
+               "Family"
+    end
+
+    test "returns N/A when registration form or membership type is missing" do
+      assert AdminMembershipHelpers.registration_form_membership_type_label(%{}) ==
+               "N/A"
+
+      assert AdminMembershipHelpers.registration_form_membership_type_label(%{
+               registration_form: %{membership_type: nil}
+             }) == "N/A"
+    end
+  end
 end
