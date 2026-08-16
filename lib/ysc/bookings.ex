@@ -741,6 +741,23 @@ defmodule Ysc.Bookings do
     ])
   end
 
+  @admin_booking_modal_preloads [
+    {:booking_guests,
+     from(bg in BookingGuest, order_by: [asc: bg.order_index])},
+    rooms: :room_category,
+    user: :current_avatar
+  ]
+
+  @doc """
+  Gets a booking with associations needed for admin edit modals.
+
+  Skips check-in preloads that are only rendered in the view modal.
+  """
+  def get_booking_for_admin_edit!(id) do
+    Repo.get!(Booking, id)
+    |> Repo.preload(@admin_booking_modal_preloads)
+  end
+
   @doc """
   Gets a booking with associations needed for admin view and edit modals.
 
@@ -749,13 +766,9 @@ defmodule Ysc.Bookings do
   """
   def get_booking_for_admin_view!(id) do
     Repo.get!(Booking, id)
-    |> Repo.preload([
-      {:booking_guests,
-       from(bg in BookingGuest, order_by: [asc: bg.order_index])},
-      rooms: :room_category,
-      user: :current_avatar,
-      check_ins: :check_in_vehicles
-    ])
+    |> Repo.preload(
+      @admin_booking_modal_preloads ++ [check_ins: :check_in_vehicles]
+    )
   end
 
   @doc """
