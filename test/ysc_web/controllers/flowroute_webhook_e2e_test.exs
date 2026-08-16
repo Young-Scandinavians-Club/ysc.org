@@ -554,6 +554,32 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       assert resp.status == 401
       assert Sms.get_sms_received_by_provider_id(:flowroute, message_id) == nil
     end
+
+    test "rejects requests when webhook token is configured as empty string",
+         %{conn: conn} do
+      config_without_token =
+        Application.get_env(:ysc, :flowroute, [])
+        |> Keyword.put(:webhook_token, "")
+
+      Application.put_env(:ysc, :flowroute, config_without_token)
+
+      message_id = "mdr2-e2e-empty-token-#{unique_key()}"
+
+      resp =
+        conn
+        |> post_webhook(
+          "sms",
+          inbound_message_payload(
+            message_id: message_id,
+            from: "14155551234",
+            to: "12061231234",
+            body: "should not be stored"
+          )
+        )
+
+      assert resp.status == 401
+      assert Sms.get_sms_received_by_provider_id(:flowroute, message_id) == nil
+    end
   end
 
   defp post_webhook(conn, kind, payload) do

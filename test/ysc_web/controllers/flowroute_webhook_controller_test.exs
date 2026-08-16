@@ -722,6 +722,23 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert conn.resp_body == "OK"
     end
 
+    test "returns 400 when required inbound fields are missing", %{conn: conn} do
+      payload = %{
+        "data" => %{
+          "id" => "mdr2-missing-from-#{System.unique_integer([:positive])}",
+          "attributes" => %{
+            "to" => "12061231234",
+            "body" => "hello"
+          }
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
+    end
+
     test "defaults inbound direction when direction key is absent", %{
       conn: conn
     } do
@@ -1216,6 +1233,22 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
 
       assert length(Sms.list_delivery_receipts_for_message(:flowroute, mid)) ==
                1
+    end
+
+    test "returns 400 when delivery receipt is missing required status", %{
+      conn: conn
+    } do
+      payload = %{
+        "data" => %{
+          "id" => "mdr2-dlr-missing-status-#{System.unique_integer([:positive])}",
+          "attributes" => %{}
+        }
+      }
+
+      conn = FlowrouteWebhookController.handle_delivery_receipt(conn, payload)
+
+      assert conn.status == 400
+      assert conn.resp_body == "Failed to process"
     end
 
     test "accepts atom status in delivery receipt attributes (normalize atom pass-through)",
