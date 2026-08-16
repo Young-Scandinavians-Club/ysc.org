@@ -112,11 +112,11 @@ defmodule YscWeb.NewsLive do
                     {@featured.title}
                   </h2>
 
-                  <article class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 whitespace-pre-line mb-6 max-w-2xl">
+                  <article class="text-zinc-600 sm:text-zinc-200 text-base lg:text-lg leading-relaxed line-clamp-2 whitespace-pre-line mb-6 max-w-2xl">
                     {preview_text(@featured)}
                   </article>
 
-                  <div class="flex items-center gap-3 pt-4 border-t border-zinc-100 sm:border-white/20">
+                  <div class="flex items-center gap-3 pt-5 border-t border-zinc-100 sm:border-white/20">
                     <.user_avatar_image
                       user={@featured.author}
                       class="w-8 h-8 sm:w-10 sm:h-10 rounded-full ring-2 ring-zinc-200 sm:ring-white/30"
@@ -212,16 +212,16 @@ defmodule YscWeb.NewsLive do
 
               <.link
                 navigate={~p"/posts/#{post.url_name}"}
-                class="text-2xl font-black text-zinc-900 tracking-tight leading-[1.1] mb-4 group-hover:text-blue-600 group-hover:underline transition-colors"
+                class="text-2xl font-black text-zinc-900 tracking-tight leading-[1.1] mb-3 group-hover:text-blue-600 group-hover:underline transition-colors"
               >
                 {post.title}
               </.link>
 
-              <article class="text-zinc-500 text-base leading-relaxed line-clamp-3 whitespace-pre-line mb-8">
+              <article class="text-zinc-500 text-base leading-relaxed line-clamp-3 whitespace-pre-line mb-6">
                 {preview_text(post)}
               </article>
 
-              <div class="mt-auto pt-6 border-t border-zinc-50 flex items-center justify-between">
+              <div class="mt-auto pt-5 border-t border-zinc-100 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                   <.user_avatar_image
                     user={post.author}
