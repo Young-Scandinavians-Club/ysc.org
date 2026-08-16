@@ -2,7 +2,9 @@ defmodule YscWeb.Api.EventsControllerTest do
   @moduledoc """
   Tests for the mobile API upcoming events list (`EventsController` + `EventsJSON`).
   """
-  use YscWeb.ConnCase, async: true
+  # async: false — shares process-global :ysc, :kiosk_api_key with other kiosk API
+  # tests; must serialize via KioskAPIKeyHelper's global lock (see bookings/properties).
+  use YscWeb.ConnCase, async: false
 
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures

@@ -136,6 +136,7 @@ config :ysc,
 
 # Relax auth rate limits in test so login/forgot-password tests don't hit them
 config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
+config :ysc, Ysc.MobileAPIRateLimit, ip_limit: 10_000
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
