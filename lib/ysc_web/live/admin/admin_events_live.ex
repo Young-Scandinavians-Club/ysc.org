@@ -2,6 +2,7 @@ defmodule YscWeb.AdminEventsLive do
   use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
+  alias Ysc.Accounts.UserDisplay
   alias Phoenix.LiveView.JS
 
   alias Ysc.Events
@@ -155,7 +156,7 @@ defmodule YscWeb.AdminEventsLive do
                       <div class="flex items-center gap-2">
                         <span class="text-sm text-zinc-600">Organizer:</span>
                         <span class="text-sm text-zinc-900">
-                          {"#{Ysc.title_case(event.organizer.first_name)} #{Ysc.title_case(event.organizer.last_name)}"}
+                          {UserDisplay.full_name(event.organizer)}
                         </span>
                       </div>
                       <div class="flex items-center gap-2">
@@ -233,7 +234,7 @@ defmodule YscWeb.AdminEventsLive do
                 </:col>
 
                 <:col :let={{_, event}} label="Author" field={:author_name}>
-                  {"#{Ysc.title_case(event.organizer.first_name)} #{Ysc.title_case(event.organizer.last_name)}"}
+                  {UserDisplay.full_name(event.organizer)}
                 </:col>
 
                 <:col :let={{_, event}} label="State" field={:state}>

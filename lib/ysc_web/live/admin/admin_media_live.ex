@@ -2,6 +2,7 @@ defmodule YscWeb.AdminMediaLive do
   use YscWeb, :admin_live_view
 
   import YscWeb.CoreComponents
+  alias Ysc.Accounts.UserDisplay
   alias Phoenix.LiveView.JS
 
   alias Ysc.Media
@@ -190,7 +191,11 @@ defmodule YscWeb.AdminMediaLive do
               </div>
 
               <p class="text-xs text-zinc-500 mt-3">
-                Uploaded by {"#{Ysc.title_case(@image_uploader.first_name)} #{Ysc.title_case(@image_uploader.last_name)} on #{Timex.format!(@active_image.inserted_at, "%b %d, %Y", :strftime)}"}
+                Uploaded by {UserDisplay.full_name(@image_uploader)} on {Timex.format!(
+                  @active_image.inserted_at,
+                  "%b %d, %Y",
+                  :strftime
+                )}
               </p>
             <% else %>
               <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
