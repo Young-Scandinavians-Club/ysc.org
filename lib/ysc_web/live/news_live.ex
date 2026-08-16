@@ -152,7 +152,7 @@ defmodule YscWeb.NewsLive do
         >
           <%= for _i <- 1..4 do %>
             <div class="flex flex-col bg-white rounded-xl p-2 ring-1 ring-zinc-100 shadow-sm animate-pulse">
-              <div class="aspect-video rounded-lg mb-4 bg-zinc-200"></div>
+              <div class="aspect-video sm:aspect-[16/10] rounded-lg mb-4 bg-zinc-200"></div>
               <div class="px-4 pb-4 space-y-4">
                 <div class="flex items-center gap-3">
                   <div class="w-16 h-3 bg-zinc-200 rounded"></div>
@@ -187,7 +187,7 @@ defmodule YscWeb.NewsLive do
             class="group flex flex-col bg-white rounded-xl p-2 border border-zinc-100 transition-all duration-300 hover:ring-2 hover:ring-blue-500"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
-              <div class="relative aspect-video overflow-hidden rounded-lg">
+              <div class="relative aspect-video sm:aspect-[16/10] overflow-hidden rounded-lg">
                 <.live_component
                   id={"news-image-#{post.id}"}
                   module={YscWeb.Components.Image}
