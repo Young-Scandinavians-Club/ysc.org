@@ -53,7 +53,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = clear_lake_booking_dates(45, 3)
+      # Relative to utc_today so handle_params -> normalize_dates does not
+      # clamp check-in to cabin_today() once the frozen July 2026 test
+      # anchor falls behind the real clock.
+      {checkin, checkout} = clear_lake_upcoming_stay_dates(45, 3)
 
       malformed_key =
         "checkin_date=#{Date.to_iso8601(checkin)}&checkout_date=#{Date.to_iso8601(checkout)}"
