@@ -1272,7 +1272,8 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
     } do
       payload = %{
         "data" => %{
-          "id" => "mdr2-dlr-missing-status-#{System.unique_integer([:positive])}",
+          "id" =>
+            "mdr2-dlr-missing-status-#{System.unique_integer([:positive])}",
           "attributes" => %{}
         }
       }
