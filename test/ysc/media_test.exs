@@ -13,6 +13,15 @@ defmodule Ysc.MediaTest do
     %{user: user}
   end
 
+  describe "year_utc_range/1" do
+    test "returns inclusive UTC bounds for a calendar year" do
+      {start_dt, end_dt} = Media.year_utc_range(2026)
+
+      assert start_dt == ~U[2026-01-01 00:00:00Z]
+      assert end_dt == ~U[2026-12-31 23:59:59Z]
+    end
+  end
+
   describe "list_images/0" do
     test "returns all images" do
       {:ok, images} = Media.list_images()

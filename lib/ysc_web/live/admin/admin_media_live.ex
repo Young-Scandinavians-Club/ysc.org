@@ -4,8 +4,6 @@ defmodule YscWeb.AdminMediaLive do
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
-  import Ecto.Query, only: [from: 2]
-  alias Ysc.Repo
   alias Ysc.Media
   alias Ysc.Media.Timeline
   alias Ysc.S3Config
@@ -699,20 +697,11 @@ defmodule YscWeb.AdminMediaLive do
       not_initialized = not socket.assigns.stream_initialized?
 
       if year_changed || search_changed || not_initialized do
-        start_date =
-          DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
-
-        end_date =
-          DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
-
         images =
-          Repo.all(
-            year_images_query(
-              start_date,
-              end_date,
-              search_query,
-              socket.assigns.per_page
-            )
+          Media.list_images_cursor(
+            start_at_year: year,
+            search: search_query,
+            limit: socket.assigns.per_page
           )
 
         Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
@@ -909,15 +898,11 @@ defmodule YscWeb.AdminMediaLive do
 
   def handle_event("filter_by_year", %{"year" => year_str}, socket) do
     year = String.to_integer(year_str)
-    start_date = DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
-    end_date = DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
 
     images =
-      Repo.all(
-        from i in Media.Image,
-          where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date,
-          order_by: [desc: i.inserted_at, desc: i.id],
-          limit: ^socket.assigns.per_page
+      Media.list_images_cursor(
+        start_at_year: year,
+        limit: socket.assigns.per_page
       )
 
     stream_items = Timeline.inject_sections(images)
@@ -950,28 +935,16 @@ defmodule YscWeb.AdminMediaLive do
          socket.assigns[:loading_more?] do
       {:noreply, socket}
     else
-      before_cursor = {last_image_date, last_image_id}
-
       socket = assign(socket, :loading_more?, true)
 
       new_images =
         if socket.assigns.selected_year do
-          year = socket.assigns.selected_year
-
-          start_date =
-            DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
-
-          end_date =
-            DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
-
-          Repo.all(
-            year_images_query(
-              start_date,
-              end_date,
-              search_query,
-              socket.assigns.per_page,
-              before_cursor
-            )
+          Media.list_images_cursor(
+            start_at_year: socket.assigns.selected_year,
+            search: search_query,
+            limit: socket.assigns.per_page,
+            before_date: last_image_date,
+            before_id: last_image_id
           )
         else
           Media.list_images_cursor(
@@ -1445,56 +1418,6 @@ defmodule YscWeb.AdminMediaLive do
     years_list = years_set |> MapSet.to_list() |> Enum.sort(:desc)
     {years_set, years_list}
   end
-
-  defp year_images_query(
-         start_date,
-         end_date,
-         search_query,
-         limit,
-         before_cursor \\ nil
-       ) do
-    query =
-      from i in Media.Image,
-        where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date,
-        order_by: [desc: i.inserted_at, desc: i.id],
-        limit: ^limit
-
-    query =
-      case before_cursor do
-        {before_date, before_id} when not is_nil(before_id) ->
-          from i in query,
-            where:
-              i.inserted_at < ^before_date or
-                (i.inserted_at == ^before_date and i.id < ^before_id)
-
-        before_date when not is_nil(before_date) ->
-          from i in query, where: i.inserted_at < ^before_date
-
-        nil ->
-          query
-      end
-
-    apply_image_search(query, search_query)
-  end
-
-  defp apply_image_search(query, search_query)
-       when is_binary(search_query) and search_query != "" do
-    search_pattern = "%#{search_query}%"
-
-    from i in query,
-      where:
-        ilike(i.title, ^search_pattern) or
-          ilike(i.alt_text, ^search_pattern) or
-          ilike(
-            fragment(
-              "regexp_replace(?, '.*/([^/]+)$', '\\1')",
-              i.raw_image_path
-            ),
-            ^search_pattern
-          )
-  end
-
-  defp apply_image_search(query, _search_query), do: query
 
   defp copy_alt_text(%Media.Image{} = image) do
     image.alt_text || image.title || "Image"
