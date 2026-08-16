@@ -4,10 +4,11 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
   Unlike flowroute_webhook_controller_test.exs (which calls the controller
   functions directly to cover parsing/edge cases), these tests exercise the
-  actual routes registered in router.ex via real HTTP requests, and cover
-  full round trips: sending an SMS through Ysc.Messages and then receiving
-  the FlowRoute webhooks for it (delivery receipts, inbound replies,
-  opt-in/opt-out) exactly as FlowRoute would deliver them in production.
+  actual routes registered in router.ex via real HTTP requests — including
+  the webhook token auth plug — and cover full round trips: sending an SMS
+  through Ysc.Messages and then receiving the FlowRoute webhooks for it
+  (delivery receipts, inbound replies, opt-in/opt-out) exactly as FlowRoute
+  would deliver them in production.
   """
   use YscWeb.ConnCase, async: false
 
@@ -19,8 +20,25 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
   alias Ysc.Repo
   alias Ysc.Sms
 
+  @token "test_flowroute_webhook_token"
+
   setup do
     Cachex.clear(:ysc_cache)
+
+    # config/runtime.exs re-declares :ysc, :flowroute at boot (even under
+    # `mix test`) from FLOWROUTE_* env vars, which clobbers whatever
+    # config/test.exs set for keys it doesn't have locally — so the webhook
+    # token is set here directly rather than relied on from config files.
+    previous_config = Application.get_env(:ysc, :flowroute, [])
+
+    Application.put_env(
+      :ysc,
+      :flowroute,
+      Keyword.put(previous_config, :webhook_token, @token)
+    )
+
+    on_exit(fn -> Application.put_env(:ysc, :flowroute, previous_config) end)
+
     :ok
   end
 
@@ -48,9 +66,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       # FlowRoute first confirms the message left their platform...
       sent_conn =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/sms_dlr",
+        |> post_webhook(
+          "sms_dlr",
           delivery_receipt_payload(
             message_id: message_id,
             status: "message sent",
@@ -67,9 +84,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       # same message always carry different event timestamps).
       delivered_conn =
         build_conn()
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/sms_dlr",
+        |> post_webhook(
+          "sms_dlr",
           delivery_receipt_payload(
             message_id: message_id,
             status: "delivered",
@@ -110,9 +126,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       resp =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/sms_dlr",
+        |> post_webhook(
+          "sms_dlr",
           delivery_receipt_payload(
             message_id: message_id,
             status: "failed",
@@ -130,7 +145,7 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       assert updated_message.status == :failed
     end
 
-    test "MMS delivery receipt via /webhooks/flowroute/mms_dlr links and updates status",
+    test "MMS delivery receipt via /webhooks/flowroute/:token/mms_dlr links and updates status",
          %{conn: conn} do
       to = unique_user_phone()
 
@@ -147,9 +162,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       resp =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/mms_dlr",
+        |> post_webhook(
+          "mms_dlr",
           delivery_receipt_payload(
             message_id: message_id,
             status: "delivered",
@@ -164,10 +178,101 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       assert updated_message.status == :delivered
     end
+
+    test "a duplicate DLR (same message_id + timestamp) is acknowledged without creating a second receipt",
+         %{conn: conn} do
+      to = unique_user_phone()
+
+      {:ok, %{id: message_id}} =
+        Ysc.Messages.run_send_sms_idempotent(
+          to,
+          "Your ticket is ready",
+          %{
+            message_type: :sms,
+            idempotency_key: "e2e-dup-dlr-#{unique_key()}",
+            message_template: "ticket_ready"
+          }
+        )
+
+      payload =
+        delivery_receipt_payload(
+          message_id: message_id,
+          status: "delivered",
+          to: to,
+          timestamp: "2026-08-16T10:00:00Z"
+        )
+
+      first = conn |> post_webhook("sms_dlr", payload)
+      assert first.status == 200
+
+      # Same webhook delivered again (FlowRoute retry, or duplicate delivery).
+      second = build_conn() |> post_webhook("sms_dlr", payload)
+
+      # Acknowledged, not treated as a failure that would make FlowRoute retry.
+      assert second.status == 200
+      assert second.resp_body == "OK"
+
+      receipts = Sms.list_delivery_receipts_for_message(:flowroute, message_id)
+      assert length(receipts) == 1
+    end
+
+    test "an out-of-order DLR does not regress an already-delivered message status",
+         %{conn: conn} do
+      to = unique_user_phone()
+
+      {:ok, %{id: message_id}} =
+        Ysc.Messages.run_send_sms_idempotent(
+          to,
+          "Your registration is complete",
+          %{
+            message_type: :sms,
+            idempotency_key: "e2e-out-of-order-#{unique_key()}",
+            message_template: "registration_complete"
+          }
+        )
+
+      # "delivered" DLR arrives first...
+      delivered_conn =
+        conn
+        |> post_webhook(
+          "sms_dlr",
+          delivery_receipt_payload(
+            message_id: message_id,
+            status: "delivered",
+            to: to,
+            timestamp: "2026-08-16T10:00:05Z"
+          )
+        )
+
+      assert delivered_conn.status == 200
+
+      assert Sms.get_sms_message_by_provider_id(:flowroute, message_id).status ==
+               :delivered
+
+      # ...then an earlier-stage "message sent" DLR shows up late (FlowRoute
+      # gives no ordering guarantee). It must not downgrade the terminal
+      # :delivered status back to :sent.
+      late_conn =
+        build_conn()
+        |> post_webhook(
+          "sms_dlr",
+          delivery_receipt_payload(
+            message_id: message_id,
+            status: "message sent",
+            to: to,
+            timestamp: "2026-08-16T10:00:01Z"
+          )
+        )
+
+      assert late_conn.status == 200
+
+      assert Sms.get_sms_message_by_provider_id(:flowroute, message_id).status ==
+               :delivered
+    end
   end
 
   describe "receive inbound SMS/MMS webhooks" do
-    test "inbound SMS via /webhooks/flowroute/sms is stored and matched to the user",
+    test "inbound SMS via /webhooks/flowroute/:token/sms is stored and matched to the user",
          %{conn: conn} do
       user = user_fixture(%{phone_number: unique_user_phone()})
       from = String.trim_leading(user.phone_number, "+")
@@ -175,9 +280,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       resp =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/sms",
+        |> post_webhook(
+          "sms",
           inbound_message_payload(
             message_id: message_id,
             from: from,
@@ -196,7 +300,7 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       assert sms_received.is_mms == false
     end
 
-    test "inbound MMS via /webhooks/flowroute/mms is stored with is_mms true",
+    test "inbound MMS via /webhooks/flowroute/:token/mms is stored with is_mms true",
          %{
            conn: conn
          } do
@@ -204,9 +308,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       resp =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/mms",
+        |> post_webhook(
+          "mms",
           inbound_message_payload(
             message_id: message_id,
             from: "14155551234",
@@ -224,6 +327,29 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
       assert sms_received.is_mms == true
     end
 
+    test "a duplicate inbound SMS webhook is acknowledged without reprocessing",
+         %{conn: conn} do
+      message_id = "mdr2-e2e-dup-inbound-#{unique_key()}"
+
+      payload =
+        inbound_message_payload(
+          message_id: message_id,
+          from: "14155551234",
+          to: "12061231234",
+          body: "hello again"
+        )
+
+      first = conn |> post_webhook("sms", payload)
+      assert first.status == 200
+
+      second = build_conn() |> post_webhook("sms", payload)
+
+      assert second.status == 200
+      assert second.resp_body == "OK"
+
+      assert Sms.get_sms_received_by_provider_id(:flowroute, message_id) != nil
+    end
+
     test "STOP via the real route opts the user out and sends a real opt-out SMS reply",
          %{conn: conn} do
       user = user_fixture(%{phone_number: unique_user_phone()})
@@ -239,9 +365,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       resp =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/sms",
+        |> post_webhook(
+          "sms",
           inbound_message_payload(from: from, to: "12061231234", body: "STOP")
         )
 
@@ -271,9 +396,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       resp =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/sms",
+        |> post_webhook(
+          "sms",
           inbound_message_payload(from: from, to: "12061231234", body: "START")
         )
 
@@ -294,9 +418,8 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
 
       resp =
         conn
-        |> put_req_header("content-type", "application/json")
-        |> post(
-          "/webhooks/flowroute/sms",
+        |> post_webhook(
+          "sms",
           inbound_message_payload(from: from, to: "12061231234", body: "HELP")
         )
 
@@ -310,10 +433,7 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
     test "malformed payload posted to the real inbound route returns 400", %{
       conn: conn
     } do
-      resp =
-        conn
-        |> put_req_header("content-type", "application/json")
-        |> post("/webhooks/flowroute/sms", %{"unexpected" => "shape"})
+      resp = conn |> post_webhook("sms", %{"unexpected" => "shape"})
 
       assert resp.status == 400
       assert resp.resp_body == "Invalid payload"
@@ -322,14 +442,93 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
     test "malformed payload posted to the real DLR route returns 400", %{
       conn: conn
     } do
-      resp =
-        conn
-        |> put_req_header("content-type", "application/json")
-        |> post("/webhooks/flowroute/sms_dlr", %{"unexpected" => "shape"})
+      resp = conn |> post_webhook("sms_dlr", %{"unexpected" => "shape"})
 
       assert resp.status == 400
       assert resp.resp_body == "Invalid payload"
     end
+  end
+
+  describe "webhook token auth" do
+    test "a request with a wrong token is rejected with 401 and not processed",
+         %{conn: conn} do
+      message_id = "mdr2-e2e-badtoken-#{unique_key()}"
+
+      payload =
+        inbound_message_payload(
+          message_id: message_id,
+          from: "14155551234",
+          to: "12061231234",
+          body: "should not be stored"
+        )
+
+      resp =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/flowroute/wrong-token/sms", payload)
+
+      assert resp.status == 401
+
+      assert Sms.get_sms_received_by_provider_id(:flowroute, message_id) == nil
+    end
+
+    test "a request with no token segment does not match the route", %{
+      conn: conn
+    } do
+      resp =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/flowroute/sms", %{})
+
+      assert resp.status == 404
+    end
+
+    test "DLR route also rejects a wrong token with 401", %{conn: conn} do
+      resp =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post(
+          "/webhooks/flowroute/wrong-token/sms_dlr",
+          delivery_receipt_payload(
+            message_id: "mdr2-irrelevant",
+            status: "delivered"
+          )
+        )
+
+      assert resp.status == 401
+    end
+
+    test "a request is rejected with 401 when no token is configured on the server (fails closed)",
+         %{conn: conn} do
+      config_without_token =
+        Application.get_env(:ysc, :flowroute, [])
+        |> Keyword.delete(:webhook_token)
+
+      Application.put_env(:ysc, :flowroute, config_without_token)
+
+      message_id = "mdr2-e2e-notoken-#{unique_key()}"
+
+      resp =
+        conn
+        |> post_webhook(
+          "sms",
+          inbound_message_payload(
+            message_id: message_id,
+            from: "14155551234",
+            to: "12061231234",
+            body: "should not be stored"
+          )
+        )
+
+      assert resp.status == 401
+      assert Sms.get_sms_received_by_provider_id(:flowroute, message_id) == nil
+    end
+  end
+
+  defp post_webhook(conn, kind, payload) do
+    conn
+    |> put_req_header("content-type", "application/json")
+    |> post("/webhooks/flowroute/#{@token}/#{kind}", payload)
   end
 
   defp unique_key, do: System.unique_integer([:positive, :monotonic])

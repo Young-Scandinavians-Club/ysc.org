@@ -4,9 +4,15 @@ defmodule YscWeb.FlowrouteWebhookController do
   """
   use YscWeb, :controller
 
+  import Ecto.Query, only: [from: 2]
+
   require Ysc.Logging
   alias Ysc.Sms
   alias Ysc.Accounts
+  alias Ysc.Repo
+
+  plug :verify_webhook_token
+       when action in [:handle_inbound_sms, :handle_delivery_receipt]
 
   @doc """
   Handles inbound SMS webhook from FlowRoute.
@@ -92,7 +98,13 @@ defmodule YscWeb.FlowrouteWebhookController do
               errors: inspect(changeset.errors)
             )
 
-            send_resp(conn, 400, "Failed to process")
+            if duplicate_webhook_error?(changeset) do
+              # Already processed this exact message_id — ack so FlowRoute
+              # stops retrying instead of treating this as a failure.
+              send_resp(conn, 200, "OK")
+            else
+              send_resp(conn, 400, "Failed to process")
+            end
         end
       end
     rescue
@@ -186,7 +198,13 @@ defmodule YscWeb.FlowrouteWebhookController do
               errors: inspect(changeset.errors)
             )
 
-            send_resp(conn, 400, "Failed to process")
+            if duplicate_webhook_error?(changeset) do
+              # Already processed this exact message_id/timestamp — ack so
+              # FlowRoute stops retrying instead of treating this as a failure.
+              send_resp(conn, 200, "OK")
+            else
+              send_resp(conn, 400, "Failed to process")
+            end
         end
       end
     rescue
@@ -222,12 +240,66 @@ defmodule YscWeb.FlowrouteWebhookController do
       end
 
     if delivery_receipt.sms_message_id do
-      case Ysc.Repo.get(Ysc.Sms.SmsMessage, delivery_receipt.sms_message_id) do
-        nil -> :ok
-        sms_message -> Sms.update_sms_message_status(sms_message, new_status)
+      apply_dlr_status_update(delivery_receipt.sms_message_id, new_status)
+    end
+
+    :ok
+  end
+
+  # Locks the SmsMessage row for the duration of the read-modify-write.
+  # FlowRoute may retry a slow-to-ack webhook, or deliver DLRs out of order
+  # (e.g. a "message sent" event arriving after "delivered" has already been
+  # applied) — without the lock and terminal-state guard below, two DLR
+  # webhooks for the same message processed concurrently could race and the
+  # later write could silently regress an already-terminal status.
+  defp apply_dlr_status_update(sms_message_id, new_status) do
+    Repo.transaction(fn ->
+      from(m in Ysc.Sms.SmsMessage,
+        where: m.id == ^sms_message_id,
+        lock: "FOR UPDATE"
+      )
+      |> Repo.one()
+      |> case do
+        nil ->
+          :ok
+
+        %{status: current} when current in [:delivered, :failed] ->
+          :ok
+
+        sms_message ->
+          Sms.update_sms_message_status(sms_message, new_status)
       end
-    else
-      :ok
+    end)
+  end
+
+  # Detects a unique-constraint violation (i.e. we've already processed this
+  # exact provider_message_id / DLR event before), as opposed to a genuine
+  # validation error.
+  defp duplicate_webhook_error?(changeset) do
+    Enum.any?(changeset.errors, fn {_field, {_message, opts}} ->
+      Keyword.get(opts, :constraint) == :unique
+    end)
+  end
+
+  defp verify_webhook_token(conn, _opts) do
+    configured_token = Application.get_env(:ysc, :flowroute)[:webhook_token]
+    provided_token = conn.params["token"]
+
+    cond do
+      is_nil(configured_token) or configured_token == "" ->
+        Ysc.Logging.warning("FlowRoute webhook token not configured")
+        conn |> send_resp(401, "Unauthorized") |> halt()
+
+      is_nil(provided_token) or provided_token == "" ->
+        Ysc.Logging.warning("FlowRoute webhook request missing token")
+        conn |> send_resp(401, "Unauthorized") |> halt()
+
+      Plug.Crypto.secure_compare(configured_token, provided_token) ->
+        conn
+
+      true ->
+        Ysc.Logging.warning("FlowRoute webhook token mismatch")
+        conn |> send_resp(401, "Unauthorized") |> halt()
     end
   end
 

@@ -44,7 +44,8 @@ config :stripity_stripe,
 config :ysc, :flowroute,
   access_key: System.get_env("FLOWROUTE_ACCESS_KEY"),
   secret_key: System.get_env("FLOWROUTE_SECRET_KEY"),
-  from_number: System.get_env("FLOWROUTE_FROM_NUMBER")
+  from_number: System.get_env("FLOWROUTE_FROM_NUMBER"),
+  webhook_token: System.get_env("FLOWROUTE_WEBHOOK_TOKEN")
 
 # Radar Maps — publishable key must be resolved at runtime so release builds pick up RADAR_PUBLIC_KEY
 # from the host (Fly secrets, etc.). Reading it only in config.exs would bake in the dev default at compile time.

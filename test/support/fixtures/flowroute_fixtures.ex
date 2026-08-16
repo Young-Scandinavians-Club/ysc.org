@@ -10,7 +10,8 @@ defmodule Ysc.FlowrouteFixtures do
 
   @doc """
   Builds an inbound SMS/MMS webhook payload, as delivered to the
-  `/webhooks/flowroute/sms` and `/webhooks/flowroute/mms` callback URLs.
+  `/webhooks/flowroute/:token/sms` and `/webhooks/flowroute/:token/mms`
+  callback URLs.
   """
   def inbound_message_payload(opts \\ []) do
     message_id = Keyword.get(opts, :message_id, unique_message_id())
@@ -37,8 +38,8 @@ defmodule Ysc.FlowrouteFixtures do
 
   @doc """
   Builds a delivery receipt (DLR) webhook payload, as delivered to the
-  `/webhooks/flowroute/sms_dlr` and `/webhooks/flowroute/mms_dlr` callback
-  URLs.
+  `/webhooks/flowroute/:token/sms_dlr` and `/webhooks/flowroute/:token/mms_dlr`
+  callback URLs.
   """
   def delivery_receipt_payload(opts) do
     message_id = Keyword.fetch!(opts, :message_id)

@@ -661,14 +661,25 @@ defmodule YscWeb.Router do
     # v2.1 payload shape as inbound SMS (differentiated by `is_mms`), and
     # SMS/MMS DLRs share the same delivery-receipt payload shape, so both
     # pairs of routes reuse the same controller actions.
-    post "/flowroute/sms", FlowrouteWebhookController, :handle_inbound_sms
-    post "/flowroute/mms", FlowrouteWebhookController, :handle_inbound_sms
+    #
+    # FlowRoute has no HMAC webhook-signing mechanism, so `:token` is a
+    # shared secret (FLOWROUTE_WEBHOOK_TOKEN) baked into the callback URL
+    # itself and checked by FlowrouteWebhookController's `verify_webhook_token`
+    # plug — this is the only thing standing between this endpoint and anyone
+    # who guesses the URL.
+    post "/flowroute/:token/sms",
+         FlowrouteWebhookController,
+         :handle_inbound_sms
 
-    post "/flowroute/sms_dlr",
+    post "/flowroute/:token/mms",
+         FlowrouteWebhookController,
+         :handle_inbound_sms
+
+    post "/flowroute/:token/sms_dlr",
          FlowrouteWebhookController,
          :handle_delivery_receipt
 
-    post "/flowroute/mms_dlr",
+    post "/flowroute/:token/mms_dlr",
          FlowrouteWebhookController,
          :handle_delivery_receipt
   end

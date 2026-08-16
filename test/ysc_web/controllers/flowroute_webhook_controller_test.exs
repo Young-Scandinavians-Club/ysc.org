@@ -269,12 +269,15 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       conn1 = FlowrouteWebhookController.handle_inbound_sms(conn, payload)
       assert conn1.status == 200
 
-      # Second request with same message_id should fail
+      # Second request with same message_id is a duplicate delivery (e.g. a
+      # FlowRoute retry) — acknowledged with 200 rather than treated as a
+      # failure, so FlowRoute doesn't keep retrying, but no second record
+      # is created and the SMS command (if any) isn't reprocessed.
       conn2 =
         FlowrouteWebhookController.handle_inbound_sms(build_conn(), payload)
 
-      assert conn2.status == 400
-      assert conn2.resp_body == "Failed to process"
+      assert conn2.status == 200
+      assert conn2.resp_body == "OK"
     end
 
     test "stores MMS flag correctly", %{conn: conn} do
@@ -1142,7 +1145,7 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert hd(receipts).provider_timestamp == nil
     end
 
-    test "returns 400 when duplicate delivery receipt for same id and timestamp",
+    test "acknowledges a duplicate delivery receipt for same id and timestamp with 200",
          %{
            conn: conn
          } do
@@ -1159,14 +1162,20 @@ defmodule YscWeb.FlowrouteWebhookControllerTest do
       assert FlowrouteWebhookController.handle_delivery_receipt(conn, payload).status ==
                200
 
+      # Same event (same id + timestamp) delivered again — a FlowRoute retry.
+      # Acknowledged with 200 so FlowRoute stops retrying, but no second
+      # receipt row is created.
       conn2 =
         FlowrouteWebhookController.handle_delivery_receipt(
           build_conn(),
           payload
         )
 
-      assert conn2.status == 400
-      assert conn2.resp_body == "Failed to process"
+      assert conn2.status == 200
+      assert conn2.resp_body == "OK"
+
+      assert length(Sms.list_delivery_receipts_for_message(:flowroute, mid)) ==
+               1
     end
 
     test "accepts atom status in delivery receipt attributes (normalize atom pass-through)",
