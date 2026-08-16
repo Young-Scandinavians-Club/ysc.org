@@ -1871,6 +1871,233 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
                "Cannot update booking: selected dates overlap a blackout period."
     end
 
+    test "edit hold day booking shows error when new dates overlap booked capacity",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+
+      booked_user =
+        user_fixture(%{first_name: "Spot", last_name: "BookedCapacity"})
+
+      hold_user = user_fixture(%{first_name: "Spot", last_name: "HoldOverlap"})
+
+      checkin = ~D[2036-11-10]
+      checkout = ~D[2036-11-12]
+      hold_checkin = ~D[2036-11-20]
+      hold_checkout = ~D[2036-11-22]
+
+      assert {:ok, _complete} =
+               Ysc.Bookings.BookingLocker.create_admin_booking(
+                 %{
+                   user_id: booked_user.id,
+                   property: :clear_lake,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   guests_count: 12,
+                   booking_mode: :day
+                 },
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          hold_user.id,
+          :clear_lake,
+          hold_checkin,
+          hold_checkout,
+          2
+        )
+
+      booked_days =
+        Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      hold_days =
+        Date.range(hold_checkin, Date.add(hold_checkout, -1)) |> Enum.to_list()
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2036-11-01&to_date=2036-11-30"
+        )
+
+      html =
+        view
+        |> form("#booking-form", %{
+          "booking" => %{
+            "checkin_date" => "2036-11-10",
+            "checkout_date" => "2036-11-12",
+            "guests_count" => "2",
+            "children_count" => "0",
+            "booking_mode" => "day",
+            "status" => "hold"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Failed to update booking"
+      assert html =~ "stale_inventory"
+
+      unchanged = Bookings.get_booking!(hold.id)
+      assert unchanged.checkin_date == hold_checkin
+      assert unchanged.checkout_date == hold_checkout
+      assert day_capacity_booked_for(:clear_lake, booked_days) == [12, 12]
+      assert day_capacity_held_for(:clear_lake, hold_days) == [2, 2]
+    end
+
+    test "edit hold buyout booking shows error when new dates overlap booked buyout",
+         %{conn: conn} do
+      allow_far_future_booking_dates()
+      booked_user = user_fixture(%{first_name: "Buyout", last_name: "Booked"})
+
+      hold_user =
+        user_fixture(%{first_name: "Buyout", last_name: "HoldOverlap"})
+
+      {checkin, checkout} = locker_buyout_dates(850)
+      {hold_checkin, hold_checkout} = locker_buyout_dates(860)
+
+      assert {:ok, _complete} =
+               Ysc.Bookings.BookingLocker.create_admin_booking(
+                 %{
+                   user_id: booked_user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   booking_mode: :buyout,
+                   guests_count: 4,
+                   total_price: Money.new(:USD, "500.00")
+                 },
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_buyout_booking(
+          hold_user.id,
+          :tahoe,
+          hold_checkin,
+          hold_checkout,
+          4
+        )
+
+      from_date = Date.add(checkin, -7) |> Date.to_string()
+      to_date = Date.add(hold_checkout, 7) |> Date.to_string()
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{hold.id}/edit?property=tahoe&from_date=#{from_date}&to_date=#{to_date}"
+        )
+
+      html =
+        view
+        |> form("#booking-form", %{
+          "booking" => %{
+            "checkin_date" => Date.to_string(checkin),
+            "checkout_date" => Date.to_string(checkout),
+            "guests_count" => "4",
+            "children_count" => "0",
+            "booking_mode" => "buyout",
+            "status" => "hold"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Failed to update booking"
+      assert html =~ "stale_inventory"
+
+      unchanged = Bookings.get_booking!(hold.id)
+      assert unchanged.checkin_date == hold_checkin
+      assert unchanged.checkout_date == hold_checkout
+    end
+
+    test "edit hold room booking shows error when new dates overlap booked room",
+         %{conn: conn} do
+      allow_far_future_booking_dates()
+
+      insert_pricing_rule!(%{
+        property: :tahoe,
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        season_id: nil
+      })
+
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Admin hold overlap #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin hold overlap room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      booked_user = user_fixture(%{first_name: "Room", last_name: "Booked"})
+      hold_user = user_fixture(%{first_name: "Room", last_name: "HoldOverlap"})
+
+      {checkin, checkout} = locker_room_dates(850, 2)
+      {hold_checkin, hold_checkout} = locker_room_dates(860, 2)
+
+      assert {:ok, _complete} =
+               Ysc.Bookings.BookingLocker.create_admin_booking(
+                 %{
+                   user_id: booked_user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   booking_mode: :room,
+                   guests_count: 2,
+                   total_price: Money.new(:USD, "200.00")
+                 },
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_room_booking(
+          hold_user.id,
+          room.id,
+          hold_checkin,
+          hold_checkout,
+          2
+        )
+
+      from_date = Date.add(checkin, -7) |> Date.to_string()
+      to_date = Date.add(hold_checkout, 7) |> Date.to_string()
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{hold.id}/edit?property=tahoe&from_date=#{from_date}&to_date=#{to_date}"
+        )
+
+      html =
+        view
+        |> form("#booking-form", %{
+          "booking" => %{
+            "checkin_date" => Date.to_string(checkin),
+            "checkout_date" => Date.to_string(checkout),
+            "guests_count" => "2",
+            "children_count" => "0",
+            "booking_mode" => "room",
+            "status" => "hold"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Failed to update booking"
+      assert html =~ "stale_inventory"
+
+      unchanged = Bookings.get_booking!(hold.id)
+      assert unchanged.checkin_date == hold_checkin
+      assert unchanged.checkout_date == hold_checkout
+    end
+
     test "edit hold day booking without inventory changes uses plain update path",
          %{conn: conn} do
       ensure_clear_lake_pricing_rules!()
