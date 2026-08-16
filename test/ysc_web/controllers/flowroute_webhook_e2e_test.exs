@@ -466,15 +466,19 @@ defmodule YscWeb.FlowrouteWebhookE2ETest do
   end
 
   describe "webhook token auth" do
-    test "a request with an empty token segment is rejected with 401", %{
+    test "a request with an empty token segment does not match the route", %{
       conn: conn
     } do
+      # `//` collapses to an empty path segment, which Phoenix's router
+      # never matches against `:token` (dynamic segments require at least
+      # one character) — so this 404s before verify_webhook_token ever runs,
+      # same as omitting the segment entirely.
       resp =
         conn
         |> put_req_header("content-type", "application/json")
         |> post("/webhooks/flowroute//sms", %{})
 
-      assert resp.status == 401
+      assert resp.status == 404
     end
 
     test "a request with a wrong token is rejected with 401 and not processed",
