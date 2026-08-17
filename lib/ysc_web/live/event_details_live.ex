@@ -5072,7 +5072,7 @@ defmodule YscWeb.EventDetailsLive do
       event =
         event
         |> Repo.preload(:cover_image)
-        |> EventPricingCache.enrich_event()
+        |> EventPricingCache.refresh_event()
 
       subscribed =
         Events.subscribed_to_event_notification?(

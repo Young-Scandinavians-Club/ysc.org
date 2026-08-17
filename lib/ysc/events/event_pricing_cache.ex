@@ -32,6 +32,32 @@ defmodule Ysc.Events.EventPricingCache do
     |> ensure_cover_image(event)
   end
 
+  @doc """
+  Recomputes pricing for `event` from the database and force-writes the
+  result into this node's cache, instead of trusting whatever is already
+  cached.
+
+  Callers reacting to an `EventUpdated` broadcast already hold the fresh,
+  authoritative event — they must not read through `enrich_event/1` there.
+  `invalidate/0`'s version bump is replicated to other nodes by
+  `Ysc.DistributedCache` as a *separate* PubSub message from the
+  `EventUpdated` broadcast, so a node can receive `EventUpdated` before it
+  has applied its own cache invalidation and would otherwise hand back a
+  stale cached value until the next invalidation or TTL expiry.
+  """
+  def refresh_event(event) do
+    cache_key = "event:pricing:#{event.id}"
+    enriched = Ysc.Events.enrich_single_event_with_pricing_from_db(event)
+
+    if Ysc.ProcessCache.enabled?() do
+      cache_with_version(cache_key, enriched)
+    end
+
+    enriched
+    |> merge_transient_list_fields(event)
+    |> ensure_cover_image(event)
+  end
+
   def invalidate do
     if Ysc.ProcessCache.enabled?() do
       new_version = System.unique_integer([:monotonic, :positive])

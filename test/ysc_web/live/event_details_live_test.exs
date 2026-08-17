@@ -1187,6 +1187,44 @@ defmodule YscWeb.EventDetailsLiveTest do
     end
   end
 
+  describe "real-time EventUpdated handling" do
+    @tag :process_caches
+    test "reflects an event edit even when this node's pricing cache has not yet observed the invalidation",
+         %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Original Title"}
+        )
+
+      # Mount warms EventPricingCache for this event (via mount_minimal_assigns).
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+      assert html =~ "Original Title"
+
+      # Update the DB directly instead of going through Events.update_event_editor,
+      # so EventPricingCache.invalidate/0 is deliberately NOT called here. This
+      # simulates a node that hasn't yet processed the Ysc.DistributedCache sync
+      # broadcast for this write (it's a separate PubSub message from the
+      # EventUpdated broadcast, with no ordering guarantee between the two) —
+      # the exact condition that let the pricing cache serve a stale value to a
+      # live EventUpdated handler.
+      {:ok, updated_event} =
+        event
+        |> Ysc.Events.Event.changeset(%{title: "Updated Title"})
+        |> Repo.update()
+
+      send(
+        view.pid,
+        {Ysc.Events,
+         %Ysc.MessagePassingEvents.EventUpdated{event: updated_event}}
+      )
+
+      html = render(view)
+      assert html =~ "Updated Title"
+      refute html =~ "Original Title"
+    end
+  end
+
   describe "handle_params/3 - URL parameter handling" do
     test "handles normal page load", %{conn: conn} do
       event = event_with_state(:upcoming, with_image: true)
