@@ -542,4 +542,43 @@ defmodule YscWeb.AdminComponentsTest do
       refute html =~ ~s(href="/admin/help")
     end
   end
+
+  describe "admin_country_with_flag/1" do
+    test "renders flag and mapped label for a supported country code" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_country_with_flag id="country-sweden" country="SE" />
+        """)
+
+      assert html =~ ~s(id="country-sweden")
+      assert html =~ "Sweden"
+      assert html =~ "fi-se"
+    end
+
+    test "renders raw label without a flag for unsupported values" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_country_with_flag country="Oslo" />
+        """)
+
+      assert html =~ "Oslo"
+      refute html =~ "fi-"
+    end
+
+    test "renders an empty span when country is nil" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_country_with_flag id="country-empty" country={nil} />
+        """)
+
+      assert html =~ ~s(id="country-empty")
+      refute html =~ "fi-"
+    end
+  end
 end

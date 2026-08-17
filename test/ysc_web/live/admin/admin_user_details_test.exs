@@ -67,6 +67,34 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert html =~ "Jane"
       assert html =~ "Smith"
     end
+
+    test "shows application country flags and labels", %{conn: conn} do
+      user = user_fixture()
+
+      signup_application_fixture(user, %{
+        place_of_birth: "SE",
+        citizenship: "US",
+        most_connected_nordic_country: "DK"
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert has_element?(view, "#application-place-of-birth", "Sweden")
+      assert has_element?(view, "#application-place-of-birth .fi-se")
+      assert has_element?(view, "#application-citizenship", "United States")
+      assert has_element?(view, "#application-citizenship .fi-us")
+
+      assert has_element?(
+               view,
+               "#application-most-connected-nordic-country",
+               "Denmark"
+             )
+
+      assert has_element?(
+               view,
+               "#application-most-connected-nordic-country .fi-dk"
+             )
+    end
   end
 
   describe "navigation tabs" do

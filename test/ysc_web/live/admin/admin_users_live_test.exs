@@ -228,6 +228,56 @@ defmodule YscWeb.AdminUsersLiveTest do
       refute html =~ "Direct EditUser"
     end
 
+    test "review modal shows country flags and labels from the application", %{
+      conn: conn
+    } do
+      pending_user =
+        user_fixture(%{
+          state: "pending_approval",
+          first_name: "Flag",
+          last_name: "Review"
+        })
+
+      signup_application_fixture(pending_user, %{
+        place_of_birth: "SE",
+        citizenship: "NO",
+        most_connected_nordic_country: "FI"
+      })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{pending_user.id}/review")
+
+      assert has_element?(view, "#application-place-of-birth", "Sweden")
+      assert has_element?(view, "#application-place-of-birth .fi-se")
+      assert has_element?(view, "#application-citizenship", "Norway")
+      assert has_element?(view, "#application-citizenship .fi-no")
+
+      assert has_element?(
+               view,
+               "#application-most-connected-nordic-country",
+               "Finland"
+             )
+
+      assert has_element?(
+               view,
+               "#application-most-connected-nordic-country .fi-fi"
+             )
+    end
+
+    test "lists pending users with a Pending Approval status badge", %{
+      conn: conn
+    } do
+      user_fixture(%{
+        state: "pending_approval",
+        first_name: "Waiting",
+        last_name: "Approval"
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
+
+      assert has_element?(view, "span", "Pending Approval")
+    end
+
     test "change event accepts flat search query param", %{conn: conn} do
       user_fixture(%{first_name: "FlatSearch", last_name: "Hit"})
 

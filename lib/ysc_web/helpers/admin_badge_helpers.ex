@@ -17,6 +17,16 @@ defmodule YscWeb.AdminBadgeHelpers do
   def user_state_badge_type(_), do: "default"
 
   @doc """
+  Human-readable label for `Ysc.Accounts.User` state atoms.
+
+  `pending_approval` is the only multi-word state and is rendered as
+  `"Pending Approval"`; other atoms are capitalized (`:active` → `"Active"`).
+  """
+  @spec user_state_label(atom()) :: String.t()
+  def user_state_label(:pending_approval), do: "Pending Approval"
+  def user_state_label(state), do: String.capitalize("#{state}")
+
+  @doc """
   Badge `type` for membership application review outcomes.
   """
   @spec review_outcome_badge_type(atom()) :: String.t()

@@ -11,6 +11,7 @@ defmodule YscWeb.AdminComponents do
   use YscWeb, :verified_routes
 
   alias Phoenix.LiveView.JS
+  alias Ysc.Accounts.UserDisplay
   alias YscWeb.AdminBookingEntitlementHelpers, as: EntitlementHelpers
   alias YscWeb.FormHelpers
 
@@ -298,6 +299,84 @@ defmodule YscWeb.AdminComponents do
     <.badge type={@badge_type}>
       {@label}
     </.badge>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_user_state_badge
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Badge for a user's account state on admin user list and detail pages.
+
+  ## Examples
+
+      <.admin_user_state_badge state={user.state} />
+  """
+  attr :state, :atom, required: true
+
+  def admin_user_state_badge(assigns) do
+    assigns =
+      assign(assigns,
+        badge_type:
+          YscWeb.AdminBadgeHelpers.user_state_badge_type(assigns.state),
+        label: YscWeb.AdminBadgeHelpers.user_state_label(assigns.state)
+      )
+
+    ~H"""
+    <.badge type={@badge_type}>
+      {@label}
+    </.badge>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_country_with_flag
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Country label with an optional flag icon for supported Nordic/US codes.
+
+  Used on admin membership application review (users list modal and user detail).
+  Unsupported or blank values render the raw label with no flag.
+
+  ## Examples
+
+      <.admin_country_with_flag country={@application.place_of_birth} />
+  """
+  attr :id, :string, default: nil
+  attr :country, :string, default: nil
+  attr :class, :any, default: nil
+
+  attr :flag_class, :string,
+    default: "h-4 w-6 rounded inline-block align-middle"
+
+  def admin_country_with_flag(assigns) do
+    assigns =
+      assign(assigns,
+        flag_css: UserDisplay.country_flag_class(assigns.country),
+        label: UserDisplay.country_label(assigns.country)
+      )
+
+    render_country_with_flag(assigns)
+  end
+
+  defp render_country_with_flag(%{flag_css: nil} = assigns) do
+    ~H"""
+    <span id={@id} class={["inline-flex items-center gap-2", @class]}>
+      {@label}
+    </span>
+    """
+  end
+
+  defp render_country_with_flag(assigns) do
+    ~H"""
+    <span id={@id} class={["inline-flex items-center gap-2", @class]}>
+      <span class="shrink-0">
+        <.flag country={@flag_css} class={@flag_class} />
+      </span>
+      {@label}
+    </span>
     """
   end
 
