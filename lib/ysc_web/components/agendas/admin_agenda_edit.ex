@@ -202,7 +202,7 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    items = upsert_agenda_item(socket.assigns.agenda_items, agenda_item)
+    items = fresh_agenda_items(socket.assigns.agenda_id)
 
     {:ok,
      socket
@@ -219,7 +219,7 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    items = remove_agenda_item(socket.assigns.agenda_items, agenda_item)
+    items = fresh_agenda_items(socket.assigns.agenda_id)
 
     {:ok,
      socket
@@ -236,7 +236,7 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    items = upsert_agenda_item(socket.assigns.agenda_items, agenda_item)
+    items = fresh_agenda_items(socket.assigns.agenda_id)
 
     {:ok,
      socket
@@ -253,7 +253,7 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    items = upsert_agenda_item(socket.assigns.agenda_items, agenda_item)
+    items = fresh_agenda_items(socket.assigns.agenda_id)
 
     {:ok,
      socket
@@ -441,18 +441,8 @@ defmodule YscWeb.AgendaEditComponent do
     Enum.find(socket.assigns.agenda_items, &(to_string(&1.id) == to_string(id)))
   end
 
-  defp upsert_agenda_item(items, agenda_item) do
-    if Enum.any?(items, &(&1.id == agenda_item.id)) do
-      Enum.map(items, fn item ->
-        if item.id == agenda_item.id, do: agenda_item, else: item
-      end)
-    else
-      items ++ [agenda_item]
-    end
-  end
-
-  defp remove_agenda_item(items, agenda_item) do
-    Enum.reject(items, &(&1.id == agenda_item.id))
+  defp fresh_agenda_items(agenda_id) do
+    Agendas.get_agenda!(agenda_id).agenda_items
   end
 
   defp to_change_form(agenda_item_or_changeset, params, action \\ nil) do
