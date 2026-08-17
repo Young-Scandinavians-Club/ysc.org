@@ -20,6 +20,20 @@ defmodule YscWeb.AdminBadgeHelpersTest do
     end
   end
 
+  describe "user_state_label/1" do
+    test "formats pending_approval as two words" do
+      assert AdminBadgeHelpers.user_state_label(:pending_approval) ==
+               "Pending Approval"
+    end
+
+    test "capitalizes other user states" do
+      assert AdminBadgeHelpers.user_state_label(:active) == "Active"
+      assert AdminBadgeHelpers.user_state_label(:rejected) == "Rejected"
+      assert AdminBadgeHelpers.user_state_label(:suspended) == "Suspended"
+      assert AdminBadgeHelpers.user_state_label(:deleted) == "Deleted"
+    end
+  end
+
   describe "review_outcome_badge_type/1" do
     test "maps review outcomes" do
       assert AdminBadgeHelpers.review_outcome_badge_type(:approved) == "green"

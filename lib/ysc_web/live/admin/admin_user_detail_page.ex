@@ -946,51 +946,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                       Place of birth
                     </dt>
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
-                      <span
-                        :if={
-                          UserDisplay.country_flag_class(
-                            @selected_user_application.place_of_birth
-                          )
-                        }
-                        class="shrink-0"
-                      >
-                        <.flag
-                          country={
-                            UserDisplay.country_flag_class(
-                              @selected_user_application.place_of_birth
-                            )
-                          }
-                          class="h-4 w-6 rounded inline-block align-middle"
-                        />
-                      </span>
-                      {UserDisplay.country_label(
-                        @selected_user_application.place_of_birth
-                      )}
+                      <.admin_country_with_flag
+                        id="application-place-of-birth"
+                        country={@selected_user_application.place_of_birth}
+                      />
                     </dd>
                   </div>
                   <div class="py-2">
                     <dt class="text-sm font-semibold text-zinc-600">Citizenship</dt>
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
-                      <span
-                        :if={
-                          UserDisplay.country_flag_class(
-                            @selected_user_application.citizenship
-                          )
-                        }
-                        class="shrink-0"
-                      >
-                        <.flag
-                          country={
-                            UserDisplay.country_flag_class(
-                              @selected_user_application.citizenship
-                            )
-                          }
-                          class="h-4 w-6 rounded inline-block align-middle"
-                        />
-                      </span>
-                      {UserDisplay.country_label(
-                        @selected_user_application.citizenship
-                      )}
+                      <.admin_country_with_flag
+                        id="application-citizenship"
+                        country={@selected_user_application.citizenship}
+                      />
                     </dd>
                   </div>
                   <div class="py-2">
@@ -998,26 +966,12 @@ defmodule YscWeb.AdminUserDetailsLive do
                       Most connected Nordic country
                     </dt>
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
-                      <span
-                        :if={
-                          UserDisplay.country_flag_class(
-                            @selected_user_application.most_connected_nordic_country
-                          )
+                      <.admin_country_with_flag
+                        id="application-most-connected-nordic-country"
+                        country={
+                          @selected_user_application.most_connected_nordic_country
                         }
-                        class="shrink-0"
-                      >
-                        <.flag
-                          country={
-                            UserDisplay.country_flag_class(
-                              @selected_user_application.most_connected_nordic_country
-                            )
-                          }
-                          class="h-4 w-6 rounded inline-block align-middle"
-                        />
-                      </span>
-                      {UserDisplay.country_label(
-                        @selected_user_application.most_connected_nordic_country
-                      )}
+                      />
                     </dd>
                   </div>
                 </dl>
@@ -2094,11 +2048,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         </div>
                       <% end %>
                     </div>
-                    <.badge type={
-                      AdminBadgeHelpers.user_state_badge_type(@primary_user.state)
-                    }>
-                      {user_state_to_readable(@primary_user.state)}
-                    </.badge>
+                    <.admin_user_state_badge state={@primary_user.state} />
                   </.link>
                 <% else %>
                   <div class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg">
@@ -4460,9 +4410,6 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:family_members, family_members)
     |> assign(:pending_invites, pending_invites)
   end
-
-  defp user_state_to_readable(:pending_approval), do: "Pending Approval"
-  defp user_state_to_readable(state), do: String.capitalize("#{state}")
 
   defp parse_datetime(datetime_string) when is_binary(datetime_string) do
     # Parse datetime-local string (assumed to be in America/Los_Angeles timezone)
