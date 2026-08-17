@@ -2299,6 +2299,116 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
                "Cannot update booking: selected dates overlap a blackout period."
     end
 
+    test "edit complete room booking shows stale_inventory when dates overlap booked room",
+         %{conn: conn} do
+      allow_far_future_booking_dates()
+
+      insert_pricing_rule!(%{
+        property: :tahoe,
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        season_id: nil
+      })
+
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Admin complete overlap #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin complete overlap room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      booked_user = user_fixture(%{first_name: "Room", last_name: "BookedComplete"})
+      moving_user = user_fixture(%{first_name: "Room", last_name: "MovingComplete"})
+
+      {checkin, checkout} = locker_room_dates(870, 2)
+      {move_checkin, move_checkout} = locker_room_dates(880, 2)
+
+      assert {:ok, _complete} =
+               Ysc.Bookings.BookingLocker.create_admin_booking(
+                 %{
+                   user_id: booked_user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   booking_mode: :room,
+                   guests_count: 2,
+                   total_price: Money.new(:USD, "200.00")
+                 },
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_admin_booking(
+          %{
+            user_id: moving_user.id,
+            property: :tahoe,
+            checkin_date: move_checkin,
+            checkout_date: move_checkout,
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(:USD, "200.00")
+          },
+          rooms: [room],
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      from_date = Date.add(checkin, -7) |> Date.to_string()
+      to_date = Date.add(move_checkout, 7) |> Date.to_string()
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=tahoe&from_date=#{from_date}&to_date=#{to_date}"
+        )
+
+      html =
+        view
+        |> form("#booking-form", %{
+          "booking" => %{
+            "checkin_date" => Date.to_string(checkin),
+            "checkout_date" => Date.to_string(checkout),
+            "guests_count" => "2",
+            "children_count" => "0",
+            "booking_mode" => "room",
+            "room_id" => room.id,
+            "status" => "complete"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Failed to update booking"
+      assert html =~ "stale_inventory"
+
+      unchanged = Bookings.get_booking!(booking.id)
+      assert unchanged.checkin_date == move_checkin
+      assert unchanged.checkout_date == move_checkout
+
+      nights = Date.diff(checkout, checkin)
+
+      booked_count =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout and ri.booked == true and ri.held == false
+          ),
+          :count
+        )
+
+      assert booked_count == nights
+    end
+
     test "day bookings are not rendered on the Full Buyout calendar row", %{
       conn: conn
     } do
