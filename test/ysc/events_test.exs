@@ -4077,4 +4077,95 @@ defmodule Ysc.EventsTest do
       assert id == scheduled.id
     end
   end
+
+  describe "create_event/1 updated_by_id" do
+    test "sets updated_by_id to the organizer" do
+      user = user_fixture()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Organizer event",
+          description: "Desc",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      assert event.updated_by_id == user.id
+    end
+  end
+
+  describe "update_event_editor/3" do
+    test "updates editorial fields" do
+      {:ok, event} = create_event_fixture()
+
+      assert {:ok, updated} =
+               Events.update_event_editor(event, %{
+                 "title" => "Edited title",
+                 "lock_version" => event.lock_version
+               })
+
+      assert updated.title == "Edited title"
+    end
+
+    test "ignores mass-assigned publish controls" do
+      {:ok, event} = create_event_fixture(%{state: :draft, published_at: nil})
+
+      assert {:ok, updated} =
+               Events.update_event_editor(event, %{
+                 "title" => "Still draft",
+                 "state" => "published",
+                 "lock_version" => event.lock_version
+               })
+
+      assert updated.title == "Still draft"
+      assert updated.state == :draft
+    end
+
+    test "sets updated_by_id when the opt is given" do
+      {:ok, event} = create_event_fixture()
+      editor = user_fixture()
+
+      assert {:ok, updated} =
+               Events.update_event_editor(
+                 event,
+                 %{"title" => "Edited", "lock_version" => event.lock_version},
+                 updated_by_id: editor.id
+               )
+
+      assert updated.updated_by_id == editor.id
+    end
+
+    test "leaves updated_by_id unchanged when the opt is omitted" do
+      organizer = user_fixture()
+      {:ok, event} = create_event_fixture(%{organizer_id: organizer.id})
+      assert event.updated_by_id == organizer.id
+
+      assert {:ok, updated} =
+               Events.update_event_editor(event, %{
+                 "title" => "Edited",
+                 "lock_version" => event.lock_version
+               })
+
+      assert updated.title == "Edited"
+      assert updated.updated_by_id == organizer.id
+    end
+
+    test "returns the updated event with organizer and updated_by preloaded" do
+      organizer = user_fixture()
+      editor = user_fixture()
+      {:ok, event} = create_event_fixture(%{organizer_id: organizer.id})
+
+      assert {:ok, updated} =
+               Events.update_event_editor(
+                 event,
+                 %{"title" => "Edited", "lock_version" => event.lock_version},
+                 updated_by_id: editor.id
+               )
+
+      assert %Ysc.Accounts.User{} = updated.organizer
+      assert updated.organizer.id == organizer.id
+      assert %Ysc.Accounts.User{} = updated.updated_by
+      assert updated.updated_by.id == editor.id
+    end
+  end
 end

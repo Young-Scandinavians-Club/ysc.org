@@ -30,6 +30,7 @@ defmodule Ysc.PostsTest do
       assert {:ok, %Post{} = post} = Posts.create_post(attrs, author)
       assert post.title == "Test Post"
       assert post.user_id == author.id
+      assert post.updated_by_id == author.id
     end
 
     test "returns error when user is not authorized", %{regular_user: user} do
@@ -260,6 +261,52 @@ defmodule Ysc.PostsTest do
                Posts.update_post(post, %{"title" => "Updated"}, user)
     end
 
+    test "sets updated_by_id to whoever performed the update", %{author: author} do
+      editor = user_fixture(%{role: "admin"})
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Original",
+            "body" => "Body",
+            "url_name" => "updated-by-test"
+          },
+          author
+        )
+
+      assert post.updated_by_id == author.id
+
+      assert {:ok, updated} =
+               Posts.update_post(post, %{"title" => "Edited"}, editor)
+
+      assert updated.updated_by_id == editor.id
+    end
+
+    test "ignores a client-supplied updated_by_id (not mass-assignable)", %{
+      author: author
+    } do
+      other_user = user_fixture()
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Original",
+            "body" => "Body",
+            "url_name" => "no-mass-assign-test"
+          },
+          author
+        )
+
+      assert {:ok, updated} =
+               Posts.update_post(
+                 post,
+                 %{"title" => "Edited", "updated_by_id" => other_user.id},
+                 author
+               )
+
+      assert updated.updated_by_id == author.id
+    end
+
     test "publishing post when author has no board position sets board_position_at_publish to nil",
          %{author: author} do
       {:ok, post} =
@@ -388,6 +435,69 @@ defmodule Ysc.PostsTest do
                )
 
       assert published.board_position_at_publish == "secretary"
+    end
+  end
+
+  describe "update_post_editor/4" do
+    test "updates editorial fields and sets updated_by_id", %{author: author} do
+      editor = user_fixture(%{role: "admin"})
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Original",
+            "body" => "Body",
+            "url_name" => "editor-updated-by-test"
+          },
+          author
+        )
+
+      assert {:ok, updated} =
+               Posts.update_post_editor(post, %{"title" => "Edited"}, editor)
+
+      assert updated.title == "Edited"
+      assert updated.updated_by_id == editor.id
+    end
+
+    test "ignores mass-assigned lifecycle fields", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Original",
+            "body" => "Body",
+            "url_name" => "editor-lifecycle-test",
+            "state" => "draft"
+          },
+          author
+        )
+
+      assert {:ok, updated} =
+               Posts.update_post_editor(
+                 post,
+                 %{"title" => "Edited", "state" => "published"},
+                 author
+               )
+
+      assert updated.title == "Edited"
+      assert updated.state == :draft
+    end
+
+    test "returns error when not authorized", %{
+      author: author,
+      regular_user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Original",
+            "body" => "Body",
+            "url_name" => "editor-auth-test"
+          },
+          author
+        )
+
+      assert {:error, :unauthorized} =
+               Posts.update_post_editor(post, %{"title" => "Edited"}, user)
     end
   end
 

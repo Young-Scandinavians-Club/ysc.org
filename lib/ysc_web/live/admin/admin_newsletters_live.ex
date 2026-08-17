@@ -200,6 +200,9 @@ defmodule YscWeb.AdminNewslettersLive do
     {:noreply, stream_insert(socket, :editions, edition)}
   end
 
+  # Content inside a `phx-update="stream"` container only updates via
+  # explicit stream operations, so re-stream the current page (editions tab
+  # only — that's the only tab presence applies to) to refresh rows.
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
     editors_by_edition =
       EditingPresence.editors_by_resource(
@@ -207,7 +210,22 @@ defmodule YscWeb.AdminNewslettersLive do
         socket.assigns.current_user.id
       )
 
-    {:noreply, assign(socket, :editors_by_edition, editors_by_edition)}
+    socket = assign(socket, :editors_by_edition, editors_by_edition)
+
+    if socket.assigns.current_tab == "editions" do
+      case Newsletter.list_paginated_editions(socket.assigns.params,
+             date_from: socket.assigns.date_from,
+             date_to: socket.assigns.date_to
+           ) do
+        {:ok, {editions, _meta}} ->
+          {:noreply, stream(socket, :editions, editions, reset: true)}
+
+        {:error, _meta} ->
+          {:noreply, socket}
+      end
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_info({:edition_sent, edition}, socket) do

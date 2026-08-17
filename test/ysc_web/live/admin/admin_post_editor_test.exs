@@ -9,6 +9,7 @@ defmodule YscWeb.AdminPostEditorLiveTest do
   alias Ysc.Posts
   alias Ysc.Posts.Post
   alias Ysc.Repo
+  alias YscWeb.Admin.EditingPresence
 
   setup :register_and_log_in_admin
 
@@ -581,6 +582,119 @@ defmodule YscWeb.AdminPostEditorLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}")
 
       assert html =~ "hero-ellipsis-vertical"
+    end
+  end
+
+  describe "editing presence" do
+    defp presence_post_fixture(user) do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Presence Post",
+            "url_name" => "presence-post-#{System.unique_integer()}",
+            "state" => "draft",
+            "body" => "Content"
+          },
+          user
+        )
+
+      post
+    end
+
+    test "shows an avatar for another admin currently editing the post", %{
+      conn: conn,
+      user: user
+    } do
+      post = presence_post_fixture(user)
+      other_admin = user_fixture(%{role: :admin, first_name: "Jamie"})
+
+      {:ok, _ref} =
+        EditingPresence.track(
+          %{id: "other-tab-#{System.unique_integer([:positive])}"},
+          :post,
+          post.id,
+          other_admin
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      assert html =~ "Jamie"
+      assert html =~ "is editing"
+    end
+
+    test "does not show the current admin's own presence", %{
+      conn: conn,
+      user: user
+    } do
+      post = presence_post_fixture(user)
+
+      {:ok, _ref} =
+        EditingPresence.track(
+          %{id: "self-tab-#{System.unique_integer([:positive])}"},
+          :post,
+          post.id,
+          user
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      refute html =~ "is editing"
+    end
+
+    test "shows no avatars when nobody else is editing", %{
+      conn: conn,
+      user: user
+    } do
+      post = presence_post_fixture(user)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      refute html =~ "is editing"
+    end
+
+    test "updates avatars live when another admin starts editing", %{
+      conn: conn,
+      user: user
+    } do
+      post = presence_post_fixture(user)
+
+      {:ok, view, html} = live(conn, ~p"/admin/posts/#{post.id}")
+      refute html =~ "is editing"
+
+      other_admin = user_fixture(%{role: :admin, first_name: "Taylor"})
+
+      {:ok, _ref} =
+        EditingPresence.track(
+          %{id: "live-tab-#{System.unique_integer([:positive])}"},
+          :post,
+          post.id,
+          other_admin
+        )
+
+      send(view.pid, %Phoenix.Socket.Broadcast{
+        topic: EditingPresence.topic(:post),
+        event: "presence_diff",
+        payload: %{}
+      })
+
+      html = render(view)
+      assert html =~ "Taylor"
+      assert html =~ "is editing"
+    end
+  end
+
+  describe "last edited by" do
+    test "shows who last edited the post", %{conn: conn, user: user} do
+      editor = user_fixture(%{role: :admin, first_name: "Morgan"})
+      post = presence_post_fixture(user)
+
+      {:ok, _post} =
+        Posts.update_post_editor(post, %{"title" => "Edited by Morgan"}, editor)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      assert html =~ "Last edited by"
+      assert html =~ "Morgan"
     end
   end
 

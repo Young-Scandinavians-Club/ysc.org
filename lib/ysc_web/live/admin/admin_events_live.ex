@@ -370,6 +370,9 @@ defmodule YscWeb.AdminEventsLive do
      |> stream(:events, [], reset: true)}
   end
 
+  # Content inside a `phx-update="stream"` container only updates via
+  # explicit stream operations, so re-stream the current page to make
+  # existing rows pick up the refreshed presence data.
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
     editors_by_event =
       EditingPresence.editors_by_resource(
@@ -377,7 +380,19 @@ defmodule YscWeb.AdminEventsLive do
         socket.assigns.current_user.id
       )
 
-    {:noreply, assign(socket, :editors_by_event, editors_by_event)}
+    socket = assign(socket, :editors_by_event, editors_by_event)
+
+    case Events.list_events_paginated(socket.assigns.params,
+           date_from: socket.assigns.date_from,
+           date_to: socket.assigns.date_to,
+           tab: socket.assigns.active_tab
+         ) do
+      {:ok, {events, _meta}} ->
+        {:noreply, stream(socket, :events, events, reset: true)}
+
+      {:error, _meta} ->
+        {:noreply, socket}
+    end
   end
 
   def handle_params(params, _uri, socket) do

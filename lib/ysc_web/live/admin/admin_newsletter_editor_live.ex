@@ -63,7 +63,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(
        :save_notice_form,
        to_form(Notice.changeset(%Notice{}, %{}), as: :save_notice)
-     )}
+     )
+     |> assign(:editors, [])}
   end
 
   @impl true
@@ -2163,6 +2164,23 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp wrap_plain_notice_body(_), do: ""
 
   @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    editors =
+      case socket.assigns.edition do
+        nil ->
+          []
+
+        edition ->
+          EditingPresence.editors(
+            :newsletter,
+            edition.id,
+            socket.assigns.current_user.id
+          )
+      end
+
+    {:noreply, assign(socket, :editors, editors)}
+  end
+
   def handle_info(
         {:edition_delivery_progress,
          %Edition{id: edition_id} = updated_edition},

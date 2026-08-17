@@ -182,4 +182,109 @@ defmodule YscWeb.AdminEventsLiveTest do
       assert copied.state == :draft
     end
   end
+
+  describe "editing presence" do
+    setup [:create_admin]
+
+    test "shows an avatar on the row of an event currently being edited", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, title: "Being edited"})
+      other_admin = user_fixture(%{role: "admin", first_name: "Jamie"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "row-tab-#{System.unique_integer([:positive])}"},
+          :event,
+          event.id,
+          other_admin
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/events")
+
+      assert html =~ "Jamie"
+      assert html =~ "is editing"
+    end
+
+    test "does not show the current admin's own presence", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, title: "Own tab open"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "self-row-tab-#{System.unique_integer([:positive])}"},
+          :event,
+          event.id,
+          admin
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/events")
+
+      refute html =~ "is editing"
+    end
+
+    test "updates row avatars live when another admin starts editing", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, title: "Live update row"})
+
+      {:ok, view, html} = live(conn, ~p"/admin/events")
+      refute html =~ "is editing"
+
+      other_admin = user_fixture(%{role: "admin", first_name: "Taylor"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "live-row-tab-#{System.unique_integer([:positive])}"},
+          :event,
+          event.id,
+          other_admin
+        )
+
+      send(view.pid, %Phoenix.Socket.Broadcast{
+        topic: YscWeb.Admin.EditingPresence.topic(:event),
+        event: "presence_diff",
+        payload: %{}
+      })
+
+      html = render(view)
+      assert html =~ "Taylor"
+      assert html =~ "is editing"
+    end
+  end
+
+  describe "last edited by" do
+    setup [:create_admin]
+
+    test "falls back to the organizer when the event has never been re-edited",
+         %{conn: conn, admin: admin} do
+      event_fixture(%{organizer_id: admin.id, title: "Never edited"})
+
+      {:ok, _view, html} = live(conn, ~p"/admin/events")
+
+      assert html =~ "Last edited"
+    end
+
+    test "shows the most recent editor after an update", %{
+      conn: conn,
+      admin: admin
+    } do
+      editor = user_fixture(%{role: "admin", first_name: "Morgan"})
+      event = event_fixture(%{organizer_id: admin.id, title: "Edited later"})
+
+      {:ok, _event} =
+        Events.update_event_editor(event, %{"title" => "Edited later!"},
+          updated_by_id: editor.id
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/events")
+
+      assert html =~ "Last edited"
+      assert html =~ "Morgan"
+    end
+  end
 end

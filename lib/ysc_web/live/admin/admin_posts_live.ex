@@ -367,11 +367,27 @@ defmodule YscWeb.AdminPostsLive do
      |> stream(:posts, [], reset: true)}
   end
 
+  # Presence data lives outside the `:posts` stream, but content inside a
+  # `phx-update="stream"` container only updates via explicit stream
+  # operations — a plain assign change alone won't re-render existing rows.
+  # Re-streaming the current page (cheap: same paginated query already used
+  # by handle_params) keeps rows in sync with live presence changes.
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
     editors_by_post =
       EditingPresence.editors_by_resource(:post, socket.assigns.current_user.id)
 
-    {:noreply, assign(socket, :editors_by_post, editors_by_post)}
+    socket = assign(socket, :editors_by_post, editors_by_post)
+
+    case Posts.list_posts_paginated(socket.assigns.params,
+           date_from: socket.assigns.date_from,
+           date_to: socket.assigns.date_to
+         ) do
+      {:ok, {posts, _meta}} ->
+        {:noreply, stream(socket, :posts, posts, reset: true)}
+
+      {:error, _meta} ->
+        {:noreply, socket}
+    end
   end
 
   def handle_params(params, _uri, socket) do

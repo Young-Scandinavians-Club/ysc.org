@@ -614,4 +614,122 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
              |> render() =~ "Sent One (copy)"
     end
   end
+
+  describe "editing presence" do
+    setup [:create_admin]
+
+    test "shows an avatar for another admin currently editing", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      other_admin = user_fixture(%{role: "admin", first_name: "Jamie"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "other-tab-#{System.unique_integer([:positive])}"},
+          :newsletter,
+          edition.id,
+          other_admin
+        )
+
+      view = live_editing_edition(conn, edition)
+      html = render(view)
+
+      assert html =~ "Jamie"
+      assert html =~ "is editing"
+    end
+
+    test "does not show the current admin's own presence", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "self-tab-#{System.unique_integer([:positive])}"},
+          :newsletter,
+          edition.id,
+          admin
+        )
+
+      view = live_editing_edition(conn, edition)
+      refute render(view) =~ "is editing"
+    end
+
+    test "shows no avatars for a brand new (unsaved) newsletter", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/new")
+      render_async(view)
+
+      refute render(view) =~ "is editing"
+    end
+
+    test "updates avatars live when another admin starts editing", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+      refute render(view) =~ "is editing"
+
+      other_admin = user_fixture(%{role: "admin", first_name: "Taylor"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "live-tab-#{System.unique_integer([:positive])}"},
+          :newsletter,
+          edition.id,
+          other_admin
+        )
+
+      send(view.pid, %Phoenix.Socket.Broadcast{
+        topic: YscWeb.Admin.EditingPresence.topic(:newsletter),
+        event: "presence_diff",
+        payload: %{}
+      })
+
+      html = render(view)
+      assert html =~ "Taylor"
+      assert html =~ "is editing"
+    end
+
+    test "an unrelated presence_diff broadcast does not crash the editor", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      send(view.pid, %Phoenix.Socket.Broadcast{
+        topic: YscWeb.Admin.EditingPresence.topic(:newsletter),
+        event: "presence_diff",
+        payload: %{joins: %{}, leaves: %{}}
+      })
+
+      assert render(view) =~ edition.title
+    end
+  end
+
+  describe "last edited by" do
+    setup [:create_admin]
+
+    test "shows who last edited the newsletter", %{conn: conn, admin: admin} do
+      editor = user_fixture(%{role: "admin", first_name: "Morgan"})
+      edition = edition_fixture(admin)
+
+      {:ok, _edition} =
+        Newsletter.update_edition_draft(edition, %{"title" => "Edited"},
+          updated_by_id: editor.id
+        )
+
+      view = live_editing_edition(conn, edition)
+      html = render(view)
+
+      assert html =~ "Last edited by"
+      assert html =~ "Morgan"
+    end
+  end
 end
