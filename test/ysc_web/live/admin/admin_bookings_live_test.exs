@@ -2325,8 +2325,11 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
           capacity_max: 4
         })
 
-      booked_user = user_fixture(%{first_name: "Room", last_name: "BookedComplete"})
-      moving_user = user_fixture(%{first_name: "Room", last_name: "MovingComplete"})
+      booked_user =
+        user_fixture(%{first_name: "Room", last_name: "BookedComplete"})
+
+      moving_user =
+        user_fixture(%{first_name: "Room", last_name: "MovingComplete"})
 
       {checkin, checkout} = locker_room_dates(870, 2)
       {move_checkin, move_checkout} = locker_room_dates(880, 2)
