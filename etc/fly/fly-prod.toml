@@ -89,7 +89,7 @@ soft_limit = 400
 
 [[vm]]
 size = 'shared-cpu-2x'
-memory = '1gb'
+memory = '2gb'
 cpus = 2
 
 [[metrics]]
