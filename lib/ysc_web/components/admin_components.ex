@@ -345,17 +345,28 @@ defmodule YscWeb.AdminComponents do
       <.admin_country_with_flag country={@application.place_of_birth} />
   """
   attr :id, :string, default: nil
-  attr :country, :string, default: nil
+
+  attr :country, :any,
+    default: nil,
+    doc: "ISO country code, display name, or nil"
+
   attr :class, :any, default: nil
 
   attr :flag_class, :string,
     default: "h-4 w-6 rounded inline-block align-middle"
 
   def admin_country_with_flag(assigns) do
+    country =
+      case assigns.country do
+        nil -> nil
+        country when is_binary(country) -> country
+        other -> to_string(other)
+      end
+
     assigns =
       assign(assigns,
-        flag_css: UserDisplay.country_flag_class(assigns.country),
-        label: UserDisplay.country_label(assigns.country)
+        flag_css: UserDisplay.country_flag_class(country),
+        label: UserDisplay.country_label(country)
       )
 
     render_country_with_flag(assigns)

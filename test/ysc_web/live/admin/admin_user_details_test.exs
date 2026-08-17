@@ -77,7 +77,10 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
         most_connected_nordic_country: "DK"
       })
 
-      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
 
       assert has_element?(view, "#application-place-of-birth", "Sweden")
       assert has_element?(view, "#application-place-of-birth .fi-se")
