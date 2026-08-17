@@ -7,6 +7,10 @@ defmodule YscWeb.FlowrouteWebhookController do
   require Ysc.Logging
   alias Ysc.Sms
   alias Ysc.Accounts
+  alias Ysc.Repo
+
+  plug :verify_webhook_token
+       when action in [:handle_inbound_sms, :handle_delivery_receipt]
 
   @doc """
   Handles inbound SMS webhook from FlowRoute.
@@ -92,7 +96,7 @@ defmodule YscWeb.FlowrouteWebhookController do
               errors: inspect(changeset.errors)
             )
 
-            send_resp(conn, 400, "Failed to process")
+            webhook_error_response(conn, changeset)
         end
       end
     rescue
@@ -186,7 +190,7 @@ defmodule YscWeb.FlowrouteWebhookController do
               errors: inspect(changeset.errors)
             )
 
-            send_resp(conn, 400, "Failed to process")
+            webhook_error_response(conn, changeset)
         end
       end
     rescue
@@ -222,12 +226,110 @@ defmodule YscWeb.FlowrouteWebhookController do
       end
 
     if delivery_receipt.sms_message_id do
-      case Ysc.Repo.get(Ysc.Sms.SmsMessage, delivery_receipt.sms_message_id) do
-        nil -> :ok
-        sms_message -> Sms.update_sms_message_status(sms_message, new_status)
-      end
+      apply_dlr_status_update(delivery_receipt.sms_message_id, new_status)
+    end
+
+    :ok
+  end
+
+  # :delivered/:failed are terminal — FlowRoute never legitimately corrects
+  # out of them, so once reached they're never overwritten. Non-terminal
+  # statuses are ordered by @status_rank so a late/out-of-order DLR can't
+  # regress the message backward (e.g. "message buffered" arriving after
+  # "message sent" was already applied).
+  @terminal_statuses [:delivered, :failed]
+  @status_rank %{buffered: 0, sent: 1}
+
+  # Locks the SmsMessage row for the duration of the read-modify-write.
+  # FlowRoute may retry a slow-to-ack webhook, or deliver DLRs out of order —
+  # without the lock and the ordering guard below, two DLR webhooks for the
+  # same message processed concurrently could race and the later write could
+  # silently regress the status.
+  defp apply_dlr_status_update(sms_message_id, new_status) do
+    result =
+      Repo.transaction(fn ->
+        case Sms.get_sms_message(sms_message_id, lock: true) do
+          nil ->
+            :missing
+
+          %{status: current} when current in @terminal_statuses ->
+            :ok
+
+          %{status: current} = sms_message ->
+            if new_status in @terminal_statuses or
+                 status_rank(new_status) >= status_rank(current) do
+              Sms.update_sms_message_status(sms_message, new_status)
+            else
+              :ok
+            end
+        end
+      end)
+
+    case result do
+      {:ok, :missing} ->
+        Ysc.Logging.warning("DLR references a missing SMS message",
+          sms_message_id: sms_message_id
+        )
+
+      {:ok, {:error, changeset}} ->
+        Ysc.Logging.error("Failed to apply DLR status to SMS message",
+          sms_message_id: sms_message_id,
+          status: new_status,
+          errors: inspect(changeset.errors)
+        )
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp status_rank(status), do: Map.get(@status_rank, status, 0)
+
+  # The specific unique-constraint names that mean "we've already processed
+  # this exact provider_message_id / DLR event before" — not just any
+  # :unique violation, so an unrelated future constraint on either schema
+  # can't be misclassified as a harmless duplicate.
+  @duplicate_webhook_constraint_names [
+    "sms_received_provider_provider_message_id_index",
+    "sms_delivery_receipts_provider_message_timestamp_unique"
+  ]
+
+  defp duplicate_webhook_error?(changeset) do
+    Enum.any?(changeset.errors, fn {_field, {_message, opts}} ->
+      Keyword.get(opts, :constraint) == :unique and
+        Keyword.get(opts, :constraint_name) in @duplicate_webhook_constraint_names
+    end)
+  end
+
+  # Already processed this exact message_id (or message_id/timestamp) — ack
+  # so FlowRoute stops retrying instead of treating this as a failure.
+  defp webhook_error_response(conn, changeset) do
+    if duplicate_webhook_error?(changeset) do
+      send_resp(conn, 200, "OK")
     else
-      :ok
+      send_resp(conn, 400, "Failed to process")
+    end
+  end
+
+  # `:token` is always a non-empty string here: it's a required path segment
+  # (router.ex's `/flowroute/:token/...`), and Phoenix's path params always
+  # take precedence when merged into conn.params, so there's no way for a
+  # matched request to reach this plug with a missing/blank token.
+  defp verify_webhook_token(conn, _opts) do
+    configured_token = Application.get_env(:ysc, :flowroute)[:webhook_token]
+    provided_token = conn.params["token"]
+
+    cond do
+      is_nil(configured_token) or configured_token == "" ->
+        Ysc.Logging.warning("FlowRoute webhook token not configured")
+        conn |> send_resp(401, "Unauthorized") |> halt()
+
+      Plug.Crypto.secure_compare(configured_token, provided_token) ->
+        conn
+
+      true ->
+        Ysc.Logging.warning("FlowRoute webhook token mismatch")
+        conn |> send_resp(401, "Unauthorized") |> halt()
     end
   end
 
@@ -300,7 +402,11 @@ defmodule YscWeb.FlowrouteWebhookController do
         )
 
         # Still send the opt-in message even if user not found
-        send_opt_in_response(sms_received.from, sms_received.to)
+        send_opt_in_response(
+          sms_received.from,
+          sms_received.to,
+          sms_received.provider_message_id
+        )
 
       user ->
         Ysc.Logging.info("Processing opt-in request",
@@ -320,7 +426,11 @@ defmodule YscWeb.FlowrouteWebhookController do
               phone_number: sms_received.from
             )
 
-            send_opt_in_response(sms_received.from, sms_received.to)
+            send_opt_in_response(
+              sms_received.from,
+              sms_received.to,
+              sms_received.provider_message_id
+            )
 
           {:error, changeset} ->
             Ysc.Logging.error(
@@ -331,7 +441,11 @@ defmodule YscWeb.FlowrouteWebhookController do
             )
 
             # Still send response even if update failed
-            send_opt_in_response(sms_received.from, sms_received.to)
+            send_opt_in_response(
+              sms_received.from,
+              sms_received.to,
+              sms_received.provider_message_id
+            )
         end
     end
   end
@@ -346,7 +460,11 @@ defmodule YscWeb.FlowrouteWebhookController do
         )
 
         # Still send the opt-out message even if user not found
-        send_opt_out_response(sms_received.from, sms_received.to)
+        send_opt_out_response(
+          sms_received.from,
+          sms_received.to,
+          sms_received.provider_message_id
+        )
 
       user ->
         Ysc.Logging.info("Processing opt-out request",
@@ -366,7 +484,11 @@ defmodule YscWeb.FlowrouteWebhookController do
               phone_number: sms_received.from
             )
 
-            send_opt_out_response(sms_received.from, sms_received.to)
+            send_opt_out_response(
+              sms_received.from,
+              sms_received.to,
+              sms_received.provider_message_id
+            )
 
           {:error, changeset} ->
             Ysc.Logging.error(
@@ -377,7 +499,11 @@ defmodule YscWeb.FlowrouteWebhookController do
             )
 
             # Still send response even if update failed
-            send_opt_out_response(sms_received.from, sms_received.to)
+            send_opt_out_response(
+              sms_received.from,
+              sms_received.to,
+              sms_received.provider_message_id
+            )
         end
     end
   end
@@ -389,37 +515,42 @@ defmodule YscWeb.FlowrouteWebhookController do
       provider_message_id: sms_received.provider_message_id
     )
 
-    send_help_response(sms_received.from, sms_received.to)
+    send_help_response(
+      sms_received.from,
+      sms_received.to,
+      sms_received.provider_message_id
+    )
   end
 
   # Send opt-in response
-  defp send_opt_in_response(to, from) do
+  defp send_opt_in_response(to, from, event_id) do
     message =
       "Young Scandinavians Club: You are now subscribed to YSC account alerts. Msg frequency varies. Msg&Data rates may apply. Reply HELP for help, STOP to cancel."
 
-    send_response_sms(to, from, message, "sms_opt_in_response")
+    send_response_sms(to, from, message, "sms_opt_in_response", event_id)
   end
 
   # Send opt-out response
-  defp send_opt_out_response(to, from) do
+  defp send_opt_out_response(to, from, event_id) do
     message =
       "Young Scandinavians Club: You have successfully unsubscribed from alerts. You will receive no further messages. Reply START to resubscribe."
 
-    send_response_sms(to, from, message, "sms_opt_out_response")
+    send_response_sms(to, from, message, "sms_opt_out_response", event_id)
   end
 
   # Send help response
-  defp send_help_response(to, from) do
+  defp send_help_response(to, from, event_id) do
     message =
       "Young Scandinavians Club: For help with account alerts, email info@ysc.org. Msg frequency varies. Msg&Data rates may apply. Reply STOP to cancel."
 
-    send_response_sms(to, from, message, "sms_help_response")
+    send_response_sms(to, from, message, "sms_help_response", event_id)
   end
 
-  # Send response SMS
-  defp send_response_sms(to, from, body, template) do
-    idempotency_key =
-      "sms_response_#{template}_#{to}_#{System.system_time(:second)}"
+  # Send response SMS. `event_id` is the inbound webhook's provider_message_id
+  # — keying idempotency off it (rather than wall-clock time) means a retried
+  # inbound webhook for the same event can't trigger a duplicate reply SMS.
+  defp send_response_sms(to, from, body, template, event_id) do
+    idempotency_key = "sms_response_#{template}_#{to}_#{event_id}"
 
     attrs = %{
       message_type: :sms,

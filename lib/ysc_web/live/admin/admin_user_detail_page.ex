@@ -69,7 +69,10 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div class="flex flex-row items-center justify-between pt-4">
           <.admin_page_title>
-            {"#{Ysc.title_case(@first_name)} #{Ysc.title_case(@last_name)}"}
+            {UserDisplay.full_name(%{
+              first_name: @first_name,
+              last_name: @last_name
+            })}
           </.admin_page_title>
           <form
             id="admin-impersonate-form"

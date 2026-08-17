@@ -3235,6 +3235,69 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert buyout_booked?(:tahoe, new_days)
     end
 
+    test "returns stale_inventory when modifying onto already-booked buyout dates" do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :buyout,
+          price_unit: :buyout_fixed,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      user1 = user_fixture()
+      user2 = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(640)
+      {checkin2, checkout2} = locker_buyout_dates(670)
+
+      attrs = %{
+        user_id: user1.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 2,
+        total_price: Money.new(:USD, "300.00")
+      }
+
+      assert {:ok, _first} =
+               BookingLocker.create_admin_booking(attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      assert {:ok, second} =
+               BookingLocker.create_admin_booking(
+                 Map.merge(attrs, %{
+                   user_id: user2.id,
+                   checkin_date: checkin2,
+                   checkout_date: checkout2
+                 }),
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      assert {:error, :stale_inventory} =
+               BookingLocker.admin_modify_complete_booking(second, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :buyout
+               })
+
+      second = Ysc.Repo.get!(Ysc.Bookings.Booking, second.id)
+      assert second.checkin_date == checkin2
+
+      first_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      second_days =
+        Date.range(checkin2, Date.add(checkout2, -1)) |> Enum.to_list()
+
+      assert buyout_booked?(:tahoe, first_days)
+      assert buyout_booked?(:tahoe, second_days)
+    end
+
     test "returns changeset error for invalid stay dates" do
       ensure_clear_lake_day_pricing_rule()
       user = user_fixture()

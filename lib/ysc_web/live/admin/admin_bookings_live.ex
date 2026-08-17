@@ -4174,7 +4174,7 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp apply_action(socket, :edit_booking, %{"id" => id}) do
-    booking = Bookings.get_booking_for_admin_view!(id)
+    booking = Bookings.get_booking_for_admin_edit!(id)
 
     # Determine booking type from existing booking
     has_rooms = Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []

@@ -12,6 +12,7 @@ defmodule YscWeb.Components.News.NewsCard do
     statics: YscWeb.static_paths()
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.UserDisplay
   alias YscWeb.PlainText
 
   attr :post, :any, required: true
@@ -79,8 +80,7 @@ defmodule YscWeb.Components.News.NewsCard do
             />
             <div>
               <p class="text-sm font-black text-zinc-500 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
-                {Ysc.title_case(@post.author.first_name || "")}
-                {Ysc.title_case(@post.author.last_name || "")}
+                {UserDisplay.full_name(@post.author)}
               </p>
               <p
                 :if={@post.board_position_at_publish}

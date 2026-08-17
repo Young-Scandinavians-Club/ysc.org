@@ -6,10 +6,17 @@ defmodule Ysc.SentryScrubber do
   @sensitive_param_keys Sentry.Scrubber.default_param_keys() ++
                           ~w(token setup_token code)
 
+  # FlowRoute has no HMAC webhook signing, so its shared secret is baked into
+  # the URL path itself (/webhooks/flowroute/<token>/...) rather than a query
+  # param or header — Sentry.Scrubber.scrub_url/2 only scrubs query strings,
+  # so it wouldn't otherwise catch this.
+  @flowroute_token_path ~r{(/webhooks/flowroute/)[^/]+(/)}
+
   @spec scrub_url(Plug.Conn.t()) :: String.t()
   def scrub_url(conn) do
     conn
     |> Plug.Conn.request_url()
+    |> String.replace(@flowroute_token_path, "\\1[REDACTED]\\2")
     |> Sentry.Scrubber.scrub_url(keys: @sensitive_param_keys)
   end
 

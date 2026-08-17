@@ -8,6 +8,7 @@ defmodule YscWeb.PostLive do
   alias Ysc.Posts
   alias Ysc.Posts.Post
   alias Ysc.Posts.Comment
+  alias Ysc.Accounts.UserDisplay
   alias YscWeb.SEO
 
   @impl true
@@ -67,8 +68,7 @@ defmodule YscWeb.PostLive do
                 Post By
               </p>
               <p class="text-sm font-medium text-zinc-500">
-                {Ysc.title_case(@post.author.first_name || "")}
-                {Ysc.title_case(@post.author.last_name || "")}
+                {UserDisplay.full_name(@post.author)}
                 <%= if @post.board_position_at_publish do %>
                   , YSC {Ysc.Accounts.format_board_position(
                     @post.board_position_at_publish
@@ -179,7 +179,7 @@ defmodule YscWeb.PostLive do
                 :for={{id, comment} <- @streams.comments}
                 id={id}
                 text={comment.text}
-                author={"#{Ysc.title_case(comment.author.first_name)} #{Ysc.title_case(comment.author.last_name)}"}
+                author={UserDisplay.full_name(comment.author)}
                 author_email={comment.author.email}
                 author_most_connected={comment.author.most_connected_country}
                 author_id={comment.author.id}

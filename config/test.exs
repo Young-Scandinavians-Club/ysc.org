@@ -136,6 +136,7 @@ config :ysc,
 
 # Relax auth rate limits in test so login/forgot-password tests don't hit them
 config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
+config :ysc, Ysc.MobileAPIRateLimit, ip_limit: 10_000
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
@@ -179,7 +180,10 @@ config :ysc,
 
 # FlowRoute SMS configuration for tests
 # Use a fake number since we're in noop mode anyway
-config :ysc, :flowroute, from_number: "12061231234"
+config :ysc, :flowroute,
+  from_number: "12061231234",
+  webhook_token: "test_flowroute_webhook_token"
+
 config :ysc, :flowroute_force_noop, true
 
 # Enables `Application.put_env(:ysc, :flowroute_test_raise, ...)` in SMS tests only.

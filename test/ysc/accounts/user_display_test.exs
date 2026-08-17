@@ -62,6 +62,56 @@ defmodule Ysc.Accounts.UserDisplayTest do
     end
   end
 
+  describe "full_name/1-3" do
+    test "title-cases and joins first and last name from a map" do
+      assert UserDisplay.full_name(%{first_name: "jane", last_name: "doe"}) ==
+               "Jane Doe"
+    end
+
+    test "title-cases and joins separate name fields" do
+      assert UserDisplay.full_name(%{first_name: "jane", last_name: "doe"}) ==
+               "Jane Doe"
+    end
+
+    test "returns a single name when the other is blank" do
+      assert UserDisplay.full_name(%{first_name: "jane", last_name: nil}) ==
+               "Jane"
+
+      assert UserDisplay.full_name(%{first_name: nil, last_name: "doe"}) ==
+               "Doe"
+    end
+
+    test "returns fallback when both names are blank" do
+      assert UserDisplay.full_name(%{first_name: nil, last_name: nil}) == nil
+
+      assert UserDisplay.full_name(%{first_name: "", last_name: ""},
+               fallback: "Unknown"
+             ) ==
+               "Unknown"
+    end
+
+    test "treats whitespace-only names as blank" do
+      assert UserDisplay.full_name(%{first_name: "  ", last_name: "doe"}) ==
+               "Doe"
+
+      assert UserDisplay.full_name(%{first_name: "jane", last_name: "  "}) ==
+               "Jane"
+    end
+  end
+
+  describe "first_name_label/1" do
+    test "title-cases first names" do
+      assert UserDisplay.first_name_label("jane") == "Jane"
+      assert UserDisplay.first_name_label(%{first_name: "jane"}) == "Jane"
+    end
+
+    test "returns empty string for nil or blank values" do
+      assert UserDisplay.first_name_label(nil) == ""
+      assert UserDisplay.first_name_label("") == ""
+      assert UserDisplay.first_name_label("  ") == ""
+    end
+  end
+
   describe "application_submitted_at/1" do
     test "prefers registration_form.completed over reviewed_at and inserted_at" do
       completed = ~U[2024-06-01 12:00:00Z]

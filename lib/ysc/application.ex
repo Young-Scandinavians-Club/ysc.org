@@ -74,6 +74,8 @@ defmodule Ysc.Application do
         {Ysc.EmailVerificationRateLimit, [clean_period: :timer.minutes(1)]},
         # Kiosk `/api/v1/mobile` JSON API (per-IP abuse / scraping)
         {Ysc.MobileAPIRateLimit, [clean_period: :timer.minutes(1)]},
+        # FlowRoute webhook routes (token brute-force protection)
+        {Ysc.FlowrouteWebhookRateLimit, [clean_period: :timer.minutes(1)]},
         # Admin help LLM (guide finder + step clarifier)
         {Ysc.AdminHelpRateLimit, [clean_period: :timer.minutes(1)]},
         # Start Apple Wallet certificate manager
