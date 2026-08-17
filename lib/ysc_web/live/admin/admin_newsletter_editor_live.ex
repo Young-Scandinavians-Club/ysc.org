@@ -29,6 +29,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      socket
      |> assign(:page_title, "Newsletter")
      |> assign(:active_page, :newsletters)
+     |> assign(:editors, [])
      |> assign(:post_results, [])
      |> assign(:event_results, [])
      |> assign(:selected_post_ids, [])
@@ -144,17 +145,31 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     |> assign(:readonly?, edition_readonly?(edition))
     |> assign(:selected_post_ids, edition.post_ids || [])
     |> assign(:selected_event_ids, edition.event_ids || [])
-    |> assign(
-      :editors,
-      EditingPresence.editors(
-        :newsletter,
-        edition.id,
-        socket.assigns.current_user.id
-      )
-    )
+    |> assign_newsletter_editors()
     |> assign_form_from_edition(edition)
     |> maybe_load_email_stats(edition)
     |> assign_preview_data()
+  end
+
+  defp assign_newsletter_editors(socket) do
+    edition_id =
+      case socket.assigns[:edition] do
+        %{id: id} when is_binary(id) -> id
+        _ -> nil
+      end
+
+    editors =
+      if edition_id do
+        EditingPresence.editors(
+          :newsletter,
+          edition_id,
+          socket.assigns.current_user.id
+        )
+      else
+        []
+      end
+
+    assign(socket, :editors, editors)
   end
 
   defp maybe_load_email_stats(socket, %Edition{status: :sent, id: edition_id})
@@ -2259,6 +2274,10 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(form: to_form(changeset, as: "edition"))
      |> assign_preview_data()
      |> schedule_auto_save()}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign_newsletter_editors(socket)}
   end
 
   def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do

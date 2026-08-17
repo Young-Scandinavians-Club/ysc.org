@@ -125,6 +125,43 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       assert html =~ "Subj"
     end
 
+    test "shows last edited by the edition creator", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+      name = Ysc.Accounts.UserDisplay.full_name(admin)
+
+      assert has_element?(view, "p", "Last edited by")
+      assert has_element?(view, "p", name)
+    end
+
+    test "shows the other admin currently editing the same edition", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+
+      other =
+        user_fixture(%{
+          role: "admin",
+          first_name: "Coedit",
+          last_name: "Orson"
+        })
+
+      other_conn = log_in_user(build_conn(), other)
+
+      {:ok, other_view, _html} =
+        live(other_conn, ~p"/admin/newsletters/#{edition.id}/edit")
+
+      render_async(other_view)
+
+      view = live_editing_edition(conn, edition)
+
+      assert has_element?(view, "[role=tooltip]", "Coedit Orson is editing")
+    end
+
     test "shows live sending progress", %{conn: conn, admin: admin} do
       edition = edition_fixture(admin)
 
