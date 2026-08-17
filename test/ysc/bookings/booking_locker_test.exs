@@ -1734,6 +1734,450 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "revert_hold_to_draft/1" do
+    test "reverts buyout hold to draft and clears buyout_held", %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(420)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert property_buyout_held?(:tahoe, days)
+
+      assert {:ok, reverted} = BookingLocker.revert_hold_to_draft(booking.id)
+      assert reverted.status == :draft
+      refute property_buyout_held?(:tahoe, days)
+    end
+
+    test "reverts room hold to draft and clears held inventory", %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Locker revert hold room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = locker_room_dates(421, 2)
+
+      result =
+        BookingLocker.create_room_booking(
+          user.id,
+          room.id,
+          checkin,
+          checkout,
+          2
+        )
+
+      case result do
+        {:ok, %Booking{} = booking} ->
+          nights = Date.diff(checkout, checkin)
+
+          held_before =
+            Repo.aggregate(
+              from(ri in Ysc.Bookings.RoomInventory,
+                where:
+                  ri.room_id == ^room.id and ri.day >= ^checkin and
+                    ri.day < ^checkout and ri.held == true
+              ),
+              :count
+            )
+
+          assert held_before == nights
+
+          assert {:ok, reverted} =
+                   BookingLocker.revert_hold_to_draft(booking.id)
+
+          assert reverted.status == :draft
+
+          held_after =
+            Repo.aggregate(
+              from(ri in Ysc.Bookings.RoomInventory,
+                where:
+                  ri.room_id == ^room.id and ri.day >= ^checkin and
+                    ri.day < ^checkout and ri.held == true
+              ),
+              :count
+            )
+
+          assert held_after == 0
+
+        {:ok, {:error, :pricing_calculation_failed}} ->
+          :ok
+
+        {:error, :pricing_calculation_failed} ->
+          :ok
+      end
+    end
+
+    test "reverts day hold to draft and releases capacity_held", %{user: user} do
+      ensure_clear_lake_day_pricing_rule()
+
+      {checkin, checkout} = locker_room_dates(422, 2)
+      guests = 3
+
+      {:ok, booking} =
+        BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          guests
+        )
+
+      day = checkin
+
+      before =
+        Repo.get_by!(PropertyInventory, property: :clear_lake, day: day)
+
+      assert {:ok, reverted} = BookingLocker.revert_hold_to_draft(booking.id)
+      assert reverted.status == :draft
+
+      after_inv =
+        Repo.get_by!(PropertyInventory, property: :clear_lake, day: day)
+
+      assert after_inv.capacity_held == before.capacity_held - guests
+    end
+
+    test "returns invalid_status when booking is not a hold", %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(423)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      booking = Ysc.Repo.preload(booking, :rooms)
+
+      booking =
+        booking
+        |> Booking.changeset(%{status: :complete},
+          rooms: booking.rooms,
+          skip_validation: true
+        )
+        |> Ysc.Repo.update!()
+
+      assert {:error, {:error, :invalid_status}} =
+               BookingLocker.revert_hold_to_draft(booking.id)
+    end
+
+    test "returns inventory_update_failed when property inventory rows are missing",
+         %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(428)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      from(pi in PropertyInventory,
+        where:
+          pi.property == :tahoe and pi.day >= ^checkin and pi.day < ^checkout
+      )
+      |> Repo.delete_all()
+
+      assert {:error, {:error, :inventory_update_failed}} =
+               BookingLocker.revert_hold_to_draft(booking.id)
+    end
+
+    test "returns inventory_update_failed when room inventory rows are missing",
+         %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Locker revert hold missing inventory",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = locker_room_dates(429, 2)
+
+      result =
+        BookingLocker.create_room_booking(
+          user.id,
+          room.id,
+          checkin,
+          checkout,
+          2
+        )
+
+      case result do
+        {:ok, %Booking{} = booking} ->
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout
+          )
+          |> Repo.delete_all()
+
+          assert {:error, {:error, :inventory_update_failed}} =
+                   BookingLocker.revert_hold_to_draft(booking.id)
+
+        {:ok, {:error, :pricing_calculation_failed}} ->
+          :ok
+
+        {:error, :pricing_calculation_failed} ->
+          :ok
+      end
+    end
+  end
+
+  describe "revert_complete_to_draft/1" do
+    test "reverts complete buyout to draft and clears buyout_booked", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(424)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+      days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert property_buyout_booked?(:tahoe, days)
+
+      assert {:ok, reverted} =
+               BookingLocker.revert_complete_to_draft(booking.id)
+
+      assert reverted.status == :draft
+      refute property_buyout_booked?(:tahoe, days)
+    end
+
+    test "reverts complete room booking to draft and clears booked inventory",
+         %{
+           user: user
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Locker revert complete room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = locker_room_dates(425, 2)
+
+      result =
+        BookingLocker.create_room_booking(
+          user.id,
+          room.id,
+          checkin,
+          checkout,
+          2
+        )
+
+      case result do
+        {:ok, %Booking{} = booking_hold} ->
+          {:ok, booking} = BookingLocker.confirm_booking(booking_hold.id)
+
+          assert {:ok, reverted} =
+                   BookingLocker.revert_complete_to_draft(booking.id)
+
+          assert reverted.status == :draft
+
+          booked_after =
+            Repo.aggregate(
+              from(ri in Ysc.Bookings.RoomInventory,
+                where:
+                  ri.room_id == ^room.id and ri.day >= ^checkin and
+                    ri.day < ^checkout and ri.booked == true
+              ),
+              :count
+            )
+
+          assert booked_after == 0
+
+        {:ok, {:error, :pricing_calculation_failed}} ->
+          :ok
+
+        {:error, :pricing_calculation_failed} ->
+          :ok
+      end
+    end
+
+    test "reverts complete day booking to draft and releases capacity_booked",
+         %{
+           user: user
+         } do
+      ensure_clear_lake_day_pricing_rule()
+
+      {checkin, checkout} = locker_room_dates(426, 2)
+      guests = 3
+
+      {:ok, hold} =
+        BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          guests
+        )
+
+      {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+      day = checkin
+
+      before =
+        Repo.get_by!(PropertyInventory, property: :clear_lake, day: day)
+
+      assert {:ok, reverted} =
+               BookingLocker.revert_complete_to_draft(booking.id)
+
+      assert reverted.status == :draft
+
+      after_revert =
+        Repo.get_by!(PropertyInventory, property: :clear_lake, day: day)
+
+      assert after_revert.capacity_booked == before.capacity_booked - guests
+    end
+
+    test "returns invalid_status when booking is still a hold", %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(427)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      assert {:error, {:error, :invalid_status}} =
+               BookingLocker.revert_complete_to_draft(hold.id)
+    end
+
+    test "returns inventory_update_failed when property inventory rows are missing",
+         %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(430)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+
+      from(pi in PropertyInventory,
+        where:
+          pi.property == :tahoe and pi.day >= ^checkin and pi.day < ^checkout
+      )
+      |> Repo.delete_all()
+
+      assert {:error, {:error, :inventory_update_failed}} =
+               BookingLocker.revert_complete_to_draft(booking.id)
+    end
+
+    test "returns inventory_update_failed when room inventory rows are missing",
+         %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Locker revert complete missing inventory",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = locker_room_dates(431, 2)
+
+      result =
+        BookingLocker.create_room_booking(
+          user.id,
+          room.id,
+          checkin,
+          checkout,
+          2
+        )
+
+      case result do
+        {:ok, %Booking{} = booking_hold} ->
+          {:ok, booking} = BookingLocker.confirm_booking(booking_hold.id)
+
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout
+          )
+          |> Repo.delete_all()
+
+          assert {:error, {:error, :inventory_update_failed}} =
+                   BookingLocker.revert_complete_to_draft(booking.id)
+
+        {:ok, {:error, :pricing_calculation_failed}} ->
+          :ok
+
+        {:error, :pricing_calculation_failed} ->
+          :ok
+      end
+    end
+  end
+
   describe "cancel_complete_booking/1 room and day modes" do
     test "cancels a complete room booking and clears room inventory", %{
       user: user
@@ -4159,6 +4603,28 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   # Helper functions
+  defp property_buyout_held?(property, days) do
+    Enum.all?(days, fn day ->
+      Repo.one!(
+        from(pi in PropertyInventory,
+          where: pi.property == ^property and pi.day == ^day,
+          select: pi.buyout_held
+        )
+      )
+    end)
+  end
+
+  defp property_buyout_booked?(property, days) do
+    Enum.all?(days, fn day ->
+      Repo.one!(
+        from(pi in PropertyInventory,
+          where: pi.property == ^property and pi.day == ^day,
+          select: pi.buyout_booked
+        )
+      )
+    end)
+  end
+
   defp create_room_category do
     {:ok, category} =
       %Ysc.Bookings.RoomCategory{}
