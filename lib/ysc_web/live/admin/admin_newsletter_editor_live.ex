@@ -29,7 +29,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      socket
      |> assign(:page_title, "Newsletter")
      |> assign(:active_page, :newsletters)
-     |> assign(:editors, [])
      |> assign(:post_results, [])
      |> assign(:event_results, [])
      |> assign(:selected_post_ids, [])
@@ -2179,23 +2178,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp wrap_plain_notice_body(_), do: ""
 
   @impl true
-  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
-    editors =
-      case socket.assigns.edition do
-        nil ->
-          []
-
-        edition ->
-          EditingPresence.editors(
-            :newsletter,
-            edition.id,
-            socket.assigns.current_user.id
-          )
-      end
-
-    {:noreply, assign(socket, :editors, editors)}
-  end
-
   def handle_info(
         {:edition_delivery_progress,
          %Edition{id: edition_id} = updated_edition},
