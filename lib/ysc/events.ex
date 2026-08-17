@@ -269,7 +269,6 @@ defmodule Ysc.Events do
       end
 
     case query
-         |> preload(:updated_by)
          |> Flop.validate_and_run(params, for: Event) do
       {:ok, {events, meta}} ->
         events = enrich_events_with_capacity(events)

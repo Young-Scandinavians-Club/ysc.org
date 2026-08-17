@@ -732,7 +732,7 @@ defmodule Ysc.Newsletter do
     base_query =
       Edition
       |> select([e], struct(e, ^@edition_list_fields))
-      |> preload([:cover_image, :creator, :updated_by])
+      |> preload([:cover_image, :creator])
       |> Ecto.Query.exclude(:order_by)
       |> maybe_filter_inserted_at_from(date_from)
       |> maybe_filter_inserted_at_to(date_to)

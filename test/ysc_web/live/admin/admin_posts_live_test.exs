@@ -217,36 +217,12 @@ defmodule YscWeb.AdminPostsLiveTest do
   describe "last edited by" do
     setup [:create_admin]
 
-    test "falls back to the author when the post has never been re-edited", %{
-      conn: conn,
-      admin: admin
-    } do
-      post_fixture(admin, %{title: "Never edited"})
+    test "is not shown on the listing page", %{conn: conn, admin: admin} do
+      post_fixture(admin, %{title: "Not on listing"})
 
       {:ok, _view, html} = live(conn, ~p"/admin/posts")
 
-      assert html =~ "Last edited by"
-    end
-
-    test "shows the most recent editor after an update", %{
-      conn: conn,
-      admin: admin
-    } do
-      editor = user_fixture(%{role: "admin", first_name: "Morgan"})
-
-      post = post_fixture(admin, %{title: "Edited later"})
-
-      {:ok, _post} =
-        Ysc.Posts.update_post_editor(
-          post,
-          %{"title" => "Edited later!"},
-          editor
-        )
-
-      {:ok, _view, html} = live(conn, ~p"/admin/posts")
-
-      assert html =~ "Last edited by"
-      assert html =~ "Morgan"
+      refute html =~ "Last edited by"
     end
   end
 end
