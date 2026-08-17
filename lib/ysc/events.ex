@@ -1091,6 +1091,11 @@ defmodule Ysc.Events do
     enriched
   end
 
+  @doc false
+  def enrich_events_with_pricing_from_db(events) when is_list(events) do
+    enrich_events_with_pricing_info(events)
+  end
+
   defp enrich_events_with_pricing_info(events) do
     event_ids = Enum.map(events, & &1.id)
 

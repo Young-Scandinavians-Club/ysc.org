@@ -15,21 +15,21 @@ defmodule Ysc.Events.EventPricingCache do
     if events == [] do
       []
     else
-      Enum.map(events, &enrich_event/1)
+      events
+      |> Enum.map(fn event ->
+        {event, lookup_cached(cache_key_for(event))}
+      end)
+      |> enrich_cache_misses()
+      |> Enum.map(fn {source_event, enriched} ->
+        enriched
+        |> merge_transient_list_fields(source_event)
+        |> ensure_cover_image(source_event)
+      end)
     end
   end
 
   def enrich_event(event) do
-    cache_key = "event:pricing:#{event.id}"
-
-    enriched =
-      fetch_cached(cache_key, fn ->
-        Ysc.Events.enrich_single_event_with_pricing_from_db(event)
-      end)
-
-    enriched
-    |> merge_transient_list_fields(event)
-    |> ensure_cover_image(event)
+    enrich_events([event]) |> List.first()
   end
 
   @doc """
@@ -72,44 +72,65 @@ defmodule Ysc.Events.EventPricingCache do
     invalidate()
   end
 
-  defp fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
+  defp cache_key_for(%{id: id}), do: "event:pricing:#{id}"
+
+  defp lookup_cached(cache_key) do
     if Ysc.ProcessCache.enabled?() do
-      do_fetch_cached(cache_key, fetch_fun)
+      do_lookup_cached(cache_key)
     else
-      fetch_fun.()
+      :miss
     end
   end
 
-  defp do_fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
+  defp do_lookup_cached(cache_key) do
     case Cachex.get(@cache_name, cache_key) do
       {:ok, nil} ->
-        value = fetch_fun.()
-        cache_with_version(cache_key, value)
-        value
+        :miss
 
       {:ok, {:version, version, value}} ->
         case Cachex.get(@cache_name, @cache_version_key) do
           {:ok, current_version} when current_version == version ->
-            value
+            {:ok, value}
 
           _ ->
-            refetch_and_cache(cache_key, fetch_fun)
+            :miss
         end
 
       {:ok, value} ->
-        cache_with_version(cache_key, value)
-        value
+        {:ok, value}
 
       {:error, _reason} ->
-        fetch_fun.()
+        :miss
     end
   end
 
-  defp refetch_and_cache(cache_key, fetch_fun) do
-    Cachex.del(@cache_name, cache_key)
-    value = fetch_fun.()
-    cache_with_version(cache_key, value)
-    value
+  defp enrich_cache_misses(event_lookups) do
+    miss_events =
+      event_lookups
+      |> Enum.filter(fn {_event, lookup} -> lookup == :miss end)
+      |> Enum.map(fn {event, :miss} -> event end)
+
+    enriched_by_id =
+      if miss_events == [] do
+        %{}
+      else
+        miss_events
+        |> Ysc.Events.enrich_events_with_pricing_from_db()
+        |> tap(&cache_batch_results/1)
+        |> Map.new(fn enriched -> {enriched.id, enriched} end)
+      end
+
+    Enum.map(event_lookups, fn
+      {event, {:ok, enriched}} ->
+        {event, enriched}
+
+      {event, :miss} ->
+        {event, Map.fetch!(enriched_by_id, event.id)}
+    end)
+  end
+
+  defp cache_batch_results(enriched_events) do
+    Enum.each(enriched_events, &cache_with_version(cache_key_for(&1), &1))
   end
 
   defp merge_transient_list_fields(enriched, source) do

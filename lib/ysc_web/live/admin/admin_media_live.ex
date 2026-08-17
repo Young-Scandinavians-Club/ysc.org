@@ -610,8 +610,10 @@ defmodule YscWeb.AdminMediaLive do
       case socket.assigns.live_action do
         :edit ->
           if connected?(socket) do
-            image = Media.fetch_image(params["id"])
-            image_uploader = Ysc.Accounts.get_user!(image.user_id)
+            image =
+              params["id"] |> Media.fetch_image() |> Ysc.Repo.preload(:uploader)
+
+            image_uploader = image.uploader
 
             form =
               to_form(Media.Image.edit_image_changeset(image, %{}), as: "image")

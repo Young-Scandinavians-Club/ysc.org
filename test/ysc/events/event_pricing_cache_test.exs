@@ -116,4 +116,33 @@ defmodule Ysc.Events.EventPricingCacheTest do
     assert enriched.ticket_tiers != []
     assert Enum.any?(enriched.ticket_tiers, &(&1.id == tier.id))
   end
+
+  test "enrich_events batches cache misses into one tier query per list" do
+    events =
+      for i <- 1..3 do
+        event =
+          event_fixture(%{
+            title: "Batch Pricing #{i} #{System.unique_integer()}"
+          })
+
+        _tier = ticket_tier_fixture(%{event_id: event.id})
+        event
+      end
+
+    tier_query_pattern = ~r/FROM "ticket_tiers"/
+
+    {_enriched, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> EventPricingCache.enrich_events(events) end,
+        pattern: tier_query_pattern,
+        caller_pids: [self()]
+      )
+
+    # Without batching, three cache misses would issue three tier queries.
+    assert query_count == 1
+
+    enriched_again = EventPricingCache.enrich_events(events)
+    assert length(enriched_again) == 3
+    assert Enum.all?(enriched_again, &Map.has_key?(&1, :pricing_info))
+  end
 end
