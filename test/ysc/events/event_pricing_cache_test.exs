@@ -120,7 +120,11 @@ defmodule Ysc.Events.EventPricingCacheTest do
   test "enrich_events batches cache misses into one tier query per list" do
     events =
       for i <- 1..3 do
-        event = event_fixture(%{title: "Batch Pricing #{i} #{System.unique_integer()}"})
+        event =
+          event_fixture(%{
+            title: "Batch Pricing #{i} #{System.unique_integer()}"
+          })
+
         _tier = ticket_tier_fixture(%{event_id: event.id})
         event
       end
