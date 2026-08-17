@@ -2363,7 +2363,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </p>
                           <p>
                             <strong>Bring Your Guests:</strong>
-                            Non-member guests are welcome! All guests must be included in your reservation. Check event details for any specific restrictions.
+                            Non-member guests are welcome. Include every guest in your booking. For age or guest limits, see the cabin rules above or contact the Cabin Master.
                           </p>
                         </div>
                       </details>
@@ -2423,14 +2423,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <div class="space-y-4">
                     <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
                       <h3 class="font-semibold text-zinc-900 mb-2">
-                        Reservation Requirements
+                        Booking requirements
                       </h3>
                       <ul class="list-disc list-inside space-y-2 text-zinc-700">
                         <li>
-                          All reservations must be made and paid in advance on the website
+                          All bookings must be made and paid in advance on the website
                         </li>
                         <li>
-                          Check event or season details for any limits on active reservations per membership
+                          You may have only one active cabin booking per membership. Book your next stay after your current one is complete.
                         </li>
                       </ul>
                     </div>

@@ -42,7 +42,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_guest_info_step_enter_guests do
-    "Enter the names of everyone else staying with you. You're already included in the reservation — only list the other people below."
+    "Enter the names of everyone else staying with you. You're already included in the booking — only list the other people below."
   end
 
   def checkout_guest_info_step_continue_payment do
@@ -109,7 +109,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_manage_booking_step do
-    "View or change your reservation anytime from My Bookings & Payments (click your name in the top-right corner), or use the link in your confirmation email"
+    "View or change your booking anytime from My Bookings & Payments (click your name in the top-right corner), or use the link in your confirmation email"
   end
 
   def checkout_pricing_load_failed do

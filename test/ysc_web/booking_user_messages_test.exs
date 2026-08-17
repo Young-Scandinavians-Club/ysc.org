@@ -46,7 +46,7 @@ defmodule YscWeb.BookingUserMessagesTest do
              "everyone else staying with you"
 
     assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~
-             "already included in the reservation"
+             "already included in the booking"
 
     assert BookingUserMessages.checkout_guest_info_step_continue_payment() =~
              "held temporarily"
