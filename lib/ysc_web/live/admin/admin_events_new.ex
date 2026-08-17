@@ -74,14 +74,18 @@ defmodule YscWeb.AdminEventsNewLive do
                   />
 
                   <.link
-                    :if={@event.state == :published}
+                    :if={
+                      @event.state in [:published, :cancelled, :draft, :scheduled]
+                    }
                     href={~p"/events/#{@event.id}"}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="inline-flex shrink-0 items-center gap-1 text-sm text-zinc-500 transition hover:text-blue-700"
                   >
                     <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
-                    <span class="sr-only">View Event</span>
+                    {if @event.state in [:published, :cancelled],
+                      do: "View Event",
+                      else: "Preview"}
                   </.link>
                 </div>
 
@@ -163,7 +167,7 @@ defmodule YscWeb.AdminEventsNewLive do
                   class={
                     Enum.join(
                       [
-                        "text-zinc-100 px-3 leading-6 py-2 text-sm font-semibold transition duration-300",
+                        "min-h-[44px] text-zinc-100 px-3 leading-6 py-2 text-sm font-semibold transition duration-300",
                         @event.state == :scheduled &&
                           "bg-green-700 hover:bg-green-800",
                         @event.state != :scheduled &&
@@ -193,7 +197,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 <.dropdown
                   id="edit-event-more"
                   right={true}
-                  class="text-zinc-800 hover:bg-zinc-100 hover:text-black"
+                  class="text-zinc-800 hover:bg-zinc-100 hover:text-black min-h-[44px]"
                 >
                   <:button_block>
                     <.icon name="hero-ellipsis-vertical" class="w-6 h-6" />
