@@ -6515,7 +6515,7 @@ defmodule YscWeb.AdminBookingsLive do
   # Status transitions away from :hold/:complete hold real PropertyInventory /
   # RoomInventory reservations. Editing `status` via the plain changeset path
   # below would leave that inventory permanently stuck as held/booked, so
-  # cancel/refund must go through BookingLocker instead, which releases it
+  # cancel/refund/draft must go through BookingLocker instead, which releases it
   # atomically with the status change.
   defp save_existing_admin_booking(
          socket,
@@ -6534,6 +6534,17 @@ defmodule YscWeb.AdminBookingsLive do
       room_id,
       rooms
     )
+  end
+
+  defp save_existing_admin_booking(
+         socket,
+         %{status: current_status} = existing_booking,
+         %{"status" => :draft} = _booking_params,
+         _room_id,
+         _rooms
+       )
+       when current_status in [:hold, :complete] do
+    revert_existing_admin_booking_to_draft(socket, existing_booking)
   end
 
   defp save_existing_admin_booking(
@@ -6898,6 +6909,16 @@ defmodule YscWeb.AdminBookingsLive do
        :error,
        "Only a complete booking can be marked refunded."
      )}
+  end
+
+  defp revert_existing_admin_booking_to_draft(socket, %{status: :hold} = booking) do
+    BookingLocker.revert_hold_to_draft(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :draft)
+  end
+
+  defp revert_existing_admin_booking_to_draft(socket, %{status: :complete} = booking) do
+    BookingLocker.revert_complete_to_draft(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :draft)
   end
 
   defp handle_admin_cancel_result(

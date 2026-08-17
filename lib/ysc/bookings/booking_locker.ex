@@ -2131,6 +2131,93 @@ defmodule Ysc.Bookings.BookingLocker do
     |> invalidate_availability_cache()
   end
 
+  @doc """
+  Reverts a hold booking to `:draft` and releases held inventory.
+
+  Like `release_hold/1`, but leaves the booking in draft instead of canceled.
+  """
+  def revert_hold_to_draft(booking_id) do
+    require Ysc.Logging
+
+    Repo.transaction(fn ->
+      booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
+
+      if booking.status != :hold do
+        Repo.rollback({:error, :invalid_status})
+      end
+
+      cancel_booking_payment_intent(booking)
+
+      case booking.booking_mode do
+        :buyout ->
+          {count, _} =
+            Repo.update_all(
+              from(pi in PropertyInventory,
+                where:
+                  pi.property == ^booking.property and
+                    pi.day >= ^booking.checkin_date and
+                    pi.day < ^booking.checkout_date
+              ),
+              set: [
+                buyout_held: false,
+                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+              ]
+            )
+
+          if count == 0 do
+            Repo.rollback({:error, :inventory_update_failed})
+          end
+
+        :room ->
+          room_ids = Enum.map(booking.rooms, & &1.id)
+
+          if room_ids != [] do
+            {count, _} =
+              Repo.update_all(
+                from(ri in RoomInventory,
+                  where:
+                    ri.room_id in ^room_ids and
+                      ri.day >= ^booking.checkin_date and
+                      ri.day < ^booking.checkout_date
+                ),
+                set: [
+                  held: false,
+                  updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+                ]
+              )
+
+            if count == 0 do
+              Repo.rollback({:error, :inventory_update_failed})
+            end
+          end
+
+        :day ->
+          release_day_held_capacity_for_stay!(booking)
+      end
+
+      case booking
+           |> Booking.changeset(
+             %{
+               status: :draft,
+               hold_expires_at: nil
+             },
+             rooms: booking.rooms,
+             skip_validation: true
+           )
+           |> put_change(:applied_booking_entitlement_id, nil)
+           |> put_change(:subtotal_price, nil)
+           |> put_change(:discount_total, nil)
+           |> Repo.update() do
+        {:ok, updated_booking} ->
+          updated_booking
+
+        {:error, changeset} ->
+          Repo.rollback({:error, changeset})
+      end
+    end)
+    |> invalidate_availability_cache()
+  end
+
   defp stripe_payment_intent_module do
     Application.get_env(
       :ysc,
@@ -3654,6 +3741,83 @@ defmodule Ysc.Bookings.BookingLocker do
       # Pass existing rooms to avoid Ecto thinking we're removing them
       case booking
            |> Booking.changeset(%{status: :canceled, hold_expires_at: nil},
+             rooms: booking.rooms,
+             skip_validation: true
+           )
+           |> Repo.update() do
+        {:ok, updated_booking} ->
+          updated_booking
+
+        {:error, changeset} ->
+          Repo.rollback({:error, changeset})
+      end
+    end)
+    |> invalidate_availability_cache()
+  end
+
+  @doc """
+  Reverts a complete booking to `:draft` and releases booked inventory.
+
+  Like `cancel_complete_booking/1`, but leaves the booking in draft instead of
+  canceled.
+  """
+  def revert_complete_to_draft(booking_id) do
+    Repo.transaction(fn ->
+      booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
+
+      if booking.status != :complete do
+        Repo.rollback({:error, :invalid_status})
+      end
+
+      case booking.booking_mode do
+        :buyout ->
+          {count, _} =
+            Repo.update_all(
+              from(pi in PropertyInventory,
+                where:
+                  pi.property == ^booking.property and
+                    pi.day >= ^booking.checkin_date and
+                    pi.day < ^booking.checkout_date
+              ),
+              set: [
+                buyout_booked: false,
+                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+              ]
+            )
+
+          if count == 0 do
+            Repo.rollback({:error, :inventory_update_failed})
+          end
+
+        :room ->
+          room_ids = Enum.map(booking.rooms, & &1.id)
+
+          if room_ids != [] do
+            {count, _} =
+              Repo.update_all(
+                from(ri in RoomInventory,
+                  where:
+                    ri.room_id in ^room_ids and
+                      ri.day >= ^booking.checkin_date and
+                      ri.day < ^booking.checkout_date
+                ),
+                set: [
+                  booked: false,
+                  updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+                ]
+              )
+
+            if count == 0 do
+              Repo.rollback({:error, :inventory_update_failed})
+            end
+          end
+
+        :day ->
+          release_day_booked_capacity_for_stay!(booking)
+      end
+
+      case booking
+           |> Booking.changeset(%{status: :draft, hold_expires_at: nil},
              rooms: booking.rooms,
              skip_validation: true
            )
