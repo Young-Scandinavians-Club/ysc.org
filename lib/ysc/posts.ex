@@ -263,6 +263,7 @@ defmodule Ysc.Posts do
       end
 
     query
+    |> preload(:updated_by)
     |> Flop.validate_and_run(params, for: Post)
   end
 
@@ -328,7 +329,10 @@ defmodule Ysc.Posts do
       params = maybe_set_board_position_at_publish(post, params)
 
       result =
-        post |> Post.update_post_changeset(params, opts) |> Repo.update()
+        post
+        |> Post.update_post_changeset(params, opts)
+        |> Ecto.Changeset.put_change(:updated_by_id, current_user.id)
+        |> Repo.update()
 
       maybe_invalidate_public_post_cache(result, post)
       result
@@ -344,7 +348,10 @@ defmodule Ysc.Posts do
   def update_post_editor(post, params, %User{} = current_user, opts \\ []) do
     with :ok <- Policy.authorize(:post_update, current_user, post) do
       result =
-        post |> Post.editor_changeset(params, opts) |> Repo.update()
+        post
+        |> Post.editor_changeset(params, opts)
+        |> Ecto.Changeset.put_change(:updated_by_id, current_user.id)
+        |> Repo.update()
 
       maybe_invalidate_public_post_cache(result, post)
       result
@@ -382,7 +389,11 @@ defmodule Ysc.Posts do
     with :ok <- Policy.authorize(:post_create, current_user) do
       new_params = Map.put(params, "user_id", current_user.id)
 
-      result = Post.new_post_changeset(%Post{}, new_params) |> Repo.insert()
+      result =
+        Post.new_post_changeset(%Post{}, new_params)
+        |> Ecto.Changeset.put_change(:updated_by_id, current_user.id)
+        |> Repo.insert()
+
       maybe_invalidate_public_post_cache(result)
       result
     end

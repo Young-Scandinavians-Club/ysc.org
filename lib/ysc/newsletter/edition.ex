@@ -36,6 +36,7 @@ defmodule Ysc.Newsletter.Edition do
 
     belongs_to :cover_image, Image
     belongs_to :creator, User
+    belongs_to :updated_by, User
 
     timestamps()
   end

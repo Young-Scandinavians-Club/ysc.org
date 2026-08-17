@@ -1,6 +1,7 @@
 defmodule YscWeb.AdminPostsLive do
   alias Ysc.Accounts.UserDisplay
   alias Ysc.Posts.Post
+  alias YscWeb.Admin.EditingPresence
   alias YscWeb.AdminBadgeHelpers
 
   use YscWeb, :admin_live_view
@@ -107,7 +108,7 @@ defmodule YscWeb.AdminPostsLive do
             :if={is_nil(@meta)}
             id="admin-posts-loading"
             rows={8}
-            columns={4}
+            columns={5}
           />
 
           <div :if={@meta}>
@@ -127,6 +128,7 @@ defmodule YscWeb.AdminPostsLive do
                           class="h-4 w-4 shrink-0 text-yellow-500"
                         />
                         <span class="truncate">{post.title}</span>
+                        <.presence_avatars editors={@editors_by_post[post.id] || []} />
                       </h3>
                       <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-sm text-zinc-600">
@@ -137,6 +139,16 @@ defmodule YscWeb.AdminPostsLive do
                           {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
                         </span>
                       </div>
+                      <.last_edited_by
+                        user={post.updated_by || post.author}
+                        at={post.updated_at}
+                        formatter={
+                          &Timex.format!(
+                            &1,
+                            "{Mshort} {D}, {YYYY} at {h12}:{m}{am}"
+                          )
+                        }
+                      />
                     </div>
                     <.post_actions_dropdown
                       post={post}
@@ -218,11 +230,22 @@ defmodule YscWeb.AdminPostsLive do
                         {post.comment_count}
                       </span>
                     </span>
+                    <.presence_avatars editors={@editors_by_post[post.id] || []} />
                   </p>
                 </:col>
 
                 <:col :let={{_, post}} label="Author" field={:author_name}>
                   {UserDisplay.full_name(post.author)}
+                </:col>
+
+                <:col :let={{_, post}} label="Last edited">
+                  <.last_edited_by
+                    user={post.updated_by || post.author}
+                    at={post.updated_at}
+                    formatter={
+                      &Timex.format!(&1, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+                    }
+                  />
                 </:col>
 
                 <:col :let={{_, post}} label="State" field={:state}>
@@ -318,6 +341,18 @@ defmodule YscWeb.AdminPostsLive do
 
   @dialyzer {:nowarn_function, mount: 3}
   def mount(_params, _session, socket) do
+    editors_by_post =
+      if connected?(socket) do
+        EditingPresence.subscribe(:post)
+
+        EditingPresence.editors_by_resource(
+          :post,
+          socket.assigns.current_user.id
+        )
+      else
+        %{}
+      end
+
     {:ok,
      socket
      |> assign(:page_title, "Posts")
@@ -328,7 +363,15 @@ defmodule YscWeb.AdminPostsLive do
      |> assign(:date_to, "")
      |> assign(:meta, nil)
      |> assign(:author_filter, [])
+     |> assign(:editors_by_post, editors_by_post)
      |> stream(:posts, [], reset: true)}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    editors_by_post =
+      EditingPresence.editors_by_resource(:post, socket.assigns.current_user.id)
+
+    {:noreply, assign(socket, :editors_by_post, editors_by_post)}
   end
 
   def handle_params(params, _uri, socket) do

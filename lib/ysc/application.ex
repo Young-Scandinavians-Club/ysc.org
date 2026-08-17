@@ -53,6 +53,8 @@ defmodule Ysc.Application do
         Ysc.Repo,
         # Start the PubSub system
         {Phoenix.PubSub, name: Ysc.PubSub},
+        # Tracks which admins are currently viewing/editing which resource
+        YscWeb.Presence,
         # Start DNS cluster to cluster the app
         {DNSCluster,
          query: Application.get_env(:ysc, :dns_cluster_query) || :ignore},

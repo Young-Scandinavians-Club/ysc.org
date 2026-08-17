@@ -10,10 +10,12 @@ defmodule YscWeb.AdminPostEditorLive do
   alias Ysc.Posts
   alias Ysc.Posts.Post
   alias Ysc.Posts.Slug
+  alias YscWeb.Admin.EditingPresence
   alias YscWeb.AdminBadgeHelpers
 
   @save_debounce_timeout 2000
   @new_post_debounce_key "new_post"
+  @post_preloads [:featured_image, :author, :updated_by]
 
   def render(assigns) do
     ~H"""
@@ -173,6 +175,8 @@ defmodule YscWeb.AdminPostEditorLive do
                 {String.capitalize("#{@post.state}")}
               </.badge>
 
+              <.presence_avatars editors={@editors} size={:md} class="self-center" />
+
               <.admin_help_link
                 topic="posts/publish"
                 label="Publishing help"
@@ -331,6 +335,12 @@ defmodule YscWeb.AdminPostEditorLive do
           </div>
         </div>
 
+        <.last_edited_by
+          user={@post.updated_by || @post.author}
+          at={@post.updated_at}
+          formatter={&Timex.format!(&1, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")}
+        />
+
         <div class="flex flex-col gap-1 py-1 text-sm leading-6 text-zinc-500 sm:flex-row sm:items-end sm:gap-2">
           <span :if={@post_id && @post.url_name}>
             <.link
@@ -399,6 +409,7 @@ defmodule YscWeb.AdminPostEditorLive do
   def mount(_params, _session, %{assigns: %{live_action: :new}} = socket) do
     create_topic = "post_editor:#{socket.id}"
     YscWeb.Endpoint.subscribe(create_topic)
+    EditingPresence.subscribe(:post)
 
     default_title = Slug.default_title()
 
@@ -429,11 +440,13 @@ defmodule YscWeb.AdminPostEditorLive do
        url_name: Slug.from_title(default_title)
      })
      |> assign(:preview_device, :computer)
+     |> assign(:editors, [])
      |> assign(form: to_form(changeset, as: "post"))}
   end
 
   def mount(%{"id" => id}, _session, socket) do
     YscWeb.Endpoint.subscribe("post_saved:#{id}")
+    EditingPresence.subscribe(:post)
 
     connected_remount? =
       connected?(socket) &&
@@ -744,7 +757,7 @@ defmodule YscWeb.AdminPostEditorLive do
          assign(
            socket,
            :post,
-           Posts.get_post!(post_id) |> Ysc.Repo.preload(:featured_image)
+           Posts.get_post!(post_id) |> Ysc.Repo.preload(@post_preloads)
          )}
 
       {:error, _} ->
@@ -769,7 +782,7 @@ defmodule YscWeb.AdminPostEditorLive do
            current_user
          ) do
       {:ok, _} ->
-        post = Posts.get_post!(post_id) |> Ysc.Repo.preload(:featured_image)
+        post = Posts.get_post!(post_id) |> Ysc.Repo.preload(@post_preloads)
 
         socket =
           socket
@@ -802,8 +815,9 @@ defmodule YscWeb.AdminPostEditorLive do
         %Phoenix.Socket.Broadcast{event: "created", payload: post_id},
         socket
       ) do
-    post = Posts.get_post!(post_id) |> Ysc.Repo.preload(:featured_image)
+    post = Posts.get_post!(post_id) |> Ysc.Repo.preload(@post_preloads)
     YscWeb.Endpoint.subscribe("post_saved:#{post_id}")
+    EditingPresence.track(socket, :post, post_id, socket.assigns.current_user)
 
     {:noreply,
      socket
@@ -812,6 +826,10 @@ defmodule YscWeb.AdminPostEditorLive do
      |> assign(:post_id, post_id)
      |> assign(:post, post)
      |> assign(:page_title, post.title)
+     |> assign(
+       :editors,
+       EditingPresence.editors(:post, post_id, socket.assigns.current_user.id)
+     )
      |> push_patch(to: ~p"/admin/posts/#{post_id}", replace: true)}
   end
 
@@ -821,8 +839,19 @@ defmodule YscWeb.AdminPostEditorLive do
      |> assign(
        :post,
        Posts.get_post!(socket.assigns.post_id)
-       |> Ysc.Repo.preload(:featured_image)
+       |> Ysc.Repo.preload(@post_preloads)
      )}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    editors =
+      EditingPresence.editors(
+        :post,
+        socket.assigns.post_id,
+        socket.assigns.current_user.id
+      )
+
+    {:noreply, assign(socket, :editors, editors)}
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "create_failed"}, socket) do
@@ -873,12 +902,27 @@ defmodule YscWeb.AdminPostEditorLive do
         {:ok, post} ->
           YscWeb.Endpoint.subscribe("post_saved:#{post.id}")
 
+          EditingPresence.track(
+            socket,
+            :post,
+            post.id,
+            socket.assigns.current_user
+          )
+
           {:ok,
            socket
            |> assign(:unsaved?, false)
            |> assign(:post_id, post.id)
            |> assign(:post, post)
-           |> assign(:page_title, post.title)}
+           |> assign(:page_title, post.title)
+           |> assign(
+             :editors,
+             EditingPresence.editors(
+               :post,
+               post.id,
+               socket.assigns.current_user.id
+             )
+           )}
 
         {:error, _} ->
           {:error, socket}
@@ -896,7 +940,7 @@ defmodule YscWeb.AdminPostEditorLive do
     |> then(&Posts.create_post(&1, current_user))
     |> case do
       {:ok, post} ->
-        {:ok, Posts.get_post!(post.id) |> Ysc.Repo.preload(:featured_image)}
+        {:ok, Posts.get_post!(post.id) |> Ysc.Repo.preload(@post_preloads)}
 
       error ->
         error
@@ -1021,13 +1065,16 @@ defmodule YscWeb.AdminPostEditorLive do
       pending_form_values: %{},
       create_topic: nil,
       preview_device: :computer,
+      editors: [],
       form:
         to_form(Post.editor_changeset(%Post{state: :draft}, %{}), as: "post")
     )
   end
 
   defp load_post(socket, id) do
-    post = Posts.get_post!(id) |> Ysc.Repo.preload(:featured_image)
+    post = Posts.get_post!(id) |> Ysc.Repo.preload(@post_preloads)
+
+    EditingPresence.track(socket, :post, id, socket.assigns.current_user)
 
     form_attrs =
       if Slug.blank_title?(post.title) do
@@ -1056,6 +1103,10 @@ defmodule YscWeb.AdminPostEditorLive do
     |> assign(:post_id, post.id)
     |> assign(:post, post)
     |> assign(:preview_device, :computer)
+    |> assign(
+      :editors,
+      EditingPresence.editors(:post, id, socket.assigns.current_user.id)
+    )
     |> assign(form: to_form(update_post_changeset, as: "post"))
   end
 end

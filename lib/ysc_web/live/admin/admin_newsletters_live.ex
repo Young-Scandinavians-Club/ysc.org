@@ -4,6 +4,7 @@ defmodule YscWeb.AdminNewslettersLive do
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
   alias YscWeb.Admin.DateTimeDisplay
+  alias YscWeb.Admin.EditingPresence
   alias YscWeb.AdminBadgeHelpers
   alias YscWeb.DateDisplay
 
@@ -12,7 +13,18 @@ defmodule YscWeb.AdminNewslettersLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Newsletter.subscribe_to_edition_updates()
+    editors_by_edition =
+      if connected?(socket) do
+        Newsletter.subscribe_to_edition_updates()
+        EditingPresence.subscribe(:newsletter)
+
+        EditingPresence.editors_by_resource(
+          :newsletter,
+          socket.assigns.current_user.id
+        )
+      else
+        %{}
+      end
 
     socket =
       socket
@@ -20,6 +32,7 @@ defmodule YscWeb.AdminNewslettersLive do
       |> assign(:active_page, :newsletters)
       |> assign(:subscriber_count, nil)
       |> assign(:creator_filter, [])
+      |> assign(:editors_by_edition, editors_by_edition)
       |> assign(:empty, false)
       |> assign(:meta, nil)
       |> assign(:params, %{})
@@ -185,6 +198,16 @@ defmodule YscWeb.AdminNewslettersLive do
   @impl true
   def handle_info({:edition_delivery_progress, edition}, socket) do
     {:noreply, stream_insert(socket, :editions, edition)}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    editors_by_edition =
+      EditingPresence.editors_by_resource(
+        :newsletter,
+        socket.assigns.current_user.id
+      )
+
+    {:noreply, assign(socket, :editors_by_edition, editors_by_edition)}
   end
 
   def handle_info({:edition_sent, edition}, socket) do
@@ -385,7 +408,7 @@ defmodule YscWeb.AdminNewslettersLive do
           </div>
 
           <%!-- Editions content --%>
-          <.admin_table_skeleton :if={is_nil(@meta)} rows={6} columns={4} />
+          <.admin_table_skeleton :if={is_nil(@meta)} rows={6} columns={6} />
 
           <div :if={@meta} class="space-y-6">
             <%!-- Mobile Card View --%>
@@ -442,7 +465,17 @@ defmodule YscWeb.AdminNewslettersLive do
                     >
                       by {creator_name(edition.creator)}
                     </span>
+                    <.presence_avatars editors={
+                      @editors_by_edition[edition.id] || []
+                    } />
                   </div>
+
+                  <.last_edited_by
+                    user={edition.updated_by || edition.creator}
+                    at={edition.updated_at}
+                    formatter={&DateDisplay.format_datetime_display/1}
+                    class="mt-1"
+                  />
 
                   <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
                     <.edition_actions_dropdown
@@ -482,12 +515,17 @@ defmodule YscWeb.AdminNewslettersLive do
                 opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
               >
                 <:col :let={{_, edition}} label="Title" field={:title}>
-                  <.link
-                    navigate={~p"/admin/newsletters/#{edition.id}/edit"}
-                    class="font-semibold text-zinc-900 hover:underline"
-                  >
-                    {edition.title}
-                  </.link>
+                  <div class="flex items-center gap-2">
+                    <.link
+                      navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                      class="font-semibold text-zinc-900 hover:underline"
+                    >
+                      {edition.title}
+                    </.link>
+                    <.presence_avatars editors={
+                      @editors_by_edition[edition.id] || []
+                    } />
+                  </div>
                 </:col>
                 <:col :let={{_, edition}} label="Subject" field={:subject}>
                   <span class="text-zinc-600">{edition.subject}</span>
@@ -539,6 +577,13 @@ defmodule YscWeb.AdminNewslettersLive do
                   <% else %>
                     <span class="text-zinc-400">—</span>
                   <% end %>
+                </:col>
+                <:col :let={{_, edition}} label="Last edited">
+                  <.last_edited_by
+                    user={edition.updated_by || edition.creator}
+                    at={edition.updated_at}
+                    formatter={&DateDisplay.format_datetime_display/1}
+                  />
                 </:col>
                 <:action :let={{_, edition}}>
                   <.edition_actions_dropdown

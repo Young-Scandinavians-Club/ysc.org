@@ -12,6 +12,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.Events.Event
   alias Ysc.Events.EventUpdate
   alias Ysc.ExpenseReports
+  alias YscWeb.Admin.EditingPresence
   alias YscWeb.AdminBadgeHelpers
   alias YscWeb.AdminCheckInPaths
   alias Ysc.Media.Image
@@ -67,6 +68,8 @@ defmodule YscWeb.AdminEventsNewLive do
                     {String.capitalize("#{@state}")}
                   </.badge>
 
+                  <.presence_avatars editors={@editors} size={:md} />
+
                   <.admin_help_link
                     topic={event_help_topic(@live_action)}
                     label="Guide for this tab"
@@ -99,6 +102,14 @@ defmodule YscWeb.AdminEventsNewLive do
                     })}
                   </p>
                 </div>
+
+                <.last_edited_by
+                  user={@event.updated_by || @event.organizer}
+                  at={@event.updated_at}
+                  formatter={
+                    &Timex.format!(&1, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+                  }
+                />
               </div>
 
               <div class="flex flex-shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
@@ -1315,6 +1326,7 @@ defmodule YscWeb.AdminEventsNewLive do
     # handle_params skips `load_event/2` when the URL id matches the mounted event,
     # so agenda PubSub updates would otherwise never be received.
     Agendas.subscribe(id)
+    EditingPresence.subscribe(:event)
 
     if connected?(socket) do
       Events.subscribe()
@@ -1387,14 +1399,16 @@ defmodule YscWeb.AdminEventsNewLive do
     case socket.assigns[:event] do
       %{id: old_id} when old_id != id ->
         Agendas.unsubscribe(old_id)
+        EditingPresence.untrack(socket, :event)
 
       _ ->
         :ok
     end
 
     Agendas.subscribe(id)
+    EditingPresence.track(socket, :event, id, socket.assigns.current_user)
 
-    event = Events.get_event!(id)
+    event = Events.get_event!(id) |> Ysc.Repo.preload([:organizer, :updated_by])
     event_changeset = Event.changeset(event, %{})
 
     capacity_attrs = %{"unlimited_capacity" => is_nil(event.max_attendees)}
@@ -1443,6 +1457,10 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:location_presets, EventLocationConfig.presets())
     |> assign_check_in_path(event)
     |> assign(:loading_event?, false)
+    |> assign(
+      :editors,
+      EditingPresence.editors(:event, id, socket.assigns.current_user.id)
+    )
   end
 
   defp assign_event_loading_shell(socket, params, id) do
@@ -1472,6 +1490,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign(:check_in_path, nil)
+    |> assign(:editors, [])
   end
 
   defp assign_updates_tab_defaults(socket) do
@@ -1982,7 +2001,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {updated_event, updated_changeset} =
       if event_changeset.valid? do
-        case Events.update_event_editor(current_event, event_params) do
+        case Events.update_event_editor(current_event, event_params,
+               updated_by_id: socket.assigns.current_user.id
+             ) do
           {:ok, updated_event} ->
             # Update succeeded, rebuild changeset with updated event
             updated_changeset =
@@ -2079,7 +2100,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {updated_event, updated_changeset} =
       if changeset.valid? do
-        case Events.update_event_editor(current_event, update_attrs) do
+        case Events.update_event_editor(current_event, update_attrs,
+               updated_by_id: socket.assigns.current_user.id
+             ) do
           {:ok, updated_event} ->
             updated_changeset =
               Event.editor_changeset(updated_event, update_attrs)
@@ -2292,9 +2315,11 @@ defmodule YscWeb.AdminEventsNewLive do
         # Extract the processed max_attendees value from the changeset
         new_max_attendees = Ecto.Changeset.get_field(changeset, :max_attendees)
 
-        case Events.update_event_editor(current_event, %{
-               "max_attendees" => new_max_attendees
-             }) do
+        case Events.update_event_editor(
+               current_event,
+               %{"max_attendees" => new_max_attendees},
+               updated_by_id: socket.assigns.current_user.id
+             ) do
           {:ok, event} -> event
           {:error, _} -> current_event
         end
@@ -2328,7 +2353,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {updated_event, updated_changeset} =
       if changeset.valid? do
-        case Events.update_event_editor(current_event, capacity_params) do
+        case Events.update_event_editor(current_event, capacity_params,
+               updated_by_id: socket.assigns.current_user.id
+             ) do
           {:ok, event} ->
             updated_changeset =
               Event.changeset(event, capacity_params)
@@ -2363,7 +2390,9 @@ defmodule YscWeb.AdminEventsNewLive do
         other -> other
       end
 
-    case Events.update_event_editor(current_event, capacity_params) do
+    case Events.update_event_editor(current_event, capacity_params,
+           updated_by_id: socket.assigns.current_user.id
+         ) do
       {:ok, event} ->
         {:noreply,
          socket
@@ -2581,7 +2610,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {updated_event, updated_changeset, save_error?} =
       if changeset.valid? do
-        case Events.update_event_editor(current_event, attrs) do
+        case Events.update_event_editor(current_event, attrs,
+               updated_by_id: socket.assigns.current_user.id
+             ) do
           {:ok, event} ->
             {event, Event.editor_changeset(event, attrs), false}
 
@@ -2641,7 +2672,9 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     current_event = Events.get_event!(socket.assigns[:event].id)
 
-    case Events.update_event_editor(current_event, %{image_id: nil}) do
+    case Events.update_event_editor(current_event, %{image_id: nil},
+           updated_by_id: socket.assigns.current_user.id
+         ) do
       {:ok, event} ->
         changeset = Event.changeset(event, %{"image_id" => nil})
         {:noreply, assign_form(socket, changeset) |> assign(:event, event)}
@@ -2649,7 +2682,9 @@ defmodule YscWeb.AdminEventsNewLive do
       {:error, _} ->
         reloaded_event = Events.get_event!(socket.assigns[:event].id)
 
-        case Events.update_event_editor(reloaded_event, %{image_id: nil}) do
+        case Events.update_event_editor(reloaded_event, %{image_id: nil},
+               updated_by_id: socket.assigns.current_user.id
+             ) do
           {:ok, event} ->
             changeset = Event.changeset(event, %{"image_id" => nil})
             {:noreply, assign_form(socket, changeset) |> assign(:event, event)}
@@ -2672,7 +2707,11 @@ defmodule YscWeb.AdminEventsNewLive do
 
     updated_event =
       if changeset.valid? do
-        case Events.update_event_editor(current_event, %{image_id: image_id}) do
+        case Events.update_event_editor(
+               current_event,
+               %{image_id: image_id},
+               updated_by_id: socket.assigns.current_user.id
+             ) do
           {:ok, event} -> event
           {:error, _} -> current_event
         end
@@ -2787,6 +2826,18 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_info({Ysc.Events, _msg}, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    editors =
+      EditingPresence.editors(
+        :event,
+        socket.assigns.event.id,
+        socket.assigns.current_user.id
+      )
+
+    {:noreply, assign(socket, :editors, editors)}
+  end
 
   defp send_ticket_tier_management_reservation_update(socket, tier_id, opts) do
     close_reserve? = Keyword.get(opts, :close_reserve_modal, false)
@@ -3037,7 +3088,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
       updated_event =
         if changeset.valid? do
-          case Events.update_event_editor(current_event, attrs) do
+          case Events.update_event_editor(current_event, attrs,
+                 updated_by_id: socket.assigns.current_user.id
+               ) do
             {:ok, event} -> event
             {:error, _} -> current_event
           end
