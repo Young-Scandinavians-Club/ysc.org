@@ -74,13 +74,18 @@ defmodule YscWeb.AdminEventsNewLive do
                   />
 
                   <.link
+                    :if={
+                      @event.state in [:published, :cancelled, :draft, :scheduled]
+                    }
                     href={~p"/events/#{@event.id}"}
                     target="_blank"
                     rel="noopener noreferrer"
                     class="inline-flex shrink-0 items-center gap-1 text-sm text-zinc-500 transition hover:text-blue-700"
                   >
                     <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
-                    {if @event.state == :published, do: "View Event", else: "Preview"}
+                    {if @event.state in [:published, :cancelled],
+                      do: "View Event",
+                      else: "Preview"}
                   </.link>
                 </div>
 

@@ -197,71 +197,45 @@ defmodule YscWeb.AgendaEditComponent do
   def update(
         %{
           event: %Ysc.MessagePassingEvents.AgendaItemAdded{
-            agenda_item: agenda_item
+            agenda_item: _agenda_item
           }
         },
         socket
       ) do
-    items = fresh_agenda_items(socket.assigns.agenda_id)
-
-    {:ok,
-     socket
-     |> assign(:agenda_items, items)
-     |> assign(:chronological_warning, check_chronological_order(items))
-     |> stream_insert(:agenda_items, to_change_form(agenda_item, %{}))}
+    {:ok, resync_agenda_items(socket)}
   end
 
   def update(
         %{
           event: %Ysc.MessagePassingEvents.AgendaItemDeleted{
-            agenda_item: agenda_item
+            agenda_item: _agenda_item
           }
         },
         socket
       ) do
-    items = fresh_agenda_items(socket.assigns.agenda_id)
-
-    {:ok,
-     socket
-     |> assign(:agenda_items, items)
-     |> assign(:chronological_warning, check_chronological_order(items))
-     |> stream_delete(:agenda_items, to_change_form(agenda_item, %{}))}
+    {:ok, resync_agenda_items(socket)}
   end
 
   def update(
         %{
           event: %Ysc.MessagePassingEvents.AgendaItemUpdated{
-            agenda_item: agenda_item
+            agenda_item: _agenda_item
           }
         },
         socket
       ) do
-    items = fresh_agenda_items(socket.assigns.agenda_id)
-
-    {:ok,
-     socket
-     |> assign(:agenda_items, items)
-     |> assign(:chronological_warning, check_chronological_order(items))
-     |> stream_insert(:agenda_items, to_change_form(agenda_item, %{}))}
+    {:ok, resync_agenda_items(socket)}
   end
 
   def update(
         %{
           event: %Ysc.MessagePassingEvents.AgendaItemRepositioned{
-            agenda_item: agenda_item
+            agenda_item: _agenda_item
           }
         },
         socket
       ) do
-    items = fresh_agenda_items(socket.assigns.agenda_id)
-
-    {:ok,
-     socket
-     |> assign(:agenda_items, items)
-     |> assign(:chronological_warning, check_chronological_order(items))
-     |> stream_insert(:agenda_items, to_change_form(agenda_item, %{}),
-       at: agenda_item.position
-     )}
+    {:ok, resync_agenda_items(socket)}
   end
 
   def update(%{agenda: agenda} = _assigns, socket) do
@@ -439,6 +413,16 @@ defmodule YscWeb.AgendaEditComponent do
 
   defp find_agenda_item(socket, id) do
     Enum.find(socket.assigns.agenda_items, &(to_string(&1.id) == to_string(id)))
+  end
+
+  defp resync_agenda_items(socket) do
+    items = fresh_agenda_items(socket.assigns.agenda_id)
+    forms = Enum.map(items, &to_change_form(&1, %{}))
+
+    socket
+    |> assign(:agenda_items, items)
+    |> assign(:chronological_warning, check_chronological_order(items))
+    |> stream(:agenda_items, forms, reset: true)
   end
 
   defp fresh_agenda_items(agenda_id) do
