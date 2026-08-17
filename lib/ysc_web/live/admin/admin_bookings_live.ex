@@ -6911,12 +6911,18 @@ defmodule YscWeb.AdminBookingsLive do
      )}
   end
 
-  defp revert_existing_admin_booking_to_draft(socket, %{status: :hold} = booking) do
+  defp revert_existing_admin_booking_to_draft(
+         socket,
+         %{status: :hold} = booking
+       ) do
     BookingLocker.revert_hold_to_draft(booking.id)
     |> handle_admin_cancel_result(socket, booking, :draft)
   end
 
-  defp revert_existing_admin_booking_to_draft(socket, %{status: :complete} = booking) do
+  defp revert_existing_admin_booking_to_draft(
+         socket,
+         %{status: :complete} = booking
+       ) do
     BookingLocker.revert_complete_to_draft(booking.id)
     |> handle_admin_cancel_result(socket, booking, :draft)
   end
