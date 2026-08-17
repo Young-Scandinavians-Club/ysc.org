@@ -1809,6 +1809,7 @@ defmodule YscWeb.EventDetailsLive do
                 id={"event-checkout-#{@event.id}"}
                 module={YscWeb.Components.Image}
                 image_id={@event.image_id}
+                image={Map.get(@event, :cover_image) || Map.get(@event, :image)}
                 preferred_type={:optimized}
               />
             </div>
@@ -2686,6 +2687,7 @@ defmodule YscWeb.EventDetailsLive do
                     id={"event-checkout-#{@event.id}"}
                     module={YscWeb.Components.Image}
                     image_id={@event.image_id}
+                    image={Map.get(@event, :cover_image) || Map.get(@event, :image)}
                   />
                 </div>
 
