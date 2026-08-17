@@ -222,7 +222,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
                "Your family already has the entire cabin booked"
              )
 
-      assert html =~ "Someone in your family already has the entire cabin booked"
+      assert html =~
+               "Someone in your family already has the entire cabin booked"
 
       socket = :sys.get_state(view.pid).socket
       refute socket.assigns.can_book
