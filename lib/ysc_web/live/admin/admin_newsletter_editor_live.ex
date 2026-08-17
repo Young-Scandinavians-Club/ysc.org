@@ -12,13 +12,18 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   alias Ysc.Repo
   alias Phoenix.LiveView.JS
   alias HtmlSanitizeEx.Scrubber
+  alias YscWeb.Admin.EditingPresence
+  alias YscWeb.DateDisplay
   alias YscWeb.Emails.NewsletterEdition
 
   @auto_save_debounce_ms 2_000
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket), do: Newsletter.subscribe_to_edition_updates()
+    if connected?(socket) do
+      Newsletter.subscribe_to_edition_updates()
+      EditingPresence.subscribe(:newsletter)
+    end
 
     {:ok,
      socket
@@ -58,7 +63,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(
        :save_notice_form,
        to_form(Notice.changeset(%Notice{}, %{}), as: :save_notice)
-     )}
+     )
+     |> assign(:editors, [])}
   end
 
   @impl true
@@ -125,15 +131,44 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   defp apply_loaded_edition(socket, edition) do
+    EditingPresence.track(
+      socket,
+      :newsletter,
+      edition.id,
+      socket.assigns.current_user
+    )
+
     socket
     |> assign(:loading_edition?, false)
     |> assign(:edition, edition)
     |> assign(:readonly?, edition_readonly?(edition))
     |> assign(:selected_post_ids, edition.post_ids || [])
     |> assign(:selected_event_ids, edition.event_ids || [])
+    |> assign_newsletter_editors()
     |> assign_form_from_edition(edition)
     |> maybe_load_email_stats(edition)
     |> assign_preview_data()
+  end
+
+  defp assign_newsletter_editors(socket) do
+    edition_id =
+      case socket.assigns[:edition] do
+        %{id: id} when is_binary(id) -> id
+        _ -> nil
+      end
+
+    editors =
+      if edition_id do
+        EditingPresence.editors(
+          :newsletter,
+          edition_id,
+          socket.assigns.current_user.id
+        )
+      else
+        []
+      end
+
+    assign(socket, :editors, editors)
   end
 
   defp maybe_load_email_stats(socket, %Edition{status: :sent, id: edition_id})
@@ -444,6 +479,13 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           </.badge>
         <% end %>
         <.badge :if={!@edition} type="yellow">Draft</.badge>
+        <.presence_avatars editors={@editors} size={:md} />
+        <.last_edited_by
+          :if={@edition}
+          user={@edition.updated_by || @edition.creator}
+          at={@edition.updated_at}
+          formatter={&DateDisplay.format_datetime_display/1}
+        />
         <.admin_help_link
           topic="newsletters/compose"
           label="Compose help"
@@ -1416,7 +1458,9 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           )
 
         edition ->
-          Newsletter.update_edition_draft(edition, params)
+          Newsletter.update_edition_draft(edition, params,
+            updated_by_id: socket.assigns.current_user.id
+          )
       end
 
     case result do
@@ -1882,6 +1926,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   defp persist_edition(socket) do
+    was_new = is_nil(socket.assigns.edition)
     params = edition_params_from_socket(socket)
 
     result =
@@ -1892,12 +1937,28 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           )
 
         edition ->
-          Newsletter.update_edition(edition, params)
+          Newsletter.update_edition(edition, params,
+            updated_by_id: socket.assigns.current_user.id
+          )
       end
 
     case result do
-      {:ok, edition} -> {:ok, Newsletter.get_edition!(edition.id), socket}
-      _ -> {:error, socket}
+      {:ok, edition} ->
+        edition = Newsletter.get_edition!(edition.id)
+
+        if was_new do
+          EditingPresence.track(
+            socket,
+            :newsletter,
+            edition.id,
+            socket.assigns.current_user
+          )
+        end
+
+        {:ok, edition, socket}
+
+      _ ->
+        {:error, socket}
     end
   end
 
@@ -1946,7 +2007,9 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           )
 
         edition ->
-          Newsletter.update_edition_draft(edition, params)
+          Newsletter.update_edition_draft(edition, params,
+            updated_by_id: socket.assigns.current_user.id
+          )
       end
 
     case result do
@@ -2193,6 +2256,10 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(form: to_form(changeset, as: "edition"))
      |> assign_preview_data()
      |> schedule_auto_save()}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign_newsletter_editors(socket)}
   end
 
   def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do

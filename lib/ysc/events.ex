@@ -269,6 +269,7 @@ defmodule Ysc.Events do
       end
 
     case query
+         |> preload(:updated_by)
          |> Flop.validate_and_run(params, for: Event) do
       {:ok, {events, meta}} ->
         events = enrich_events_with_capacity(events)
@@ -441,9 +442,14 @@ defmodule Ysc.Events do
     organizer_id =
       Map.get(attrs, :organizer_id) || Map.get(attrs, "organizer_id")
 
+    event_changeset =
+      %Event{}
+      |> Event.changeset(attrs)
+      |> maybe_put_updated_by(organizer_id)
+
     multi =
       Ecto.Multi.new()
-      |> Ecto.Multi.insert(:event, Event.changeset(%Event{}, attrs))
+      |> Ecto.Multi.insert(:event, event_changeset)
 
     multi =
       if organizer_id do
@@ -693,17 +699,27 @@ defmodule Ysc.Events do
   Ignores mass-assigned publish controls (`state`, `published_at`, `publish_at`,
   `organizer_id`). Use `publish_event/1`, `unpublish_event/1`, and similar for
   lifecycle transitions.
+
+  Options:
+  - `:updated_by_id` — user id to record as the last editor.
   """
-  def update_event_editor(%Event{} = event, attrs) do
+  def update_event_editor(%Event{} = event, attrs, opts \\ []) do
     event
     |> Event.editor_changeset(attrs)
+    |> maybe_put_updated_by(Keyword.get(opts, :updated_by_id))
     |> Repo.update(stale_error_field: :lock_version)
     |> finalize_event_update()
   end
 
+  defp maybe_put_updated_by(changeset, nil), do: changeset
+
+  defp maybe_put_updated_by(changeset, user_id),
+    do: Ecto.Changeset.put_change(changeset, :updated_by_id, user_id)
+
   defp finalize_event_update(result) do
     case result do
       {:ok, event} ->
+        event = Repo.preload(event, [:organizer, :updated_by])
         invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
         maybe_reschedule_event_photo_reminder(event)

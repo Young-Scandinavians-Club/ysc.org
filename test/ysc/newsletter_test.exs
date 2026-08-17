@@ -663,6 +663,67 @@ defmodule Ysc.NewsletterTest do
 
       assert %{subject: [_ | _]} = errors_on(changeset)
     end
+
+    test "sets updated_by_id to the creator" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition_draft(
+          %{"title" => "Bootstrap", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      assert edition.updated_by_id == user.id
+    end
+
+    test "leaves updated_by_id nil without a created_by_id" do
+      {:ok, edition} =
+        Newsletter.create_edition_draft(%{
+          "title" => "No creator",
+          "subject" => "S"
+        })
+
+      assert edition.updated_by_id == nil
+    end
+  end
+
+  describe "update_edition_draft/3" do
+    test "sets updated_by_id when an updated_by_id opt is given" do
+      user = user_fixture()
+      editor = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition_draft(
+          %{"title" => "Original", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      assert {:ok, updated} =
+               Newsletter.update_edition_draft(
+                 edition,
+                 %{"title" => "Edited"},
+                 updated_by_id: editor.id
+               )
+
+      assert updated.title == "Edited"
+      assert updated.updated_by_id == editor.id
+    end
+
+    test "leaves updated_by_id unchanged when the opt is omitted" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition_draft(
+          %{"title" => "Original", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      assert {:ok, updated} =
+               Newsletter.update_edition_draft(edition, %{"title" => "Edited"})
+
+      assert updated.title == "Edited"
+      assert updated.updated_by_id == user.id
+    end
   end
 
   describe "editions" do

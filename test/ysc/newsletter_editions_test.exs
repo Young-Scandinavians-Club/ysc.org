@@ -160,7 +160,7 @@ defmodule Ysc.NewsletterEditionsTest do
   # update_edition/2
   # ---------------------------------------------------------------------------
 
-  describe "update_edition/2" do
+  describe "update_edition/3" do
     test "updates allowed fields" do
       edition = edition_fixture(admin_fixture())
 
@@ -183,6 +183,36 @@ defmodule Ysc.NewsletterEditionsTest do
                Newsletter.update_edition(edition, %{"title" => ""})
 
       assert %{title: ["can't be blank"]} = errors_on(changeset)
+    end
+
+    test "sets updated_by_id when the opt is given" do
+      creator = admin_fixture()
+      editor = admin_fixture()
+      edition = edition_fixture(creator)
+
+      assert {:ok, updated} =
+               Newsletter.update_edition(edition, %{"title" => "Edited"},
+                 updated_by_id: editor.id
+               )
+
+      assert updated.updated_by_id == editor.id
+    end
+
+    test "does not touch updated_by_id when the opt is omitted (system updates)" do
+      creator = admin_fixture()
+      editor = admin_fixture()
+      edition = edition_fixture(creator)
+
+      {:ok, edition} =
+        Newsletter.update_edition(edition, %{"title" => "First edit"},
+          updated_by_id: editor.id
+        )
+
+      assert {:ok, updated} =
+               Newsletter.update_edition(edition, %{"sent_count" => 5})
+
+      assert updated.sent_count == 5
+      assert updated.updated_by_id == editor.id
     end
   end
 

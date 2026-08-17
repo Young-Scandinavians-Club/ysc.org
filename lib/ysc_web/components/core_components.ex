@@ -2556,6 +2556,82 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Avatar stack showing who else is currently editing a resource, via `Phoenix.Presence`.
+
+  `editors` is a list of `%{user_id:, name:, avatar_url:}` maps (see
+  `YscWeb.Admin.EditingPresence`). Renders nothing when the list is empty.
+  """
+  attr :editors, :list, required: true
+
+  attr :size, :atom,
+    default: :sm,
+    values: [:sm, :md],
+    doc: ":sm for table rows, :md for editor headers"
+
+  attr :max_shown, :integer, default: 3
+  attr :class, :string, default: nil
+
+  def presence_avatars(assigns) do
+    ~H"""
+    <div :if={@editors != []} class={["flex items-center -space-x-2", @class]}>
+      <.tooltip
+        :for={editor <- Enum.take(@editors, @max_shown)}
+        tooltip_text={"#{editor.name} is editing"}
+      >
+        <img
+          src={editor.avatar_url}
+          alt=""
+          class={[
+            "rounded-full ring-2 ring-white object-cover",
+            @size == :sm && "h-5 w-5",
+            @size == :md && "h-7 w-7"
+          ]}
+        />
+      </.tooltip>
+      <.tooltip
+        :if={length(@editors) > @max_shown}
+        tooltip_text={
+          @editors |> Enum.drop(@max_shown) |> Enum.map_join(", ", & &1.name)
+        }
+      >
+        <span class={[
+          "flex items-center justify-center rounded-full bg-zinc-200 font-semibold text-zinc-700 ring-2 ring-white",
+          @size == :sm && "h-5 w-5 text-[9px]",
+          @size == :md && "h-7 w-7 text-[10px]"
+        ]}>
+          +{length(@editors) - @max_shown}
+        </span>
+      </.tooltip>
+    </div>
+    """
+  end
+
+  @doc """
+  Small "Last edited by X · DATE" line for admin editor/listing pages.
+
+  `user` is the resource's `updated_by` (or a fallback owner for
+  pre-migration records with no `updated_by_id` yet). `formatter` is a
+  `fun(DateTime.t()) :: String.t()` so each page keeps its own date style.
+  Renders nothing when `user` or `at` is nil.
+  """
+  attr :user, :any, required: true
+  attr :at, :any, required: true
+  attr :formatter, :any, required: true
+  attr :class, :string, default: nil
+
+  def last_edited_by(assigns) do
+    ~H"""
+    <p :if={@user && @at} class={["text-xs text-zinc-500", @class]}>
+      Last edited by
+      <span class="font-medium text-zinc-700">
+        {Ysc.Accounts.UserDisplay.full_name(@user)}
+      </span>
+      · {@formatter.(@at)}
+    </p>
+    """
+  end
+
   attr :event, :any, required: true
   attr :sold_out, :boolean, default: false
   attr :selling_fast, :boolean, default: false

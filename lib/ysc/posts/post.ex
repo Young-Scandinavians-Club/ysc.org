@@ -49,6 +49,10 @@ defmodule Ysc.Posts.Post do
       foreign_key: :user_id,
       references: :id
 
+    belongs_to :updated_by, Ysc.Accounts.User,
+      foreign_key: :updated_by_id,
+      references: :id
+
     field :state, PostState
     field :title, :string
 

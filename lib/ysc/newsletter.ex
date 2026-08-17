@@ -76,6 +76,7 @@ defmodule Ysc.Newsletter do
     :scheduled_at,
     :cover_image_id,
     :creator_id,
+    :updated_by_id,
     :inserted_at,
     :updated_at
   ]
@@ -731,7 +732,7 @@ defmodule Ysc.Newsletter do
     base_query =
       Edition
       |> select([e], struct(e, ^@edition_list_fields))
-      |> preload([:cover_image, :creator])
+      |> preload([:cover_image, :creator, :updated_by])
       |> Ecto.Query.exclude(:order_by)
       |> maybe_filter_inserted_at_from(date_from)
       |> maybe_filter_inserted_at_to(date_to)
@@ -811,7 +812,9 @@ defmodule Ysc.Newsletter do
   Gets a single edition by id. Raises if not found.
   """
   def get_edition!(id),
-    do: Repo.get!(Edition, id) |> Repo.preload([:cover_image, :creator])
+    do:
+      Repo.get!(Edition, id)
+      |> Repo.preload([:cover_image, :creator, :updated_by])
 
   @doc """
   Lists all sent editions, most recently sent first.
@@ -858,6 +861,7 @@ defmodule Ysc.Newsletter do
     %Edition{}
     |> Edition.changeset(attrs)
     |> maybe_put_creator(creator_id)
+    |> maybe_put_updated_by(creator_id)
     |> Repo.insert()
   end
 
@@ -873,6 +877,7 @@ defmodule Ysc.Newsletter do
     |> Edition.draft_changeset(attrs)
     |> Ecto.Changeset.put_change(:status, :draft)
     |> maybe_put_creator(creator_id)
+    |> maybe_put_updated_by(creator_id)
     |> Repo.insert()
   end
 
@@ -881,12 +886,23 @@ defmodule Ysc.Newsletter do
   defp maybe_put_creator(changeset, creator_id),
     do: Ecto.Changeset.put_change(changeset, :creator_id, creator_id)
 
+  defp maybe_put_updated_by(changeset, nil), do: changeset
+
+  defp maybe_put_updated_by(changeset, user_id),
+    do: Ecto.Changeset.put_change(changeset, :updated_by_id, user_id)
+
   @doc """
   Updates an edition.
+
+  Options:
+  - `:updated_by_id` — user id to record as the last editor. Omit for
+    system-driven updates (e.g. delivery progress) that shouldn't overwrite
+    who last edited the content.
   """
-  def update_edition(%Edition{} = edition, attrs) do
+  def update_edition(%Edition{} = edition, attrs, opts \\ []) do
     edition
     |> Edition.changeset(attrs)
+    |> maybe_put_updated_by(Keyword.get(opts, :updated_by_id))
     |> Repo.update()
   end
 
@@ -964,10 +980,14 @@ defmodule Ysc.Newsletter do
 
   @doc """
   Updates editorial newsletter fields from the admin editor draft save path.
+
+  Options:
+  - `:updated_by_id` — user id to record as the last editor.
   """
-  def update_edition_draft(%Edition{} = edition, attrs) do
+  def update_edition_draft(%Edition{} = edition, attrs, opts \\ []) do
     edition
     |> Edition.draft_changeset(attrs)
+    |> maybe_put_updated_by(Keyword.get(opts, :updated_by_id))
     |> Repo.update()
   end
 

@@ -68,6 +68,11 @@ defmodule Ysc.Events.Event do
       foreign_key: :organizer_id,
       references: :id
 
+    # Who last saved a change to this event (any editor mutation)
+    belongs_to :updated_by, Ysc.Accounts.User,
+      foreign_key: :updated_by_id,
+      references: :id
+
     field :title, :string
     # Short description that will be displayed in the event list
     # and in the calendar event tooltip

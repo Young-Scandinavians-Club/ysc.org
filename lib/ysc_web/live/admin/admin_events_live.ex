@@ -7,6 +7,7 @@ defmodule YscWeb.AdminEventsLive do
 
   alias Ysc.Events
   alias Ysc.Scanning
+  alias YscWeb.Admin.EditingPresence
   alias YscWeb.AdminCheckInPaths
 
   def render(assigns) do
@@ -125,7 +126,7 @@ defmodule YscWeb.AdminEventsLive do
             :if={is_nil(@meta)}
             id="admin-events-loading"
             rows={8}
-            columns={5}
+            columns={6}
           />
 
           <div :if={@meta}>
@@ -137,8 +138,9 @@ defmodule YscWeb.AdminEventsLive do
                     navigate={~p"/admin/events/#{event.id}/edit"}
                     class="mb-3 cursor-pointer block"
                   >
-                    <h3 class="text-base font-semibold text-zinc-900 mb-2">
-                      {event.title}
+                    <h3 class="text-base font-semibold text-zinc-900 mb-2 flex items-center gap-1.5">
+                      <span>{event.title}</span>
+                      <.presence_avatars editors={@editors_by_event[event.id] || []} />
                     </h3>
                     <div class="space-y-1.5">
                       <div class="flex items-center gap-2">
@@ -163,6 +165,14 @@ defmodule YscWeb.AdminEventsLive do
                         <span class="text-sm text-zinc-600">Created:</span>
                         <span class="text-sm text-zinc-900">
                           {format_date(event.inserted_at)}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm text-zinc-600">Last edited:</span>
+                        <span class="text-sm text-zinc-900">
+                          {UserDisplay.full_name(
+                            event.updated_by || event.organizer
+                          )} · {format_date(event.updated_at)}
                         </span>
                       </div>
                     </div>
@@ -220,8 +230,9 @@ defmodule YscWeb.AdminEventsLive do
                 opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
               >
                 <:col :let={{_, event}} label="Title" field={:title}>
-                  <p class="text-sm font-semibold">
-                    {event.title}
+                  <p class="text-sm font-semibold flex items-center gap-1.5">
+                    <span>{event.title}</span>
+                    <.presence_avatars editors={@editors_by_event[event.id] || []} />
                   </p>
                 </:col>
 
@@ -253,6 +264,14 @@ defmodule YscWeb.AdminEventsLive do
 
                 <:col :let={{_, event}} label="Created" field={:inserted_at}>
                   {format_date(event.inserted_at)}
+                </:col>
+
+                <:col :let={{_, event}} label="Last edited">
+                  <.last_edited_by
+                    user={event.updated_by || event.organizer}
+                    at={event.updated_at}
+                    formatter={&format_date/1}
+                  />
                 </:col>
 
                 <:action :let={{_, event}}>
@@ -323,6 +342,18 @@ defmodule YscWeb.AdminEventsLive do
   end
 
   def mount(_params, _session, socket) do
+    editors_by_event =
+      if connected?(socket) do
+        EditingPresence.subscribe(:event)
+
+        EditingPresence.editors_by_resource(
+          :event,
+          socket.assigns.current_user.id
+        )
+      else
+        %{}
+      end
+
     {:ok,
      socket
      |> assign(:page_title, "Events")
@@ -335,7 +366,33 @@ defmodule YscWeb.AdminEventsLive do
      |> assign(:open_check_in_sessions, %{})
      |> assign(:meta, nil)
      |> assign(:author_filter, [])
+     |> assign(:editors_by_event, editors_by_event)
      |> stream(:events, [], reset: true)}
+  end
+
+  # Content inside a `phx-update="stream"` container only updates via
+  # explicit stream operations, so re-stream the current page to make
+  # existing rows pick up the refreshed presence data.
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    editors_by_event =
+      EditingPresence.editors_by_resource(
+        :event,
+        socket.assigns.current_user.id
+      )
+
+    socket = assign(socket, :editors_by_event, editors_by_event)
+
+    case Events.list_events_paginated(socket.assigns.params,
+           date_from: socket.assigns.date_from,
+           date_to: socket.assigns.date_to,
+           tab: socket.assigns.active_tab
+         ) do
+      {:ok, {events, _meta}} ->
+        {:noreply, stream(socket, :events, events, reset: true)}
+
+      {:error, _meta} ->
+        {:noreply, socket}
+    end
   end
 
   def handle_params(params, _uri, socket) do

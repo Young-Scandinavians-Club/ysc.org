@@ -139,4 +139,114 @@ defmodule YscWeb.AdminPostsLiveTest do
       assert_patched(view, ~p"/admin/posts")
     end
   end
+
+  describe "editing presence" do
+    setup [:create_admin]
+
+    test "shows an avatar on the row of a post currently being edited", %{
+      conn: conn,
+      admin: admin
+    } do
+      post = post_fixture(admin, %{title: "Being edited"})
+      other_admin = user_fixture(%{role: "admin", first_name: "Jamie"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "row-tab-#{System.unique_integer([:positive])}"},
+          :post,
+          post.id,
+          other_admin
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts")
+
+      assert html =~ "Jamie"
+      assert html =~ "is editing"
+    end
+
+    test "does not show the current admin's own presence", %{
+      conn: conn,
+      admin: admin
+    } do
+      post = post_fixture(admin, %{title: "Own tab open"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "self-row-tab-#{System.unique_integer([:positive])}"},
+          :post,
+          post.id,
+          admin
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts")
+
+      refute html =~ "is editing"
+    end
+
+    test "updates row avatars live when another admin starts editing", %{
+      conn: conn,
+      admin: admin
+    } do
+      post = post_fixture(admin, %{title: "Live update row"})
+
+      {:ok, view, html} = live(conn, ~p"/admin/posts")
+      refute html =~ "is editing"
+
+      other_admin = user_fixture(%{role: "admin", first_name: "Taylor"})
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: "live-row-tab-#{System.unique_integer([:positive])}"},
+          :post,
+          post.id,
+          other_admin
+        )
+
+      send(view.pid, %Phoenix.Socket.Broadcast{
+        topic: YscWeb.Admin.EditingPresence.topic(:post),
+        event: "presence_diff",
+        payload: %{}
+      })
+
+      html = render(view)
+      assert html =~ "Taylor"
+      assert html =~ "is editing"
+    end
+  end
+
+  describe "last edited by" do
+    setup [:create_admin]
+
+    test "falls back to the author when the post has never been re-edited", %{
+      conn: conn,
+      admin: admin
+    } do
+      post_fixture(admin, %{title: "Never edited"})
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts")
+
+      assert html =~ "Last edited by"
+    end
+
+    test "shows the most recent editor after an update", %{
+      conn: conn,
+      admin: admin
+    } do
+      editor = user_fixture(%{role: "admin", first_name: "Morgan"})
+
+      post = post_fixture(admin, %{title: "Edited later"})
+
+      {:ok, _post} =
+        Ysc.Posts.update_post_editor(
+          post,
+          %{"title" => "Edited later!"},
+          editor
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/posts")
+
+      assert html =~ "Last edited by"
+      assert html =~ "Morgan"
+    end
+  end
 end
