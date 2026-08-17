@@ -3742,6 +3742,102 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert buyout_booked?(:tahoe, second_days)
     end
 
+    test "returns stale_inventory when modifying complete room booking onto already-booked room dates",
+         %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Admin modify overlap room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      user2 = user_fixture()
+      {checkin, checkout} = locker_room_dates(680, 2)
+      {checkin2, checkout2} = locker_room_dates(710, 2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(:USD, "200.00")
+      }
+
+      assert {:ok, _first} =
+               BookingLocker.create_admin_booking(attrs,
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      assert {:ok, second} =
+               BookingLocker.create_admin_booking(
+                 Map.merge(attrs, %{
+                   user_id: user2.id,
+                   checkin_date: checkin2,
+                   checkout_date: checkout2
+                 }),
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      assert {:error, :stale_inventory} =
+               BookingLocker.admin_modify_complete_booking(
+                 second,
+                 %{
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   guests_count: 2,
+                   children_count: 0,
+                   booking_mode: :room
+                 },
+                 rooms: [room]
+               )
+
+      second = Ysc.Repo.get!(Ysc.Bookings.Booking, second.id)
+      assert second.checkin_date == checkin2
+
+      nights = Date.diff(checkout, checkin)
+
+      booked_first =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin and
+                ri.day < ^checkout and ri.booked == true and ri.held == false
+          ),
+          :count
+        )
+
+      booked_second =
+        Repo.aggregate(
+          from(ri in Ysc.Bookings.RoomInventory,
+            where:
+              ri.room_id == ^room.id and ri.day >= ^checkin2 and
+                ri.day < ^checkout2 and ri.booked == true and ri.held == false
+          ),
+          :count
+        )
+
+      assert booked_first == nights
+      assert booked_second == nights
+    end
+
     test "returns changeset error for invalid stay dates" do
       ensure_clear_lake_day_pricing_rule()
       user = user_fixture()
