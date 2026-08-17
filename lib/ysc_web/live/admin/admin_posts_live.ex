@@ -108,7 +108,7 @@ defmodule YscWeb.AdminPostsLive do
             :if={is_nil(@meta)}
             id="admin-posts-loading"
             rows={8}
-            columns={5}
+            columns={4}
           />
 
           <div :if={@meta}>
@@ -139,16 +139,6 @@ defmodule YscWeb.AdminPostsLive do
                           {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
                         </span>
                       </div>
-                      <.last_edited_by
-                        user={post.updated_by || post.author}
-                        at={post.updated_at}
-                        formatter={
-                          &Timex.format!(
-                            &1,
-                            "{Mshort} {D}, {YYYY} at {h12}:{m}{am}"
-                          )
-                        }
-                      />
                     </div>
                     <.post_actions_dropdown
                       post={post}
@@ -236,16 +226,6 @@ defmodule YscWeb.AdminPostsLive do
 
                 <:col :let={{_, post}} label="Author" field={:author_name}>
                   {UserDisplay.full_name(post.author)}
-                </:col>
-
-                <:col :let={{_, post}} label="Last edited">
-                  <.last_edited_by
-                    user={post.updated_by || post.author}
-                    at={post.updated_at}
-                    formatter={
-                      &Timex.format!(&1, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
-                    }
-                  />
                 </:col>
 
                 <:col :let={{_, post}} label="State" field={:state}>

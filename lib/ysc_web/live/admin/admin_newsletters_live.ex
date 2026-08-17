@@ -437,8 +437,11 @@ defmodule YscWeb.AdminNewslettersLive do
                     navigate={~p"/admin/newsletters/#{edition.id}/edit"}
                     class="block"
                   >
-                    <h3 class="text-base font-semibold text-zinc-900 truncate">
-                      {edition.title}
+                    <h3 class="text-base font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0">
+                      <span class="truncate">{edition.title}</span>
+                      <.presence_avatars editors={
+                        @editors_by_edition[edition.id] || []
+                      } />
                     </h3>
                     <p class="text-sm text-zinc-500 truncate mt-0.5">
                       {edition.subject}
@@ -483,17 +486,7 @@ defmodule YscWeb.AdminNewslettersLive do
                     >
                       by {creator_name(edition.creator)}
                     </span>
-                    <.presence_avatars editors={
-                      @editors_by_edition[edition.id] || []
-                    } />
                   </div>
-
-                  <.last_edited_by
-                    user={edition.updated_by || edition.creator}
-                    at={edition.updated_at}
-                    formatter={&DateDisplay.format_datetime_display/1}
-                    class="mt-1"
-                  />
 
                   <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
                     <.edition_actions_dropdown
@@ -595,13 +588,6 @@ defmodule YscWeb.AdminNewslettersLive do
                   <% else %>
                     <span class="text-zinc-400">—</span>
                   <% end %>
-                </:col>
-                <:col :let={{_, edition}} label="Last edited">
-                  <.last_edited_by
-                    user={edition.updated_by || edition.creator}
-                    at={edition.updated_at}
-                    formatter={&DateDisplay.format_datetime_display/1}
-                  />
                 </:col>
                 <:action :let={{_, edition}}>
                   <.edition_actions_dropdown

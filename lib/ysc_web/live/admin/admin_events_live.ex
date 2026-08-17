@@ -126,7 +126,7 @@ defmodule YscWeb.AdminEventsLive do
             :if={is_nil(@meta)}
             id="admin-events-loading"
             rows={8}
-            columns={6}
+            columns={5}
           />
 
           <div :if={@meta}>
@@ -165,14 +165,6 @@ defmodule YscWeb.AdminEventsLive do
                         <span class="text-sm text-zinc-600">Created:</span>
                         <span class="text-sm text-zinc-900">
                           {format_date(event.inserted_at)}
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm text-zinc-600">Last edited:</span>
-                        <span class="text-sm text-zinc-900">
-                          {UserDisplay.full_name(
-                            event.updated_by || event.organizer
-                          )} · {format_date(event.updated_at)}
                         </span>
                       </div>
                     </div>
@@ -264,14 +256,6 @@ defmodule YscWeb.AdminEventsLive do
 
                 <:col :let={{_, event}} label="Created" field={:inserted_at}>
                   {format_date(event.inserted_at)}
-                </:col>
-
-                <:col :let={{_, event}} label="Last edited">
-                  <.last_edited_by
-                    user={event.updated_by || event.organizer}
-                    at={event.updated_at}
-                    formatter={&format_date/1}
-                  />
                 </:col>
 
                 <:action :let={{_, event}}>

@@ -260,31 +260,12 @@ defmodule YscWeb.AdminEventsLiveTest do
   describe "last edited by" do
     setup [:create_admin]
 
-    test "falls back to the organizer when the event has never been re-edited",
-         %{conn: conn, admin: admin} do
-      event_fixture(%{organizer_id: admin.id, title: "Never edited"})
+    test "is not shown on the listing page", %{conn: conn, admin: admin} do
+      event_fixture(%{organizer_id: admin.id, title: "Not on listing"})
 
       {:ok, _view, html} = live(conn, ~p"/admin/events")
 
-      assert html =~ "Last edited"
-    end
-
-    test "shows the most recent editor after an update", %{
-      conn: conn,
-      admin: admin
-    } do
-      editor = user_fixture(%{role: "admin", first_name: "Morgan"})
-      event = event_fixture(%{organizer_id: admin.id, title: "Edited later"})
-
-      {:ok, _event} =
-        Events.update_event_editor(event, %{"title" => "Edited later!"},
-          updated_by_id: editor.id
-        )
-
-      {:ok, _view, html} = live(conn, ~p"/admin/events")
-
-      assert html =~ "Last edited"
-      assert html =~ "Morgan"
+      refute html =~ "Last edited"
     end
   end
 end

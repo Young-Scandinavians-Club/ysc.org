@@ -546,31 +546,12 @@ defmodule YscWeb.AdminNewslettersLiveTest do
   describe "last edited by" do
     setup [:create_admin]
 
-    test "falls back to the creator when the edition has never been re-edited",
-         %{conn: conn, admin: admin} do
-      edition_fixture(admin, %{"title" => "Never edited"})
+    test "is not shown on the listing page", %{conn: conn, admin: admin} do
+      edition_fixture(admin, %{"title" => "Not on listing"})
 
       {_view, html} = live_newsletters(conn)
 
-      assert html =~ "Last edited by"
-    end
-
-    test "shows the most recent editor after an update", %{
-      conn: conn,
-      admin: admin
-    } do
-      editor = user_fixture(%{role: "admin", first_name: "Morgan"})
-      edition = edition_fixture(admin, %{"title" => "Edited later"})
-
-      {:ok, _edition} =
-        Newsletter.update_edition_draft(edition, %{"title" => "Edited later!"},
-          updated_by_id: editor.id
-        )
-
-      {_view, html} = live_newsletters(conn)
-
-      assert html =~ "Last edited by"
-      assert html =~ "Morgan"
+      refute html =~ "Last edited by"
     end
   end
 end

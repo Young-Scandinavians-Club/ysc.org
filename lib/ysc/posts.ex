@@ -263,7 +263,6 @@ defmodule Ysc.Posts do
       end
 
     query
-    |> preload(:updated_by)
     |> Flop.validate_and_run(params, for: Post)
   end
 
