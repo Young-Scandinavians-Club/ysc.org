@@ -2956,6 +2956,31 @@ defmodule Ysc.EventsTest do
       assert cancelled.state == :cancelled
     end
 
+    test "publish_event schedules the notification and photo-reminder jobs independently",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} = Events.publish_event(event)
+
+        assert [notification_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert [reminder_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventPhotoReminderWorker)
+
+        assert notification_job.args["event_id"] == published.id
+        assert reminder_job.args["event_id"] == published.id
+
+        # Notification fires ~1 hour after publish; the photo reminder fires
+        # the day after the event ends. A shared Oban uniqueness key across
+        # the two workers previously let the later insert silently overwrite
+        # the earlier job's scheduled_at instead of creating its own job.
+        assert DateTime.diff(notification_job.scheduled_at, published.published_at) in 3500..3700
+
+        assert DateTime.compare(reminder_job.scheduled_at, notification_job.scheduled_at) ==
+                 :gt
+      end)
+    end
+
     test "list_upcoming_events_paginated returns meta and events", %{user: user} do
       {:ok, _} =
         Events.create_event(%{

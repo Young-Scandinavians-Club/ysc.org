@@ -11,7 +11,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
     queue: :bulk_mail,
     max_attempts: 3,
     unique: [
-      fields: [:args],
+      fields: [:args, :worker],
       keys: [:event_id],
       states: :incomplete,
       period: :infinity
