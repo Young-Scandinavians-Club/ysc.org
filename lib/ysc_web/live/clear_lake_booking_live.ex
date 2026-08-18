@@ -6,6 +6,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.Bookings.{
     AvailabilityCache,
     ConfigCacheTelemetry,
+    PropertyDisplay,
     Season,
     SeasonCache,
     SeasonHelpers,
@@ -177,6 +178,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         load_radar: true,
         availability_cache_version: 0
       )
+      |> assign_sleeping_copy()
 
     # Validate all conditions (availability, booking mode, guests, etc.)
     # Only run heavy validation when connected (availability checks run queries)
@@ -394,6 +396,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             buyout_booking_allowed: buyout_booking_allowed,
             active_bookings: active_bookings
           )
+          |> assign_sleeping_copy()
 
         socket =
           maybe_validate_and_price(
@@ -548,16 +551,39 @@ defmodule YscWeb.ClearLakeBookingLive do
         <div class="max-w-screen-xl mx-auto px-4 space-y-10">
           <!-- Essential Alerts Bar (High-Contrast) -->
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-900 text-white p-4 rounded-xl">
-            <div class="flex items-center gap-3">
-              <span class="text-xl flex-shrink-0">🧺</span>
-              <div>
-                <p class="text-xs font-black text-teal-400 uppercase">
-                  Linens
-                </p>
-                <p class="text-xs font-bold leading-tight">
-                  Bring your own bed linens
-                </p>
-              </div>
+            <div id="sleeping-alert" class="flex items-center gap-3">
+              <%= cond do %>
+                <% @sleeping_mode == :winter -> %>
+                  <span class="text-xl flex-shrink-0">🛏️</span>
+                  <div>
+                    <p class="text-xs font-black text-teal-400 uppercase">
+                      Beds set up
+                    </p>
+                    <p class="text-xs font-bold leading-tight">
+                      Bring your own linens
+                    </p>
+                  </div>
+                <% @sleeping_mode == :mixed -> %>
+                  <span class="text-xl flex-shrink-0">⛺</span>
+                  <div>
+                    <p class="text-xs font-black text-teal-400 uppercase">
+                      Sleeping
+                    </p>
+                    <p class="text-xs font-bold leading-tight">
+                      Setup depends on season — lawn in summer, beds in winter
+                    </p>
+                  </div>
+                <% true -> %>
+                  <span class="text-xl flex-shrink-0">⛺</span>
+                  <div>
+                    <p class="text-xs font-black text-teal-400 uppercase">
+                      Sleeping
+                    </p>
+                    <p class="text-xs font-bold leading-tight">
+                      Lawn camp or bring your own setup
+                    </p>
+                  </div>
+              <% end %>
             </div>
             <div class="flex items-center gap-3">
               <span class="text-xl flex-shrink-0">🚫</span>
@@ -1603,9 +1629,11 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Welcome to the YSC Clear Lake Cabin
                     </h1>
                     <p class="text-lg text-zinc-600 leading-relaxed">
-                      Your year-round gateway to North America's oldest natural lake. Since <strong>1963</strong>, the YSC has proudly owned this beautiful cabin, located in the heart of
-                      <strong>Kelseyville</strong>
-                      on the shores of <strong>Clear Lake</strong>.
+                      Your year-round gateway to North America's oldest natural lake —
+                      <strong>2.5 million years</strong>
+                      old — in <strong>Kelseyville</strong>. Since
+                      <strong>1963</strong>
+                      this has been a <strong>Member Sanctuary</strong>: we don't just stay here, we keep it together.
                     </p>
                   </div>
                   <!-- Important Notice -->
@@ -1649,7 +1677,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       icon="🛏️"
                       label="Capacity"
                       value="12 Guests"
-                      detail="Summer lawn & winter beds"
+                      detail="Lawn in summer, beds in winter"
                     />
                     <.at_glance_stat
                       accent={:teal}
@@ -1701,8 +1729,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </div>
                     </div>
                     <p class="text-sm text-zinc-600 mt-4">
-                      <strong>📍 Location:</strong>
-                      Kelseyville, on the shores of Clear Lake.
+                      Times are approximate from the cabin.
                     </p>
                   </section>
                 </section>
@@ -1712,33 +1739,20 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <span>🗓️</span>
                     <span>How to Book</span>
                   </h2>
-                  <div>
-                    <h3 class="font-semibold text-zinc-900 mb-3">
-                      Booking steps
-                    </h3>
-                    <ul class="space-y-2 text-zinc-700">
-                      <li>
-                        Use the <strong>booking form above</strong>
-                        to check availability and select your dates.
-                      </li>
-                      <li>
-                        Choose <strong>Shared cabin</strong>
-                        or <strong>Reserve the whole cabin</strong>
-                        and enter your guest count.
-                      </li>
-                      <li>
-                        Complete your booking and payment <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
-                      </li>
-                      <li>
-                        After booking, you can view and manage your booking from your booking details page (link in your confirmation email).
-                      </li>
-                      <li>
-                        For cancellation policies and refund information, see the
-                        <strong>Cabin & Booking Rules</strong>
-                        tab.
-                      </li>
-                    </ul>
-                  </div>
+                  <ul class="space-y-2 text-zinc-700">
+                    <li>
+                      Use the <strong>booking form above</strong>
+                      to choose shared vs whole cabin, dates, and guests, then pay on this site.
+                    </li>
+                    <li>
+                      You'll get a confirmation email with a link to view and manage your booking.
+                    </li>
+                    <li>
+                      Cancellation and refunds are on the
+                      <strong>Cabin & Booking Rules</strong>
+                      tab.
+                    </li>
+                  </ul>
                 </section>
                 <section id="getting-there">
                   <h2 class="text-2xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
@@ -1778,11 +1792,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                           />
                         </summary>
                         <div class="p-4 border-t border-zinc-100 bg-white">
-                          <p class="text-base text-zinc-600 mb-4">
-                            Public transportation options are very limited — <strong>driving is essential</strong>. See the map in the Getting There section (right column) for location.
-                          </p>
                           <!-- Vertical Trail Directions -->
-                          <div class="relative pl-8 space-y-6 mt-6">
+                          <div class="relative pl-8 space-y-6 mt-2">
                             <!-- Trail line -->
                             <div class="absolute left-3 top-0 bottom-0 w-0.5 bg-teal-300">
                             </div>
@@ -1935,23 +1946,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                               If you reach Konocti Harbor Inn, you've gone too far — turn around.
                             </p>
                           </div>
-                          <!-- Parking Strategy Tip -->
-                          <div class="mt-6 p-4 bg-zinc-900 text-white rounded-xl">
-                            <div class="flex items-center gap-3 mb-2">
-                              <.icon
-                                name="hero-truck"
-                                class="w-5 h-5 text-teal-400"
-                              />
-                              <h4 class="font-bold text-base">Parking Strategy</h4>
-                            </div>
-                            <p class="text-sm text-zinc-300 leading-relaxed">
-                              Parking is limited. Please park as close to the next car as possible and choose a spot based on your departure time.
-                            </p>
-                            <p class="text-sm text-zinc-300 leading-relaxed mt-2">
-                              <strong>Pro Tip:</strong>
-                              If you plan to leave early Sunday, don't park in the back or you may find yourself blocked in!
-                            </p>
-                          </div>
                         </div>
                       </details>
                     </div>
@@ -1988,17 +1982,16 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </h2>
                     </div>
                     <p class="text-teal-100 mb-6 leading-relaxed">
-                      Sent via email <strong>24 hours before check-in</strong>. Unique to your booking. The code is also displayed on your booking confirmation page when your stay is within 48 hours of check-in or currently active.
+                      Sent via email <strong>about 3 days before check-in</strong>, and shown on your booking confirmation page within 48 hours of check-in or while your stay is active.
                     </p>
                     <div class="bg-teal-700/50 border border-white/10 rounded-xl p-4 text-sm">
                       <p class="font-semibold text-teal-50 mb-2">Important:</p>
                       <ul class="list-disc list-inside space-y-1 text-teal-100 text-xs">
                         <li>
-                          Save the door code before you arrive — cell service can be limited in the area
+                          Save the door code before you arrive — cell service can be limited
                         </li>
-                        <li>The door code is unique to your booking period</li>
                         <li>
-                          If you don't receive the code, check your spam folder. Still nothing? Email the Clear Lake cabin contact at <a
+                          If you don't receive it, check spam, then email <a
                             href={"mailto:#{EmailConfig.clear_lake_email()}"}
                             class="text-teal-200 hover:text-white underline"
                           >
@@ -2008,7 +2001,10 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </ul>
                     </div>
                   </div>
-                  <div class="bg-zinc-900 rounded-xl p-8 text-white">
+                  <div
+                    id="pre-arrival-checklist"
+                    class="bg-zinc-900 rounded-xl p-8 text-white"
+                  >
                     <h2 class="text-xl font-bold mb-6">Pre-Arrival Checklist</h2>
                     <ul class="space-y-4">
                       <li class="flex items-center gap-3">
@@ -2035,54 +2031,28 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </p>
                         </div>
                       </li>
-                      <li class="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          class="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
-                        />
-                        <div>
-                          <span class="font-semibold">Pack Linens & Bedding</span>
-                          <p class="text-xs text-zinc-400 mt-1">
-                            Sheets, pillowcases, comforter or sleeping bag, and towels
-                          </p>
-                        </div>
-                      </li>
                     </ul>
                   </div>
                 </section>
-                <!-- Parking & Transportation -->
+                <!-- Parking -->
                 <section
                   id="parking-transportation"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
                 >
                   <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
                     <span>🚙</span>
-                    <span>Parking & Transportation</span>
+                    <span>Parking</span>
                   </h2>
-                  <div class="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <p class="font-semibold mb-2 text-zinc-900">Parking Rules:</p>
-                      <ul class="list-disc list-inside space-y-1 text-zinc-700">
-                        <li>
-                          Parking is limited — park as close to the next car as possible.
-                        </li>
-                        <li>Choose a spot based on your departure time.</li>
-                        <li>
-                          <strong>Pro Tip:</strong>
-                          If you plan to leave early Sunday, don't park in the back or you may find yourself blocked in.
-                        </li>
-                        <li>Do not block driveways or neighbors' access.</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <p class="font-semibold mb-2 text-zinc-900">Getting Here:</p>
-                      <p class="text-sm text-zinc-700">
-                        Public transportation is very limited.
-                        <strong>Driving is essential.</strong>
-                        See the step-by-step directions in the Getting There section above.
-                      </p>
-                    </div>
-                  </div>
+                  <ul class="list-disc list-inside space-y-1 text-zinc-700">
+                    <li>
+                      Park parallel in the lot along the water line, as close to the next car as possible.
+                    </li>
+                    <li>Choose a spot based on your departure time.</li>
+                    <li>
+                      Leaving early Sunday? Don't park in the back or you may get blocked in.
+                    </li>
+                    <li>Do not block the driveway or neighbors' access.</li>
+                  </ul>
                 </section>
                 <!-- CTA Card when booking is unavailable -->
                 <div
@@ -2125,172 +2095,188 @@ defmodule YscWeb.ClearLakeBookingLive do
                     Pay or renew membership
                   </.link>
                 </div>
-                <!-- What to Bring -->
-                <section class="bg-teal-900 rounded-xl p-8 text-white">
-                  <h2 class="text-lg font-bold mb-6">The Packing List</h2>
-                  <ul class="space-y-4 text-sm text-teal-100">
-                    <li class="flex items-start gap-3">
-                      <span class="text-teal-400 mt-0.5">●</span>
-                      <div>
-                        <span class="block">Linens & Bedding</span>
-                        <span class="text-xs text-teal-300">
-                          Requirements differ by season. Summer: camping setup on the lawn — sheets, pillowcases, comforter/sleeping bag. Winter: indoor bed setup — see Winter Season card below.
-                        </span>
-                      </div>
+                <!-- Before you go -->
+                <section
+                  id="before-you-go"
+                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
+                >
+                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
+                    <span>📋</span>
+                    <span>Before you go</span>
+                  </h2>
+                  <p class="text-sm text-zinc-600 mb-6">
+                    On-site details for after you book. The dumpster padlock code is in your check-in email.
+                  </p>
+                  <ul class="space-y-4 text-zinc-700">
+                    <li class="flex gap-3">
+                      <span class="text-teal-600 font-bold">•</span>
+                      <span>
+                        <strong>Training videos (required):</strong>
+                        Watch the
+                        <.link
+                          id="clear-lake-training-videos"
+                          href={PropertyDisplay.training_videos_url(:clear_lake)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="text-teal-700 underline hover:text-teal-900"
+                        >
+                          Clear Lake training videos
+                        </.link>
+                        (8 short videos) before you arrive.
+                      </span>
                     </li>
-                    <li class="flex items-start gap-3">
-                      <span class="text-teal-400 mt-0.5">●</span>
-                      <div>
-                        <span class="block">Towels</span>
-                        <span class="text-xs text-teal-300">
-                          Bath & beach towels
-                        </span>
-                      </div>
+                    <li class="flex gap-3">
+                      <span class="text-teal-600 font-bold">•</span>
+                      <span>
+                        <strong>Lockbox & keys:</strong>
+                        Left side of the single entry door (across the main grass). Four keys open the cabin, pantry, pool storage, and bathrooms — lock all of those when you leave and return the keys to the lockbox.
+                      </span>
                     </li>
-                    <li class="flex items-center gap-3">
-                      <span class="text-teal-400">●</span> Reusable Water Bottle
+                    <li class="flex gap-3">
+                      <span class="text-teal-600 font-bold">•</span>
+                      <span>
+                        <strong>Water:</strong>
+                        The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are potable — don't waste fresh water.
+                      </span>
                     </li>
-                    <li class="flex items-center gap-3">
-                      <span class="text-teal-400">●</span> Sunscreen & Swimsuit
+                    <li :if={@sleeping_mode != :winter} class="flex gap-3">
+                      <span class="text-teal-600 font-bold">•</span>
+                      <span>
+                        <strong>Thursday morning sprinklers:</strong>
+                        If you're staying Wednesday–Thursday, move sleeping gear off the lawn to the deck or concrete patio so it doesn't get soaked.
+                      </span>
+                    </li>
+                    <li class="flex gap-3">
+                      <span class="text-teal-600 font-bold">•</span>
+                      <span>
+                        <strong>Garbage:</strong>
+                        Use the dumpsters before you leave.
+                      </span>
+                    </li>
+                    <li class="flex gap-3">
+                      <span class="text-teal-600 font-bold">•</span>
+                      <span>
+                        <strong>Opening & closing:</strong>
+                        Printed checklists in the Cabin Master Room — use them to open and shut down the cabin.
+                      </span>
                     </li>
                   </ul>
                 </section>
-                <!-- Lake Lore -->
-                <section class="bg-zinc-900 rounded-xl p-8 text-white">
-                  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <.icon
-                      name="hero-information-circle"
-                      class="w-6 h-6 text-teal-400"
-                    /> Lake Lore
+                <!-- Sleeping at the cabin -->
+                <section
+                  id="sleeping-at-the-cabin"
+                  class={[
+                    "rounded-xl p-6 shadow-sm border-2",
+                    if(@sleeping_mode == :winter,
+                      do: "bg-amber-50 border-amber-200",
+                      else: "bg-teal-50 border-teal-200"
+                    )
+                  ]}
+                >
+                  <h2 class={[
+                    "text-lg font-bold mb-3 flex items-center gap-2",
+                    if(@sleeping_mode == :winter,
+                      do: "text-amber-900",
+                      else: "text-teal-900"
+                    )
+                  ]}>
+                    <span class="text-xl">
+                      {if(@sleeping_mode == :winter, do: "🛏️", else: "⛺")}
+                    </span>
+                    Sleeping at the cabin
                   </h2>
-                  <div class="space-y-4 text-base text-zinc-300">
-                    <p>
-                      <strong class="text-white">2.5 Million Years:</strong>
-                      Clear Lake is the oldest lake in North America, offering a unique ecosystem for bird watching and fishing year-round.
-                    </p>
-                    <p>
-                      <strong class="text-white">A Member Sanctuary:</strong>
-                      Everything you see was built and is maintained by our community. We don't just stay here; we preserve and cherish it together.
-                    </p>
-                  </div>
+                  <%= cond do %>
+                    <% @sleeping_mode == :winter -> %>
+                      <div class="space-y-3">
+                        <p class="text-sm font-semibold text-amber-800">
+                          Winter ({@winter_season_window})
+                        </p>
+                        <p class="text-base text-amber-900 leading-relaxed font-semibold">
+                          Indoor beds are set up in the cabin.
+                        </p>
+                        <p class="text-sm text-amber-800 leading-relaxed">
+                          Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
+                        </p>
+                        <p class="text-xs text-amber-700 leading-relaxed">
+                          Summer ({@summer_season_window}): beds come down — lawn camp or bring your own sleeping setup.
+                        </p>
+                      </div>
+                    <% @sleeping_mode == :mixed -> %>
+                      <div class="space-y-4">
+                        <p class="text-sm font-semibold text-teal-800">
+                          Your stay covers both seasons.
+                        </p>
+                        <p class="text-sm text-teal-900 leading-relaxed">
+                          <strong>Summer ({@summer_season_window}):</strong>
+                          Beds are not set up. Lawn camp or use the cabin with your own sleeping setup. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
+                        </p>
+                        <p class="text-sm text-teal-900 leading-relaxed">
+                          <strong>Winter ({@winter_season_window}):</strong>
+                          Indoor beds are set up. Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
+                        </p>
+                      </div>
+                    <% true -> %>
+                      <div class="space-y-3">
+                        <p class="text-sm font-semibold text-teal-800">
+                          Summer ({@summer_season_window})
+                        </p>
+                        <p class="text-base text-teal-900 leading-relaxed font-semibold">
+                          Beds are not set up in the cabin.
+                        </p>
+                        <p class="text-sm text-teal-800 leading-relaxed">
+                          Lawn camp or use the cabin with your own sleeping setup. Pack a sleeping bag, pillow, and a tent if you're camping on the lawn. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
+                        </p>
+                        <p class="text-xs text-teal-700 leading-relaxed">
+                          Winter ({@winter_season_window}): indoor beds are set up — pack linens if you book those dates.
+                        </p>
+                      </div>
+                  <% end %>
+                  <p class={[
+                    "text-sm mt-4 leading-relaxed",
+                    if(@sleeping_mode == :winter,
+                      do: "text-amber-800",
+                      else: "text-teal-800"
+                    )
+                  ]}>
+                    Also pack bath and beach towels, a reusable water bottle, sunscreen, and a swimsuit.
+                  </p>
                 </section>
-                <!-- Winter Season -->
-                <section class="bg-amber-50 border-2 border-amber-200 rounded-xl p-6 shadow-sm">
-                  <h2 class="text-lg font-bold mb-3 flex items-center gap-2 text-amber-900">
-                    <span class="text-xl">❄️</span> Winter Season (Oct–April)
-                  </h2>
-                  <div class="space-y-3">
-                    <p class="text-base text-amber-900 leading-relaxed font-semibold">
-                      <span class="inline-block mr-1">🛏️</span>
-                      Indoor beds are set up in the cabin during winter months!
-                    </p>
-                    <p class="text-sm text-amber-800 leading-relaxed">
-                      Please bring your own linens: sheets, pillowcases, comforter or sleeping bag, and towels. We also recommend an extra wool blanket and indoor slippers to keep cozy in the Social Hall.
-                    </p>
-                  </div>
-                </section>
-                <!-- Amenities -->
                 <section
                   id="amenities"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
                 >
                   <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
                     <span>🏠</span>
-                    <span>Everything You Need for a Perfect Stay</span>
+                    <span>On the property</span>
                   </h2>
                   <ul class="space-y-3 text-zinc-700">
                     <li class="flex gap-3">
                       <span class="text-teal-600 font-bold">•</span>
                       <span>
-                        <strong>The Iconic Private Dock</strong>
+                        <strong>Private dock</strong>
                         — Deep-water swimming, sunbathing, boat mooring.
                       </span>
                     </li>
                     <li class="flex gap-3">
                       <span class="text-teal-600 font-bold">•</span>
                       <span>
-                        <strong>Social Hall & Dance Floor</strong>
-                        — Cedar hall with wood-burning fireplace.
+                        <strong>Social Hall</strong>
+                        — Cedar hall with wood-burning fireplace and dance floor.
                       </span>
                     </li>
                     <li class="flex gap-3">
                       <span class="text-teal-600 font-bold">•</span>
                       <span>
-                        <strong>Gourmet Group Kitchen</strong>
+                        <strong>Group kitchen</strong>
                         — Industrial stoves, ample fridge space.
-                      </span>
-                    </li>
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Sleeping</strong>
-                        — Summer: sleeping lawn (bring sleeping bags). Winter: indoor beds (bring linens & comforter).
                       </span>
                     </li>
                   </ul>
                 </section>
-                <!-- Stewards of the Lake Section -->
-                <section class="bg-amber-50 rounded-xl p-8 lg:p-12 border border-amber-100 mb-20">
-                  <div class="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
-                    <div class="lg:col-span-2">
-                      <h2 class="text-3xl font-bold text-zinc-900 mb-4">
-                        The Dock Revival Project
-                      </h2>
-                      <p class="text-zinc-700 mb-6 leading-relaxed">
-                        The heart of the cabin is its dock. In 2023, after brutal winter storms, our members rallied together to rebuild our private mooring. We are currently raising $45,000 to ensure this landmark outlasts the next 20 years.
-                      </p>
-
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                        <div class="p-4 bg-white border border-amber-200 rounded-xl shadow-sm">
-                          <p class="text-base font-bold text-amber-900">
-                            $150 — Legacy Tier
-                          </p>
-                          <p class="text-sm text-zinc-600">
-                            Your name inscribed on a tile on the cabin fireplace mantle for eternity.
-                          </p>
-                        </div>
-                        <div class="p-4 bg-white border border-amber-200 rounded-xl shadow-sm">
-                          <p class="text-base font-bold text-amber-900">
-                            $100 — Captain's Tier
-                          </p>
-                          <p class="text-sm text-zinc-600">
-                            Includes a $15 coupon for any Clear Lake summer event.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div class="bg-white border-2 border-amber-200 rounded-xl p-6 shadow-sm">
-                        <p class="text-base text-amber-900 leading-relaxed mb-2">
-                          <strong>
-                            Interested in contributing to the Dock Revival Project?
-                          </strong>
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed mb-3">
-                          Reach out to the club through our contact page to learn more about donation options and legacy tiers.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="space-y-6">
-                      <div class="bg-white p-6 rounded-xl shadow-sm border border-amber-200">
-                        <h4 class="font-bold text-zinc-900 mb-3 text-base uppercase tracking-wider">
-                          Honorary Stewards
-                        </h4>
-                        <p class="text-sm text-zinc-500 leading-relaxed">
-                          Special thanks to
-                          <strong>
-                            Allen Hinkelman, Solveig Barnes, and Dave Conroy
-                          </strong>
-                          for taking the lead in 2019 to turn this dream into a reality.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </section>
                 <!-- Footer -->
                 <div class="mt-12 pt-8 border-t border-zinc-100 text-center">
                   <p class="text-sm text-zinc-600 italic">
-                    The Clear Lake cabin has been a member-run treasure since 1963. Thank you for doing your part to keep it clean for the next family.
+                    The Clear Lake cabin has been a member-run treasure since 1963. Thank you for doing your part to keep it clean for the YSC member.
                   </p>
                 </div>
               </div>
@@ -2309,13 +2295,32 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <div class="text-sm text-red-700">No exceptions</div>
                     </div>
                     <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-sm">
-                      <div class="text-4xl mb-3">🧺</div>
-                      <div class="font-bold text-amber-900 text-lg mb-1">
-                        Bring Own Linens
-                      </div>
-                      <div class="text-sm text-amber-700">
-                        Sheets, Pillowcases, Comforters or Sleeping Bags & Towels Required
-                      </div>
+                      <%= cond do %>
+                        <% @sleeping_mode == :winter -> %>
+                          <div class="text-4xl mb-3">🧺</div>
+                          <div class="font-bold text-amber-900 text-lg mb-1">
+                            Bring Own Linens
+                          </div>
+                          <div class="text-sm text-amber-700">
+                            Sheets, pillowcases, comforter or sleeping bag, and towels
+                          </div>
+                        <% @sleeping_mode == :mixed -> %>
+                          <div class="text-4xl mb-3">⛺</div>
+                          <div class="font-bold text-amber-900 text-lg mb-1">
+                            Seasonal Sleeping
+                          </div>
+                          <div class="text-sm text-amber-700">
+                            Summer: own setup. Winter: linens for indoor beds
+                          </div>
+                        <% true -> %>
+                          <div class="text-4xl mb-3">⛺</div>
+                          <div class="font-bold text-amber-900 text-lg mb-1">
+                            Bring Your Sleeping Setup
+                          </div>
+                          <div class="text-sm text-amber-700">
+                            Sleeping bag, pillow, towels — lawn camp or cabin with your own setup
+                          </div>
+                      <% end %>
                     </div>
                     <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-sm">
                       <div class="text-4xl mb-3">🚭</div>
@@ -2380,10 +2385,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                           />
                         </summary>
                         <div class="px-5 pb-5 text-sm text-zinc-600 space-y-4 border-t border-zinc-50 pt-4">
-                          <p>
-                            <strong>No Pets Policy:</strong>
-                            To protect local wildlife and maintain a pristine environment, pets are not permitted on the property.
-                          </p>
                           <p>
                             <strong>Boating & Dock Access:</strong>
                             Members enjoy free mooring at our private dock. Please email the cabin contact at {EmailConfig.clear_lake_email()} in advance.
@@ -2493,10 +2494,14 @@ defmodule YscWeb.ClearLakeBookingLive do
             <%!-- Year-Round Access --%>
             <.feature_card title="Year-Round Access">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                <strong class="text-zinc-900">Summer (May–Sept):</strong>
-                Legendary dock parties and sleeping under the stars on our lawn.<br />
-                <strong class="text-zinc-900">Winter (Oct–April):</strong>
-                Cozy indoor beds set up in the cabin for warm, comfortable lakeside retreats.
+                <strong class="text-zinc-900">
+                  Summer ({@summer_season_window}):
+                </strong>
+                Legendary dock parties and sleeping under the stars on our lawn. Beds are not set up — lawn camp or bring your own sleeping setup.<br />
+                <strong class="text-zinc-900">
+                  Winter ({@winter_season_window}):
+                </strong>
+                Cozy indoor beds set up in the cabin for warm, comfortable lakeside retreats. Bring your own linens.
               </p>
             </.feature_card>
             <%!-- Community Treasure --%>
@@ -2571,6 +2576,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
+      |> assign_sleeping_copy()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -2604,6 +2610,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
+      |> assign_sleeping_copy()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -2637,6 +2644,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
+      |> assign_sleeping_copy()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -2842,6 +2850,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         availability_error: nil,
         date_form: date_form
       )
+      |> assign_sleeping_copy()
       |> update_url_with_dates(nil, nil)
 
     {:noreply, socket}
@@ -3094,6 +3103,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         buyout_booking_allowed: buyout_booking_allowed
       )
       |> calculate_price_if_ready()
+      |> assign_sleeping_copy()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -3155,6 +3165,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       season_end_date: season_end_date,
       max_booking_date: max_booking_date
     )
+    |> assign_sleeping_copy()
     |> assign(
       :availability_cache_version,
       System.unique_integer([:positive])
@@ -3929,6 +3940,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       day_booking_allowed: day_booking_allowed,
       buyout_booking_allowed: buyout_booking_allowed
     )
+    |> assign_sleeping_copy()
   end
 
   # Determines which booking modes are allowed based on season settings for the selected dates
@@ -3998,6 +4010,106 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp today_in_timezone(_),
     do: DateTime.now!(default_timezone()) |> DateTime.to_date()
+
+  defp assign_sleeping_copy(socket) do
+    seasons = socket.assigns.seasons
+    current_season = socket.assigns.current_season
+    winter_season = Enum.find(seasons, &winter_season?/1)
+    summer_season = Enum.find(seasons, &summer_season?/1)
+
+    assign(socket,
+      sleeping_mode:
+        sleeping_mode(
+          seasons,
+          socket.assigns.checkin_date,
+          socket.assigns.checkout_date,
+          current_season
+        ),
+      winter_season: winter_season,
+      summer_season: summer_season,
+      winter_season_window:
+        format_season_window(winter_season) || "Nov 1 – Apr 30",
+      summer_season_window:
+        format_season_window(summer_season) || "May 1 – Oct 31"
+    )
+  end
+
+  defp sleeping_mode(seasons, checkin_date, checkout_date, current_season) do
+    relevant =
+      relevant_sleeping_seasons(
+        seasons,
+        checkin_date,
+        checkout_date,
+        current_season
+      )
+
+    winter? = Enum.any?(relevant, &winter_season?/1)
+    summer? = Enum.any?(relevant, &(not winter_season?(&1)))
+
+    cond do
+      winter? and summer? -> :mixed
+      winter? -> :winter
+      summer? -> :summer
+      true -> :mixed
+    end
+  end
+
+  defp relevant_sleeping_seasons(
+         seasons,
+         checkin_date,
+         checkout_date,
+         current_season
+       ) do
+    {range_start, range_end} =
+      cond do
+        match?(%Date{}, checkin_date) and match?(%Date{}, checkout_date) and
+            Date.compare(checkout_date, checkin_date) == :gt ->
+          {checkin_date, Date.add(checkout_date, -1)}
+
+        match?(%Date{}, checkin_date) ->
+          {checkin_date, checkin_date}
+
+        true ->
+          {nil, nil}
+      end
+
+    cond do
+      range_start ->
+        Date.range(range_start, range_end)
+        |> Enum.map(&Season.find_season_for_date(seasons, &1))
+        |> Enum.reject(&is_nil/1)
+        |> Enum.uniq_by(& &1.id)
+
+      current_season ->
+        [current_season]
+
+      true ->
+        []
+    end
+  end
+
+  defp winter_season?(%{name: name}) when is_binary(name),
+    do: String.downcase(name) == "winter"
+
+  defp winter_season?(_), do: false
+
+  defp summer_season?(%{name: name}) when is_binary(name),
+    do: String.downcase(name) == "summer"
+
+  defp summer_season?(_), do: false
+
+  defp format_season_window(%{
+         start_date: %Date{} = start_date,
+         end_date: %Date{} = end_date
+       }) do
+    "#{format_month_day(start_date)} – #{format_month_day(end_date)}"
+  end
+
+  defp format_season_window(_), do: nil
+
+  defp format_month_day(%Date{} = date) do
+    Calendar.strftime(date, "%b") <> " #{date.day}"
+  end
 
   defp clear_lake_hero_carousel_images do
     [

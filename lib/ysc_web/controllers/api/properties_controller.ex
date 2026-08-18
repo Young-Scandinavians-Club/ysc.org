@@ -187,12 +187,12 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "What's Here",
           content:
-            "- **The Private Dock** — swimming, sunbathing, boat mooring.\n- **Social Hall** — cedar hall with a wood-burning fireplace and dance floor.\n- **Group Kitchen** — industrial stoves and ample fridge space.\n- **Sleeping:** Summer is a sleeping-lawn setup (bring a sleeping bag); winter has indoor beds (bring linens & a comforter)."
+            "- **The Private Dock** — swimming, sunbathing, boat mooring.\n- **Social Hall** — cedar hall with a wood-burning fireplace and dance floor.\n- **Group Kitchen** — industrial stoves and ample fridge space.\n- **Sleeping:** Summer (May 1 – Oct 31): no beds — lawn camp or bring your own sleeping setup. Winter (Nov 1 – Apr 30): indoor beds are set up (bring linens & a comforter)."
         },
         %{
           title: "What to Bring",
           content:
-            "- Linens & bedding (requirements differ by season — see the Winter Season note in Kitchen & Mats)\n- Bath & beach towels\n- Reusable water bottle\n- Sunscreen & swimsuit"
+            "- Sleeping gear (summer: sleeping bag, pillow, tent if camping — beds are not set up; winter: linens for indoor beds)\n- Bath & beach towels\n- Reusable water bottle\n- Sunscreen & swimsuit"
         }
       ],
       "etiquette" => [
@@ -223,7 +223,7 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "Parking",
           content:
-            "Parking is limited — park as close to the next car as possible, and choose a spot based on your departure time.\n\n> **Pro tip:** Leaving early Sunday? Don't park in the back or you may find yourself blocked in.\n\nDo not block driveways or neighbors' access."
+            "Parking is limited — park parallel in the lot along the water line, as close to the next car as possible, and choose a spot based on your departure time.\n\n> **Pro tip:** Leaving early Sunday? Don't park in the back or you may find yourself blocked in.\n\nDo not block the driveway or neighbors' access."
         },
         %{
           title: "Getting Here",
@@ -238,9 +238,9 @@ defmodule YscWeb.Api.PropertiesController do
             "- **Deep Clean:** Sanitize range top, ovens, and countertops.\n- **Dishwasher:** Must be emptied **before** you depart.\n- **Sleeping Mats:** Sanitize, wipe down, and stack neatly in the storage room next to the pool toy room."
         },
         %{
-          title: "Winter Season (Oct–April)",
+          title: "Winter Season (Nov 1 – Apr 30)",
           content:
-            "Indoor beds are set up in the cabin during winter months. Bring your own linens: sheets, pillowcases, a comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help keep you cozy in the Social Hall."
+            "Indoor beds are set up in the cabin during winter. Bring your own linens: sheets, pillowcases, a comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help keep you cozy in the Social Hall.\n\nIn summer (May 1 – Oct 31), beds are not set up. Lawn camp or use the cabin with your own sleeping setup."
         }
       ],
       "checkout" => [

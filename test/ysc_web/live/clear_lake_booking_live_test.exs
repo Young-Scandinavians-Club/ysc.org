@@ -28,6 +28,33 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
     {:ok, view, html}
   end
 
+  defp future_stay_on(month, day, nights \\ 3) do
+    today = Date.utc_today()
+    this_year = Date.new!(today.year, month, day)
+
+    checkin =
+      if Date.compare(this_year, Date.add(today, 1)) == :gt do
+        this_year
+      else
+        Date.new!(today.year + 1, month, day)
+      end
+
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  defp clear_lake_path_with_stay(checkin, checkout, extra \\ %{}) do
+    params =
+      Map.merge(
+        %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout)
+        },
+        extra
+      )
+
+    ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+  end
+
   # render/1 round-trips with the LiveView so :sys.get_state does not time out when
   # the process is still finishing mount-time cache loads under full-suite contention.
   defp guests_count_assign(view) do
@@ -2270,15 +2297,55 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake Cabin Exterior"
     end
 
-    test "shows winter bedding information for logged-in users", %{conn: conn} do
+    test "shows winter indoor-bed copy when stay dates are in winter", %{
+      conn: conn
+    } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(12, 15)
 
-      {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      {:ok, view, html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
 
-      # Winter bedding info should be clear
-      assert html =~ "Indoor beds are set up in the cabin during winter months"
-      assert html =~ "bring your own linens"
+      assert has_element?(view, "#sleeping-at-the-cabin")
+      assert html =~ "Indoor beds are set up in the cabin."
+      assert html =~ "Bring your own linens"
+      assert html =~ "Pack linens"
+      refute html =~ "Beds are not set up in the cabin."
+      refute html =~ "Thursday morning sprinklers"
+    end
+
+    test "shows lawn-camp copy and hides bed linens for summer stays", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(7, 15)
+
+      {:ok, view, html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+
+      assert has_element?(view, "#sleeping-at-the-cabin")
+      assert html =~ "Beds are not set up in the cabin."
+      assert html =~ "Lawn camp"
+      refute html =~ "Bring your own bed linens"
+      refute html =~ "Pack Linens for Indoor Beds"
+      refute html =~ "Indoor beds are set up in the cabin."
+    end
+
+    test "shows both sleeping setups when a stay spans summer and winter", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(10, 30, 4)
+
+      {:ok, _view, html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+
+      assert html =~ "Your stay covers both seasons."
+      assert html =~ "Beds are not set up."
+      assert html =~ "Indoor beds are set up."
     end
 
     test "shows community treasure messaging instead of dugnad", %{conn: conn} do
@@ -2294,39 +2361,44 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       refute html =~ "chore duty"
     end
 
-    test "shows contact information instead of donate button", %{conn: conn} do
+    test "does not show dock revival donate copy", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
-      # Should show reach out message instead of donate button
-      assert html =~ "Reach out to the club" or html =~ "contact page"
-      # Should NOT have donate now button
+      refute html =~ "The Dock Revival Project"
       refute html =~ "Donate Now"
     end
 
-    test "displays winter season information in packing list", %{conn: conn} do
+    test "logged-in members see before-you-go details from the check-in email",
+         %{
+           conn: conn
+         } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(7, 15)
 
-      {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      {:ok, view, html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
 
-      # Packing list should mention linens and bedding
-      assert html =~ "Linens" or html =~ "linens"
-      assert html =~ "comforter" or html =~ "sleeping bag"
+      assert has_element?(view, "#before-you-go")
+      assert has_element?(view, "#clear-lake-training-videos")
+      assert html =~ "Four keys"
+      assert html =~ "Thursday morning sprinklers"
+      assert html =~ "about 3 days before check-in"
+      refute html =~ "1982"
     end
 
-    test "shows year-round access with seasonal details", %{conn: conn} do
-      user = user_with_membership(:lifetime)
-      conn = log_in_user(conn, user)
-
+    test "logged-out year-round card uses property season date ranges", %{
+      conn: conn
+    } do
       {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
-      # Should explain both summer and winter sleeping arrangements
-      assert html =~ "Summer" and html =~ "Winter"
-      assert html =~ "sleeping lawn" or html =~ "under the stars"
-      assert html =~ "Indoor beds"
+      assert html =~ "Summer (May 1 – Oct 31)"
+      assert html =~ "Winter (Nov 1 – Apr 30)"
+      refute html =~ "May–Sept"
+      refute html =~ "Oct–April"
     end
   end
 
