@@ -1151,6 +1151,34 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "disable_event_notifications/1" do
+    test "disables event notifications for a matching user" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      assert user.event_notifications == true
+
+      assert {:ok, updated} = Accounts.disable_event_notifications(user.email)
+      assert updated.event_notifications == false
+      assert Accounts.get_user_by_email(user.email).event_notifications == false
+    end
+
+    test "returns :not_found when no user matches the email" do
+      assert {:ok, :not_found} =
+               Accounts.disable_event_notifications("nobody@example.com")
+    end
+
+    test "returns :already_disabled when preference is already off" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+
+      {:ok, user} =
+        Accounts.update_notification_preferences(user, %{
+          "event_notifications" => "false"
+        })
+
+      assert {:ok, :already_disabled} =
+               Accounts.disable_event_notifications(user.email)
+    end
+  end
+
   describe "update_billing_address/2" do
     test "updates billing address" do
       user = user_fixture(%{phone_number: "+14159098268"})
