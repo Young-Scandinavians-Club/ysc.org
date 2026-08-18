@@ -1674,9 +1674,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                     />
                     <.at_glance_stat
                       accent={:teal}
-                      icon="🛏️"
-                      label="Capacity"
-                      value="12 Guests"
+                      icon="⛺"
+                      label="Sleeping"
+                      value="Seasonal"
                       detail="Lawn in summer, beds in winter"
                     />
                     <.at_glance_stat
@@ -2136,7 +2136,17 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <span class="text-teal-600 font-bold">•</span>
                       <span>
                         <strong>Water:</strong>
-                        The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are potable — don't waste fresh water.
+                        The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are potable — don't waste fresh water. See the
+                        <.link
+                          id="clear-lake-water-operations"
+                          href={~p"/documents/clear_lake_water_operations.pdf"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="text-teal-700 underline hover:text-teal-900"
+                        >
+                          potable water operations guide
+                        </.link>
+                        (PDF) for startup, shutdown, and tank fill.
                       </span>
                     </li>
                     <li :if={@sleeping_mode != :winter} class="flex gap-3">
@@ -2368,7 +2378,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </p>
                           <p>
                             <strong>Bring Your Guests:</strong>
-                            Non-member guests are welcome. Include every guest in your booking. For age or guest limits, see the cabin rules above or contact the Cabin Master.
+                            Non-member guests are welcome. Include every guest in your booking.
                           </p>
                         </div>
                       </details>

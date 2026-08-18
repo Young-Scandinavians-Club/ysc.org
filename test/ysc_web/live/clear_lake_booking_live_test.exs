@@ -2384,10 +2384,12 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       assert has_element?(view, "#before-you-go")
       assert has_element?(view, "#clear-lake-training-videos")
+      assert has_element?(view, "#clear-lake-water-operations")
       assert html =~ "Four keys"
       assert html =~ "Thursday morning sprinklers"
       assert html =~ "about 3 days before check-in"
       refute html =~ "1982"
+      refute html =~ "12 Guests"
     end
 
     test "logged-out year-round card uses property season date ranges", %{
