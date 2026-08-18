@@ -124,4 +124,16 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
       assert RefundPolicyDisplay.find_rule_for_days(nil, 30) == nil
     end
   end
+
+  describe "policy_rules/1" do
+    test "returns a list of rules or empty for missing or unloaded policies" do
+      rules = [%{days_before_checkin: 14}]
+
+      assert RefundPolicyDisplay.policy_rules(%{rules: rules}) == rules
+      assert RefundPolicyDisplay.policy_rules(%{rules: []}) == []
+      assert RefundPolicyDisplay.policy_rules(nil) == []
+      assert RefundPolicyDisplay.policy_rules(%{}) == []
+      assert RefundPolicyDisplay.rules_sorted_desc(:not_loaded) == []
+    end
+  end
 end

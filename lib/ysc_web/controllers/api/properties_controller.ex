@@ -8,6 +8,7 @@ defmodule YscWeb.Api.PropertiesController do
   use YscWeb, :controller
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.{SeasonCache, SeasonHelpers}
   alias Ysc.Extensions.PhoneNumber
   alias Ysc.Settings
   alias YscWeb.Emails.OutageNotification
@@ -177,6 +178,8 @@ defmodule YscWeb.Api.PropertiesController do
   end
 
   defp clear_lake_rules(cabin_master) do
+    {summer_window, winter_window} = clear_lake_season_windows()
+
     %{
       "welcome" => [
         %{
@@ -187,7 +190,7 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "What's Here",
           content:
-            "- **The Private Dock** — swimming, sunbathing, boat mooring.\n- **Social Hall** — cedar hall with a wood-burning fireplace and dance floor.\n- **Group Kitchen** — industrial stoves and ample fridge space.\n- **Sleeping:** Summer (May 1 – Oct 31): no beds — lawn camp or bring your own sleeping setup. Winter (Nov 1 – Apr 30): indoor beds in three rooms — two rooms with one queen each, one room with a queen and two full-size beds (bring linens & a comforter). Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks."
+            "- **The Private Dock** — swimming, sunbathing, boat mooring.\n- **Social Hall** — cedar hall with a wood-burning fireplace and dance floor.\n- **Group Kitchen** — industrial stoves and ample fridge space.\n- **Sleeping:** Summer (#{summer_window}): no beds — lawn camp or bring your own sleeping setup. Winter (#{winter_window}): indoor beds in three rooms — two rooms with one queen each, one room with a queen and two full-size beds (bring linens & a comforter). Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks."
         },
         %{
           title: "What to Bring",
@@ -238,9 +241,9 @@ defmodule YscWeb.Api.PropertiesController do
             "- **Deep Clean:** Sanitize range top, ovens, and countertops.\n- **Dishwasher:** Must be emptied **before** you depart.\n- **Sleeping Mats:** Sanitize, wipe down, and stack neatly in the storage room next to the pool toy room."
         },
         %{
-          title: "Winter Season (Nov 1 – Apr 30)",
+          title: "Winter Season (#{winter_window})",
           content:
-            "Indoor beds are set up in three separate rooms during winter. Two rooms have one queen bed each; the third has a queen and two full-size beds. Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks. Bring your own linens: sheets, pillowcases, a comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help keep you cozy in the Social Hall.\n\nIn summer (May 1 – Oct 31), beds are not set up. Lawn camp or use the cabin with your own sleeping setup."
+            "Indoor beds are set up in three separate rooms during winter. Two rooms have one queen bed each; the third has a queen and two full-size beds. Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks. Bring your own linens: sheets, pillowcases, a comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help keep you cozy in the Social Hall.\n\nIn summer (#{summer_window}), beds are not set up. Lawn camp or use the cabin with your own sleeping setup."
         }
       ],
       "checkout" => [
@@ -256,6 +259,18 @@ defmodule YscWeb.Api.PropertiesController do
         }
       ],
       "emergency" => clear_lake_emergency_sections(cabin_master)
+    }
+  end
+
+  defp clear_lake_season_windows do
+    seasons = SeasonCache.get_all_for_property(:clear_lake)
+
+    winter = Enum.find(seasons, &SeasonHelpers.winter_sleeping_season?/1)
+    summer = Enum.find(seasons, &SeasonHelpers.summer_sleeping_season?/1)
+
+    {
+      SeasonHelpers.format_season_window(summer) || "May 1 – Oct 31",
+      SeasonHelpers.format_season_window(winter) || "Nov 1 – Apr 30"
     }
   end
 

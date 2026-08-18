@@ -1661,36 +1661,38 @@ defmodule YscWeb.ClearLakeBookingLive do
                     Clear Lake and the surrounding region offer year-round outdoor opportunities:
                   </p>
                   <!-- At-A-Glance Hero Grid -->
-                  <.at_glance_grid>
-                    <.at_glance_stat
-                      accent={:teal}
-                      icon="⚓"
-                      label="Dock"
-                      value="100-Foot Private"
-                      detail="Boat mooring & swimming"
-                    />
-                    <.at_glance_stat
-                      accent={:teal}
-                      icon="🎵"
-                      label="Social Hall"
-                      value="Dance Floor"
-                      detail="Fireplace & games"
-                    />
-                    <.at_glance_stat
-                      accent={:teal}
-                      icon="⛺"
-                      label="Sleeping"
-                      value="Seasonal"
-                      detail="Lawn in summer, 3 rooms of beds in winter"
-                    />
-                    <.at_glance_stat
-                      accent={:teal}
-                      icon="🌅"
-                      label="Season"
-                      value="Year-Round"
-                      detail="Summer & winter stays"
-                    />
-                  </.at_glance_grid>
+                  <div id="clear-lake-at-a-glance">
+                    <.at_glance_grid>
+                      <.at_glance_stat
+                        accent={:teal}
+                        icon="⚓"
+                        label="Dock"
+                        value="100-Foot Private"
+                        detail="Boat mooring & swimming"
+                      />
+                      <.at_glance_stat
+                        accent={:teal}
+                        icon="🎵"
+                        label="Social Hall"
+                        value="Dance Floor"
+                        detail="Fireplace & games"
+                      />
+                      <.at_glance_stat
+                        accent={:teal}
+                        icon="⛺"
+                        label="Sleeping"
+                        value="Seasonal"
+                        detail="Lawn in summer, 3 rooms of beds in winter"
+                      />
+                      <.at_glance_stat
+                        accent={:teal}
+                        icon="🌅"
+                        label="Season"
+                        value="Year-Round"
+                        detail="Summer & winter stays"
+                      />
+                    </.at_glance_grid>
+                  </div>
 
                   <YscWeb.Components.ImageCarousel.image_carousel
                     id="clear-lake-experience-carousel"
@@ -2293,7 +2295,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Footer -->
                 <div class="mt-12 pt-8 border-t border-zinc-100 text-center">
                   <p class="text-sm text-zinc-600 italic">
-                    The Clear Lake cabin has been a member-run treasure since 1963. Thank you for doing your part to keep it clean for the YSC member.
+                    The Clear Lake cabin has been a member-run treasure since 1963. Thank you for doing your part to keep it clean for the next YSC member.
                   </p>
                 </div>
               </div>
@@ -2477,25 +2479,35 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </tr>
                           </thead>
                           <tbody>
-                            <%= if @buyout_refund_policy || @day_refund_policy do %>
+                            <%= if RefundPolicyDisplay.policy_rules(
+                                     @buyout_refund_policy
+                                   ) != [] or
+                                     RefundPolicyDisplay.policy_rules(
+                                       @day_refund_policy
+                                     ) != [] do %>
                               <% all_days =
                                 RefundPolicyDisplay.unique_threshold_days_desc([
-                                  @buyout_refund_policy &&
-                                    @buyout_refund_policy.rules,
-                                  @day_refund_policy && @day_refund_policy.rules
+                                  RefundPolicyDisplay.policy_rules(
+                                    @buyout_refund_policy
+                                  ),
+                                  RefundPolicyDisplay.policy_rules(
+                                    @day_refund_policy
+                                  )
                                 ]) %>
                               <%= for days <- all_days do %>
                                 <% buyout_rule =
                                   RefundPolicyDisplay.find_rule_for_days(
-                                    @buyout_refund_policy &&
-                                      @buyout_refund_policy.rules,
+                                    RefundPolicyDisplay.policy_rules(
+                                      @buyout_refund_policy
+                                    ),
                                     days
                                   )
 
                                 day_rule =
                                   RefundPolicyDisplay.find_rule_for_days(
-                                    @day_refund_policy &&
-                                      @day_refund_policy.rules,
+                                    RefundPolicyDisplay.policy_rules(
+                                      @day_refund_policy
+                                    ),
                                     days
                                   ) %>
                                 <tr class="border-b border-zinc-100 hover:bg-white">
@@ -2561,14 +2573,18 @@ defmodule YscWeb.ClearLakeBookingLive do
                         Cancellation Policy Summary
                       </h3>
                       <div class="space-y-4 text-sm text-blue-900">
-                        <%= if @buyout_refund_policy && @buyout_refund_policy.rules do %>
+                        <%= if RefundPolicyDisplay.policy_rules(
+                                 @buyout_refund_policy
+                               ) != [] do %>
                           <div>
                             <p class="font-semibold mb-2">
                               Entire cabin:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
-                                    @buyout_refund_policy.rules
+                                    RefundPolicyDisplay.policy_rules(
+                                      @buyout_refund_policy
+                                    )
                                   ) do %>
                                 <li>
                                   {RefundPolicyDisplay.rule_threshold_summary(rule)}
@@ -2577,14 +2593,17 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </ul>
                           </div>
                         <% end %>
-                        <%= if @day_refund_policy && @day_refund_policy.rules do %>
+                        <%= if RefundPolicyDisplay.policy_rules(@day_refund_policy) !=
+                                 [] do %>
                           <div>
                             <p class="font-semibold mb-2">
                               Shared cabin:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
-                                    @day_refund_policy.rules
+                                    RefundPolicyDisplay.policy_rules(
+                                      @day_refund_policy
+                                    )
                                   ) do %>
                                 <li>
                                   {RefundPolicyDisplay.rule_threshold_summary(rule)}
@@ -2593,9 +2612,12 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </ul>
                           </div>
                         <% end %>
-                        <%= if (!@buyout_refund_policy ||
-                                  !@buyout_refund_policy.rules) &&
-                                 (!@day_refund_policy || !@day_refund_policy.rules) do %>
+                        <%= if RefundPolicyDisplay.policy_rules(
+                                 @buyout_refund_policy
+                               ) == [] and
+                                 RefundPolicyDisplay.policy_rules(
+                                   @day_refund_policy
+                                 ) == [] do %>
                           <p class="text-blue-800">
                             Cancellation policy details will be displayed here once available.
                           </p>
@@ -2656,18 +2678,20 @@ defmodule YscWeb.ClearLakeBookingLive do
               </p>
             </.feature_card>
             <%!-- Year-Round Access --%>
-            <.feature_card title="Year-Round Access">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                <strong class="text-zinc-900">
-                  Summer ({@summer_season_window}):
-                </strong>
-                Legendary dock parties and sleeping under the stars on our lawn. Beds are not set up — lawn camp or bring your own sleeping setup.<br />
-                <strong class="text-zinc-900">
-                  Winter ({@winter_season_window}):
-                </strong>
-                Cozy indoor beds in three rooms (queens and fulls), each with heaters, lamps, and storage. Bring your own linens.
-              </p>
-            </.feature_card>
+            <div id="clear-lake-year-round-access">
+              <.feature_card title="Year-Round Access">
+                <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+                  <strong class="text-zinc-900">
+                    Summer ({@summer_season_window}):
+                  </strong>
+                  Legendary dock parties and sleeping under the stars on our lawn. Beds are not set up — lawn camp or bring your own sleeping setup.<br />
+                  <strong class="text-zinc-900">
+                    Winter ({@winter_season_window}):
+                  </strong>
+                  Cozy indoor beds in three rooms (queens and fulls), each with heaters, lamps, and storage. Bring your own linens.
+                </p>
+              </.feature_card>
+            </div>
             <%!-- Community Treasure --%>
             <.feature_card title="A Community Treasure">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
@@ -4189,8 +4213,12 @@ defmodule YscWeb.ClearLakeBookingLive do
   defp assign_sleeping_copy(socket) do
     seasons = socket.assigns.seasons
     current_season = socket.assigns.current_season
-    winter_season = Enum.find(seasons, &winter_season?/1)
-    summer_season = Enum.find(seasons, &summer_season?/1)
+
+    winter_season =
+      Enum.find(seasons, &SeasonHelpers.winter_sleeping_season?/1)
+
+    summer_season =
+      Enum.find(seasons, &SeasonHelpers.summer_sleeping_season?/1)
 
     assign(socket,
       sleeping_mode:
@@ -4203,9 +4231,9 @@ defmodule YscWeb.ClearLakeBookingLive do
       winter_season: winter_season,
       summer_season: summer_season,
       winter_season_window:
-        format_season_window(winter_season) || "Nov 1 – Apr 30",
+        SeasonHelpers.format_season_window(winter_season) || "Nov 1 – Apr 30",
       summer_season_window:
-        format_season_window(summer_season) || "May 1 – Oct 31"
+        SeasonHelpers.format_season_window(summer_season) || "May 1 – Oct 31"
     )
   end
 
@@ -4218,8 +4246,8 @@ defmodule YscWeb.ClearLakeBookingLive do
         current_season
       )
 
-    winter? = Enum.any?(relevant, &winter_season?/1)
-    summer? = Enum.any?(relevant, &(not winter_season?(&1)))
+    winter? = Enum.any?(relevant, &SeasonHelpers.winter_sleeping_season?/1)
+    summer? = Enum.any?(relevant, &SeasonHelpers.summer_sleeping_season?/1)
 
     cond do
       winter? and summer? -> :mixed
@@ -4261,29 +4289,6 @@ defmodule YscWeb.ClearLakeBookingLive do
       true ->
         []
     end
-  end
-
-  defp winter_season?(%{name: name}) when is_binary(name),
-    do: String.downcase(name) == "winter"
-
-  defp winter_season?(_), do: false
-
-  defp summer_season?(%{name: name}) when is_binary(name),
-    do: String.downcase(name) == "summer"
-
-  defp summer_season?(_), do: false
-
-  defp format_season_window(%{
-         start_date: %Date{} = start_date,
-         end_date: %Date{} = end_date
-       }) do
-    "#{format_month_day(start_date)} – #{format_month_day(end_date)}"
-  end
-
-  defp format_season_window(_), do: nil
-
-  defp format_month_day(%Date{} = date) do
-    Calendar.strftime(date, "%b") <> " #{date.day}"
   end
 
   defp clear_lake_hero_carousel_images do
