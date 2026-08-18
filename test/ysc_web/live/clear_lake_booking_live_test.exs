@@ -3151,6 +3151,51 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
     end
   end
 
+  describe "coverage gap: no seasons configured" do
+    test "falls back to mixed sleeping copy and default season windows when no dates are selected",
+         %{conn: conn} do
+      clear_seasons!()
+
+      try do
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+
+        {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+        html = render(view)
+
+        assert :sys.get_state(view.pid).socket.assigns.sleeping_mode == :mixed
+        assert html =~ "Your stay covers both seasons."
+        assert html =~ "Nov 1 – Apr 30"
+        assert html =~ "May 1 – Oct 31"
+      after
+        seed_canonical_seasons!()
+      end
+    end
+
+    test "still renders when dates are selected but no seasons exist", %{
+      conn: conn
+    } do
+      clear_seasons!()
+
+      try do
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+
+        {checkin, checkout} = clear_lake_booking_dates(30, 3)
+
+        {:ok, _view, html} =
+          live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+
+        assert html =~ "Clear Lake"
+        assert html =~ "Nov 1 – Apr 30"
+        assert html =~ "May 1 – Oct 31"
+      after
+        seed_canonical_seasons!()
+      end
+    end
+  end
+
   # Helper function for finding next weekday
   defp find_next_weekday(date, target_day_of_week) do
     current_day = Date.day_of_week(date)
