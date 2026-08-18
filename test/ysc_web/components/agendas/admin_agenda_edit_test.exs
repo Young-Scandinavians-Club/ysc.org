@@ -277,6 +277,96 @@ defmodule YscWeb.AgendaEditComponentTest do
     end
   end
 
+  describe "chronological warning" do
+    test "is hidden when timed items are in start-time order", %{
+      agenda: agenda,
+      event: event
+    } do
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Morning",
+          start_time: ~T[09:00:00],
+          end_time: ~T[09:30:00]
+        })
+
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Afternoon",
+          start_time: ~T[10:00:00],
+          end_time: ~T[10:30:00]
+        })
+
+      html = render_agenda(agenda, event)
+
+      refute html =~ "Chronological Warning"
+    end
+
+    test "is shown when a later slot starts before an earlier one", %{
+      agenda: agenda,
+      event: event
+    } do
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Late slot first",
+          start_time: ~T[11:00:00]
+        })
+
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Earlier slot second",
+          start_time: ~T[09:00:00]
+        })
+
+      html = render_agenda(agenda, event)
+
+      assert html =~ "Chronological Warning"
+      assert html =~ "out of order"
+    end
+
+    test "is shown when an earlier slot's end overlaps the next start", %{
+      agenda: agenda,
+      event: event
+    } do
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Overlapping first",
+          start_time: ~T[09:00:00],
+          end_time: ~T[10:30:00]
+        })
+
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Overlapping second",
+          start_time: ~T[10:00:00],
+          end_time: ~T[11:00:00]
+        })
+
+      html = render_agenda(agenda, event)
+
+      assert html =~ "Chronological Warning"
+    end
+
+    test "ignores items without a start time when checking order", %{
+      agenda: agenda,
+      event: event
+    } do
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Untimed"
+        })
+
+      {:ok, _} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Timed",
+          start_time: ~T[09:00:00]
+        })
+
+      html = render_agenda(agenda, event)
+
+      refute html =~ "Chronological Warning"
+    end
+  end
+
   describe "styling and layout" do
     test "applies correct CSS classes for agenda items", %{
       agenda: agenda,
@@ -318,5 +408,16 @@ defmodule YscWeb.AgendaEditComponentTest do
       assert html =~ "space-y-4"
       assert html =~ "left-[15px]"
     end
+  end
+
+  defp render_agenda(agenda, event) do
+    agenda = Agendas.get_agenda!(agenda.id)
+
+    render_component(AgendaEditComponent, %{
+      id: "agenda-edit-#{agenda.id}",
+      agenda: agenda,
+      agenda_id: agenda.id,
+      event_id: event.id
+    })
   end
 end
