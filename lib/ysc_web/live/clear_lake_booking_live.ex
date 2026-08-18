@@ -1681,7 +1681,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       icon="⛺"
                       label="Sleeping"
                       value="Seasonal"
-                      detail="Lawn in summer, beds in winter"
+                      detail="Lawn in summer, 3 rooms of beds in winter"
                     />
                     <.at_glance_stat
                       accent={:teal}
@@ -2206,7 +2206,10 @@ defmodule YscWeb.ClearLakeBookingLive do
                           Winter ({@winter_season_window})
                         </p>
                         <p class="text-base text-amber-900 leading-relaxed font-semibold">
-                          Indoor beds are set up in the cabin.
+                          Indoor beds are set up in three separate rooms.
+                        </p>
+                        <p class="text-sm text-amber-800 leading-relaxed">
+                          {winter_beds_setup_copy()}
                         </p>
                         <p class="text-sm text-amber-800 leading-relaxed">
                           Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
@@ -2226,7 +2229,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </p>
                         <p class="text-sm text-teal-900 leading-relaxed">
                           <strong>Winter ({@winter_season_window}):</strong>
-                          Indoor beds are set up. Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
+                          Indoor beds are set up in three separate rooms. {winter_beds_setup_copy()} Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
                         </p>
                       </div>
                     <% true -> %>
@@ -2241,7 +2244,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           Lawn camp or use the cabin with your own sleeping setup. Pack a sleeping bag, pillow, and a tent if you're camping on the lawn. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
                         </p>
                         <p class="text-xs text-teal-700 leading-relaxed">
-                          Winter ({@winter_season_window}): indoor beds are set up — pack linens if you book those dates.
+                          Winter ({@winter_season_window}): indoor beds are set up in three rooms — pack linens if you book those dates.
                         </p>
                       </div>
                   <% end %>
@@ -2662,7 +2665,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <strong class="text-zinc-900">
                   Winter ({@winter_season_window}):
                 </strong>
-                Cozy indoor beds set up in the cabin for warm, comfortable lakeside retreats. Bring your own linens.
+                Cozy indoor beds in three rooms (queens and fulls), each with heaters, lamps, and storage. Bring your own linens.
               </p>
             </.feature_card>
             <%!-- Community Treasure --%>
@@ -4178,6 +4181,10 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp today_in_timezone(_),
     do: DateTime.now!(default_timezone()) |> DateTime.to_date()
+
+  defp winter_beds_setup_copy do
+    "Two rooms have one queen bed each. The third has a queen and two full-size beds. Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks."
+  end
 
   defp assign_sleeping_copy(socket) do
     seasons = socket.assigns.seasons

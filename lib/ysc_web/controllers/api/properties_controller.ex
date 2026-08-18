@@ -187,7 +187,7 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "What's Here",
           content:
-            "- **The Private Dock** — swimming, sunbathing, boat mooring.\n- **Social Hall** — cedar hall with a wood-burning fireplace and dance floor.\n- **Group Kitchen** — industrial stoves and ample fridge space.\n- **Sleeping:** Summer (May 1 – Oct 31): no beds — lawn camp or bring your own sleeping setup. Winter (Nov 1 – Apr 30): indoor beds are set up (bring linens & a comforter)."
+            "- **The Private Dock** — swimming, sunbathing, boat mooring.\n- **Social Hall** — cedar hall with a wood-burning fireplace and dance floor.\n- **Group Kitchen** — industrial stoves and ample fridge space.\n- **Sleeping:** Summer (May 1 – Oct 31): no beds — lawn camp or bring your own sleeping setup. Winter (Nov 1 – Apr 30): indoor beds in three rooms — two rooms with one queen each, one room with a queen and two full-size beds (bring linens & a comforter). Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks."
         },
         %{
           title: "What to Bring",
@@ -240,7 +240,7 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "Winter Season (Nov 1 – Apr 30)",
           content:
-            "Indoor beds are set up in the cabin during winter. Bring your own linens: sheets, pillowcases, a comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help keep you cozy in the Social Hall.\n\nIn summer (May 1 – Oct 31), beds are not set up. Lawn camp or use the cabin with your own sleeping setup."
+            "Indoor beds are set up in three separate rooms during winter. Two rooms have one queen bed each; the third has a queen and two full-size beds. Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks. Bring your own linens: sheets, pillowcases, a comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help keep you cozy in the Social Hall.\n\nIn summer (May 1 – Oct 31), beds are not set up. Lawn camp or use the cabin with your own sleeping setup."
         }
       ],
       "checkout" => [

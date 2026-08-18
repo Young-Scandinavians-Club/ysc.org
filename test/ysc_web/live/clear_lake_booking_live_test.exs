@@ -2354,7 +2354,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
 
       assert has_element?(view, "#sleeping-at-the-cabin")
-      assert html =~ "Indoor beds are set up in the cabin."
+      assert html =~ "Indoor beds are set up in three separate rooms."
+      assert html =~ "one queen bed each"
+      assert html =~ "two full-size beds"
+      assert html =~ "bedside tables, lamps, heaters"
       assert html =~ "Bring your own linens"
       assert html =~ "Pack linens"
       refute html =~ "Beds are not set up in the cabin."
@@ -2376,7 +2379,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Lawn camp"
       refute html =~ "Bring your own bed linens"
       refute html =~ "Pack Linens for Indoor Beds"
-      refute html =~ "Indoor beds are set up in the cabin."
+      refute html =~ "Indoor beds are set up in three separate rooms."
     end
 
     test "shows both sleeping setups when a stay spans summer and winter", %{
@@ -2391,7 +2394,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       assert html =~ "Your stay covers both seasons."
       assert html =~ "Beds are not set up."
-      assert html =~ "Indoor beds are set up."
+      assert html =~ "Indoor beds are set up in three separate rooms."
+      assert html =~ "one queen bed each"
     end
 
     test "shows community treasure messaging instead of dugnad", %{conn: conn} do
@@ -2445,6 +2449,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       assert html =~ "Summer (May 1 – Oct 31)"
       assert html =~ "Winter (Nov 1 – Apr 30)"
+      assert html =~ "three rooms (queens and fulls)"
       refute html =~ "May–Sept"
       refute html =~ "Oct–April"
     end

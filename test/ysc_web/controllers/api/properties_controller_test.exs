@@ -262,7 +262,12 @@ defmodule YscWeb.Api.PropertiesControllerTest do
       assert welcome_text =~ "Nov 1 – Apr 30"
       assert welcome_text =~ "lawn camp"
       assert welcome_text =~ "beds are not set up"
+      assert welcome_text =~ "three rooms"
+      assert welcome_text =~ "queen"
+      assert welcome_text =~ "full-size"
       assert "Winter Season (Nov 1 – Apr 30)" in cleaning_titles
+      assert cleaning_text =~ "three separate rooms"
+      assert cleaning_text =~ "bedside tables, lamps, heaters"
       refute cleaning_text =~ "Oct–April"
     end
 
