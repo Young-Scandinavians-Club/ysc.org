@@ -62,6 +62,10 @@ defmodule YscWeb.Components.Autocomplete do
         placeholder="Search by name or email..."
         required
       />
+
+  From a LiveComponent, pass `target={@myself}` so search, select, and
+  clear events stay on the component instead of bubbling to the parent
+  LiveView.
   """
   use Phoenix.Component
 
@@ -85,6 +89,10 @@ defmodule YscWeb.Components.Autocomplete do
   attr :debounce, :integer, default: 300
   attr :errors, :list, default: []
   attr :class, :string, default: ""
+
+  attr :target, :any,
+    default: nil,
+    doc: "Optional phx-target. Pass @myself from LiveComponents."
 
   def autocomplete(assigns) do
     # Default value_fn extracts :id field if not provided or nil
@@ -127,6 +135,7 @@ defmodule YscWeb.Components.Autocomplete do
           <button
             type="button"
             phx-click={@clear_event}
+            phx-target={@target}
             class="ml-2 p-1 text-zinc-400 hover:text-zinc-600 rounded-full hover:bg-blue-100 transition-colors"
             aria-label="Clear selection"
           >
@@ -145,6 +154,7 @@ defmodule YscWeb.Components.Autocomplete do
           id={"#{@id}-input"}
           value={@search_value}
           phx-keyup={@search_event}
+          phx-target={@target}
           phx-debounce={@debounce}
           placeholder={@placeholder}
           autocomplete="off"
@@ -161,6 +171,7 @@ defmodule YscWeb.Components.Autocomplete do
           :if={@search_value != ""}
           type="button"
           phx-click={@clear_event}
+          phx-target={@target}
           class="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 transition-colors"
           aria-label="Clear search"
         >
@@ -184,6 +195,7 @@ defmodule YscWeb.Components.Autocomplete do
               <button
                 type="button"
                 phx-click={@select_event}
+                phx-target={@target}
                 phx-value-id={@value_fn.(result)}
                 class="w-full px-3 py-2 text-left hover:bg-zinc-100 focus:bg-zinc-100 focus:outline-none transition-colors duration-75 cursor-pointer"
               >

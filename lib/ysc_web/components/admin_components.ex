@@ -16,6 +16,7 @@ defmodule YscWeb.AdminComponents do
   alias YscWeb.FormHelpers
 
   import Flop.Phoenix
+  import YscWeb.Components.Autocomplete
   import YscWeb.CoreComponents
 
   @min_date Date.utc_today() |> Date.add(-365)
@@ -388,6 +389,81 @@ defmodule YscWeb.AdminComponents do
       </span>
       {@label}
     </span>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_user_autocomplete
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Admin member/user search picker built on `<.autocomplete>`.
+
+  Displays `UserDisplay.full_name/1` with the user's email as the subtitle.
+  Pass `target={@myself}` from LiveComponents so search/select/clear events
+  stay on the component.
+
+  ## Examples
+
+      <.admin_user_autocomplete
+        id="ticket-grant-user-autocomplete"
+        label="Member"
+        name="ticket_grant[user_id]"
+        search_event="search-users"
+        select_event="select-user"
+        clear_event="clear-user"
+        search_value={@user_search}
+        results={@user_search_results}
+        selected={@selected_user}
+        target={@myself}
+        required
+      />
+  """
+  attr :id, :string, required: true
+  attr :label, :string, default: "Member"
+  attr :name, :string, required: true
+  attr :search_event, :string, required: true
+  attr :select_event, :string, required: true
+  attr :clear_event, :string, required: true
+  attr :search_value, :string, default: ""
+  attr :results, :list, default: []
+  attr :selected, :any, default: nil
+  attr :placeholder, :string, default: "Search by name or email..."
+  attr :required, :boolean, default: false
+  attr :errors, :list, default: []
+  attr :class, :string, default: ""
+  attr :debounce, :integer, default: 300
+
+  attr :target, :any,
+    default: nil,
+    doc: "Optional phx-target (typically @myself from LiveComponents)"
+
+  def admin_user_autocomplete(assigns) do
+    assigns =
+      assigns
+      |> assign(:display_fn, &UserDisplay.full_name/1)
+      |> assign(:subtitle_fn, fn user -> user.email end)
+
+    ~H"""
+    <.autocomplete
+      id={@id}
+      label={@label}
+      name={@name}
+      search_event={@search_event}
+      select_event={@select_event}
+      clear_event={@clear_event}
+      search_value={@search_value}
+      results={@results}
+      selected={@selected}
+      display_fn={@display_fn}
+      subtitle_fn={@subtitle_fn}
+      placeholder={@placeholder}
+      required={@required}
+      errors={@errors}
+      class={@class}
+      debounce={@debounce}
+      target={@target}
+    />
     """
   end
 

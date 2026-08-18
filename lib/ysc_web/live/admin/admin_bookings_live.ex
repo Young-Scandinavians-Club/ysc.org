@@ -5,7 +5,6 @@ defmodule YscWeb.AdminBookingsLive do
 
   import Phoenix.HTML
   import YscWeb.CoreComponents
-  import YscWeb.Components.Autocomplete
   alias Phoenix.LiveView.JS
 
   alias Ysc.Avatars
@@ -1547,7 +1546,7 @@ defmodule YscWeb.AdminBookingsLive do
             value={Atom.to_string(@selected_property)}
           />
 
-          <.autocomplete
+          <.admin_user_autocomplete
             id="booking-user-autocomplete"
             label="User"
             name="booking[user_id]"
@@ -1557,9 +1556,6 @@ defmodule YscWeb.AdminBookingsLive do
             search_value={@user_search}
             results={@user_search_results}
             selected={@selected_user}
-            display_fn={fn user -> "#{user.first_name} #{user.last_name}" end}
-            subtitle_fn={fn user -> user.email end}
-            placeholder="Search by name or email..."
             required
           />
 

@@ -581,4 +581,88 @@ defmodule YscWeb.AdminComponentsTest do
       refute html =~ "fi-"
     end
   end
+
+  describe "admin_user_autocomplete/1" do
+    test "renders the search input when no user is selected" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_user_autocomplete
+          id="grant-user-autocomplete"
+          name="ticket_grant[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+        />
+        """)
+
+      assert html =~ ~s(id="grant-user-autocomplete")
+      assert html =~ ~s(id="grant-user-autocomplete-input")
+      assert html =~ "Member"
+      assert html =~ "Search by name or email"
+      assert html =~ ~s(name="ticket_grant[user_id]")
+      refute html =~ "phx-target"
+    end
+
+    test "renders the selected member using UserDisplay.full_name" do
+      assigns = %{
+        selected: %{
+          id: "user-1",
+          first_name: "ada",
+          last_name: "lovelace",
+          email: "ada@example.com"
+        }
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_user_autocomplete
+          id="grant-user-autocomplete"
+          name="ticket_grant[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+          selected={@selected}
+        />
+        """)
+
+      assert html =~ "Ada Lovelace"
+      assert html =~ "ada@example.com"
+      assert html =~ ~s(value="user-1")
+      refute html =~ "grant-user-autocomplete-input"
+    end
+
+    test "forwards phx-target onto search and select controls" do
+      assigns = %{
+        results: [
+          %{
+            id: "user-2",
+            first_name: "Grace",
+            last_name: "Hopper",
+            email: "grace@example.com"
+          }
+        ]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_user_autocomplete
+          id="grant-user-autocomplete"
+          name="ticket_grant[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+          search_value="Gr"
+          results={@results}
+          target="grant-form"
+        />
+        """)
+
+      assert html =~ ~s(phx-target="grant-form")
+      assert html =~ ~s(phx-keyup="search-users")
+      assert html =~ ~s(phx-click="select-user")
+      assert html =~ "Grace Hopper"
+    end
+  end
 end

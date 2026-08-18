@@ -1290,12 +1290,12 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert has_element?(view, "#ticket-grant-form")
 
       view
-      |> element("#ticket-grant-form input[name='user_search']")
-      |> render_change(%{"user_search" => "Migrated"})
+      |> element("#ticket-grant-user-autocomplete-input")
+      |> render_keyup(%{"value" => "Migrated"})
 
       view
       |> element(
-        "#ticket-grant-form div[phx-click='select-user'][phx-value-id='#{member.id}']"
+        "#ticket-grant-user-autocomplete button[phx-click='select-user'][phx-value-id='#{member.id}']"
       )
       |> render_click()
 
