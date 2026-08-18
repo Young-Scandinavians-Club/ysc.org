@@ -26,6 +26,8 @@ defmodule YscWeb.SesWebhookController do
 
   require Ysc.Logging
 
+  alias Ysc.Accounts
+  alias Ysc.Accounts.EmailCategories
   alias Ysc.Newsletter
   alias Ysc.SNS.SignatureVerifier
 
@@ -191,7 +193,7 @@ defmodule YscWeb.SesWebhookController do
 
     case Newsletter.record_email_event(event_attrs) do
       {:ok, _event} ->
-        handle_event_side_effects(event_type, email, ses_event)
+        handle_event_side_effects(event_type, email, ses_event, tags)
         emit_ses_webhook_telemetry(event_type, :recorded, started_at)
 
       {:error, changeset} ->
@@ -222,7 +224,7 @@ defmodule YscWeb.SesWebhookController do
     }
   end
 
-  defp handle_event_side_effects("bounce", email, ses_event) do
+  defp handle_event_side_effects("bounce", email, ses_event, tags) do
     bounce_type = get_in(ses_event, ["bounce", "bounceType"])
 
     if bounce_type == "Permanent" do
@@ -253,10 +255,48 @@ defmodule YscWeb.SesWebhookController do
             error: inspect(reason)
           )
       end
+
+      maybe_disable_event_notifications(email, tags, "bounce")
     end
   end
 
-  defp handle_event_side_effects(_event_type, _email, _ses_event), do: :ok
+  defp handle_event_side_effects("complaint", email, _ses_event, tags) do
+    maybe_disable_event_notifications(email, tags, "complaint")
+  end
+
+  defp handle_event_side_effects(_event_type, _email, _ses_event, _tags),
+    do: :ok
+
+  # Complaints and hard bounces on event-notification emails imply the
+  # recipient doesn't want them; disable that preference so we stop sending.
+  defp maybe_disable_event_notifications(email, tags, reason) do
+    template = Map.get(tags, "template")
+
+    if EmailCategories.get_category(template) == :event do
+      case Accounts.disable_event_notifications(email) do
+        {:ok, :not_found} ->
+          :ok
+
+        {:ok, :already_disabled} ->
+          :ok
+
+        {:ok, _user} ->
+          Ysc.Logging.info(
+            "SES webhook: disabled event notifications",
+            email: mask_email(email),
+            reason: reason
+          )
+
+        {:error, changeset} ->
+          Ysc.Logging.error(
+            "SES webhook: failed to disable event notifications",
+            email: mask_email(email),
+            reason: reason,
+            error: inspect(changeset.errors)
+          )
+      end
+    end
+  end
 
   defp emit_hard_bounce_telemetry(outcome) do
     :telemetry.execute(

@@ -1935,6 +1935,30 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Disables event notifications for the user with the given email, e.g. in
+  response to an SES complaint or hard bounce on an event-notification email.
+
+  Returns `{:ok, user}` if the preference was updated, `{:ok, :not_found}` if
+  no user matches the email, or `{:ok, :already_disabled}` if the preference
+  was already off.
+  """
+  @spec disable_event_notifications(String.t()) ::
+          {:ok, User.t() | :not_found | :already_disabled}
+          | {:error, Ecto.Changeset.t()}
+  def disable_event_notifications(email) when is_binary(email) do
+    case get_user_by_email(email) do
+      nil ->
+        {:ok, :not_found}
+
+      %User{event_notifications: false} ->
+        {:ok, :already_disabled}
+
+      %User{} = user ->
+        update_notification_preferences(user, %{event_notifications: false})
+    end
+  end
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for changing the user's billing address.
   """
   def change_billing_address(user, attrs \\ %{}) do
