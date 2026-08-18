@@ -4507,39 +4507,24 @@ defmodule Ysc.Accounts do
   from `now`).
   """
   def get_application_statistics(now \\ DateTime.utc_now()) do
-    stats =
-      now
-      |> application_statistics_query()
-      |> Repo.one() ||
-        %{
-          this_month: 0,
-          this_year: 0,
-          last_month: 0,
-          last_year_month: 0
-        }
+    %{
+      this_month: this_month,
+      this_year: this_year,
+      last_month: last_month,
+      last_year_month: last_year_month
+    } = now |> application_statistics_query() |> Repo.one!()
 
-    this_month = stats.this_month || 0
-    this_year = stats.this_year || 0
-    last_month = stats.last_month || 0
-    last_year_month = stats.last_year_month || 0
-
-    month_change =
-      if last_month > 0 do
-        round((this_month - last_month) / last_month * 100)
-      else
-        0
-      end
-
-    year_change =
-      if last_year_month > 0 do
-        round((this_year - last_year_month) / last_year_month * 100)
-      else
-        0
-      end
+    month_change = percent_change(this_month, last_month)
+    year_change = percent_change(this_year, last_year_month)
 
     {this_month, this_year, last_month, last_year_month, month_change,
      year_change}
   end
+
+  defp percent_change(_current, 0), do: 0
+
+  defp percent_change(current, previous),
+    do: round((current - previous) / previous * 100)
 
   defp application_statistics_query(%DateTime{} = now) do
     month_start = %DateTime{
