@@ -1244,7 +1244,8 @@ defmodule YscWeb.AdminDashboardLive do
              fn -> Bookings.pending_refunds_dashboard_summary() end},
             {:recent_newsletters,
              fn -> Newsletter.list_recent_sent_editions_with_stats(5) end},
-            {:application_statistics, fn -> get_application_statistics() end},
+            {:application_statistics,
+             fn -> Accounts.get_application_statistics() end},
             {:property_stats, fn -> get_property_stats() end},
             {:membership_stats, fn -> Accounts.get_membership_stats() end},
             {:membership_joins_ytd,
@@ -1384,105 +1385,6 @@ defmodule YscWeb.AdminDashboardLive do
     alias Ysc.Repo
     import Ecto.Query
     Repo.one(from e in Ysc.Newsletter.Edition, select: count())
-  end
-
-  defp get_application_statistics do
-    alias Ysc.Repo
-    import Ecto.Query
-
-    now = DateTime.utc_now()
-
-    # Start of current month
-    month_start = %DateTime{
-      now
-      | day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    # Start of current year
-    year_start = %DateTime{
-      now
-      | month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    # Count all new applications this month (all users created this month)
-    applications_this_month =
-      Repo.one(
-        from u in Ysc.Accounts.User,
-          where: u.inserted_at >= ^month_start,
-          where: u.inserted_at < ^now,
-          select: count(u.id)
-      ) || 0
-
-    # Count all new applications this year (all users created this year)
-    applications_this_year =
-      Repo.one(
-        from u in Ysc.Accounts.User,
-          where: u.inserted_at >= ^year_start,
-          where: u.inserted_at < ^now,
-          select: count(u.id)
-      ) || 0
-
-    # Start of last month
-    last_month_start = Timex.shift(month_start, months: -1)
-    last_month_end = month_start
-
-    # Count applications last month
-    applications_last_month =
-      Repo.one(
-        from u in Ysc.Accounts.User,
-          where: u.inserted_at >= ^last_month_start,
-          where: u.inserted_at < ^last_month_end,
-          select: count(u.id)
-      ) || 0
-
-    # Start of last year (same month)
-    last_year_month_start = Timex.shift(month_start, years: -1)
-
-    last_year_month_end =
-      Timex.shift(month_start, years: -1) |> Timex.shift(months: 1)
-
-    # Count applications last year (same month)
-    applications_last_year =
-      Repo.one(
-        from u in Ysc.Accounts.User,
-          where: u.inserted_at >= ^last_year_month_start,
-          where: u.inserted_at < ^last_year_month_end,
-          select: count(u.id)
-      ) || 0
-
-    # Calculate percentage changes
-    applications_month_change =
-      if applications_last_month > 0 do
-        round(
-          (applications_this_month - applications_last_month) /
-            applications_last_month * 100
-        )
-      else
-        0
-      end
-
-    applications_year_change =
-      if applications_last_year > 0 do
-        round(
-          (applications_this_year - applications_last_year) /
-            applications_last_year * 100
-        )
-      else
-        0
-      end
-
-    {applications_this_month, applications_this_year, applications_last_month,
-     applications_last_year, applications_month_change,
-     applications_year_change}
   end
 
   defp hours_waiting(user) do

@@ -13,6 +13,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.Events.{EventPricingCache, TicketTierHelpers}
   alias Ysc.MoneyHelper
   alias Ysc.Repo
+  alias Ysc.Subscriptions
   alias Ysc.Tickets.DonationDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
 
@@ -3656,6 +3657,7 @@ defmodule YscWeb.EventDetailsLive do
     socket
     |> SEO.assign_seo(SEO.assigns_for_event(event_for_seo))
     |> assign(:event, event)
+    |> assign(:had_membership?, event_had_membership?(socket))
     # Async data - will be populated after connection
     |> assign(:agendas, [])
     |> assign(:active_agenda, nil)
@@ -3710,6 +3712,19 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:async_data_loaded, false)
     # Save-the-date subscription loads after WebSocket connect (see load_event_data_async)
     |> assign(:subscribed_to_save_the_date, false)
+  end
+
+  # Only needed for expired-vs-never-subscribed ticket copy, and only when
+  # the viewer is signed in without an active membership.
+  defp event_had_membership?(socket) do
+    user = socket.assigns[:current_user]
+    active? = socket.assigns[:active_membership?] == true
+
+    if user && not active? do
+      Subscriptions.has_any_subscription?(user)
+    else
+      false
+    end
   end
 
   # Load expensive data asynchronously after WebSocket connection

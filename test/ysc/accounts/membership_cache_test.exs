@@ -243,6 +243,31 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       assert membership1.user_id == membership2.user_id
     end
 
+    test "cache hit does not re-query the subscription row" do
+      user = user_fixture()
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_cache_hit_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      user = Accounts.get_user!(user.id, [:subscriptions])
+      assert MembershipCache.get_active_membership(user)
+
+      {_membership, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipCache.get_active_membership(user) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+    end
+
     test "invalidates expired cached subscriptions" do
       user = user_fixture()
 

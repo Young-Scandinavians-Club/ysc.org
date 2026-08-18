@@ -4499,6 +4499,80 @@ defmodule Ysc.Accounts do
     is_nil(user.post_migration_onboarding_completed_at)
   end
 
+  @doc """
+  New-user application counts for the admin dashboard.
+
+  One query with filtered `COUNT`s instead of four sequential scans of `users`.
+  Windows match the previous LiveView implementation (UTC month/year bounds
+  from `now`).
+  """
+  def get_application_statistics(now \\ DateTime.utc_now()) do
+    %{
+      this_month: this_month,
+      this_year: this_year,
+      last_month: last_month,
+      last_year_month: last_year_month
+    } = now |> application_statistics_query() |> Repo.one!()
+
+    month_change = percent_change(this_month, last_month)
+    year_change = percent_change(this_year, last_year_month)
+
+    {this_month, this_year, last_month, last_year_month, month_change,
+     year_change}
+  end
+
+  defp percent_change(_current, 0), do: 0
+
+  defp percent_change(current, previous),
+    do: round((current - previous) / previous * 100)
+
+  defp application_statistics_query(%DateTime{} = now) do
+    month_start = %DateTime{
+      now
+      | day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    year_start = %DateTime{
+      now
+      | month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    last_month_start = Timex.shift(month_start, months: -1)
+    last_year_month_start = Timex.shift(month_start, years: -1)
+
+    last_year_month_end =
+      last_year_month_start |> Timex.shift(months: 1)
+
+    from(u in User,
+      where: u.inserted_at >= ^last_year_month_start,
+      where: u.inserted_at < ^now,
+      select: %{
+        this_month: count(u.id) |> filter(u.inserted_at >= ^month_start),
+        this_year: count(u.id) |> filter(u.inserted_at >= ^year_start),
+        last_month:
+          count(u.id)
+          |> filter(
+            u.inserted_at >= ^last_month_start and u.inserted_at < ^month_start
+          ),
+        last_year_month:
+          count(u.id)
+          |> filter(
+            u.inserted_at >= ^last_year_month_start and
+              u.inserted_at < ^last_year_month_end
+          )
+      }
+    )
+  end
+
   @doc false
   def ci_query_explain_query do
     from(u in User,
@@ -4506,5 +4580,10 @@ defmodule Ysc.Accounts do
       order_by: [asc: u.last_name, asc: u.first_name],
       limit: 50
     )
+  end
+
+  @doc false
+  def ci_query_explain_application_statistics_query do
+    application_statistics_query(Ysc.Ci.QueryExplain.Fixtures.now())
   end
 end

@@ -209,6 +209,32 @@ defmodule Ysc.SubscriptionsTest do
       assert Enum.any?(subscriptions, &(&1.id == sub2.id))
     end
 
+    test "has_any_subscription?/1 is true for expired rows and sub-accounts",
+         %{
+           user: user
+         } do
+      refute Subscriptions.has_any_subscription?(nil)
+      refute Subscriptions.has_any_subscription?(user)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_any_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), -2, :day)
+        })
+
+      assert Subscriptions.has_any_subscription?(user)
+
+      sub_account =
+        user_fixture_unique()
+        |> Ecto.Changeset.change(primary_user_id: user.id)
+        |> Repo.update!()
+
+      assert Subscriptions.has_any_subscription?(sub_account)
+    end
+
     test "get_subscription/1 returns subscription by id", %{user: user} do
       {:ok, subscription} =
         Subscriptions.create_subscription(%{

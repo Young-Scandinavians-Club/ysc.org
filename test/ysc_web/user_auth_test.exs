@@ -221,6 +221,31 @@ defmodule YscWeb.UserAuthTest do
         UserAuth.on_mount(:mount_current_user, %{}, session, %LiveView.Socket{})
 
       assert updated_socket.assigns.current_user.id == user.id
+      assert updated_socket.assigns.had_membership? == false
+    end
+
+    test "does not load subscription history for had_membership? on every LiveView",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_hist_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), -2, :day)
+        })
+
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      {:cont, updated_socket} =
+        UserAuth.on_mount(:mount_current_user, %{}, session, %LiveView.Socket{})
+
+      assert updated_socket.assigns.had_membership? == false
     end
 
     test "assigns nil to current_user assign if there isn't a valid user_token",

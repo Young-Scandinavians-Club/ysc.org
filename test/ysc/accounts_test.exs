@@ -2535,6 +2535,130 @@ defmodule Ysc.AccountsTest do
       end
     end
 
+    test "get_application_statistics uses a single users query" do
+      {_stats, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_application_statistics() end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 1
+    end
+
+    test "get_application_statistics counts a newly inserted user in this month and year" do
+      # `inserted_at` is `:utc_datetime` (second precision). Use a `now` after
+      # both the snapshot and the insert so the new row is inside `[..., now)`.
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      {month_before, year_before, _, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      user_fixture(%{phone_number: unique_user_phone()})
+
+      {month_after, year_after, _, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      assert month_after == month_before + 1
+      assert year_after == year_before + 1
+    end
+
+    test "get_application_statistics attributes last-month users separately" do
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      month_start = %DateTime{
+        now
+        | day: 1,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          microsecond: {0, 0}
+      }
+
+      last_month_at =
+        month_start
+        |> Timex.shift(days: -2)
+        |> DateTime.truncate(:second)
+
+      {month_before, _, last_before, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      Repo.update_all(from(u in User, where: u.id == ^user.id),
+        set: [inserted_at: last_month_at, updated_at: last_month_at]
+      )
+
+      {month_after, _, last_after, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      assert month_after == month_before
+      assert last_after == last_before + 1
+    end
+
+    test "get_application_statistics computes month and year percent changes" do
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      month_start = %DateTime{
+        now
+        | day: 1,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          microsecond: {0, 0}
+      }
+
+      last_month_at =
+        month_start
+        |> Timex.shift(days: -2)
+        |> DateTime.truncate(:second)
+
+      last_year_month_at =
+        month_start
+        |> Timex.shift(years: -1)
+        |> DateTime.add(2, :day)
+        |> DateTime.truncate(:second)
+
+      {_, _, last_month_before, last_year_before, _, _} =
+        Accounts.get_application_statistics(now)
+
+      last_month_user = user_fixture(%{phone_number: unique_user_phone()})
+      last_year_user = user_fixture(%{phone_number: unique_user_phone()})
+      user_fixture(%{phone_number: unique_user_phone()})
+
+      Repo.update_all(from(u in User, where: u.id == ^last_month_user.id),
+        set: [inserted_at: last_month_at, updated_at: last_month_at]
+      )
+
+      Repo.update_all(from(u in User, where: u.id == ^last_year_user.id),
+        set: [inserted_at: last_year_month_at, updated_at: last_year_month_at]
+      )
+
+      {this_month, this_year, last_month, last_year_month, month_change,
+       year_change} = Accounts.get_application_statistics(now)
+
+      assert last_month == last_month_before + 1
+      assert last_year_month == last_year_before + 1
+      assert month_change == round((this_month - last_month) / last_month * 100)
+
+      assert year_change ==
+               round((this_year - last_year_month) / last_year_month * 100)
+    end
+
+    test "get_application_statistics reports 0 percent change when prior windows are empty" do
+      now = ~U[2099-06-15 12:00:00Z]
+
+      {this_month, this_year, last_month, last_year_month, month_change,
+       year_change} = Accounts.get_application_statistics(now)
+
+      assert this_month == 0
+      assert this_year == 0
+      assert last_month == 0
+      assert last_year_month == 0
+      assert month_change == 0
+      assert year_change == 0
+    end
+
     test "get_membership_joins_ytd_comparison returns comparable YTD join stats" do
       cmp = Accounts.get_membership_joins_ytd_comparison()
 

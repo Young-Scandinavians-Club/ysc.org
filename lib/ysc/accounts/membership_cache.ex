@@ -30,9 +30,14 @@ defmodule Ysc.Accounts.MembershipCache do
   @doc """
   Like `get_active_membership/1`, with optional `:validate` (default `true`).
 
-  When `validate: false`, returns cached membership without a per-subscription
-  database round-trip. Pair with `batch_validate_subscription_ids/1` for hot paths
-  that load many users at once.
+  When `validate: true`, cache hits are checked with `Subscriptions.valid?/1`
+  against the cached struct (status and period dates) so every authenticated
+  page load does not re-fetch the subscription row. Mutations invalidate this
+  cache; TTL covers missed invalidations.
+
+  When `validate: false`, returns cached membership without that check. Pair
+  with `batch_validate_subscription_ids/1` for hot paths that load many users
+  at once.
   """
   def get_active_membership(user, opts) when is_list(opts) do
     validate? = Keyword.get(opts, :validate, true)
@@ -325,14 +330,12 @@ defmodule Ysc.Accounts.MembershipCache do
 
   defp get_membership_plan_type_from_membership(_), do: nil
 
-  # Validates that a cached membership is still valid (hasn't expired)
+  # Validates that a cached membership is still valid (hasn't expired).
+  # Uses cached fields only — do not query here; this runs on every cache hit.
   defp membership_valid?(%{type: :lifetime}), do: true
 
-  defp membership_valid?(%Subscriptions.Subscription{id: id}) do
-    case Ysc.Repo.get(Subscriptions.Subscription, id) do
-      nil -> false
-      fresh -> Subscriptions.valid?(fresh)
-    end
+  defp membership_valid?(%Subscriptions.Subscription{} = subscription) do
+    Subscriptions.valid?(subscription)
   end
 
   defp membership_valid?(_), do: false
