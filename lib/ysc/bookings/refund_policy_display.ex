@@ -26,6 +26,8 @@ defmodule Ysc.Bookings.RefundPolicyDisplay do
     Enum.sort_by(rules, & &1.days_before_checkin, :desc)
   end
 
+  def rules_sorted_desc(_), do: []
+
   @doc """
   Sorts rules by `days_before_checkin` ascending (most restrictive thresholds first).
   """
@@ -100,6 +102,14 @@ defmodule Ysc.Bookings.RefundPolicyDisplay do
   end
 
   @doc """
+  Returns a policy's rules list, or `[]` when the policy is missing, has no
+  rules, or `:rules` was never loaded.
+  """
+  def policy_rules(nil), do: []
+  def policy_rules(%{rules: rules}) when is_list(rules), do: rules
+  def policy_rules(_), do: []
+
+  @doc """
   Unique `days_before_checkin` values from one or more rule lists, sorted descending.
   """
   def unique_threshold_days_desc(rule_lists) when is_list(rule_lists) do
@@ -112,15 +122,15 @@ defmodule Ysc.Bookings.RefundPolicyDisplay do
   @doc """
   Finds the rule matching a specific days-before-check-in threshold.
   """
-  def find_rule_for_days(nil, _days), do: nil
-
   def find_rule_for_days(rules, days) when is_list(rules) do
     Enum.find(rules, &(&1.days_before_checkin == days))
   end
 
-  defp threshold_days_from_rules(nil), do: []
+  def find_rule_for_days(_, _days), do: nil
 
   defp threshold_days_from_rules(rules) when is_list(rules) do
     Enum.map(rules, & &1.days_before_checkin)
   end
+
+  defp threshold_days_from_rules(_), do: []
 end

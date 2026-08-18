@@ -13,6 +13,28 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
     :ok
   end
 
+  describe "sleeping season windows" do
+    test "classifies year-spanning seasons as winter sleeping" do
+      winter = %{start_date: ~D[2024-11-01], end_date: ~D[2025-04-30]}
+      summer = %{start_date: ~D[2024-05-01], end_date: ~D[2024-10-31]}
+
+      assert SeasonHelpers.winter_sleeping_season?(winter)
+      refute SeasonHelpers.summer_sleeping_season?(winter)
+      assert SeasonHelpers.summer_sleeping_season?(summer)
+      refute SeasonHelpers.winter_sleeping_season?(summer)
+      refute SeasonHelpers.winter_sleeping_season?(%{name: "Winter"})
+    end
+
+    test "formats recurring month/day windows" do
+      assert SeasonHelpers.format_season_window(%{
+               start_date: ~D[2024-11-01],
+               end_date: ~D[2025-04-30]
+             }) == "Nov 1 – Apr 30"
+
+      assert SeasonHelpers.format_season_window(nil) == nil
+    end
+  end
+
   describe "get_current_season_info/2" do
     test "returns season and date range when a season matches" do
       {:ok, _} =

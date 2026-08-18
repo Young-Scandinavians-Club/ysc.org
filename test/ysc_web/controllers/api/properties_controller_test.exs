@@ -240,6 +240,37 @@ defmodule YscWeb.Api.PropertiesControllerTest do
       assert sections_text =~ "midnight"
     end
 
+    test "clear_lake welcome and cleaning tabs describe seasonal sleeping", %{
+      conn: conn
+    } do
+      response = get(conn, ~p"/api/v1/mobile/properties/clear_lake/info")
+
+      assert %{"data" => %{"tabs" => tabs}} = json_response(response, 200)
+
+      welcome_tab = Enum.find(tabs, &(&1["id"] == "welcome"))
+      cleaning_tab = Enum.find(tabs, &(&1["id"] == "cleaning"))
+
+      welcome_text =
+        welcome_tab["sections"] |> Enum.map_join(" ", & &1["content"])
+
+      cleaning_titles = Enum.map(cleaning_tab["sections"], & &1["title"])
+
+      cleaning_text =
+        cleaning_tab["sections"] |> Enum.map_join(" ", & &1["content"])
+
+      assert welcome_text =~ "May 1 – Oct 31"
+      assert welcome_text =~ "Nov 1 – Apr 30"
+      assert welcome_text =~ "lawn camp"
+      assert welcome_text =~ "beds are not set up"
+      assert welcome_text =~ "three rooms"
+      assert welcome_text =~ "queen"
+      assert welcome_text =~ "full-size"
+      assert "Winter Season (Nov 1 – Apr 30)" in cleaning_titles
+      assert cleaning_text =~ "three separate rooms"
+      assert cleaning_text =~ "bedside tables, lamps, heaters"
+      refute cleaning_text =~ "Oct–April"
+    end
+
     test "clear_lake returns tabs in correct order", %{conn: conn} do
       response = get(conn, ~p"/api/v1/mobile/properties/clear_lake/info")
 
