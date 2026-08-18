@@ -84,4 +84,30 @@ defmodule YscWeb.AdminDashboardQueryTest do
       assert bookings_query_count == 1
     end
   end
+
+  describe "application statistics queries" do
+    setup %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      %{conn: log_in_user(conn, admin), admin: admin}
+    end
+
+    test "dashboard application statistics use a single filtered count query",
+         %{
+           conn: conn
+         } do
+      pattern = ~r/count\(u0\."id"\) FILTER \(WHERE u0\."inserted_at"/i
+
+      {_result, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, _html} = live(conn, ~p"/admin")
+            render_async(view)
+            render(view)
+          end,
+          pattern: pattern
+        )
+
+      assert query_count == 1
+    end
+  end
 end

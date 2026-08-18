@@ -2535,6 +2535,67 @@ defmodule Ysc.AccountsTest do
       end
     end
 
+    test "get_application_statistics uses a single users query" do
+      {_stats, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_application_statistics() end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 1
+    end
+
+    test "get_application_statistics counts a newly inserted user in this month and year" do
+      # `inserted_at` is `:utc_datetime` (second precision). Use a `now` after
+      # both the snapshot and the insert so the new row is inside `[..., now)`.
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      {month_before, year_before, _, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      user_fixture(%{phone_number: unique_user_phone()})
+
+      {month_after, year_after, _, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      assert month_after == month_before + 1
+      assert year_after == year_before + 1
+    end
+
+    test "get_application_statistics attributes last-month users separately" do
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      month_start = %DateTime{
+        now
+        | day: 1,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          microsecond: {0, 0}
+      }
+
+      last_month_at =
+        month_start
+        |> Timex.shift(days: -2)
+        |> DateTime.truncate(:second)
+
+      {month_before, _, last_before, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      Repo.update_all(from(u in User, where: u.id == ^user.id),
+        set: [inserted_at: last_month_at, updated_at: last_month_at]
+      )
+
+      {month_after, _, last_after, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      assert month_after == month_before
+      assert last_after == last_before + 1
+    end
+
     test "get_membership_joins_ytd_comparison returns comparable YTD join stats" do
       cmp = Accounts.get_membership_joins_ytd_comparison()
 
