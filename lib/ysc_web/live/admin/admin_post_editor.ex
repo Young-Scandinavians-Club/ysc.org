@@ -338,7 +338,11 @@ defmodule YscWeb.AdminPostEditorLive do
         <.last_edited_by
           user={@post.updated_by || @post.author}
           at={@post.updated_at}
-          formatter={&Timex.format!(&1, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")}
+          formatter={
+            &(&1
+              |> DateTime.shift_zone!("America/Los_Angeles")
+              |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}"))
+          }
         />
 
         <div class="flex flex-col gap-1 py-1 text-sm leading-6 text-zinc-500 sm:flex-row sm:items-end sm:gap-2">

@@ -12,8 +12,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   alias Ysc.Repo
   alias Phoenix.LiveView.JS
   alias HtmlSanitizeEx.Scrubber
+  alias YscWeb.Admin.DateTimeDisplay
   alias YscWeb.Admin.EditingPresence
-  alias YscWeb.DateDisplay
   alias YscWeb.Emails.NewsletterEdition
 
   @auto_save_debounce_ms 2_000
@@ -484,7 +484,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           :if={@edition}
           user={@edition.updated_by || @edition.creator}
           at={@edition.updated_at}
-          formatter={&DateDisplay.format_datetime_display/1}
+          formatter={&DateTimeDisplay.format_utc_date/1}
         />
         <.admin_help_link
           topic="newsletters/compose"
