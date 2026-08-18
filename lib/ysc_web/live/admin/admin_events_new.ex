@@ -111,7 +111,9 @@ defmodule YscWeb.AdminEventsNewLive do
                   user={@event.updated_by || @event.organizer}
                   at={@event.updated_at}
                   formatter={
-                    &Timex.format!(&1, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+                    &(&1
+                      |> DateTime.shift_zone!("America/Los_Angeles")
+                      |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}"))
                   }
                 />
               </div>
