@@ -214,7 +214,7 @@ defmodule Ysc.MixProject do
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
       {:floki, "~> 0.38"},
-      {:flop, "~> 0.26.6"},
+      {:flop, "~> 0.27.2"},
       {:flop_phoenix, "~> 0.26.2"},
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
