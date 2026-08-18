@@ -5,20 +5,22 @@ defmodule Ysc.SNS.SignatureVerifier do
   Follows the AWS SNS signature verification spec:
   https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html
 
-  The signing certificate URL is validated to be from an amazonaws.com domain
-  before being fetched to prevent SSRF attacks.
+  Certificate and subscription-confirmation URLs are restricted to
+  `sns.<region>.amazonaws.com` (and `.amazonaws.com.cn`). Allowing any
+  `*.amazonaws.com` host is not sufficient: an attacker can host a
+  self-signed cert on their own S3 bucket, forge a signed SNS envelope,
+  and either fetch an arbitrary `SubscribeURL` or inject SES events
+  (including hard-bounce suppressions).
   """
   require Ysc.Logging
 
-  @valid_cert_domains ~w(amazonaws.com)
+  # AWS SDK host check: sns.<region>.amazonaws.com with optional China TLD.
+  @sns_host_regex ~r/^sns\.[a-z0-9-]{1,64}\.amazonaws\.com(\.cn)?$/i
 
   @doc """
   Verifies the signature of an SNS notification or subscription confirmation.
 
   Returns `:ok` if the signature is valid, `{:error, reason}` otherwise.
-
-  Note: In test/dev environments where SNS is not used, this always returns `:ok`
-  if the `SNS_SKIP_SIGNATURE_VERIFICATION` env var is set (for local testing only).
   """
   @spec verify(map()) :: :ok | {:error, atom()}
   def verify(message) when is_map(message) do
@@ -29,33 +31,109 @@ defmodule Ysc.SNS.SignatureVerifier do
     end
   end
 
-  defp validate_cert_url(nil), do: {:error, :missing_cert_url}
+  @doc """
+  Returns `:ok` when `url` is an HTTPS SNS endpoint on a regional SNS host.
 
-  defp validate_cert_url(url) when is_binary(url) do
+  ## Options
+
+    * `:require_pem` — cert URLs must have a `.pem` path and no query/fragment
+  """
+  @spec validate_sns_https_url(String.t(), keyword()) :: :ok | {:error, atom()}
+  def validate_sns_https_url(url, opts \\ [])
+
+  def validate_sns_https_url(url, opts) when is_binary(url) do
+    require_pem? = Keyword.get(opts, :require_pem, false)
+
     case URI.parse(url) do
-      %URI{scheme: "https", host: host} when is_binary(host) ->
-        if Enum.any?(
-             @valid_cert_domains,
-             &(host == &1 or String.ends_with?(host, "." <> &1))
-           ) do
-          :ok
-        else
-          Ysc.Logging.warning("SNS cert URL has invalid host",
-            url: url,
-            host: host
-          )
+      %URI{scheme: "https", host: host} = uri when is_binary(host) ->
+        cond do
+          uri.userinfo not in [nil, ""] ->
+            {:error, :userinfo_not_allowed}
 
-          {:error, :invalid_cert_host}
+          uri.port not in [nil, 443] ->
+            {:error, :invalid_cert_url}
+
+          not sns_host?(host) ->
+            {:error, :invalid_cert_host}
+
+          path_unsafe?(uri.path) ->
+            {:error, :invalid_cert_url}
+
+          require_pem? and not pem_cert_path?(uri) ->
+            {:error, :invalid_cert_url}
+
+          true ->
+            :ok
         end
 
       _ ->
-        Ysc.Logging.warning("SNS cert URL is not a valid HTTPS URL", url: url)
         {:error, :invalid_cert_url}
     end
   end
 
+  def validate_sns_https_url(_url, _opts), do: {:error, :invalid_cert_url}
+
+  @doc """
+  Resolves the signed SNS `Type` from the message body.
+
+  The `x-amz-sns-message-type` header is not part of the signature. If it is
+  present it must match the signed body `Type` so a captured Notification
+  cannot be replayed as a SubscriptionConfirmation (which fetches SubscribeURL).
+  """
+  @spec signed_message_type(map(), String.t() | nil) ::
+          {:ok, String.t() | nil} | {:error, atom()}
+  def signed_message_type(message, header_type)
+      when is_map(message) and (is_binary(header_type) or is_nil(header_type)) do
+    body_type = message["Type"]
+
+    cond do
+      is_binary(header_type) and header_type != body_type ->
+        {:error, :message_type_mismatch}
+
+      true ->
+        {:ok, body_type}
+    end
+  end
+
+  defp validate_cert_url(nil), do: {:error, :missing_cert_url}
+
+  defp validate_cert_url(url) when is_binary(url) do
+    case validate_sns_https_url(url, require_pem: true) do
+      :ok ->
+        :ok
+
+      {:error, reason} = error ->
+        Ysc.Logging.warning("SNS cert URL rejected", url: url, reason: reason)
+        error
+    end
+  end
+
+  defp sns_host?(host) do
+    normalized =
+      host
+      |> String.downcase()
+      |> String.trim_trailing(".")
+
+    Regex.match?(@sns_host_regex, normalized)
+  end
+
+  defp path_unsafe?(nil), do: false
+
+  defp path_unsafe?(path) when is_binary(path) do
+    String.contains?(path, "..") or String.contains?(path, "\\")
+  end
+
+  defp pem_cert_path?(%URI{path: path, query: query, fragment: fragment}) do
+    is_binary(path) and String.ends_with?(path, ".pem") and is_nil(query) and
+      is_nil(fragment)
+  end
+
   defp fetch_cert(url) do
-    case Req.get(url) do
+    case Req.get(url,
+           retry: false,
+           receive_timeout: 10_000,
+           max_redirects: 0
+         ) do
       {:ok, %Req.Response{status: 200, body: body}} when is_binary(body) ->
         {:ok, body}
 
