@@ -3452,7 +3452,7 @@ defmodule Ysc.Quickbooks.Client do
           update_token_config(access_token, new_refresh_token)
 
           Ysc.Logging.warning(
-            "[QB Client] ⚠️  IMPORTANT: New refresh token received. Update your .env file with: QUICKBOOKS_REFRESH_TOKEN=\"#{new_refresh_token}\""
+            "[QB Client] New refresh token received and stored. Update QUICKBOOKS_REFRESH_TOKEN from the secure credential store — do not copy tokens from logs."
           )
 
           Ysc.Logging.info(
