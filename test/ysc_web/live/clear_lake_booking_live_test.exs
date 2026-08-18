@@ -6,7 +6,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
+  import Ecto.Query
 
+  alias Ysc.Bookings
   alias Ysc.Repo
 
   # LiveView subscribes to booking config caches; parallel tests invalidate them in
@@ -70,6 +72,50 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {:error, {:redirect, _}} = redirect -> redirect
       other -> other
     end
+  end
+
+  defp seed_clear_lake_refund_policies do
+    from(p in Ysc.Bookings.RefundPolicy, where: p.property == :clear_lake)
+    |> Repo.update_all(set: [is_active: false])
+
+    {:ok, buyout} =
+      Bookings.create_refund_policy(%{
+        property: :clear_lake,
+        booking_mode: :buyout,
+        is_active: true,
+        name: "Clear Lake buyout test policy #{System.unique_integer()}"
+      })
+
+    {:ok, day} =
+      Bookings.create_refund_policy(%{
+        property: :clear_lake,
+        booking_mode: :day,
+        is_active: true,
+        name: "Clear Lake day test policy #{System.unique_integer()}"
+      })
+
+    {:ok, _} =
+      Bookings.create_refund_policy_rule(%{
+        refund_policy_id: buyout.id,
+        days_before_checkin: 21,
+        refund_percentage: Decimal.new("35")
+      })
+
+    {:ok, _} =
+      Bookings.create_refund_policy_rule(%{
+        refund_policy_id: day.id,
+        days_before_checkin: 14,
+        refund_percentage: Decimal.new("75")
+      })
+
+    :ok
+  end
+
+  defp clear_clear_lake_refund_policies do
+    from(p in Ysc.Bookings.RefundPolicy, where: p.property == :clear_lake)
+    |> Repo.update_all(set: [is_active: false])
+
+    Ysc.Bookings.RefundPolicyCache.invalidate()
   end
 
   describe "malformed query params" do
@@ -2460,6 +2506,59 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         )
 
       assert html =~ "No Pets"
+      assert html =~ "Cabin Master"
+    end
+
+    test "rules tab shows configured cancellation policy percentages", %{
+      conn: conn
+    } do
+      seed_clear_lake_refund_policies()
+
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+        )
+
+      assert has_element?(view, "#cancellation-policy")
+      assert has_element?(view, "#cancellation-policy", "35%")
+      assert has_element?(view, "#cancellation-policy", "75%")
+
+      assert has_element?(
+               view,
+               "#cancellation-policy",
+               "21 or more days before check-in"
+             )
+
+      assert has_element?(
+               view,
+               "#cancellation-policy",
+               "14 or more days before check-in"
+             )
+    end
+
+    test "rules tab shows empty cancellation copy when no policies exist", %{
+      conn: conn
+    } do
+      clear_clear_lake_refund_policies()
+
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+        )
+
+      assert has_element?(
+               view,
+               "#cancellation-policy",
+               "Policy information will be displayed here"
+             )
     end
 
     test "switch-tab with unknown tab value leaves active tab unchanged", %{
@@ -2821,18 +2920,29 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
-    test "handles refund_policy_cache_invalidated message without crashing", %{
+    test "handles refund_policy_cache_invalidated by reloading policies", %{
       conn: conn
     } do
+      clear_clear_lake_refund_policies()
+
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+        )
 
+      refute has_element?(view, "#cancellation-policy", "35%")
+
+      seed_clear_lake_refund_policies()
       send(view.pid, {:refund_policy_cache_invalidated, 1})
 
       html = render(view)
       assert html =~ "Clear Lake"
+      assert has_element?(view, "#cancellation-policy", "35%")
+      assert has_element?(view, "#cancellation-policy", "75%")
     end
   end
 

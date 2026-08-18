@@ -7,6 +7,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     AvailabilityCache,
     ConfigCacheTelemetry,
     PropertyDisplay,
+    RefundPolicyDisplay,
     Season,
     SeasonCache,
     SeasonHelpers,
@@ -176,7 +177,9 @@ defmodule YscWeb.ClearLakeBookingLive do
         buyout_booking_allowed: buyout_booking_allowed,
         active_bookings: active_bookings,
         load_radar: true,
-        availability_cache_version: 0
+        availability_cache_version: 0,
+        buyout_refund_policy: nil,
+        day_refund_policy: nil
       )
       |> assign_sleeping_copy()
 
@@ -187,6 +190,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         subscribe_booking_config_caches()
 
         socket
+        |> refresh_refund_policies()
         |> validate_all_conditions(
           checkin_date,
           checkout_date,
@@ -601,7 +605,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   Access
                 </p>
                 <p class="text-xs font-bold leading-tight">
-                  Free boat mooring — email the cabin host before you arrive
+                  Free boat mooring — email the Cabin Master before you arrive
                 </p>
               </div>
             </div>
@@ -1750,7 +1754,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <li>
                       Cancellation and refunds are on the
                       <strong>Cabin & Booking Rules</strong>
-                      tab.
+                      tab under Cancellation Policy.
                     </li>
                   </ul>
                 </section>
@@ -2397,7 +2401,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <div class="px-5 pb-5 text-sm text-zinc-600 space-y-4 border-t border-zinc-50 pt-4">
                           <p>
                             <strong>Boating & Dock Access:</strong>
-                            Members enjoy free mooring at our private dock. Please email the cabin contact at {EmailConfig.clear_lake_email()} in advance.
+                            Members enjoy free mooring at our private dock. Please email the Cabin Master at {EmailConfig.clear_lake_email()} in advance.
                             <em>Note: trailers must be parked off-site.</em>
                           </p>
                           <div class="p-4 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs">
@@ -2442,9 +2446,159 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </li>
                       </ul>
                     </div>
-                    <p class="text-sm text-zinc-600">
-                      Cancellation and refund policies depend on booking type and season. See your confirmation email and the cabin rules for full details.
-                    </p>
+                  </div>
+                </section>
+                <section
+                  id="cancellation-policy"
+                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12"
+                >
+                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
+                    <.icon name="hero-receipt-refund" class="w-6 h-6" />
+                    <span>Cancellation Policy</span>
+                  </h2>
+                  <div>
+                    <div class="bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden mb-4">
+                      <div class="overflow-x-auto">
+                        <table class="w-full border-collapse">
+                          <thead>
+                            <tr class="bg-zinc-100 text-zinc-900">
+                              <th class="px-4 py-3 text-left font-bold">
+                                Days Before Check-In
+                              </th>
+                              <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
+                                Entire cabin
+                              </th>
+                              <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
+                                Shared cabin
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <%= if @buyout_refund_policy || @day_refund_policy do %>
+                              <% all_days =
+                                RefundPolicyDisplay.unique_threshold_days_desc([
+                                  @buyout_refund_policy &&
+                                    @buyout_refund_policy.rules,
+                                  @day_refund_policy && @day_refund_policy.rules
+                                ]) %>
+                              <%= for days <- all_days do %>
+                                <% buyout_rule =
+                                  RefundPolicyDisplay.find_rule_for_days(
+                                    @buyout_refund_policy &&
+                                      @buyout_refund_policy.rules,
+                                    days
+                                  )
+
+                                day_rule =
+                                  RefundPolicyDisplay.find_rule_for_days(
+                                    @day_refund_policy &&
+                                      @day_refund_policy.rules,
+                                    days
+                                  ) %>
+                                <tr class="border-b border-zinc-100 hover:bg-white">
+                                  <td class="px-4 py-3 font-semibold text-zinc-900">
+                                    {days}+ days
+                                  </td>
+                                  <td class={[
+                                    "px-4 py-3 text-center border-l border-zinc-100",
+                                    if(
+                                      buyout_rule &&
+                                        buyout_rule.refund_percentage,
+                                      do:
+                                        RefundPolicyDisplay.refund_percentage_tier_class(
+                                          buyout_rule.refund_percentage
+                                        ),
+                                      else: "text-zinc-400"
+                                    )
+                                  ]}>
+                                    <%= if buyout_rule && buyout_rule.refund_percentage do %>
+                                      {RefundPolicyDisplay.refund_percentage_int(
+                                        buyout_rule.refund_percentage
+                                      )}%
+                                    <% else %>
+                                      —
+                                    <% end %>
+                                  </td>
+                                  <td class={[
+                                    "px-4 py-3 text-center border-l border-zinc-100",
+                                    if(day_rule && day_rule.refund_percentage,
+                                      do:
+                                        RefundPolicyDisplay.refund_percentage_tier_class(
+                                          day_rule.refund_percentage
+                                        ),
+                                      else: "text-zinc-400"
+                                    )
+                                  ]}>
+                                    <%= if day_rule && day_rule.refund_percentage do %>
+                                      {RefundPolicyDisplay.refund_percentage_int(
+                                        day_rule.refund_percentage
+                                      )}%
+                                    <% else %>
+                                      —
+                                    <% end %>
+                                  </td>
+                                </tr>
+                              <% end %>
+                            <% else %>
+                              <tr>
+                                <td
+                                  colspan="3"
+                                  class="px-4 py-3 text-center text-zinc-600"
+                                >
+                                  Policy information will be displayed here
+                                </td>
+                              </tr>
+                            <% end %>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                      <h3 class="font-semibold text-blue-900 mb-3">
+                        Cancellation Policy Summary
+                      </h3>
+                      <div class="space-y-4 text-sm text-blue-900">
+                        <%= if @buyout_refund_policy && @buyout_refund_policy.rules do %>
+                          <div>
+                            <p class="font-semibold mb-2">
+                              Entire cabin:
+                            </p>
+                            <ul class="list-disc list-inside space-y-1 ml-2">
+                              <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
+                                    @buyout_refund_policy.rules
+                                  ) do %>
+                                <li>
+                                  {RefundPolicyDisplay.rule_threshold_summary(rule)}
+                                </li>
+                              <% end %>
+                            </ul>
+                          </div>
+                        <% end %>
+                        <%= if @day_refund_policy && @day_refund_policy.rules do %>
+                          <div>
+                            <p class="font-semibold mb-2">
+                              Shared cabin:
+                            </p>
+                            <ul class="list-disc list-inside space-y-1 ml-2">
+                              <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
+                                    @day_refund_policy.rules
+                                  ) do %>
+                                <li>
+                                  {RefundPolicyDisplay.rule_threshold_summary(rule)}
+                                </li>
+                              <% end %>
+                            </ul>
+                          </div>
+                        <% end %>
+                        <%= if (!@buyout_refund_policy ||
+                                  !@buyout_refund_policy.rules) &&
+                                 (!@day_refund_policy || !@day_refund_policy.rules) do %>
+                          <p class="text-blue-800">
+                            Cancellation policy details will be displayed here once available.
+                          </p>
+                        <% end %>
+                      </div>
+                    </div>
                   </div>
                 </section>
               </div>
@@ -3149,9 +3303,16 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   def handle_info({:refund_policy_cache_invalidated, _version}, socket) do
-    # Clear Lake does not mount refund-policy assigns today; acknowledge the event.
     ConfigCacheTelemetry.live_rebuild(:clear_lake_booking, :refund_policy)
-    {:noreply, socket}
+    {:noreply, refresh_refund_policies(socket)}
+  end
+
+  defp refresh_refund_policies(socket) do
+    assign(socket,
+      buyout_refund_policy:
+        Bookings.get_active_refund_policy(:clear_lake, :buyout),
+      day_refund_policy: Bookings.get_active_refund_policy(:clear_lake, :day)
+    )
   end
 
   defp refresh_after_season_cache_change(socket) do
