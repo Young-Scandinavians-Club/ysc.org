@@ -724,7 +724,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         "Closed"
 
       :fully_blocked_booked ->
-        "Booked"
+        booked_status_label(day, assigns)
 
       :fully_blocked_gray ->
         "Unavailable"
@@ -743,6 +743,21 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         saturday_rule_status_label(day, assigns) || ""
     end
   end
+
+  # Share the buyout classification between the main status and detail so a
+  # fully blocked night cannot render "Booked" and "Partially booked" together.
+  defp booked_status_label(day, assigns) do
+    info = Map.get(assigns.availability, day)
+
+    if assigns.selected_booking_mode == :buyout && is_map(info) do
+      buyout_unavailable_label(info)
+    else
+      "Booked"
+    end
+  end
+
+  defp buyout_unavailable_label(%{has_buyout: true}), do: "Booked"
+  defp buyout_unavailable_label(_info), do: "Partially booked"
 
   defp saturday_rule_status_label(day, assigns) do
     property = assigns[:property]
@@ -1582,7 +1597,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           "Not available"
 
         mode == :buyout && !info.can_book_buyout ->
-          if info.has_buyout, do: "Booked", else: "Partially booked"
+          buyout_unavailable_label(info)
 
         mode == :day && !info.can_book_day ->
           "Unavailable"
