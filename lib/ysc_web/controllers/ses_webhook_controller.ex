@@ -35,15 +35,24 @@ defmodule YscWeb.SesWebhookController do
   Handles SNS HTTP POST notifications.
   """
   def webhook(conn, params) do
-    with {:ok, sns_message} <- resolve_sns_message(conn, params),
-         :ok <- verify_sns_signature(sns_message) do
-      message_type =
-        conn |> get_req_header("x-amz-sns-message-type") |> List.first()
+    header_type =
+      conn |> get_req_header("x-amz-sns-message-type") |> List.first()
 
+    with {:ok, sns_message} <- resolve_sns_message(conn, params),
+         :ok <- verify_sns_signature(sns_message),
+         {:ok, message_type} <-
+           SignatureVerifier.signed_message_type(sns_message, header_type) do
       handle_message(conn, sns_message, message_type)
     else
       {:error, :signature_verification_failed} ->
         Ysc.Logging.warning("SES webhook: SNS signature verification failed")
+        send_resp(conn, 403, "Forbidden")
+
+      {:error, :message_type_mismatch} ->
+        Ysc.Logging.warning(
+          "SES webhook: SNS message Type does not match x-amz-sns-message-type"
+        )
+
         send_resp(conn, 403, "Forbidden")
 
       {:error, reason} ->
@@ -70,32 +79,10 @@ defmodule YscWeb.SesWebhookController do
   end
 
   defp handle_message(conn, sns_message, "SubscriptionConfirmation") do
-    subscribe_url = sns_message["SubscribeURL"]
-
-    if is_binary(subscribe_url) do
-      case Req.get(subscribe_url, retry: false, receive_timeout: 10_000) do
-        {:ok, %Req.Response{status: status}} when status in 200..299 ->
-          Ysc.Logging.info("SES webhook: SNS subscription confirmed",
-            topic_arn: sns_message["TopicArn"]
-          )
-
-        {:ok, %Req.Response{status: status}} ->
-          Ysc.Logging.warning(
-            "SES webhook: SNS subscription confirmation returned non-2xx",
-            status: status
-          )
-
-        {:error, reason} ->
-          Ysc.Logging.warning(
-            "SES webhook: SNS subscription confirmation request failed",
-            reason: inspect(reason)
-          )
-      end
-    else
-      Ysc.Logging.warning(
-        "SES webhook: SubscriptionConfirmation missing SubscribeURL"
-      )
-    end
+    confirm_sns_subscription(
+      sns_message["SubscribeURL"],
+      sns_message["TopicArn"]
+    )
 
     send_resp(conn, 200, "OK")
   end
@@ -124,6 +111,54 @@ defmodule YscWeb.SesWebhookController do
   defp handle_message(conn, _sns_message, type) do
     Ysc.Logging.info("SES webhook: ignoring SNS message type", type: type)
     send_resp(conn, 200, "OK")
+  end
+
+  defp confirm_sns_subscription(subscribe_url, topic_arn)
+       when is_binary(subscribe_url) do
+    if skip_signature_verification?() or
+         match?(:ok, SignatureVerifier.validate_sns_https_url(subscribe_url)) do
+      fetch_subscribe_url(subscribe_url, topic_arn)
+    else
+      Ysc.Logging.warning(
+        "SES webhook: SubscribeURL rejected (not a regional SNS HTTPS host)",
+        topic_arn: topic_arn
+      )
+    end
+  end
+
+  defp confirm_sns_subscription(_subscribe_url, _topic_arn) do
+    Ysc.Logging.warning(
+      "SES webhook: SubscriptionConfirmation missing SubscribeURL"
+    )
+  end
+
+  defp fetch_subscribe_url(subscribe_url, topic_arn) do
+    case Req.get(subscribe_url,
+           retry: false,
+           receive_timeout: 10_000,
+           max_redirects: 0
+         ) do
+      {:ok, %Req.Response{status: status}} when status in 200..299 ->
+        Ysc.Logging.info("SES webhook: SNS subscription confirmed",
+          topic_arn: topic_arn
+        )
+
+      {:ok, %Req.Response{status: status}} ->
+        Ysc.Logging.warning(
+          "SES webhook: SNS subscription confirmation returned non-2xx",
+          status: status
+        )
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "SES webhook: SNS subscription confirmation request failed",
+          reason: inspect(reason)
+        )
+    end
+  end
+
+  defp skip_signature_verification? do
+    Application.get_env(:ysc, :sns_skip_signature_verification, false)
   end
 
   defp process_ses_event(ses_event) do
@@ -321,7 +356,7 @@ defmodule YscWeb.SesWebhookController do
   defp mask_email(other), do: inspect(other)
 
   defp verify_sns_signature(sns_message) do
-    if Application.get_env(:ysc, :sns_skip_signature_verification, false) do
+    if skip_signature_verification?() do
       :ok
     else
       case SignatureVerifier.verify(sns_message) do

@@ -881,6 +881,62 @@ defmodule YscWeb.SesWebhookControllerTest do
       assert conn.status == 403
       assert conn.resp_body == "Forbidden"
     end
+
+    test "returns 403 when SigningCertURL is an S3 amazonaws.com host", %{
+      conn: conn
+    } do
+      prev = Application.get_env(:ysc, :sns_skip_signature_verification)
+      Application.put_env(:ysc, :sns_skip_signature_verification, false)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :sns_skip_signature_verification, prev)
+      end)
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "s3-cert@example.com",
+          env: "test",
+          bounce_type: "Permanent"
+        )
+
+      payload =
+        build_sns_wrapper("Notification", ses_event, %{
+          "SigningCertURL" =>
+            "https://attacker-bucket.s3.amazonaws.com/forged.pem"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      refute Repo.get_by(EmailEvent, email: "s3-cert@example.com")
+    end
+  end
+
+  describe "webhook/2 - signed Type vs unsigned header" do
+    test "returns 403 when header Type does not match signed body Type", %{
+      conn: conn
+    } do
+      payload =
+        build_sns_wrapper("Notification", %{}, %{
+          "SubscribeURL" => "http://127.0.0.1/exfil"
+        })
+
+      conn =
+        conn
+        |> put_req_header(
+          "x-amz-sns-message-type",
+          "SubscriptionConfirmation"
+        )
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      assert conn.resp_body == "Forbidden"
+    end
   end
 
   describe "webhook/2 - tag extraction" do

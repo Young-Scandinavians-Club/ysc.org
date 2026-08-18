@@ -27,6 +27,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
   Finding 27 (MEDIUM)   GET auto-login/passkey endpoints allowed login CSRF (session fixation to attacker account)
   Finding 28 (CRITICAL) Account setup auto-activation charged saved cards without owner session
+  Finding 32 (HIGH)     SNS cert URL allowed any *.amazonaws.com host (S3-hosted forged certs)
+  Finding 33 (MEDIUM)   QuickBooks refresh token logged in full on rotation
   Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -2244,5 +2246,34 @@ defmodule YscWeb.SecurityAuditTest do
         |> DateTime.truncate(:second)
     )
     |> Repo.update!()
+  end
+
+  # Finding 32 (HIGH): SNS cert URLs must be regional SNS hosts, not any amazonaws.com
+  describe "Finding 32: SNS signing cert URL host allowlist" do
+    test "rejects attacker-controlled S3 amazonaws.com cert URLs" do
+      assert {:error, :invalid_cert_host} ==
+               Ysc.SNS.SignatureVerifier.validate_sns_https_url(
+                 "https://attacker.s3.us-west-2.amazonaws.com/forged.pem",
+                 require_pem: true
+               )
+    end
+
+    test "accepts regional SNS certificate URLs" do
+      assert :ok ==
+               Ysc.SNS.SignatureVerifier.validate_sns_https_url(
+                 "https://sns.us-west-2.amazonaws.com/SimpleNotificationService-60eadc5305533def8eb9f2241f05d5a7.pem",
+                 require_pem: true
+               )
+    end
+  end
+
+  # Finding 33 (MEDIUM): QuickBooks refresh token must not be written to logs
+  describe "Finding 33: QuickBooks refresh token logging" do
+    test "client source does not interpolate the refresh token into log messages" do
+      source =
+        File.read!(Path.join(File.cwd!(), "lib/ysc/quickbooks/client.ex"))
+
+      refute source =~ ~S(QUICKBOOKS_REFRESH_TOKEN="#{new_refresh_token}")
+    end
   end
 end
