@@ -497,26 +497,15 @@ defmodule YscWeb.UserAuth do
 
     socket =
       Phoenix.Component.assign_new(socket, :had_membership?, fn ->
-        case socket.assigns.current_user do
-          nil -> false
-          user -> had_membership?(user)
-        end
+        # Default false on every LiveView. EventDetailsLive computes the real
+        # value (expired vs never-subscribed copy) only when a logged-in user
+        # has no active membership — avoid `list_subscriptions/1` on all pages.
+        false
       end)
 
     Phoenix.Component.assign_new(socket, :active_membership?, fn ->
       socket.assigns.current_membership != nil
     end)
-  end
-
-  defp had_membership?(user) do
-    user_to_check =
-      if Accounts.sub_account?(user) do
-        Accounts.get_primary_user(user) || user
-      else
-        user
-      end
-
-    Subscriptions.list_subscriptions(user_to_check) != []
   end
 
   @doc """
