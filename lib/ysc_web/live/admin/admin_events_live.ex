@@ -351,32 +351,42 @@ defmodule YscWeb.AdminEventsLive do
      |> assign(:meta, nil)
      |> assign(:author_filter, [])
      |> assign(:editors_by_event, editors_by_event)
+     |> assign(:events_by_id, %{})
      |> stream(:events, [], reset: true)}
   end
 
   # Content inside a `phx-update="stream"` container only updates via
-  # explicit stream operations, so re-stream the current page to make
-  # existing rows pick up the refreshed presence data.
-  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+  # explicit stream operations. `editors_by_event` is cheap to recompute
+  # (in-memory Presence.list, no DB), but we only force a row re-render for
+  # events whose presence actually changed *and* are currently visible on
+  # this page — everything else needs neither a DB hit nor a stream touch.
+  def handle_info(
+        %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload},
+        socket
+      ) do
     editors_by_event =
       EditingPresence.editors_by_resource(
         :event,
         socket.assigns.current_user.id
       )
 
-    socket = assign(socket, :editors_by_event, editors_by_event)
+    changed_ids =
+      payload
+      |> EditingPresence.diff_resource_ids()
+      |> Enum.filter(&Map.has_key?(socket.assigns.events_by_id, &1))
 
-    case Events.list_events_paginated(socket.assigns.params,
-           date_from: socket.assigns.date_from,
-           date_to: socket.assigns.date_to,
-           tab: socket.assigns.active_tab
-         ) do
-      {:ok, {events, _meta}} ->
-        {:noreply, stream(socket, :events, events, reset: true)}
+    socket =
+      changed_ids
+      |> Enum.reduce(socket, fn event_id, acc ->
+        stream_insert(
+          acc,
+          :events,
+          Map.fetch!(acc.assigns.events_by_id, event_id)
+        )
+      end)
+      |> assign(:editors_by_event, editors_by_event)
 
-      {:error, _meta} ->
-        {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   def handle_params(params, _uri, socket) do
@@ -408,6 +418,7 @@ defmodule YscWeb.AdminEventsLive do
            |> assign(:date_from, date_from)
            |> assign(:date_to, date_to)
            |> assign(:open_check_in_sessions, open_check_in_sessions)
+           |> assign(:events_by_id, Map.new(events, &{&1.id, &1}))
            |> stream(:events, events, reset: true)}
 
         {:error, _meta} ->

@@ -534,7 +534,10 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       send(view.pid, %Phoenix.Socket.Broadcast{
         topic: YscWeb.Admin.EditingPresence.topic(:newsletter),
         event: "presence_diff",
-        payload: %{}
+        payload: %{
+          joins: %{"k" => %{metas: [%{resource_id: edition.id}]}},
+          leaves: %{}
+        }
       })
 
       html = render(view)

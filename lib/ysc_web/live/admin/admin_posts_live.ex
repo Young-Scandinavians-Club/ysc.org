@@ -344,30 +344,37 @@ defmodule YscWeb.AdminPostsLive do
      |> assign(:meta, nil)
      |> assign(:author_filter, [])
      |> assign(:editors_by_post, editors_by_post)
+     |> assign(:posts_by_id, %{})
      |> stream(:posts, [], reset: true)}
   end
 
   # Presence data lives outside the `:posts` stream, but content inside a
   # `phx-update="stream"` container only updates via explicit stream
   # operations — a plain assign change alone won't re-render existing rows.
-  # Re-streaming the current page (cheap: same paginated query already used
-  # by handle_params) keeps rows in sync with live presence changes.
-  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+  # `editors_by_post` is cheap to recompute (in-memory Presence.list, no DB),
+  # but we only need to force a row re-render for posts whose presence
+  # actually changed *and* that are currently visible on this page — anything
+  # else doesn't need a DB hit or a stream touch at all.
+  def handle_info(
+        %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload},
+        socket
+      ) do
     editors_by_post =
       EditingPresence.editors_by_resource(:post, socket.assigns.current_user.id)
 
-    socket = assign(socket, :editors_by_post, editors_by_post)
+    changed_ids =
+      payload
+      |> EditingPresence.diff_resource_ids()
+      |> Enum.filter(&Map.has_key?(socket.assigns.posts_by_id, &1))
 
-    case Posts.list_posts_paginated(socket.assigns.params,
-           date_from: socket.assigns.date_from,
-           date_to: socket.assigns.date_to
-         ) do
-      {:ok, {posts, _meta}} ->
-        {:noreply, stream(socket, :posts, posts, reset: true)}
+    socket =
+      changed_ids
+      |> Enum.reduce(socket, fn post_id, acc ->
+        stream_insert(acc, :posts, Map.fetch!(acc.assigns.posts_by_id, post_id))
+      end)
+      |> assign(:editors_by_post, editors_by_post)
 
-      {:error, _meta} ->
-        {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   def handle_params(params, _uri, socket) do
@@ -390,6 +397,7 @@ defmodule YscWeb.AdminPostsLive do
            |> assign(:search_query, search_query)
            |> assign(:date_from, date_from)
            |> assign(:date_to, date_to)
+           |> assign(:posts_by_id, Map.new(posts, &{&1.id, &1}))
            |> stream(:posts, posts, reset: true)}
 
         {:error, _meta} ->
@@ -460,6 +468,10 @@ defmodule YscWeb.AdminPostsLive do
            ) do
       {:noreply,
        socket
+       |> assign(
+         :posts_by_id,
+         Map.delete(socket.assigns.posts_by_id, target.id)
+       )
        |> stream_delete(:posts, target)
        |> YscWeb.Flash.put_toast(:info, "Post deleted.", title: "Post deleted")}
     else
@@ -548,6 +560,8 @@ defmodule YscWeb.AdminPostsLive do
   defp maybe_stream_update_post(socket, nil), do: socket
 
   defp maybe_stream_update_post(socket, %Post{} = post) do
-    stream_insert(socket, :posts, post)
+    socket
+    |> assign(:posts_by_id, Map.put(socket.assigns.posts_by_id, post.id, post))
+    |> stream_insert(:posts, post)
   end
 end
