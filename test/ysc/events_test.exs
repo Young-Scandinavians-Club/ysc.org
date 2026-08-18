@@ -2974,9 +2974,15 @@ defmodule Ysc.EventsTest do
         # the day after the event ends. A shared Oban uniqueness key across
         # the two workers previously let the later insert silently overwrite
         # the earlier job's scheduled_at instead of creating its own job.
-        assert DateTime.diff(notification_job.scheduled_at, published.published_at) in 3500..3700
+        assert DateTime.diff(
+                 notification_job.scheduled_at,
+                 published.published_at
+               ) in 3500..3700
 
-        assert DateTime.compare(reminder_job.scheduled_at, notification_job.scheduled_at) ==
+        assert DateTime.compare(
+                 reminder_job.scheduled_at,
+                 notification_job.scheduled_at
+               ) ==
                  :gt
       end)
     end
