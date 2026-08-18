@@ -33,6 +33,7 @@ defmodule YscWeb.AdminNewslettersLive do
       |> assign(:subscriber_count, nil)
       |> assign(:creator_filter, [])
       |> assign(:editors_by_edition, editors_by_edition)
+      |> assign(:editions_by_id, %{})
       |> assign(:empty, false)
       |> assign(:meta, nil)
       |> assign(:params, %{})
@@ -161,6 +162,7 @@ defmodule YscWeb.AdminNewslettersLive do
      |> assign(:empty, editions == [])
      |> assign(:search_query, search_query)
      |> assign(:creator_filter, Newsletter.get_all_creators())
+     |> assign(:editions_by_id, Map.new(editions, &{&1.id, &1}))
      |> stream(:editions, editions, reset: true)}
   end
 
@@ -197,45 +199,65 @@ defmodule YscWeb.AdminNewslettersLive do
 
   @impl true
   def handle_info({:edition_delivery_progress, edition}, socket) do
-    {:noreply, stream_insert(socket, :editions, edition)}
+    {:noreply, stream_insert_edition(socket, edition)}
   end
 
   # Content inside a `phx-update="stream"` container only updates via
-  # explicit stream operations, so re-stream the current page (editions tab
-  # only — that's the only tab presence applies to) to refresh rows.
-  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+  # explicit stream operations. `editors_by_edition` is cheap to recompute
+  # (in-memory Presence.list, no DB), but we only force a row re-render for
+  # editions whose presence actually changed *and* are currently visible on
+  # the editions tab (the only tab presence applies to) — everything else
+  # needs neither a DB hit nor a stream touch.
+  def handle_info(
+        %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload},
+        socket
+      ) do
     editors_by_edition =
       EditingPresence.editors_by_resource(
         :newsletter,
         socket.assigns.current_user.id
       )
 
-    socket = assign(socket, :editors_by_edition, editors_by_edition)
-
-    if socket.assigns.current_tab == "editions" do
-      case Newsletter.list_paginated_editions(socket.assigns.params,
-             date_from: socket.assigns.date_from,
-             date_to: socket.assigns.date_to
-           ) do
-        {:ok, {editions, _meta}} ->
-          {:noreply, stream(socket, :editions, editions, reset: true)}
-
-        {:error, _meta} ->
-          {:noreply, socket}
+    changed_ids =
+      if socket.assigns.current_tab == "editions" do
+        payload
+        |> EditingPresence.diff_resource_ids()
+        |> Enum.filter(&Map.has_key?(socket.assigns.editions_by_id, &1))
+      else
+        []
       end
-    else
-      {:noreply, socket}
-    end
+
+    socket =
+      changed_ids
+      |> Enum.reduce(socket, fn edition_id, acc ->
+        stream_insert(
+          acc,
+          :editions,
+          Map.fetch!(acc.assigns.editions_by_id, edition_id)
+        )
+      end)
+      |> assign(:editors_by_edition, editors_by_edition)
+
+    {:noreply, socket}
   end
 
   def handle_info({:edition_sent, edition}, socket) do
     {:noreply,
      socket
      |> assign(:creator_filter, Newsletter.get_all_creators())
-     |> stream_insert(:editions, edition)
+     |> stream_insert_edition(edition)
      |> YscWeb.Flash.put_toast(:info, "\"#{edition.title}\" has been sent.",
        title: "Newsletter sent"
      )}
+  end
+
+  defp stream_insert_edition(socket, edition) do
+    socket
+    |> assign(
+      :editions_by_id,
+      Map.put(socket.assigns.editions_by_id, edition.id, edition)
+    )
+    |> stream_insert(:editions, edition)
   end
 
   defp allowed_tab("subscribers"), do: "subscribers"
@@ -1135,7 +1157,7 @@ defmodule YscWeb.AdminNewslettersLive do
       {:ok, sending_edition} ->
         {:noreply,
          socket
-         |> stream_insert(:editions, sending_edition)
+         |> stream_insert_edition(sending_edition)
          |> YscWeb.Flash.put_toast(:info, "Sending newsletter…",
            title: "Newsletter"
          )}
@@ -1283,6 +1305,10 @@ defmodule YscWeb.AdminNewslettersLive do
       {:ok, _} ->
         {:noreply,
          socket
+         |> assign(
+           :editions_by_id,
+           Map.delete(socket.assigns.editions_by_id, edition.id)
+         )
          |> stream_delete(:editions, edition)
          |> YscWeb.Flash.put_toast(:info, "Newsletter deleted.",
            title: "Newsletter"

@@ -61,4 +61,17 @@ defmodule YscWeb.Admin.EditingPresence do
     |> Enum.uniq_by(&{&1.resource_id, &1.user_id})
     |> Enum.group_by(& &1.resource_id)
   end
+
+  @doc """
+  Resource ids touched by a `presence_diff` broadcast's payload (joins and/or
+  leaves). Lets listing pages re-render only the rows actually affected by a
+  diff instead of the whole page.
+  """
+  @spec diff_resource_ids(%{joins: map(), leaves: map()}) :: [term()]
+  def diff_resource_ids(%{joins: joins, leaves: leaves}) do
+    (Map.values(joins) ++ Map.values(leaves))
+    |> Enum.flat_map(fn %{metas: metas} -> metas end)
+    |> Enum.map(& &1.resource_id)
+    |> Enum.uniq()
+  end
 end
