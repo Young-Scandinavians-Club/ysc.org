@@ -781,12 +781,15 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp day_has_detail?(day, assigns) do
-    availability_display_text(
-      day,
-      assigns.selected_booking_mode,
-      assigns.availability,
-      assigns
-    ) != ""
+    detail =
+      availability_display_text(
+        day,
+        assigns.selected_booking_mode,
+        assigns.availability,
+        assigns
+      )
+
+    detail != "" && detail != day_status_label(day, assigns)
   end
 
   defp day_aria_label(day, assigns, has_tooltip?) do
@@ -1579,7 +1582,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           "Not available"
 
         mode == :buyout && !info.can_book_buyout ->
-          "Partially booked"
+          if info.has_buyout, do: "Booked", else: "Partially booked"
 
         mode == :day && !info.can_book_day ->
           "Unavailable"
