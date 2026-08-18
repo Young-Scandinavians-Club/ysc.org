@@ -1,7 +1,10 @@
 defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   use YscWeb, :live_component
 
+  import YscWeb.AdminComponents
+
   alias Ysc.Accounts
+  alias Ysc.Accounts.UserDisplay
   alias Ysc.Tickets
   alias YscWeb.AdminEventsLive.TicketTierManagement
 
@@ -26,64 +29,20 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
         class="mt-8"
       >
         <.input type="hidden" field={@form[:ticket_tier_id]} />
-        <!-- User Search -->
-        <div class="space-y-2">
-          <label class="block text-sm font-semibold leading-6 text-zinc-800">
-            Member
-          </label>
-          <div
-            :if={@selected_user}
-            class="flex items-center justify-between p-3 bg-zinc-50 rounded-lg border border-zinc-200"
-          >
-            <div>
-              <p class="font-medium text-zinc-900">
-                {@selected_user.first_name} {@selected_user.last_name}
-              </p>
-              <p class="text-sm text-zinc-600">{@selected_user.email}</p>
-            </div>
-            <button
-              type="button"
-              phx-click="clear-user"
-              phx-target={@myself}
-              class="text-zinc-400 hover:text-red-600"
-              title="Clear member"
-            >
-              <.icon name="hero-x-mark" class="w-5 h-5" />
-            </button>
-          </div>
-          <div :if={!@selected_user} class="space-y-2">
-            <input
-              type="text"
-              phx-debounce="200"
-              phx-target={@myself}
-              phx-change="search-users"
-              name="user_search"
-              placeholder="Search by name or email..."
-              value={@user_search}
-              class="block w-full rounded-md border-0 py-1.5 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 placeholder:text-zinc-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-            />
-            <div
-              :if={length(@user_search_results) > 0}
-              class="border border-zinc-200 rounded-lg bg-white shadow-lg max-h-60 overflow-y-auto"
-            >
-              <div
-                :for={user <- @user_search_results}
-                phx-click="select-user"
-                phx-value-id={user.id}
-                phx-target={@myself}
-                class="p-3 hover:bg-zinc-50 cursor-pointer border-b border-zinc-100 last:border-b-0"
-              >
-                <p class="font-medium text-zinc-900">
-                  {user.first_name} {user.last_name}
-                </p>
-                <p class="text-sm text-zinc-600">{user.email}</p>
-              </div>
-            </div>
-          </div>
-          <.error :for={error <- @form[:user_id].errors}>
-            {translate_error(error)}
-          </.error>
-        </div>
+        <.admin_user_autocomplete
+          id="ticket-grant-user-autocomplete"
+          label="Member"
+          name="ticket_grant[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+          search_value={@user_search}
+          results={@user_search_results}
+          selected={@selected_user}
+          errors={Enum.map(@form[:user_id].errors, &translate_error/1)}
+          target={@myself}
+          required
+        />
 
         <.input
           type="number"
@@ -169,7 +128,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   end
 
   @impl true
-  def handle_event("search-users", %{"user_search" => query}, socket) do
+  def handle_event("search-users", %{"value" => query}, socket) do
     results =
       if String.length(query) >= 2 do
         Accounts.search_users(query, limit: 10)
@@ -203,6 +162,8 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     {:noreply,
      socket
      |> assign(:selected_user, nil)
+     |> assign(:user_search, "")
+     |> assign(:user_search_results, [])
      |> assign(:form, to_form(merged, as: "ticket_grant"))}
   end
 
@@ -255,7 +216,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
               id: "ticket-tier-management-#{socket.assigns.event_id}",
               close_grant_modal: true,
               grant_success: %{
-                user_name: "#{user.first_name} #{user.last_name}",
+                user_name: UserDisplay.full_name(user),
                 quantity: quantity
               }
             )
