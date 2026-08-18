@@ -22,7 +22,9 @@ defmodule Ysc.MixProject do
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-43966",
-          "EEF-CVE-2026-43969"
+          "EEF-CVE-2026-43969",
+          # Published 2026-08-18; still unpatched on Hex cowlib 2.19.0.
+          "EEF-CVE-2026-43971"
         ]
       ],
       test_coverage: [
