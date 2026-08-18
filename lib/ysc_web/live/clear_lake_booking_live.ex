@@ -2440,9 +2440,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <li>
                           All bookings must be made and paid in advance on the website
                         </li>
-                        <li>
-                          You may have only one active cabin booking per membership. Book your next stay after your current one is complete.
-                        </li>
                       </ul>
                     </div>
                     <p class="text-sm text-zinc-600">
