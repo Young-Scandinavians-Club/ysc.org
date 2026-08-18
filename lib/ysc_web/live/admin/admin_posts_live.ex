@@ -121,15 +121,17 @@ defmodule YscWeb.AdminPostsLive do
                 >
                   <div class="flex items-start justify-between mb-3">
                     <div class="flex-1 min-w-0">
-                      <h3 class="text-base font-semibold text-zinc-900 mb-1 flex items-center gap-1.5 min-w-0">
-                        <.icon
-                          :if={post.featured_post}
-                          name="hero-star-solid"
-                          class="h-4 w-4 shrink-0 text-yellow-500"
-                        />
-                        <span class="truncate">{post.title}</span>
+                      <div class="mb-1 flex items-center gap-1.5 min-w-0">
+                        <h3 class="text-base font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0">
+                          <.icon
+                            :if={post.featured_post}
+                            name="hero-star-solid"
+                            class="h-4 w-4 shrink-0 text-yellow-500"
+                          />
+                          <span class="truncate">{post.title}</span>
+                        </h3>
                         <.presence_avatars editors={@editors_by_post[post.id] || []} />
-                      </h3>
+                      </div>
                       <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-sm text-zinc-600">
                           {UserDisplay.full_name(post.author)}
@@ -201,7 +203,7 @@ defmodule YscWeb.AdminPostsLive do
                 opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
               >
                 <:col :let={{_, post}} label="Title" field={:title}>
-                  <p class="text-sm font-semibold flex items-center gap-1.5">
+                  <div class="text-sm font-semibold flex items-center gap-1.5">
                     <.icon
                       :if={post.featured_post}
                       name="hero-star-solid"
@@ -221,7 +223,7 @@ defmodule YscWeb.AdminPostsLive do
                       </span>
                     </span>
                     <.presence_avatars editors={@editors_by_post[post.id] || []} />
-                  </p>
+                  </div>
                 </:col>
 
                 <:col :let={{_, post}} label="Author" field={:author_name}>

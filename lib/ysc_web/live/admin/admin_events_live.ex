@@ -138,10 +138,12 @@ defmodule YscWeb.AdminEventsLive do
                     navigate={~p"/admin/events/#{event.id}/edit"}
                     class="mb-3 cursor-pointer block"
                   >
-                    <h3 class="text-base font-semibold text-zinc-900 mb-2 flex items-center gap-1.5">
-                      <span>{event.title}</span>
+                    <div class="mb-2 flex items-center gap-1.5">
+                      <h3 class="text-base font-semibold text-zinc-900 min-w-0 flex-1 truncate">
+                        {event.title}
+                      </h3>
                       <.presence_avatars editors={@editors_by_event[event.id] || []} />
-                    </h3>
+                    </div>
                     <div class="space-y-1.5">
                       <div class="flex items-center gap-2">
                         <span class="text-sm text-zinc-600">Event Date:</span>
@@ -222,10 +224,10 @@ defmodule YscWeb.AdminEventsLive do
                 opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
               >
                 <:col :let={{_, event}} label="Title" field={:title}>
-                  <p class="text-sm font-semibold flex items-center gap-1.5">
+                  <div class="text-sm font-semibold flex items-center gap-1.5">
                     <span>{event.title}</span>
                     <.presence_avatars editors={@editors_by_event[event.id] || []} />
-                  </p>
+                  </div>
                 </:col>
 
                 <:col :let={{_, event}} label="Date" field={:start_date}>

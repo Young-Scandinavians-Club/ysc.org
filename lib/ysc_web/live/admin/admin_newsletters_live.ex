@@ -459,12 +459,14 @@ defmodule YscWeb.AdminNewslettersLive do
                     navigate={~p"/admin/newsletters/#{edition.id}/edit"}
                     class="block"
                   >
-                    <h3 class="text-base font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0">
-                      <span class="truncate">{edition.title}</span>
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <h3 class="text-base font-semibold text-zinc-900 truncate min-w-0">
+                        {edition.title}
+                      </h3>
                       <.presence_avatars editors={
                         @editors_by_edition[edition.id] || []
                       } />
-                    </h3>
+                    </div>
                     <p class="text-sm text-zinc-500 truncate mt-0.5">
                       {edition.subject}
                     </p>
