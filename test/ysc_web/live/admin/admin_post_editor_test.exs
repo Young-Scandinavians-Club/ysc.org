@@ -696,6 +696,40 @@ defmodule YscWeb.AdminPostEditorLiveTest do
       assert html =~ "Last edited by"
       assert html =~ "Morgan"
     end
+
+    test "formats the timestamp in Pacific time, not UTC", %{
+      conn: conn,
+      user: user
+    } do
+      # 05:00 UTC on Mar 15 is still Mar 14 10:00pm PDT.
+      edited_at = ~U[2024-03-15 05:00:00Z]
+      post = presence_post_fixture(user)
+      stamp_updated_at(Post, post.id, edited_at)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      assert has_element?(view, "p", pacific_last_edited_label(edited_at))
+      refute has_element?(view, "p", utc_last_edited_label(edited_at))
+    end
+  end
+
+  defp stamp_updated_at(schema, id, datetime) do
+    {1, _} =
+      Repo.update_all(from(r in schema, where: r.id == ^id),
+        set: [updated_at: datetime]
+      )
+
+    :ok
+  end
+
+  defp pacific_last_edited_label(datetime) do
+    datetime
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+  end
+
+  defp utc_last_edited_label(datetime) do
+    Timex.format!(datetime, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
   end
 
   defp register_and_log_in_admin(%{conn: conn}) do
