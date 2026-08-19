@@ -45,7 +45,8 @@ defmodule Ysc.Stripe.HttpClient do
   end
 
   # stripity_stripe passes "" for GET bodies (params are already in the query
-  # string). Req rewrites GET/DELETE with a body into POST, which Stripe rejects.
+  # string). Skip empty bodies so GET/DELETE stay bodyless. Req 0.7.0–0.7.2
+  # rewrote GET/DELETE with a body into POST (Stripe rejects that); 0.7.3 reverted it.
   defp put_body(req_opts, body) when body in [nil, ""], do: req_opts
 
   defp put_body(req_opts, body) do

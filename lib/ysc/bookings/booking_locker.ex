@@ -1774,6 +1774,86 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
+  @unreserved_booking_statuses [:draft, :canceled, :refunded]
+
+  @doc """
+  Activates a draft, canceled, or refunded booking to `:hold` or `:complete`
+  and claims inventory for the submitted dates.
+
+  Revert-to-draft, cancel, and refund all release PropertyInventory /
+  RoomInventory. The admin status dropdown still allows setting those bookings
+  back to hold/complete; a plain changeset would mark the row reserved without
+  reclaiming inventory, so the dates stay bookable and overlap.
+  """
+  def admin_activate_unreserved_booking(%Booking{} = booking, attrs, opts \\ []) do
+    rooms = Keyword.get(opts, :rooms)
+    status = Map.get(attrs, :status) || Map.get(attrs, "status")
+
+    result =
+      Repo.transaction(fn ->
+        booking =
+          Repo.get!(Booking, booking.id)
+          |> Repo.preload([:rooms, :user])
+
+        if booking.status not in @unreserved_booking_statuses do
+          Repo.rollback({:error, :invalid_status})
+        end
+
+        if status not in [:hold, :complete] do
+          Repo.rollback({:error, :invalid_status})
+        end
+
+        parsed = normalize_admin_modify_attrs(attrs)
+
+        if Bookings.has_blackout?(
+             booking.property,
+             parsed.checkin_date,
+             parsed.checkout_date
+           ) do
+          Repo.rollback({:error, :blackout_conflict})
+        end
+
+        changeset_opts = admin_modify_changeset_opts(booking, parsed, rooms)
+
+        update_attrs = %{
+          checkin_date: parsed.checkin_date,
+          checkout_date: parsed.checkout_date,
+          guests_count: parsed.guests_count,
+          children_count: parsed.children_count,
+          booking_mode: parsed.booking_mode,
+          status: status,
+          hold_expires_at: nil
+        }
+
+        case booking
+             |> Booking.changeset(update_attrs, changeset_opts)
+             |> Repo.update() do
+          {:ok, updated} ->
+            updated = Repo.preload(updated, [:rooms, :user])
+
+            inventory_result =
+              case status do
+                :complete -> safe_update_inventory_for_admin_booking(updated)
+                :hold -> safe_update_held_inventory_for_admin_booking(updated)
+              end
+
+            case inventory_result do
+              :ok -> updated
+              {:error, reason} -> Repo.rollback({:error, reason})
+            end
+
+          {:error, changeset} ->
+            Repo.rollback({:error, changeset})
+        end
+      end)
+
+    case result do
+      {:ok, updated} -> invalidate_availability_cache({:ok, updated})
+      {:error, {:error, reason}} -> {:error, reason}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # Updates inventory to mark dates as booked for an admin-created booking
   defp update_inventory_for_admin_booking(booking) do
     days = stay_night_dates(booking.checkin_date, booking.checkout_date)

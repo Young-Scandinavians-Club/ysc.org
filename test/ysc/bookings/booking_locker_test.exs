@@ -2178,6 +2178,268 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "admin_activate_unreserved_booking/3" do
+    test "reclaims Clear Lake day booked capacity when draft is set to complete" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      checkin = ~D[2037-03-10]
+      checkout = ~D[2037-03-13]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      assert {:ok, draft} = BookingLocker.revert_complete_to_draft(booking.id)
+      assert draft.status == :draft
+      assert activate_day_capacity_booked(:clear_lake, stay_days) == [0, 0, 0]
+
+      assert {:ok, activated} =
+               BookingLocker.admin_activate_unreserved_booking(draft, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day,
+                 status: :complete
+               })
+
+      assert activated.status == :complete
+      assert activate_day_capacity_booked(:clear_lake, stay_days) == [2, 2, 2]
+      assert activate_day_capacity_held(:clear_lake, stay_days) == [0, 0, 0]
+    end
+
+    test "reclaims Clear Lake day held capacity when draft is set to hold" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      {checkin, checkout} = locker_room_dates(80, 3)
+
+      {:ok, hold} =
+        BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      assert {:ok, draft} = BookingLocker.revert_hold_to_draft(hold.id)
+      assert draft.status == :draft
+      assert activate_day_capacity_held(:clear_lake, stay_days) == [0, 0, 0]
+
+      assert {:ok, activated} =
+               BookingLocker.admin_activate_unreserved_booking(draft, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day,
+                 status: :hold
+               })
+
+      assert activated.status == :hold
+      assert activate_day_capacity_held(:clear_lake, stay_days) == [2, 2, 2]
+      assert activate_day_capacity_booked(:clear_lake, stay_days) == [0, 0, 0]
+    end
+
+    test "reclaims buyout inventory when a canceled booking is set to complete",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = locker_buyout_dates(430)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+      days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert property_buyout_booked?(:tahoe, days)
+
+      assert {:ok, canceled} = BookingLocker.cancel_complete_booking(booking.id)
+      assert canceled.status == :canceled
+      refute property_buyout_booked?(:tahoe, days)
+
+      assert {:ok, activated} =
+               BookingLocker.admin_activate_unreserved_booking(canceled, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 4,
+                 children_count: 0,
+                 booking_mode: :buyout,
+                 status: :complete
+               })
+
+      assert activated.status == :complete
+      assert property_buyout_booked?(:tahoe, days)
+    end
+
+    test "rejects activating a draft buyout onto already-booked dates", %{
+      user: user
+    } do
+      user2 = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(431)
+
+      {:ok, first} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            booking_mode: :buyout,
+            guests_count: 4,
+            total_price: Money.new(:USD, "500.00")
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      {overlap_checkin, overlap_checkout} = locker_buyout_dates_after(checkout)
+
+      {:ok, overlap_hold} =
+        BookingLocker.create_buyout_booking(
+          user2.id,
+          :tahoe,
+          overlap_checkin,
+          overlap_checkout,
+          4
+        )
+
+      {:ok, overlap} = BookingLocker.confirm_booking(overlap_hold.id)
+      assert {:ok, draft} = BookingLocker.revert_complete_to_draft(overlap.id)
+
+      assert {:error, :stale_inventory} =
+               BookingLocker.admin_activate_unreserved_booking(draft, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 4,
+                 children_count: 0,
+                 booking_mode: :buyout,
+                 status: :complete
+               })
+
+      assert Repo.get!(Booking, draft.id).status == :draft
+      assert Repo.get!(Booking, first.id).status == :complete
+    end
+
+    test "returns invalid_status when booking is already complete" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      checkin = ~D[2037-04-10]
+      checkout = ~D[2037-04-13]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:error, :invalid_status} =
+               BookingLocker.admin_activate_unreserved_booking(booking, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day,
+                 status: :complete
+               })
+    end
+
+    test "returns blackout_conflict when dates overlap a blackout" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      checkin = ~D[2037-05-10]
+      checkout = ~D[2037-05-13]
+      new_checkin = ~D[2037-05-20]
+      new_checkout = ~D[2037-05-23]
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:ok, draft} = BookingLocker.revert_complete_to_draft(booking.id)
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :clear_lake,
+                 start_date: new_checkin,
+                 end_date: new_checkout,
+                 reason: "Admin activate blackout conflict"
+               })
+
+      assert {:error, :blackout_conflict} =
+               BookingLocker.admin_activate_unreserved_booking(draft, %{
+                 checkin_date: new_checkin,
+                 checkout_date: new_checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day,
+                 status: :complete
+               })
+
+      assert Repo.get!(Booking, draft.id).status == :draft
+    end
+
+    defp activate_day_capacity_booked(property, days) do
+      Enum.map(days, fn day ->
+        Repo.one!(
+          from(pi in PropertyInventory,
+            where: pi.property == ^property and pi.day == ^day,
+            select: pi.capacity_booked
+          )
+        )
+      end)
+    end
+
+    defp activate_day_capacity_held(property, days) do
+      Enum.map(days, fn day ->
+        Repo.one!(
+          from(pi in PropertyInventory,
+            where: pi.property == ^property and pi.day == ^day,
+            select: pi.capacity_held
+          )
+        )
+      end)
+    end
+  end
+
   describe "cancel_complete_booking/1 room and day modes" do
     test "cancels a complete room booking and clears room inventory", %{
       user: user

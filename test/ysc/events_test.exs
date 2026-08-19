@@ -2987,6 +2987,58 @@ defmodule Ysc.EventsTest do
       end)
     end
 
+    test "updating a published event's dates keeps both jobs independently scheduled",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} = Events.publish_event(event)
+
+        assert [_notification_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert [reminder_before] =
+                 all_enqueued(worker: YscWeb.Workers.EventPhotoReminderWorker)
+
+        new_start =
+          DateTime.utc_now()
+          |> DateTime.add(45, :day)
+          |> DateTime.truncate(:second)
+
+        new_end =
+          DateTime.utc_now()
+          |> DateTime.add(46, :day)
+          |> DateTime.truncate(:second)
+
+        assert {:ok, updated} =
+                 Events.update_event(published, %{
+                   start_date: new_start,
+                   end_date: new_end
+                 })
+
+        # Date edits reschedule the reminder first, then the notification.
+        # Without :worker in each unique key those inserts collide and the
+        # later job silently overwrites the earlier one (same production bug
+        # as first-publish, but in the opposite insert order).
+        assert [notification_after] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert [reminder_after] =
+                 all_enqueued(worker: YscWeb.Workers.EventPhotoReminderWorker)
+
+        assert notification_after.args["event_id"] == updated.id
+        assert reminder_after.args["event_id"] == updated.id
+
+        assert DateTime.diff(
+                 notification_after.scheduled_at,
+                 updated.published_at
+               ) in 3500..3700
+
+        assert DateTime.compare(
+                 reminder_after.scheduled_at,
+                 reminder_before.scheduled_at
+               ) == :gt
+      end)
+    end
+
     test "list_upcoming_events_paginated returns meta and events", %{user: user} do
       {:ok, _} =
         Events.create_event(%{
