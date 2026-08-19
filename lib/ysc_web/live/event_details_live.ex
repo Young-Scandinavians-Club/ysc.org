@@ -3529,8 +3529,13 @@ defmodule YscWeb.EventDetailsLive do
                       Host
                     </span>
                   </div>
-                  <p :if={!(is_host && ticket_count == 0)} class="text-sm text-zinc-500">
-                    {ticket_count} {if ticket_count == 1, do: "ticket", else: "tickets"}
+                  <p
+                    :if={!(is_host && ticket_count == 0)}
+                    class="text-sm text-zinc-500"
+                  >
+                    {ticket_count} {if ticket_count == 1,
+                      do: "ticket",
+                      else: "tickets"}
                   </p>
                 </div>
               </div>
