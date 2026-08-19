@@ -2072,7 +2072,7 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
               </div>
               <p class="text-xs text-blue-700 text-center max-w-md">
-                Complete payment before the timer expires. Unpaid reservations are released so others can buy tickets.
+                Complete payment before the timer expires. If time runs out, your tickets go back on sale so others can buy them.
               </p>
             </div>
           </div>

@@ -3420,7 +3420,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <ul class="space-y-2 text-zinc-700">
                       <li>
                         <strong>Step 1:</strong>
-                        Choose your booking mode (individual rooms or rent the entire cabin).
+                        Choose whether you want individual rooms or the entire cabin.
                       </li>
                       <li>
                         <strong>Step 2:</strong>

@@ -3,18 +3,18 @@ defmodule YscWeb.BookingUserMessages do
 
   def reservation_not_found do
     trim("""
-    We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. Contact info@ysc.org if you need help.
+    We couldn't find this booking. It may have expired, already been completed, or belong to a different account. Contact info@ysc.org if you need help.
     """)
   end
 
   def checkout_not_found do
     trim("""
-    We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. If you were checking out, start a new booking from the cabin page. Contact info@ysc.org if you need help.
+    We couldn't find this booking. It may have expired, already been completed, or belong to a different account. If you were checking out, start a new booking from the cabin page. Contact info@ysc.org if you need help.
     """)
   end
 
   def modification_acknowledgment_required do
-    "Please check the box at the bottom of the form confirming you understand that changing this reservation means you won't receive a refund, even if our usual cancellation policy would allow one."
+    "Please check the box at the bottom of the form confirming you understand that changing this booking means you won't receive a refund, even if our usual cancellation policy would allow one."
   end
 
   def modification_forfeiture_title do
@@ -23,7 +23,7 @@ defmodule YscWeb.BookingUserMessages do
 
   def modification_forfeiture_body do
     trim("""
-    If you change this reservation, you cannot get a refund later — even if our usual cancellation rules would have allowed one.
+    If you change this booking, you cannot get a refund later — even if our usual cancellation rules would have allowed one.
     """)
   end
 
@@ -164,19 +164,19 @@ defmodule YscWeb.BookingUserMessages do
 
   def modification_redirect_hold_expired do
     trim("""
-    Your payment went through, but we couldn't save your new dates in time. Your original reservation is unchanged. Try changing your dates again from this booking page. If you were charged twice or your dates look wrong, email info@ysc.org with #{booking_reference_support_phrase()}.
+    Your payment went through, but we couldn't save your new dates in time. Your original booking is unchanged. Try changing your dates again from this booking page. If you were charged twice or your dates look wrong, email info@ysc.org with #{booking_reference_support_phrase()}.
     """)
   end
 
   def modification_redirect_ledger_payment_failed do
     trim("""
-    Your payment went through, but we couldn't record it for your updated reservation. #{modification_after_payment_recovery_body()}
+    Your payment went through, but we couldn't record it for your updated booking. #{modification_after_payment_recovery_body()}
     """)
   end
 
   def modification_redirect_update_failed do
     trim("""
-    Your payment went through, but we couldn't update your reservation. #{modification_after_payment_recovery_body()}
+    Your payment went through, but we couldn't update your booking. #{modification_after_payment_recovery_body()}
     """)
   end
 
@@ -195,19 +195,19 @@ defmodule YscWeb.BookingUserMessages do
 
     case reason do
       {:payment_not_found, _} ->
-        "We cancelled your reservation, but we couldn't find your payment record to process a refund. #{support} and we'll help."
+        "We cancelled your booking, but we couldn't find your payment record to process a refund. #{support} and we'll help."
 
       {:calculation_failed, _} ->
-        "We cancelled your reservation, but we couldn't calculate your refund right now. #{support} and we'll follow up."
+        "We cancelled your booking, but we couldn't calculate your refund right now. #{support} and we'll follow up."
 
       {:refund_failed, _} ->
-        "We cancelled your reservation, but your refund couldn't be processed automatically. #{support} and we'll help."
+        "We cancelled your booking, but your refund couldn't be processed automatically. #{support} and we'll help."
 
       {:pending_refund_failed, _} ->
-        "We cancelled your reservation, but we couldn't submit your refund for review. #{support} and we'll follow up."
+        "We cancelled your booking, but we couldn't submit your refund for review. #{support} and we'll follow up."
 
       {:cancellation_failed, _} ->
-        "We couldn't cancel your reservation. Please try again, or email info@ysc.org if the problem continues."
+        "We couldn't cancel your booking. Please try again, or email info@ysc.org if the problem continues."
     end
   end
 

@@ -3963,7 +3963,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           "The date #{date_str} isn't available for group bookings — the cabin may be reserved for a private group that day."
 
         day_availability && assigns[:selected_booking_mode] == :buyout ->
-          "The date #{date_str} isn't available for reserving the whole cabin — there are existing shared-stay bookings or another whole-cabin reservation."
+          "The date #{date_str} isn't available for booking the whole cabin — there are existing shared-stay bookings or another whole-cabin booking."
 
         true ->
           "The date #{date_str} is unavailable for your selected number of guests."

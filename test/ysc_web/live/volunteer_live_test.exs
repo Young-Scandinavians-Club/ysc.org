@@ -41,7 +41,13 @@ defmodule YscWeb.VolunteerLiveTest do
     test "shows submit button", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/volunteer")
 
-      assert has_element?(view, "button[type='submit']", "Submit Application")
+      assert has_element?(
+               view,
+               "#volunteer-submit-button",
+               "Submit volunteer form"
+             )
+
+      refute has_element?(view, "button", "Submit Application")
     end
   end
 
@@ -258,7 +264,13 @@ defmodule YscWeb.VolunteerLiveTest do
     test "submit button has descriptive text", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/volunteer")
 
-      assert has_element?(view, "button", "Submit Application")
+      assert has_element?(
+               view,
+               "#volunteer-submit-button",
+               "Submit volunteer form"
+             )
+
+      refute has_element?(view, "button", "Submit Application")
     end
   end
 
