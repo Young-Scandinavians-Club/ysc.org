@@ -8,7 +8,7 @@ defmodule YscWeb.AdminMediaLive do
   alias Ysc.Media
   alias Ysc.Media.Timeline
   alias Ysc.S3Config
-  alias YscWeb.{MediaGalleryCursor, S3.SimpleS3Upload}
+  alias YscWeb.{MediaGalleryCursor, MediaLibraryUpload}
 
   @impl true
   def render(assigns) do
@@ -583,14 +583,14 @@ defmodule YscWeb.AdminMediaLive do
       |> allow_upload(:media_uploads,
         accept: ~w(.jpg .jpeg .png .gif .webp),
         max_entries: 10,
-        external: &presign_upload/2,
+        external: &MediaLibraryUpload.presign/2,
         progress: &handle_media_upload_progress/3
       )
       |> allow_upload(:media_drop_uploads,
         accept: ~w(.jpg .jpeg .png .gif .webp),
         max_entries: 10,
         auto_upload: true,
-        external: &presign_upload/2,
+        external: &MediaLibraryUpload.presign/2,
         progress: &handle_media_upload_progress/3
       )
 
@@ -1191,38 +1191,6 @@ defmodule YscWeb.AdminMediaLive do
       socket.assigns.search_query,
       socket.assigns.search_query
     )
-  end
-
-  defp presign_upload(entry, socket) do
-    uploads = socket.assigns.uploads
-    key = "public/#{entry.client_name}"
-
-    config = %{
-      region: S3Config.region(),
-      access_key_id: S3Config.aws_access_key_id(),
-      secret_access_key: S3Config.aws_secret_access_key()
-    }
-
-    {:ok, fields} =
-      SimpleS3Upload.sign_form_upload(config, S3Config.bucket_name(),
-        key: key,
-        content_type: entry.client_type,
-        max_file_size: uploads[entry.upload_config].max_file_size,
-        expires_in: :timer.hours(1),
-        server_side_encryption: S3Config.server_side_encryption?()
-      )
-
-    upload_url = S3Config.upload_url()
-    :ok = S3Config.assert_direct_upload_url!(upload_url, :media)
-
-    meta = %{
-      uploader: "S3",
-      key: key,
-      url: upload_url,
-      fields: fields
-    }
-
-    {:ok, meta, socket}
   end
 
   defp upload_entries_in_progress?(socket, upload_name) do

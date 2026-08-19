@@ -29,6 +29,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 28 (CRITICAL) Account setup auto-activation charged saved cards without owner session
   Finding 32 (HIGH)     SNS cert URL allowed any *.amazonaws.com host (S3-hosted forged certs)
   Finding 33 (MEDIUM)   QuickBooks refresh token logged in full on rotation
+  Finding 34 (MEDIUM)   Media library S3 uploads used guessable public/<filename> keys
   Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -2274,6 +2275,29 @@ defmodule YscWeb.SecurityAuditTest do
         File.read!(Path.join(File.cwd!(), "lib/ysc/quickbooks/client.ex"))
 
       refute source =~ ~S(QUICKBOOKS_REFRESH_TOKEN="#{new_refresh_token}")
+    end
+  end
+
+  # Finding 34 (MEDIUM): media-library direct uploads used public/<client filename>
+  describe "Finding 34: media library uploads use unpredictable S3 keys" do
+    test "presigned media-library keys are unique and ignore client Content-Type" do
+      entry = %Phoenix.LiveView.UploadEntry{
+        upload_config: :media_uploads,
+        client_name: "club-logo.png",
+        client_type: "text/html"
+      }
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{uploads: %{media_uploads: %{max_file_size: 1_000_000}}}
+      }
+
+      assert {:ok, first, _} = YscWeb.MediaLibraryUpload.presign(entry, socket)
+      assert {:ok, second, _} = YscWeb.MediaLibraryUpload.presign(entry, socket)
+
+      refute first.key == "public/club-logo.png"
+      assert first.key =~ ~r{^public/[^/]+/club-logo\.png$}
+      assert first.key != second.key
+      assert first.fields["content-type"] == "image/png"
     end
   end
 end
