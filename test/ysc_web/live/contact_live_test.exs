@@ -63,6 +63,7 @@ defmodule YscWeb.ContactLiveTest do
       {:ok, view, _html} = live(conn, ~p"/contact")
 
       assert has_element?(view, "p", "Submitting as")
+      assert has_element?(view, "#submitting-as")
       assert has_element?(view, "p", "John Doe")
       assert has_element?(view, "p", "john@example.com")
     end
@@ -275,6 +276,7 @@ defmodule YscWeb.ContactLiveTest do
       {:ok, view, _html} = live(conn, ~p"/contact")
 
       assert has_element?(view, "a[href='mailto:tahoe@ysc.org']", "Tahoe Cabin")
+      assert has_element?(view, "#contact-card-tahoe")
 
       assert has_element?(
                view,

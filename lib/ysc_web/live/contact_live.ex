@@ -1,6 +1,8 @@
 defmodule YscWeb.ContactLive do
   use YscWeb, :live_view
 
+  alias Ysc.EmailConfig
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -29,23 +31,7 @@ defmodule YscWeb.ContactLive do
           </.form_notice>
 
           <div class="not-prose">
-            <div
-              :if={@logged_in?}
-              class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
-            >
-              <div class="flex items-center gap-3">
-                <.user_avatar_image
-                  user={@current_user}
-                  class="w-10 h-10 shrink-0"
-                />
-                <div>
-                  <p class="text-sm font-semibold text-blue-900">Submitting as</p>
-                  <p class="text-sm text-blue-700">
-                    {@current_user.first_name} {@current_user.last_name} ({@current_user.email})
-                  </p>
-                </div>
-              </div>
-            </div>
+            <.submitting_as :if={@logged_in?} user={@current_user} />
 
             <.simple_form
               :if={!@submitted}
@@ -102,138 +88,15 @@ defmodule YscWeb.ContactLive do
         <div class="prose prose-zinc prose-a:text-blue-600 max-w-xl mx-auto lg:mx-0">
           <h2>Contact Directly</h2>
           <div class="not-prose grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-            <a
-              href="mailto:tahoe@ysc.org"
-              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
+            <.mailto_card
+              :for={card <- department_contact_cards()}
+              id={card.id}
+              email={card.email}
+              icon={card.icon}
+              title={card.title}
             >
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-home-modern"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Tahoe Cabin</h3>
-                  <p class="text-sm text-zinc-600">
-                    Questions about bookings or stays.
-                  </p>
-                  <p class="text-sm text-blue-600 mt-2">tahoe@ysc.org</p>
-                </div>
-              </div>
-            </a>
-
-            <a
-              href="mailto:cl@ysc.org"
-              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
-            >
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-home"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Clear Lake Cabin</h3>
-                  <p class="text-sm text-zinc-600">
-                    Questions about bookings or stays.
-                  </p>
-                  <p class="text-sm text-blue-600 mt-2">cl@ysc.org</p>
-                </div>
-              </div>
-            </a>
-
-            <a
-              href="mailto:volunteer@ysc.org"
-              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
-            >
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-user-group"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Volunteer</h3>
-                  <p class="text-sm text-zinc-600">
-                    Join the team or suggest events.
-                  </p>
-                  <p class="text-sm text-blue-600 mt-2">volunteer@ysc.org</p>
-                </div>
-              </div>
-            </a>
-
-            <a
-              href="mailto:board@ysc.org"
-              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
-            >
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-users"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Board of Directors</h3>
-                  <p class="text-sm text-zinc-600">
-                    Get in touch with the current Board.
-                  </p>
-                  <p class="text-sm text-blue-600 mt-2">board@ysc.org</p>
-                </div>
-              </div>
-            </a>
-
-            <a
-              href="mailto:web@ysc.org"
-              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
-            >
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-computer-desktop"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Web</h3>
-                  <p class="text-sm text-zinc-600">
-                    Sign in or website related issues.
-                  </p>
-                  <p class="text-sm text-blue-600 mt-2">web@ysc.org</p>
-                </div>
-              </div>
-            </a>
-
-            <a
-              href="mailto:choir@ysc.org"
-              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
-            >
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-musical-note"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">Choir</h3>
-                  <p class="text-sm text-zinc-600">
-                    Questions about choir rehearsals or events.
-                  </p>
-                  <p class="text-sm text-blue-600 mt-2">choir@ysc.org</p>
-                </div>
-              </div>
-            </a>
-
-            <a
-              href="mailto:info@ysc.org"
-              class="p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200"
-            >
-              <div class="flex items-start gap-3">
-                <.icon
-                  name="hero-envelope"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 class="font-bold text-zinc-900 mb-1">General Inquiry</h3>
-                  <p class="text-sm text-zinc-600">
-                    For general questions and inquiries.
-                  </p>
-                  <p class="text-sm text-blue-600 mt-2">info@ysc.org</p>
-                </div>
-              </div>
-            </a>
+              {card.description}
+            </.mailto_card>
           </div>
 
           <div class="pt-8 border-t border-zinc-200">
@@ -401,5 +264,59 @@ defmodule YscWeb.ContactLive do
     params
     |> Map.put("name", "#{user.first_name} #{user.last_name}")
     |> Map.put("email", user.email)
+  end
+
+  defp department_contact_cards do
+    [
+      %{
+        id: "contact-card-tahoe",
+        email: EmailConfig.tahoe_email(),
+        icon: "hero-home-modern",
+        title: "Tahoe Cabin",
+        description: "Questions about bookings or stays."
+      },
+      %{
+        id: "contact-card-clear-lake",
+        email: EmailConfig.clear_lake_email(),
+        icon: "hero-home",
+        title: "Clear Lake Cabin",
+        description: "Questions about bookings or stays."
+      },
+      %{
+        id: "contact-card-volunteer",
+        email: EmailConfig.volunteer_email(),
+        icon: "hero-user-group",
+        title: "Volunteer",
+        description: "Join the team or suggest events."
+      },
+      %{
+        id: "contact-card-board",
+        email: EmailConfig.board_email(),
+        icon: "hero-users",
+        title: "Board of Directors",
+        description: "Get in touch with the current Board."
+      },
+      %{
+        id: "contact-card-web",
+        email: "web@ysc.org",
+        icon: "hero-computer-desktop",
+        title: "Web",
+        description: "Sign in or website related issues."
+      },
+      %{
+        id: "contact-card-choir",
+        email: "choir@ysc.org",
+        icon: "hero-musical-note",
+        title: "Choir",
+        description: "Questions about choir rehearsals or events."
+      },
+      %{
+        id: "contact-card-general",
+        email: EmailConfig.contact_email(),
+        icon: "hero-envelope",
+        title: "General Inquiry",
+        description: "For general questions and inquiries."
+      }
+    ]
   end
 end
