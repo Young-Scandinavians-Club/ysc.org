@@ -6,6 +6,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
 
   alias Ysc.EventPhotos
   alias Ysc.Events
+  alias Ysc.Events.Event
   alias Ysc.Events.Ticket
   alias Ysc.Repo
   alias YscWeb.Workers.EventPhotoReminderWorker
@@ -16,6 +17,15 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
     event = event_fixture(%{organizer_id: organizer.id, state: :published})
     {:ok, collection} = EventPhotos.ensure_collection_for_event(event)
     %{organizer: organizer, event: event, collection: collection}
+  end
+
+  describe "Oban unique configuration" do
+    test "scopes uniqueness to this worker so notification jobs cannot collide" do
+      unique = EventPhotoReminderWorker.__opts__()[:unique]
+
+      assert :worker in unique[:fields]
+      assert unique[:keys] == [:event_id]
+    end
   end
 
   describe "perform/1" do
@@ -173,6 +183,40 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
           worker: EventPhotoReminderWorker,
           args: %{"event_id" => future_event.id}
         )
+      end)
+    end
+
+    test "does not cancel a pending notification job for the same event", %{
+      event: event
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        future_event =
+          event
+          |> Event.changeset(%{
+            start_date:
+              DateTime.add(DateTime.utc_now(), 30, :day)
+              |> DateTime.truncate(:second),
+            end_date:
+              DateTime.add(DateTime.utc_now(), 31, :day)
+              |> DateTime.truncate(:second)
+          })
+          |> Repo.update!()
+
+        future_publish = DateTime.add(DateTime.utc_now(), 3600, :second)
+
+        assert :ok =
+                 YscWeb.Workers.EventNotificationWorker.schedule_notifications(
+                   future_event.id,
+                   future_publish
+                 )
+
+        assert :ok = EventPhotoReminderWorker.schedule_reminder(future_event)
+
+        assert [_notification] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert [_reminder] =
+                 all_enqueued(worker: EventPhotoReminderWorker)
       end)
     end
 

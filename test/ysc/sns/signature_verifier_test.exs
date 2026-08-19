@@ -93,6 +93,36 @@ defmodule Ysc.SNS.SignatureVerifierTest do
                  require_pem: true
                )
     end
+
+    test "accepts a trailing-dot DNS root on a regional SNS host" do
+      assert :ok ==
+               SignatureVerifier.validate_sns_https_url(
+                 "https://sns.us-west-2.amazonaws.com./SimpleNotificationService-abc.pem",
+                 require_pem: true
+               )
+    end
+
+    test "rejects cert URLs that are not .pem or carry a fragment" do
+      assert {:error, :invalid_cert_url} ==
+               SignatureVerifier.validate_sns_https_url(
+                 "https://sns.us-west-2.amazonaws.com/SimpleNotificationService-abc",
+                 require_pem: true
+               )
+
+      assert {:error, :invalid_cert_url} ==
+               SignatureVerifier.validate_sns_https_url(
+                 "https://sns.us-west-2.amazonaws.com/cert.pem#x",
+                 require_pem: true
+               )
+    end
+
+    test "rejects nil or non-string URLs" do
+      assert {:error, :invalid_cert_url} ==
+               SignatureVerifier.validate_sns_https_url(nil)
+
+      assert {:error, :invalid_cert_url} ==
+               SignatureVerifier.validate_sns_https_url(:not_a_url)
+    end
   end
 
   describe "signed_message_type/2" do

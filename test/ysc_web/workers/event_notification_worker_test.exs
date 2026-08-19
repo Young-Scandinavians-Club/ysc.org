@@ -198,7 +198,56 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
     end
   end
 
+  describe "Oban unique configuration" do
+    test "scopes uniqueness to this worker so photo-reminder jobs cannot collide" do
+      unique = EventNotificationWorker.__opts__()[:unique]
+
+      assert :worker in unique[:fields]
+      assert unique[:keys] == [:event_id]
+    end
+  end
+
   describe "schedule_notifications/2" do
+    test "does not cancel a pending photo-reminder job for the same event", %{
+      event: event
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _collection} =
+          Ysc.EventPhotos.ensure_collection_for_event(event)
+
+        future_event =
+          event
+          |> Event.changeset(%{
+            start_date:
+              DateTime.add(DateTime.utc_now(), 30, :day)
+              |> DateTime.truncate(:second),
+            end_date:
+              DateTime.add(DateTime.utc_now(), 31, :day)
+              |> DateTime.truncate(:second)
+          })
+          |> Ysc.Repo.update!()
+
+        assert :ok =
+                 YscWeb.Workers.EventPhotoReminderWorker.schedule_reminder(
+                   future_event
+                 )
+
+        future_publish = DateTime.add(DateTime.utc_now(), 3600, :second)
+
+        assert :ok =
+                 EventNotificationWorker.schedule_notifications(
+                   future_event.id,
+                   future_publish
+                 )
+
+        assert [_notification] =
+                 all_enqueued(worker: EventNotificationWorker)
+
+        assert [_reminder] =
+                 all_enqueued(worker: YscWeb.Workers.EventPhotoReminderWorker)
+      end)
+    end
+
     test "schedules notifications for future publish time", %{event: event} do
       future_time = DateTime.add(DateTime.utc_now(), 3600, :second)
 
