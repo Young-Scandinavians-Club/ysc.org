@@ -3501,7 +3501,7 @@ defmodule YscWeb.EventDetailsLive do
               <% display_name =
                 if attendee_name != "",
                   do: attendee_name,
-                  else: attendee.email || "Unknown" %>
+                  else: "Member" %>
               <% ticket_count = Map.get(@ticket_counts_per_user, attendee.id, 0) %>
               <% is_host = MapSet.member?(@host_ids, attendee.id) %>
               <div class={[
@@ -3529,18 +3529,8 @@ defmodule YscWeb.EventDetailsLive do
                       Host
                     </span>
                   </div>
-                  <p class="text-sm text-zinc-500">
-                    <%= cond do %>
-                      <% ticket_count == 0 && is_host -> %>
-                        No ticket
-                      <% true -> %>
-                        {ticket_count} {if ticket_count == 1,
-                          do: "ticket",
-                          else: "tickets"}
-                    <% end %>
-                    <span :if={attendee.email && attendee_name != ""}>
-                      · {attendee.email}
-                    </span>
+                  <p :if={!(is_host && ticket_count == 0)} class="text-sm text-zinc-500">
+                    {ticket_count} {if ticket_count == 1, do: "ticket", else: "tickets"}
                   </p>
                 </div>
               </div>
