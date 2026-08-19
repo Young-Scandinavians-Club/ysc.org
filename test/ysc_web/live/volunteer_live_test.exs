@@ -76,6 +76,7 @@ defmodule YscWeb.VolunteerLiveTest do
       assert html =~ "Submitting as"
       assert html =~ "Alice Smith"
       assert html =~ "alice@example.com"
+      assert html =~ ~s(id="volunteer-submitting-as")
     end
 
     test "does not show visible name and email fields for authenticated users",
