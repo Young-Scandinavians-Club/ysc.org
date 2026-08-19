@@ -22,6 +22,19 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
       assert EmailCategories.get_category("membership_ended") == :account
     end
 
+    test "maps every opt-out event template to :event" do
+      for template <- [
+            "event_notification",
+            "event_update_notification",
+            "save_the_date_available",
+            "tahoe_winter_weekend_available",
+            "tahoe_summer_buyout_available"
+          ] do
+        assert EmailCategories.get_category(template) == :event,
+               "#{template} must stay in :event so SES complaints/bounces can disable it"
+      end
+    end
+
     test "defaults to :account for unknown templates" do
       assert EmailCategories.get_category("unknown") == :account
     end

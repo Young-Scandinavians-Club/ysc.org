@@ -374,6 +374,48 @@ defmodule YscWeb.SesWebhookControllerTest do
       assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
                true
     end
+
+    test "disables event_notifications for other :event category templates", %{
+      conn: conn
+    } do
+      user = user_fixture(%{email: "save-the-date-complainer@example.com"})
+
+      ses_event =
+        build_ses_event("Complaint",
+          email: "save-the-date-complainer@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-19T12:00:00.000Z"
+        })
+        |> put_in(["mail", "tags", "template"], ["save_the_date_available"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               false
+    end
+
+    test "does NOT disable event_notifications when the complaint has no template tag",
+         %{conn: conn} do
+      user = user_fixture(%{email: "untagged-complainer@example.com"})
+
+      ses_event =
+        build_ses_event("Complaint",
+          email: "untagged-complainer@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-19T12:00:00.000Z"
+        })
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               true
+    end
   end
 
   describe "webhook/2 - Notification - bounce event (soft)" do
@@ -402,6 +444,25 @@ defmodule YscWeb.SesWebhookControllerTest do
       # Soft bounce should NOT unsubscribe
       subscriber = Repo.reload!(subscriber)
       assert subscriber.subscribed == true
+    end
+
+    test "does NOT disable event_notifications on a soft bounce of an event email",
+         %{conn: conn} do
+      user = user_fixture(%{email: "event-softbounce@example.com"})
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "event-softbounce@example.com",
+          env: "test",
+          bounce_type: "Transient",
+          bounce_sub_type: "General"
+        )
+        |> put_in(["mail", "tags", "template"], ["event_notification"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               true
     end
   end
 
@@ -498,6 +559,25 @@ defmodule YscWeb.SesWebhookControllerTest do
 
       assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
                false
+    end
+
+    test "does NOT disable event_notifications when the hard bounce is on a non-event email",
+         %{conn: conn} do
+      user = user_fixture(%{email: "newsletter-hardbounce@example.com"})
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "newsletter-hardbounce@example.com",
+          env: "test",
+          bounce_type: "Permanent",
+          bounce_sub_type: "General"
+        )
+        |> put_in(["mail", "tags", "template"], ["newsletter_edition"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               true
     end
 
     test "hard bounce for non-subscriber returns 200 without error", %{
