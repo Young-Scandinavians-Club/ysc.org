@@ -6692,6 +6692,91 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
+  # Draft/canceled/refunded bookings have no inventory reservation. Setting
+  # them to :hold/:complete via the status dropdown must claim inventory the
+  # same way create/modify does — otherwise the row looks reserved while the
+  # dates stay bookable (or the save crashes: there was no matching clause).
+  defp save_existing_admin_booking(
+         socket,
+         %{status: current_status} = existing_booking,
+         %{"status" => new_status} = booking_params,
+         _room_id,
+         rooms
+       )
+       when current_status in [:draft, :canceled, :refunded] and
+              new_status in [:hold, :complete] do
+    activate_unreserved_admin_booking(
+      socket,
+      existing_booking,
+      new_status,
+      booking_params,
+      rooms
+    )
+  end
+
+  defp save_existing_admin_booking(
+         socket,
+         existing_booking,
+         booking_params,
+         room_id,
+         rooms
+       ) do
+    do_save_existing_admin_booking(
+      socket,
+      existing_booking,
+      booking_params,
+      room_id,
+      rooms
+    )
+  end
+
+  defp activate_unreserved_admin_booking(
+         socket,
+         booking,
+         status,
+         booking_params,
+         rooms
+       ) do
+    inventory_attrs =
+      booking
+      |> admin_booking_inventory_attrs(booking_params)
+      |> Map.put(:status, status)
+
+    case BookingLocker.admin_activate_unreserved_booking(
+           booking,
+           inventory_attrs,
+           rooms: rooms
+         ) do
+      {:ok, _booking} ->
+        {:noreply, admin_booking_save_success(socket, "updated")}
+
+      {:error, {:error, changeset}}
+      when is_struct(changeset, Ecto.Changeset) ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, :blackout_conflict} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Cannot update booking: selected dates overlap a blackout period."
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to update booking: #{inspect(reason)}"
+         )}
+    end
+  end
+
   defp do_save_existing_admin_booking(
          socket,
          existing_booking,
