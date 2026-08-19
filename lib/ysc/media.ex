@@ -515,6 +515,34 @@ defmodule Ysc.Media do
     "attachments/#{Ecto.ULID.generate()}/#{Path.basename(client_filename)}"
   end
 
+  @doc """
+  S3 object key for a volunteer media-library image upload.
+
+  Prefixes a ULID so two uploads of the same client filename cannot overwrite
+  each other on the public-read media bucket. Only the basename is kept so
+  client-supplied path segments cannot choose another prefix.
+  """
+  def public_image_storage_key(client_filename)
+      when is_binary(client_filename) do
+    "public/#{Ecto.ULID.generate()}/#{Path.basename(client_filename)}"
+  end
+
+  @doc """
+  MIME type for a media-library image, derived from the filename extension.
+
+  Direct-to-S3 POST policies bind `Content-Type`, so this must not trust the
+  browser-supplied `entry.client_type`.
+  """
+  def image_content_type_from_filename(filename) when is_binary(filename) do
+    case filename |> Path.extname() |> String.downcase() do
+      ".webp" -> "image/webp"
+      ext when ext in [".jpg", ".jpeg"] -> "image/jpeg"
+      ".png" -> "image/png"
+      ".gif" -> "image/gif"
+      _ -> "application/octet-stream"
+    end
+  end
+
   def upload_file_to_s3(path, key, opts)
       when is_binary(key) and is_list(opts) do
     case Application.get_env(:ysc, :media_s3_uploader) do
@@ -572,13 +600,7 @@ defmodule Ysc.Media do
   end
 
   defp content_type_from_path(path) do
-    case path |> Path.extname() |> String.downcase() do
-      ".webp" -> "image/webp"
-      ".jpg" -> "image/jpeg"
-      ".jpeg" -> "image/jpeg"
-      ".png" -> "image/png"
-      _ -> "application/octet-stream"
-    end
+    image_content_type_from_filename(path)
   end
 
   @doc false
