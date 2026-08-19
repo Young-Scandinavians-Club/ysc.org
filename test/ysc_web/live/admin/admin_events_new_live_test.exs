@@ -90,6 +90,34 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "new event mount" do
+    setup [:create_admin]
+
+    test "disconnected render does not insert a draft event", %{conn: conn} do
+      count_before = Repo.aggregate(Event, :count)
+
+      html =
+        conn
+        |> get(~p"/admin/events/new")
+        |> html_response(200)
+
+      assert html =~ "admin-event-loading"
+      assert Repo.aggregate(Event, :count) == count_before
+    end
+
+    test "connected mount inserts one draft and redirects to edit", %{
+      conn: conn
+    } do
+      count_before = Repo.aggregate(Event, :count)
+
+      assert {:error, {:live_redirect, %{to: path}}} =
+               live(conn, ~p"/admin/events/new")
+
+      assert path =~ ~r{/admin/events/.+/edit}
+      assert Repo.aggregate(Event, :count) == count_before + 1
+    end
+  end
+
   describe "editor date picker" do
     setup [:create_admin]
 

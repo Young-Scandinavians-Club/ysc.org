@@ -134,42 +134,13 @@ defmodule YscWeb.Workers.UserExporter do
       Ysc.Logging.info("UserExporter: Output path: #{output_path}")
       file = File.open!(output_path, [:write, :utf8])
 
-      # Note: Can't use preloads in streams, so we'll load subscriptions manually
+      # Stream in pages and preload each page in bulk. Per-row Repo.preload
+      # here was an N+1 (billing address + subscriptions + primary user).
       Repo.transaction(fn ->
         filtered_query
         |> Repo.stream(max_rows: @stream_rows_count)
-        |> Stream.map(fn user ->
-          # Load subscriptions with subscription_items for this user
-          # Also preload primary_user and their subscriptions if user is a sub-account
-          user
-          |> Repo.preload([
-            :billing_address,
-            subscriptions: [:subscription_items]
-          ])
-          |> then(fn user ->
-            if user.primary_user_id do
-              primary_user =
-                case user.primary_user do
-                  %Ecto.Association.NotLoaded{} ->
-                    Accounts.get_user!(user.primary_user_id, [:subscriptions])
-                    |> Repo.preload(subscriptions: [:subscription_items])
-
-                  primary_user when not is_nil(primary_user) ->
-                    # Ensure subscriptions are loaded
-                    primary_user
-                    |> Repo.preload(subscriptions: [:subscription_items])
-
-                  _ ->
-                    Accounts.get_user!(user.primary_user_id, [:subscriptions])
-                    |> Repo.preload(subscriptions: [:subscription_items])
-                end
-
-              %{user | primary_user: primary_user}
-            else
-              user
-            end
-          end)
-        end)
+        |> Stream.chunk_every(@stream_rows_count)
+        |> Stream.flat_map(&preload_users_for_export/1)
         |> Stream.with_index()
         |> Stream.map(fn {entry, index} ->
           build_csv_row(entry, index, fields, job_pid, total_count)
@@ -184,6 +155,40 @@ defmodule YscWeb.Workers.UserExporter do
       send(job_pid, {:complete, output_path})
 
       output_path
+    end)
+  end
+
+  defp preload_users_for_export(users) do
+    users =
+      Repo.preload(users, [
+        :billing_address,
+        :primary_user,
+        subscriptions: [:subscription_items]
+      ])
+
+    primary_users =
+      users
+      |> Enum.map(& &1.primary_user)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq_by(& &1.id)
+
+    primary_by_id =
+      if primary_users == [] do
+        %{}
+      else
+        primary_users
+        |> Repo.preload(subscriptions: [:subscription_items])
+        |> Map.new(&{&1.id, &1})
+      end
+
+    Enum.map(users, fn user ->
+      case user.primary_user_id do
+        nil ->
+          user
+
+        primary_id ->
+          %{user | primary_user: Map.get(primary_by_id, primary_id)}
+      end
     end)
   end
 
