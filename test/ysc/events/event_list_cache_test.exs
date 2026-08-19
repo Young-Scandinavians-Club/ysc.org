@@ -69,4 +69,49 @@ defmodule Ysc.Events.EventListCacheTest do
       assert is_integer(count1)
     end
   end
+
+  describe "create_event cache invalidation" do
+    test "draft create does not invalidate the public event list cache" do
+      _published =
+        event_fixture(%{title: "Public #{System.unique_integer()}"})
+
+      EventListCache.list_upcoming_events(20)
+      EventListCache.subscribe()
+
+      organizer_id = Ysc.AccountsFixtures.user_fixture().id
+
+      {:ok, _draft} =
+        Ysc.Events.create_event(%{
+          title: "Draft #{System.unique_integer()}",
+          description: "",
+          state: :draft,
+          organizer_id: organizer_id
+        })
+
+      refute_received {:event_list_cache_invalidated, _}
+    end
+
+    test "published create invalidates the public event list cache" do
+      EventListCache.list_upcoming_events(20)
+      EventListCache.subscribe()
+
+      _published =
+        event_fixture(%{title: "Public #{System.unique_integer()}"})
+
+      assert_received {:event_list_cache_invalidated, _}
+    end
+
+    test "copy_event draft does not invalidate the public event list cache" do
+      published =
+        event_fixture(%{title: "Copy source #{System.unique_integer()}"})
+
+      EventListCache.list_upcoming_events(20)
+      EventListCache.subscribe()
+
+      {:ok, copied} = Ysc.Events.copy_event(published)
+
+      assert copied.state == :draft
+      refute_received {:event_list_cache_invalidated, _}
+    end
+  end
 end
