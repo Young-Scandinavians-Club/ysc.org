@@ -349,11 +349,12 @@ defmodule YscWeb.VolunteerLive do
             <:actions>
               <.button
                 :if={!@submitted}
+                id="volunteer-submit-button"
                 type="submit"
                 phx-disable-with="Sending..."
                 class="w-full md:w-auto"
               >
-                Submit Application →
+                Submit volunteer form
               </.button>
             </:actions>
           </.simple_form>
@@ -404,7 +405,7 @@ defmodule YscWeb.VolunteerLive do
           {:noreply,
            socket
            |> assign(:submitted, true)
-           |> YscWeb.Flash.put_toast(:info, "Volunteer application submitted",
+           |> YscWeb.Flash.put_toast(:info, "Volunteer form submitted",
              title: "Volunteer"
            )}
 

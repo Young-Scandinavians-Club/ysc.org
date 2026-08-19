@@ -1150,7 +1150,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking_b.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
         )
 
-      assert html =~ "update your reservation"
+      assert html =~ "update your booking"
       assert html =~ "info@ysc.org"
 
       reloaded = Repo.get!(Booking, booking_b.id)
@@ -1285,7 +1285,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{pi_id}"
         )
 
-      assert html =~ "update your reservation"
+      assert html =~ "update your booking"
       assert html =~ "info@ysc.org"
 
       reloaded = Repo.get!(Booking, booking.id)
@@ -2025,7 +2025,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "update your reservation"
+      assert html =~ "update your booking"
       assert html =~ "info@ysc.org"
 
       reloaded = Repo.get!(Booking, booking.id)

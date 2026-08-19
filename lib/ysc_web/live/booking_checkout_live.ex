@@ -174,7 +174,7 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Your member discount or free night is no longer valid for this reservation, so we can't finish checkout at this price. Please start a new booking from the cabin page — your previous dates may no longer be available.",
+           "Your member discount or free night is no longer valid for this booking, so we can't finish checkout at this price. Please start a new booking from the cabin page — your previous dates may no longer be available.",
            title: "Checkout"
          )
          |> redirect(to: get_property_redirect_path(booking.property))}
@@ -1691,7 +1691,7 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Your member discount or free night is no longer valid for this reservation, so we can't finish checkout at this price. Please start a new booking from the cabin page — your previous dates may no longer be available.",
+           "Your member discount or free night is no longer valid for this booking, so we can't finish checkout at this price. Please start a new booking from the cabin page — your previous dates may no longer be available.",
            title: "Checkout"
          )
          |> redirect(to: get_property_redirect_path(booking.property))}
@@ -3182,6 +3182,6 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp leave_checkout_confirm do
-    "Leave checkout and release these dates? Your reservation is not confirmed until payment is complete."
+    "Leave checkout and release these dates? Your booking is not confirmed until payment is complete."
   end
 end

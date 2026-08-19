@@ -5,14 +5,21 @@ defmodule YscWeb.BookingUserMessagesTest do
 
   test "reservation not found message" do
     assert BookingUserMessages.reservation_not_found() =~
-             "couldn't find this reservation"
+             "couldn't find this booking"
+
+    refute BookingUserMessages.reservation_not_found() =~ "reservation"
 
     assert BookingUserMessages.reservation_not_found() =~ "info@ysc.org"
   end
 
   test "checkout not found message" do
     assert BookingUserMessages.checkout_not_found() =~
+             "couldn't find this booking"
+
+    assert BookingUserMessages.checkout_not_found() =~
              "start a new booking from the cabin page"
+
+    refute BookingUserMessages.checkout_not_found() =~ "reservation"
   end
 
   test "modification messages" do
@@ -141,7 +148,7 @@ defmodule YscWeb.BookingUserMessagesTest do
 
   test "modification redirect error messages" do
     assert BookingUserMessages.modification_redirect_hold_expired() =~
-             "original reservation is unchanged"
+             "original booking is unchanged"
 
     assert BookingUserMessages.modification_redirect_hold_expired() =~
              "info@ysc.org"
@@ -153,7 +160,7 @@ defmodule YscWeb.BookingUserMessagesTest do
              "My Bookings & Payments"
 
     assert BookingUserMessages.modification_redirect_update_failed() =~
-             "couldn't update your reservation"
+             "couldn't update your booking"
 
     assert BookingUserMessages.modification_finalize_failed() =~
              "couldn't save your new dates"
@@ -182,7 +189,15 @@ defmodule YscWeb.BookingUserMessagesTest do
              "couldn't submit your refund for review"
 
     assert BookingUserMessages.cancel_refund_error({:cancellation_failed, nil}) =~
-             "couldn't cancel your reservation"
+             "couldn't cancel your booking"
+
+    refute BookingUserMessages.cancel_refund_error({:payment_not_found, nil}) =~
+             "reservation"
+
+    refute BookingUserMessages.modification_forfeiture_body() =~ "reservation"
+
+    refute BookingUserMessages.modification_acknowledgment_required() =~
+             "reservation"
   end
 
   test "booking creation failed message" do
