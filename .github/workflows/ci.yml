@@ -182,7 +182,20 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Install shfmt
-        run: sudo apt-get update && sudo apt-get install -y shfmt
+        run: |
+          set -euo pipefail
+          if sudo timeout 90s apt-get update &&
+            sudo timeout 90s apt-get install -y shfmt; then
+            shfmt --version
+            exit 0
+          fi
+          echo "::warning::apt-get shfmt timed out or failed; installing from GitHub releases"
+          version="v3.12.0"
+          curl -fsSL \
+            "https://github.com/mvdan/sh/releases/download/${version}/shfmt_${version}_linux_amd64" \
+            -o /tmp/shfmt
+          sudo install -m 755 /tmp/shfmt /usr/local/bin/shfmt
+          shfmt --version
 
       - name: Install dprint
         run: |
