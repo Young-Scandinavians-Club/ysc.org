@@ -1086,7 +1086,7 @@ defmodule YscWeb.Components.DateRangePicker do
         "Past dates cannot be booked"
 
       after_max_date?(day, ctx.max) ->
-        "Reservations are not open for this date yet"
+        "Bookings are not open for this date yet"
 
       saturday?(day) && !ctx.allow_saturdays && ctx.state == :set_end ->
         "Check-outs are not permitted on Saturdays"
