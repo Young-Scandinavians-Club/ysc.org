@@ -8,7 +8,9 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.Ledgers
   alias Ysc.Accounts
   alias Ysc.Webhooks
+  alias Ysc.Bookings
   alias Ysc.Bookings.BookingLocker
+  alias Ysc.MoneyHelper
   alias Ysc.Tickets
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReport
@@ -693,15 +695,11 @@ defmodule YscWeb.AdminMoneyLive do
              refund_params["reason"]
            ) do
         {:ok, %{refund_amount: calculated_refund_amount}} ->
-          # Process the ledger refund with the calculated amount
-          refund_attrs = %{
-            payment_id: payment.id,
-            refund_amount: calculated_refund_amount,
-            reason: refund_params["reason"],
-            external_refund_id: "admin_refund_#{Ecto.ULID.generate()}"
-          }
-
-          case Ledgers.process_refund(refund_attrs) do
+          case create_stripe_refund_and_record(
+                 payment,
+                 calculated_refund_amount,
+                 refund_params["reason"]
+               ) do
             {:ok, {_refund, _transaction, _entries}} ->
               # Refresh data
               %{start_date: start_date, end_date: end_date} = socket.assigns
@@ -728,6 +726,22 @@ defmodule YscWeb.AdminMoneyLive do
                |> paginate_webhooks(1)
                |> push_patch(to: payment_path)}
 
+            {:error, {:stripe_error, msg}} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Stripe error: #{inspect(msg)}",
+                 title: "Refund"
+               )}
+
+            {:error, :no_stripe_payment} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(
+                 :error,
+                 "Cannot process refund: no Stripe payment found for this payment.",
+                 title: "Refund"
+               )}
+
             {:error, _changeset} ->
               {:noreply,
                socket
@@ -751,17 +765,14 @@ defmodule YscWeb.AdminMoneyLive do
       # Full refund (existing logic)
       case parse_amount_string(refund_params["amount"]) do
         {:ok, refund_amount} ->
-          refund_attrs = %{
-            payment_id: payment.id,
-            refund_amount: refund_amount,
-            reason: refund_params["reason"],
-            external_refund_id: "admin_refund_#{Ecto.ULID.generate()}"
-          }
-
           # Check if we should release availability
           release_availability = refund_params["release_availability"] == "true"
 
-          case Ledgers.process_refund(refund_attrs) do
+          case create_stripe_refund_and_record(
+                 payment,
+                 refund_amount,
+                 refund_params["reason"]
+               ) do
             {:ok, {_refund, _transaction, _entries}} ->
               # If checkbox is checked, cancel booking or ticket order to release availability
               release_result =
@@ -815,6 +826,22 @@ defmodule YscWeb.AdminMoneyLive do
                |> paginate_ledger_entries(1)
                |> paginate_webhooks(1)
                |> push_patch(to: payment_path)}
+
+            {:error, {:stripe_error, msg}} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:error, "Stripe error: #{inspect(msg)}",
+                 title: "Refund"
+               )}
+
+            {:error, :no_stripe_payment} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(
+                 :error,
+                 "Cannot process refund: no Stripe payment found for this payment.",
+                 title: "Refund"
+               )}
 
             {:error, _changeset} ->
               {:noreply,
@@ -3995,6 +4022,38 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp parse_amount_string(_), do: {:error, :invalid_format}
+
+  # Issues the refund in Stripe first, then records it in the ledger using the
+  # Stripe-issued refund id (mirrors AdminBookingsLive's process-booking-refund).
+  # Ledgers.process_refund's idempotency check only matches on external_refund_id,
+  # so a ledger-only refund recorded before Stripe confirms the money moved would
+  # get a synthetic id that a later webhook for the real Stripe refund can't match
+  # against -- producing a second Refund, a second ledger transaction, and a
+  # second "your refund has been processed" email for the same payment.
+  defp create_stripe_refund_and_record(payment, refund_amount, reason) do
+    if payment.external_payment_id && payment.external_provider == :stripe do
+      amount_cents = MoneyHelper.money_to_cents(refund_amount)
+
+      case Bookings.create_stripe_refund_for_admin(
+             payment.external_payment_id,
+             amount_cents,
+             reason
+           ) do
+        {:ok, stripe_refund} ->
+          Ledgers.process_refund(%{
+            payment_id: payment.id,
+            refund_amount: refund_amount,
+            reason: reason,
+            external_refund_id: stripe_refund.id
+          })
+
+        {:error, stripe_reason} ->
+          {:error, {:stripe_error, stripe_reason}}
+      end
+    else
+      {:error, :no_stripe_payment}
+    end
+  end
 
   defp expense_report_status_changeset(params) do
     types = %{
