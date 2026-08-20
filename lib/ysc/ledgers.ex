@@ -4094,10 +4094,6 @@ defmodule Ysc.Ledgers do
 
   defp decimal_or_zero(nil), do: Decimal.new(0)
   defp decimal_or_zero(%Decimal{} = decimal), do: decimal
-  defp decimal_or_zero(number) when is_integer(number), do: Decimal.new(number)
-
-  defp decimal_or_zero(number) when is_float(number),
-    do: Decimal.from_float(number)
 
   @doc false
   def ci_query_explain_query do

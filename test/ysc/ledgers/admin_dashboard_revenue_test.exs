@@ -1,8 +1,10 @@
 defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
   use Ysc.DataCase, async: true
 
+  import Ecto.Query
+
   alias Ysc.Ledgers
-  alias Ysc.Ledgers.LedgerEntry
+  alias Ysc.Ledgers.{LedgerAccount, LedgerEntry}
   alias Ysc.Repo
 
   setup do
@@ -62,6 +64,28 @@ defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
       now = ~U[2026-08-20 12:00:00Z]
       snapshot = Ledgers.get_admin_dashboard_revenue(now)
 
+      assert snapshot.totals_by_account_id == %{}
+      assert Decimal.eq?(snapshot.ytd_total, Decimal.new(0))
+      assert snapshot.sparkline == List.duplicate(Decimal.new(0), 7)
+    end
+
+    test "returns empty totals when revenue accounts have not been seeded" do
+      Repo.delete_all(
+        from(a in LedgerAccount,
+          where:
+            a.name in [
+              "membership_revenue",
+              "event_revenue",
+              "tahoe_booking_revenue",
+              "clear_lake_booking_revenue",
+              "donation_revenue"
+            ]
+        )
+      )
+
+      snapshot = Ledgers.get_admin_dashboard_revenue(~U[2026-08-20 12:00:00Z])
+
+      assert snapshot.accounts_by_name == %{}
       assert snapshot.totals_by_account_id == %{}
       assert Decimal.eq?(snapshot.ytd_total, Decimal.new(0))
       assert snapshot.sparkline == List.duplicate(Decimal.new(0), 7)
