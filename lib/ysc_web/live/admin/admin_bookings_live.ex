@@ -968,7 +968,6 @@ defmodule YscWeb.AdminBookingsLive do
               :if={@primary_payment && length(@booking_refunds) == 0}
               phx-click="show-booking-refund-modal"
               phx-disable-with="Loading..."
-              data-confirm="Are you sure you want to process a refund for this booking? This action will initiate a refund through Stripe."
               class="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
             >
               <.icon name="hero-arrow-uturn-left" class="w-4 h-4" /> Process Refund
