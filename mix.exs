@@ -261,8 +261,10 @@ defmodule Ysc.MixProject do
       {:sentry, "~> 13.4"},
       {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
-      # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+ (we use SES)
-      {:swoosh, "~> 1.26.3"},
+      # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
+      # 1.27.1: AmazonSES returns {:error, %{code, message}} instead of crashing when
+      # SES error XML is missing Code/Message nodes (we use SES).
+      {:swoosh, "~> 1.27.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.3"},
