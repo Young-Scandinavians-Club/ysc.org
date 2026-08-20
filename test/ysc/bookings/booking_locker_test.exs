@@ -2417,6 +2417,123 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert Repo.get!(Booking, draft.id).status == :draft
     end
 
+    test "same-day hold activation does not hold capacity on the previous day" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      neighbor_user = user_fixture()
+      previous_day = ~D[2037-04-19]
+      same_day = ~D[2037-04-20]
+
+      {:ok, neighbor} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: neighbor_user.id,
+            property: :clear_lake,
+            checkin_date: previous_day,
+            checkout_date: same_day,
+            guests_count: 3,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert neighbor.status == :complete
+      assert activate_day_capacity_booked(:clear_lake, [previous_day]) == [3]
+
+      {:ok, same_day_booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: same_day,
+            checkout_date: same_day,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:ok, draft} =
+               BookingLocker.revert_complete_to_draft(same_day_booking.id)
+
+      assert activate_day_capacity_booked(:clear_lake, [previous_day]) == [3]
+      assert activate_day_capacity_held(:clear_lake, [previous_day]) == [0]
+
+      assert {:ok, hold} =
+               BookingLocker.admin_activate_unreserved_booking(draft, %{
+                 checkin_date: same_day,
+                 checkout_date: same_day,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day,
+                 status: :hold
+               })
+
+      assert hold.status == :hold
+      assert activate_day_capacity_booked(:clear_lake, [previous_day]) == [3]
+      assert activate_day_capacity_held(:clear_lake, [previous_day]) == [0]
+    end
+
+    test "editing a same-day complete booking does not release the previous day" do
+      ensure_clear_lake_day_pricing_rule()
+      user = user_fixture()
+      neighbor_user = user_fixture()
+      previous_day = ~D[2037-04-21]
+      same_day = ~D[2037-04-22]
+      new_checkout = ~D[2037-04-24]
+
+      {:ok, _neighbor} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: neighbor_user.id,
+            property: :clear_lake,
+            checkin_date: previous_day,
+            checkout_date: same_day,
+            guests_count: 3,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      {:ok, same_day_booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :clear_lake,
+            checkin_date: same_day,
+            checkout_date: same_day,
+            guests_count: 2,
+            booking_mode: :day
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert activate_day_capacity_booked(:clear_lake, [previous_day]) == [3]
+
+      assert {:ok, updated} =
+               BookingLocker.admin_modify_complete_booking(same_day_booking, %{
+                 checkin_date: same_day,
+                 checkout_date: new_checkout,
+                 guests_count: 2,
+                 children_count: 0,
+                 booking_mode: :day
+               })
+
+      assert updated.checkin_date == same_day
+      assert updated.checkout_date == new_checkout
+      assert activate_day_capacity_booked(:clear_lake, [previous_day]) == [3]
+
+      assert activate_day_capacity_booked(:clear_lake, [
+               same_day,
+               ~D[2037-04-23]
+             ]) ==
+               [2, 2]
+    end
+
     defp activate_day_capacity_booked(property, days) do
       Enum.map(days, fn day ->
         Repo.one!(
