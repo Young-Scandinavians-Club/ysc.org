@@ -760,6 +760,27 @@ defmodule Ysc.AccountsTest do
                  valid_user_password()
                )
     end
+
+    test "returns legacy dotted Gmail users when login uses canonical or alias form" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "login.#{tag}@gmail.com"
+      canonical_email = "login#{tag}@gmail.com"
+
+      %{id: id, email: ^dotted_email} =
+        legacy_gmail_user_fixture(%{email: dotted_email})
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email_and_password(
+                 canonical_email,
+                 valid_user_password()
+               )
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email_and_password(
+                 "login.#{tag}+inbox@gmail.com",
+                 valid_user_password()
+               )
+    end
   end
 
   describe "get_user!/1" do
@@ -1735,6 +1756,36 @@ defmodule Ysc.AccountsTest do
   describe "deliver_user_reset_password_instructions/2" do
     setup do
       %{user: user_fixture(%{phone_number: "+14159098268"})}
+    end
+
+    test "finds legacy dotted Gmail users when reset is requested with an alias", %{
+      user: _default_user
+    } do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "reset.#{tag}@gmail.com"
+      canonical_email = "reset#{tag}@gmail.com"
+
+      %{id: id, email: ^dotted_email} =
+        legacy_gmail_user_fixture(%{email: dotted_email})
+
+      assert %User{id: ^id} = Accounts.get_user_by_email(canonical_email)
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_reset_password_instructions(
+            Accounts.get_user_by_email(canonical_email),
+            url
+          )
+        end)
+
+      {:ok, token} = Base.url_decode64(token, padding: false)
+
+      assert user_token =
+               Repo.get_by(UserToken, token: :crypto.hash(:sha256, token))
+
+      assert user_token.user_id == id
+      assert user_token.sent_to == dotted_email
+      assert user_token.context == "reset_password"
     end
 
     test "sends token through notification", %{user: user} do

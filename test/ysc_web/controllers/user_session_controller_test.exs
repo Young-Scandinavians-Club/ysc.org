@@ -50,6 +50,27 @@ defmodule YscWeb.UserSessionControllerTest do
                "Please verify your email address before signing in"
     end
 
+    test "logs the user in with a Gmail alias of a legacy dotted stored address", %{
+      conn: conn
+    } do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "session.#{tag}@gmail.com"
+      canonical_email = "session#{tag}@gmail.com"
+
+      legacy_gmail_user_fixture(%{email: dotted_email})
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{
+            "email" => canonical_email,
+            "password" => valid_user_password()
+          }
+        })
+
+      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
+    end
+
     test "logs the user in with verified email", %{conn: conn, user: user} do
       # Mark email as verified
       {:ok, _} = Ysc.Accounts.mark_email_verified(user)

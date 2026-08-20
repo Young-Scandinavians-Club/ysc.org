@@ -32,6 +32,29 @@ defmodule YscWeb.UserForgotPasswordLiveTest do
       %{user: user_fixture()}
     end
 
+    test "sends reset token when user enters Gmail alias of legacy dotted address", %{
+      conn: conn,
+      user: _default_user
+    } do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "forgot.#{tag}@gmail.com"
+      canonical_email = "forgot#{tag}@gmail.com"
+
+      %{id: id} = legacy_gmail_user_fixture(%{email: dotted_email})
+
+      {:ok, lv, _html} = live(conn, ~p"/users/reset-password")
+
+      {:ok, conn} =
+        lv
+        |> form("#reset_password_form", user: %{"email" => canonical_email})
+        |> render_submit()
+        |> follow_redirect(conn, "/")
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "password reset link"
+
+      assert Repo.get_by!(Accounts.UserToken, user_id: id).context == "reset_password"
+    end
+
     test "sends a new reset password token", %{conn: conn, user: user} do
       {:ok, lv, _html} = live(conn, ~p"/users/reset-password")
 

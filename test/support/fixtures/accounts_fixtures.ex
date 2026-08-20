@@ -89,6 +89,36 @@ defmodule Ysc.AccountsFixtures do
   end
 
   @doc """
+  Inserts a legacy Gmail user whose stored email may include dots or plus-tags.
+
+  Registration normalizes Gmail addresses on insert, so tests that exercise
+  WordPress-era dotted rows must bypass `register_user/1`.
+  """
+  def legacy_gmail_user_fixture(attrs \\ %{}) do
+    password = Map.get(attrs, :password, valid_user_password())
+    now = DateTime.truncate(DateTime.utc_now(), :second)
+
+    attrs =
+      attrs
+      |> Map.drop([:password])
+      |> Map.merge(%{
+        first_name: valid_user_first_name(),
+        last_name: valid_user_last_name(),
+        phone_number: unique_user_phone(),
+        state: :active,
+        role: :member,
+        hashed_password: Argon2.hash_pwd_salt(password),
+        email_verified_at: now,
+        confirmed_at: now,
+        post_migration_onboarding_completed_at: now
+      })
+
+    %Ysc.Accounts.User{}
+    |> Ecto.Changeset.change(attrs)
+    |> Ysc.Repo.insert!()
+  end
+
+  @doc """
   Creates a user without a password (like an OAuth user).
   Directly inserts into the database to bypass password requirement.
   """
