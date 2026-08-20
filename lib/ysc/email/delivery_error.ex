@@ -12,24 +12,27 @@ defmodule Ysc.Email.DeliveryError do
   def classify({:error, %{code: code, message: message}})
       when is_binary(code) do
     category =
-      case code do
-        code
-        when code in [
-               "Throttling",
-               "ThrottlingException",
-               "TooManyRequestsException"
-             ] ->
+      cond do
+        # Swoosh 1.27.1+ returns "" for missing SES Error/Code XML nodes instead of
+        # crashing. Treat blank codes as unknown (retryable): before the adapter
+        # fix this path raised and was classified as :unknown.
+        String.trim(code) == "" ->
+          :unknown
+
+        code in [
+          "Throttling",
+          "ThrottlingException",
+          "TooManyRequestsException"
+        ] ->
           :rate_limited
 
-        code
-        when code in ["AccountSendingPausedException", "DailyQuotaExceeded"] ->
+        code in ["AccountSendingPausedException", "DailyQuotaExceeded"] ->
           :quota_exhausted
 
-        code
-        when code in ["ServiceUnavailable", "InternalFailure", "RequestTimeout"] ->
+        code in ["ServiceUnavailable", "InternalFailure", "RequestTimeout"] ->
           :transient
 
-        _ ->
+        true ->
           :permanent
       end
 

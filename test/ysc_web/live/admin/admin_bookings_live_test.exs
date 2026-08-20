@@ -1028,6 +1028,21 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       _ = user
     end
 
+    test "defaults checkout to the next day when the calendar sends a single date",
+         %{
+           conn: conn
+         } do
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/new?property=clear_lake&from_date=2036-06-01&to_date=2036-06-15&type=day&date=2036-06-05"
+        )
+
+      assert has_element?(view, "#booking-form")
+      assert has_element?(view, "#booking_checkin_date[value='2036-06-05']")
+      assert has_element?(view, "#booking_checkout_date[value='2036-06-06']")
+    end
+
     test "loads new refund policy modal route", %{conn: conn} do
       {:ok, view, html} =
         live(

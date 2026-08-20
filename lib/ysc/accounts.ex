@@ -3318,12 +3318,20 @@ defmodule Ysc.Accounts do
 
   @doc """
   Marks a user's phone as verified by setting the phone_verified_at timestamp.
+
+  For WP-migrated users, also turns on SMS notifications for any category
+  where email notifications are already on. Migrated users never went
+  through the SMS opt-in checkbox that native sign-up/settings phone
+  verification flows show, so without this their SMS prefs stay stuck at
+  the `false` value the WP import forced regardless of their email prefs.
   """
   def mark_phone_verified(user) do
+    attrs =
+      %{phone_verified_at: DateTime.utc_now()}
+      |> maybe_sync_migrated_sms_notifications(user)
+
     case user
-         |> User.phone_verification_changeset(%{
-           phone_verified_at: DateTime.utc_now()
-         })
+         |> User.phone_verification_changeset(attrs)
          |> Repo.update() do
       {:ok, _} = ok ->
         invalidate_user_profile_cache(user)
@@ -3331,6 +3339,32 @@ defmodule Ysc.Accounts do
 
       error ->
         error
+    end
+  end
+
+  defp maybe_sync_migrated_sms_notifications(attrs, user) do
+    if wp_migrated?(user) do
+      attrs
+      |> maybe_enable_sms(
+        :account_notifications_sms,
+        user.account_notifications,
+        user.account_notifications_sms
+      )
+      |> maybe_enable_sms(
+        :event_notifications_sms,
+        user.event_notifications,
+        user.event_notifications_sms
+      )
+    else
+      attrs
+    end
+  end
+
+  defp maybe_enable_sms(attrs, field, email_pref, sms_pref) do
+    if email_pref && !sms_pref do
+      Map.put(attrs, field, true)
+    else
+      attrs
     end
   end
 
