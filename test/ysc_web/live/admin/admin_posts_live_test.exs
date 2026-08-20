@@ -62,6 +62,32 @@ defmodule YscWeb.AdminPostsLiveTest do
       )
     end
 
+    test "renders date range filter inputs", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/admin/posts")
+      render_async(view, 5000)
+
+      assert has_element?(view, "#filter-posts-date-from")
+      assert has_element?(view, "#filter-posts-date-to")
+    end
+
+    test "date range filter patches URL with date_from and date_to", %{
+      conn: conn
+    } do
+      {:ok, view, _} = live(conn, ~p"/admin/posts")
+      render_async(view, 5000)
+
+      view
+      |> form("#posts-filter-form", %{
+        date_from: "2026-01-01",
+        date_to: "2026-03-31"
+      })
+      |> render_change()
+
+      path = assert_patch(view)
+      assert path =~ "date_from=2026-01-01"
+      assert path =~ "date_to=2026-03-31"
+    end
+
     test "toggles featured post", %{conn: conn, admin: admin} do
       p1 =
         post_fixture(admin, %{title: "Featured Candidate", featured_post: false})

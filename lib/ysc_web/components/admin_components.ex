@@ -3239,6 +3239,70 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_filter_date_range
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Renders From/To date inputs for admin Flop list filter dropdowns.
+
+  Place inside `<.filter_form>` after the Flop fields. Submitted as `date_from`
+  / `date_to` query params (not Flop filters) and merged into the URL by
+  `YscWeb.AdminFlopHelpers.list_filter_params/3`.
+
+  Input ids are `{id}-date-from` and `{id}-date-to`.
+
+  ## Examples
+
+      <.admin_filter_date_range
+        id="filter-newsletters"
+        label="Date Created"
+        date_from={@date_from}
+        date_to={@date_to}
+      />
+  """
+  attr :id, :string,
+    required: true,
+    doc: "Prefix for From/To input ids (`{id}-date-from`, `{id}-date-to`)"
+
+  attr :label, :string,
+    required: true,
+    doc: "Section heading above the date inputs (e.g. \"Date Created\")"
+
+  attr :date_from, :any, default: "", doc: "ISO date string for the From input"
+  attr :date_to, :any, default: "", doc: "ISO date string for the To input"
+
+  attr :from_name, :string, default: "date_from"
+  attr :to_name, :string, default: "date_to"
+
+  def admin_filter_date_range(assigns) do
+    ~H"""
+    <div class="mt-4">
+      <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
+        {@label}
+      </p>
+      <div class="space-y-2">
+        <.input
+          type="date"
+          name={@from_name}
+          value={@date_from}
+          label="From"
+          id={"#{@id}-date-from"}
+          phx-debounce="300"
+        />
+        <.input
+          type="date"
+          name={@to_name}
+          value={@date_to}
+          label="To"
+          id={"#{@id}-date-to"}
+          phx-debounce="300"
+        />
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_flop_pagination
   # ---------------------------------------------------------------------------
 

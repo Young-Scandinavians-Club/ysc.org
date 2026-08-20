@@ -84,6 +84,41 @@ defmodule YscWeb.AdminFlopHelpers do
   end
 
   @doc """
+  Builds route params from an admin Flop list filter-form change.
+
+  Date range inputs are not Flop filters; they are stripped from the form
+  params, then merged back as `date_from` / `date_to` query params. Empty
+  filter values are dropped and the current title search (if any) is preserved.
+
+  `extra` is merged onto the params (e.g. `%{"tab" => "upcoming"}`) before
+  the date range is applied.
+
+  ## Examples
+
+      list_filter_params(params, socket.assigns.meta)
+
+      list_filter_params(params, socket.assigns.meta, %{
+        "tab" => socket.assigns.active_tab
+      })
+  """
+  @spec list_filter_params(map(), term(), map()) :: map()
+  def list_filter_params(params, meta, extra \\ %{}) when is_map(params) do
+    date_from = Map.get(params, "date_from", "")
+    date_to = Map.get(params, "date_to", "")
+
+    params
+    |> Map.drop(["_target", "date_from", "date_to"])
+    |> Map.merge(extra)
+    |> Map.put(
+      "filters",
+      params["filters"]
+      |> compact_filter_params()
+      |> merge_title_filter_into_params(meta)
+    )
+    |> merge_date_range_into_params(date_from, date_to)
+  end
+
+  @doc """
   Adds non-empty `date_from` / `date_to` keys to route params.
   """
   @spec merge_date_range_into_params(map(), String.t(), String.t()) :: map()
