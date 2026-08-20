@@ -5,7 +5,16 @@ defmodule YscWeb.AdminDashboardLive do
   import YscWeb.CoreComponents
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Posts, Events, Accounts, Bookings, BuildVersion, Newsletter}
+  alias Ysc.{
+    Posts,
+    Events,
+    Accounts,
+    Bookings,
+    BuildVersion,
+    Newsletter,
+    Ledgers
+  }
+
   alias Ysc.Accounts.UserDisplay
   alias Ysc.Scanning
   alias YscWeb.{AdminCheckInPaths, AdminMembershipHelpers}
@@ -1252,8 +1261,6 @@ defmodule YscWeb.AdminDashboardLive do
              fn -> Accounts.get_membership_joins_ytd_comparison() end},
             {:memberships_renewing_30_days,
              fn -> get_renewals_in_30_days() end},
-            {:ytd_revenue_pair, fn -> calculate_ytd_revenue() end},
-            {:revenue_sparkline, fn -> get_last_7_days_revenue() end},
             {:newsletter_subscriber_stats,
              fn -> get_newsletter_subscriber_stats() end}
           ]
@@ -1276,8 +1283,6 @@ defmodule YscWeb.AdminDashboardLive do
 
         joins_ytd = Map.fetch!(data, :membership_joins_ytd)
 
-        {ytd_revenue, ytd_revenue_label} = Map.fetch!(data, :ytd_revenue_pair)
-
         {newsletter_subscriber_count, newsletter_subscribers_this_month} =
           Map.fetch!(data, :newsletter_subscriber_stats)
 
@@ -1297,7 +1302,6 @@ defmodule YscWeb.AdminDashboardLive do
         |> assign(:applications_month_change, applications_month_change)
         |> assign(:applications_year_change, applications_year_change)
         |> assign(:property_stats, Map.fetch!(data, :property_stats))
-        |> assign(:revenue_sparkline, Map.fetch!(data, :revenue_sparkline))
         |> assign(:membership_stats, Map.fetch!(data, :membership_stats))
         |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
         |> assign(:membership_joins_prior_ytd, joins_ytd.prior_ytd_joins)
@@ -1313,8 +1317,6 @@ defmodule YscWeb.AdminDashboardLive do
           :memberships_renewing_30_days,
           Map.fetch!(data, :memberships_renewing_30_days)
         )
-        |> assign(:ytd_revenue, ytd_revenue)
-        |> assign(:ytd_revenue_label, ytd_revenue_label)
         |> assign(:newsletter_subscriber_count, newsletter_subscriber_count)
         |> assign(
           :newsletter_subscribers_this_month,
@@ -1481,40 +1483,14 @@ defmodule YscWeb.AdminDashboardLive do
   end
 
   defp calculate_all_revenue_stats do
-    alias Ysc.Repo
-    import Ecto.Query
+    snapshot = Ledgers.get_admin_dashboard_revenue()
+    bounds = snapshot.bounds
+    accounts = snapshot.accounts_by_name
+    totals = snapshot.totals_by_account_id
 
-    now = DateTime.utc_now()
-
-    month_start = %DateTime{
-      now
-      | day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    prev_month_start = Timex.shift(month_start, months: -1)
-    last_year_month_start = Timex.shift(month_start, years: -1)
-
-    last_year_month_end =
-      Timex.shift(month_start, years: -1) |> Timex.shift(months: 1)
-
-    revenue_account_names = [
-      "membership_revenue",
-      "event_revenue",
-      "tahoe_booking_revenue",
-      "clear_lake_booking_revenue",
-      "donation_revenue"
-    ]
-
-    accounts =
-      from(a in Ysc.Ledgers.LedgerAccount,
-        where: a.name in ^revenue_account_names
-      )
-      |> Repo.all()
-      |> Map.new(&{&1.name, &1})
+    current = period_totals_map(totals, :current_month)
+    prev = period_totals_map(totals, :prev_month)
+    last_year = period_totals_map(totals, :last_year_month)
 
     bookings_account_ids =
       [
@@ -1542,75 +1518,9 @@ defmodule YscWeb.AdminDashboardLive do
         do: accounts["membership_revenue"].id,
         else: nil
 
-    all_revenue_account_ids = Map.values(accounts) |> Enum.map(& &1.id)
-
-    all_entries =
-      from(e in Ysc.Ledgers.LedgerEntry,
-        where: e.account_id in ^all_revenue_account_ids,
-        where:
-          (e.inserted_at >= ^month_start and e.inserted_at < ^now) or
-            (e.inserted_at >= ^prev_month_start and e.inserted_at < ^month_start) or
-            (e.inserted_at >= ^last_year_month_start and
-               e.inserted_at < ^last_year_month_end),
-        select: %{
-          account_id: e.account_id,
-          amount: fragment("ABS((?.amount).amount)", e),
-          debit_credit: e.debit_credit,
-          inserted_at: e.inserted_at
-        }
-      )
-      |> Repo.all()
-
-    revenue_data =
-      Enum.reduce(
-        all_entries,
-        %{current: %{}, prev: %{}, last_year: %{}},
-        fn entry, acc ->
-          account_id = entry.account_id
-          amount = entry.amount || Decimal.new(0)
-
-          debit_credit =
-            case entry.debit_credit do
-              atom when is_atom(atom) -> to_string(atom)
-              str when is_binary(str) -> str
-              _ -> "debit"
-            end
-
-          signed_amount =
-            if debit_credit == "credit",
-              do: amount,
-              else: Decimal.negate(amount)
-
-          inserted_at = entry.inserted_at
-
-          acc =
-            if DateTime.compare(inserted_at, month_start) != :lt and
-                 DateTime.compare(inserted_at, now) == :lt do
-              update_revenue_period(acc, :current, account_id, signed_amount)
-            else
-              acc
-            end
-
-          acc =
-            if DateTime.compare(inserted_at, prev_month_start) != :lt and
-                 DateTime.compare(inserted_at, month_start) == :lt do
-              update_revenue_period(acc, :prev, account_id, signed_amount)
-            else
-              acc
-            end
-
-          if DateTime.compare(inserted_at, last_year_month_start) != :lt and
-               DateTime.compare(inserted_at, last_year_month_end) == :lt do
-            update_revenue_period(acc, :last_year, account_id, signed_amount)
-          else
-            acc
-          end
-        end
-      )
-
-    current_total = sum_revenue_map(revenue_data.current)
-    prev_total = sum_revenue_map(revenue_data.prev)
-    last_year_total = sum_revenue_map(revenue_data.last_year)
+    current_total = sum_revenue_map(current)
+    prev_total = sum_revenue_map(prev)
+    last_year_total = sum_revenue_map(last_year)
 
     current_revenue = Money.new(current_total, :USD)
     prev_revenue = Money.new(prev_total, :USD)
@@ -1618,7 +1528,7 @@ defmodule YscWeb.AdminDashboardLive do
 
     {bookings_revenue, events_revenue, membership_revenue} =
       revenue_three_way_totals(
-        revenue_data.current,
+        current,
         bookings_account_ids,
         events_account_id,
         membership_account_id
@@ -1626,7 +1536,7 @@ defmodule YscWeb.AdminDashboardLive do
 
     {prev_bookings, prev_events, prev_membership} =
       revenue_three_way_totals(
-        revenue_data.prev,
+        prev,
         bookings_account_ids,
         events_account_id,
         membership_account_id
@@ -1634,7 +1544,7 @@ defmodule YscWeb.AdminDashboardLive do
 
     {ly_bookings, ly_events, ly_membership} =
       revenue_three_way_totals(
-        revenue_data.last_year,
+        last_year,
         bookings_account_ids,
         events_account_id,
         membership_account_id
@@ -1654,25 +1564,21 @@ defmodule YscWeb.AdminDashboardLive do
       mix_three_percentages(ly_bookings, ly_events, ly_membership)
 
     revenue_tahoe =
-      decimal_to_money(
-        Map.get(revenue_data.current, tahoe_account_id, Decimal.new(0))
-      )
+      decimal_to_money(Map.get(current, tahoe_account_id, Decimal.new(0)))
 
     revenue_clear_lake =
-      decimal_to_money(
-        Map.get(revenue_data.current, clear_lake_account_id, Decimal.new(0))
-      )
+      decimal_to_money(Map.get(current, clear_lake_account_id, Decimal.new(0)))
 
     cabin_sum =
       Decimal.add(
-        Map.get(revenue_data.current, tahoe_account_id, Decimal.new(0)),
-        Map.get(revenue_data.current, clear_lake_account_id, Decimal.new(0))
+        Map.get(current, tahoe_account_id, Decimal.new(0)),
+        Map.get(current, clear_lake_account_id, Decimal.new(0))
       )
 
     {cabin_tahoe_pct, cabin_clear_pct} =
       if Decimal.gt?(cabin_sum, Decimal.new(0)) do
-        t = Map.get(revenue_data.current, tahoe_account_id, Decimal.new(0))
-        c = Map.get(revenue_data.current, clear_lake_account_id, Decimal.new(0))
+        t = Map.get(current, tahoe_account_id, Decimal.new(0))
+        c = Map.get(current, clear_lake_account_id, Decimal.new(0))
 
         {
           round(Decimal.to_float(Decimal.div(t, cabin_sum)) * 100),
@@ -1683,24 +1589,33 @@ defmodule YscWeb.AdminDashboardLive do
       end
 
     {revenue_change_text, revenue_change_direction} =
-      month_over_month_change(current_revenue, prev_revenue, prev_month_start)
+      month_over_month_change(
+        current_revenue,
+        prev_revenue,
+        bounds.prev_month_start
+      )
 
     {revenue_yoy_change_text, revenue_yoy_change_direction} =
       year_over_year_change(
         current_revenue,
         last_year_revenue,
-        last_year_month_start
+        bounds.last_year_month_start
       )
 
     current_period_label =
-      month_start
+      bounds.month_start
       |> DateTime.shift_zone!("America/Los_Angeles")
       |> Timex.format!("{Mshort} {YYYY}")
 
     comparison_month_year_pretty =
-      last_year_month_start
+      bounds.last_year_month_start
       |> DateTime.shift_zone!("America/Los_Angeles")
       |> Timex.format!("{Mshort} {YYYY}")
+
+    ytd_revenue_label =
+      bounds.now
+      |> DateTime.shift_zone!("America/Los_Angeles")
+      |> Timex.format!("Jan–{Mshort} {YYYY}")
 
     %{
       current_month_revenue: current_revenue,
@@ -1733,23 +1648,18 @@ defmodule YscWeb.AdminDashboardLive do
       cabin_tahoe_percent_of_bookings: cabin_tahoe_pct,
       cabin_clear_lake_percent_of_bookings: cabin_clear_pct,
       current_period_label: current_period_label,
-      comparison_month_year_pretty: comparison_month_year_pretty
+      comparison_month_year_pretty: comparison_month_year_pretty,
+      ytd_revenue: Money.new(snapshot.ytd_total, :USD),
+      ytd_revenue_label: ytd_revenue_label,
+      revenue_sparkline: snapshot.sparkline
     }
   end
 
-  defp update_revenue_period(acc, period_key, account_id, signed_amount) do
-    key = Map.get(acc, period_key) || %{}
-
-    Map.put(
-      acc,
-      period_key,
-      Map.update(key, account_id, signed_amount, fn existing ->
-        Decimal.add(existing, signed_amount)
-      end)
-    )
+  defp period_totals_map(totals_by_account_id, period) do
+    Map.new(totals_by_account_id, fn {account_id, periods} ->
+      {account_id, Map.get(periods, period, Decimal.new(0))}
+    end)
   end
-
-  defp sum_revenue_map(nil), do: Decimal.new(0)
 
   defp sum_revenue_map(map) do
     map
@@ -1918,74 +1828,6 @@ defmodule YscWeb.AdminDashboardLive do
     ) || 0
   end
 
-  defp calculate_ytd_revenue do
-    alias Ysc.Repo
-    import Ecto.Query
-
-    now = DateTime.utc_now()
-
-    year_start = %DateTime{
-      now
-      | month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    revenue_account_names = [
-      "membership_revenue",
-      "event_revenue",
-      "tahoe_booking_revenue",
-      "clear_lake_booking_revenue",
-      "donation_revenue"
-    ]
-
-    account_ids =
-      from(a in Ysc.Ledgers.LedgerAccount,
-        where: a.name in ^revenue_account_names,
-        select: a.id
-      )
-      |> Repo.all()
-
-    entries =
-      Repo.all(
-        from e in Ysc.Ledgers.LedgerEntry,
-          where: e.account_id in ^account_ids,
-          where: e.inserted_at >= ^year_start,
-          where: e.inserted_at < ^now,
-          select: %{
-            amount: fragment("ABS((?.amount).amount)", e),
-            debit_credit: e.debit_credit
-          }
-      )
-
-    total =
-      Enum.reduce(entries, Decimal.new(0), fn entry, acc ->
-        debit_credit =
-          case entry.debit_credit do
-            atom when is_atom(atom) -> to_string(atom)
-            str when is_binary(str) -> str
-            _ -> "debit"
-          end
-
-        amount = entry.amount || Decimal.new(0)
-
-        signed =
-          if debit_credit == "credit", do: amount, else: Decimal.negate(amount)
-
-        Decimal.add(acc, signed)
-      end)
-
-    label =
-      now
-      |> DateTime.shift_zone!("America/Los_Angeles")
-      |> Timex.format!("Jan–{Mshort} {YYYY}")
-
-    {Money.new(total, :USD), label}
-  end
-
   defp get_newsletter_subscriber_stats do
     alias Ysc.Repo
     import Ecto.Query
@@ -2040,62 +1882,6 @@ defmodule YscWeb.AdminDashboardLive do
         where: e.status in [:draft, :scheduled],
         select: count()
     ) || 0
-  end
-
-  defp get_last_7_days_revenue do
-    alias Ysc.Repo
-    import Ecto.Query
-
-    today_utc = DateTime.utc_now() |> DateTime.to_date()
-    days = Enum.map(6..0//-1, &Date.add(today_utc, -&1))
-    oldest_day = List.first(days)
-    start_dt = DateTime.new!(oldest_day, ~T[00:00:00], "Etc/UTC")
-    end_dt = DateTime.utc_now()
-
-    revenue_account_names = [
-      "membership_revenue",
-      "event_revenue",
-      "tahoe_booking_revenue",
-      "clear_lake_booking_revenue",
-      "donation_revenue"
-    ]
-
-    account_ids =
-      from(a in Ysc.Ledgers.LedgerAccount,
-        where: a.name in ^revenue_account_names,
-        select: a.id
-      )
-      |> Repo.all()
-
-    entries =
-      Repo.all(
-        from e in Ysc.Ledgers.LedgerEntry,
-          where: e.account_id in ^account_ids,
-          where: e.inserted_at >= ^start_dt,
-          where: e.inserted_at < ^end_dt,
-          select: %{
-            amount: fragment("ABS((?.amount).amount)", e),
-            debit_credit: e.debit_credit,
-            inserted_at: e.inserted_at
-          }
-      )
-
-    by_date = Enum.group_by(entries, &DateTime.to_date(&1.inserted_at))
-
-    Enum.map(days, fn day ->
-      Enum.reduce(Map.get(by_date, day, []), Decimal.new(0), fn entry, acc ->
-        dc =
-          case entry.debit_credit do
-            atom when is_atom(atom) -> to_string(atom)
-            str when is_binary(str) -> str
-            _ -> "debit"
-          end
-
-        amount = entry.amount || Decimal.new(0)
-        signed = if dc == "credit", do: amount, else: Decimal.negate(amount)
-        Decimal.add(acc, signed)
-      end)
-    end)
   end
 
   defp sparkline_line_points(values) when is_list(values) and values != [] do

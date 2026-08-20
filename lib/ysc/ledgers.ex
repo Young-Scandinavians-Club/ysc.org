@@ -36,6 +36,14 @@ defmodule Ysc.Ledgers do
     :membership
   ]
 
+  @admin_dashboard_revenue_account_names [
+    "membership_revenue",
+    "event_revenue",
+    "tahoe_booking_revenue",
+    "clear_lake_booking_revenue",
+    "donation_revenue"
+  ]
+
   alias YscWeb.Workers.{
     QuickbooksSyncPaymentWorker,
     QuickbooksSyncRefundWorker
@@ -3867,6 +3875,230 @@ defmodule Ysc.Ledgers do
     end
   end
 
+  @doc """
+  Aggregates admin-dashboard revenue in SQL instead of loading ledger rows.
+
+  Returns period totals grouped by revenue account, a YTD total, and a 7-day
+  UTC sparkline. Windows match the previous LiveView implementation.
+  """
+  def get_admin_dashboard_revenue(now \\ DateTime.utc_now()) do
+    bounds = admin_dashboard_revenue_bounds(now)
+
+    accounts =
+      from(a in LedgerAccount,
+        where: a.name in ^@admin_dashboard_revenue_account_names
+      )
+      |> Repo.all()
+
+    accounts_by_name = Map.new(accounts, &{&1.name, &1})
+    account_ids = Enum.map(accounts, & &1.id)
+
+    totals_by_account_id =
+      if account_ids == [] do
+        %{}
+      else
+        bounds
+        |> admin_dashboard_revenue_totals_query(account_ids)
+        |> Repo.all()
+        |> Map.new(fn row ->
+          {row.account_id,
+           %{
+             current_month: decimal_or_zero(row.current_month),
+             prev_month: decimal_or_zero(row.prev_month),
+             last_year_month: decimal_or_zero(row.last_year_month),
+             ytd: decimal_or_zero(row.ytd)
+           }}
+        end)
+      end
+
+    sparkline =
+      if account_ids == [] do
+        List.duplicate(Decimal.new(0), length(bounds.sparkline_days))
+      else
+        daily_totals =
+          bounds
+          |> admin_dashboard_revenue_sparkline_query(account_ids)
+          |> Repo.all()
+          |> Map.new(fn row -> {row.day, decimal_or_zero(row.total)} end)
+
+        Enum.map(bounds.sparkline_days, fn day ->
+          Map.get(daily_totals, day, Decimal.new(0))
+        end)
+      end
+
+    ytd_total =
+      totals_by_account_id
+      |> Map.values()
+      |> Enum.reduce(Decimal.new(0), fn periods, acc ->
+        Decimal.add(acc, periods.ytd)
+      end)
+
+    %{
+      bounds: bounds,
+      accounts_by_name: accounts_by_name,
+      totals_by_account_id: totals_by_account_id,
+      sparkline: sparkline,
+      ytd_total: ytd_total
+    }
+  end
+
+  @doc false
+  def admin_dashboard_revenue_totals_query(bounds, account_ids) do
+    from(e in LedgerEntry,
+      where: e.account_id in ^account_ids,
+      where: e.inserted_at >= ^bounds.earliest,
+      where: e.inserted_at < ^bounds.now,
+      group_by: e.account_id,
+      select: %{
+        account_id: e.account_id,
+        current_month:
+          sum(
+            fragment(
+              """
+              CASE WHEN ?::text = 'credit' THEN ABS((?.amount).amount)
+                   ELSE -ABS((?.amount).amount) END
+              """,
+              e.debit_credit,
+              e,
+              e
+            )
+          )
+          |> filter(
+            e.inserted_at >= ^bounds.month_start and
+              e.inserted_at < ^bounds.now
+          ),
+        prev_month:
+          sum(
+            fragment(
+              """
+              CASE WHEN ?::text = 'credit' THEN ABS((?.amount).amount)
+                   ELSE -ABS((?.amount).amount) END
+              """,
+              e.debit_credit,
+              e,
+              e
+            )
+          )
+          |> filter(
+            e.inserted_at >= ^bounds.prev_month_start and
+              e.inserted_at < ^bounds.month_start
+          ),
+        last_year_month:
+          sum(
+            fragment(
+              """
+              CASE WHEN ?::text = 'credit' THEN ABS((?.amount).amount)
+                   ELSE -ABS((?.amount).amount) END
+              """,
+              e.debit_credit,
+              e,
+              e
+            )
+          )
+          |> filter(
+            e.inserted_at >= ^bounds.last_year_month_start and
+              e.inserted_at < ^bounds.last_year_month_end
+          ),
+        ytd:
+          sum(
+            fragment(
+              """
+              CASE WHEN ?::text = 'credit' THEN ABS((?.amount).amount)
+                   ELSE -ABS((?.amount).amount) END
+              """,
+              e.debit_credit,
+              e,
+              e
+            )
+          )
+          |> filter(
+            e.inserted_at >= ^bounds.year_start and e.inserted_at < ^bounds.now
+          )
+      }
+    )
+  end
+
+  @doc false
+  def admin_dashboard_revenue_sparkline_query(bounds, account_ids) do
+    from(e in LedgerEntry,
+      where: e.account_id in ^account_ids,
+      where: e.inserted_at >= ^bounds.sparkline_start,
+      where: e.inserted_at < ^bounds.now,
+      group_by: fragment("(?::date)", e.inserted_at),
+      select: %{
+        day: fragment("(?::date)", e.inserted_at),
+        total:
+          sum(
+            fragment(
+              """
+              CASE WHEN ?::text = 'credit' THEN ABS((?.amount).amount)
+                   ELSE -ABS((?.amount).amount) END
+              """,
+              e.debit_credit,
+              e,
+              e
+            )
+          )
+      }
+    )
+  end
+
+  defp admin_dashboard_revenue_bounds(%DateTime{} = now) do
+    month_start = %DateTime{
+      now
+      | day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    year_start = %DateTime{
+      now
+      | month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    prev_month_start = Timex.shift(month_start, months: -1)
+    last_year_month_start = Timex.shift(month_start, years: -1)
+
+    last_year_month_end =
+      last_year_month_start |> Timex.shift(months: 1)
+
+    today_utc = DateTime.to_date(now)
+    sparkline_days = Enum.map(6..0//-1, &Date.add(today_utc, -&1))
+
+    sparkline_start =
+      DateTime.new!(List.first(sparkline_days), ~T[00:00:00], "Etc/UTC")
+
+    earliest =
+      [last_year_month_start, year_start, sparkline_start]
+      |> Enum.min_by(&DateTime.to_unix/1)
+
+    %{
+      now: now,
+      month_start: month_start,
+      year_start: year_start,
+      prev_month_start: prev_month_start,
+      last_year_month_start: last_year_month_start,
+      last_year_month_end: last_year_month_end,
+      sparkline_days: sparkline_days,
+      sparkline_start: sparkline_start,
+      earliest: earliest
+    }
+  end
+
+  defp decimal_or_zero(nil), do: Decimal.new(0)
+  defp decimal_or_zero(%Decimal{} = decimal), do: decimal
+  defp decimal_or_zero(number) when is_integer(number), do: Decimal.new(number)
+
+  defp decimal_or_zero(number) when is_float(number),
+    do: Decimal.from_float(number)
+
   @doc false
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
@@ -3879,5 +4111,23 @@ defmodule Ysc.Ledgers do
       where: pp.payout_id == ^payout_id,
       preload: [:user, :payment_method]
     )
+  end
+
+  @doc false
+  def ci_query_explain_admin_dashboard_revenue_totals_query do
+    bounds = admin_dashboard_revenue_bounds(Ysc.Ci.QueryExplain.Fixtures.now())
+
+    admin_dashboard_revenue_totals_query(bounds, [
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    ])
+  end
+
+  @doc false
+  def ci_query_explain_admin_dashboard_revenue_sparkline_query do
+    bounds = admin_dashboard_revenue_bounds(Ysc.Ci.QueryExplain.Fixtures.now())
+
+    admin_dashboard_revenue_sparkline_query(bounds, [
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    ])
   end
 end
