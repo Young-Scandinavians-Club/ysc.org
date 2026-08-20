@@ -1307,6 +1307,63 @@ defmodule Ysc.AccountsTest do
       assert "has already been taken" in errors_on(changeset).email
     end
 
+    test "rejects signup that would shadow a legacy dotted Gmail address" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "legacy.#{tag}@gmail.com"
+      canonical_email = "legacy#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Member",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: canonical_email,
+          phone_number: unique_user_phone(),
+          first_name: "Attacker",
+          last_name: "Shadow",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(canonical_email)
+    end
+
+    test "rejects signup that would shadow a legacy plus-tagged Gmail address" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      plus_email = "plus#{tag}+old@gmail.com"
+      canonical_email = "plus#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: plus_email,
+        first_name: "Legacy",
+        last_name: "Plus",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: canonical_email,
+          phone_number: unique_user_phone(),
+          first_name: "Attacker",
+          last_name: "Shadow",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+    end
+
     test "normalizes Gmail email when registering new user" do
       {:ok, user} =
         Accounts.register_user(

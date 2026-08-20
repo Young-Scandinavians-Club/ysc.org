@@ -30,6 +30,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 32 (HIGH)     SNS cert URL allowed any *.amazonaws.com host (S3-hosted forged certs)
   Finding 33 (MEDIUM)   QuickBooks refresh token logged in full on rotation
   Finding 34 (MEDIUM)   Media library S3 uploads used guessable public/<filename> keys
+  Finding 35 (HIGH)     Gmail uniqueness ignored legacy dotted/plus stored addresses, allowing login shadowing
   Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -2298,6 +2299,68 @@ defmodule YscWeb.SecurityAuditTest do
       assert first.key =~ ~r{^public/[^/]+/club-logo\.png$}
       assert first.key != second.key
       assert first.fields["content-type"] == "image/png"
+    end
+  end
+
+  # Finding 35 (HIGH): Gmail uniqueness must use canonical matching, not only
+  # the exact email column. Login/OAuth already resolve jane.doe@gmail.com and
+  # janedoe@gmail.com to the same mailbox; a new signup of the canonical form
+  # would otherwise steal those lookups from a legacy dotted row.
+  describe "Finding 35: Gmail canonical uniqueness rejects alias shadowing" do
+    test "register_user cannot take over lookups for a legacy dotted Gmail" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "shadow.#{tag}@gmail.com"
+      canonical_email = "shadow#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Gmail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      assert {:error, changeset} =
+               Accounts.register_user(%{
+                 email: canonical_email,
+                 phone_number: unique_user_phone(),
+                 first_name: "Attacker",
+                 last_name: "Shadow",
+                 password: "valid password"
+               })
+
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(canonical_email)
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(dotted_email)
+    end
+
+    test "email change cannot target a canonical alias of another member" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "change.#{tag}@gmail.com"
+      canonical_email = "change#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Gmail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      attacker = user_fixture(%{email: "attacker#{tag}@example.com"})
+
+      changeset = User.email_changeset(attacker, %{email: canonical_email})
+
+      refute changeset.valid?
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
     end
   end
 end

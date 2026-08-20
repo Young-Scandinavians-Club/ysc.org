@@ -7,6 +7,7 @@ defmodule Ysc.Accounts.User do
   """
   use Ecto.Schema
   import Ecto.Changeset
+  import Ecto.Query
 
   @type t :: %__MODULE__{}
 
@@ -571,11 +572,71 @@ defmodule Ysc.Accounts.User do
   defp maybe_validate_unique_email(changeset, opts) do
     if Keyword.get(opts, :validate_email, true) do
       changeset
+      |> reject_canonical_email_collision()
       |> unsafe_validate_unique(:email, Ysc.Repo)
       |> unique_constraint(:email)
     else
       changeset
     end
+  end
+
+  # unsafe_validate_unique/3 only compares the stored email column. Login and
+  # OAuth look up Gmail addresses by canonical form (dots and plus-tags stripped),
+  # so a legacy row stored as jane.doe@gmail.com would not collide with a new
+  # janedoe@gmail.com signup — and get_user_by_email/1 would then prefer the
+  # new canonical row, locking the original member out.
+  defp reject_canonical_email_collision(changeset) do
+    email = get_field(changeset, :email)
+    current_id = changeset.data.id
+
+    if is_binary(email) and email != "" do
+      case get_by_canonical_email(email) do
+        %User{id: id} when id != current_id ->
+          add_error(changeset, :email, "has already been taken")
+
+        _ ->
+          changeset
+      end
+    else
+      changeset
+    end
+  end
+
+  @doc """
+  Finds a user by email using the same canonical Gmail matching as login.
+
+  Exact column match is tried first (normalized address). If that misses,
+  Gmail/Googlemail aliases stored with dots or plus-tags are considered.
+  """
+  def get_by_canonical_email(email) when is_binary(email) do
+    normalized_email = Email.normalize(email)
+
+    case Ysc.Repo.get_by(User, email: normalized_email) do
+      %User{} = user ->
+        user
+
+      nil ->
+        find_by_gmail_alias(normalized_email)
+    end
+  end
+
+  defp find_by_gmail_alias(normalized_email) do
+    if Email.gmail?(normalized_email) do
+      [_local, domain] = String.split(normalized_email, "@", parts: 2)
+
+      from(u in User, where: ilike(u.email, ^"%@#{domain}"))
+      |> Ysc.Repo.all()
+      |> Enum.find(fn user ->
+        Email.normalize(user.email) == normalized_email
+      end)
+    end
+  end
+
+  @doc false
+  def ci_query_explain_gmail_alias_query do
+    domain = "gmail.com"
+
+    from(u in User, where: ilike(u.email, ^"%@#{domain}"))
   end
 
   @doc """

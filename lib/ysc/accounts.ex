@@ -14,7 +14,6 @@ defmodule Ysc.Accounts do
   alias Ysc.Accounts.{
     Address,
     BoardPosition,
-    Email,
     FamilyInvite,
     MembershipCache,
     User,
@@ -50,15 +49,7 @@ defmodule Ysc.Accounts do
 
   """
   def get_user_by_email(email) when is_binary(email) do
-    normalized_email = Email.normalize(email)
-
-    case Repo.get_by(User, email: normalized_email) do
-      %User{} = user ->
-        user
-
-      nil ->
-        find_user_by_canonical_email(normalized_email)
-    end
+    User.get_by_canonical_email(email)
   end
 
   @doc """
@@ -146,20 +137,6 @@ defmodule Ysc.Accounts do
       end
     rescue
       _ -> {:error, :normalization_failed}
-    end
-  end
-
-  defp find_user_by_canonical_email(normalized_email) do
-    if Email.gmail?(normalized_email) do
-      [_local, domain] = String.split(normalized_email, "@", parts: 2)
-
-      from(u in User, where: ilike(u.email, ^"%@#{domain}"))
-      |> Repo.all()
-      |> Enum.find(fn user ->
-        Email.normalize(user.email) == normalized_email
-      end)
-    else
-      nil
     end
   end
 
