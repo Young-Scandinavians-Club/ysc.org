@@ -667,7 +667,11 @@ defmodule Ysc.Accounts.User do
   """
   def phone_verification_changeset(user, attrs) do
     user
-    |> cast(attrs, [:phone_verified_at])
+    |> cast(attrs, [
+      :phone_verified_at,
+      :account_notifications_sms,
+      :event_notifications_sms
+    ])
     |> validate_required([:phone_verified_at])
   end
 

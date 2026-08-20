@@ -67,7 +67,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
                 )}
               </p>
               <p class="text-xs text-blue-600">
-                As the member making this reservation, you must stay at the cabin. You are already included in the guest count — only enter the other people staying with you below.
+                As the member making this booking, you must stay at the cabin. You are already included in the guest count — only enter the other people staying with you below.
               </p>
             </div>
           </div>

@@ -4111,17 +4111,19 @@ defmodule YscWeb.AdminBookingsLive do
         true -> :buyout
       end
 
-    # Get initial dates from params (from two-click selection)
+    # Get initial dates from params (from two-click selection).
+    # Inventory is [checkin, checkout); equal dates are a 0-night stay and
+    # Date.range/2 infers a negative step that would include the day before.
     {checkin_date, checkout_date} =
       if params["start_date"] && params["end_date"] do
         try do
           start = Date.from_iso8601!(params["start_date"])
           ending = Date.from_iso8601!(params["end_date"])
-          {start, ending}
+          overnight_booking_dates(start, ending)
         rescue
           _ ->
             initial = socket.assigns.calendar_start_date
-            {initial, initial}
+            overnight_booking_dates(initial, initial)
         end
       else
         # Fallback to single date or current date
@@ -4136,7 +4138,7 @@ defmodule YscWeb.AdminBookingsLive do
             socket.assigns.calendar_start_date
           end
 
-        {initial_checkin, initial_checkin}
+        overnight_booking_dates(initial_checkin, initial_checkin)
       end
 
     # Get room_id if provided
@@ -7743,6 +7745,16 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp default_date_range(_), do: default_date_range("America/Los_Angeles")
+
+  # Inventory is [checkin, checkout). Same-day check-in/check-out is 0 nights
+  # and would previously feed Date.range/2 a descending bound.
+  defp overnight_booking_dates(checkin_date, checkout_date) do
+    if Date.compare(checkout_date, checkin_date) == :gt do
+      {checkin_date, checkout_date}
+    else
+      {checkin_date, Date.add(checkin_date, 1)}
+    end
+  end
 
   defp today_in_timezone(timezone) when is_binary(timezone) do
     DateTime.now!(timezone) |> DateTime.to_date()

@@ -26,6 +26,32 @@ defmodule Ysc.Email.DeliveryErrorTest do
     refute DeliveryError.retryable?(error)
   end
 
+  test "Swoosh AmazonSES XML helpers return empty strings for missing error nodes" do
+    alias Swoosh.Adapters.XML.Helpers, as: XMLHelper
+
+    node = XMLHelper.parse("<ErrorResponse><Error></Error></ErrorResponse>")
+
+    assert XMLHelper.first_text(node, "//Error/Code") == ""
+    assert XMLHelper.first_text(node, "//Message") == ""
+  end
+
+  test "treats blank SES error codes as unknown and retryable" do
+    # Swoosh 1.27.1 AmazonSES parse_error_response/1 returns empty strings when
+    # Error/Code or Message nodes are missing from the XML body.
+    error =
+      DeliveryError.classify({:error, %{code: "", message: ""}})
+
+    assert error.category == :unknown
+    assert error.code == ""
+    assert DeliveryError.retryable?(error)
+
+    whitespace =
+      DeliveryError.classify({:error, %{code: "   ", message: "malformed xml"}})
+
+    assert whitespace.category == :unknown
+    assert DeliveryError.retryable?(whitespace)
+  end
+
   test "treats ambiguous transport failures as retryable" do
     assert %{category: :transient} = DeliveryError.classify({:error, :timeout})
 

@@ -441,6 +441,8 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       refute day_html =~ "Partially booked"
       assert day_html =~ "Booked"
+      assert day_html =~ "Another member has already booked this date"
+      refute day_html =~ "reservations"
       assert aria =~ "Booked"
       refute aria =~ "Booked, Partially booked"
     end
@@ -565,7 +567,9 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       assert saturday_cell =~ "No check-out"
       assert saturday_cell =~ "Check-outs are not permitted on Saturdays"
-      refute saturday_cell =~ "Restricted (e.g. min/max stay)"
+
+      refute saturday_cell =~
+               "This stay length isn't allowed. Try different dates."
     end
 
     test "valid checkout before blackout shows check-out only, not not available" do

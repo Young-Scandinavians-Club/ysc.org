@@ -229,9 +229,7 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp day_property_inventory_stay_days(booking) do
-    booking.checkin_date
-    |> Date.range(Date.add(booking.checkout_date, -1))
-    |> Enum.to_list()
+    stay_night_dates(booking.checkin_date, booking.checkout_date)
   end
 
   defp day_property_inventory_query(booking) do
@@ -2787,7 +2785,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
   defp modification_stay_days(checkin, checkout) do
     checkin
-    |> Date.range(Date.add(checkout, -1))
+    |> stay_night_dates(checkout)
     |> MapSet.new()
   end
 
@@ -3260,10 +3258,7 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp release_booked_inventory!(booking) do
-    days =
-      booking.checkin_date
-      |> Date.range(Date.add(booking.checkout_date, -1))
-      |> Enum.to_list()
+    days = stay_night_dates(booking.checkin_date, booking.checkout_date)
 
     case booking.booking_mode do
       :buyout ->
@@ -3406,10 +3401,7 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp book_inventory_for_complete!(booking, hold_context) do
-    days =
-      booking.checkin_date
-      |> Date.range(Date.add(booking.checkout_date, -1))
-      |> Enum.to_list()
+    days = stay_night_dates(booking.checkin_date, booking.checkout_date)
 
     held_days =
       case hold_context do

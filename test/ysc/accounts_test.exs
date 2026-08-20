@@ -2227,6 +2227,60 @@ defmodule Ysc.AccountsTest do
       assert {:ok, u3} = Accounts.mark_password_set(u2)
       assert u3.password_set_at
     end
+
+    test "mark_phone_verified/1 enables SMS notifications for WP-migrated users whose matching email notifications are already on" do
+      user = oauth_user_fixture(%{phone_number: "+14159098317"})
+
+      {:ok, migrated_user} =
+        user
+        |> Ecto.Changeset.change(post_migration_onboarding_completed_at: nil)
+        |> Repo.update()
+
+      assert Accounts.wp_migrated?(migrated_user)
+      assert migrated_user.account_notifications
+      assert migrated_user.event_notifications
+      refute migrated_user.account_notifications_sms
+      refute migrated_user.event_notifications_sms
+
+      assert {:ok, verified_user} = Accounts.mark_phone_verified(migrated_user)
+      assert verified_user.phone_verified_at
+      assert verified_user.account_notifications_sms
+      assert verified_user.event_notifications_sms
+    end
+
+    test "mark_phone_verified/1 leaves SMS notifications off for WP-migrated users whose matching email notifications are off" do
+      user = oauth_user_fixture(%{phone_number: "+14159098318"})
+
+      {:ok, migrated_user} =
+        user
+        |> Ecto.Changeset.change(
+          post_migration_onboarding_completed_at: nil,
+          account_notifications: false,
+          event_notifications: false
+        )
+        |> Repo.update()
+
+      assert {:ok, verified_user} = Accounts.mark_phone_verified(migrated_user)
+      refute verified_user.account_notifications_sms
+      refute verified_user.event_notifications_sms
+    end
+
+    test "mark_phone_verified/1 does not override an explicit SMS opt-out for non-migrated users" do
+      user = user_fixture(%{phone_number: "+14159098319"})
+      refute Accounts.wp_migrated?(user)
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(
+          account_notifications_sms: false,
+          event_notifications_sms: false
+        )
+        |> Repo.update()
+
+      assert {:ok, verified_user} = Accounts.mark_phone_verified(user)
+      refute verified_user.account_notifications_sms
+      refute verified_user.event_notifications_sms
+    end
   end
 
   describe "post-migration onboarding" do
