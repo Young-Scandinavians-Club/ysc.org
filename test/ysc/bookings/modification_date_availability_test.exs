@@ -582,7 +582,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
         )
 
       refute Map.get(tooltips, Date.to_iso8601(open_checkin)) ==
-               "The property is not available starting on this date"
+               "The cabin is not available starting on this date"
 
       assert :ok =
                ModificationDateAvailability.validate_modification_dates(
@@ -635,7 +635,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
         )
 
       assert Map.get(tooltips, Date.to_iso8601(full_checkin)) ==
-               "The property is not available starting on this date"
+               "The cabin is not available starting on this date"
 
       assert {:error, :property_unavailable} =
                ModificationDateAvailability.validate_modification_dates(

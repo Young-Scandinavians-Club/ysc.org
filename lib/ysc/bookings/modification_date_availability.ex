@@ -347,10 +347,10 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
     cond do
       Date.compare(date, min_date) == :lt ->
-        "Past dates cannot be selected"
+        "Past dates cannot be booked"
 
       Date.compare(date, max_date) == :gt ->
-        "Reservations are not open for this date yet"
+        "Bookings are not open for this date yet"
 
       not SeasonHelpers.date_selectable?(booking.property, date, today, seasons) ->
         "Bookings for this season are not yet open"
@@ -359,7 +359,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
         "This date is unavailable"
 
       buyout_on_date?(snapshot, date) and booking.booking_mode == :room ->
-        "Full cabin buyout is already reserved on this date"
+        "The entire cabin is already booked on this date"
 
       not has_valid_checkout?(snapshot, date, max_date, today, seasons) ->
         availability_message(booking)
@@ -774,10 +774,10 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     do: "Your room is not available starting on this date"
 
   defp availability_message(%{booking_mode: :buyout}),
-    do: "The property is not available starting on this date"
+    do: "The cabin is not available starting on this date"
 
   defp availability_message(_),
-    do: "The property is not available starting on this date"
+    do: "The cabin is not available starting on this date"
 
   defp availability_error_message(:blackout_conflict),
     do:
@@ -790,7 +790,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     do: "Your room is not available for the selected dates"
 
   defp availability_error_message(:property_buyout_active),
-    do: "The property has an active buyout for the selected dates"
+    do: "The entire cabin is already booked for those dates"
 
   defp availability_error_message(:rooms_already_booked),
     do: "Rooms are already booked for the selected dates"
