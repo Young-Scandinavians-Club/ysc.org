@@ -729,7 +729,9 @@ defmodule YscWeb.AdminMoneyLive do
             {:error, {:stripe_error, msg}} ->
               {:noreply,
                socket
-               |> YscWeb.Flash.put_toast(:error, "Stripe error: #{inspect(msg)}",
+               |> YscWeb.Flash.put_toast(
+                 :error,
+                 "Stripe error: #{inspect(msg)}",
                  title: "Refund"
                )}
 
@@ -830,7 +832,9 @@ defmodule YscWeb.AdminMoneyLive do
             {:error, {:stripe_error, msg}} ->
               {:noreply,
                socket
-               |> YscWeb.Flash.put_toast(:error, "Stripe error: #{inspect(msg)}",
+               |> YscWeb.Flash.put_toast(
+                 :error,
+                 "Stripe error: #{inspect(msg)}",
                  title: "Refund"
                )}
 
