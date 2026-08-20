@@ -116,6 +116,74 @@ defmodule YscWeb.AdminFlopHelpersTest do
     end
   end
 
+  describe "list_filter_params/3" do
+    test "compacts filters, preserves title search, and merges date range" do
+      meta = %{
+        flop: %{
+          filters: [%Flop.Filter{field: :title, op: :ilike, value: "Viking"}]
+        }
+      }
+
+      params = %{
+        "_target" => ["date_from"],
+        "date_from" => "2026-01-01",
+        "date_to" => "2026-03-31",
+        "filters" => %{
+          "0" => %{"field" => "status", "op" => "in", "value" => "draft"},
+          "1" => %{"field" => "creator_id", "op" => "in", "value" => [""]}
+        }
+      }
+
+      assert AdminFlopHelpers.list_filter_params(params, meta) == %{
+               "filters" => %{
+                 "0" => %{
+                   "field" => "status",
+                   "op" => "in",
+                   "value" => "draft"
+                 },
+                 "1" => %{
+                   "field" => "title",
+                   "op" => "ilike",
+                   "value" => "Viking"
+                 }
+               },
+               "date_from" => "2026-01-01",
+               "date_to" => "2026-03-31"
+             }
+    end
+
+    test "merges extra keys such as tab" do
+      params = %{
+        "date_from" => "2026-08-01",
+        "date_to" => "",
+        "filters" => %{}
+      }
+
+      assert AdminFlopHelpers.list_filter_params(params, nil, %{
+               "tab" => "upcoming"
+             }) == %{
+               "filters" => %{},
+               "tab" => "upcoming",
+               "date_from" => "2026-08-01"
+             }
+    end
+
+    test "drops LiveView internals and empty date keys" do
+      params = %{
+        "_target" => ["filters", "0", "value"],
+        "date_from" => "",
+        "date_to" => "",
+        "filters" => %{
+          "0" => %{"field" => "state", "op" => "in", "value" => ""}
+        }
+      }
+
+      assert AdminFlopHelpers.list_filter_params(params, nil) == %{
+               "filters" => %{}
+             }
+    end
+  end
+
   describe "merge_date_range_into_params/3" do
     test "adds non-empty date range keys" do
       assert AdminFlopHelpers.merge_date_range_into_params(

@@ -95,29 +95,12 @@ defmodule YscWeb.AdminEventsLive do
                 meta={@meta}
                 id="events-filter-form"
               >
-                <div class="mt-4">
-                  <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
-                    Event Date Range
-                  </p>
-                  <div class="space-y-2">
-                    <.input
-                      type="date"
-                      name="date_from"
-                      value={@date_from}
-                      label="From"
-                      id="filter-date-from"
-                      phx-debounce="300"
-                    />
-                    <.input
-                      type="date"
-                      name="date_to"
-                      value={@date_to}
-                      label="To"
-                      id="filter-date-to"
-                      phx-debounce="300"
-                    />
-                  </div>
-                </div>
+                <.admin_filter_date_range
+                  id="filter-events"
+                  label="Event Date Range"
+                  date_from={@date_from}
+                  date_to={@date_to}
+                />
               </.filter_form>
             </.admin_filter_dropdown>
           </div>
@@ -478,26 +461,10 @@ defmodule YscWeb.AdminEventsLive do
   end
 
   def handle_event("update-filter", params, socket) do
-    date_from = Map.get(params, "date_from", "")
-    date_to = Map.get(params, "date_to", "")
-
-    params =
-      params
-      |> Map.delete("_target")
-      |> Map.delete("date_from")
-      |> Map.delete("date_to")
-
-    final_filters =
-      params["filters"]
-      |> compact_filter_params()
-      |> merge_title_filter_into_params(socket.assigns.meta)
-
     new_params =
-      Map.merge(params, %{
-        "filters" => final_filters,
+      list_filter_params(params, socket.assigns.meta, %{
         "tab" => socket.assigns.active_tab
       })
-      |> merge_date_range_into_params(date_from, date_to)
 
     {:noreply, push_patch(socket, to: ~p"/admin/events?#{new_params}")}
   end

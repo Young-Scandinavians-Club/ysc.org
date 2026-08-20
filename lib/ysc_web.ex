@@ -86,6 +86,8 @@ defmodule YscWeb do
           non_flop_params: 1,
           title_search_query: 1,
           build_title_search_filter_params: 2,
+          list_filter_params: 3,
+          list_filter_params: 2,
           merge_date_range_into_params: 3,
           compact_filter_params: 1,
           merge_title_filter_into_params: 2

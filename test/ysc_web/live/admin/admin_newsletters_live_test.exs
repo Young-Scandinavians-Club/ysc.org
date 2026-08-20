@@ -111,6 +111,34 @@ defmodule YscWeb.AdminNewslettersLiveTest do
   # Search
   # ---------------------------------------------------------------------------
 
+  describe "date range filter" do
+    setup [:create_admin]
+
+    test "renders From/To date inputs in the editions filter form", %{
+      conn: conn
+    } do
+      {view, _html} = live_newsletters(conn)
+
+      assert has_element?(view, "#filter-newsletters-date-from")
+      assert has_element?(view, "#filter-newsletters-date-to")
+    end
+
+    test "patches URL with date_from and date_to", %{conn: conn} do
+      {view, _html} = live_newsletters(conn)
+
+      view
+      |> form("#newsletters-filter-form", %{
+        date_from: "2026-01-01",
+        date_to: "2026-03-31"
+      })
+      |> render_change()
+
+      path = assert_patch(view)
+      assert path =~ "date_from=2026-01-01"
+      assert path =~ "date_to=2026-03-31"
+    end
+  end
+
   describe "search" do
     setup [:create_admin]
 
