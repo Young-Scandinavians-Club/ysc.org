@@ -92,6 +92,18 @@ defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
     end
   end
 
+  describe "ci_query_explain admin dashboard revenue queries" do
+    test "ci_query_explain_admin_dashboard_revenue_totals_query/0 returns a query" do
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_admin_dashboard_revenue_totals_query()
+    end
+
+    test "ci_query_explain_admin_dashboard_revenue_sparkline_query/0 returns a query" do
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_admin_dashboard_revenue_sparkline_query()
+    end
+  end
+
   defp insert_entry!(account, debit_credit, amount, inserted_at) do
     at = DateTime.truncate(inserted_at, :second)
 
