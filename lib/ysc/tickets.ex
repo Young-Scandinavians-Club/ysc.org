@@ -539,12 +539,35 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Calculates the refund amount for the given tickets without mutating anything.
+
+  Lets a caller (e.g. an admin refund flow) get the amount to send to the
+  payment provider *before* committing to cancelling any tickets, so a
+  provider-side failure doesn't leave tickets cancelled with no refund
+  actually issued.
+
+  ## Returns:
+  - `{:ok, Money.t()}` on success
+  - `{:error, :no_valid_tickets}` if none of `ticket_ids` are refundable
+  """
+  def calculate_refund_amount(ticket_order, ticket_ids) do
+    case fetch_refundable_tickets(ticket_order, ticket_ids) do
+      {:ok, %{refund_amount: refund_amount}} -> {:ok, refund_amount}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
   Refunds individual tickets from a ticket order.
 
   This function:
   - Cancels the specified tickets (returns them to stock)
   - Calculates the refund amount based on ticket prices
   - Updates the ticket order if all tickets are refunded
+
+  Call `calculate_refund_amount/2` first if you need the amount before
+  deciding whether to cancel the tickets at all (e.g. to issue a payment
+  provider refund only after which this should run).
 
   ## Parameters:
   - `ticket_order`: The ticket order to refund from
@@ -558,75 +581,14 @@ defmodule Ysc.Tickets do
   def refund_tickets(ticket_order, ticket_ids, reason \\ "Admin refund") do
     result =
       Repo.transaction(fn ->
-        # Get the tickets to refund
-        tickets_to_refund =
-          from(t in Ticket,
-            where: t.id in ^ticket_ids,
-            where: t.ticket_order_id == ^ticket_order.id,
-            where: t.status in [:confirmed, :pending],
-            preload: [:ticket_tier]
-          )
-          |> Repo.all()
+        {tickets_to_refund, refund_amount} =
+          case fetch_refundable_tickets(ticket_order, ticket_ids) do
+            {:ok, %{tickets_to_refund: tickets, refund_amount: amount}} ->
+              {tickets, amount}
 
-        if Enum.empty?(tickets_to_refund) do
-          Repo.rollback({:error, :no_valid_tickets})
-        end
-
-        donation_tickets_count =
-          from(t in Ticket,
-            join: tt in TicketTier,
-            on: t.ticket_tier_id == tt.id,
-            where: t.ticket_order_id == ^ticket_order.id,
-            where: tt.type == :donation
-          )
-          |> Repo.aggregate(:count, :id)
-
-        # Calculate refund amount
-        refund_amount =
-          tickets_to_refund
-          |> Enum.reduce(Money.new(0, :USD), fn ticket, acc ->
-            case ticket.ticket_tier.type do
-              :free ->
-                acc
-
-              :donation ->
-                # For donation tickets, we need to get the actual donation amount
-                # Since donation tickets store the amount in the payment, we'll use a proportional split
-                # This is a simplification - ideally we'd store the donation amount per ticket
-                if ticket_order.total_amount && ticket_order.payment_id do
-                  if donation_tickets_count > 0 do
-                    case Money.div(
-                           ticket_order.total_amount,
-                           donation_tickets_count
-                         ) do
-                      {:ok, ticket_amount} ->
-                        case Money.add(acc, ticket_amount) do
-                          {:ok, new_total} -> new_total
-                          {:error, _} -> acc
-                        end
-
-                      {:error, _} ->
-                        acc
-                    end
-                  else
-                    acc
-                  end
-                else
-                  acc
-                end
-
-              _ ->
-                # For paid tickets, use the tier price
-                if ticket.ticket_tier.price do
-                  case Money.add(acc, ticket.ticket_tier.price) do
-                    {:ok, new_total} -> new_total
-                    {:error, _} -> acc
-                  end
-                else
-                  acc
-                end
-            end
-          end)
+            {:error, error_reason} ->
+              Repo.rollback(error_reason)
+          end
 
         # Cancel the tickets (this returns them to stock)
         Enum.each(tickets_to_refund, fn ticket ->
@@ -683,6 +645,82 @@ defmodule Ysc.Tickets do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # Read-only: finds the refundable tickets and computes the refund amount,
+  # without cancelling anything. Shared by calculate_refund_amount/2 (no
+  # mutation) and refund_tickets/3 (calculates then mutates in one transaction).
+  defp fetch_refundable_tickets(ticket_order, ticket_ids) do
+    tickets_to_refund =
+      from(t in Ticket,
+        where: t.id in ^ticket_ids,
+        where: t.ticket_order_id == ^ticket_order.id,
+        where: t.status in [:confirmed, :pending],
+        preload: [:ticket_tier]
+      )
+      |> Repo.all()
+
+    if Enum.empty?(tickets_to_refund) do
+      {:error, :no_valid_tickets}
+    else
+      donation_tickets_count =
+        from(t in Ticket,
+          join: tt in TicketTier,
+          on: t.ticket_tier_id == tt.id,
+          where: t.ticket_order_id == ^ticket_order.id,
+          where: tt.type == :donation
+        )
+        |> Repo.aggregate(:count, :id)
+
+      refund_amount =
+        tickets_to_refund
+        |> Enum.reduce(Money.new(0, :USD), fn ticket, acc ->
+          case ticket.ticket_tier.type do
+            :free ->
+              acc
+
+            :donation ->
+              # For donation tickets, we need to get the actual donation amount
+              # Since donation tickets store the amount in the payment, we'll use a proportional split
+              # This is a simplification - ideally we'd store the donation amount per ticket
+              if ticket_order.total_amount && ticket_order.payment_id do
+                if donation_tickets_count > 0 do
+                  case Money.div(
+                         ticket_order.total_amount,
+                         donation_tickets_count
+                       ) do
+                    {:ok, ticket_amount} ->
+                      case Money.add(acc, ticket_amount) do
+                        {:ok, new_total} -> new_total
+                        {:error, _} -> acc
+                      end
+
+                    {:error, _} ->
+                      acc
+                  end
+                else
+                  acc
+                end
+              else
+                acc
+              end
+
+            _ ->
+              # For paid tickets, use the tier price
+              if ticket.ticket_tier.price do
+                case Money.add(acc, ticket.ticket_tier.price) do
+                  {:ok, new_total} -> new_total
+                  {:error, _} -> acc
+                end
+              else
+                acc
+              end
+          end
+        end)
+
+      {:ok,
+       %{tickets_to_refund: tickets_to_refund, refund_amount: refund_amount}}
     end
   end
 
