@@ -50,9 +50,10 @@ defmodule YscWeb.UserSessionControllerTest do
                "Please verify your email address before signing in"
     end
 
-    test "logs the user in with a Gmail alias of a legacy dotted stored address", %{
-      conn: conn
-    } do
+    test "logs the user in with a Gmail alias of a legacy dotted stored address",
+         %{
+           conn: conn
+         } do
       tag = Integer.to_string(System.unique_integer([:positive]))
       dotted_email = "session.#{tag}@gmail.com"
       canonical_email = "session#{tag}@gmail.com"

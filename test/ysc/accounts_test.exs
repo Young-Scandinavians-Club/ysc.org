@@ -1758,9 +1758,10 @@ defmodule Ysc.AccountsTest do
       %{user: user_fixture(%{phone_number: "+14159098268"})}
     end
 
-    test "finds legacy dotted Gmail users when reset is requested with an alias", %{
-      user: _default_user
-    } do
+    test "finds legacy dotted Gmail users when reset is requested with an alias",
+         %{
+           user: _default_user
+         } do
       tag = Integer.to_string(System.unique_integer([:positive]))
       dotted_email = "reset.#{tag}@gmail.com"
       canonical_email = "reset#{tag}@gmail.com"

@@ -470,9 +470,10 @@ defmodule YscWeb.AuthControllerTest do
       assert get_session(conn, :reauth_verified_at) != nil
     end
 
-    test "reauth accepts Gmail alias when stored email uses legacy dotted form", %{
-      conn: conn
-    } do
+    test "reauth accepts Gmail alias when stored email uses legacy dotted form",
+         %{
+           conn: conn
+         } do
       tag = Integer.to_string(System.unique_integer([:positive]))
       dotted_email = "reauth.#{tag}@gmail.com"
       canonical_email = "reauth#{tag}@gmail.com"
