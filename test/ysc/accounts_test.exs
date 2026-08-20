@@ -232,6 +232,12 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "ci_query_explain_gmail_alias_query/0" do
+    test "returns a valid Ecto query" do
+      assert %Ecto.Query{} = User.ci_query_explain_gmail_alias_query()
+    end
+  end
+
   describe "get_user_by_phone_number/1" do
     test "returns nil for unknown phone number" do
       refute Accounts.get_user_by_phone_number("+15550000000")
@@ -757,6 +763,27 @@ defmodule Ysc.AccountsTest do
       assert %User{id: ^id} =
                Accounts.get_user_by_email_and_password(
                  user.email,
+                 valid_user_password()
+               )
+    end
+
+    test "returns legacy dotted Gmail users when login uses canonical or alias form" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "login.#{tag}@gmail.com"
+      canonical_email = "login#{tag}@gmail.com"
+
+      %{id: id, email: ^dotted_email} =
+        legacy_gmail_user_fixture(%{email: dotted_email})
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email_and_password(
+                 canonical_email,
+                 valid_user_password()
+               )
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email_and_password(
+                 "login.#{tag}+inbox@gmail.com",
                  valid_user_password()
                )
     end
@@ -1307,6 +1334,63 @@ defmodule Ysc.AccountsTest do
       assert "has already been taken" in errors_on(changeset).email
     end
 
+    test "rejects signup that would shadow a legacy dotted Gmail address" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "legacy.#{tag}@gmail.com"
+      canonical_email = "legacy#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Member",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: canonical_email,
+          phone_number: unique_user_phone(),
+          first_name: "Attacker",
+          last_name: "Shadow",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(canonical_email)
+    end
+
+    test "rejects signup that would shadow a legacy plus-tagged Gmail address" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      plus_email = "plus#{tag}+old@gmail.com"
+      canonical_email = "plus#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: plus_email,
+        first_name: "Legacy",
+        last_name: "Plus",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: canonical_email,
+          phone_number: unique_user_phone(),
+          first_name: "Attacker",
+          last_name: "Shadow",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+    end
+
     test "normalizes Gmail email when registering new user" do
       {:ok, user} =
         Accounts.register_user(
@@ -1678,6 +1762,37 @@ defmodule Ysc.AccountsTest do
   describe "deliver_user_reset_password_instructions/2" do
     setup do
       %{user: user_fixture(%{phone_number: "+14159098268"})}
+    end
+
+    test "finds legacy dotted Gmail users when reset is requested with an alias",
+         %{
+           user: _default_user
+         } do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "reset.#{tag}@gmail.com"
+      canonical_email = "reset#{tag}@gmail.com"
+
+      %{id: id, email: ^dotted_email} =
+        legacy_gmail_user_fixture(%{email: dotted_email})
+
+      assert %User{id: ^id} = Accounts.get_user_by_email(canonical_email)
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_reset_password_instructions(
+            Accounts.get_user_by_email(canonical_email),
+            url
+          )
+        end)
+
+      {:ok, token} = Base.url_decode64(token, padding: false)
+
+      assert user_token =
+               Repo.get_by(UserToken, token: :crypto.hash(:sha256, token))
+
+      assert user_token.user_id == id
+      assert user_token.sent_to == dotted_email
+      assert user_token.context == "reset_password"
     end
 
     test "sends token through notification", %{user: user} do

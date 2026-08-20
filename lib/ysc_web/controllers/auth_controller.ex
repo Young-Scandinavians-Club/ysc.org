@@ -8,6 +8,7 @@ defmodule YscWeb.AuthController do
   plug Ueberauth
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.Email
   alias YscWeb.UserAuth
 
   @doc """
@@ -86,7 +87,7 @@ defmodule YscWeb.AuthController do
         )
         |> redirect(to: ~p"/users/log-in")
 
-      String.downcase(oauth_email) == String.downcase(current_user.email) ->
+      Email.equiv?(oauth_email, current_user.email) ->
         conn
         |> UserAuth.clear_reauth_session()
         |> put_session(

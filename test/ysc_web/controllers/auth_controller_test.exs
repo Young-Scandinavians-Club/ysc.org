@@ -470,6 +470,33 @@ defmodule YscWeb.AuthControllerTest do
       assert get_session(conn, :reauth_verified_at) != nil
     end
 
+    test "reauth accepts Gmail alias when stored email uses legacy dotted form",
+         %{
+           conn: conn
+         } do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "reauth.#{tag}@gmail.com"
+      canonical_email = "reauth#{tag}@gmail.com"
+
+      user = legacy_gmail_user_fixture(%{email: dotted_email})
+      auth = build_oauth_auth(canonical_email)
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> fetch_flash()
+        |> init_test_session(%{
+          reauth_mode: true,
+          reauth_return_to: "/users/settings/security"
+        })
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn) == "/users/settings/security"
+      assert get_session(conn, :reauth_verified_at) != nil
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "verified"
+    end
+
     test "redirects to login when session has no user token during reauth", %{
       conn: conn
     } do
@@ -515,6 +542,26 @@ defmodule YscWeb.AuthControllerTest do
     test "successfully authenticates with Google", %{conn: conn} do
       user = user_fixture(%{state: "active", email: "googleuser@gmail.com"})
       auth = build_oauth_auth(user.email, :google)
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Google"
+    end
+
+    test "successfully authenticates with Google when stored email is legacy dotted Gmail",
+         %{conn: conn} do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "oauth.#{tag}@gmail.com"
+      canonical_email = "oauth#{tag}@gmail.com"
+
+      legacy_gmail_user_fixture(%{email: dotted_email})
+      auth = build_oauth_auth(canonical_email, :google)
 
       conn =
         conn
