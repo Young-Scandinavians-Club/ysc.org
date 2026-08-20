@@ -3504,13 +3504,16 @@ defmodule YscWeb.EventDetailsLive do
                   else: "Member" %>
               <% ticket_count = Map.get(@ticket_counts_per_user, attendee.id, 0) %>
               <% is_host = MapSet.member?(@host_ids, attendee.id) %>
-              <div class={[
-                "flex items-center gap-3 p-3 rounded-xl border",
-                if(is_host,
-                  do: "bg-amber-50 border-amber-200",
-                  else: "bg-zinc-50 border-zinc-200"
-                )
-              ]}>
+              <div
+                id={"attendees-modal-user-#{attendee.id}"}
+                class={[
+                  "flex items-center gap-3 p-3 rounded-xl border",
+                  if(is_host,
+                    do: "bg-amber-50 border-amber-200",
+                    else: "bg-zinc-50 border-zinc-200"
+                  )
+                ]}
+              >
                 <div class="relative flex-shrink-0">
                   <.user_avatar_image
                     user={attendee}
@@ -3531,6 +3534,7 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                   <p
                     :if={!(is_host && ticket_count == 0)}
+                    id={"attendees-modal-user-#{attendee.id}-tickets"}
                     class="text-sm text-zinc-500"
                   >
                     {ticket_count} {if ticket_count == 1,

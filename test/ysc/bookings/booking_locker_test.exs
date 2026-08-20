@@ -2292,6 +2292,43 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert property_buyout_booked?(:tahoe, days)
     end
 
+    test "reclaims buyout inventory when a refunded booking is set to complete",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = locker_buyout_dates(432)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+      days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert property_buyout_booked?(:tahoe, days)
+
+      assert {:ok, refunded} = BookingLocker.refund_complete_booking(booking.id)
+      assert refunded.status == :refunded
+      refute property_buyout_booked?(:tahoe, days)
+
+      assert {:ok, activated} =
+               BookingLocker.admin_activate_unreserved_booking(refunded, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 4,
+                 children_count: 0,
+                 booking_mode: :buyout,
+                 status: :complete
+               })
+
+      assert activated.status == :complete
+      assert property_buyout_booked?(:tahoe, days)
+    end
+
     test "rejects activating a draft buyout onto already-booked dates", %{
       user: user
     } do
