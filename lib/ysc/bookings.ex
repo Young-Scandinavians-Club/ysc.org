@@ -5779,13 +5779,21 @@ defmodule Ysc.Bookings do
   - `payment_intent_id`: The Stripe payment intent ID
   - `amount_cents`: The refund amount in cents
   - `reason`: Reason for the refund
+  - `opts`: Pass `idempotency_key: key` so a retried request (e.g. after the
+    ledger write fails post-refund) reuses the original Stripe refund instead
+    of creating a second one.
 
   ## Returns
   - `{:ok, %Stripe.Refund{}}` on success
   - `{:error, reason}` on failure
   """
-  def create_stripe_refund_for_admin(payment_intent_id, amount_cents, reason) do
-    create_stripe_refund(payment_intent_id, amount_cents, reason)
+  def create_stripe_refund_for_admin(
+        payment_intent_id,
+        amount_cents,
+        reason,
+        opts \\ []
+      ) do
+    create_stripe_refund(payment_intent_id, amount_cents, reason, opts)
   end
 
   # Creates a refund in Stripe for a payment intent.

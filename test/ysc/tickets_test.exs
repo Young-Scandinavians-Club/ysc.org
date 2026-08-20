@@ -1134,7 +1134,7 @@ defmodule Ysc.TicketsTest do
       {:ok, order} =
         Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
 
-      assert {:error, {:error, :no_valid_tickets}} ==
+      assert {:error, :no_valid_tickets} ==
                Tickets.refund_tickets(order, [Ecto.ULID.generate()], "test")
     end
   end
