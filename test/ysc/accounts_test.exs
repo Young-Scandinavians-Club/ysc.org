@@ -232,6 +232,12 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "ci_query_explain_gmail_alias_query/0" do
+    test "returns a valid Ecto query" do
+      assert %Ecto.Query{} = User.ci_query_explain_gmail_alias_query()
+    end
+  end
+
   describe "get_user_by_phone_number/1" do
     test "returns nil for unknown phone number" do
       refute Accounts.get_user_by_phone_number("+15550000000")
