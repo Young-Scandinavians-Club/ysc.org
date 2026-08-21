@@ -250,13 +250,14 @@ defmodule Ysc.Bookings.ModifyBookingTest do
 
   describe "prepare_modification/2" do
     test "returns preview with zero delta when price unchanged", %{user: user} do
-      {checkin, checkout} = tahoe_booking_dates(60)
+      {checkin, checkout} = locker_buyout_dates(6)
       booking = complete_buyout_booking!(user, checkin, checkout)
+      {new_checkin, new_checkout} = locker_buyout_dates_after(checkout, 7)
 
       assert {:ok, preview} =
                Bookings.prepare_modification(booking, %{
-                 "checkin_date" => Date.to_string(Date.add(checkin, 7)),
-                 "checkout_date" => Date.to_string(Date.add(checkout, 7)),
+                 "checkin_date" => Date.to_string(new_checkin),
+                 "checkout_date" => Date.to_string(new_checkout),
                  "guests_count" => "4",
                  "children_count" => "0"
                })
@@ -265,7 +266,7 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       assert preview.amount_paid
       assert Money.equal?(preview.delta, Money.new(0, :USD))
       assert preview.previous_stay.nights == Date.diff(checkout, checkin)
-      assert preview.new_stay.checkin_date == Date.add(checkin, 7)
+      assert preview.new_stay.checkin_date == new_checkin
       assert is_map(preview.previous_breakdown)
       assert is_map(preview.breakdown)
       assert preview.breakdown.booking_mode == :buyout
