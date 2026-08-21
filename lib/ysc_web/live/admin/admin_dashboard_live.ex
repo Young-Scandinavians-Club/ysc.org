@@ -638,7 +638,10 @@ defmodule YscWeb.AdminDashboardLive do
                       <div class="flex justify-between gap-2 text-xs font-bold text-zinc-600">
                         <span class="truncate">{tier.name}</span>
                         <span class="shrink-0 text-zinc-900 tabular-nums">
-                          {tier.sold_tickets_count} / {tier_capacity_label(tier, event)}
+                          {tier.sold_tickets_count} / {tier_capacity_label(
+                            tier,
+                            event
+                          )}
                           <span class="text-zinc-400 font-medium ml-1">
                             · {format_money(tier_line_revenue(tier))}
                           </span>
@@ -1473,9 +1476,14 @@ defmodule YscWeb.AdminDashboardLive do
 
   defp tier_capacity_label(tier, event) do
     cond do
-      tier.quantity && tier.quantity > 0 -> tier.quantity
-      event.max_attendees && event.max_attendees > 0 -> "#{event.max_attendees} event cap"
-      true -> "∞"
+      tier.quantity && tier.quantity > 0 ->
+        tier.quantity
+
+      event.max_attendees && event.max_attendees > 0 ->
+        "#{event.max_attendees} event cap"
+
+      true ->
+        "∞"
     end
   end
 
