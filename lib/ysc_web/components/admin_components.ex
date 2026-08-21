@@ -1874,6 +1874,118 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_mobile_list
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Mobile-only stacked list for admin index pages (posts, events, newsletters, users).
+
+  Hidden from `md` and up, where the corresponding table is shown. Put cards,
+  empty states, and compact pagination in the default slot.
+
+  ## Examples
+
+      <.admin_mobile_list id="admin-posts-mobile">
+        <.admin_mobile_list_card
+          :for={{_, post} <- @streams.posts}
+          id={"admin-post-card-\#{post.id}"}
+          clickable
+          phx-click={JS.navigate(~p"/admin/posts/\#{post.id}")}
+        >
+          <h3 class="text-base font-semibold text-zinc-900 truncate">{post.title}</h3>
+        </.admin_mobile_list_card>
+      </.admin_mobile_list>
+  """
+  attr :id, :string, required: true
+
+  attr :class, :any,
+    default: nil,
+    doc:
+      "Additional classes merged onto the `block md:hidden space-y-4` wrapper"
+
+  slot :inner_block, required: true
+
+  def admin_mobile_list(assigns) do
+    ~H"""
+    <div id={@id} class={["block md:hidden space-y-4", @class]}>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_mobile_list_card
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Card inside `<.admin_mobile_list>`.
+
+  `interactive` (default true) adds hover shadow. `clickable` adds
+  `cursor-pointer` when the whole card is the hit target (`phx-click`).
+
+  `:footer` renders a top-bordered action row. Use `footer_align={:between}`
+  when the footer has a status badge on the left and actions on the right.
+
+  ## Examples
+
+      <.admin_mobile_list_card id="edition-1">
+        <h3 class="text-base font-semibold text-zinc-900 truncate">{@edition.title}</h3>
+        <:footer>
+          <.edition_actions_dropdown edition={@edition} menu_id="edition-actions-mob-1" />
+        </:footer>
+      </.admin_mobile_list_card>
+  """
+  attr :id, :string, default: nil
+
+  attr :interactive, :boolean,
+    default: true,
+    doc: "When true, hover adds a shadow (list rows that navigate)"
+
+  attr :clickable, :boolean,
+    default: false,
+    doc: "When true, shows a pointer cursor (whole-card phx-click)"
+
+  attr :footer_align, :atom,
+    default: :end,
+    values: [:end, :between],
+    doc: ":end for action-only footers; :between for badge + actions"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the card"
+
+  attr :rest, :global, include: ~w(phx-click phx-value-id)
+
+  slot :inner_block, required: true
+  slot :footer
+
+  def admin_mobile_list_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "bg-white rounded-lg border border-zinc-200 p-4",
+        @interactive && "hover:shadow-md transition-shadow",
+        @clickable && "cursor-pointer",
+        @class
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+      <div
+        :if={@footer != []}
+        class={[
+          "flex items-center gap-2 pt-3 mt-3 border-t border-zinc-200",
+          if(@footer_align == :between, do: "justify-between", else: "justify-end")
+        ]}
+      >
+        {render_slot(@footer)}
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_empty_panel
   # ---------------------------------------------------------------------------
 

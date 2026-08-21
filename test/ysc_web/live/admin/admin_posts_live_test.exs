@@ -29,11 +29,13 @@ defmodule YscWeb.AdminPostsLiveTest do
     setup [:create_admin]
 
     test "lists posts", %{conn: conn, admin: admin} do
-      post_fixture(admin, %{title: "Viking News"})
+      post = post_fixture(admin, %{title: "Viking News"})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/posts")
+      {:ok, view, html} = live(conn, ~p"/admin/posts")
       assert html =~ "Posts"
       assert html =~ "Viking News"
+      assert has_element?(view, "#admin-posts-mobile")
+      assert has_element?(view, "#admin-post-card-#{post.id}")
     end
 
     test "navigates to new post editor", %{conn: conn} do

@@ -435,74 +435,75 @@ defmodule YscWeb.AdminNewslettersLive do
 
           <div :if={@meta} class="space-y-6">
             <%!-- Mobile Card View --%>
-            <div class="block md:hidden space-y-4">
-              <%= for {_, edition} <- @streams.editions do %>
-                <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
-                  <.link
-                    navigate={~p"/admin/newsletters/#{edition.id}/edit"}
-                    class="block"
-                  >
-                    <div class="flex items-center gap-1.5 min-w-0">
-                      <h3 class="text-base font-semibold text-zinc-900 truncate min-w-0">
-                        {edition.title}
-                      </h3>
-                      <.presence_avatars editors={
-                        @editors_by_edition[edition.id] || []
-                      } />
-                    </div>
-                    <p class="text-sm text-zinc-500 truncate mt-0.5">
-                      {edition.subject}
-                    </p>
-                  </.link>
+            <.admin_mobile_list id="admin-newsletters-mobile">
+              <.admin_mobile_list_card
+                :for={{_, edition} <- @streams.editions}
+                id={"admin-newsletter-card-#{edition.id}"}
+              >
+                <.link
+                  navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                  class="block"
+                >
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <h3 class="text-base font-semibold text-zinc-900 truncate min-w-0">
+                      {edition.title}
+                    </h3>
+                    <.presence_avatars editors={
+                      @editors_by_edition[edition.id] || []
+                    } />
+                  </div>
+                  <p class="text-sm text-zinc-500 truncate mt-0.5">
+                    {edition.subject}
+                  </p>
+                </.link>
 
-                  <div class="flex items-center gap-3 mt-2 flex-wrap">
-                    <%= if edition.status == :sending do %>
-                      <.admin_sending_badge />
-                    <% else %>
-                      <.badge type={
-                        newsletter_edition_status_badge_type(edition.status)
-                      }>
-                        {newsletter_edition_status_label(edition.status)}
-                      </.badge>
+                <div class="flex items-center gap-3 mt-2 flex-wrap">
+                  <%= if edition.status == :sending do %>
+                    <.admin_sending_badge />
+                  <% else %>
+                    <.badge type={
+                      newsletter_edition_status_badge_type(edition.status)
+                    }>
+                      {newsletter_edition_status_label(edition.status)}
+                    </.badge>
+                  <% end %>
+                  <span class="text-sm text-zinc-500">
+                    <%= cond do %>
+                      <% edition.sent_at -> %>
+                        Sent {DateTimeDisplay.format_datetime_compact(
+                          edition.sent_at
+                        )}
+                      <% edition.scheduled_at -> %>
+                        Scheduled {DateTimeDisplay.format_datetime_compact(
+                          edition.scheduled_at
+                        )}
+                      <% true -> %>
+                        Created {DateTimeDisplay.format_datetime_compact(
+                          edition.inserted_at
+                        )}
                     <% end %>
-                    <span class="text-sm text-zinc-500">
-                      <%= cond do %>
-                        <% edition.sent_at -> %>
-                          Sent {DateTimeDisplay.format_datetime_compact(
-                            edition.sent_at
-                          )}
-                        <% edition.scheduled_at -> %>
-                          Scheduled {DateTimeDisplay.format_datetime_compact(
-                            edition.scheduled_at
-                          )}
-                        <% true -> %>
-                          Created {DateTimeDisplay.format_datetime_compact(
-                            edition.inserted_at
-                          )}
-                      <% end %>
-                    </span>
-                    <span
-                      :if={edition.status == :sent && edition.sent_count > 0}
-                      class="text-sm text-zinc-500"
-                    >
-                      {edition.sent_count} sent
-                    </span>
-                    <span
-                      :if={creator_assigned?(edition)}
-                      class="text-sm text-zinc-500"
-                    >
-                      by {creator_name(edition.creator)}
-                    </span>
-                  </div>
-
-                  <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
-                    <.edition_actions_dropdown
-                      edition={edition}
-                      menu_id={"newsletter-actions-mob-#{edition.id}"}
-                    />
-                  </div>
+                  </span>
+                  <span
+                    :if={edition.status == :sent && edition.sent_count > 0}
+                    class="text-sm text-zinc-500"
+                  >
+                    {edition.sent_count} sent
+                  </span>
+                  <span
+                    :if={creator_assigned?(edition)}
+                    class="text-sm text-zinc-500"
+                  >
+                    by {creator_name(edition.creator)}
+                  </span>
                 </div>
-              <% end %>
+
+                <:footer>
+                  <.edition_actions_dropdown
+                    edition={edition}
+                    menu_id={"newsletter-actions-mob-#{edition.id}"}
+                  />
+                </:footer>
+              </.admin_mobile_list_card>
 
               <.admin_list_empty_state
                 :if={@empty}
@@ -517,7 +518,7 @@ defmodule YscWeb.AdminNewslettersLive do
                   density={:compact}
                 />
               </div>
-            </div>
+            </.admin_mobile_list>
             <%!-- Desktop Table View --%>
             <div class="hidden md:block py-6 w-full">
               <Flop.Phoenix.table
@@ -710,50 +711,52 @@ defmodule YscWeb.AdminNewslettersLive do
 
           <div :if={!subscribers_loading?(@sub_meta)}>
             <%!-- Mobile card view --%>
-            <div class="block md:hidden space-y-4">
-              <%= for {_, subscriber} <- @streams.subscribers do %>
-                <div class="bg-white rounded-lg border border-zinc-200 p-4">
-                  <p class="text-base font-medium text-zinc-900 truncate">
-                    {subscriber.email}
-                  </p>
-                  <p
-                    :if={subscriber_name(subscriber) != ""}
-                    class="text-sm text-zinc-500 mt-0.5"
+            <.admin_mobile_list id="admin-subscribers-mobile">
+              <.admin_mobile_list_card
+                :for={{_, subscriber} <- @streams.subscribers}
+                id={"admin-subscriber-card-#{subscriber.id}"}
+                interactive={false}
+              >
+                <p class="text-base font-medium text-zinc-900 truncate">
+                  {subscriber.email}
+                </p>
+                <p
+                  :if={subscriber_name(subscriber) != ""}
+                  class="text-sm text-zinc-500 mt-0.5"
+                >
+                  {subscriber_name(subscriber)}
+                </p>
+                <div class="flex items-center gap-3 mt-2 flex-wrap">
+                  <.badge type={
+                    newsletter_subscriber_status_badge_type(subscriber.subscribed)
+                  }>
+                    {newsletter_subscriber_status_label(subscriber.subscribed)}
+                  </.badge>
+                  <.badge
+                    :if={subscriber.source}
+                    type={
+                      AdminBadgeHelpers.newsletter_source_badge_type(
+                        subscriber.source
+                      )
+                    }
+                    class="me-0"
                   >
-                    {subscriber_name(subscriber)}
-                  </p>
-                  <div class="flex items-center gap-3 mt-2 flex-wrap">
-                    <.badge type={
-                      newsletter_subscriber_status_badge_type(subscriber.subscribed)
-                    }>
-                      {newsletter_subscriber_status_label(subscriber.subscribed)}
-                    </.badge>
-                    <.badge
-                      :if={subscriber.source}
-                      type={
-                        AdminBadgeHelpers.newsletter_source_badge_type(
-                          subscriber.source
-                        )
-                      }
-                      class="me-0"
-                    >
-                      {AdminBadgeHelpers.newsletter_source_label(subscriber.source)}
-                    </.badge>
-                    <span
-                      :if={subscriber.subscribed_at}
-                      class="text-xs text-zinc-400"
-                    >
-                      Subscribed {format_date(subscriber.subscribed_at)}
-                    </span>
-                  </div>
-                  <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
-                    <.subscriber_actions_dropdown
-                      subscriber={subscriber}
-                      menu_id={"subscriber-actions-mob-#{subscriber.id}"}
-                    />
-                  </div>
+                    {AdminBadgeHelpers.newsletter_source_label(subscriber.source)}
+                  </.badge>
+                  <span
+                    :if={subscriber.subscribed_at}
+                    class="text-xs text-zinc-400"
+                  >
+                    Subscribed {format_date(subscriber.subscribed_at)}
+                  </span>
                 </div>
-              <% end %>
+                <:footer>
+                  <.subscriber_actions_dropdown
+                    subscriber={subscriber}
+                    menu_id={"subscriber-actions-mob-#{subscriber.id}"}
+                  />
+                </:footer>
+              </.admin_mobile_list_card>
 
               <.admin_list_empty_state
                 :if={subscribers_empty?(@streams.subscribers, @sub_meta)}
@@ -777,7 +780,7 @@ defmodule YscWeb.AdminNewslettersLive do
                   density={:compact}
                 />
               </div>
-            </div>
+            </.admin_mobile_list>
 
             <%!-- Desktop table view --%>
             <div class="hidden md:block py-6 w-full">
@@ -922,11 +925,11 @@ defmodule YscWeb.AdminNewslettersLive do
             </.button>
           </div>
 
-          <div class="block md:hidden space-y-4">
-            <div
+          <.admin_mobile_list id="admin-notices-mobile">
+            <.admin_mobile_list_card
               :for={notice <- @notices}
               id={"notice-mob-#{notice.id}"}
-              class="bg-white rounded-lg border border-zinc-200 p-4"
+              interactive={false}
             >
               <button
                 type="button"
@@ -944,20 +947,20 @@ defmodule YscWeb.AdminNewslettersLive do
                   </span>
                 </p>
               </button>
-              <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
+              <:footer>
                 <.notice_actions_dropdown
                   notice={notice}
                   menu_id={"notice-actions-mob-#{notice.id}"}
                 />
-              </div>
-            </div>
+              </:footer>
+            </.admin_mobile_list_card>
 
             <.admin_list_empty_state
               :if={@notices_empty?}
               title="No saved notices"
               suggestion="Create reusable notices to insert into newsletter intros."
             />
-          </div>
+          </.admin_mobile_list>
 
           <div class="hidden md:block py-6 w-full">
             <table :if={!@notices_empty?} id="admin_notices_list">

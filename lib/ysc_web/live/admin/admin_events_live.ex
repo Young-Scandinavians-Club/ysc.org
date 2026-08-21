@@ -114,75 +114,77 @@ defmodule YscWeb.AdminEventsLive do
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>
-            <div class="block md:hidden space-y-4">
-              <%= for {_, event} <- @streams.events do %>
-                <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
-                  <.link
-                    navigate={~p"/admin/events/#{event.id}/edit"}
-                    class="mb-3 cursor-pointer block"
-                  >
-                    <div class="mb-2 flex items-center gap-1.5">
-                      <h3 class="text-base font-semibold text-zinc-900 min-w-0 flex-1 truncate">
-                        {event.title}
-                      </h3>
-                      <.presence_avatars editors={@editors_by_event[event.id] || []} />
+            <.admin_mobile_list id="admin-events-mobile">
+              <.admin_mobile_list_card
+                :for={{_, event} <- @streams.events}
+                id={"admin-event-card-#{event.id}"}
+                footer_align={:between}
+              >
+                <.link
+                  navigate={~p"/admin/events/#{event.id}/edit"}
+                  class="mb-3 cursor-pointer block"
+                >
+                  <div class="mb-2 flex items-center gap-1.5">
+                    <h3 class="text-base font-semibold text-zinc-900 min-w-0 flex-1 truncate">
+                      {event.title}
+                    </h3>
+                    <.presence_avatars editors={@editors_by_event[event.id] || []} />
+                  </div>
+                  <div class="space-y-1.5">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Event Date:</span>
+                      <span class="text-sm font-medium text-zinc-900">
+                        {format_date(event.start_date)}
+                      </span>
                     </div>
-                    <div class="space-y-1.5">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm text-zinc-600">Event Date:</span>
-                        <span class="text-sm font-medium text-zinc-900">
-                          {format_date(event.start_date)}
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm text-zinc-600">Capacity:</span>
-                        <span class="text-sm font-medium text-zinc-900">
-                          {format_capacity(event)}
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm text-zinc-600">Organizer:</span>
-                        <span class="text-sm text-zinc-900">
-                          {UserDisplay.full_name(event.organizer)}
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm text-zinc-600">Created:</span>
-                        <span class="text-sm text-zinc-900">
-                          {format_date(event.inserted_at)}
-                        </span>
-                      </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Capacity:</span>
+                      <span class="text-sm font-medium text-zinc-900">
+                        {format_capacity(event)}
+                      </span>
                     </div>
-                  </.link>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Organizer:</span>
+                      <span class="text-sm text-zinc-900">
+                        {UserDisplay.full_name(event.organizer)}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Created:</span>
+                      <span class="text-sm text-zinc-900">
+                        {format_date(event.inserted_at)}
+                      </span>
+                    </div>
+                  </div>
+                </.link>
 
-                  <div class="flex items-center justify-between gap-2 pt-3 border-t border-zinc-200">
-                    <div>
-                      <%= if event.state == :scheduled && event.publish_at do %>
-                        <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
-                          <.badge type={event_state_to_badge_style(event.state)}>
-                            {String.capitalize("#{event.state}")}
-                          </.badge>
-                        </.tooltip>
-                      <% else %>
+                <:footer>
+                  <div>
+                    <%= if event.state == :scheduled && event.publish_at do %>
+                      <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
                         <.badge type={event_state_to_badge_style(event.state)}>
                           {String.capitalize("#{event.state}")}
                         </.badge>
-                      <% end %>
-                    </div>
-
-                    <.event_actions_dropdown
-                      event={event}
-                      menu_id={"event-actions-mob-#{event.id}"}
-                      check_in_path={
-                        AdminCheckInPaths.path_for_event(
-                          event.id,
-                          @open_check_in_sessions
-                        )
-                      }
-                    />
+                      </.tooltip>
+                    <% else %>
+                      <.badge type={event_state_to_badge_style(event.state)}>
+                        {String.capitalize("#{event.state}")}
+                      </.badge>
+                    <% end %>
                   </div>
-                </div>
-              <% end %>
+
+                  <.event_actions_dropdown
+                    event={event}
+                    menu_id={"event-actions-mob-#{event.id}"}
+                    check_in_path={
+                      AdminCheckInPaths.path_for_event(
+                        event.id,
+                        @open_check_in_sessions
+                      )
+                    }
+                  />
+                </:footer>
+              </.admin_mobile_list_card>
               <%!-- Mobile Pagination --%>
               <div class="pt-4">
                 <.admin_flop_pagination
@@ -191,7 +193,7 @@ defmodule YscWeb.AdminEventsLive do
                   density={:compact}
                 />
               </div>
-            </div>
+            </.admin_mobile_list>
             <%!-- Desktop Table View --%>
             <div class="hidden md:block">
               <Flop.Phoenix.table
