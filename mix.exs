@@ -180,6 +180,10 @@ defmodule Ysc.MixProject do
       {:digital_token, "~> 1.0", override: true},
       {:argon2_elixir, "~> 4.1"},
       {:atomex, "~> 0.5"},
+      # EEF-CVE-2026-47079/47080/48590: entity-like sequences, CDATA ]]> breakout,
+      # and invalid element/attribute names; fixed in xml_builder 2.4.1+. atomex
+      # still lists ~> 2.1, so pin the patched floor (used for Atom feeds).
+      {:xml_builder, "~> 2.4.1", override: true},
       {:blurhash, "~> 2.0"},
       {:brotli, ">= 0.0.0", runtime: false},
       {:cachex, "~> 4.1"},
