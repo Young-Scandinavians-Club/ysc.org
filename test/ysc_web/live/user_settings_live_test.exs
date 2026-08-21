@@ -1077,6 +1077,34 @@ defmodule YscWeb.UserSettingsLiveTest do
              )
     end
 
+    test "payments tab summarizes free-night stay perks for the member", %{
+      conn: conn
+    } do
+      organizer = user_fixture(%{state: :active})
+      member = user_fixture(%{state: :active})
+      conn = log_in_user(conn, member)
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: member.id,
+                   issued_by_user_id: organizer.id,
+                   benefit_kind: :free_nights,
+                   property: :tahoe,
+                   free_nights: 2,
+                   buyout_max_discount: Money.new(:USD, 200)
+                 },
+                 send_notification: false
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/users/payments")
+      html = render(view)
+
+      assert has_element?(view, "#member-entitlement-#{entitlement.id}")
+      assert html =~ "2 free nights"
+      assert html =~ "book the whole cabin"
+    end
+
     test "payment pagination prev on first page is a no-op", %{conn: conn} do
       user = user_fixture(%{state: :active})
       conn = log_in_user(conn, user)
