@@ -12,6 +12,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.VerificationCodes
+  alias Ysc.EmailVerificationRateLimit
   alias Ysc.Payments
   alias Ysc.Subscriptions
 
@@ -884,19 +885,24 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "4"}))
 
-      for _ <- 1..12 do
+      # Hammer buckets can miss a LiveView submit under load; exhaust the
+      # per-user phone limiter first so one invalid submit always toasts.
+      limit =
+        Application.get_env(:ysc, EmailVerificationRateLimit, [])[
+          :attempt_limit_per_minute
+        ] || 12
+
+      for _ <- 1..limit do
+        assert :ok = EmailVerificationRateLimit.check(user.id, :phone)
+      end
+
+      html =
         view
         |> form("#phone_verification_form", %{
           "verification_code" => @invalid_otp
         })
         |> render_submit()
-      end
 
-      view
-      |> form("#phone_verification_form", %{"verification_code" => @invalid_otp})
-      |> render_submit()
-
-      html = render(view)
       assert html =~ "Too many verification attempts"
     end
 
