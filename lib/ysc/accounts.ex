@@ -2254,10 +2254,14 @@ defmodule Ysc.Accounts do
   Deletes all session tokens for the given user.
 
   Used when an account is suspended, rejected, or deleted so existing cookies
-  stop working immediately instead of remaining valid for up to 60 days.
+  and mobile bearer tokens stop working immediately instead of remaining valid
+  for up to 60 days (web) / 90 days (mobile).
   """
   def revoke_all_user_sessions(%User{} = user) do
-    Repo.delete_all(UserToken.by_user_and_contexts_query(user, ["session"]))
+    Repo.delete_all(
+      UserToken.by_user_and_contexts_query(user, ["session", "mobile_session"])
+    )
+
     :ok
   end
 
@@ -2389,7 +2393,10 @@ defmodule Ysc.Accounts do
   def delete_user_mobile_token(token) when is_binary(token) do
     case UserToken.hash_mobile_token(token) do
       {:ok, hashed_token} ->
-        Repo.delete_all(UserToken.by_token_and_context_query(hashed_token, "mobile_session"))
+        Repo.delete_all(
+          UserToken.by_token_and_context_query(hashed_token, "mobile_session")
+        )
+
         :ok
 
       :error ->

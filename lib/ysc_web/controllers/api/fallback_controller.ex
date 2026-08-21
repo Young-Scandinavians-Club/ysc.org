@@ -57,13 +57,25 @@ defmodule YscWeb.Api.FallbackController do
     ticket_tier_not_found: "ticket tier not found",
     membership_required: "member does not have an active membership",
     invalid_plan: "invalid membership plan",
-    terminal_not_configured: "Stripe Terminal is not configured for this environment",
-    user_already_has_active_subscription: "member already has an active membership",
+    terminal_not_configured:
+      "Stripe Terminal is not configured for this environment",
+    user_already_has_active_subscription:
+      "member already has an active membership",
     sub_accounts_cannot_create_subscriptions:
       "sub-accounts cannot sign up for their own membership"
   }
 
-  for {reason, message} <- @app_error_messages do
+  @app_not_found_errors [:member_not_found, :ticket_tier_not_found]
+
+  for {reason, message} <- Map.take(@app_error_messages, @app_not_found_errors) do
+    def call(conn, {:error, unquote(reason)}) do
+      conn
+      |> put_status(:not_found)
+      |> json(%{error: unquote(message)})
+    end
+  end
+
+  for {reason, message} <- Map.drop(@app_error_messages, @app_not_found_errors) do
     def call(conn, {:error, unquote(reason)}) do
       conn
       |> put_status(:unprocessable_entity)

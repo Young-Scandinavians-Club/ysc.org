@@ -5,6 +5,8 @@ defmodule YscWeb.Api.AppPaymentsController do
   """
   use YscWeb, :controller
 
+  require Ysc.Logging
+
   action_fallback YscWeb.Api.FallbackController
 
   defp stripe_client do
@@ -17,13 +19,35 @@ defmodule YscWeb.Api.AppPaymentsController do
   reader. Connection tokens are short-lived and requested per session.
   """
   def connection_token(conn, _params) do
-    with location_id when is_binary(location_id) and location_id != "" <-
-           Application.get_env(:ysc, :stripe_terminal_location_id),
-         {:ok, connection_token} <-
-           stripe_client().create_terminal_connection_token(%{location: location_id}) do
-      render(conn, :connection_token, connection_token: connection_token)
-    else
-      _ -> {:error, :terminal_not_configured}
+    location_id = Application.get_env(:ysc, :stripe_terminal_location_id)
+
+    cond do
+      not is_binary(location_id) or location_id == "" ->
+        {:error, :terminal_not_configured}
+
+      true ->
+        case stripe_client().create_terminal_connection_token(%{
+               location: location_id
+             }) do
+          {:ok, connection_token} ->
+            render(conn, :connection_token, connection_token: connection_token)
+
+          {:error, %Stripe.Error{} = error} = result ->
+            Ysc.Logging.error(
+              "Failed to create Stripe Terminal connection token",
+              error: error
+            )
+
+            result
+
+          {:error, reason} = result ->
+            Ysc.Logging.error(
+              "Failed to create Stripe Terminal connection token",
+              extra: %{reason: inspect(reason)}
+            )
+
+            result
+        end
     end
   end
 end

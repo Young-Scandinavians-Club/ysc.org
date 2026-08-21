@@ -15,7 +15,8 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
 
     user_fixture()
     |> Ecto.Changeset.change(
-      lifetime_membership_awarded_at: DateTime.truncate(DateTime.utc_now(), :second)
+      lifetime_membership_awarded_at:
+        DateTime.truncate(DateTime.utc_now(), :second)
     )
     |> Ysc.Repo.update!()
   end
@@ -25,7 +26,10 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
     token = Accounts.generate_user_mobile_token(admin)
 
     original_stripe_client = Application.get_env(:ysc, :stripe_client)
-    on_exit(fn -> Application.put_env(:ysc, :stripe_client, original_stripe_client) end)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
 
     conn =
       conn
@@ -36,7 +40,9 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
   end
 
   describe "POST /api/v1/app/tickets/:ticket_tier_id/payment_intent" do
-    test "creates a ticket order and a card-present payment intent", %{conn: conn} do
+    test "creates a ticket order and a card-present payment intent", %{
+      conn: conn
+    } do
       member = member_with_active_membership()
       event = event_fixture()
       tier = ticket_tier_fixture(%{event_id: event.id})
@@ -72,7 +78,9 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert is_binary(ticket_order_id)
     end
 
-    test "returns an error when the member has no active membership", %{conn: conn} do
+    test "returns an error when the member has no active membership", %{
+      conn: conn
+    } do
       Ysc.Ledgers.ensure_basic_accounts()
       member = user_fixture()
       event = event_fixture()
@@ -86,22 +94,28 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert json_response(response, 422)
     end
 
-    test "returns an error for an unknown ticket tier", %{conn: conn} do
+    test "returns 404 for an unknown ticket tier", %{conn: conn} do
       member = member_with_active_membership()
 
       response =
-        post(conn, ~p"/api/v1/app/tickets/01ARZ3NDEKTSV4RRFFQ69G5FAV/payment_intent", %{
-          "member_id" => member.id
-        })
+        post(
+          conn,
+          ~p"/api/v1/app/tickets/01ARZ3NDEKTSV4RRFFQ69G5FAV/payment_intent",
+          %{
+            "member_id" => member.id
+          }
+        )
 
-      assert json_response(response, 422)
+      assert %{"error" => "ticket tier not found"} =
+               json_response(response, 404)
     end
 
     test "returns 400 when member_id is missing", %{conn: conn} do
       event = event_fixture()
       tier = ticket_tier_fixture(%{event_id: event.id})
 
-      response = post(conn, ~p"/api/v1/app/tickets/#{tier.id}/payment_intent", %{})
+      response =
+        post(conn, ~p"/api/v1/app/tickets/#{tier.id}/payment_intent", %{})
 
       assert json_response(response, 400)
     end
@@ -110,9 +124,12 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       response =
         conn
         |> Plug.Conn.delete_req_header("authorization")
-        |> post(~p"/api/v1/app/tickets/01ARZ3NDEKTSV4RRFFQ69G5FAV/payment_intent", %{
-          "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV"
-        })
+        |> post(
+          ~p"/api/v1/app/tickets/01ARZ3NDEKTSV4RRFFQ69G5FAV/payment_intent",
+          %{
+            "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+          }
+        )
 
       assert json_response(response, 401)
     end

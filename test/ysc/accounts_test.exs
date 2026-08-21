@@ -1797,6 +1797,25 @@ defmodule Ysc.AccountsTest do
       assert Accounts.delete_user_mobile_token(token) == :ok
       refute Accounts.get_user_by_mobile_token(token)
     end
+
+    test "revokes mobile tokens when the account is blocked, including after reactivation",
+         %{user: user, token: token} do
+      admin = user_fixture(%{role: :admin})
+
+      assert Accounts.get_user_by_mobile_token(token)
+
+      assert {:ok, suspended} =
+               Accounts.update_user(user, %{state: :suspended}, admin)
+
+      assert suspended.state == :suspended
+      refute Accounts.get_user_by_mobile_token(token)
+
+      assert {:ok, reactivated} =
+               Accounts.update_user(suspended, %{state: :active}, admin)
+
+      assert reactivated.state == :active
+      refute Accounts.get_user_by_mobile_token(token)
+    end
   end
 
   describe "deliver_user_reset_password_instructions/2" do

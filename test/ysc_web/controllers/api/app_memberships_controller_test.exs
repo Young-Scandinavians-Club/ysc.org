@@ -14,7 +14,10 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
     token = Accounts.generate_user_mobile_token(admin)
 
     original_stripe_client = Application.get_env(:ysc, :stripe_client)
-    on_exit(fn -> Application.put_env(:ysc, :stripe_client, original_stripe_client) end)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
 
     conn =
       conn
@@ -54,13 +57,23 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
       member = user_fixture()
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
-      Mox.expect(Ysc.StripeMock, :attach_payment_method, fn "pm_test_card", params ->
+      stripe_price_id =
+        :ysc
+        |> Application.get_env(:membership_plans, [])
+        |> Enum.find(&(&1.id == :single))
+        |> Map.fetch!(:stripe_price_id)
+
+      Mox.expect(Ysc.StripeMock, :attach_payment_method, fn "pm_test_card",
+                                                            params ->
         assert is_binary(params.customer)
         {:ok, %Stripe.PaymentMethod{id: "pm_test_card"}}
       end)
 
-      Mox.stub(Stripe.SubscriptionMock, :create, fn params ->
+      Mox.stub(Stripe.SubscriptionMock, :create, fn params, opts ->
         assert params.default_payment_method == "pm_test_card"
+
+        assert opts[:headers]["Idempotency-Key"] ==
+                 "app_membership_#{member.id}_#{stripe_price_id}"
 
         {:ok, %Stripe.Subscription{id: "sub_test_123", status: "active"}}
       end)
@@ -72,7 +85,8 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
           "payment_method_id" => "pm_test_card"
         })
 
-      assert %{"id" => "sub_test_123", "status" => "active"} = json_response(response, 200)
+      assert %{"id" => "sub_test_123", "status" => "active"} =
+               json_response(response, 200)
     end
 
     test "returns an error for an unknown plan", %{conn: conn} do
@@ -89,9 +103,21 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
     end
 
     test "returns 400 when required fields are missing", %{conn: conn} do
-      response = post(conn, ~p"/api/v1/app/memberships/subscribe", %{"plan" => "single"})
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{"plan" => "single"})
 
       assert json_response(response, 400)
+    end
+
+    test "returns 404 for an unknown member", %{conn: conn} do
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          "plan" => "single",
+          "payment_method_id" => "pm_test_card"
+        })
+
+      assert %{"error" => "member not found"} = json_response(response, 404)
     end
   end
 end

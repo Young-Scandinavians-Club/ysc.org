@@ -33,11 +33,14 @@ defmodule YscWeb.Api.AppMembershipsController do
       }) do
     with {:ok, member} <- fetch_member(member_id),
          {:ok, plan} <- fetch_plan(plan_id),
-         {:ok, _payment_method} <- attach_payment_method(member, payment_method_id),
+         {:ok, _payment_method} <-
+           attach_payment_method(member, payment_method_id),
          {:ok, subscription} <-
            Customers.create_subscription(member,
              prices: [%{price: plan.stripe_price_id, quantity: 1}],
-             default_payment_method: payment_method_id
+             default_payment_method: payment_method_id,
+             idempotency_key:
+               "app_membership_#{member.id}_#{plan.stripe_price_id}"
            ) do
       render(conn, :subscription, subscription: subscription)
     end
@@ -69,7 +72,10 @@ defmodule YscWeb.Api.AppMembershipsController do
 
   defp attach_payment_method(member, payment_method_id) do
     member = Customers.ensure_stripe_customer(member)
-    stripe_client().attach_payment_method(payment_method_id, %{customer: member.stripe_id})
+
+    stripe_client().attach_payment_method(payment_method_id, %{
+      customer: member.stripe_id
+    })
   end
 
   defp stripe_client do

@@ -19,7 +19,12 @@ defmodule YscWeb.Api.AppPaymentsControllerTest do
     original_stripe_client = Application.get_env(:ysc, :stripe_client)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :stripe_terminal_location_id, original_location_id)
+      Application.put_env(
+        :ysc,
+        :stripe_terminal_location_id,
+        original_location_id
+      )
+
       Application.put_env(:ysc, :stripe_client, original_stripe_client)
     end)
 
@@ -52,6 +57,36 @@ defmodule YscWeb.Api.AppPaymentsControllerTest do
       response = post(conn, ~p"/api/v1/app/payments/connection_token")
 
       assert %{"secret" => "pst_test_secret"} = json_response(response, 200)
+    end
+
+    test "returns a Stripe error instead of terminal_not_configured when the provider fails",
+         %{conn: conn} do
+      Application.put_env(:ysc, :stripe_terminal_location_id, "tml_test_123")
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(
+        Ysc.StripeMock,
+        :create_terminal_connection_token,
+        fn _params ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :api_error,
+             message: "Stripe is unavailable",
+             request_id: nil,
+             extra: %{},
+             user_message: nil
+           }}
+        end
+      )
+
+      response = post(conn, ~p"/api/v1/app/payments/connection_token")
+
+      body = json_response(response, 422)
+      assert body["error"]
+
+      refute body["error"] ==
+               "Stripe Terminal is not configured for this environment"
     end
 
     test "returns 401 without a bearer token", %{conn: conn} do
