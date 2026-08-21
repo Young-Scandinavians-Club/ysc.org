@@ -149,6 +149,11 @@ config :phoenix_live_view, :debug_heex_annotations, true
 # Kiosk API key for property kiosk app authentication (can be overridden via env var)
 config :ysc, :kiosk_api_key, System.get_env("KIOSK_API_KEY") || "dev-kiosk-key"
 
+# Stripe Terminal location for the admin/volunteer mobile app's tap-to-pay
+# connection tokens (can be overridden via env var once a real test-mode
+# Location exists in the Stripe Dashboard).
+config :ysc, :stripe_terminal_location_id, System.get_env("STRIPE_TERMINAL_LOCATION_ID")
+
 # OAuth Configuration for development
 # Set these via environment variables or use test values
 config :ueberauth, Ueberauth.Strategy.Google.OAuth,

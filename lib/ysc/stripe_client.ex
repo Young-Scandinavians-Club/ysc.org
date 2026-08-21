@@ -39,4 +39,10 @@ defmodule Ysc.StripeClient do
 
   def list_balance_transactions(params, opts \\ []),
     do: stripe_retry(fn -> Stripe.BalanceTransaction.list(params, opts) end)
+
+  def create_terminal_connection_token(params \\ %{}),
+    do: stripe_retry(fn -> Stripe.Terminal.ConnectionToken.create(params) end)
+
+  def attach_payment_method(id, params),
+    do: stripe_retry(fn -> Stripe.PaymentMethod.attach(id, params) end)
 end

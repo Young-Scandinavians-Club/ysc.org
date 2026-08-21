@@ -2354,6 +2354,50 @@ defmodule Ysc.Accounts do
     :ok
   end
 
+  ## Mobile app bearer tokens
+
+  @doc """
+  Generates a long-lived bearer token for the admin/volunteer mobile app.
+  """
+  def generate_user_mobile_token(user) do
+    {token, user_token} = UserToken.build_mobile_token(user)
+    Repo.insert!(user_token)
+    token
+  end
+
+  @doc """
+  Gets the user for a mobile bearer token, if the token is valid, not
+  expired, and the user is still allowed to be signed in.
+  """
+  def get_user_by_mobile_token(token) when is_binary(token) do
+    case UserToken.verify_mobile_token_query(token) do
+      {:ok, query} ->
+        user = Repo.one(query)
+        if user && login_allowed_state?(user), do: user
+
+      :error ->
+        nil
+    end
+  end
+
+  def get_user_by_mobile_token(_), do: nil
+
+  @doc """
+  Revokes a mobile bearer token (mobile app sign-out).
+  """
+  def delete_user_mobile_token(token) when is_binary(token) do
+    case UserToken.hash_mobile_token(token) do
+      {:ok, hashed_token} ->
+        Repo.delete_all(UserToken.by_token_and_context_query(hashed_token, "mobile_session"))
+        :ok
+
+      :error ->
+        :ok
+    end
+  end
+
+  def delete_user_mobile_token(_), do: :ok
+
   @doc """
   Revokes a specific session for the user by encoded session ID (Base64).
   Used when the user signs out a session from the Security settings page.

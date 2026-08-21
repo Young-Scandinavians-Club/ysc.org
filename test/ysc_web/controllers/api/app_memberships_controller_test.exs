@@ -1,0 +1,97 @@
+defmodule YscWeb.Api.AppMembershipsControllerTest do
+  @moduledoc """
+  Tests for the admin/volunteer mobile app's membership plans and in-person
+  sign-up endpoints (`AppMembershipsController` + `AppMembershipsJSON`).
+  """
+  use YscWeb.ConnCase, async: false
+
+  import Ysc.AccountsFixtures
+
+  alias Ysc.Accounts
+
+  setup %{conn: conn} do
+    admin = user_fixture(%{role: :admin})
+    token = Accounts.generate_user_mobile_token(admin)
+
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+    on_exit(fn -> Application.put_env(:ysc, :stripe_client, original_stripe_client) end)
+
+    conn =
+      conn
+      |> put_req_header("accept", "application/json")
+      |> put_req_header("authorization", "Bearer #{token}")
+
+    {:ok, conn: conn}
+  end
+
+  describe "GET /api/v1/app/memberships/plans" do
+    test "lists configured plans without leaking stripe_price_id", %{conn: conn} do
+      response = get(conn, ~p"/api/v1/app/memberships/plans")
+
+      assert %{"data" => plans} = json_response(response, 200)
+      assert is_list(plans) and plans != []
+
+      Enum.each(plans, fn plan ->
+        assert Map.has_key?(plan, "id")
+        assert Map.has_key?(plan, "name")
+        assert Map.has_key?(plan, "amount")
+        refute Map.has_key?(plan, "stripe_price_id")
+      end)
+    end
+
+    test "returns 401 without a bearer token", %{conn: conn} do
+      response =
+        conn
+        |> Plug.Conn.delete_req_header("authorization")
+        |> get(~p"/api/v1/app/memberships/plans")
+
+      assert json_response(response, 401)
+    end
+  end
+
+  describe "POST /api/v1/app/memberships/subscribe" do
+    test "attaches the payment method and creates a subscription", %{conn: conn} do
+      member = user_fixture()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :attach_payment_method, fn "pm_test_card", params ->
+        assert is_binary(params.customer)
+        {:ok, %Stripe.PaymentMethod{id: "pm_test_card"}}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn params ->
+        assert params.default_payment_method == "pm_test_card"
+
+        {:ok, %Stripe.Subscription{id: "sub_test_123", status: "active"}}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_test_card"
+        })
+
+      assert %{"id" => "sub_test_123", "status" => "active"} = json_response(response, 200)
+    end
+
+    test "returns an error for an unknown plan", %{conn: conn} do
+      member = user_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "not-a-real-plan",
+          "payment_method_id" => "pm_test_card"
+        })
+
+      assert json_response(response, 422)
+    end
+
+    test "returns 400 when required fields are missing", %{conn: conn} do
+      response = post(conn, ~p"/api/v1/app/memberships/subscribe", %{"plan" => "single"})
+
+      assert json_response(response, 400)
+    end
+  end
+end

@@ -228,6 +228,56 @@ defmodule Ysc.Accounts.UserToken do
     end
   end
 
+  # Mobile app bearer tokens (admin/volunteer sign-in) are long-lived so the
+  # app doesn't need to re-prompt for credentials at every event.
+  @mobile_session_validity_in_days 90
+
+  @doc """
+  Builds a long-lived bearer token for the admin/volunteer mobile app.
+
+  Hashed at rest like the email tokens (not stored raw like the web session
+  token) since this value is sent as a bearer credential on every API request
+  rather than living inside a signed/encrypted cookie.
+  """
+  def build_mobile_token(user) do
+    build_hashed_token(user, "mobile_session", nil)
+  end
+
+  @doc """
+  Verifies a mobile bearer token and returns its underlying lookup query.
+
+  The query returns the user found by the token, if any. Valid for
+  #{@mobile_session_validity_in_days} days from issuance.
+  """
+  def verify_mobile_token_query(token) do
+    case Base.url_decode64(token, padding: false) do
+      {:ok, decoded_token} ->
+        hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
+
+        query =
+          from token in by_token_and_context_query(hashed_token, "mobile_session"),
+            join: user in assoc(token, :user),
+            where: token.inserted_at > ago(@mobile_session_validity_in_days, "day"),
+            select: user
+
+        {:ok, query}
+
+      :error ->
+        :error
+    end
+  end
+
+  @doc """
+  Hashes a raw mobile token value the same way `build_mobile_token/1` does,
+  so callers can look up/delete a token row without re-verifying it.
+  """
+  def hash_mobile_token(token) do
+    case Base.url_decode64(token, padding: false) do
+      {:ok, decoded_token} -> {:ok, :crypto.hash(@hash_algorithm, decoded_token)}
+      :error -> :error
+    end
+  end
+
   defp days_for_context("reset_password"), do: @reset_password_validity_in_days
 
   @doc """

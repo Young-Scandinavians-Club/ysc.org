@@ -35,4 +35,10 @@ defmodule Ysc.StripeRetrieveBlockedClient do
 
   @impl true
   defdelegate list_balance_transactions(p, o), to: Ysc.TestStripeClient
+
+  @impl true
+  defdelegate create_terminal_connection_token(p), to: Ysc.TestStripeClient
+
+  @impl true
+  defdelegate attach_payment_method(id, p), to: Ysc.TestStripeClient
 end

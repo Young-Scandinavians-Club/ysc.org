@@ -45,6 +45,14 @@ defmodule Ysc.StripeRefundApproveTestClient do
   def list_balance_transactions(_params, _opts),
     do: unexpected!(:list_balance_transactions)
 
+  @impl true
+  def create_terminal_connection_token(_params),
+    do: unexpected!(:create_terminal_connection_token)
+
+  @impl true
+  def attach_payment_method(_id, _params),
+    do: unexpected!(:attach_payment_method)
+
   defp unexpected!(op),
     do:
       raise(

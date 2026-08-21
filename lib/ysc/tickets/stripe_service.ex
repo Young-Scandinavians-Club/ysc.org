@@ -33,6 +33,7 @@ defmodule Ysc.Tickets.StripeService do
     payment_method_id = Keyword.get(opts, :payment_method_id)
     receipt_email = Keyword.get(opts, :receipt_email)
     user = Keyword.get(opts, :user)
+    card_present = Keyword.get(opts, :card_present, false)
 
     with {:ok, ticket_order} <- Tickets.sync_pending_order_pricing(ticket_order) do
       create_payment_intent_for_order(
@@ -40,7 +41,8 @@ defmodule Ysc.Tickets.StripeService do
         customer_id,
         payment_method_id,
         receipt_email,
-        user
+        user,
+        card_present
       )
     end
   end
@@ -50,7 +52,8 @@ defmodule Ysc.Tickets.StripeService do
          customer_id,
          payment_method_id,
          receipt_email,
-         user
+         user,
+         card_present
        ) do
     amount_cents = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
@@ -67,11 +70,22 @@ defmodule Ysc.Tickets.StripeService do
         event_id: ticket_order.event_id,
         user_id: ticket_order.user_id
       },
-      description: "Event tickets - Order #{ticket_order.reference_id}",
-      automatic_payment_methods: %{
-        enabled: true
-      }
+      description: "Event tickets - Order #{ticket_order.reference_id}"
     }
+
+    # The mobile app's Stripe Terminal SDK collects and confirms the card
+    # present locally, so it needs a PaymentIntent scoped to card_present
+    # rather than the automatic_payment_methods used by the web Elements
+    # checkout (which negotiates the method with the customer's browser).
+    payment_intent_params =
+      if card_present do
+        Map.merge(payment_intent_params, %{
+          payment_method_types: ["card_present"],
+          capture_method: "automatic"
+        })
+      else
+        Map.put(payment_intent_params, :automatic_payment_methods, %{enabled: true})
+      end
 
     payment_intent_params =
       cond do
