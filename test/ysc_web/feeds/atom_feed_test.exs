@@ -67,6 +67,45 @@ defmodule YscWeb.Feeds.AtomFeedTest do
       refute xml =~ "<p>#{marker}</p>"
     end
 
+    test "escapes entity-like sequences in titles so they stay inert after XML parse" do
+      post = %Post{
+        id: Ecto.ULID.generate(),
+        url_name: "entity-title",
+        title: "&lt;script&gt;alert(1)&lt;/script&gt;",
+        preview_text: "ok",
+        raw_body: nil,
+        rendered_body: "<p>Rendered</p>",
+        updated_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        published_on: DateTime.utc_now() |> DateTime.truncate(:second)
+      }
+
+      xml = AtomFeed.posts_feed([post])
+
+      assert xml =~ "&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;"
+      refute xml =~ "<title>&lt;script&gt;"
+    end
+
+    test "escapes HTML content so nested entity sequences cannot become markup" do
+      marker = "feed-html#{System.unique_integer()}"
+
+      post = %Post{
+        id: Ecto.ULID.generate(),
+        url_name: "html-content",
+        title: "HTML Content Post",
+        preview_text: "preview",
+        raw_body: nil,
+        rendered_body: "<p>#{marker} &lt;img src=x onerror=alert(1)&gt;</p>",
+        updated_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        published_on: DateTime.utc_now() |> DateTime.truncate(:second)
+      }
+
+      xml = AtomFeed.posts_feed([post])
+
+      assert xml =~ marker
+      assert xml =~ "&amp;lt;img"
+      refute xml =~ ~s|<content type="html"><p>|
+    end
+
     test "omits summary when post has no preview or body text" do
       post = %Post{
         id: Ecto.ULID.generate(),
