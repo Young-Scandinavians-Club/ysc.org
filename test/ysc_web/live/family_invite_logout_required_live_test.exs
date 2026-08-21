@@ -79,10 +79,10 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
       {:ok, view, html} =
         live(conn, ~p"/family-invite/#{invite.token}/logout-required")
 
-      assert html =~ "Log Out to Accept Invitation"
+      assert html =~ "Sign out to accept this invitation"
       assert html =~ other.email
       assert html =~ "finish accepting"
-      assert has_element?(view, "button", "Log out and sign in with")
+      assert has_element?(view, "button", "Sign out and sign in with")
 
       assert render(view) =~
                "/users/log-in?redirect_to=/family-invite/#{invite.token}/accept"
@@ -98,9 +98,9 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
       {:ok, view, html} =
         live(conn, ~p"/family-invite/#{invite.token}/logout-required")
 
-      assert html =~ "Log Out to Accept Invitation"
+      assert html =~ "Sign out to accept this invitation"
       assert html =~ invite.email
-      assert has_element?(view, "button", "Log out and continue with")
+      assert has_element?(view, "button", "Sign out and continue with")
 
       assert render(view) =~
                ~p"/family-invite/#{invite.token}/accept"

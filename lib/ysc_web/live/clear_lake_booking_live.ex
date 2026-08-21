@@ -751,7 +751,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
-                          Reserve space for your group. Other YSC members may also stay at the cabin during the same dates.
+                          Book space for your group. Other YSC members may also stay at the cabin during the same dates.
                         </p>
                       </label>
                       <label class={[
@@ -804,7 +804,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Reserve the whole cabin
+                            Book the whole cabin
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -841,7 +841,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Shared cabin stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
+                      Shared cabin stays are not available for the selected dates. Try different dates or book the whole cabin if that option is open.
                     </span>
                     <span
                       :if={
@@ -851,7 +851,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
+                      Booking the whole cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
                     </span>
                   </p>
                 </div>
@@ -2715,7 +2715,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               class="p-8 md:p-12 text-center flex flex-col items-center"
             >
               <p class="text-base text-zinc-700 leading-relaxed mb-6">
-                Sign in to view the cabin calendar, check availability, and reserve your dates.
+                Sign in to view the cabin calendar, check availability, and book your dates.
               </p>
               <.link
                 navigate={
@@ -3468,7 +3468,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp format_booking_error(:invalid_booking_mode),
     do:
-      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Shared cabin and Reserve the whole cabin."
+      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Shared cabin and Book the whole cabin."
 
   defp format_booking_error(:membership_required),
     do: YscWeb.BookingUserMessages.membership_required_plain_message()
@@ -4084,10 +4084,10 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     cond do
       booking_mode == :day && !day_booking_allowed ->
-        "Shared cabin stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
+        "Shared cabin stays are not available for the selected dates. Try different dates or book the whole cabin if that option is open."
 
       booking_mode == :buyout && !buyout_booking_allowed ->
-        "Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared cabin stay if that option is open."
+        "Booking the whole cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open."
 
       true ->
         nil

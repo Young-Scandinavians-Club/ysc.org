@@ -1815,7 +1815,7 @@ defmodule YscWeb.HomeLive do
                     My Membership QR
                   </h3>
                   <p class="text-sm text-zinc-500 mb-5">
-                    Show this to an admin for membership verification
+                    Show this at check-in so a volunteer can confirm your membership.
                   </p>
                   <.qr_code
                     data={@membership_qr_token}

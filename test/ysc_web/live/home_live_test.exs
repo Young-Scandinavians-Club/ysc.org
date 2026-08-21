@@ -473,10 +473,17 @@ defmodule YscWeb.HomeLiveTest do
       |> render_click()
 
       assert has_element?(view, "#membership-qr-modal")
+      html = render(view)
+
+      assert html =~
+               "Show this at check-in so a volunteer can confirm your membership."
+
+      refute html =~ "Show this to an admin for membership verification"
 
       render_click(view, "hide_membership_qr", %{})
 
-      refute render(view) =~ "Show this to an admin for membership verification"
+      refute render(view) =~
+               "Show this at check-in so a volunteer can confirm your membership."
     end
 
     test "hide_membership_qr clears modal after show_membership_qr", %{

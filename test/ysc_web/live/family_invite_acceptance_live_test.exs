@@ -372,7 +372,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
   end
 
   describe "mount/3 — existing account, not logged in" do
-    test "prompts log in when invite email already has an account", %{
+    test "prompts sign in when invite email already has an account", %{
       conn: conn
     } do
       existing = user_fixture()
@@ -393,8 +393,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
 
-      assert html =~ "Log in to accept"
-      assert has_element?(view, "a", "Log in to accept")
+      assert html =~ "Sign in to accept"
+      assert has_element?(view, "a", "Sign in to accept")
     end
   end
 
@@ -447,7 +447,64 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
         |> element("button", "Join Family Membership")
         |> render_click()
 
-      assert html =~ "log in with the email address that was invited"
+      assert html =~ "sign in with the email address that was invited"
+    end
+
+    test "shows error when the invite is for the logged-in primary's own account",
+         %{conn: conn} do
+      primary = user_fixture()
+      token = FamilyInvite.build_token()
+
+      {:ok, invite} =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: primary.email,
+          token: token,
+          primary_user_id: primary.id,
+          created_by_user_id: primary.id
+        })
+        |> Repo.insert()
+
+      conn = log_in_user(conn, primary)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      html =
+        view
+        |> element("button", "Join Family Membership")
+        |> render_click()
+
+      assert html =~ "family member, not for your own account"
+    end
+
+    test "shows error when the logged-in user is already on a family membership" do
+      {invite, _primary} = create_family_invite()
+      other_primary = user_fixture()
+
+      invited_user =
+        user_fixture(%{email: invite.email})
+        |> Ecto.Changeset.change(%{primary_user_id: other_primary.id})
+        |> Repo.update!()
+
+      socket = %Phoenix.LiveView.Socket{
+        endpoint: YscWeb.Endpoint,
+        assigns: %{
+          __changed__: %{},
+          flash: %{},
+          invite: invite,
+          current_user: invited_user
+        }
+      }
+
+      assert {:noreply, socket} =
+               YscWeb.FamilyInviteAcceptanceLive.handle_event(
+                 "link_existing",
+                 %{},
+                 socket
+               )
+
+      assert Phoenix.Flash.get(socket.assigns.flash, :error) =~
+               "one family membership at a time"
     end
   end
 
