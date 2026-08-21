@@ -2088,14 +2088,17 @@ defmodule Ysc.Events do
         u.first_name,
         u.last_name,
         u.email,
+        u.most_connected_country,
         tt.price
       ],
       select: %{
         ticket_tier_id: tt.id,
         ticket_tier_name: tt.name,
         user_id: u.id,
-        user_name: fragment("? || ' ' || ?", u.first_name, u.last_name),
+        user_first_name: u.first_name,
+        user_last_name: u.last_name,
         user_email: u.email,
+        most_connected_country: u.most_connected_country,
         ticket_count: count(t.id),
         ticket_tier_price: tt.price,
         purchased_at: max(t.inserted_at)
@@ -2121,8 +2124,19 @@ defmodule Ysc.Events do
             Money.new(0, :USD)
         end
 
+      # Lightweight user map (not a full %User{}) for display in `.user_card` —
+      # avatar falls back to the default flag image since `current_avatar` isn't preloaded.
+      user = %{
+        id: purchase.user_id,
+        first_name: purchase.user_first_name,
+        last_name: purchase.user_last_name,
+        email: purchase.user_email,
+        most_connected_country: purchase.most_connected_country
+      }
+
       purchase
       |> Map.put(:total_amount, total_amount)
+      |> Map.put(:user, user)
       |> Map.delete(:ticket_tier_price)
     end)
   end
