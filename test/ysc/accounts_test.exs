@@ -214,21 +214,42 @@ defmodule Ysc.AccountsTest do
       dotted_email = "user.#{tag}@gmail.com"
       canonical_email = "user#{tag}@gmail.com"
 
-      %User{}
-      |> Ecto.Changeset.change(%{
-        email: dotted_email,
-        first_name: "Legacy",
-        last_name: "Dots",
-        state: :active,
-        role: :member
-      })
-      |> Repo.insert!()
+      legacy_gmail_user_fixture(%{email: dotted_email})
 
       assert %User{email: ^dotted_email} =
                Accounts.get_user_by_email(canonical_email)
 
       assert %User{email: ^dotted_email} =
                Accounts.get_user_by_email(dotted_email)
+    end
+
+    test "finds Gmail users stored with plus-tags in the database" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      plus_email = "plus#{tag}+old@gmail.com"
+      canonical_email = "plus#{tag}@gmail.com"
+
+      legacy_gmail_user_fixture(%{email: plus_email})
+
+      assert %User{email: ^plus_email} =
+               Accounts.get_user_by_email(canonical_email)
+
+      assert %User{email: ^plus_email} =
+               Accounts.get_user_by_email("plus.#{tag}+inbox@gmail.com")
+    end
+
+    test "gmail alias lookup does not match a different local part" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      stored_email = "keep.#{tag}@gmail.com"
+
+      legacy_gmail_user_fixture(%{email: stored_email})
+      other = user_fixture(%{email: "other#{tag}@gmail.com"})
+
+      assert %User{email: ^stored_email} =
+               Accounts.get_user_by_email("keep#{tag}@gmail.com")
+
+      refute Accounts.get_user_by_email("keep#{tag}x@gmail.com")
+      assert %User{id: id} = Accounts.get_user_by_email("other#{tag}@gmail.com")
+      assert id == other.id
     end
   end
 
