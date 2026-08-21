@@ -65,11 +65,13 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     end
 
     test "lists existing editions", %{conn: conn, admin: admin} do
-      edition_fixture(admin, %{"title" => "Spring Update"})
+      edition = edition_fixture(admin, %{"title" => "Spring Update"})
 
-      {_view, html} = live_newsletters(conn)
+      {view, html} = live_newsletters(conn)
 
       assert html =~ "Spring Update"
+      assert has_element?(view, "#admin-newsletters-mobile")
+      assert has_element?(view, "#admin-newsletter-card-#{edition.id}")
     end
 
     test "shows a New Newsletter button", %{conn: conn} do
@@ -259,15 +261,18 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     setup [:create_admin]
 
     test "loads subscribers list after async fetch", %{conn: conn} do
-      Newsletter.subscribe("sub-tab-#{System.unique_integer()}@example.com",
-        source: "test"
-      )
+      {:ok, subscriber} =
+        Newsletter.subscribe("sub-tab-#{System.unique_integer()}@example.com",
+          source: "test"
+        )
 
       {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=subscribers")
       html = render_async(view, 5000)
 
       assert html =~ "sub-tab-"
       assert html =~ "Subscribers" or html =~ "subscriber"
+      assert has_element?(view, "#admin-subscribers-mobile")
+      assert has_element?(view, "#admin-subscriber-card-#{subscriber.id}")
     end
 
     test "switch-tab patches URL for editions", %{conn: conn} do
@@ -335,7 +340,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
         |> Ecto.Changeset.change(%{first_name: "Ada", last_name: "Admin"})
         |> Ysc.Repo.update!()
 
-      {:ok, _notice} =
+      {:ok, notice} =
         Newsletter.create_notice(
           %{"name" => "Parking reminder", "body" => "<p>Lot B</p>"},
           created_by_id: admin.id
@@ -348,6 +353,8 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       assert html =~ "Parking reminder"
       assert html =~ "Ada Admin"
       assert has_element?(view, "#new-notice-btn")
+      assert has_element?(view, "#admin-notices-mobile")
+      assert has_element?(view, "#notice-mob-#{notice.id}")
 
       view |> element("#new-notice-btn") |> render_click()
       assert has_element?(view, "#notice-form")
