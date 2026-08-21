@@ -1331,6 +1331,11 @@ defmodule YscWeb.UserSettingsLiveTest do
       render_click(view, "show_membership_qr")
       assert has_element?(view, "#settings-membership-qr-modal")
 
+      html = render(view)
+
+      assert html =~
+               "Show this at check-in so a volunteer can confirm your membership."
+
       render_click(view, "hide_membership_qr")
       refute has_element?(view, "#settings-membership-qr-modal")
     end

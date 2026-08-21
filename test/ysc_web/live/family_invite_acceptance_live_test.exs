@@ -372,7 +372,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
   end
 
   describe "mount/3 — existing account, not logged in" do
-    test "prompts log in when invite email already has an account", %{
+    test "prompts sign in when invite email already has an account", %{
       conn: conn
     } do
       existing = user_fixture()
@@ -393,8 +393,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
 
-      assert html =~ "Log in to accept"
-      assert has_element?(view, "a", "Log in to accept")
+      assert html =~ "Sign in to accept"
+      assert has_element?(view, "a", "Sign in to accept")
     end
   end
 
@@ -447,7 +447,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
         |> element("button", "Join Family Membership")
         |> render_click()
 
-      assert html =~ "log in with the email address that was invited"
+      assert html =~ "sign in with the email address that was invited"
     end
   end
 

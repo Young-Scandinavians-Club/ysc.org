@@ -1786,7 +1786,7 @@ defmodule YscWeb.UserSettingsLive do
                 My Membership QR
               </h3>
               <p class="text-sm text-zinc-500 mb-5">
-                Show this to an admin for membership verification
+                Show this at check-in so a volunteer can confirm your membership.
               </p>
               <.qr_code data={@membership_qr_token} size={250} class="mx-auto" />
               <%= if @apple_wallet_membership_enabled? &&
@@ -6260,7 +6260,7 @@ defmodule YscWeb.UserSettingsLive do
         n = ent.free_nights || 0
         cap = format_member_money(ent.buyout_max_discount)
 
-        "#{n} free night#{if n == 1, do: "", else: "s"} (up to #{cap} off when you reserve the whole cabin)"
+        "#{n} free night#{if n == 1, do: "", else: "s"} (up to #{cap} off when you book the whole cabin)"
 
       :percent_off ->
         pct = ent.percent_off || Decimal.new(0)

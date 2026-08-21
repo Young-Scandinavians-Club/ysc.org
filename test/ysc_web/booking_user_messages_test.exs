@@ -90,6 +90,7 @@ defmodule YscWeb.BookingUserMessagesTest do
              "open spots at the cabin"
 
     refute BookingUserMessages.insufficient_capacity_error() =~ "capacity"
+    refute BookingUserMessages.insufficient_capacity_error() =~ "reserve"
 
     assert BookingUserMessages.insufficient_capacity_error(
              include_guest_count: true
@@ -98,6 +99,10 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.property_unavailable_error() =~ "isn't available"
     refute BookingUserMessages.property_unavailable_error() =~ "property"
+    refute BookingUserMessages.property_unavailable_error() =~ "reserve"
+
+    assert BookingUserMessages.property_unavailable_error() =~
+             "book the whole cabin"
 
     assert BookingUserMessages.insufficient_capacity_summary() =~
              "Not enough space"

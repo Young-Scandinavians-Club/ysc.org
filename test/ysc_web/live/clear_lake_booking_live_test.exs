@@ -485,6 +485,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       # Lifetime members should see booking functionality
       assert html =~ "Clear Lake"
+      assert html =~ "Book the whole cabin"
+      refute html =~ "Reserve the whole cabin"
+      refute html =~ "Reserve space for your group"
     end
 
     test "handles subscription members", %{conn: conn} do
@@ -2983,6 +2986,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
                "Sign In Required"
 
       assert has_element?(view, "a", "Sign In to Book")
+      assert render(view) =~ "book your dates"
     end
 
     test "user pending board approval sees application-status CTA", %{
@@ -3193,7 +3197,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       state = :sys.get_state(view.pid)
 
       assert state.socket.assigns.form_errors.general ==
-               "The cabin isn't available for those dates. Try different dates or reserve the whole cabin."
+               "The cabin isn't available for those dates. Try different dates or book the whole cabin."
     end
 
     test "shows application-pending message when a pending-approval user attempts to book",
