@@ -2097,7 +2097,8 @@ defmodule Ysc.Events do
         user_name: fragment("? || ' ' || ?", u.first_name, u.last_name),
         user_email: u.email,
         ticket_count: count(t.id),
-        ticket_tier_price: tt.price
+        ticket_tier_price: tt.price,
+        purchased_at: max(t.inserted_at)
       }
     )
     |> Repo.all()

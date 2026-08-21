@@ -437,6 +437,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         <% end %>
                       </span>
                     </div>
+
+                    <div>
+                      <span class="font-medium text-zinc-700">Purchased:</span>
+                      <span class="ml-1">
+                        {format_purchase_date(purchase.purchased_at)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1049,6 +1056,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       base_row = %{
         "Ticket Reference" => ticket.reference_id || "",
         "Ticket Tier" => (ticket.ticket_tier && ticket.ticket_tier.name) || "",
+        "Purchase Date" => format_purchase_date(ticket.inserted_at),
         "Purchaser First Name" => purchaser_first_name,
         "Purchaser Last Name" => purchaser_last_name,
         "Purchaser Email" => purchaser_email,
@@ -1087,6 +1095,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   defp format_date(date), do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
+
+  defp format_purchase_date(nil), do: "—"
+
+  defp format_purchase_date(%DateTime{} = datetime) do
+    datetime
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+  end
 
   defp format_money_safe(nil), do: "—"
   defp format_money_safe(""), do: "—"
