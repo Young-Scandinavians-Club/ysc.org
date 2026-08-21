@@ -17,11 +17,14 @@ defmodule YscWeb.AdminEventsLiveTest do
     setup [:create_admin]
 
     test "lists events", %{conn: conn, admin: admin} do
-      event_fixture(%{title: "Grand Viking Feast", organizer_id: admin.id})
+      event =
+        event_fixture(%{title: "Grand Viking Feast", organizer_id: admin.id})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events")
+      {:ok, view, html} = live(conn, ~p"/admin/events")
       assert html =~ "Events"
       assert html =~ "Grand Viking Feast"
+      assert has_element?(view, "#admin-events-mobile")
+      assert has_element?(view, "#admin-event-card-#{event.id}")
     end
 
     test "renders date range filter inputs", %{conn: conn} do

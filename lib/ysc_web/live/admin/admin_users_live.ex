@@ -548,74 +548,74 @@ defmodule YscWeb.AdminUsersLive do
 
           <div :if={@meta}>
             <!-- Mobile Card View -->
-            <div class="block md:hidden space-y-4">
-              <%= for {_, user} <- @streams.users do %>
-                <div
-                  class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  phx-click={
-                    if user.state == :pending_approval,
-                      do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
-                      else:
-                        JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
-                  }
-                >
-                  <div class="flex items-start gap-3 mb-3">
-                    <.user_card user={user} />
-                  </div>
+            <.admin_mobile_list id="admin-users-mobile">
+              <.admin_mobile_list_card
+                :for={{_, user} <- @streams.users}
+                id={"admin-user-card-#{user.id}"}
+                clickable
+                phx-click={
+                  if user.state == :pending_approval,
+                    do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
+                    else:
+                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                }
+              >
+                <div class="flex items-start gap-3 mb-3">
+                  <.user_card user={user} />
+                </div>
 
-                  <div class="space-y-2 mb-3">
-                    <div :if={user.phone_number} class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Phone:</span>
-                      <span class="text-sm text-zinc-900">
-                        {Ysc.Extensions.PhoneNumber.format_for_display(
-                          user.phone_number
-                        ) || user.phone_number}
-                      </span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Account Status:</span>
-                      <.admin_user_state_badge state={user.state} />
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Membership:</span>
-                      <%= case membership_display(user) do %>
-                        <% {nil, _} -> %>
-                          <span class="text-sm text-zinc-400">—</span>
-                        <% {membership_type, inherited?} -> %>
-                          <div class="flex items-center gap-1">
-                            <.badge type="sky">
-                              {String.capitalize("#{membership_type}")}
-                            </.badge>
-                            <%= if inherited? do %>
-                              <.tooltip tooltip_text="Membership inherited from parent account">
-                                <.icon
-                                  name="hero-users"
-                                  class="w-4 h-4 text-zinc-500"
-                                />
-                              </.tooltip>
-                            <% end %>
-                          </div>
-                      <% end %>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Applied:</span>
-                      <span class="text-sm text-zinc-900">
-                        {DateTimeDisplay.format_utc_date(
-                          UserDisplay.application_submitted_at(user)
-                        )}
-                      </span>
-                    </div>
+                <div class="space-y-2 mb-3">
+                  <div :if={user.phone_number} class="flex items-center gap-2">
+                    <span class="text-sm text-zinc-600">Phone:</span>
+                    <span class="text-sm text-zinc-900">
+                      {Ysc.Extensions.PhoneNumber.format_for_display(
+                        user.phone_number
+                      ) || user.phone_number}
+                    </span>
                   </div>
-
-                  <div class="flex justify-end pt-3 border-t border-zinc-200">
-                    <.user_actions_dropdown
-                      user={user}
-                      params={@params}
-                      menu_id={"user-actions-mob-#{user.id}"}
-                    />
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-zinc-600">Account Status:</span>
+                    <.admin_user_state_badge state={user.state} />
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-zinc-600">Membership:</span>
+                    <%= case membership_display(user) do %>
+                      <% {nil, _} -> %>
+                        <span class="text-sm text-zinc-400">—</span>
+                      <% {membership_type, inherited?} -> %>
+                        <div class="flex items-center gap-1">
+                          <.badge type="sky">
+                            {String.capitalize("#{membership_type}")}
+                          </.badge>
+                          <%= if inherited? do %>
+                            <.tooltip tooltip_text="Membership inherited from parent account">
+                              <.icon
+                                name="hero-users"
+                                class="w-4 h-4 text-zinc-500"
+                              />
+                            </.tooltip>
+                          <% end %>
+                        </div>
+                    <% end %>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-zinc-600">Applied:</span>
+                    <span class="text-sm text-zinc-900">
+                      {DateTimeDisplay.format_utc_date(
+                        UserDisplay.application_submitted_at(user)
+                      )}
+                    </span>
                   </div>
                 </div>
-              <% end %>
+
+                <:footer>
+                  <.user_actions_dropdown
+                    user={user}
+                    params={@params}
+                    menu_id={"user-actions-mob-#{user.id}"}
+                  />
+                </:footer>
+              </.admin_mobile_list_card>
               <.admin_list_empty_state
                 :if={@empty}
                 title="No results found"
@@ -631,7 +631,7 @@ defmodule YscWeb.AdminUsersLive do
                   density={:compact}
                 />
               </div>
-            </div>
+            </.admin_mobile_list>
             <!-- Desktop Table View -->
             <div class="hidden md:block">
               <Flop.Phoenix.table

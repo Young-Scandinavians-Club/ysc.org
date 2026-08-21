@@ -96,74 +96,74 @@ defmodule YscWeb.AdminPostsLive do
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>
-            <div class="block md:hidden space-y-4">
-              <%= for {_, post} <- @streams.posts do %>
-                <div
-                  class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
-                >
-                  <div class="flex items-start justify-between mb-3">
-                    <div class="flex-1 min-w-0">
-                      <div class="mb-1 flex items-center gap-1.5 min-w-0">
-                        <h3 class="text-base font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0">
-                          <.icon
-                            :if={post.featured_post}
-                            name="hero-star-solid"
-                            class="h-4 w-4 shrink-0 text-yellow-500"
-                          />
-                          <span class="truncate">{post.title}</span>
-                        </h3>
-                        <.presence_avatars editors={@editors_by_post[post.id] || []} />
-                      </div>
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-sm text-zinc-600">
-                          {UserDisplay.full_name(post.author)}
-                        </span>
-                        <span class="text-zinc-400">•</span>
-                        <span class="text-sm text-zinc-600">
-                          {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
-                        </span>
-                      </div>
+            <.admin_mobile_list id="admin-posts-mobile">
+              <.admin_mobile_list_card
+                :for={{_, post} <- @streams.posts}
+                id={"admin-post-card-#{post.id}"}
+                clickable
+                phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
+              >
+                <div class="flex items-start justify-between mb-3">
+                  <div class="flex-1 min-w-0">
+                    <div class="mb-1 flex items-center gap-1.5 min-w-0">
+                      <h3 class="text-base font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0">
+                        <.icon
+                          :if={post.featured_post}
+                          name="hero-star-solid"
+                          class="h-4 w-4 shrink-0 text-yellow-500"
+                        />
+                        <span class="truncate">{post.title}</span>
+                      </h3>
+                      <.presence_avatars editors={@editors_by_post[post.id] || []} />
                     </div>
-                    <.post_actions_dropdown
-                      post={post}
-                      menu_id={"post-actions-mob-#{post.id}"}
-                    />
-                  </div>
-
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                      <.tooltip
-                        :if={post.published_on != nil}
-                        tooltip_text={
-                          Timex.format!(post.published_on, "%b %e, %Y", :strftime)
-                        }
-                      >
-                        <.badge type={
-                          AdminBadgeHelpers.post_state_badge_type(post.state)
-                        }>
-                          {String.capitalize("#{post.state}")}
-                        </.badge>
-                      </.tooltip>
-
-                      <.badge
-                        :if={post.published_on == nil}
-                        type={AdminBadgeHelpers.post_state_badge_type(post.state)}
-                      >
-                        {String.capitalize("#{post.state}")}
-                      </.badge>
-
-                      <span
-                        :if={post.comment_count > 0}
-                        class="flex items-center gap-1 text-zinc-600 text-sm"
-                      >
-                        <.icon name="hero-chat-bubble-oval-left" class="w-4 h-4" />
-                        {post.comment_count}
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-sm text-zinc-600">
+                        {UserDisplay.full_name(post.author)}
+                      </span>
+                      <span class="text-zinc-400">•</span>
+                      <span class="text-sm text-zinc-600">
+                        {Timex.format!(post.inserted_at, "{Mshort} {D}, {YYYY}")}
                       </span>
                     </div>
                   </div>
+                  <.post_actions_dropdown
+                    post={post}
+                    menu_id={"post-actions-mob-#{post.id}"}
+                  />
                 </div>
-              <% end %>
+
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <.tooltip
+                      :if={post.published_on != nil}
+                      tooltip_text={
+                        Timex.format!(post.published_on, "%b %e, %Y", :strftime)
+                      }
+                    >
+                      <.badge type={
+                        AdminBadgeHelpers.post_state_badge_type(post.state)
+                      }>
+                        {String.capitalize("#{post.state}")}
+                      </.badge>
+                    </.tooltip>
+
+                    <.badge
+                      :if={post.published_on == nil}
+                      type={AdminBadgeHelpers.post_state_badge_type(post.state)}
+                    >
+                      {String.capitalize("#{post.state}")}
+                    </.badge>
+
+                    <span
+                      :if={post.comment_count > 0}
+                      class="flex items-center gap-1 text-zinc-600 text-sm"
+                    >
+                      <.icon name="hero-chat-bubble-oval-left" class="w-4 h-4" />
+                      {post.comment_count}
+                    </span>
+                  </div>
+                </div>
+              </.admin_mobile_list_card>
               <%!-- Mobile Pagination --%>
               <div class="pt-4">
                 <.admin_flop_pagination
@@ -172,7 +172,7 @@ defmodule YscWeb.AdminPostsLive do
                   density={:compact}
                 />
               </div>
-            </div>
+            </.admin_mobile_list>
             <%!-- Desktop Table View --%>
             <div class="hidden md:block">
               <Flop.Phoenix.table

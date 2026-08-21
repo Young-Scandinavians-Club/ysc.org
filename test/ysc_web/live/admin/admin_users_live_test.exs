@@ -22,11 +22,13 @@ defmodule YscWeb.AdminUsersLiveTest do
     setup [:create_admin]
 
     test "lists users", %{conn: conn} do
-      user_fixture(%{first_name: "Member", last_name: "One"})
+      user = user_fixture(%{first_name: "Member", last_name: "One"})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/users")
+      {:ok, view, html} = live(conn, ~p"/admin/users")
       assert html =~ "Users"
       assert html =~ "Member One"
+      assert has_element?(view, "#admin-users-mobile")
+      assert has_element?(view, "#admin-user-card-#{user.id}")
     end
 
     test "shows an Applied column with the application submission date", %{
