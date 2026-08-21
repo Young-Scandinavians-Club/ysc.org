@@ -255,10 +255,15 @@ defmodule Ysc.Accounts.UserToken do
         hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
 
         query =
-          from token in by_token_and_context_query(hashed_token, "mobile_session"),
-            join: user in assoc(token, :user),
-            where: token.inserted_at > ago(@mobile_session_validity_in_days, "day"),
-            select: user
+          from token in by_token_and_context_query(
+                 hashed_token,
+                 "mobile_session"
+               ),
+               join: user in assoc(token, :user),
+               where:
+                 token.inserted_at >
+                   ago(@mobile_session_validity_in_days, "day"),
+               select: user
 
         {:ok, query}
 
@@ -273,8 +278,11 @@ defmodule Ysc.Accounts.UserToken do
   """
   def hash_mobile_token(token) do
     case Base.url_decode64(token, padding: false) do
-      {:ok, decoded_token} -> {:ok, :crypto.hash(@hash_algorithm, decoded_token)}
-      :error -> :error
+      {:ok, decoded_token} ->
+        {:ok, :crypto.hash(@hash_algorithm, decoded_token)}
+
+      :error ->
+        :error
     end
   end
 

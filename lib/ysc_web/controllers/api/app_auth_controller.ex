@@ -18,7 +18,8 @@ defmodule YscWeb.Api.AppAuthController do
   def create_password_session(conn, %{"email" => email, "password" => password})
       when is_binary(email) and is_binary(password) do
     with :ok <- Ysc.AuthRateLimit.check_identifier(email),
-         %Accounts.User{} = user <- Accounts.get_user_by_email_and_password(email, password),
+         %Accounts.User{} = user <-
+           Accounts.get_user_by_email_and_password(email, password),
          true <- user.role in [:admin, :volunteer],
          true <- Accounts.login_allowed_state?(user) do
       token = Accounts.generate_user_mobile_token(user)

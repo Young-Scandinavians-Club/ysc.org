@@ -57,7 +57,8 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
           def create_terminal_connection_token(_params),
             do: {:error, :not_implemented}
 
-          def attach_payment_method(_id, _params), do: {:error, :not_implemented}
+          def attach_payment_method(_id, _params),
+            do: {:error, :not_implemented}
 
           def retrieve_payment_intent(id, _opts) do
             {:ok,

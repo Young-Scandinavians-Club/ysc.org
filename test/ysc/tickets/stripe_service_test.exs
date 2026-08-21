@@ -116,7 +116,9 @@ defmodule Ysc.Tickets.StripeServiceTest do
       end)
 
       assert {:ok, payment_intent} =
-               StripeService.create_payment_intent(ticket_order, card_present: true)
+               StripeService.create_payment_intent(ticket_order,
+                 card_present: true
+               )
 
       assert payment_intent.id == "pi_card_present"
     end

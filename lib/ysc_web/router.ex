@@ -171,7 +171,10 @@ defmodule YscWeb.Router do
     get "/memberships/plans", AppMembershipsController, :plans
     post "/memberships/subscribe", AppMembershipsController, :subscribe
     post "/payments/connection_token", AppPaymentsController, :connection_token
-    post "/tickets/:ticket_tier_id/payment_intent", AppTicketsController, :create_payment_intent
+
+    post "/tickets/:ticket_tier_id/payment_intent",
+         AppTicketsController,
+         :create_payment_intent
   end
 
   scope "/", YscWeb do

@@ -23,7 +23,9 @@ defmodule YscWeb.Api.AppAuthControllerTest do
           "password" => valid_user_password()
         })
 
-      assert %{"token" => token, "user" => user_json} = json_response(response, 200)
+      assert %{"token" => token, "user" => user_json} =
+               json_response(response, 200)
+
       assert is_binary(token) and token != ""
       assert user_json["id"] == to_string(user.id)
       assert user_json["role"] == "admin"
@@ -78,7 +80,9 @@ defmodule YscWeb.Api.AppAuthControllerTest do
     end
 
     test "returns 400 when email or password is missing", %{conn: conn} do
-      response = post(conn, ~p"/api/v1/app/auth/password", %{"email" => "a@b.com"})
+      response =
+        post(conn, ~p"/api/v1/app/auth/password", %{"email" => "a@b.com"})
+
       assert json_response(response, 400)
     end
   end

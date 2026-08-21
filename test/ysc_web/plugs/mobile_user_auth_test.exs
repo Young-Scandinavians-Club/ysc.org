@@ -39,7 +39,9 @@ defmodule YscWeb.Plugs.MobileUserAuthTest do
   end
 
   describe "call/2 with a plain member token" do
-    test "returns 401 — members cannot use the admin/volunteer app", %{conn: conn} do
+    test "returns 401 — members cannot use the admin/volunteer app", %{
+      conn: conn
+    } do
       user = user_fixture(%{role: :member})
       token = Accounts.generate_user_mobile_token(user)
 

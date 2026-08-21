@@ -504,7 +504,9 @@ if config_env() == :prod do
   # Stripe Terminal location the admin/volunteer mobile app's tap-to-pay
   # connection tokens are scoped to. Created once via the Stripe
   # Dashboard/API (a Terminal `Location` object).
-  config :ysc, :stripe_terminal_location_id, System.get_env("STRIPE_TERMINAL_LOCATION_ID")
+  config :ysc,
+         :stripe_terminal_location_id,
+         System.get_env("STRIPE_TERMINAL_LOCATION_ID")
 
   # ## Membership Plans Configuration
   #

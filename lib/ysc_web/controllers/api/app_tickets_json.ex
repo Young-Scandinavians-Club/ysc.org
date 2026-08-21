@@ -3,7 +3,10 @@ defmodule YscWeb.Api.AppTicketsJSON do
   JSON rendering for the admin/volunteer mobile app's ticket purchase endpoint.
   """
 
-  def payment_intent(%{payment_intent: payment_intent, ticket_order: ticket_order}) do
+  def payment_intent(%{
+        payment_intent: payment_intent,
+        ticket_order: ticket_order
+      }) do
     %{
       ticket_order_id: to_string(ticket_order.id),
       ticket_order_reference: ticket_order.reference_id,

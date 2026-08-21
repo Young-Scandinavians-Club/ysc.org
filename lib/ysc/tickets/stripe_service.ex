@@ -84,7 +84,9 @@ defmodule Ysc.Tickets.StripeService do
           capture_method: "automatic"
         })
       else
-        Map.put(payment_intent_params, :automatic_payment_methods, %{enabled: true})
+        Map.put(payment_intent_params, :automatic_payment_methods, %{
+          enabled: true
+        })
       end
 
     payment_intent_params =
