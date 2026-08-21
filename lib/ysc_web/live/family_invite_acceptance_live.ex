@@ -143,7 +143,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Please log in with the email address that was invited.",
+           "Please sign in with the email address that was invited.",
            title: "Invitation"
          )}
 
@@ -152,14 +152,16 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "You can only be linked to one family membership at a time. Click your name in the top-right corner, open Membership, and use \"Leave family membership\" to leave your current family first. Then you can accept this invitation.",
+           "You can only be on one family membership at a time. Click your name in the top-right corner, open Membership, and use \"Leave family membership\" to leave your current family first. Then you can accept this invitation.",
            title: "Invitation"
          )}
 
       {:error, :cannot_link_self} ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "You cannot link your own account.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This invitation is for a family member, not for your own account.",
            title: "Invitation"
          )}
     end
@@ -174,7 +176,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Account created successfully! You can now log in with your email and password.",
+           "Account created successfully! You can now sign in with your email and password.",
            title: "Family invitation"
          )
          |> redirect(to: ~p"/users/log-in")}
@@ -237,7 +239,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         <div :if={@can_link_existing} class="mt-8">
           <.callout type="info" class="p-6">
             <p class="text-blue-800 mb-4">
-              You're logged in as <strong>{@current_user.email}</strong>. Click below to join <strong>{@invite.primary_user.first_name}</strong>'s family membership.
+              You're signed in as <strong>{@current_user.email}</strong>. Click below to join <strong>{@invite.primary_user.first_name}</strong>'s family membership.
             </p>
             <.button
               phx-click="link_existing"
@@ -253,7 +255,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         <div :if={@existing_user && !@current_user} class="mt-8">
           <.callout type="neutral" class="p-6">
             <p class="mb-4">
-              You already have an account with this email. Log in to accept this invitation.
+              You already have an account with this email. Sign in to accept this invitation.
             </p>
             <.link
               navigate={
@@ -261,10 +263,10 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
               }
               class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500"
             >
-              Log in to accept
+              Sign in to accept
             </.link>
             <p class="mt-4 text-xs text-zinc-500">
-              After logging in, you'll be redirected back to complete the invitation.
+              After you sign in, you'll return here to finish accepting the invitation.
             </p>
           </.callout>
         </div>
@@ -327,7 +329,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
           class="mt-8"
         >
           <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-4">
-            You're logged in as a different account. To accept this invitation for <strong>{@invite.email}</strong>, please log out and either log in with that email or
+            You're signed in as a different account. To accept this invitation for <strong>{@invite.email}</strong>, please sign out and either sign in with that email or
             create a new account with that email.
           </p>
         </div>

@@ -59,6 +59,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
     test "loads page successfully", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/bookings/tahoe")
       assert html =~ "Tahoe"
+      assert html =~ "book your dates"
+      refute html =~ "reserve your dates"
     end
 
     test "loads page with query parameters", %{conn: conn} do
@@ -113,6 +115,21 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/tahoe")
 
       assert html =~ "Tahoe"
+    end
+
+    test "uses book, not rent or reserve, for the entire-cabin option", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+      html = render(view)
+
+      assert html =~ "Book the entire cabin"
+      refute html =~ "Rent the entire cabin"
+      refute html =~ "Reserve the entire cabin"
     end
 
     test "shows readable essential alerts for members", %{conn: conn} do

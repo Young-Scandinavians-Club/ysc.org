@@ -55,9 +55,9 @@ defmodule YscWeb.BookingUserMessages do
 
   def insufficient_capacity_error(opts \\ []) do
     if Keyword.get(opts, :include_guest_count, false) do
-      "There aren't enough open spots at the cabin for your dates and group size. Try fewer guests, different dates, or reserve the whole cabin."
+      "There aren't enough open spots at the cabin for your dates and group size. Try fewer guests, different dates, or book the whole cabin."
     else
-      "There aren't enough open spots at the cabin for your dates. Try different dates, fewer guests, or reserve the whole cabin."
+      "There aren't enough open spots at the cabin for your dates. Try different dates, fewer guests, or book the whole cabin."
     end
   end
 
@@ -66,7 +66,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def property_unavailable_error do
-    "The cabin isn't available for those dates. Try different dates or reserve the whole cabin."
+    "The cabin isn't available for those dates. Try different dates or book the whole cabin."
   end
 
   def property_unavailable_summary do

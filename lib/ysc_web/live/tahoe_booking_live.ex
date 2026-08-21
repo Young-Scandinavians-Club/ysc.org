@@ -1412,11 +1412,11 @@ defmodule YscWeb.TahoeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Rent the entire cabin
+                            Book the entire cabin
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
-                          Reserve the entire cabin exclusively for your group. Includes all 7 bedrooms, 3 bathrooms, and the sauna.
+                          Book the entire cabin exclusively for your group. Includes all 7 bedrooms, 3 bathrooms, and the sauna.
                         </p>
                         <p class="text-xs text-amber-600 mt-2 ml-9 font-medium">
                           {buyout_mode_availability_copy(@seasons)}
@@ -3824,7 +3824,7 @@ defmodule YscWeb.TahoeBookingLive do
                             class="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5"
                           />
                           <p class="text-sm text-blue-900">
-                            <strong>Rent the entire cabin:</strong>
+                            <strong>Book the entire cabin:</strong>
                             {buyout_mode_availability_copy(@seasons)}
                           </p>
                         </div>
@@ -4658,7 +4658,7 @@ defmodule YscWeb.TahoeBookingLive do
               class="p-8 md:p-12 text-center flex flex-col items-center"
             >
               <p class="text-base text-zinc-700 leading-relaxed mb-6">
-                Sign in to view the cabin calendar, check availability, and reserve your dates.
+                Sign in to view the cabin calendar, check availability, and book your dates.
               </p>
               <.link
                 navigate={~p"/users/log-in?#{%{redirect_to: ~p"/bookings/tahoe"}}"}

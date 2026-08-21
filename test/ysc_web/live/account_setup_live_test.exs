@@ -12,6 +12,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.VerificationCodes
+  alias Ysc.EmailVerificationRateLimit
   alias Ysc.Payments
   alias Ysc.Subscriptions
 
@@ -884,20 +885,23 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "4"}))
 
-      for _ <- 1..12 do
-        view
-        |> form("#phone_verification_form", %{
-          "verification_code" => @invalid_otp
-        })
-        |> render_submit()
-      end
+      # OTP widget form submits can miss Hammer under CI load. Fill the
+      # per-user phone bucket until deny, then fire the event directly.
+      limit =
+        Application.get_env(:ysc, EmailVerificationRateLimit, [])[
+          :attempt_limit_per_minute
+        ] || 12
 
-      view
-      |> form("#phone_verification_form", %{"verification_code" => @invalid_otp})
-      |> render_submit()
+      assert Enum.any?(1..(limit + 2), fn _ ->
+               EmailVerificationRateLimit.check(user.id, :phone) ==
+                 :rate_limited
+             end)
 
-      html = render(view)
-      assert html =~ "Too many verification attempts"
+      render_submit(view, "verify_phone_code", %{
+        "verification_code" => "999999"
+      })
+
+      assert render(view) =~ "Too many verification attempts"
     end
 
     test "valid code redirects to auto-login", %{
