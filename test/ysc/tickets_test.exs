@@ -70,6 +70,11 @@ defmodule Ysc.TicketsTest do
     %{user: user, event: event, tier1: tier1, tier2: tier2}
   end
 
+  defp tickets_for_order(order_id) do
+    from(t in Ticket, where: t.ticket_order_id == ^order_id, order_by: t.id)
+    |> Repo.all()
+  end
+
   describe "create_ticket_order/3" do
     setup do
       tickets_setup()
@@ -1121,6 +1126,68 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "calculate_refund_amount/2" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns the paid tier price without cancelling tickets", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      assert {:ok, amount} =
+               Tickets.calculate_refund_amount(order, [ticket.id])
+
+      assert Money.equal?(amount, Money.new(50, :USD))
+      assert Repo.get!(Ticket, ticket.id).status == :pending
+      assert Tickets.get_ticket_order(order.id).status == :pending
+    end
+
+    test "sums prices for selected tickets across tiers", %{
+      user: user,
+      event: event,
+      tier1: tier1,
+      tier2: tier2
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{
+          tier1.id => 1,
+          tier2.id => 1
+        })
+
+      ticket_ids = order.id |> tickets_for_order() |> Enum.map(& &1.id)
+
+      assert {:ok, amount} = Tickets.calculate_refund_amount(order, ticket_ids)
+      assert Money.equal?(amount, Money.new(150, :USD))
+
+      statuses =
+        order.id
+        |> tickets_for_order()
+        |> Enum.map(& &1.status)
+        |> Enum.uniq()
+
+      assert statuses == [:pending]
+    end
+
+    test "returns error when no matching tickets to refund", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:error, :no_valid_tickets} ==
+               Tickets.calculate_refund_amount(order, [Ecto.ULID.generate()])
+    end
+  end
+
   describe "refund_tickets/3" do
     setup do
       tickets_setup()
@@ -1136,6 +1203,43 @@ defmodule Ysc.TicketsTest do
 
       assert {:error, :no_valid_tickets} ==
                Tickets.refund_tickets(order, [Ecto.ULID.generate()], "test")
+    end
+
+    test "cancels selected tickets and the order when none remain", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      assert {:ok, refund_info} =
+               Tickets.refund_tickets(order, [ticket.id], "admin refund")
+
+      assert Money.equal?(refund_info.refund_amount, Money.new(50, :USD))
+      assert Repo.get!(Ticket, ticket.id).status == :cancelled
+      assert Tickets.get_ticket_order(order.id).status == :cancelled
+    end
+
+    test "leaves the order open when other tickets remain", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      [first | [second]] = tickets_for_order(order.id)
+
+      assert {:ok, refund_info} =
+               Tickets.refund_tickets(order, [first.id], "partial")
+
+      assert Money.equal?(refund_info.refund_amount, Money.new(50, :USD))
+      assert Repo.get!(Ticket, first.id).status == :cancelled
+      assert Repo.get!(Ticket, second.id).status == :pending
+      assert Tickets.get_ticket_order(order.id).status == :pending
     end
   end
 

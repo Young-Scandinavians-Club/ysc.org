@@ -966,6 +966,7 @@ defmodule YscWeb.AdminBookingsLive do
           <div class="flex gap-2 w-full sm:w-auto justify-end sm:justify-start">
             <.button
               :if={@primary_payment && length(@booking_refunds) == 0}
+              id="show-booking-refund-modal"
               phx-click="show-booking-refund-modal"
               phx-disable-with="Loading..."
               class="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"

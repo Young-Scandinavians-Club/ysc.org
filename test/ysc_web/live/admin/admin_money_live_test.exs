@@ -8,6 +8,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
   import Ecto.Query
 
   alias Ysc.Ledgers
+  alias Ysc.Ledgers.Refund
   alias Ysc.LedgersFixtures
   alias Ysc.Repo
   alias Ysc.Tickets
@@ -72,7 +73,8 @@ defmodule YscWeb.AdminMoneyLiveTest do
     :ok
   end
 
-  defp completed_ticket_order_with_payment! do
+  defp completed_ticket_order_with_payment!(opts \\ []) do
+    quantity = Keyword.get(opts, :quantity, 1)
     user = user_fixture()
 
     user =
@@ -87,7 +89,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
     tier = ticket_tier_fixture(%{event_id: event.id})
 
     {:ok, order} =
-      Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      Tickets.create_ticket_order(user.id, event.id, %{tier.id => quantity})
 
     {:ok, {payment, _transaction, _entries}} =
       Ledgers.process_event_payment_with_donations(%{
@@ -108,7 +110,27 @@ defmodule YscWeb.AdminMoneyLiveTest do
     from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
     |> Repo.update_all(set: [status: :confirmed])
 
-    %{payment: payment, ticket_order: completed}
+    tickets =
+      from(t in Ysc.Events.Ticket,
+        where: t.ticket_order_id == ^order.id,
+        order_by: t.id
+      )
+      |> Repo.all()
+
+    %{payment: payment, ticket_order: completed, tickets: tickets}
+  end
+
+  defp refunds_for_payment(payment_id) do
+    from(r in Refund, where: r.payment_id == ^payment_id) |> Repo.all()
+  end
+
+  defp expected_stripe_refund_id(payment, amount) do
+    amount_cents = Ysc.MoneyHelper.money_to_cents(amount)
+
+    key =
+      Ysc.Stripe.Idempotency.key("admin_refund_#{payment.id}_#{amount_cents}")
+
+    "re_test_#{key}"
   end
 
   describe "Admin Money" do
@@ -547,6 +569,158 @@ defmodule YscWeb.AdminMoneyLiveTest do
         )
 
       assert Enum.all?(tickets, &(&1.status == :cancelled))
+    end
+
+    test "full refund records the Stripe refund id instead of a fabricated ledger id",
+         %{conn: conn} do
+      %{payment: payment} = completed_ticket_order_with_payment!()
+
+      refund_amount =
+        payment.amount
+        |> Money.to_decimal()
+        |> Decimal.to_string(:normal)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
+
+      view
+      |> form("#refund-form", %{
+        "refund" => %{
+          "amount" => refund_amount,
+          "reason" => "Customer request",
+          "release_availability" => "false"
+        }
+      })
+      |> render_submit()
+
+      [refund] = refunds_for_payment(payment.id)
+      expected_id = expected_stripe_refund_id(payment, payment.amount)
+
+      assert refund.external_refund_id == expected_id
+      assert String.starts_with?(refund.external_refund_id, "re_test_")
+
+      refute refund.external_refund_id =~
+               ~r/^admin_refund_[0-9A-HJKMNP-TV-Z]{26}$/
+
+      updated_payment = Ledgers.get_payment(payment.id)
+      assert updated_payment.status == :refunded
+    end
+
+    test "does not record a ledger refund or cancel tickets when Stripe fails",
+         %{conn: conn} do
+      previous = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeRetrieveFailClient)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, previous)
+      end)
+
+      %{payment: payment, ticket_order: ticket_order} =
+        completed_ticket_order_with_payment!()
+
+      refund_amount =
+        payment.amount
+        |> Money.to_decimal()
+        |> Decimal.to_string(:normal)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
+
+      html =
+        view
+        |> form("#refund-form", %{
+          "refund" => %{
+            "amount" => refund_amount,
+            "reason" => "Customer request",
+            "release_availability" => "true"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Stripe declined the refund"
+      assert refunds_for_payment(payment.id) == []
+      assert Ledgers.get_payment(payment.id).status == :completed
+      assert Repo.get!(TicketOrder, ticket_order.id).status == :completed
+
+      tickets =
+        Repo.all(
+          from(t in Ysc.Events.Ticket,
+            where: t.ticket_order_id == ^ticket_order.id
+          )
+        )
+
+      assert Enum.all?(tickets, &(&1.status == :confirmed))
+    end
+
+    test "rejects refunds when the payment has no Stripe payment intent", %{
+      conn: conn
+    } do
+      %{payment: payment, ticket_order: ticket_order} =
+        completed_ticket_order_with_payment!()
+
+      {:ok, payment} =
+        payment
+        |> Ecto.Changeset.change(%{external_payment_id: nil})
+        |> Repo.update()
+
+      refund_amount =
+        payment.amount
+        |> Money.to_decimal()
+        |> Decimal.to_string(:normal)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
+
+      html =
+        view
+        |> form("#refund-form", %{
+          "refund" => %{
+            "amount" => refund_amount,
+            "reason" => "Customer request",
+            "release_availability" => "true"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "no Stripe payment found"
+      assert refunds_for_payment(payment.id) == []
+      assert Ledgers.get_payment(payment.id).status == :completed
+      assert Repo.get!(TicketOrder, ticket_order.id).status == :completed
+    end
+
+    test "partial ticket refund issues Stripe first then cancels only selected tickets",
+         %{conn: conn} do
+      %{payment: payment, ticket_order: ticket_order, tickets: tickets} =
+        completed_ticket_order_with_payment!(quantity: 2)
+
+      [first | [second]] = tickets
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
+
+      html =
+        view
+        |> form("#refund-form", %{
+          "refund" => %{
+            "ticket_ids" => [first.id],
+            "reason" => "One ticket unused"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Refunded 1 ticket(s) successfully"
+
+      [refund] = refunds_for_payment(payment.id)
+      expected_amount = Money.new(50, :USD)
+
+      assert refund.external_refund_id ==
+               expected_stripe_refund_id(payment, expected_amount)
+
+      assert Money.equal?(refund.amount, expected_amount)
+      assert Repo.get!(Ysc.Events.Ticket, first.id).status == :cancelled
+      assert Repo.get!(Ysc.Events.Ticket, second.id).status == :confirmed
+      assert Repo.get!(TicketOrder, ticket_order.id).status == :completed
+      assert Ledgers.get_payment(payment.id).status == :completed
     end
   end
 end
