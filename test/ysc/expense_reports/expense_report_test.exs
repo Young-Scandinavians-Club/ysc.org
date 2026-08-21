@@ -92,5 +92,30 @@ defmodule Ysc.ExpenseReports.ExpenseReportTest do
 
       assert cs.valid?
     end
+
+    test "allows submitted report with a mileage item and no receipt", %{
+      user: user
+    } do
+      cs =
+        ExpenseReport.changeset(%ExpenseReport{}, %{
+          user_id: user.id,
+          purpose: "Trip",
+          reimbursement_method: "check",
+          status: "submitted",
+          certification_accepted: true,
+          expense_items: [
+            %{
+              date: ~D[2024-01-01],
+              expense_type: "mileage",
+              description: "Board meeting",
+              mileage_from_to: "Home to YSC Cabin",
+              miles_driven: 20,
+              receipt_s3_path: nil
+            }
+          ]
+        })
+
+      assert cs.valid?
+    end
   end
 end

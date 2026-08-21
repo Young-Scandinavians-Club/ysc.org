@@ -163,10 +163,21 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
         description: item.description || "N/A",
         date: format_date(item.date),
         amount: format_money(item.amount),
-        has_receipt: !is_nil(item.receipt_s3_path) && item.receipt_s3_path != ""
+        has_receipt:
+          !is_nil(item.receipt_s3_path) && item.receipt_s3_path != "",
+        mileage: item.expense_type == "mileage",
+        mileage_info: format_mileage_info(item)
       }
     end)
   end
+
+  defp format_mileage_info(%{expense_type: "mileage"} = item) do
+    route = if item.mileage_from_to, do: "#{item.mileage_from_to} — ", else: ""
+    miles = if item.miles_driven, do: "#{item.miles_driven} mi", else: ""
+    "#{route}#{miles}"
+  end
+
+  defp format_mileage_info(_item), do: nil
 
   defp format_income_items(income_items_list) do
     Enum.map(income_items_list, fn item ->
