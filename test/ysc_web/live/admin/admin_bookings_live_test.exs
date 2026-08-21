@@ -1028,6 +1028,21 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       _ = user
     end
 
+    test "defaults checkout to the next day when the calendar sends a single date",
+         %{
+           conn: conn
+         } do
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/new?property=clear_lake&from_date=2036-06-01&to_date=2036-06-15&type=day&date=2036-06-05"
+        )
+
+      assert has_element?(view, "#booking-form")
+      assert has_element?(view, "#booking_checkin_date[value='2036-06-05']")
+      assert has_element?(view, "#booking_checkout_date[value='2036-06-06']")
+    end
+
     test "loads new refund policy modal route", %{conn: conn} do
       {:ok, view, html} =
         live(
@@ -1831,6 +1846,151 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
 
       updated = Bookings.get_booking!(booking.id)
       assert updated.status == :draft
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+      assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+    end
+
+    test "edit draft day booking to complete reclaims capacity_booked inventory",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "DraftToComplete"})
+
+      checkin = ~D[2037-03-10]
+      checkout = ~D[2037-03-13]
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      {:ok, booking} = Ysc.Bookings.BookingLocker.confirm_booking(booking.id)
+      {:ok, _} = Ysc.Bookings.BookingLocker.revert_complete_to_draft(booking.id)
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=clear_lake&from_date=2037-03-01&to_date=2037-03-20"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2037-03-10",
+          "checkout_date" => "2037-03-13",
+          "guests_count" => "2",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "status" => "complete"
+        }
+      })
+      |> render_submit()
+
+      updated = Bookings.get_booking!(booking.id)
+      assert updated.status == :complete
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+      assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+    end
+
+    test "edit draft day booking to hold reclaims capacity_held inventory", %{
+      conn: conn
+    } do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "DraftToHold"})
+
+      checkin = ~D[2037-04-10]
+      checkout = ~D[2037-04-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      {:ok, _} = Ysc.Bookings.BookingLocker.revert_hold_to_draft(hold.id)
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2037-04-01&to_date=2037-04-20"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2037-04-10",
+          "checkout_date" => "2037-04-13",
+          "guests_count" => "2",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "status" => "hold"
+        }
+      })
+      |> render_submit()
+
+      updated = Bookings.get_booking!(hold.id)
+      assert updated.status == :hold
+      assert day_capacity_held_for(:clear_lake, stay_days) == [2, 2, 2]
+      assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+    end
+
+    test "saving a draft day booking without changing status does not crash", %{
+      conn: conn
+    } do
+      ensure_clear_lake_pricing_rules!()
+      user = user_fixture(%{first_name: "Spot", last_name: "DraftResave"})
+
+      checkin = ~D[2037-05-10]
+      checkout = ~D[2037-05-13]
+
+      {:ok, booking} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      {:ok, booking} = Ysc.Bookings.BookingLocker.confirm_booking(booking.id)
+      {:ok, _} = Ysc.Bookings.BookingLocker.revert_complete_to_draft(booking.id)
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=clear_lake&from_date=2037-05-01&to_date=2037-05-20"
+        )
+
+      view
+      |> form("#booking-form", %{
+        "booking" => %{
+          "checkin_date" => "2037-05-10",
+          "checkout_date" => "2037-05-13",
+          "guests_count" => "3",
+          "children_count" => "0",
+          "booking_mode" => "day",
+          "status" => "draft"
+        }
+      })
+      |> render_submit()
+
+      updated = Bookings.get_booking!(booking.id)
+      assert updated.status == :draft
+      assert updated.guests_count == 3
       assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
       assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
     end

@@ -47,6 +47,23 @@ defmodule YscWeb.AdminEventsLive.TicketReservationFormTest do
       assert html =~ "Reserve Tickets"
     end
 
+    test "uses the shared admin user autocomplete picker" do
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      user = user_fixture()
+
+      html =
+        render_component(TicketReservationForm, %{
+          id: "reserve-#{tier.id}",
+          ticket_tier: tier,
+          current_user: user
+        })
+
+      assert html =~ ~s(id="ticket-reservation-user-autocomplete")
+      assert html =~ ~s(id="ticket-reservation-user-autocomplete-input")
+      assert html =~ "Search by name or email"
+    end
+
     test "displays discount field" do
       event = event_fixture()
       tier = ticket_tier_fixture(%{event_id: event.id})

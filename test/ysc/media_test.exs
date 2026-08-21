@@ -760,4 +760,44 @@ defmodule Ysc.MediaTest do
       assert updated.processing_state == :completed
     end
   end
+
+  describe "public_image_storage_key/1" do
+    test "uses a unique prefix so the same filename cannot collide" do
+      first = Media.public_image_storage_key("club-logo.png")
+      second = Media.public_image_storage_key("club-logo.png")
+
+      assert first != second
+      assert first =~ ~r{^public/[^/]+/club-logo\.png$}
+      assert second =~ ~r{^public/[^/]+/club-logo\.png$}
+      refute first == "public/club-logo.png"
+    end
+
+    test "keeps only the basename so client path segments cannot choose a prefix" do
+      key = Media.public_image_storage_key("../../existing/club-logo.png")
+
+      assert key =~ ~r{^public/[^/]+/club-logo\.png$}
+      refute key =~ "existing"
+      refute key =~ ".."
+    end
+  end
+
+  describe "image_content_type_from_filename/1" do
+    test "maps allowed image extensions" do
+      assert Media.image_content_type_from_filename("photo.JPG") == "image/jpeg"
+
+      assert Media.image_content_type_from_filename("photo.jpeg") ==
+               "image/jpeg"
+
+      assert Media.image_content_type_from_filename("photo.png") == "image/png"
+      assert Media.image_content_type_from_filename("photo.gif") == "image/gif"
+
+      assert Media.image_content_type_from_filename("photo.webp") ==
+               "image/webp"
+    end
+
+    test "does not trust a spoofed HTML extension as an image type" do
+      assert Media.image_content_type_from_filename("payload.html") ==
+               "application/octet-stream"
+    end
+  end
 end

@@ -30,6 +30,27 @@ defmodule Ysc.Subscriptions do
   end
 
   @doc """
+  Returns true if the user (or their primary, for sub-accounts) has any
+  subscription row, including expired ones.
+
+  Used to distinguish "never subscribed" from "lapsed membership" without
+  loading subscription records or items.
+  """
+  def has_any_subscription?(nil), do: false
+
+  def has_any_subscription?(%{id: id, primary_user_id: primary_user_id}) do
+    user_id = primary_user_id || id
+
+    user_id
+    |> has_any_subscription_query()
+    |> Repo.exists?()
+  end
+
+  defp has_any_subscription_query(user_id) do
+    from(s in Subscription, where: s.user_id == ^user_id)
+  end
+
+  @doc """
   Gets a single subscription by Stripe ID.
 
   ## Examples
@@ -2285,5 +2306,10 @@ defmodule Ysc.Subscriptions do
       where: s.user_id == ^user_id,
       preload: :subscription_items
     )
+  end
+
+  @doc false
+  def ci_query_explain_has_any_subscription_query do
+    has_any_subscription_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

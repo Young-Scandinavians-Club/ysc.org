@@ -2178,5 +2178,111 @@ defmodule YscWeb.EventDetailsLiveTest do
       element(view, "#attendees-overflow-btn") |> render_click()
       assert has_element?(view, "#attendees-modal")
     end
+
+    test "Who's Going modal hides attendee emails and host zero-ticket counts",
+         %{conn: conn} do
+      viewer = user_with_membership(:lifetime)
+      conn = log_in_user(conn, viewer)
+
+      host =
+        user_with_membership(:lifetime, %{
+          first_name: "Hosty",
+          last_name: "McHost",
+          email:
+            "host-whos-going-#{System.unique_integer([:positive])}@ysc.test"
+        })
+
+      named =
+        user_with_membership(:lifetime, %{
+          first_name: "Greta",
+          last_name: "Garbo",
+          email:
+            "greta-whos-going-#{System.unique_integer([:positive])}@ysc.test"
+        })
+
+      nameless =
+        user_with_membership(:lifetime, %{
+          first_name: "Temp",
+          last_name: "Name",
+          email:
+            "nameless-whos-going-#{System.unique_integer([:positive])}@ysc.test"
+        })
+        |> Ecto.Changeset.change(%{first_name: nil, last_name: nil})
+        |> Repo.update!()
+
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: host)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      confirmed_ticket(event, tier, named)
+      confirmed_ticket(event, tier, named)
+      confirmed_ticket(event, tier, nameless)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+      render_click(view, "show-attendees-modal")
+
+      assert has_element?(view, "#attendees-modal")
+
+      assert has_element?(
+               view,
+               "#attendees-modal-user-#{named.id}",
+               "Greta Garbo"
+             )
+
+      assert has_element?(
+               view,
+               "#attendees-modal-user-#{named.id}-tickets",
+               "2 tickets"
+             )
+
+      assert has_element?(
+               view,
+               "#attendees-modal-user-#{nameless.id}",
+               "Member"
+             )
+
+      assert has_element?(
+               view,
+               "#attendees-modal-user-#{host.id}",
+               "Hosty McHost"
+             )
+
+      assert has_element?(view, "#attendees-modal-user-#{host.id}", "Host")
+      refute has_element?(view, "#attendees-modal-user-#{host.id}-tickets")
+      refute has_element?(view, "#attendees-modal", "No ticket")
+      refute has_element?(view, "#attendees-modal", named.email)
+      refute has_element?(view, "#attendees-modal", nameless.email)
+      refute has_element?(view, "#attendees-modal", host.email)
+    end
+
+    test "Who's Going modal still shows ticket count for hosts who bought tickets",
+         %{conn: conn} do
+      viewer = user_with_membership(:lifetime)
+      conn = log_in_user(conn, viewer)
+
+      host =
+        user_with_membership(:lifetime, %{
+          first_name: "HostBuyer",
+          last_name: "Tickets"
+        })
+
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: host)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+      confirmed_ticket(event, tier, host)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+      render_click(view, "show-attendees-modal")
+
+      assert has_element?(view, "#attendees-modal-user-#{host.id}", "Host")
+
+      assert has_element?(
+               view,
+               "#attendees-modal-user-#{host.id}-tickets",
+               "1 ticket"
+             )
+    end
   end
 end

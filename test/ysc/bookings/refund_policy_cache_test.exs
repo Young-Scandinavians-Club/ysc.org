@@ -441,6 +441,33 @@ defmodule Ysc.Bookings.RefundPolicyCacheTest do
       assert match?({:version, _, _}, stored)
     end
 
+    test "reloads rules when a cached policy has unloaded associations" do
+      policy =
+        create_refund_policy(%{
+          name: "Unloaded Rules Policy",
+          property: :tahoe,
+          booking_mode: :room,
+          is_active: true
+        })
+
+      create_refund_policy_rule(policy.id, 14, "100.0")
+      loaded = RefundPolicyCache.get_active(:tahoe, :room)
+      assert is_list(loaded.rules)
+
+      cache_key = "refund_policy:property:tahoe:booking_mode:room"
+      {:ok, {:version, version, _}} = Cachex.get(:ysc_cache, cache_key)
+
+      unloaded = Repo.get!(Ysc.Bookings.RefundPolicy, policy.id)
+      refute is_list(unloaded.rules)
+
+      Cachex.put(:ysc_cache, cache_key, {:version, version, unloaded})
+
+      cached = RefundPolicyCache.get_active(:tahoe, :room)
+      assert cached.id == policy.id
+      assert is_list(cached.rules)
+      assert length(cached.rules) == 1
+    end
+
     test "initializes version key when absent before caching" do
       Cachex.del(:ysc_cache, "refund_policy:version")
 

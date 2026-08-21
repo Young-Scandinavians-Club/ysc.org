@@ -44,7 +44,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
         # Check if cache version is still valid
         case Cachex.get(@cache_name, @cache_version_key) do
           {:ok, current_version} when current_version == version ->
-            policy
+            policy_with_loaded_rules(policy, property, booking_mode)
 
           _ ->
             # Version mismatch - invalidate and refetch
@@ -56,6 +56,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
 
       {:ok, policy} ->
         # Legacy format (no version) - upgrade to versioned
+        policy = policy_with_loaded_rules(policy, property, booking_mode)
         cache_with_version(cache_key, policy)
         policy
 
@@ -128,6 +129,23 @@ defmodule Ysc.Bookings.RefundPolicyCache do
 
   defp build_cache_key(property, booking_mode) do
     "#{@cache_prefix}property:#{property}:booking_mode:#{booking_mode}"
+  end
+
+  defp policy_with_loaded_rules(nil, _property, _booking_mode), do: nil
+
+  defp policy_with_loaded_rules(
+         %{rules: rules} = policy,
+         _property,
+         _booking_mode
+       )
+       when is_list(rules) do
+    policy
+  end
+
+  defp policy_with_loaded_rules(_policy, property, booking_mode) do
+    policy = get_active_refund_policy_db(property, booking_mode)
+    cache_with_version(build_cache_key(property, booking_mode), policy)
+    policy
   end
 
   defp cache_with_version(key, value) do

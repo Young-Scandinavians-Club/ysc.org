@@ -24,6 +24,33 @@ defmodule YscWeb.AdminEventsLiveTest do
       assert html =~ "Grand Viking Feast"
     end
 
+    test "renders date range filter inputs", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/admin/events")
+      render_async(view, 5000)
+
+      assert has_element?(view, "#filter-events-date-from")
+      assert has_element?(view, "#filter-events-date-to")
+    end
+
+    test "date range filter patches URL with date_from, date_to, and tab", %{
+      conn: conn
+    } do
+      {:ok, view, _} = live(conn, ~p"/admin/events")
+      render_async(view, 5000)
+
+      view
+      |> form("#events-filter-form", %{
+        date_from: "2026-01-01",
+        date_to: "2026-03-31"
+      })
+      |> render_change()
+
+      path = assert_patch(view)
+      assert path =~ "date_from=2026-01-01"
+      assert path =~ "date_to=2026-03-31"
+      assert path =~ "tab=upcoming"
+    end
+
     test "navigates to new event page", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/events")
 

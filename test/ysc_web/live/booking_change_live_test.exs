@@ -427,7 +427,7 @@ defmodule YscWeb.BookingChangeLiveTest do
       |> render_change()
 
     assert html =~ "modification-preview-error"
-    assert html =~ "whole cabin is already reserved"
+    assert html =~ "whole cabin is already booked"
   end
 
   test "shows plain-language blackout message when dates overlap a blackout period",
@@ -1100,7 +1100,7 @@ defmodule YscWeb.BookingChangeLiveTest do
       })
       |> render_submit()
 
-    assert html =~ "No changes were made to your reservation."
+    assert html =~ "No changes were made to your booking."
   end
 
   test "submit-modification shows a validation error for an invalid date range",

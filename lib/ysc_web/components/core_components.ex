@@ -21,6 +21,7 @@ defmodule YscWeb.CoreComponents do
   import Phoenix.Controller, only: [get_csrf_token: 0]
 
   alias Phoenix.LiveView.JS
+  alias Ysc.Accounts.UserDisplay
   alias YscWeb.{DateDisplay, FormHelpers, UploadErrors}
 
   @doc """
@@ -3824,6 +3825,170 @@ defmodule YscWeb.CoreComponents do
   defp form_notice_icon(:success, :default), do: "hero-check-circle"
   defp form_notice_icon(_kind, false), do: nil
   defp form_notice_icon(_kind, icon) when is_binary(icon), do: icon
+
+  @doc """
+  Signed-in identity banner for public forms (contact, volunteer).
+
+  Shows the member's avatar, title-cased name, and email so they can confirm
+  who the submission will be attributed to. Pass extra content (for example
+  hidden name/email fields) via the inner block.
+
+  ## Examples
+
+      <.submitting_as user={@current_user} />
+
+      <.submitting_as user={@current_user} id="volunteer-submitting-as">
+        <input type="hidden" name={@form[:name].name} value={@form[:name].value} />
+      </.submitting_as>
+  """
+  attr :user, :map, required: true
+  attr :id, :string, default: "submitting-as"
+  attr :class, :any, default: nil
+  slot :inner_block
+
+  def submitting_as(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg",
+        @class
+      ]}
+    >
+      <div class="flex items-center gap-3">
+        <.user_avatar_image user={@user} class="w-10 h-10 shrink-0" />
+        <div>
+          <p class="text-sm font-semibold text-blue-900">Submitting as</p>
+          <p class="text-sm text-blue-700">
+            {UserDisplay.full_name(@user)} ({@user.email})
+          </p>
+        </div>
+      </div>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
+  Department mailto card used on the public contact page.
+
+  ## Examples
+
+      <.mailto_card
+        id="contact-card-tahoe"
+        email={Ysc.EmailConfig.tahoe_email()}
+        icon="hero-home-modern"
+        title="Tahoe Cabin"
+      >
+        Questions about bookings or stays.
+      </.mailto_card>
+  """
+  attr :id, :string, default: nil
+  attr :email, :string, required: true
+  attr :icon, :string, required: true
+  attr :title, :string, required: true
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  def mailto_card(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      href={"mailto:#{@email}"}
+      class={[
+        "p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200",
+        @class
+      ]}
+    >
+      <div class="flex items-start gap-3">
+        <.icon
+          name={@icon}
+          class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
+        />
+        <div>
+          <h3 class="font-bold text-zinc-900 mb-1">{@title}</h3>
+          <p class="text-sm text-zinc-600">
+            {render_slot(@inner_block)}
+          </p>
+          <p class="text-sm text-blue-600 mt-2">{@email}</p>
+        </div>
+      </div>
+    </.link>
+    """
+  end
+
+  @doc """
+  Large selectable checkbox card for multi-select interest/option grids.
+
+  Renders a boolean checkbox with a hidden `"false"` companion input so
+  unchecked values submit, matching `<.input type="checkbox">`.
+
+  ## Examples
+
+      <.checkbox_card
+        field={@form[:interest_events]}
+        icon="hero-calendar"
+        label="Events & Parties"
+        description="Help organize banquets and social gatherings."
+      />
+  """
+  attr :field, Phoenix.HTML.FormField, required: true
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
+  attr :description, :string, required: true
+
+  attr :hover_class, :string,
+    default: nil,
+    doc: "Optional extra hover utilities (e.g. hover:border-orange-200)"
+
+  attr :rest, :global, include: ~w(phx-debounce disabled)
+
+  def checkbox_card(assigns) do
+    field = assigns.field
+
+    assigns =
+      assigns
+      |> assign(:id, field.id)
+      |> assign(:name, field.name)
+      |> assign(
+        :checked,
+        Phoenix.HTML.Form.normalize_value("checkbox", field.value)
+      )
+      |> assign(
+        :aria_label,
+        "#{assigns.label}: #{String.trim_trailing(assigns.description, ".")}"
+      )
+
+    ~H"""
+    <label
+      for={@id}
+      class={[
+        "relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group",
+        @hover_class
+      ]}
+    >
+      <input type="hidden" name={@name} value="false" />
+      <input
+        type="checkbox"
+        id={@id}
+        name={@name}
+        value="true"
+        checked={@checked}
+        aria-label={@aria_label}
+        class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
+        {@rest}
+      />
+      <.icon
+        name={@icon}
+        class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
+      />
+      <span class="font-bold text-zinc-900 leading-tight mb-1">
+        {@label}
+      </span>
+      <span class="text-xs text-zinc-500">{@description}</span>
+    </label>
+    """
+  end
 
   @doc """
   Amber warning panel with leading icon, optional title, and free-form body (often `{raw/1}` HTML).

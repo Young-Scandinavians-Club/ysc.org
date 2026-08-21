@@ -45,8 +45,8 @@ defmodule YscWeb.VolunteerRoleTest do
     test "new event page creates an event and redirects to its edit page", %{
       conn: conn
     } do
-      # AdminEventsNewLive creates a draft event on mount and live-redirects
-      # to the edit page — a live_redirect proves the page was accessible
+      # Connected mount creates a draft and live-redirects to the edit page.
+      # The HTTP dead render is a loading shell and does not insert.
       assert {:error, {:live_redirect, %{to: path}}} =
                live(conn, ~p"/admin/events/new")
 

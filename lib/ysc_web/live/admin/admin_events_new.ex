@@ -1355,15 +1355,24 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, inserted_event} =
-      Events.create_event(%{
-        title: "New Event",
-        description: "",
-        state: :draft,
-        organizer_id: socket.assigns.current_user.id
-      })
+    # Defer the draft INSERT until the WebSocket is connected. A disconnected
+    # mount (HTTP GET /admin/events/new) used to insert + invalidate public
+    # event caches before first paint, and `push_navigate` on dead render is
+    # an extra round-trip. Posts/newsletters already create in-memory until save.
+    if connected?(socket) do
+      {:ok, inserted_event} =
+        Events.create_event(%{
+          title: "New Event",
+          description: "",
+          state: :draft,
+          organizer_id: socket.assigns.current_user.id
+        })
 
-    {:ok, push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
+      {:ok,
+       push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
+    else
+      {:ok, assign_new_event_loading_shell(socket)}
+    end
   end
 
   @impl true
@@ -1467,6 +1476,18 @@ defmodule YscWeb.AdminEventsNewLive do
       :editors,
       EditingPresence.editors(:event, id, socket.assigns.current_user.id)
     )
+  end
+
+  defp assign_new_event_loading_shell(socket) do
+    socket
+    |> assign(:loading_event?, true)
+    |> assign(:event, nil)
+    |> assign(:active_page, :events)
+    |> assign(:page_title, "New Event")
+    |> assign(:list_params, %{})
+    |> assign(:event_title, "New Event")
+    |> assign(:state, :draft)
+    |> assign(:editors, [])
   end
 
   defp assign_event_loading_shell(socket, params, id) do

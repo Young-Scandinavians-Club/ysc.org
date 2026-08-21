@@ -30,6 +30,53 @@ defmodule Ysc.Bookings.SeasonHelpers do
   end
 
   @doc """
+  True when a season's recurring window spans two calendar years
+  (start month after end month), e.g. Nov 1 – Apr 30.
+
+  Clear Lake uses this year-spanning window for indoor beds, so sleeping
+  copy should key off dates rather than `Season.name`.
+  """
+  def winter_sleeping_season?(%{
+        start_date: %Date{} = start_date,
+        end_date: %Date{} = end_date
+      }) do
+    start_date.month > end_date.month
+  end
+
+  def winter_sleeping_season?(_), do: false
+
+  @doc """
+  True when a season's recurring window stays in a single calendar year
+  (start month on or before end month), e.g. May 1 – Oct 31.
+  """
+  def summer_sleeping_season?(%{
+        start_date: %Date{} = start_date,
+        end_date: %Date{} = end_date
+      }) do
+    start_date.month <= end_date.month
+  end
+
+  def summer_sleeping_season?(_), do: false
+
+  @doc """
+  Formats a season's recurring month/day window, e.g. `"Nov 1 – Apr 30"`.
+
+  Returns `nil` when the season has no dates.
+  """
+  def format_season_window(%{
+        start_date: %Date{} = start_date,
+        end_date: %Date{} = end_date
+      }) do
+    "#{format_month_day(start_date)} – #{format_month_day(end_date)}"
+  end
+
+  def format_season_window(_), do: nil
+
+  defp format_month_day(%Date{} = date) do
+    Calendar.strftime(date, "%b") <> " #{date.day}"
+  end
+
+  @doc """
   Gets the current season and its actual date range for a property.
 
   When `seasons` is a preloaded list (e.g. from `SeasonCache`), no DB query is made.

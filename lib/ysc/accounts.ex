@@ -14,7 +14,6 @@ defmodule Ysc.Accounts do
   alias Ysc.Accounts.{
     Address,
     BoardPosition,
-    Email,
     FamilyInvite,
     MembershipCache,
     User,
@@ -50,15 +49,7 @@ defmodule Ysc.Accounts do
 
   """
   def get_user_by_email(email) when is_binary(email) do
-    normalized_email = Email.normalize(email)
-
-    case Repo.get_by(User, email: normalized_email) do
-      %User{} = user ->
-        user
-
-      nil ->
-        find_user_by_canonical_email(normalized_email)
-    end
+    User.get_by_canonical_email(email)
   end
 
   @doc """
@@ -146,20 +137,6 @@ defmodule Ysc.Accounts do
       end
     rescue
       _ -> {:error, :normalization_failed}
-    end
-  end
-
-  defp find_user_by_canonical_email(normalized_email) do
-    if Email.gmail?(normalized_email) do
-      [_local, domain] = String.split(normalized_email, "@", parts: 2)
-
-      from(u in User, where: ilike(u.email, ^"%@#{domain}"))
-      |> Repo.all()
-      |> Enum.find(fn user ->
-        Email.normalize(user.email) == normalized_email
-      end)
-    else
-      nil
     end
   end
 
@@ -1935,6 +1912,30 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Disables event notifications for the user with the given email, e.g. in
+  response to an SES complaint or hard bounce on an event-notification email.
+
+  Returns `{:ok, user}` if the preference was updated, `{:ok, :not_found}` if
+  no user matches the email, or `{:ok, :already_disabled}` if the preference
+  was already off.
+  """
+  @spec disable_event_notifications(String.t()) ::
+          {:ok, User.t() | :not_found | :already_disabled}
+          | {:error, Ecto.Changeset.t()}
+  def disable_event_notifications(email) when is_binary(email) do
+    case get_user_by_email(email) do
+      nil ->
+        {:ok, :not_found}
+
+      %User{event_notifications: false} ->
+        {:ok, :already_disabled}
+
+      %User{} = user ->
+        update_notification_preferences(user, %{event_notifications: false})
+    end
+  end
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for changing the user's billing address.
   """
   def change_billing_address(user, attrs \\ %{}) do
@@ -3361,12 +3362,20 @@ defmodule Ysc.Accounts do
 
   @doc """
   Marks a user's phone as verified by setting the phone_verified_at timestamp.
+
+  For WP-migrated users, also turns on SMS notifications for any category
+  where email notifications are already on. Migrated users never went
+  through the SMS opt-in checkbox that native sign-up/settings phone
+  verification flows show, so without this their SMS prefs stay stuck at
+  the `false` value the WP import forced regardless of their email prefs.
   """
   def mark_phone_verified(user) do
+    attrs =
+      %{phone_verified_at: DateTime.utc_now()}
+      |> maybe_sync_migrated_sms_notifications(user)
+
     case user
-         |> User.phone_verification_changeset(%{
-           phone_verified_at: DateTime.utc_now()
-         })
+         |> User.phone_verification_changeset(attrs)
          |> Repo.update() do
       {:ok, _} = ok ->
         invalidate_user_profile_cache(user)
@@ -3374,6 +3383,32 @@ defmodule Ysc.Accounts do
 
       error ->
         error
+    end
+  end
+
+  defp maybe_sync_migrated_sms_notifications(attrs, user) do
+    if wp_migrated?(user) do
+      attrs
+      |> maybe_enable_sms(
+        :account_notifications_sms,
+        user.account_notifications,
+        user.account_notifications_sms
+      )
+      |> maybe_enable_sms(
+        :event_notifications_sms,
+        user.event_notifications,
+        user.event_notifications_sms
+      )
+    else
+      attrs
+    end
+  end
+
+  defp maybe_enable_sms(attrs, field, email_pref, sms_pref) do
+    if email_pref && !sms_pref do
+      Map.put(attrs, field, true)
+    else
+      attrs
     end
   end
 
@@ -4543,6 +4578,80 @@ defmodule Ysc.Accounts do
     is_nil(user.post_migration_onboarding_completed_at)
   end
 
+  @doc """
+  New-user application counts for the admin dashboard.
+
+  One query with filtered `COUNT`s instead of four sequential scans of `users`.
+  Windows match the previous LiveView implementation (UTC month/year bounds
+  from `now`).
+  """
+  def get_application_statistics(now \\ DateTime.utc_now()) do
+    %{
+      this_month: this_month,
+      this_year: this_year,
+      last_month: last_month,
+      last_year_month: last_year_month
+    } = now |> application_statistics_query() |> Repo.one!()
+
+    month_change = percent_change(this_month, last_month)
+    year_change = percent_change(this_year, last_year_month)
+
+    {this_month, this_year, last_month, last_year_month, month_change,
+     year_change}
+  end
+
+  defp percent_change(_current, 0), do: 0
+
+  defp percent_change(current, previous),
+    do: round((current - previous) / previous * 100)
+
+  defp application_statistics_query(%DateTime{} = now) do
+    month_start = %DateTime{
+      now
+      | day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    year_start = %DateTime{
+      now
+      | month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    last_month_start = Timex.shift(month_start, months: -1)
+    last_year_month_start = Timex.shift(month_start, years: -1)
+
+    last_year_month_end =
+      last_year_month_start |> Timex.shift(months: 1)
+
+    from(u in User,
+      where: u.inserted_at >= ^last_year_month_start,
+      where: u.inserted_at < ^now,
+      select: %{
+        this_month: count(u.id) |> filter(u.inserted_at >= ^month_start),
+        this_year: count(u.id) |> filter(u.inserted_at >= ^year_start),
+        last_month:
+          count(u.id)
+          |> filter(
+            u.inserted_at >= ^last_month_start and u.inserted_at < ^month_start
+          ),
+        last_year_month:
+          count(u.id)
+          |> filter(
+            u.inserted_at >= ^last_year_month_start and
+              u.inserted_at < ^last_year_month_end
+          )
+      }
+    )
+  end
+
   @doc false
   def ci_query_explain_query do
     from(u in User,
@@ -4550,5 +4659,10 @@ defmodule Ysc.Accounts do
       order_by: [asc: u.last_name, asc: u.first_name],
       limit: 50
     )
+  end
+
+  @doc false
+  def ci_query_explain_application_statistics_query do
+    application_statistics_query(Ysc.Ci.QueryExplain.Fixtures.now())
   end
 end

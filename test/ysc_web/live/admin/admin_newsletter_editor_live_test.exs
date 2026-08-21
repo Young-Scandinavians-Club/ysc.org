@@ -1,11 +1,15 @@
 defmodule YscWeb.AdminNewsletterEditorLiveTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Swoosh.TestAssertions
   import Ysc.AccountsFixtures
 
   alias Ysc.Newsletter
+  alias Ysc.Newsletter.Edition
+  alias Ysc.Repo
+  alias YscWeb.Admin.DateTimeDisplay
 
   # ---------------------------------------------------------------------------
   # Helpers
@@ -768,5 +772,29 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       assert html =~ "Last edited by"
       assert html =~ "Morgan"
     end
+
+    test "formats the date in Pacific time, not UTC", %{
+      conn: conn,
+      admin: admin
+    } do
+      # 05:00 UTC on Mar 15 is still Mar 14 in America/Los_Angeles.
+      edited_at = ~U[2024-03-15 05:00:00Z]
+      edition = edition_fixture(admin)
+      stamp_updated_at(Edition, edition.id, edited_at)
+
+      view = live_editing_edition(conn, edition)
+
+      assert has_element?(view, "p", DateTimeDisplay.format_utc_date(edited_at))
+      refute has_element?(view, "p", "Mar 15, 2024")
+    end
+  end
+
+  defp stamp_updated_at(schema, id, datetime) do
+    {1, _} =
+      Repo.update_all(from(r in schema, where: r.id == ^id),
+        set: [updated_at: datetime]
+      )
+
+    :ok
   end
 end

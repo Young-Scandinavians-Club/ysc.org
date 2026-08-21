@@ -47,22 +47,11 @@ defmodule YscWeb.VolunteerLive do
             id="volunteer-form"
           >
             <%!-- Show user info if logged in, otherwise show input fields --%>
-            <div
+            <.submitting_as
               :if={@logged_in?}
-              class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
+              user={@current_user}
+              id="volunteer-submitting-as"
             >
-              <div class="flex items-center gap-3">
-                <.user_avatar_image
-                  user={@current_user}
-                  class="w-10 h-10 shrink-0"
-                />
-                <div>
-                  <p class="text-sm font-semibold text-blue-900">Submitting as</p>
-                  <p class="text-sm text-blue-700">
-                    {@current_user.first_name} {@current_user.last_name} ({@current_user.email})
-                  </p>
-                </div>
-              </div>
               <%!-- Hidden fields to ensure name and email are submitted --%>
               <input
                 type="hidden"
@@ -74,7 +63,7 @@ defmodule YscWeb.VolunteerLive do
                 name={@form[:email].name}
                 value={@form[:email].value}
               />
-            </div>
+            </.submitting_as>
 
             <div
               :if={!@logged_in?}
@@ -100,227 +89,15 @@ defmodule YscWeb.VolunteerLive do
               </p>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <%!-- Events/Parties --%>
-                <label
-                  for={@form[:interest_events].id}
-                  class="relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group"
-                >
-                  <input
-                    type="hidden"
-                    name={@form[:interest_events].name}
-                    value="false"
-                  />
-                  <input
-                    type="checkbox"
-                    id={@form[:interest_events].id}
-                    name={@form[:interest_events].name}
-                    value="true"
-                    checked={
-                      Phoenix.HTML.Form.normalize_value(
-                        "checkbox",
-                        @form[:interest_events].value
-                      )
-                    }
-                    aria-label="Events & Parties: Help organize banquets and social gatherings"
-                    class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
-                    phx-debounce="blur"
-                  />
-                  <.icon
-                    name="hero-calendar"
-                    class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
-                  />
-                  <span class="font-bold text-zinc-900 leading-tight mb-1">
-                    Events & Parties
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    Help organize banquets and social gatherings.
-                  </span>
-                </label>
-
-                <%!-- Activities --%>
-                <label
-                  for={@form[:interest_activities].id}
-                  class="relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group"
-                >
-                  <input
-                    type="hidden"
-                    name={@form[:interest_activities].name}
-                    value="false"
-                  />
-                  <input
-                    type="checkbox"
-                    id={@form[:interest_activities].id}
-                    name={@form[:interest_activities].name}
-                    value="true"
-                    checked={
-                      Phoenix.HTML.Form.normalize_value(
-                        "checkbox",
-                        @form[:interest_activities].value
-                      )
-                    }
-                    aria-label="Activities: Plan outdoor adventures and member activities"
-                    class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
-                    phx-debounce="blur"
-                  />
-                  <.icon
-                    name="hero-map"
-                    class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
-                  />
-                  <span class="font-bold text-zinc-900 leading-tight mb-1">
-                    Activities
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    Plan outdoor adventures and member activities.
-                  </span>
-                </label>
-
-                <%!-- Clear Lake --%>
-                <label
-                  for={@form[:interest_clear_lake].id}
-                  class="relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 hover:border-orange-200 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group"
-                >
-                  <input
-                    type="hidden"
-                    name={@form[:interest_clear_lake].name}
-                    value="false"
-                  />
-                  <input
-                    type="checkbox"
-                    id={@form[:interest_clear_lake].id}
-                    name={@form[:interest_clear_lake].name}
-                    value="true"
-                    checked={
-                      Phoenix.HTML.Form.normalize_value(
-                        "checkbox",
-                        @form[:interest_clear_lake].value
-                      )
-                    }
-                    aria-label="Clear Lake: Help maintain and manage our Clear Lake cabin"
-                    class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
-                    phx-debounce="blur"
-                  />
-                  <.icon
-                    name="hero-home"
-                    class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
-                  />
-                  <span class="font-bold text-zinc-900 leading-tight mb-1">
-                    Clear Lake
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    Help maintain and manage our Clear Lake cabin.
-                  </span>
-                </label>
-
-                <%!-- Tahoe --%>
-                <label
-                  for={@form[:interest_tahoe].id}
-                  class="relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 hover:border-orange-200 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group"
-                >
-                  <input
-                    type="hidden"
-                    name={@form[:interest_tahoe].name}
-                    value="false"
-                  />
-                  <input
-                    type="checkbox"
-                    id={@form[:interest_tahoe].id}
-                    name={@form[:interest_tahoe].name}
-                    value="true"
-                    checked={
-                      Phoenix.HTML.Form.normalize_value(
-                        "checkbox",
-                        @form[:interest_tahoe].value
-                      )
-                    }
-                    aria-label="Tahoe: Support our mountain retreat at Lake Tahoe"
-                    class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
-                    phx-debounce="blur"
-                  />
-                  <.icon
-                    name="hero-home-modern"
-                    class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
-                  />
-                  <span class="font-bold text-zinc-900 leading-tight mb-1">
-                    Tahoe
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    Support our mountain retreat at Lake Tahoe.
-                  </span>
-                </label>
-
-                <%!-- Marketing --%>
-                <label
-                  for={@form[:interest_marketing].id}
-                  class="relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 hover:border-purple-200 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group"
-                >
-                  <input
-                    type="hidden"
-                    name={@form[:interest_marketing].name}
-                    value="false"
-                  />
-                  <input
-                    type="checkbox"
-                    id={@form[:interest_marketing].id}
-                    name={@form[:interest_marketing].name}
-                    value="true"
-                    checked={
-                      Phoenix.HTML.Form.normalize_value(
-                        "checkbox",
-                        @form[:interest_marketing].value
-                      )
-                    }
-                    aria-label="Marketing: Help us grow our Instagram and newsletter"
-                    class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
-                    phx-debounce="blur"
-                  />
-                  <.icon
-                    name="hero-megaphone"
-                    class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
-                  />
-                  <span class="font-bold text-zinc-900 leading-tight mb-1">
-                    Marketing
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    Help us grow our Instagram and newsletter.
-                  </span>
-                </label>
-
-                <%!-- Website --%>
-                <label
-                  for={@form[:interest_website].id}
-                  class="relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 hover:border-purple-200 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group"
-                >
-                  <input
-                    type="hidden"
-                    name={@form[:interest_website].name}
-                    value="false"
-                  />
-                  <input
-                    type="checkbox"
-                    id={@form[:interest_website].id}
-                    name={@form[:interest_website].name}
-                    value="true"
-                    checked={
-                      Phoenix.HTML.Form.normalize_value(
-                        "checkbox",
-                        @form[:interest_website].value
-                      )
-                    }
-                    aria-label="Website: Help improve and maintain our website"
-                    class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
-                    phx-debounce="blur"
-                  />
-                  <.icon
-                    name="hero-computer-desktop"
-                    class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
-                  />
-                  <span class="font-bold text-zinc-900 leading-tight mb-1">
-                    Website
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    Help improve and maintain our website.
-                  </span>
-                </label>
+                <.checkbox_card
+                  :for={card <- volunteer_interest_cards()}
+                  field={@form[card.field]}
+                  icon={card.icon}
+                  label={card.label}
+                  description={card.description}
+                  hover_class={card.hover_class}
+                  phx-debounce="blur"
+                />
               </div>
             </div>
 
@@ -349,11 +126,12 @@ defmodule YscWeb.VolunteerLive do
             <:actions>
               <.button
                 :if={!@submitted}
+                id="volunteer-submit-button"
                 type="submit"
                 phx-disable-with="Sending..."
                 class="w-full md:w-auto"
               >
-                Submit Application →
+                Submit volunteer form
               </.button>
             </:actions>
           </.simple_form>
@@ -404,7 +182,7 @@ defmodule YscWeb.VolunteerLive do
           {:noreply,
            socket
            |> assign(:submitted, true)
-           |> YscWeb.Flash.put_toast(:info, "Volunteer application submitted",
+           |> YscWeb.Flash.put_toast(:info, "Volunteer form submitted",
              title: "Volunteer"
            )}
 
@@ -467,4 +245,51 @@ defmodule YscWeb.VolunteerLive do
 
   defp add_user_id(params, nil), do: params
   defp add_user_id(params, user), do: Map.put(params, "user_id", user.id)
+
+  defp volunteer_interest_cards do
+    [
+      %{
+        field: :interest_events,
+        icon: "hero-calendar",
+        label: "Events & Parties",
+        description: "Help organize banquets and social gatherings.",
+        hover_class: nil
+      },
+      %{
+        field: :interest_activities,
+        icon: "hero-map",
+        label: "Activities",
+        description: "Plan outdoor adventures and member activities.",
+        hover_class: nil
+      },
+      %{
+        field: :interest_clear_lake,
+        icon: "hero-home",
+        label: "Clear Lake",
+        description: "Help maintain and manage our Clear Lake cabin.",
+        hover_class: "hover:border-orange-200"
+      },
+      %{
+        field: :interest_tahoe,
+        icon: "hero-home-modern",
+        label: "Tahoe",
+        description: "Support our mountain retreat at Lake Tahoe.",
+        hover_class: "hover:border-orange-200"
+      },
+      %{
+        field: :interest_marketing,
+        icon: "hero-megaphone",
+        label: "Marketing",
+        description: "Help us grow our Instagram and newsletter.",
+        hover_class: "hover:border-purple-200"
+      },
+      %{
+        field: :interest_website,
+        icon: "hero-computer-desktop",
+        label: "Website",
+        description: "Help improve and maintain our website.",
+        hover_class: "hover:border-purple-200"
+      }
+    ]
+  end
 end

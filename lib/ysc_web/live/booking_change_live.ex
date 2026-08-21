@@ -280,7 +280,7 @@ defmodule YscWeb.BookingChangeLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "No changes were made to your reservation."
+             "No changes were made to your booking."
            )}
 
         {:error, reason} ->
@@ -461,7 +461,7 @@ defmodule YscWeb.BookingChangeLive do
       role="status"
       aria-live="polite"
     >
-      <span class="sr-only">Loading change reservation…</span>
+      <span class="sr-only">Loading change booking…</span>
       <.skeleton_block class="h-4 w-40 rounded mb-6" />
       <.skeleton_block class="h-9 w-72 rounded mb-2" />
       <.skeleton_block class="h-5 w-56 rounded mb-6" />
@@ -537,7 +537,7 @@ defmodule YscWeb.BookingChangeLive do
                   Your rooms
                 </h2>
                 <p class="text-sm text-zinc-500 mb-2">
-                  Room assignments cannot be changed here. To change rooms, cancel this reservation and book again.
+                  Room assignments cannot be changed here. To change rooms, cancel this booking and book again.
                 </p>
                 <ul class="text-sm text-zinc-600 list-disc list-inside">
                   <%= for room <- @booking.rooms do %>
@@ -1300,7 +1300,7 @@ defmodule YscWeb.BookingChangeLive do
      |> assign(:payment_processing, true)
      |> YscWeb.Flash.put_toast(
        :info,
-       "Payment successful. Finishing your reservation update…",
+       "Payment successful. Finishing your booking update…",
        title: "Payment received"
      )
      |> push_navigate(
@@ -1519,7 +1519,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp modification_error_message(:property_buyout_active),
     do:
-      "The whole cabin is already reserved for those dates. Please choose different dates."
+      "The whole cabin is already booked for those dates. Please choose different dates."
 
   defp modification_error_message(:rooms_already_booked),
     do: "Rooms are already booked for the selected dates."
@@ -1536,29 +1536,28 @@ defmodule YscWeb.BookingChangeLive do
 
   defp modification_error_message(:payment_metadata_mismatch),
     do:
-      "We couldn't verify your payment. Your reservation has not been changed yet. Please try again."
+      "We couldn't verify your payment. Your booking has not been changed yet. Please try again."
 
   defp modification_error_message(:inventory_update_failed),
-    do:
-      "Availability changed while updating your reservation. Please try again."
+    do: "Availability changed while updating your booking. Please try again."
 
   defp modification_error_message(:checkin_in_past),
     do: "Check-in date cannot be in the past."
 
   defp modification_error_message(:modification_hold_expired),
     do:
-      "Time ran out before payment finished. Your original reservation is unchanged. Please start your date change again."
+      "Time ran out before payment finished. Your original booking is unchanged. Please start your date change again."
 
   defp modification_error_message(:modification_hold_mismatch),
     do:
-      "Your reservation details changed while payment was in progress. Please start again."
+      "Your booking details changed while payment was in progress. Please start again."
 
   defp modification_error_message(reason) when is_atom(reason),
     do:
-      "We couldn't update your reservation. Please try again. If this keeps happening, contact info@ysc.org."
+      "We couldn't update your booking. Please try again. If this keeps happening, contact info@ysc.org."
 
   defp modification_error_message(_),
-    do: "Unable to update reservation. Please try again."
+    do: "Unable to update booking. Please try again."
 
   defp property_label(:tahoe), do: "Tahoe"
   defp property_label(:clear_lake), do: "Clear Lake"
@@ -1610,7 +1609,7 @@ defmodule YscWeb.BookingChangeLive do
             <.icon name="hero-check-circle" class="w-5 h-5" /> Payment successful
           </p>
           <p class="text-sm mt-2 text-green-800">
-            We're saving your reservation changes. You'll be redirected to your confirmation shortly.
+            We're saving your booking changes. You'll be redirected to your confirmation shortly.
           </p>
         </div>
       <% else %>
@@ -1718,7 +1717,7 @@ defmodule YscWeb.BookingChangeLive do
           id="modification-downgrade-notice"
           class="mt-4 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3"
         >
-          Shortening your stay reduces the reservation total, but we do not refund the difference.
+          Shortening your stay reduces the booking total, but we do not refund the difference.
         </p>
       <% end %>
     </div>

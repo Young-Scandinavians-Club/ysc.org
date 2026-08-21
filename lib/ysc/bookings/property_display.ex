@@ -6,6 +6,8 @@ defmodule Ysc.Bookings.PropertyDisplay do
   cards, and `full_name/2` for booking details and receipts.
   """
 
+  @clear_lake_training_videos_url "https://www.youtube.com/watch?v=53ARqZXuE0o&list=PLCfwh7uBCuiwoTgkTJDsi5wfD__0EHk3l&index=4&t"
+
   @doc """
   Short label for emails, SMS, and compact UI (e.g. `"Tahoe"`, `"Clear Lake"`).
 
@@ -80,4 +82,12 @@ defmodule Ysc.Bookings.PropertyDisplay do
   def address("tahoe", default), do: address(:tahoe, default)
   def address("clear_lake", default), do: address(:clear_lake, default)
   def address(_, default), do: default
+
+  @doc """
+  Mandatory Clear Lake training-video playlist shown on the booking page
+  and in the check-in reminder email.
+  """
+  def training_videos_url(:clear_lake), do: @clear_lake_training_videos_url
+  def training_videos_url("clear_lake"), do: training_videos_url(:clear_lake)
+  def training_videos_url(_), do: nil
 end

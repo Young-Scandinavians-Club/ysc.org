@@ -62,6 +62,32 @@ defmodule YscWeb.AdminPostsLiveTest do
       )
     end
 
+    test "renders date range filter inputs", %{conn: conn} do
+      {:ok, view, _} = live(conn, ~p"/admin/posts")
+      render_async(view, 5000)
+
+      assert has_element?(view, "#filter-posts-date-from")
+      assert has_element?(view, "#filter-posts-date-to")
+    end
+
+    test "date range filter patches URL with date_from and date_to", %{
+      conn: conn
+    } do
+      {:ok, view, _} = live(conn, ~p"/admin/posts")
+      render_async(view, 5000)
+
+      view
+      |> form("#posts-filter-form", %{
+        date_from: "2026-01-01",
+        date_to: "2026-03-31"
+      })
+      |> render_change()
+
+      path = assert_patch(view)
+      assert path =~ "date_from=2026-01-01"
+      assert path =~ "date_to=2026-03-31"
+    end
+
     test "toggles featured post", %{conn: conn, admin: admin} do
       p1 =
         post_fixture(admin, %{title: "Featured Candidate", featured_post: false})
@@ -214,6 +240,67 @@ defmodule YscWeb.AdminPostsLiveTest do
       html = render(view)
       assert html =~ "Taylor"
       assert html =~ "is editing"
+    end
+
+    test "clears row avatars when the other admin leaves", %{
+      conn: conn,
+      admin: admin
+    } do
+      post = post_fixture(admin, %{title: "Leave update row"})
+      other_admin = user_fixture(%{role: "admin", first_name: "Taylor"})
+      socket_id = "leave-row-tab-#{System.unique_integer([:positive])}"
+
+      {:ok, _ref} =
+        YscWeb.Admin.EditingPresence.track(
+          %{id: socket_id},
+          :post,
+          post.id,
+          other_admin
+        )
+
+      {:ok, view, html} = live(conn, ~p"/admin/posts")
+      assert html =~ "Taylor"
+      assert html =~ "is editing"
+
+      :ok = YscWeb.Admin.EditingPresence.untrack(%{id: socket_id}, :post)
+
+      send(view.pid, %Phoenix.Socket.Broadcast{
+        topic: YscWeb.Admin.EditingPresence.topic(:post),
+        event: "presence_diff",
+        payload: %{
+          joins: %{},
+          leaves: %{"k" => %{metas: [%{resource_id: post.id}]}}
+        }
+      })
+
+      html = render(view)
+      refute html =~ "is editing"
+    end
+
+    test "ignores presence_diff for a post that is not on this page", %{
+      conn: conn,
+      admin: admin
+    } do
+      post_fixture(admin, %{title: "Visible post"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts")
+
+      send(view.pid, %Phoenix.Socket.Broadcast{
+        topic: YscWeb.Admin.EditingPresence.topic(:post),
+        event: "presence_diff",
+        payload: %{
+          joins: %{
+            "k" => %{metas: [%{resource_id: Ecto.ULID.generate()}]}
+          },
+          leaves: %{
+            "k2" => %{metas: [%{resource_id: Ecto.ULID.generate()}]}
+          }
+        }
+      })
+
+      html = render(view)
+      assert html =~ "Visible post"
+      refute html =~ "is editing"
     end
   end
 

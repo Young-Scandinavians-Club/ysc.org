@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.24.1",
+      version: "2.26.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -22,7 +22,9 @@ defmodule Ysc.MixProject do
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-43966",
-          "EEF-CVE-2026-43969"
+          "EEF-CVE-2026-43969",
+          # Published 2026-08-18; still unpatched on Hex cowlib 2.19.0.
+          "EEF-CVE-2026-43971"
         ]
       ],
       test_coverage: [
@@ -214,7 +216,7 @@ defmodule Ysc.MixProject do
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
       {:floki, "~> 0.38"},
-      {:flop, "~> 0.26.6"},
+      {:flop, "~> 0.27.2"},
       {:flop_phoenix, "~> 0.26.2"},
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
@@ -259,8 +261,10 @@ defmodule Ysc.MixProject do
       {:sentry, "~> 13.4"},
       {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
-      # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+ (we use SES)
-      {:swoosh, "~> 1.26.3"},
+      # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
+      # 1.27.1: AmazonSES returns {:error, %{code, message}} instead of crashing when
+      # SES error XML is missing Code/Message nodes (we use SES).
+      {:swoosh, "~> 1.27.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.3"},

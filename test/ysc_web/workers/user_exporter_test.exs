@@ -626,4 +626,24 @@ defmodule YscWeb.Workers.UserExporterTest do
       assert Map.get(row, "membership_renewal_tz") in [nil, ""]
     end
   end
+
+  describe "query batching" do
+    test "preloads subscriptions once per page instead of per user", %{
+      channel: channel
+    } do
+      Enum.each(1..8, fn _ -> user_fixture() end)
+
+      {_path, subscription_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            run_export(channel, oban_job(channel, ["id", "email"], false))
+          end,
+          pattern: ~r/FROM "subscriptions"/
+        )
+
+      # Batched preload: users' subscriptions + primary users' subscriptions.
+      # Per-row preload would issue at least one query per exported user.
+      assert subscription_queries <= 4
+    end
+  end
 end

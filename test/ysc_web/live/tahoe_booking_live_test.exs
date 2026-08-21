@@ -140,6 +140,21 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert page_title(view) =~ "Tahoe Cabin"
     end
 
+    test "how-to-book copy uses plain language instead of booking mode", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      html = render(view)
+
+      assert html =~
+               "Choose whether you want individual rooms or the entire cabin."
+
+      refute html =~ "Choose your booking mode"
+    end
+
     test "initializes with today's date if no params", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)

@@ -471,7 +471,7 @@ defmodule Ysc.Events do
 
     case Repo.transaction(multi) do
       {:ok, %{event: event}} ->
-        invalidate_event_caches()
+        maybe_invalidate_event_caches(event)
         broadcast(%Ysc.MessagePassingEvents.EventAdded{event: event})
         {:ok, event}
 
@@ -673,7 +673,7 @@ defmodule Ysc.Events do
 
     case result do
       {:ok, new_event} ->
-        invalidate_event_caches()
+        maybe_invalidate_event_caches(new_event)
         broadcast(%Ysc.MessagePassingEvents.EventAdded{event: new_event})
         {:ok, new_event}
 
@@ -3616,6 +3616,16 @@ defmodule Ysc.Events do
     Ysc.Events.EventPricingCache.invalidate()
     :ok
   end
+
+  # Public lists and pricing caches only include published/cancelled events.
+  # Draft and scheduled creates (admin "New Event", copy-as-draft) must not
+  # bump the distributed cache version or every /events visitor refetches.
+  defp maybe_invalidate_event_caches(%Event{state: state})
+       when state in [:published, :cancelled, "published", "cancelled"] do
+    invalidate_event_caches()
+  end
+
+  defp maybe_invalidate_event_caches(_event), do: :ok
 
   @doc false
   def ci_query_explain_query, do: upcoming_events_with_preload_query()

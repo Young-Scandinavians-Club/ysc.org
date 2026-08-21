@@ -6,7 +6,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
+  import Ecto.Query
 
+  alias Ysc.Bookings
   alias Ysc.Repo
 
   # LiveView subscribes to booking config caches; parallel tests invalidate them in
@@ -28,6 +30,33 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
     {:ok, view, html}
   end
 
+  defp future_stay_on(month, day, nights \\ 3) do
+    today = Date.utc_today()
+    this_year = Date.new!(today.year, month, day)
+
+    checkin =
+      if Date.compare(this_year, Date.add(today, 1)) == :gt do
+        this_year
+      else
+        Date.new!(today.year + 1, month, day)
+      end
+
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  defp clear_lake_path_with_stay(checkin, checkout, extra \\ %{}) do
+    params =
+      Map.merge(
+        %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout)
+        },
+        extra
+      )
+
+    ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+  end
+
   # render/1 round-trips with the LiveView so :sys.get_state does not time out when
   # the process is still finishing mount-time cache loads under full-suite contention.
   defp guests_count_assign(view) do
@@ -42,6 +71,68 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {:error, {:live_redirect, _}} = redirect -> redirect
       {:error, {:redirect, _}} = redirect -> redirect
       other -> other
+    end
+  end
+
+  defp seed_clear_lake_refund_policies do
+    from(p in Ysc.Bookings.RefundPolicy, where: p.property == :clear_lake)
+    |> Repo.update_all(set: [is_active: false])
+
+    {:ok, buyout} =
+      Bookings.create_refund_policy(%{
+        property: :clear_lake,
+        booking_mode: :buyout,
+        is_active: true,
+        name: "Clear Lake buyout test policy #{System.unique_integer()}"
+      })
+
+    {:ok, day} =
+      Bookings.create_refund_policy(%{
+        property: :clear_lake,
+        booking_mode: :day,
+        is_active: true,
+        name: "Clear Lake day test policy #{System.unique_integer()}"
+      })
+
+    {:ok, _} =
+      Bookings.create_refund_policy_rule(%{
+        refund_policy_id: buyout.id,
+        days_before_checkin: 21,
+        refund_percentage: Decimal.new("35")
+      })
+
+    {:ok, _} =
+      Bookings.create_refund_policy_rule(%{
+        refund_policy_id: day.id,
+        days_before_checkin: 14,
+        refund_percentage: Decimal.new("75")
+      })
+
+    :ok
+  end
+
+  defp mutate_clear_lake_refund_policies(fun) do
+    previous_active_ids =
+      from(p in Ysc.Bookings.RefundPolicy,
+        where: p.property == :clear_lake and p.is_active == true,
+        select: p.id
+      )
+      |> Repo.all()
+
+    try do
+      fun.()
+    after
+      from(p in Ysc.Bookings.RefundPolicy, where: p.property == :clear_lake)
+      |> Repo.update_all(set: [is_active: false])
+
+      if previous_active_ids != [] do
+        from(p in Ysc.Bookings.RefundPolicy,
+          where: p.id in ^previous_active_ids
+        )
+        |> Repo.update_all(set: [is_active: true])
+      end
+
+      Ysc.Bookings.RefundPolicyCache.invalidate()
     end
   end
 
@@ -2270,15 +2361,137 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake Cabin Exterior"
     end
 
-    test "shows winter bedding information for logged-in users", %{conn: conn} do
+    test "winter sleeping copy follows season dates even if the winter season is renamed",
+         %{conn: conn} do
+      winter =
+        Repo.get_by!(Ysc.Bookings.Season,
+          name: "Winter",
+          property: :clear_lake
+        )
+
+      {:ok, _} = Bookings.update_season(winter, %{name: "Indoor Season"})
+
+      try do
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+        {checkin, checkout} = future_stay_on(12, 15)
+
+        {:ok, view, _html} =
+          live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+
+        assert has_element?(
+                 view,
+                 "#sleeping-at-the-cabin",
+                 "Indoor beds are set up in three separate rooms."
+               )
+      after
+        seed_canonical_seasons!()
+      end
+    end
+
+    test "shows winter indoor-bed copy when stay dates are in winter", %{
+      conn: conn
+    } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(12, 15)
 
-      {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
 
-      # Winter bedding info should be clear
-      assert html =~ "Indoor beds are set up in the cabin during winter months"
-      assert html =~ "bring your own linens"
+      assert has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "Indoor beds are set up in three separate rooms."
+             )
+
+      assert has_element?(view, "#sleeping-at-the-cabin", "one queen bed each")
+      assert has_element?(view, "#sleeping-at-the-cabin", "two full-size beds")
+
+      assert has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "bedside tables, lamps, heaters"
+             )
+
+      assert has_element?(view, "#sleeping-alert", "Bring your own linens")
+      assert has_element?(view, "#sleeping-at-the-cabin", "Pack linens")
+
+      refute has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "Beds are not set up in the cabin."
+             )
+
+      refute has_element?(
+               view,
+               "#before-you-go",
+               "Thursday morning sprinklers"
+             )
+    end
+
+    test "shows lawn-camp copy and hides bed linens for summer stays", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(7, 15)
+
+      {:ok, view, _html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+
+      assert has_element?(view, "#sleeping-at-the-cabin")
+
+      assert has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "Beds are not set up in the cabin."
+             )
+
+      assert has_element?(view, "#sleeping-at-the-cabin", "Lawn camp")
+
+      refute has_element?(
+               view,
+               "#sleeping-alert",
+               "Bring your own linens"
+             )
+
+      refute has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "Indoor beds are set up in three separate rooms."
+             )
+    end
+
+    test "shows both sleeping setups when a stay spans summer and winter", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(10, 30, 4)
+
+      {:ok, view, _html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+
+      assert has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "Your stay covers both seasons."
+             )
+
+      assert has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "Beds are not set up."
+             )
+
+      assert has_element?(
+               view,
+               "#sleeping-at-the-cabin",
+               "Indoor beds are set up in three separate rooms."
+             )
+
+      assert has_element?(view, "#sleeping-at-the-cabin", "one queen bed each")
     end
 
     test "shows community treasure messaging instead of dugnad", %{conn: conn} do
@@ -2294,39 +2507,68 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       refute html =~ "chore duty"
     end
 
-    test "shows contact information instead of donate button", %{conn: conn} do
+    test "does not show dock revival donate copy", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
-      # Should show reach out message instead of donate button
-      assert html =~ "Reach out to the club" or html =~ "contact page"
-      # Should NOT have donate now button
+      refute html =~ "The Dock Revival Project"
       refute html =~ "Donate Now"
     end
 
-    test "displays winter season information in packing list", %{conn: conn} do
+    test "logged-in members see before-you-go details from the check-in email",
+         %{
+           conn: conn
+         } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
+      {checkin, checkout} = future_stay_on(7, 15)
 
-      {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} =
+        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
 
-      # Packing list should mention linens and bedding
-      assert html =~ "Linens" or html =~ "linens"
-      assert html =~ "comforter" or html =~ "sleeping bag"
+      assert has_element?(view, "#before-you-go")
+      assert has_element?(view, "#clear-lake-training-videos")
+      assert has_element?(view, "#clear-lake-water-operations")
+      assert has_element?(view, "#before-you-go", "Four keys")
+      assert has_element?(view, "#before-you-go", "Thursday morning sprinklers")
+
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "about 3 days before check-in"
+             )
+
+      refute has_element?(view, "#before-you-go", "1982")
+      refute has_element?(view, "#clear-lake-at-a-glance", "12 Guests")
     end
 
-    test "shows year-round access with seasonal details", %{conn: conn} do
-      user = user_with_membership(:lifetime)
-      conn = log_in_user(conn, user)
+    test "logged-out year-round card uses property season date ranges", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
-      {:ok, _view, html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      assert has_element?(
+               view,
+               "#clear-lake-year-round-access",
+               "Summer (May 1 – Oct 31)"
+             )
 
-      # Should explain both summer and winter sleeping arrangements
-      assert html =~ "Summer" and html =~ "Winter"
-      assert html =~ "sleeping lawn" or html =~ "under the stars"
-      assert html =~ "Indoor beds"
+      assert has_element?(
+               view,
+               "#clear-lake-year-round-access",
+               "Winter (Nov 1 – Apr 30)"
+             )
+
+      assert has_element?(
+               view,
+               "#clear-lake-year-round-access",
+               "three rooms (queens and fulls)"
+             )
+
+      refute has_element?(view, "#clear-lake-year-round-access", "May–Sept")
+      refute has_element?(view, "#clear-lake-year-round-access", "Oct–April")
     end
   end
 
@@ -2386,6 +2628,100 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         )
 
       assert html =~ "No Pets"
+      assert html =~ "Cabin Master"
+    end
+
+    test "rules tab shows configured cancellation policy percentages", %{
+      conn: conn
+    } do
+      mutate_clear_lake_refund_policies(fn ->
+        seed_clear_lake_refund_policies()
+
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+
+        {:ok, view, _html} =
+          live_clear_lake(
+            conn,
+            ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+          )
+
+        assert has_element?(view, "#cancellation-policy")
+        assert has_element?(view, "#cancellation-policy", "35%")
+        assert has_element?(view, "#cancellation-policy", "75%")
+
+        assert has_element?(
+                 view,
+                 "#cancellation-policy",
+                 "21 or more days before check-in"
+               )
+
+        assert has_element?(
+                 view,
+                 "#cancellation-policy",
+                 "14 or more days before check-in"
+               )
+      end)
+    end
+
+    test "rules tab shows empty cancellation copy when no policies exist", %{
+      conn: conn
+    } do
+      mutate_clear_lake_refund_policies(fn ->
+        from(p in Ysc.Bookings.RefundPolicy, where: p.property == :clear_lake)
+        |> Repo.update_all(set: [is_active: false])
+
+        Ysc.Bookings.RefundPolicyCache.invalidate()
+
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+
+        {:ok, view, _html} =
+          live_clear_lake(
+            conn,
+            ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+          )
+
+        assert has_element?(
+                 view,
+                 "#cancellation-policy",
+                 "Policy information will be displayed here"
+               )
+      end)
+    end
+
+    test "rules tab treats an active policy with no rules as empty", %{
+      conn: conn
+    } do
+      mutate_clear_lake_refund_policies(fn ->
+        from(p in Ysc.Bookings.RefundPolicy, where: p.property == :clear_lake)
+        |> Repo.update_all(set: [is_active: false])
+
+        {:ok, _} =
+          Bookings.create_refund_policy(%{
+            property: :clear_lake,
+            booking_mode: :buyout,
+            is_active: true,
+            name: "Clear Lake empty rules #{System.unique_integer()}"
+          })
+
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+
+        {:ok, view, _html} =
+          live_clear_lake(
+            conn,
+            ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+          )
+
+        assert has_element?(
+                 view,
+                 "#cancellation-policy",
+                 "Policy information will be displayed here"
+               )
+
+        refute has_element?(view, "#cancellation-policy", "Entire cabin:")
+      end)
     end
 
     test "switch-tab with unknown tab value leaves active tab unchanged", %{
@@ -2747,18 +3083,34 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
-    test "handles refund_policy_cache_invalidated message without crashing", %{
+    test "handles refund_policy_cache_invalidated by reloading policies", %{
       conn: conn
     } do
-      user = user_with_membership(:lifetime)
-      conn = log_in_user(conn, user)
+      mutate_clear_lake_refund_policies(fn ->
+        from(p in Ysc.Bookings.RefundPolicy, where: p.property == :clear_lake)
+        |> Repo.update_all(set: [is_active: false])
 
-      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+        Ysc.Bookings.RefundPolicyCache.invalidate()
 
-      send(view.pid, {:refund_policy_cache_invalidated, 1})
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
 
-      html = render(view)
-      assert html =~ "Clear Lake"
+        {:ok, view, _html} =
+          live_clear_lake(
+            conn,
+            ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+          )
+
+        refute has_element?(view, "#cancellation-policy", "35%")
+
+        seed_clear_lake_refund_policies()
+        send(view.pid, {:refund_policy_cache_invalidated, 1})
+
+        html = render(view)
+        assert html =~ "Clear Lake"
+        assert has_element?(view, "#cancellation-policy", "35%")
+        assert has_element?(view, "#cancellation-policy", "75%")
+      end)
     end
   end
 
@@ -2964,6 +3316,51 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       day_state = :sys.get_state(view.pid)
       assert day_state.socket.assigns.selected_booking_mode == :day
       assert day_state.socket.assigns.calculated_price != nil
+    end
+  end
+
+  describe "coverage gap: no seasons configured" do
+    test "falls back to mixed sleeping copy and default season windows when no dates are selected",
+         %{conn: conn} do
+      clear_seasons!()
+
+      try do
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+
+        {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+        html = render(view)
+
+        assert :sys.get_state(view.pid).socket.assigns.sleeping_mode == :mixed
+        assert html =~ "Your stay covers both seasons."
+        assert html =~ "Nov 1 – Apr 30"
+        assert html =~ "May 1 – Oct 31"
+      after
+        seed_canonical_seasons!()
+      end
+    end
+
+    test "still renders when dates are selected but no seasons exist", %{
+      conn: conn
+    } do
+      clear_seasons!()
+
+      try do
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+
+        {checkin, checkout} = clear_lake_booking_dates(30, 3)
+
+        {:ok, _view, html} =
+          live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+
+        assert html =~ "Clear Lake"
+        assert html =~ "Nov 1 – Apr 30"
+        assert html =~ "May 1 – Oct 31"
+      after
+        seed_canonical_seasons!()
+      end
     end
   end
 

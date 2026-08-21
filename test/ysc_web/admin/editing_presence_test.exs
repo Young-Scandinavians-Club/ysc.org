@@ -188,6 +188,46 @@ defmodule YscWeb.Admin.EditingPresenceTest do
     end
   end
 
+  describe "diff_resource_ids/1" do
+    test "collects resource ids from joins" do
+      post_id = Ecto.ULID.generate()
+
+      assert EditingPresence.diff_resource_ids(%{
+               joins: %{"socket-1" => %{metas: [%{resource_id: post_id}]}},
+               leaves: %{}
+             }) == [post_id]
+    end
+
+    test "collects resource ids from leaves so listing rows can drop avatars" do
+      post_id = Ecto.ULID.generate()
+
+      assert EditingPresence.diff_resource_ids(%{
+               joins: %{},
+               leaves: %{"socket-1" => %{metas: [%{resource_id: post_id}]}}
+             }) == [post_id]
+    end
+
+    test "uniques ids that appear in both joins and leaves" do
+      shared_id = Ecto.ULID.generate()
+      other_id = Ecto.ULID.generate()
+
+      ids =
+        EditingPresence.diff_resource_ids(%{
+          joins: %{
+            "a" => %{metas: [%{resource_id: shared_id}]},
+            "b" => %{metas: [%{resource_id: other_id}]}
+          },
+          leaves: %{"c" => %{metas: [%{resource_id: shared_id}]}}
+        })
+
+      assert Enum.sort(ids) == Enum.sort([shared_id, other_id])
+    end
+
+    test "returns an empty list when the diff has no metas" do
+      assert EditingPresence.diff_resource_ids(%{joins: %{}, leaves: %{}}) == []
+    end
+  end
+
   describe "subscribe/1" do
     test "subscribes the caller to the resource type's topic" do
       assert :ok = EditingPresence.subscribe(:post)

@@ -27,6 +27,10 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
   Finding 27 (MEDIUM)   GET auto-login/passkey endpoints allowed login CSRF (session fixation to attacker account)
   Finding 28 (CRITICAL) Account setup auto-activation charged saved cards without owner session
+  Finding 32 (HIGH)     SNS cert URL allowed any *.amazonaws.com host (S3-hosted forged certs)
+  Finding 33 (MEDIUM)   QuickBooks refresh token logged in full on rotation
+  Finding 34 (MEDIUM)   Media library S3 uploads used guessable public/<filename> keys
+  Finding 35 (HIGH)     Gmail uniqueness ignored legacy dotted/plus stored addresses, allowing login shadowing
   Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -2244,5 +2248,119 @@ defmodule YscWeb.SecurityAuditTest do
         |> DateTime.truncate(:second)
     )
     |> Repo.update!()
+  end
+
+  # Finding 32 (HIGH): SNS cert URLs must be regional SNS hosts, not any amazonaws.com
+  describe "Finding 32: SNS signing cert URL host allowlist" do
+    test "rejects attacker-controlled S3 amazonaws.com cert URLs" do
+      assert {:error, :invalid_cert_host} ==
+               Ysc.SNS.SignatureVerifier.validate_sns_https_url(
+                 "https://attacker.s3.us-west-2.amazonaws.com/forged.pem",
+                 require_pem: true
+               )
+    end
+
+    test "accepts regional SNS certificate URLs" do
+      assert :ok ==
+               Ysc.SNS.SignatureVerifier.validate_sns_https_url(
+                 "https://sns.us-west-2.amazonaws.com/SimpleNotificationService-60eadc5305533def8eb9f2241f05d5a7.pem",
+                 require_pem: true
+               )
+    end
+  end
+
+  # Finding 33 (MEDIUM): QuickBooks refresh token must not be written to logs
+  describe "Finding 33: QuickBooks refresh token logging" do
+    test "client source does not interpolate the refresh token into log messages" do
+      source =
+        File.read!(Path.join(File.cwd!(), "lib/ysc/quickbooks/client.ex"))
+
+      refute source =~ ~S(QUICKBOOKS_REFRESH_TOKEN="#{new_refresh_token}")
+    end
+  end
+
+  # Finding 34 (MEDIUM): media-library direct uploads used public/<client filename>
+  describe "Finding 34: media library uploads use unpredictable S3 keys" do
+    test "presigned media-library keys are unique and ignore client Content-Type" do
+      entry = %Phoenix.LiveView.UploadEntry{
+        upload_config: :media_uploads,
+        client_name: "club-logo.png",
+        client_type: "text/html"
+      }
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{uploads: %{media_uploads: %{max_file_size: 1_000_000}}}
+      }
+
+      assert {:ok, first, _} = YscWeb.MediaLibraryUpload.presign(entry, socket)
+      assert {:ok, second, _} = YscWeb.MediaLibraryUpload.presign(entry, socket)
+
+      refute first.key == "public/club-logo.png"
+      assert first.key =~ ~r{^public/[^/]+/club-logo\.png$}
+      assert first.key != second.key
+      assert first.fields["content-type"] == "image/png"
+    end
+  end
+
+  # Finding 35 (HIGH): Gmail uniqueness must use canonical matching, not only
+  # the exact email column. Login/OAuth already resolve jane.doe@gmail.com and
+  # janedoe@gmail.com to the same mailbox; a new signup of the canonical form
+  # would otherwise steal those lookups from a legacy dotted row.
+  describe "Finding 35: Gmail canonical uniqueness rejects alias shadowing" do
+    test "register_user cannot take over lookups for a legacy dotted Gmail" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "shadow.#{tag}@gmail.com"
+      canonical_email = "shadow#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Gmail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      assert {:error, changeset} =
+               Accounts.register_user(%{
+                 email: canonical_email,
+                 phone_number: unique_user_phone(),
+                 first_name: "Attacker",
+                 last_name: "Shadow",
+                 password: "valid password"
+               })
+
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(canonical_email)
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(dotted_email)
+    end
+
+    test "email change cannot target a canonical alias of another member" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "change.#{tag}@gmail.com"
+      canonical_email = "change#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Gmail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      attacker = user_fixture(%{email: "attacker#{tag}@example.com"})
+
+      changeset = User.email_changeset(attacker, %{email: canonical_email})
+
+      refute changeset.valid?
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+    end
   end
 end

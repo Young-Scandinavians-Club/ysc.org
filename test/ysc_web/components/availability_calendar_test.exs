@@ -113,6 +113,17 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
     )
   end
 
+  defp render_shifted_buyout_calendar(date) do
+    calendar_base = Date.add(date, -1)
+
+    render_clear_lake_calendar(
+      today: calendar_base,
+      min: calendar_base,
+      max: Date.add(date, 30),
+      selected_booking_mode: :buyout
+    )
+  end
+
   defp render_clear_lake_calendar(opts \\ []) do
     today = Date.utc_today()
 
@@ -402,6 +413,72 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute day_html =~ "Check-in allowed"
     end
 
+    test "buyout calendar labels a fully blocked cabin night as Booked, not Partially booked" do
+      user = user_fixture()
+      checkin = buyout_calendar_test_date()
+      occupied = Date.add(checkin, 1)
+      checkout = Date.add(checkin, 2)
+
+      {:ok, _buyout} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          property: :clear_lake,
+          booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 10,
+          status: :complete,
+          total_price: Money.new(500, :USD)
+        })
+
+      AvailabilityCache.invalidate()
+
+      html = render_shifted_buyout_calendar(occupied)
+      day_str = Date.to_iso8601(occupied)
+      day_html = extract_day_cell(html, day_str)
+      button = calendar_day_button(calendar_document(html), day_str)
+      aria = calendar_element_attr(button, "aria-label")
+
+      refute day_html =~ "Partially booked"
+      assert day_html =~ "Booked"
+      assert day_html =~ "Another member has already booked this date"
+      refute day_html =~ "reservations"
+      assert aria =~ "Booked"
+      refute aria =~ "Booked, Partially booked"
+    end
+
+    test "buyout calendar labels a day-booking blocked night as Partially booked only" do
+      user = user_fixture()
+      checkin = buyout_calendar_test_date()
+      occupied = Date.add(checkin, 1)
+      checkout = Date.add(checkin, 2)
+
+      {:ok, _day_booking} =
+        Bookings.create_booking(%{
+          user_id: user.id,
+          property: :clear_lake,
+          booking_mode: :day,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 2,
+          status: :complete,
+          total_price: Money.new(100, :USD)
+        })
+
+      AvailabilityCache.invalidate()
+
+      html = render_shifted_buyout_calendar(occupied)
+      day_str = Date.to_iso8601(occupied)
+      day_html = extract_day_cell(html, day_str)
+      button = calendar_day_button(calendar_document(html), day_str)
+      aria = calendar_element_attr(button, "aria-label")
+
+      assert day_html =~ "Partially booked"
+      refute day_html =~ ~r/font-semibold">\s*Booked\s*</
+      refute aria =~ "Booked, Partially booked"
+      assert aria =~ "Partially booked"
+    end
+
     test "styles checkout dates beyond max stay as restricted when selecting end date" do
       today = ~D[2026-07-21]
       # Use a weekday check-in so Saturday arrival rules do not interfere
@@ -490,7 +567,9 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       assert saturday_cell =~ "No check-out"
       assert saturday_cell =~ "Check-outs are not permitted on Saturdays"
-      refute saturday_cell =~ "Restricted (e.g. min/max stay)"
+
+      refute saturday_cell =~
+               "This stay length isn't allowed. Try different dates."
     end
 
     test "valid checkout before blackout shows check-out only, not not available" do

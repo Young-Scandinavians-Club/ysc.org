@@ -3420,7 +3420,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <ul class="space-y-2 text-zinc-700">
                       <li>
                         <strong>Step 1:</strong>
-                        Choose your booking mode (individual rooms or rent the entire cabin).
+                        Choose whether you want individual rooms or the entire cabin.
                       </li>
                       <li>
                         <strong>Step 2:</strong>
@@ -7691,7 +7691,7 @@ defmodule YscWeb.TahoeBookingLive do
         Map.put(
           acc,
           Date.to_iso8601(day),
-          "The entire cabin is already reserved on this date"
+          "The entire cabin is already booked on this date"
         )
       end)
 
@@ -7744,7 +7744,7 @@ defmodule YscWeb.TahoeBookingLive do
 
       # Buyout
       MapSet.member?(context.buyout_dates, context.date) ->
-        "The entire cabin is already reserved on this date"
+        "The entire cabin is already booked on this date"
 
       # Room inventory / capacity for the selected party size
       true ->

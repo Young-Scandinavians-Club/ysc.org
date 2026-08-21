@@ -5,7 +5,6 @@ defmodule YscWeb.AdminBookingsLive do
 
   import Phoenix.HTML
   import YscWeb.CoreComponents
-  import YscWeb.Components.Autocomplete
   alias Phoenix.LiveView.JS
 
   alias Ysc.Avatars
@@ -969,7 +968,6 @@ defmodule YscWeb.AdminBookingsLive do
               :if={@primary_payment && length(@booking_refunds) == 0}
               phx-click="show-booking-refund-modal"
               phx-disable-with="Loading..."
-              data-confirm="Are you sure you want to process a refund for this booking? This action will initiate a refund through Stripe."
               class="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
             >
               <.icon name="hero-arrow-uturn-left" class="w-4 h-4" /> Process Refund
@@ -1547,7 +1545,7 @@ defmodule YscWeb.AdminBookingsLive do
             value={Atom.to_string(@selected_property)}
           />
 
-          <.autocomplete
+          <.admin_user_autocomplete
             id="booking-user-autocomplete"
             label="User"
             name="booking[user_id]"
@@ -1557,9 +1555,6 @@ defmodule YscWeb.AdminBookingsLive do
             search_value={@user_search}
             results={@user_search_results}
             selected={@selected_user}
-            display_fn={fn user -> "#{user.first_name} #{user.last_name}" end}
-            subtitle_fn={fn user -> user.email end}
-            placeholder="Search by name or email..."
             required
           />
 
@@ -4115,17 +4110,19 @@ defmodule YscWeb.AdminBookingsLive do
         true -> :buyout
       end
 
-    # Get initial dates from params (from two-click selection)
+    # Get initial dates from params (from two-click selection).
+    # Inventory is [checkin, checkout); equal dates are a 0-night stay and
+    # Date.range/2 infers a negative step that would include the day before.
     {checkin_date, checkout_date} =
       if params["start_date"] && params["end_date"] do
         try do
           start = Date.from_iso8601!(params["start_date"])
           ending = Date.from_iso8601!(params["end_date"])
-          {start, ending}
+          overnight_booking_dates(start, ending)
         rescue
           _ ->
             initial = socket.assigns.calendar_start_date
-            {initial, initial}
+            overnight_booking_dates(initial, initial)
         end
       else
         # Fallback to single date or current date
@@ -4140,7 +4137,7 @@ defmodule YscWeb.AdminBookingsLive do
             socket.assigns.calendar_start_date
           end
 
-        {initial_checkin, initial_checkin}
+        overnight_booking_dates(initial_checkin, initial_checkin)
       end
 
     # Get room_id if provided
@@ -6696,6 +6693,91 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
+  # Draft/canceled/refunded bookings have no inventory reservation. Setting
+  # them to :hold/:complete via the status dropdown must claim inventory the
+  # same way create/modify does — otherwise the row looks reserved while the
+  # dates stay bookable (or the save crashes: there was no matching clause).
+  defp save_existing_admin_booking(
+         socket,
+         %{status: current_status} = existing_booking,
+         %{"status" => new_status} = booking_params,
+         _room_id,
+         rooms
+       )
+       when current_status in [:draft, :canceled, :refunded] and
+              new_status in [:hold, :complete] do
+    activate_unreserved_admin_booking(
+      socket,
+      existing_booking,
+      new_status,
+      booking_params,
+      rooms
+    )
+  end
+
+  defp save_existing_admin_booking(
+         socket,
+         existing_booking,
+         booking_params,
+         room_id,
+         rooms
+       ) do
+    do_save_existing_admin_booking(
+      socket,
+      existing_booking,
+      booking_params,
+      room_id,
+      rooms
+    )
+  end
+
+  defp activate_unreserved_admin_booking(
+         socket,
+         booking,
+         status,
+         booking_params,
+         rooms
+       ) do
+    inventory_attrs =
+      booking
+      |> admin_booking_inventory_attrs(booking_params)
+      |> Map.put(:status, status)
+
+    case BookingLocker.admin_activate_unreserved_booking(
+           booking,
+           inventory_attrs,
+           rooms: rooms
+         ) do
+      {:ok, _booking} ->
+        {:noreply, admin_booking_save_success(socket, "updated")}
+
+      {:error, {:error, changeset}}
+      when is_struct(changeset, Ecto.Changeset) ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, :blackout_conflict} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Cannot update booking: selected dates overlap a blackout period."
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to update booking: #{inspect(reason)}"
+         )}
+    end
+  end
+
   defp do_save_existing_admin_booking(
          socket,
          existing_booking,
@@ -7662,6 +7744,16 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp default_date_range(_), do: default_date_range("America/Los_Angeles")
+
+  # Inventory is [checkin, checkout). Same-day check-in/check-out is 0 nights
+  # and would previously feed Date.range/2 a descending bound.
+  defp overnight_booking_dates(checkin_date, checkout_date) do
+    if Date.compare(checkout_date, checkin_date) == :gt do
+      {checkin_date, checkout_date}
+    else
+      {checkin_date, Date.add(checkin_date, 1)}
+    end
+  end
 
   defp today_in_timezone(timezone) when is_binary(timezone) do
     DateTime.now!(timezone) |> DateTime.to_date()

@@ -1,6 +1,7 @@
 defmodule YscWeb.AdminEventsNewLiveTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
@@ -9,7 +10,9 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   alias Ysc.Agendas
   alias Ysc.EventPhotos
   alias Ysc.Events
+  alias Ysc.Events.Event
   alias Ysc.MessagePassingEvents
+  alias Ysc.Repo
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -84,6 +87,34 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert length(hosts) == 1
       assert hd(hosts).id == admin.id
+    end
+  end
+
+  describe "new event mount" do
+    setup [:create_admin]
+
+    test "disconnected render does not insert a draft event", %{conn: conn} do
+      count_before = Repo.aggregate(Event, :count)
+
+      html =
+        conn
+        |> get(~p"/admin/events/new")
+        |> html_response(200)
+
+      assert html =~ "admin-event-loading"
+      assert Repo.aggregate(Event, :count) == count_before
+    end
+
+    test "connected mount inserts one draft and redirects to edit", %{
+      conn: conn
+    } do
+      count_before = Repo.aggregate(Event, :count)
+
+      assert {:error, {:live_redirect, %{to: path}}} =
+               live(conn, ~p"/admin/events/new")
+
+      assert path =~ ~r{/admin/events/.+/edit}
+      assert Repo.aggregate(Event, :count) == count_before + 1
     end
   end
 
@@ -1287,12 +1318,12 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert has_element?(view, "#ticket-grant-form")
 
       view
-      |> element("#ticket-grant-form input[name='user_search']")
-      |> render_change(%{"user_search" => "Migrated"})
+      |> element("#ticket-grant-user-autocomplete-input")
+      |> render_keyup(%{"value" => "Migrated"})
 
       view
       |> element(
-        "#ticket-grant-form div[phx-click='select-user'][phx-value-id='#{member.id}']"
+        "#ticket-grant-user-autocomplete button[phx-click='select-user'][phx-value-id='#{member.id}']"
       )
       |> render_click()
 
@@ -1442,5 +1473,161 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert html =~ "Last edited by"
     end
+
+    test "formats the timestamp in Pacific time, not UTC", %{
+      conn: conn,
+      admin: admin
+    } do
+      # 05:00 UTC on Mar 15 is still Mar 14 10:00pm PDT.
+      edited_at = ~U[2024-03-15 05:00:00Z]
+      event = event_fixture(%{organizer_id: admin.id, title: "Timezone event"})
+      stamp_updated_at(Event, event.id, edited_at)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "p", pacific_last_edited_label(edited_at))
+      refute has_element?(view, "p", utc_last_edited_label(edited_at))
+    end
+  end
+
+  describe "event preview link" do
+    setup [:create_admin]
+
+    test "labels the public page link Preview for draft events", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          state: :draft,
+          title: "Draft preview"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(
+               view,
+               ~s|a[href="/events/#{event.id}"][target="_blank"]|,
+               "Preview"
+             )
+
+      refute has_element?(
+               view,
+               ~s|a[href="/events/#{event.id}"]|,
+               "View Event"
+             )
+    end
+
+    test "labels the public page link View Event for published events", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          state: :published,
+          title: "Published view"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(
+               view,
+               ~s|a[href="/events/#{event.id}"][target="_blank"]|,
+               "View Event"
+             )
+    end
+  end
+
+  describe "agenda chronological warning after PubSub" do
+    setup [:create_admin]
+
+    test "clears a false warning after a drag-reorder that restores chronological order",
+         %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id, title: "Agenda resync"})
+      {:ok, agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      {:ok, late} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Late first",
+          start_time: ~T[11:00:00]
+        })
+
+      {:ok, early} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Early second",
+          start_time: ~T[09:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+      assert has_element?(view, "h3", "Chronological Warning")
+
+      # Moving the 09:00 item to the top shifts sibling positions in the DB.
+      # The old in-memory patch only updated this one item, so the warning
+      # stayed up even though the agenda is now in order.
+      assert :ok = Agendas.update_agenda_item_position(event.id, early, 0)
+
+      html = render_agenda_item_event(view, early)
+      refute html =~ "Chronological Warning"
+      assert html =~ late.title
+    end
+
+    test "shows a warning after a drag-reorder that breaks chronological order",
+         %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id, title: "Agenda break"})
+      {:ok, agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      {:ok, _morning} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Morning",
+          start_time: ~T[09:00:00]
+        })
+
+      {:ok, afternoon} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Afternoon",
+          start_time: ~T[11:00:00]
+        })
+
+      {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+      refute html =~ "Chronological Warning"
+
+      assert :ok = Agendas.update_agenda_item_position(event.id, afternoon, 0)
+
+      html = render_agenda_item_event(view, afternoon)
+      assert html =~ "Chronological Warning"
+    end
+  end
+
+  # send_update from handle_info is applied on the following render.
+  defp render_agenda_item_event(view, agenda_item) do
+    send(
+      view.pid,
+      {Ysc.Agendas,
+       %MessagePassingEvents.AgendaItemRepositioned{agenda_item: agenda_item}}
+    )
+
+    _ = render(view)
+    render(view)
+  end
+
+  defp stamp_updated_at(schema, id, datetime) do
+    {1, _} =
+      Repo.update_all(from(r in schema, where: r.id == ^id),
+        set: [updated_at: datetime]
+      )
+
+    :ok
+  end
+
+  defp pacific_last_edited_label(datetime) do
+    datetime
+    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+  end
+
+  defp utc_last_edited_label(datetime) do
+    Timex.format!(datetime, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
   end
 end

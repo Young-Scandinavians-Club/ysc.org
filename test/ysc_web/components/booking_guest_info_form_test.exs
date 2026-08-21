@@ -75,6 +75,11 @@ defmodule YscWeb.Components.BookingGuestInfoFormTest do
       assert html =~ "Guest Information"
       assert html =~ "Custom intro for checkout"
       assert html =~ "You (the member making this booking)"
+
+      assert html =~
+               "As the member making this booking, you must stay at the cabin."
+
+      refute html =~ "making this reservation"
       assert html =~ "Pat"
       assert html =~ "Member"
       assert html =~ "Adult Guest"

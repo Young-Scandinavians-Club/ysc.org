@@ -437,4 +437,127 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "/images/default_avatars/"
     end
   end
+
+  describe "submitting_as/1" do
+    test "renders the signed-in member name, email, and default id" do
+      assigns = %{
+        user: %{
+          id: "01JUSER",
+          first_name: "ada",
+          last_name: "lovelace",
+          email: "ada@example.com",
+          most_connected_country: "SE"
+        }
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.submitting_as user={@user} />
+        """)
+
+      assert html =~ ~s(id="submitting-as")
+      assert html =~ "Submitting as"
+      assert html =~ "Ada Lovelace"
+      assert html =~ "ada@example.com"
+    end
+
+    test "renders extra inner-block content such as hidden fields" do
+      assigns = %{
+        user: %{
+          id: "01JUSER",
+          first_name: "Grace",
+          last_name: "Hopper",
+          email: "grace@example.com"
+        }
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.submitting_as user={@user} id="volunteer-submitting-as">
+          <input type="hidden" name="volunteer[name]" value="Grace Hopper" />
+        </.submitting_as>
+        """)
+
+      assert html =~ ~s(id="volunteer-submitting-as")
+      assert html =~ ~s(name="volunteer[name]")
+      assert html =~ "Grace Hopper"
+    end
+  end
+
+  describe "mailto_card/1" do
+    test "renders a mailto link with title, description, icon, and address" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.mailto_card
+          id="contact-card-tahoe"
+          email="tahoe@ysc.org"
+          icon="hero-home-modern"
+          title="Tahoe Cabin"
+        >
+          Questions about bookings or stays.
+        </.mailto_card>
+        """)
+
+      assert html =~ ~s(id="contact-card-tahoe")
+      assert html =~ ~s(href="mailto:tahoe@ysc.org")
+      assert html =~ "Tahoe Cabin"
+      assert html =~ "Questions about bookings or stays."
+      assert html =~ "tahoe@ysc.org"
+      assert html =~ "hero-home-modern"
+    end
+  end
+
+  describe "checkbox_card/1" do
+    test "renders an unchecked boolean checkbox card" do
+      form = to_form(%{"interest_events" => "false"}, as: :volunteer)
+      assigns = %{form: form}
+
+      html =
+        rendered_to_string(~H"""
+        <.checkbox_card
+          field={@form[:interest_events]}
+          icon="hero-calendar"
+          label="Events & Parties"
+          description="Help organize banquets and social gatherings."
+        />
+        """)
+
+      assert html =~ ~s(id="volunteer_interest_events")
+      assert html =~ ~s(name="volunteer[interest_events]")
+      assert html =~ ~s(value="false")
+      assert html =~ ~s(value="true")
+      assert html =~ "Events &amp; Parties"
+      assert html =~ "Help organize banquets and social gatherings."
+      assert html =~ "hero-calendar"
+
+      assert html =~
+               ~s(aria-label="Events &amp; Parties: Help organize banquets and social gatherings")
+
+      refute html =~ ~r/<input[^>]*type="checkbox"[^>]*\bchecked\b/
+    end
+
+    test "marks the checkbox checked and merges hover classes" do
+      form = to_form(%{"interest_tahoe" => "true"}, as: :volunteer)
+      assigns = %{form: form}
+
+      html =
+        rendered_to_string(~H"""
+        <.checkbox_card
+          field={@form[:interest_tahoe]}
+          icon="hero-home-modern"
+          label="Tahoe"
+          description="Support our mountain retreat at Lake Tahoe."
+          hover_class="hover:border-orange-200"
+          phx-debounce="blur"
+        />
+        """)
+
+      assert html =~ ~r/<input[^>]*type="checkbox"[^>]*\bchecked\b/
+      assert html =~ "hover:border-orange-200"
+      assert html =~ ~s(phx-debounce="blur")
+      assert html =~ "Tahoe"
+    end
+  end
 end

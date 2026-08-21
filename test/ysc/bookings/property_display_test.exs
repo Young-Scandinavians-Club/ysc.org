@@ -76,4 +76,17 @@ defmodule Ysc.Bookings.PropertyDisplayTest do
       assert PropertyDisplay.address(:unknown) == "Property Address"
     end
   end
+
+  describe "training_videos_url/1" do
+    test "returns the Clear Lake playlist URL" do
+      url = PropertyDisplay.training_videos_url(:clear_lake)
+
+      assert url =~ "youtube.com"
+      assert PropertyDisplay.training_videos_url("clear_lake") == url
+    end
+
+    test "returns nil for other properties" do
+      assert PropertyDisplay.training_videos_url(:tahoe) == nil
+    end
+  end
 end

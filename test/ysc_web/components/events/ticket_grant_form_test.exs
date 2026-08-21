@@ -39,7 +39,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       assert doc |> LazyHTML.query("#ticket-grant-form") |> Enum.any?()
 
       assert doc
-             |> LazyHTML.query("input[name=user_search]")
+             |> LazyHTML.query("#ticket-grant-user-autocomplete-input")
              |> Enum.any?()
 
       assert doc |> LazyHTML.query("#ticket_grant_quantity") |> Enum.any?()
@@ -198,7 +198,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       {:noreply, socket} =
         TicketGrantForm.handle_event(
           "search-users",
-          %{"user_search" => "Searchable"},
+          %{"value" => "Searchable"},
           socket
         )
 
@@ -216,7 +216,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       {:noreply, socket} =
         TicketGrantForm.handle_event(
           "search-users",
-          %{"user_search" => "a"},
+          %{"value" => "a"},
           socket
         )
 
@@ -277,6 +277,8 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
         TicketGrantForm.handle_event("clear-user", %{}, socket)
 
       assert socket.assigns.selected_user == nil
+      assert socket.assigns.user_search == ""
+      assert socket.assigns.user_search_results == []
       refute Map.has_key?(socket.assigns.form.params, "user_id")
     end
   end

@@ -413,29 +413,12 @@ defmodule YscWeb.AdminNewslettersLive do
                     meta={@meta}
                     id="newsletters-filter-form"
                   >
-                    <div class="mt-4">
-                      <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
-                        Date Created
-                      </p>
-                      <div class="space-y-2">
-                        <.input
-                          type="date"
-                          name="date_from"
-                          value={@date_from}
-                          label="From"
-                          id="filter-newsletters-date-from"
-                          phx-debounce="300"
-                        />
-                        <.input
-                          type="date"
-                          name="date_to"
-                          value={@date_to}
-                          label="To"
-                          id="filter-newsletters-date-to"
-                          phx-debounce="300"
-                        />
-                      </div>
-                    </div>
+                    <.admin_filter_date_range
+                      id="filter-newsletters"
+                      label="Date Created"
+                      date_from={@date_from}
+                      date_to={@date_to}
+                    />
                   </.filter_form>
                 </.admin_filter_dropdown>
               </div>
@@ -459,12 +442,14 @@ defmodule YscWeb.AdminNewslettersLive do
                     navigate={~p"/admin/newsletters/#{edition.id}/edit"}
                     class="block"
                   >
-                    <h3 class="text-base font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0">
-                      <span class="truncate">{edition.title}</span>
+                    <div class="flex items-center gap-1.5 min-w-0">
+                      <h3 class="text-base font-semibold text-zinc-900 truncate min-w-0">
+                        {edition.title}
+                      </h3>
                       <.presence_avatars editors={
                         @editors_by_edition[edition.id] || []
                       } />
-                    </h3>
+                    </div>
                     <p class="text-sm text-zinc-500 truncate mt-0.5">
                       {edition.subject}
                     </p>
@@ -1456,23 +1441,7 @@ defmodule YscWeb.AdminNewslettersLive do
   end
 
   def handle_event("update-filter", params, socket) do
-    date_from = Map.get(params, "date_from", "")
-    date_to = Map.get(params, "date_to", "")
-
-    params =
-      params
-      |> Map.delete("_target")
-      |> Map.delete("date_from")
-      |> Map.delete("date_to")
-
-    final_filters =
-      params["filters"]
-      |> compact_filter_params()
-      |> merge_title_filter_into_params(socket.assigns.meta)
-
-    new_params =
-      Map.merge(params, %{"filters" => final_filters})
-      |> merge_date_range_into_params(date_from, date_to)
+    new_params = list_filter_params(params, socket.assigns.meta)
 
     {:noreply, push_patch(socket, to: ~p"/admin/newsletters?#{new_params}")}
   end

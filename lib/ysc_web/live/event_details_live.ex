@@ -13,6 +13,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.Events.{EventPricingCache, TicketTierHelpers}
   alias Ysc.MoneyHelper
   alias Ysc.Repo
+  alias Ysc.Subscriptions
   alias Ysc.Tickets.DonationDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
 
@@ -2071,7 +2072,7 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
               </div>
               <p class="text-xs text-blue-700 text-center max-w-md">
-                Complete payment before the timer expires. Unpaid reservations are released so others can buy tickets.
+                Complete payment before the timer expires. If time runs out, your tickets go back on sale so others can buy them.
               </p>
             </div>
           </div>
@@ -3500,16 +3501,19 @@ defmodule YscWeb.EventDetailsLive do
               <% display_name =
                 if attendee_name != "",
                   do: attendee_name,
-                  else: attendee.email || "Unknown" %>
+                  else: "Member" %>
               <% ticket_count = Map.get(@ticket_counts_per_user, attendee.id, 0) %>
               <% is_host = MapSet.member?(@host_ids, attendee.id) %>
-              <div class={[
-                "flex items-center gap-3 p-3 rounded-xl border",
-                if(is_host,
-                  do: "bg-amber-50 border-amber-200",
-                  else: "bg-zinc-50 border-zinc-200"
-                )
-              ]}>
+              <div
+                id={"attendees-modal-user-#{attendee.id}"}
+                class={[
+                  "flex items-center gap-3 p-3 rounded-xl border",
+                  if(is_host,
+                    do: "bg-amber-50 border-amber-200",
+                    else: "bg-zinc-50 border-zinc-200"
+                  )
+                ]}
+              >
                 <div class="relative flex-shrink-0">
                   <.user_avatar_image
                     user={attendee}
@@ -3528,18 +3532,14 @@ defmodule YscWeb.EventDetailsLive do
                       Host
                     </span>
                   </div>
-                  <p class="text-sm text-zinc-500">
-                    <%= cond do %>
-                      <% ticket_count == 0 && is_host -> %>
-                        No ticket
-                      <% true -> %>
-                        {ticket_count} {if ticket_count == 1,
-                          do: "ticket",
-                          else: "tickets"}
-                    <% end %>
-                    <span :if={attendee.email && attendee_name != ""}>
-                      · {attendee.email}
-                    </span>
+                  <p
+                    :if={!(is_host && ticket_count == 0)}
+                    id={"attendees-modal-user-#{attendee.id}-tickets"}
+                    class="text-sm text-zinc-500"
+                  >
+                    {ticket_count} {if ticket_count == 1,
+                      do: "ticket",
+                      else: "tickets"}
                   </p>
                 </div>
               </div>
@@ -3656,6 +3656,7 @@ defmodule YscWeb.EventDetailsLive do
     socket
     |> SEO.assign_seo(SEO.assigns_for_event(event_for_seo))
     |> assign(:event, event)
+    |> assign(:had_membership?, event_had_membership?(socket))
     # Async data - will be populated after connection
     |> assign(:agendas, [])
     |> assign(:active_agenda, nil)
@@ -3710,6 +3711,19 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:async_data_loaded, false)
     # Save-the-date subscription loads after WebSocket connect (see load_event_data_async)
     |> assign(:subscribed_to_save_the_date, false)
+  end
+
+  # Only needed for expired-vs-never-subscribed ticket copy, and only when
+  # the viewer is signed in without an active membership.
+  defp event_had_membership?(socket) do
+    user = socket.assigns[:current_user]
+    active? = socket.assigns[:active_membership?] == true
+
+    if user && not active? do
+      Subscriptions.has_any_subscription?(user)
+    else
+      false
+    end
   end
 
   # Load expensive data asynchronously after WebSocket connection

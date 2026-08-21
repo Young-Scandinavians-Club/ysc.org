@@ -331,6 +331,91 @@ defmodule YscWeb.SesWebhookControllerTest do
       assert event != nil
       assert event.environment == "test"
     end
+
+    test "disables event_notifications when the complaint is on an event-notification email",
+         %{conn: conn} do
+      user = user_fixture(%{email: "event-complainer@example.com"})
+      assert user.event_notifications == true
+
+      ses_event =
+        build_ses_event("Complaint",
+          email: "event-complainer@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-19T12:00:00.000Z"
+        })
+        |> put_in(["mail", "tags", "template"], ["event_notification"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               false
+    end
+
+    test "does NOT disable event_notifications when the complaint is on a non-event email",
+         %{conn: conn} do
+      user = user_fixture(%{email: "newsletter-complainer@example.com"})
+
+      ses_event =
+        build_ses_event("Complaint",
+          email: "newsletter-complainer@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-19T12:00:00.000Z"
+        })
+        |> put_in(["mail", "tags", "template"], ["newsletter_edition"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               true
+    end
+
+    test "disables event_notifications for other :event category templates", %{
+      conn: conn
+    } do
+      user = user_fixture(%{email: "save-the-date-complainer@example.com"})
+
+      ses_event =
+        build_ses_event("Complaint",
+          email: "save-the-date-complainer@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-19T12:00:00.000Z"
+        })
+        |> put_in(["mail", "tags", "template"], ["save_the_date_available"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               false
+    end
+
+    test "does NOT disable event_notifications when the complaint has no template tag",
+         %{conn: conn} do
+      user = user_fixture(%{email: "untagged-complainer@example.com"})
+
+      ses_event =
+        build_ses_event("Complaint",
+          email: "untagged-complainer@example.com",
+          env: "test"
+        )
+        |> Map.put("complaint", %{
+          "complaintFeedbackType" => "abuse",
+          "timestamp" => "2026-03-19T12:00:00.000Z"
+        })
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               true
+    end
   end
 
   describe "webhook/2 - Notification - bounce event (soft)" do
@@ -359,6 +444,25 @@ defmodule YscWeb.SesWebhookControllerTest do
       # Soft bounce should NOT unsubscribe
       subscriber = Repo.reload!(subscriber)
       assert subscriber.subscribed == true
+    end
+
+    test "does NOT disable event_notifications on a soft bounce of an event email",
+         %{conn: conn} do
+      user = user_fixture(%{email: "event-softbounce@example.com"})
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "event-softbounce@example.com",
+          env: "test",
+          bounce_type: "Transient",
+          bounce_sub_type: "General"
+        )
+        |> put_in(["mail", "tags", "template"], ["event_notification"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               true
     end
   end
 
@@ -435,6 +539,45 @@ defmodule YscWeb.SesWebhookControllerTest do
 
       assert_receive {:telemetry, [:ysc, :email, :hard_bounce], %{count: 1},
                       %{outcome: :unsubscribed}}
+    end
+
+    test "disables event_notifications when the hard bounce is on an event-notification email",
+         %{conn: conn} do
+      user = user_fixture(%{email: "event-hardbounce@example.com"})
+      assert user.event_notifications == true
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "event-hardbounce@example.com",
+          env: "test",
+          bounce_type: "Permanent",
+          bounce_sub_type: "General"
+        )
+        |> put_in(["mail", "tags", "template"], ["event_notification"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               false
+    end
+
+    test "does NOT disable event_notifications when the hard bounce is on a non-event email",
+         %{conn: conn} do
+      user = user_fixture(%{email: "newsletter-hardbounce@example.com"})
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "newsletter-hardbounce@example.com",
+          env: "test",
+          bounce_type: "Permanent",
+          bounce_sub_type: "General"
+        )
+        |> put_in(["mail", "tags", "template"], ["newsletter_edition"])
+
+      post_notification(conn, ses_event)
+
+      assert Ysc.Accounts.get_user_by_email(user.email).event_notifications ==
+               true
     end
 
     test "hard bounce for non-subscriber returns 200 without error", %{
@@ -875,6 +1018,62 @@ defmodule YscWeb.SesWebhookControllerTest do
       conn =
         conn
         |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      assert conn.resp_body == "Forbidden"
+    end
+
+    test "returns 403 when SigningCertURL is an S3 amazonaws.com host", %{
+      conn: conn
+    } do
+      prev = Application.get_env(:ysc, :sns_skip_signature_verification)
+      Application.put_env(:ysc, :sns_skip_signature_verification, false)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :sns_skip_signature_verification, prev)
+      end)
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: "s3-cert@example.com",
+          env: "test",
+          bounce_type: "Permanent"
+        )
+
+      payload =
+        build_sns_wrapper("Notification", ses_event, %{
+          "SigningCertURL" =>
+            "https://attacker-bucket.s3.amazonaws.com/forged.pem"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      refute Repo.get_by(EmailEvent, email: "s3-cert@example.com")
+    end
+  end
+
+  describe "webhook/2 - signed Type vs unsigned header" do
+    test "returns 403 when header Type does not match signed body Type", %{
+      conn: conn
+    } do
+      payload =
+        build_sns_wrapper("Notification", %{}, %{
+          "SubscribeURL" => "http://127.0.0.1/exfil"
+        })
+
+      conn =
+        conn
+        |> put_req_header(
+          "x-amz-sns-message-type",
+          "SubscriptionConfirmation"
+        )
         |> put_req_header("content-type", "application/json")
         |> post("/webhooks/ses", payload)
 

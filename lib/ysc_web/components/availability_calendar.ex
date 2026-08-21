@@ -724,7 +724,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         "Closed"
 
       :fully_blocked_booked ->
-        "Booked"
+        booked_status_label(day, assigns)
 
       :fully_blocked_gray ->
         "Unavailable"
@@ -743,6 +743,21 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         saturday_rule_status_label(day, assigns) || ""
     end
   end
+
+  # Share the buyout classification between the main status and detail so a
+  # fully blocked night cannot render "Booked" and "Partially booked" together.
+  defp booked_status_label(day, assigns) do
+    info = Map.get(assigns.availability, day)
+
+    if assigns.selected_booking_mode == :buyout && is_map(info) do
+      buyout_unavailable_label(info)
+    else
+      "Booked"
+    end
+  end
+
+  defp buyout_unavailable_label(%{has_buyout: true}), do: "Booked"
+  defp buyout_unavailable_label(_info), do: "Partially booked"
 
   defp saturday_rule_status_label(day, assigns) do
     property = assigns[:property]
@@ -781,12 +796,15 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp day_has_detail?(day, assigns) do
-    availability_display_text(
-      day,
-      assigns.selected_booking_mode,
-      assigns.availability,
-      assigns
-    ) != ""
+    detail =
+      availability_display_text(
+        day,
+        assigns.selected_booking_mode,
+        assigns.availability,
+        assigns
+      )
+
+    detail != "" && detail != day_status_label(day, assigns)
   end
 
   defp day_aria_label(day, assigns, has_tooltip?) do
@@ -1258,10 +1276,10 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   defp get_bookings_reason(day, assigns) do
     cond do
       winter_buyout_blocked?(day, assigns) ->
-        "Entire cabin is not available in winter"
+        "The entire cabin isn't available in winter. You can still book individual rooms."
 
       assigns[:selected_booking_mode] == :buyout ->
-        "Other members already have reservations on this date. Choose different dates or book a group or room stay instead."
+        "Another member has already booked this date. Choose different dates, or book rooms or a shared stay instead of the whole cabin."
 
       true ->
         "Another member has already booked this date. Try different dates, or choose a shared stay if that's available."
@@ -1272,7 +1290,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     selection_rule_reason(day, assigns) ||
       cond do
         winter_buyout_blocked?(day, assigns) ->
-          "Entire cabin is not available in winter"
+          "The entire cabin isn't available in winter. You can still book individual rooms."
 
         check_other_rules(
           day,
@@ -1283,7 +1301,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           assigns[:selected_booking_mode],
           assigns[:seasons]
         ) ->
-          "Restricted (e.g. min/max stay)"
+          "This stay length isn't allowed. Try different dates."
 
         true ->
           "Unavailable"
@@ -1579,7 +1597,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           "Not available"
 
         mode == :buyout && !info.can_book_buyout ->
-          "Partially booked"
+          buyout_unavailable_label(info)
 
         mode == :day && !info.can_book_day ->
           "Unavailable"

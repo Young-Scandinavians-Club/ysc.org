@@ -6,8 +6,6 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
 
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
-  import YscWeb.Components.Autocomplete
-
   alias Ysc.Accounts
   alias Ysc.Bookings.Entitlements
   alias YscWeb.AdminBookingEntitlementHelpers
@@ -225,7 +223,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
             phx-change="validate_entitlement_form"
             phx-submit="grant_booking_entitlement"
           >
-            <.autocomplete
+            <.admin_user_autocomplete
               id="entitlement-grant-user-autocomplete"
               label="Member"
               name="entitlement[user_id]"
@@ -235,9 +233,6 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
               search_value={@grant_user_search}
               results={@grant_user_results}
               selected={@grant_selected_user}
-              display_fn={fn user -> "#{user.first_name} #{user.last_name}" end}
-              subtitle_fn={fn user -> user.email end}
-              placeholder="Search by name or email..."
               required
             />
 

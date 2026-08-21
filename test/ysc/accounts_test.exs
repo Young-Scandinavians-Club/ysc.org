@@ -232,6 +232,12 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "ci_query_explain_gmail_alias_query/0" do
+    test "returns a valid Ecto query" do
+      assert %Ecto.Query{} = User.ci_query_explain_gmail_alias_query()
+    end
+  end
+
   describe "get_user_by_phone_number/1" do
     test "returns nil for unknown phone number" do
       refute Accounts.get_user_by_phone_number("+15550000000")
@@ -760,6 +766,27 @@ defmodule Ysc.AccountsTest do
                  valid_user_password()
                )
     end
+
+    test "returns legacy dotted Gmail users when login uses canonical or alias form" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "login.#{tag}@gmail.com"
+      canonical_email = "login#{tag}@gmail.com"
+
+      %{id: id, email: ^dotted_email} =
+        legacy_gmail_user_fixture(%{email: dotted_email})
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email_and_password(
+                 canonical_email,
+                 valid_user_password()
+               )
+
+      assert %User{id: ^id} =
+               Accounts.get_user_by_email_and_password(
+                 "login.#{tag}+inbox@gmail.com",
+                 valid_user_password()
+               )
+    end
   end
 
   describe "get_user!/1" do
@@ -1151,6 +1178,34 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "disable_event_notifications/1" do
+    test "disables event notifications for a matching user" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      assert user.event_notifications == true
+
+      assert {:ok, updated} = Accounts.disable_event_notifications(user.email)
+      assert updated.event_notifications == false
+      assert Accounts.get_user_by_email(user.email).event_notifications == false
+    end
+
+    test "returns :not_found when no user matches the email" do
+      assert {:ok, :not_found} =
+               Accounts.disable_event_notifications("nobody@example.com")
+    end
+
+    test "returns :already_disabled when preference is already off" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+
+      {:ok, user} =
+        Accounts.update_notification_preferences(user, %{
+          "event_notifications" => "false"
+        })
+
+      assert {:ok, :already_disabled} =
+               Accounts.disable_event_notifications(user.email)
+    end
+  end
+
   describe "update_billing_address/2" do
     test "updates billing address" do
       user = user_fixture(%{phone_number: "+14159098268"})
@@ -1273,6 +1328,63 @@ defmodule Ysc.AccountsTest do
           phone_number: "+14159098260",
           first_name: "John",
           last_name: "Doe",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+    end
+
+    test "rejects signup that would shadow a legacy dotted Gmail address" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "legacy.#{tag}@gmail.com"
+      canonical_email = "legacy#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Member",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: canonical_email,
+          phone_number: unique_user_phone(),
+          first_name: "Attacker",
+          last_name: "Shadow",
+          password: "valid password"
+        })
+
+      assert "has already been taken" in errors_on(changeset).email
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(canonical_email)
+    end
+
+    test "rejects signup that would shadow a legacy plus-tagged Gmail address" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      plus_email = "plus#{tag}+old@gmail.com"
+      canonical_email = "plus#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: plus_email,
+        first_name: "Legacy",
+        last_name: "Plus",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      {:error, changeset} =
+        Accounts.register_user(%{
+          email: canonical_email,
+          phone_number: unique_user_phone(),
+          first_name: "Attacker",
+          last_name: "Shadow",
           password: "valid password"
         })
 
@@ -1690,6 +1802,37 @@ defmodule Ysc.AccountsTest do
   describe "deliver_user_reset_password_instructions/2" do
     setup do
       %{user: user_fixture(%{phone_number: "+14159098268"})}
+    end
+
+    test "finds legacy dotted Gmail users when reset is requested with an alias",
+         %{
+           user: _default_user
+         } do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "reset.#{tag}@gmail.com"
+      canonical_email = "reset#{tag}@gmail.com"
+
+      %{id: id, email: ^dotted_email} =
+        legacy_gmail_user_fixture(%{email: dotted_email})
+
+      assert %User{id: ^id} = Accounts.get_user_by_email(canonical_email)
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_reset_password_instructions(
+            Accounts.get_user_by_email(canonical_email),
+            url
+          )
+        end)
+
+      {:ok, token} = Base.url_decode64(token, padding: false)
+
+      assert user_token =
+               Repo.get_by(UserToken, token: :crypto.hash(:sha256, token))
+
+      assert user_token.user_id == id
+      assert user_token.sent_to == dotted_email
+      assert user_token.context == "reset_password"
     end
 
     test "sends token through notification", %{user: user} do
@@ -2239,6 +2382,60 @@ defmodule Ysc.AccountsTest do
       assert {:ok, u3} = Accounts.mark_password_set(u2)
       assert u3.password_set_at
     end
+
+    test "mark_phone_verified/1 enables SMS notifications for WP-migrated users whose matching email notifications are already on" do
+      user = oauth_user_fixture(%{phone_number: "+14159098317"})
+
+      {:ok, migrated_user} =
+        user
+        |> Ecto.Changeset.change(post_migration_onboarding_completed_at: nil)
+        |> Repo.update()
+
+      assert Accounts.wp_migrated?(migrated_user)
+      assert migrated_user.account_notifications
+      assert migrated_user.event_notifications
+      refute migrated_user.account_notifications_sms
+      refute migrated_user.event_notifications_sms
+
+      assert {:ok, verified_user} = Accounts.mark_phone_verified(migrated_user)
+      assert verified_user.phone_verified_at
+      assert verified_user.account_notifications_sms
+      assert verified_user.event_notifications_sms
+    end
+
+    test "mark_phone_verified/1 leaves SMS notifications off for WP-migrated users whose matching email notifications are off" do
+      user = oauth_user_fixture(%{phone_number: "+14159098318"})
+
+      {:ok, migrated_user} =
+        user
+        |> Ecto.Changeset.change(
+          post_migration_onboarding_completed_at: nil,
+          account_notifications: false,
+          event_notifications: false
+        )
+        |> Repo.update()
+
+      assert {:ok, verified_user} = Accounts.mark_phone_verified(migrated_user)
+      refute verified_user.account_notifications_sms
+      refute verified_user.event_notifications_sms
+    end
+
+    test "mark_phone_verified/1 does not override an explicit SMS opt-out for non-migrated users" do
+      user = user_fixture(%{phone_number: "+14159098319"})
+      refute Accounts.wp_migrated?(user)
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(
+          account_notifications_sms: false,
+          event_notifications_sms: false
+        )
+        |> Repo.update()
+
+      assert {:ok, verified_user} = Accounts.mark_phone_verified(user)
+      refute verified_user.account_notifications_sms
+      refute verified_user.event_notifications_sms
+    end
   end
 
   describe "post-migration onboarding" do
@@ -2573,6 +2770,130 @@ defmodule Ysc.AccountsTest do
       after
         Application.put_env(:ysc, :membership_plans, plans)
       end
+    end
+
+    test "get_application_statistics uses a single users query" do
+      {_stats, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_application_statistics() end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 1
+    end
+
+    test "get_application_statistics counts a newly inserted user in this month and year" do
+      # `inserted_at` is `:utc_datetime` (second precision). Use a `now` after
+      # both the snapshot and the insert so the new row is inside `[..., now)`.
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      {month_before, year_before, _, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      user_fixture(%{phone_number: unique_user_phone()})
+
+      {month_after, year_after, _, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      assert month_after == month_before + 1
+      assert year_after == year_before + 1
+    end
+
+    test "get_application_statistics attributes last-month users separately" do
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      month_start = %DateTime{
+        now
+        | day: 1,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          microsecond: {0, 0}
+      }
+
+      last_month_at =
+        month_start
+        |> Timex.shift(days: -2)
+        |> DateTime.truncate(:second)
+
+      {month_before, _, last_before, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      Repo.update_all(from(u in User, where: u.id == ^user.id),
+        set: [inserted_at: last_month_at, updated_at: last_month_at]
+      )
+
+      {month_after, _, last_after, _, _, _} =
+        Accounts.get_application_statistics(now)
+
+      assert month_after == month_before
+      assert last_after == last_before + 1
+    end
+
+    test "get_application_statistics computes month and year percent changes" do
+      now = DateTime.utc_now() |> DateTime.add(5, :second)
+
+      month_start = %DateTime{
+        now
+        | day: 1,
+          hour: 0,
+          minute: 0,
+          second: 0,
+          microsecond: {0, 0}
+      }
+
+      last_month_at =
+        month_start
+        |> Timex.shift(days: -2)
+        |> DateTime.truncate(:second)
+
+      last_year_month_at =
+        month_start
+        |> Timex.shift(years: -1)
+        |> DateTime.add(2, :day)
+        |> DateTime.truncate(:second)
+
+      {_, _, last_month_before, last_year_before, _, _} =
+        Accounts.get_application_statistics(now)
+
+      last_month_user = user_fixture(%{phone_number: unique_user_phone()})
+      last_year_user = user_fixture(%{phone_number: unique_user_phone()})
+      user_fixture(%{phone_number: unique_user_phone()})
+
+      Repo.update_all(from(u in User, where: u.id == ^last_month_user.id),
+        set: [inserted_at: last_month_at, updated_at: last_month_at]
+      )
+
+      Repo.update_all(from(u in User, where: u.id == ^last_year_user.id),
+        set: [inserted_at: last_year_month_at, updated_at: last_year_month_at]
+      )
+
+      {this_month, this_year, last_month, last_year_month, month_change,
+       year_change} = Accounts.get_application_statistics(now)
+
+      assert last_month == last_month_before + 1
+      assert last_year_month == last_year_before + 1
+      assert month_change == round((this_month - last_month) / last_month * 100)
+
+      assert year_change ==
+               round((this_year - last_year_month) / last_year_month * 100)
+    end
+
+    test "get_application_statistics reports 0 percent change when prior windows are empty" do
+      now = ~U[2099-06-15 12:00:00Z]
+
+      {this_month, this_year, last_month, last_year_month, month_change,
+       year_change} = Accounts.get_application_statistics(now)
+
+      assert this_month == 0
+      assert this_year == 0
+      assert last_month == 0
+      assert last_year_month == 0
+      assert month_change == 0
+      assert year_change == 0
     end
 
     test "get_membership_joins_ytd_comparison returns comparable YTD join stats" do
