@@ -2741,7 +2741,10 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/bookings/#{booking.id}")
 
-      assert has_element?(view, "button[phx-click='show-booking-refund-modal']")
+      assert has_element?(view, "#show-booking-refund-modal")
+      # Native data-confirm can be auto-cancelled by the browser and silently
+      # swallow the click; the amount/reason modal is the confirmation step.
+      refute has_element?(view, "#show-booking-refund-modal[data-confirm]")
 
       view |> render_click("show-booking-refund-modal")
 

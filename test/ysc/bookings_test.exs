@@ -3281,6 +3281,20 @@ defmodule Ysc.BookingsTest do
 
       assert String.starts_with?(id, "re_test")
     end
+
+    test "embeds the idempotency key in the test stub refund id" do
+      key = Ysc.Stripe.Idempotency.key("admin_refund_pay123_5000")
+
+      assert {:ok, %Stripe.Refund{id: id}} =
+               Bookings.create_stripe_refund_for_admin(
+                 "pi_test_admin_idem",
+                 5000,
+                 "Admin reason",
+                 idempotency_key: key
+               )
+
+      assert id == "re_test_#{key}"
+    end
   end
 
   describe "maybe_refund_unfulfilled_checkout_payment/3" do
