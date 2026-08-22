@@ -1,7 +1,9 @@
 defmodule Ysc.EventsTest do
   use Ysc.DataCase, async: false
 
+  alias Ysc.Accounts.User
   alias Ysc.Agendas
+  alias Ysc.Avatars
   alias Ysc.Events
   alias Ysc.Events.{Event, EventPricingCache, FaqQuestion, Ticket, TicketTier}
   alias Ysc.Ledgers
@@ -1742,6 +1744,21 @@ defmodule Ysc.EventsTest do
     |> Events.create_ticket_tier()
   end
 
+  defp insert_confirmed_ticket(attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    %Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: attrs.event_id,
+      ticket_tier_id: attrs.ticket_tier_id,
+      user_id: attrs.user_id,
+      status: Map.get(attrs, :status, :confirmed),
+      inserted_at: Map.get(attrs, :inserted_at, now),
+      expires_at: Map.get(attrs, :expires_at, DateTime.add(now, 1, :day))
+    }
+    |> Repo.insert!()
+  end
+
   defp create_ticket_fixture(attrs) do
     # Extract provided IDs (handle both atom and string keys)
     provided_event_id = attrs[:event_id] || attrs["event_id"]
@@ -2000,13 +2017,11 @@ defmodule Ysc.EventsTest do
         })
 
       for _i <- 1..2 do
-        %Ysc.Events.Ticket{
+        insert_confirmed_ticket(%{
           event_id: event.id,
           ticket_tier_id: tier.id,
-          user_id: user.id,
-          status: :confirmed
-        }
-        |> Ysc.Repo.insert!()
+          user_id: user.id
+        })
       end
 
       summary = Events.get_ticket_purchase_summary(event.id)
@@ -2016,6 +2031,227 @@ defmodule Ysc.EventsTest do
       purchase = Enum.at(summary, 0)
       assert Map.has_key?(purchase, :ticket_count)
       assert Map.has_key?(purchase, :total_amount)
+      assert purchase.ticket_count == 2
+      assert purchase.total_amount == Money.new(100, :USD)
+    end
+
+    test "attaches a preloaded %User{} so purchaser avatars can resolve", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Avatar summary #{System.unique_integer()}",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 100,
+          event_id: event.id
+        })
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          profile_path: "https://example.com/profile.webp",
+          thumb_path: "https://example.com/thumb.webp"
+        })
+
+      {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: user.id
+      })
+
+      [purchase] = Events.get_ticket_purchase_summary(event.id)
+
+      assert %User{} = purchase.user
+      assert purchase.user.id == user.id
+      assert Ecto.assoc_loaded?(purchase.user.current_avatar)
+      assert purchase.user.current_avatar_id == avatar.id
+
+      assert Avatars.resolve_user_avatar_url(purchase.user, :profile) ==
+               "https://example.com/profile.webp"
+    end
+
+    test "uses max(inserted_at) as purchased_at for the user+tier group", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Purchased at #{System.unique_integer()}",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 100,
+          event_id: event.id
+        })
+
+      earlier = ~U[2026-08-01 10:00:00Z]
+      later = ~U[2026-08-10 18:30:00Z]
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        inserted_at: earlier
+      })
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        inserted_at: later
+      })
+
+      [purchase] = Events.get_ticket_purchase_summary(event.id)
+      assert purchase.ticket_count == 2
+      assert DateTime.compare(purchase.purchased_at, later) == :eq
+    end
+
+    test "groups by user and tier and ignores non-confirmed tickets", %{
+      user: user
+    } do
+      other = user_fixture()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Grouping summary #{System.unique_integer()}",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, ga} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 100,
+          event_id: event.id
+        })
+
+      {:ok, vip} =
+        Events.create_ticket_tier(%{
+          name: "VIP",
+          type: :paid,
+          price: Money.new(80, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: ga.id,
+        user_id: user.id
+      })
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: vip.id,
+        user_id: user.id
+      })
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: ga.id,
+        user_id: other.id
+      })
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: ga.id,
+        user_id: other.id,
+        status: :cancelled
+      })
+
+      summary = Events.get_ticket_purchase_summary(event.id)
+      assert length(summary) == 3
+
+      user_ga =
+        Enum.find(
+          summary,
+          &(&1.user_id == user.id and &1.ticket_tier_id == ga.id)
+        )
+
+      user_vip =
+        Enum.find(
+          summary,
+          &(&1.user_id == user.id and &1.ticket_tier_id == vip.id)
+        )
+
+      other_ga =
+        Enum.find(
+          summary,
+          &(&1.user_id == other.id and &1.ticket_tier_id == ga.id)
+        )
+
+      assert user_ga.ticket_count == 1
+      assert user_ga.ticket_tier_name == "GA"
+      assert user_ga.total_amount == Money.new(40, :USD)
+      assert user_vip.ticket_count == 1
+      assert user_vip.ticket_tier_name == "VIP"
+      assert other_ga.ticket_count == 1
+    end
+
+    test "sets user to nil when the purchaser row cannot be loaded", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Nil purchaser #{System.unique_integer()}",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(10, :USD),
+          quantity: 100,
+          event_id: event.id
+        })
+
+      insert_confirmed_ticket(%{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: nil
+      })
+
+      [purchase] = Events.get_ticket_purchase_summary(event.id)
+      assert is_nil(purchase.user_id)
+      assert is_nil(purchase.user)
+      assert purchase.ticket_count == 1
     end
   end
 
