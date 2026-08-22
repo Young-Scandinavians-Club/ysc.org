@@ -1224,6 +1224,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     Enum.sort_by(purchases, &purchase_sort_key(&1, sort_by), sort_dir)
   end
 
+  defp purchase_sort_key(%{user: nil}, :user_name), do: ""
+
   defp purchase_sort_key(purchase, :user_name) do
     "#{purchase.user.first_name} #{purchase.user.last_name}"
     |> String.downcase()
