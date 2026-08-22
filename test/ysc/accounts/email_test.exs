@@ -29,15 +29,15 @@ defmodule Ysc.Accounts.EmailTest do
       assert Email.normalize("j.doe+personal+tag@gmail.com") == "jdoe@gmail.com"
     end
 
-    test "normalizes Googlemail addresses the same as Gmail" do
-      assert Email.normalize("john.doe@googlemail.com") ==
-               "johndoe@googlemail.com"
+    test "normalizes Googlemail addresses onto gmail.com" do
+      assert Email.normalize("john.doe@googlemail.com") == "johndoe@gmail.com"
 
-      assert Email.normalize("john+test@googlemail.com") ==
-               "john@googlemail.com"
+      assert Email.normalize("john+test@googlemail.com") == "john@gmail.com"
 
       assert Email.normalize("john.doe+test@googlemail.com") ==
-               "johndoe@googlemail.com"
+               "johndoe@gmail.com"
+
+      assert Email.normalize("Alice@GoogleMail.com") == "alice@gmail.com"
     end
 
     test "handles case insensitivity for Gmail" do

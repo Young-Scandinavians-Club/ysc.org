@@ -7,9 +7,11 @@ defmodule Ysc.Accounts.Email do
   Gmail (and Googlemail) have special handling for email addresses:
   - Dots (.) in the local part are ignored: `john.doe@gmail.com` = `johndoe@gmail.com`
   - Plus addressing is ignored: `john+test@gmail.com` = `john@gmail.com`
+  - `googlemail.com` is the same mailbox as `gmail.com` and is normalized to `gmail.com`
 
   This module normalizes Gmail addresses to their canonical form to prevent:
   - Multiple signups with the same Gmail address using dots/plus-addressing
+  - Parallel accounts via `@googlemail.com` vs `@gmail.com`
   - Potential phishing or abuse attempts
   - Confusion about account ownership
 
@@ -17,6 +19,7 @@ defmodule Ysc.Accounts.Email do
   """
 
   @gmail_domains ~w(gmail.com googlemail.com)
+  @canonical_gmail_domain "gmail.com"
 
   @doc """
   Normalizes an email address to its canonical form.
@@ -78,6 +81,9 @@ defmodule Ysc.Accounts.Email do
       iex> Ysc.Accounts.Email.equiv?("eaz.holm@gmail.com", "eazholm@gmail.com")
       true
 
+      iex> Ysc.Accounts.Email.equiv?("user@gmail.com", "user@googlemail.com")
+      true
+
       iex> Ysc.Accounts.Email.equiv?("user@example.com", "user@example.com")
       true
 
@@ -109,7 +115,7 @@ defmodule Ysc.Accounts.Email do
           |> remove_dots()
           |> remove_plus_addressing()
 
-        "#{normalized_local}@#{domain}"
+        "#{normalized_local}@#{@canonical_gmail_domain}"
 
       _ ->
         email
