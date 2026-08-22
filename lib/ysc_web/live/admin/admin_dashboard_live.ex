@@ -634,10 +634,17 @@ defmodule YscWeb.AdminDashboardLive do
                   </div>
 
                   <div :if={not Enum.empty?(tiers)} class="mt-4 space-y-3">
-                    <div :for={tier <- tiers} class="space-y-1.5">
+                    <div
+                      :for={tier <- tiers}
+                      id={"dashboard-event-#{event.id}-tier-#{tier.id}"}
+                      class="space-y-1.5"
+                    >
                       <div class="flex justify-between gap-2 text-xs font-bold text-zinc-600">
                         <span class="truncate">{tier.name}</span>
-                        <span class="shrink-0 text-zinc-900 tabular-nums">
+                        <span
+                          id={"dashboard-event-#{event.id}-tier-#{tier.id}-capacity"}
+                          class="shrink-0 text-zinc-900 tabular-nums"
+                        >
                           {tier.sold_tickets_count} / {tier_capacity_label(
                             tier,
                             event
@@ -649,6 +656,7 @@ defmodule YscWeb.AdminDashboardLive do
                       </div>
                       <div class="w-full bg-zinc-200/80 h-2 rounded-full overflow-hidden">
                         <div
+                          id={"dashboard-event-#{event.id}-tier-#{tier.id}-progress"}
                           class="bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full transition-all duration-700 max-w-full"
                           style={"width: #{calculate_progress_percentage(tier, event, tiers)}%"}
                         >

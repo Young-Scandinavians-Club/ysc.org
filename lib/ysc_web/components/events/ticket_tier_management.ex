@@ -380,6 +380,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
             </span>
           </div>
           <.button
+            id="export-tickets-csv"
             phx-click="export-tickets-csv"
             phx-target={@myself}
             phx-disable-with="Exporting..."
@@ -1180,6 +1181,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   defp purchases_sort_button(assigns) do
     ~H"""
     <button
+      id={"ticket-purchases-sort-#{@field}"}
       type="button"
       phx-click="sort-purchases"
       phx-value-field={@field}
