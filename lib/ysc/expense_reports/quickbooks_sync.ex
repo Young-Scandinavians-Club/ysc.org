@@ -395,7 +395,7 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
         #   end
 
         %{
-          description: "#{item.vendor} - #{item.description}",
+          description: expense_line_description(item),
           amount: amount,
           account_ref: %{value: default_expense_account_id || ""},
           class_ref: nil
@@ -478,6 +478,15 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
         {:error, reason}
     end
   end
+
+  defp expense_line_description(%{expense_type: "mileage"} = item) do
+    route = if item.mileage_from_to, do: " (#{item.mileage_from_to})", else: ""
+    miles = if item.miles_driven, do: " - #{item.miles_driven} mi", else: ""
+    "Mileage#{route}#{miles} - #{item.description}"
+  end
+
+  defp expense_line_description(item),
+    do: "#{item.vendor} - #{item.description}"
 
   defp build_private_note(%ExpenseReport{} = expense_report) do
     # Add expense report DB ID for reference

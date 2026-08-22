@@ -2161,6 +2161,50 @@ defmodule Ysc.ExpenseReportsTest do
     end
   end
 
+  describe "create_expense_report/2 — mileage items" do
+    test "submits successfully with a mileage-only item and no receipt", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      report =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          assert {:ok, report} =
+                   ExpenseReports.create_expense_report(
+                     %{
+                       "user_id" => user.id,
+                       "status" => "submitted",
+                       "purpose" => "Board meeting mileage",
+                       "reimbursement_method" => "bank_transfer",
+                       "bank_account_id" => bank_account.id,
+                       "certification_accepted" => true,
+                       "expense_items" => [
+                         %{
+                           "date" => "2024-01-15",
+                           "expense_type" => "mileage",
+                           "description" => "Board meeting",
+                           "mileage_from_to" => "Home to YSC Cabin",
+                           "miles_driven" => "20"
+                         }
+                       ]
+                     },
+                     user
+                   )
+
+          report
+        end)
+
+      assert report.status == "submitted"
+      [item] = report.expense_items
+      assert item.vendor == "Mileage"
+      assert item.amount == Money.new(:USD, "6.00")
+    end
+  end
+
   describe "submit_expense_report/1 vs expense report email jobs" do
     test "submit_expense_report enqueues QuickBooks sync but does not schedule expense report emails",
          %{

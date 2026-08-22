@@ -51,9 +51,16 @@
         <strong><%= item.vendor %></strong><br/>
         <%= item.description %><br/>
         <span class="gray-text-inline">Date: <%= item.date %></span><br/>
+        <%= if item.mileage do %>
+        <span class="gray-text-inline"><%= item.mileage_info %></span><br/>
+        <% end %>
         <span class="green-text-bold">Amount: <%= item.amount %></span>
-        <%= if item.has_receipt do %>
+        <%= cond do %>
+        <% item.has_receipt -> %>
         <br/><span class="green-text">✓ Receipt attached</span>
+        <% item.mileage -> %>
+        <br/><span class="gray-text-inline">Mileage — no receipt required</span>
+        <% true -> %>
         <% end %>
       </mj-text>
       <% end %>

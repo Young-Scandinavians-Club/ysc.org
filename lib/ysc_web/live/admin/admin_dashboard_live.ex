@@ -638,9 +638,9 @@ defmodule YscWeb.AdminDashboardLive do
                       <div class="flex justify-between gap-2 text-xs font-bold text-zinc-600">
                         <span class="truncate">{tier.name}</span>
                         <span class="shrink-0 text-zinc-900 tabular-nums">
-                          {tier.sold_tickets_count} / {if(tier.quantity,
-                            do: tier.quantity,
-                            else: "∞"
+                          {tier.sold_tickets_count} / {tier_capacity_label(
+                            tier,
+                            event
                           )}
                           <span class="text-zinc-400 font-medium ml-1">
                             · {format_money(tier_line_revenue(tier))}
@@ -650,7 +650,7 @@ defmodule YscWeb.AdminDashboardLive do
                       <div class="w-full bg-zinc-200/80 h-2 rounded-full overflow-hidden">
                         <div
                           class="bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full transition-all duration-700 max-w-full"
-                          style={"width: #{calculate_progress_percentage(tier)}%"}
+                          style={"width: #{calculate_progress_percentage(tier, event, tiers)}%"}
                         >
                         </div>
                       </div>
@@ -1474,11 +1474,30 @@ defmodule YscWeb.AdminDashboardLive do
     end
   end
 
-  defp calculate_progress_percentage(tier) do
-    if tier.quantity && tier.quantity > 0 do
-      min(100, round(tier.sold_tickets_count / tier.quantity * 100))
-    else
-      0
+  defp tier_capacity_label(tier, event) do
+    cond do
+      tier.quantity && tier.quantity > 0 ->
+        tier.quantity
+
+      event.max_attendees && event.max_attendees > 0 ->
+        "#{event.max_attendees} event cap"
+
+      true ->
+        "∞"
+    end
+  end
+
+  defp calculate_progress_percentage(tier, event, tiers) do
+    cond do
+      tier.quantity && tier.quantity > 0 ->
+        min(100, round(tier.sold_tickets_count / tier.quantity * 100))
+
+      event.max_attendees && event.max_attendees > 0 ->
+        total_sold = Enum.sum(Enum.map(tiers, & &1.sold_tickets_count))
+        min(100, round(total_sold / event.max_attendees * 100))
+
+      true ->
+        0
     end
   end
 
