@@ -77,10 +77,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     end
 
     test "renders checkout page", %{conn: conn, booking: booking} do
-      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Complete Your Booking"
       assert html =~ "Booking Summary"
       assert html =~ "What Happens Next?"
+      assert has_element?(view, "#checkout-next-steps")
+      assert has_element?(view, "#checkout-next-steps-step-1")
+      assert has_element?(view, "#checkout-next-steps-step-4")
 
       assert html =~
                "Enter your payment details in the payment section to complete your booking"
@@ -1346,9 +1349,11 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       conn: conn,
       booking: booking
     } do
-      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Guest Information"
       assert html =~ "What Happens Next?"
+      assert has_element?(view, "#checkout-next-steps")
+      assert has_element?(view, "#checkout-next-steps-step-1")
 
       assert html =~ "Enter the names of everyone else staying with you"
       assert html =~ "already included in the booking"

@@ -662,84 +662,43 @@ defmodule YscWeb.BookingCheckoutLive do
           </div>
           <!-- What Happens Next -->
           <div class="bg-white rounded-lg border border-zinc-200 p-6">
-            <h3 class="text-lg font-bold text-zinc-900 mb-4">What Happens Next?</h3>
-            <ol class="space-y-3 text-sm text-zinc-600">
-              <%= if @checkout_step == :guest_info do %>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    1
-                  </span>
-                  <span>
-                    {YscWeb.BookingUserMessages.checkout_guest_info_step_enter_guests()}
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    2
-                  </span>
-                  <span>
-                    <%= if @complimentary_checkout do %>
-                      {YscWeb.BookingUserMessages.checkout_guest_info_step_continue_complimentary()}
-                    <% else %>
-                      {YscWeb.BookingUserMessages.checkout_guest_info_step_continue_payment()}
-                    <% end %>
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    3
-                  </span>
-                  <span>
-                    {YscWeb.BookingUserMessages.checkout_confirmation_email_step()}
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    4
-                  </span>
-                  <span>
-                    {YscWeb.BookingUserMessages.checkout_cabin_access_step()}
-                  </span>
-                </li>
-              <% else %>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    1
-                  </span>
-                  <span>
-                    <%= if @complimentary_checkout do %>
-                      {YscWeb.BookingUserMessages.checkout_payment_step_confirm_complimentary()}
-                    <% else %>
-                      {YscWeb.BookingUserMessages.checkout_payment_step_pay()}
-                    <% end %>
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    2
-                  </span>
-                  <span>
-                    {YscWeb.BookingUserMessages.checkout_confirmation_email_step()}
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    3
-                  </span>
-                  <span>
-                    {YscWeb.BookingUserMessages.checkout_cabin_access_step()}
-                  </span>
-                </li>
-                <li class="flex items-start gap-3">
-                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                    4
-                  </span>
-                  <span>
-                    {YscWeb.BookingUserMessages.checkout_manage_booking_step()}
-                  </span>
-                </li>
-              <% end %>
-            </ol>
+            <h3
+              id="checkout-next-steps-heading"
+              class="text-lg font-bold text-zinc-900 mb-4"
+            >
+              What Happens Next?
+            </h3>
+            <.step_list
+              id="checkout-next-steps"
+              aria-labelledby="checkout-next-steps-heading"
+            >
+              <:step :if={@checkout_step == :guest_info}>
+                {BookingUserMessages.checkout_guest_info_step_enter_guests()}
+              </:step>
+              <:step :if={@checkout_step == :guest_info}>
+                <%= if @complimentary_checkout do %>
+                  {BookingUserMessages.checkout_guest_info_step_continue_complimentary()}
+                <% else %>
+                  {BookingUserMessages.checkout_guest_info_step_continue_payment()}
+                <% end %>
+              </:step>
+              <:step :if={@checkout_step != :guest_info}>
+                <%= if @complimentary_checkout do %>
+                  {BookingUserMessages.checkout_payment_step_confirm_complimentary()}
+                <% else %>
+                  {BookingUserMessages.checkout_payment_step_pay()}
+                <% end %>
+              </:step>
+              <:step>
+                {BookingUserMessages.checkout_confirmation_email_step()}
+              </:step>
+              <:step>
+                {BookingUserMessages.checkout_cabin_access_step()}
+              </:step>
+              <:step :if={@checkout_step != :guest_info}>
+                {BookingUserMessages.checkout_manage_booking_step()}
+              </:step>
+            </.step_list>
           </div>
         </aside>
       </div>

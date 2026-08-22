@@ -171,7 +171,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       booking = booking_fixture(%{user_id: user.id, status: :complete})
 
       # Create booking guests - function expects list of {index, attrs} tuples
-      {:ok, _guests} =
+      {:ok, guests} =
         Ysc.Bookings.create_booking_guests(booking.id, [
           {0,
            %{
@@ -189,11 +189,15 @@ defmodule YscWeb.BookingReceiptLiveTest do
            }}
         ])
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert html =~ "Guest Information"
       assert html =~ "John Doe"
       assert html =~ "Jane Doe"
+
+      for guest <- guests do
+        assert has_element?(view, "#receipt-guest-#{guest.id}-badge")
+      end
     end
   end
 
