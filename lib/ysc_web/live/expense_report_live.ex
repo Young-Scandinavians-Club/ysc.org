@@ -1963,13 +1963,16 @@ defmodule YscWeb.ExpenseReportLive do
                       <% mileage? = expense_f[:expense_type].value == "mileage" %>
 
                       <%= if mileage? do %>
-                        <div class="rounded-lg bg-blue-50/50 border border-blue-100 p-3 text-xs text-zinc-600 flex gap-2">
+                        <div
+                          id={"mileage-help-#{expense_f.index}"}
+                          class="rounded-lg bg-blue-50/50 border border-blue-100 p-3 text-xs text-zinc-600 flex gap-2"
+                        >
                           <.icon
                             name="hero-information-circle"
                             class="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5"
                           />
                           <span>
-                            No receipt is needed for mileage. To document the trip we just need the date, the route, the business purpose, and the miles driven.
+                            No receipt is needed for mileage. Enter the date, where you drove from and to, why you made the trip, and how many miles.
                           </span>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2035,7 +2038,7 @@ defmodule YscWeb.ExpenseReportLive do
                             <.input
                               field={expense_f[:mileage_from_to]}
                               type="text"
-                              label="From / To"
+                              label="Route (from / to)"
                               placeholder="Home to YSC Cabin"
                               required
                             />
@@ -2052,7 +2055,7 @@ defmodule YscWeb.ExpenseReportLive do
                           <.input
                             field={expense_f[:description]}
                             type="textarea"
-                            label="Business Purpose"
+                            label="Purpose of trip"
                             placeholder="Board meeting, work weekend, cabin maintenance, etc."
                             required
                           />
@@ -2066,7 +2069,7 @@ defmodule YscWeb.ExpenseReportLive do
 
                         <div>
                           <label class="block text-sm font-semibold leading-6 text-zinc-700 mb-2">
-                            Mileage Reimbursement ({mileage_rate_display()}/mile)
+                            Amount we will reimburse ({mileage_rate_display()}/mile)
                           </label>
                           <div class="rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-2.5 text-sm text-zinc-700">
                             {mileage_amount_display(
