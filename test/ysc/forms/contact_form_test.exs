@@ -44,10 +44,14 @@ defmodule Ysc.Forms.ContactFormTest do
         email: "john@example.com",
         subject: "Question",
         message: "This is my question.",
+        # Client-supplied user_id must be ignored (Finding 44).
         user_id: user.id
       }
 
-      changeset = ContactForm.changeset(%ContactForm{}, attrs)
+      changeset =
+        %ContactForm{}
+        |> ContactForm.changeset(attrs)
+        |> ContactForm.put_submitter(user)
 
       assert changeset.valid?
       assert changeset.changes.user_id == user.id
@@ -203,13 +207,16 @@ defmodule Ysc.Forms.ContactFormTest do
         name: "Anonymous",
         email: "anonymous@example.com",
         subject: "Question",
-        message: "This is an anonymous question.",
-        user_id: nil
+        message: "This is an anonymous question."
       }
 
-      changeset = ContactForm.changeset(%ContactForm{}, attrs)
+      changeset =
+        %ContactForm{}
+        |> ContactForm.changeset(attrs)
+        |> ContactForm.put_submitter(nil)
 
       assert changeset.valid?
+      refute Map.has_key?(changeset.changes, :user_id)
     end
   end
 
@@ -221,11 +228,14 @@ defmodule Ysc.Forms.ContactFormTest do
         name: "Test User",
         email: "test@example.com",
         subject: "Test Subject",
-        message: "This is a test message that is long enough.",
-        user_id: user.id
+        message: "This is a test message that is long enough."
       }
 
-      changeset = ContactForm.changeset(%ContactForm{}, attrs)
+      changeset =
+        %ContactForm{}
+        |> ContactForm.changeset(attrs)
+        |> ContactForm.put_submitter(user)
+
       {:ok, contact_form} = Repo.insert(changeset)
 
       retrieved = Repo.get(ContactForm, contact_form.id)
