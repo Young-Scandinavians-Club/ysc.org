@@ -21,6 +21,22 @@ defmodule YscWeb.AdminDashboardLiveTest do
     %{conn: log_in_user(conn, user), user: user}
   end
 
+  defp insert_sold_tickets(event, tier, user, count) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    for _i <- 1..count do
+      %Ysc.Events.Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        status: :confirmed,
+        expires_at: DateTime.add(now, 1, :day)
+      }
+      |> Repo.insert!()
+    end
+  end
+
   describe "Admin Dashboard" do
     setup [:create_admin]
 
@@ -202,6 +218,141 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert html =~ "Manage events"
       assert html =~ "Manage posts"
       assert html =~ "Manage newsletters"
+    end
+  end
+
+  describe "ticket tier capacity fallback" do
+    setup [:create_admin]
+
+    test "unlimited tiers fall back to event cap for label and shared progress",
+         %{
+           conn: conn,
+           user: admin
+         } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Event Cap Progress #{System.unique_integer()}",
+          max_attendees: 20
+        })
+
+      ga =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Unlimited",
+          quantity: nil
+        })
+
+      vip =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "VIP Unlimited",
+          quantity: nil
+        })
+
+      insert_sold_tickets(event, ga, admin, 4)
+      insert_sold_tickets(event, vip, admin, 6)
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{ga.id}-capacity",
+               "4 / 20 event cap"
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{vip.id}-capacity",
+               "6 / 20 event cap"
+             )
+
+      # Fallback progress uses total sold across tiers (10/20), not each tier
+      # alone (which would be 20% and 30%).
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{ga.id}-progress[style=\"width: 50%\"]"
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{vip.id}-progress[style=\"width: 50%\"]"
+             )
+    end
+
+    test "tiers with their own quantity keep per-tier progress", %{
+      conn: conn,
+      user: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Tier Qty Progress #{System.unique_integer()}",
+          max_attendees: 100
+        })
+
+      ga =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Limited GA",
+          quantity: 10
+        })
+
+      insert_sold_tickets(event, ga, admin, 3)
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{ga.id}-capacity",
+               "3 / 10"
+             )
+
+      refute has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{ga.id}-capacity",
+               "event cap"
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{ga.id}-progress[style=\"width: 30%\"]"
+             )
+    end
+
+    test "unlimited event and unlimited tier show an infinite capacity label",
+         %{
+           conn: conn,
+           user: admin
+         } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Infinite Cap #{System.unique_integer()}",
+          unlimited_capacity: true
+        })
+
+      ga =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Open GA",
+          quantity: nil
+        })
+
+      insert_sold_tickets(event, ga, admin, 2)
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{ga.id}-capacity",
+               "2 / ∞"
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-tier-#{ga.id}-progress[style=\"width: 0%\"]"
+             )
     end
   end
 end
