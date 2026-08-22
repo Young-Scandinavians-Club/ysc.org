@@ -226,7 +226,11 @@ defmodule Ysc.MixProject do
       {:gettext, "~> 0.26"},
       {:goth, "~> 1.4"},
       {:hammer, "~> 7.3"},
-      {:html_sanitize_ex, "~> 1.5"},
+      # 1.5.5: CSS.scrub treats nested tags inside <style> as empty (parser can
+      # pass a tree instead of a string); HTML5 also tightens meta http-equiv
+      # and object data=. We use BasicHTML / TrixScrubber / strip_tags, not
+      # HTML5, but pin the patched floor.
+      {:html_sanitize_ex, "~> 1.5.5"},
       {:image, "~> 0.72"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
