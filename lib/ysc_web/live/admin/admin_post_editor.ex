@@ -984,20 +984,14 @@ defmodule YscWeb.AdminPostEditorLive do
   end
 
   defp scrub_raw_body(values) do
-    # Never trust client-supplied rendered_body (Atom feeds and other sinks
-    # consume it). Always derive it from scrubbed raw_body when present.
-    values = Map.drop(values, ["rendered_body", :rendered_body])
-
-    case Map.fetch(values, "raw_body") do
-      {:ok, raw_body} ->
-        Map.put(
-          values,
-          "rendered_body",
-          Scrubber.scrub(raw_body, Scrubber.BasicHTML)
-        )
-
-      :error ->
-        values
+    if Map.has_key?(values, "raw_body") do
+      Map.put(
+        values,
+        "rendered_body",
+        Scrubber.scrub(Map.get(values, "raw_body"), Scrubber.BasicHTML)
+      )
+    else
+      values
     end
   end
 

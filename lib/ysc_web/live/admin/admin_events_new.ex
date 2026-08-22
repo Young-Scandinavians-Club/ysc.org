@@ -2927,7 +2927,8 @@ defmodule YscWeb.AdminEventsNewLive do
     else
       event = socket.assigns.event
 
-      rendered_body = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+      rendered_body =
+        params["rendered_body"] || Scrubber.scrub(raw_body, Ysc.TrixScrubber)
 
       preview_update = %EventUpdate{
         title: params["title"],
@@ -3031,7 +3032,7 @@ defmodule YscWeb.AdminEventsNewLive do
     if sms_checked?(form) and event do
       params = form_params(form)
       raw_body = params["raw_body"] || ""
-      rendered_body = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+      rendered_body = params["rendered_body"] || raw_body
 
       preview =
         Segment.build_event_update_sms(

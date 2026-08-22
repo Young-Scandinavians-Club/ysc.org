@@ -12,44 +12,6 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
   import YscWeb.Emails.Helpers, only: [absolute_url: 1]
 
-  # Tags retained for email layout transforms. Unknown tags are dropped
-  # (children/text kept) so iframe/object/script/etc. cannot reach the inbox.
-  @email_allowed_tags MapSet.new([
-                        "a",
-                        "b",
-                        "blockquote",
-                        "br",
-                        "code",
-                        "del",
-                        "div",
-                        "em",
-                        "figcaption",
-                        "figure",
-                        "h1",
-                        "h2",
-                        "h3",
-                        "h4",
-                        "h5",
-                        "h6",
-                        "hr",
-                        "i",
-                        "img",
-                        "li",
-                        "ol",
-                        "p",
-                        "pre",
-                        "span",
-                        "strong",
-                        "table",
-                        "tbody",
-                        "td",
-                        "th",
-                        "thead",
-                        "tr",
-                        "u",
-                        "ul"
-                      ])
-
   @doc """
   Transforms Trix editor HTML into email-safe HTML for use inside MJML mj-text blocks.
 
@@ -59,11 +21,9 @@ defmodule YscWeb.Emails.NewsletterEdition do
   Transformations applied:
     - Trix figure attachments (`<figure><a><img><figcaption>`) → `<img>` with inline styles
       plus an optional styled caption `<p>`.
-    - Only an allowlisted set of formatting tags kept; unknown tags (`iframe`, `object`,
-      `script`, `style`, `base`, `meta`, …) are dropped.
-    - All `data-trix-*` and `class` attributes stripped.
-    - Event-handler attributes (`on*`) stripped.
-    - `javascript:`, `data:`, and `vbscript:` URI schemes stripped from href/src.
+    - All `data-trix-*` attributes stripped.
+    - All `class` attributes stripped (Trix CSS is not present in email clients).
+    - Standard formatting tags (`em`, `strong`, `a`, `br`, `ul`, `ol`, `li`, etc.) kept as-is.
   """
   def email_safe_html(nil), do: ""
   def email_safe_html(""), do: ""
@@ -94,7 +54,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
     case Floki.find(fragment, "img") do
       [{"img", img_attrs, _} | _] ->
-        src = safe_uri(floki_attr(img_attrs, "src"))
+        src = floki_attr(img_attrs, "src")
         alt = floki_attr(img_attrs, "alt") || ""
 
         img_nodes =
@@ -139,7 +99,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
         # Non-image file attachment — render as a download link button
         href =
           case Floki.find(fragment, "a") do
-            [{"a", a_attrs, _} | _] -> safe_uri(floki_attr(a_attrs, "href"))
+            [{"a", a_attrs, _} | _] -> floki_attr(a_attrs, "href")
             _ -> nil
           end
 
@@ -194,67 +154,28 @@ defmodule YscWeb.Emails.NewsletterEdition do
     end
   end
 
-  # Drop non-allowlisted tags (keep text children). Script/style are dropped
-  # entirely so their payloads cannot leak as text nodes.
+  # Strip data-trix-* and class attrs from all other tags, recurse into children
   defp transform_node_for_email({tag, _attrs, _children})
        when tag in ["script", "style"] do
     []
   end
 
   defp transform_node_for_email({tag, attrs, children}) do
-    if MapSet.member?(@email_allowed_tags, tag) do
-      safe_attrs =
-        attrs
-        |> Enum.reject(&unsafe_email_attr?/1)
-        |> Enum.map(&sanitize_email_uri_attr/1)
+    safe_attrs =
+      Enum.reject(attrs, fn {name, value} ->
+        String.starts_with?(name, "data-trix") or name == "class" or
+          String.starts_with?(name, "on") or
+          (is_binary(value) and
+             String.match?(
+               String.trim(value) |> String.downcase(),
+               ~r/^javascript:/
+             ))
+      end)
 
-      [{tag, safe_attrs, transform_nodes_for_email(children)}]
-    else
-      transform_nodes_for_email(children)
-    end
+    [{tag, safe_attrs, transform_nodes_for_email(children)}]
   end
 
   defp transform_node_for_email(text) when is_binary(text), do: [text]
-
-  defp unsafe_email_attr?({name, _value}) do
-    String.starts_with?(name, "data-trix") or name == "class" or
-      String.starts_with?(name, "on")
-  end
-
-  defp sanitize_email_uri_attr({name, value})
-       when name in ["href", "src"] and is_binary(value) do
-    case safe_uri(value) do
-      nil -> {name, ""}
-      safe -> {name, safe}
-    end
-  end
-
-  defp sanitize_email_uri_attr(attr), do: attr
-
-  defp safe_uri(nil), do: nil
-
-  defp safe_uri(value) when is_binary(value) do
-    normalized = value |> String.trim() |> String.downcase()
-
-    cond do
-      value |> String.trim() == "" ->
-        nil
-
-      String.starts_with?(normalized, "javascript:") ->
-        nil
-
-      String.starts_with?(normalized, "data:") ->
-        nil
-
-      String.starts_with?(normalized, "vbscript:") ->
-        nil
-
-      true ->
-        String.trim(value)
-    end
-  end
-
-  defp safe_uri(_), do: nil
 
   defp floki_attr(attrs, name) do
     case Enum.find(attrs, fn {k, _} -> k == name end) do
@@ -292,8 +213,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
   Use with `NewsletterEdition.render(NewsletterEdition.build_assigns(edition, subscriber, posts, events))`.
   """
-  # intro_html is produced by email_safe_html/1 (allowlisted tags + URI scrubbing);
-  # content is admin/volunteer-authored.
+  # intro_html is produced by email_safe_html/1 which strips all attributes and
+  # unknown tags via Floki; content is admin-authored only.
   # sobelow_skip ["XSS.Raw"]
   def build_assigns(edition, subscriber, posts, events) do
     first_name = subscriber.first_name || "there"
@@ -343,8 +264,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
   Uses a placeholder subscriber so first_name is "there" and unsubscribe_url points
   to the public unsubscribe page (recipients get their own link in the real email).
   """
-  # intro_html is produced by email_safe_html/1 (allowlisted tags + URI scrubbing);
-  # content is admin/volunteer-authored.
+  # intro_html is produced by email_safe_html/1 which strips all attributes and
+  # unknown tags via Floki; content is admin-authored only.
   # sobelow_skip ["XSS.Raw"]
   def build_preview_assigns(
         title,

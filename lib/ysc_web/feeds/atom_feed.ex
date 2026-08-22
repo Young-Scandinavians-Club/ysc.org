@@ -120,8 +120,7 @@ defmodule YscWeb.Feeds.AtomFeed do
   defp maybe_entry_html_content(entry, html) when html in [nil, ""], do: entry
 
   defp maybe_entry_html_content(entry, html) do
-    safe_html = HtmlSanitizeEx.Scrubber.scrub(html, Ysc.TrixScrubber)
-    Entry.content(entry, safe_html, type: "html")
+    Entry.content(entry, html, type: "html")
   end
 
   defp maybe_post_author(entry, post) do

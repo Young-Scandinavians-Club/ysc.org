@@ -3458,7 +3458,10 @@ defmodule Ysc.Quickbooks.Client do
           Ysc.Logging.info(
             "[QB Client] Successfully refreshed QuickBooks access token",
             access_token_length: String.length(access_token),
-            refresh_token_length: String.length(new_refresh_token)
+            refresh_token_length: String.length(new_refresh_token),
+            access_token_preview: String.slice(access_token, 0, 20) <> "...",
+            refresh_token_preview:
+              String.slice(new_refresh_token, 0, 20) <> "..."
           )
 
           {:ok, access_token}

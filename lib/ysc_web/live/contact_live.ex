@@ -168,24 +168,26 @@ defmodule YscWeb.ContactLive do
 
   @impl true
   def handle_event("validate", %{"contact_form" => contact_params}, socket) do
-    params = add_user_info(contact_params, socket.assigns[:current_user])
+    params =
+      contact_params
+      |> add_user_info(socket.assigns[:current_user])
+      |> add_user_id(socket.assigns[:current_user])
 
     changeset =
-      %Ysc.Forms.ContactForm{}
-      |> Ysc.Forms.ContactForm.changeset(params)
-      |> Ysc.Forms.ContactForm.put_submitter(socket.assigns[:current_user])
+      Ysc.Forms.ContactForm.changeset(%Ysc.Forms.ContactForm{}, params)
 
     {:noreply, assign_form(socket, changeset)}
   end
 
   @impl true
   def handle_event("save", %{"contact_form" => contact_params} = values, socket) do
-    params = add_user_info(contact_params, socket.assigns[:current_user])
+    params =
+      contact_params
+      |> add_user_info(socket.assigns[:current_user])
+      |> add_user_id(socket.assigns[:current_user])
 
     changeset =
-      %Ysc.Forms.ContactForm{}
-      |> Ysc.Forms.ContactForm.changeset(params)
-      |> Ysc.Forms.ContactForm.put_submitter(socket.assigns[:current_user])
+      Ysc.Forms.ContactForm.changeset(%Ysc.Forms.ContactForm{}, params)
 
     if socket.assigns.logged_in? do
       case Ysc.Forms.create_contact_form(changeset) do
@@ -248,9 +250,13 @@ defmodule YscWeb.ContactLive do
   defp starting_params(user) do
     %{
       name: "#{user.first_name} #{user.last_name}",
-      email: user.email
+      email: user.email,
+      user_id: user.id
     }
   end
+
+  defp add_user_id(params, nil), do: params
+  defp add_user_id(params, user), do: Map.put(params, "user_id", user.id)
 
   defp add_user_info(params, nil), do: params
 
