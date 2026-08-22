@@ -1186,6 +1186,141 @@ defmodule Ysc.TicketsTest do
       assert {:error, :no_valid_tickets} ==
                Tickets.calculate_refund_amount(order, [Ecto.ULID.generate()])
     end
+
+    test "subtracts per-ticket discount from the paid tier price", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      ticket
+      |> Ecto.Changeset.change(discount_amount: Money.new(20, :USD))
+      |> Repo.update!()
+
+      assert {:ok, amount} =
+               Tickets.calculate_refund_amount(order, [ticket.id])
+
+      assert Money.equal?(amount, Money.new(30, :USD))
+    end
+
+    test "refunds donation remainder, not the full mixed-order total", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, donation_tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Support",
+          type: :donation,
+          price: nil,
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{
+          tier1.id => 1,
+          # $10.00 donation
+          donation_tier.id => 1_000
+        })
+
+      tickets =
+        order.id
+        |> tickets_for_order()
+        |> Repo.preload(:ticket_tier)
+
+      donation_ticket =
+        Enum.find(tickets, &(&1.ticket_tier.type == :donation))
+
+      paid_ticket = Enum.find(tickets, &(&1.ticket_tier.type == :paid))
+
+      assert {:ok, donation_refund} =
+               Tickets.calculate_refund_amount(order, [donation_ticket.id])
+
+      assert Money.equal?(donation_refund, Money.new(10, :USD))
+
+      assert {:ok, paid_refund} =
+               Tickets.calculate_refund_amount(order, [paid_ticket.id])
+
+      assert Money.equal?(paid_refund, Money.new(50, :USD))
+    end
+
+    test "keeps original donation share after a sibling donation is cancelled",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, donation_tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Support",
+          type: :donation,
+          price: nil,
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{
+          tier1.id => 1,
+          donation_tier.id => 1_000
+        })
+
+      [original_donation] =
+        order.id
+        |> tickets_for_order()
+        |> Repo.preload(:ticket_tier)
+        |> Enum.filter(&(&1.ticket_tier.type == :donation))
+
+      extra_donation =
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: donation_tier.id,
+          ticket_order_id: order.id,
+          status: :cancelled,
+          expires_at: DateTime.truncate(DateTime.utc_now(), :second)
+        }
+        |> Repo.insert!()
+
+      # Two donation tickets share the $10 remainder → $5 each, even though
+      # the sibling is already cancelled. Splitting only across remaining
+      # donations would refund the full $10 again.
+      assert {:ok, amount} =
+               Tickets.calculate_refund_amount(order, [original_donation.id])
+
+      assert Money.equal?(amount, Money.new(:USD, "5.00"))
+      assert Repo.get!(Ticket, extra_donation.id).status == :cancelled
+    end
+
+    test "returns zero for free tickets", %{
+      user: user,
+      event: event
+    } do
+      {:ok, free_tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Comp",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{free_tier.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      assert {:ok, amount} =
+               Tickets.calculate_refund_amount(order, [ticket.id])
+
+      assert Money.zero?(amount)
+    end
   end
 
   describe "refund_tickets/3" do

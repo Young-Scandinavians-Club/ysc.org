@@ -26,6 +26,50 @@ defmodule Ysc.Tickets.DonationDisplayTest do
                "ticket-d1" => "$5.00",
                "ticket-d2" => "$5.00"
              }
+
+      amounts = DonationDisplay.money_amounts_by_ticket_id(order)
+      assert Money.equal?(amounts["ticket-ga"], Money.new(:USD, "25.00"))
+      assert Money.equal?(amounts["ticket-d1"], Money.new(:USD, "5.00"))
+      assert Money.equal?(amounts["ticket-d2"], Money.new(:USD, "5.00"))
+    end
+
+    test "keeps original donation share when a sibling donation is cancelled" do
+      ga_tier = %{type: :paid, price: Money.new(:USD, "50.00")}
+      donation_tier = %{type: :donation, price: nil}
+
+      order = %{
+        total_amount: Money.new(:USD, "60.00"),
+        tickets: [
+          %{
+            id: "paid",
+            ticket_tier: ga_tier,
+            discount_amount: Money.new(0, :USD)
+          },
+          %{id: "d1", ticket_tier: donation_tier, status: :cancelled},
+          %{id: "d2", ticket_tier: donation_tier, status: :confirmed}
+        ]
+      }
+
+      amounts = DonationDisplay.money_amounts_by_ticket_id(order)
+      assert Money.equal?(amounts["d2"], Money.new(:USD, "5.00"))
+    end
+
+    test "subtracts discount from paid ticket net amount" do
+      ga_tier = %{type: :paid, price: Money.new(:USD, "50.00")}
+
+      order = %{
+        total_amount: Money.new(:USD, "30.00"),
+        tickets: [
+          %{
+            id: "paid",
+            ticket_tier: ga_tier,
+            discount_amount: Money.new(:USD, "20.00")
+          }
+        ]
+      }
+
+      amounts = DonationDisplay.money_amounts_by_ticket_id(order)
+      assert Money.equal?(amounts["paid"], Money.new(:USD, "30.00"))
     end
 
     test "returns Donation fallback when order has no positive donation split" do
