@@ -167,8 +167,12 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
         expense_items
         |> Enum.with_index()
         |> Enum.filter(fn {item, _index} ->
+          # Mileage items are backed by the logged date/route/purpose/miles
+          # instead of a receipt, per the IRS Accountable Plan rules.
           receipt_path = get_receipt_path(item)
-          is_nil(receipt_path) || receipt_path == ""
+
+          get_expense_type(item) != "mileage" &&
+            (is_nil(receipt_path) || receipt_path == "")
         end)
 
       if Enum.any?(items_without_receipts) do
@@ -194,6 +198,16 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
   end
 
   defp get_receipt_path(_), do: nil
+
+  defp get_expense_type(%Ecto.Changeset{} = item) do
+    Ecto.Changeset.get_field(item, :expense_type)
+  end
+
+  defp get_expense_type(%ExpenseReportItem{} = item) do
+    item.expense_type
+  end
+
+  defp get_expense_type(_), do: nil
 
   defp validate_reimbursement_method(changeset, _opts) do
     # This validation is handled in the context module's validate_reimbursement_setup

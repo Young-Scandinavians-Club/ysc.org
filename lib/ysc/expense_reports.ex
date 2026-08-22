@@ -238,7 +238,9 @@ defmodule Ysc.ExpenseReports do
         expense_items
         |> Enum.filter(fn item ->
           receipt_path = get_receipt_path_from_item(item)
-          is_nil(receipt_path) || receipt_path == ""
+
+          get_expense_type_from_item(item) != "mileage" &&
+            (is_nil(receipt_path) || receipt_path == "")
         end)
 
       if Enum.any?(items_without_receipts) do
@@ -264,6 +266,16 @@ defmodule Ysc.ExpenseReports do
   end
 
   defp get_receipt_path_from_item(_), do: nil
+
+  defp get_expense_type_from_item(%Ecto.Changeset{} = item) do
+    Ecto.Changeset.get_field(item, :expense_type)
+  end
+
+  defp get_expense_type_from_item(%ExpenseReportItem{} = item) do
+    item.expense_type
+  end
+
+  defp get_expense_type_from_item(_), do: nil
 
   defp validate_reimbursement_setup(changeset, %User{} = user) do
     method = Ecto.Changeset.get_field(changeset, :reimbursement_method)

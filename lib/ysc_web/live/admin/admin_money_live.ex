@@ -3696,22 +3696,35 @@ defmodule YscWeb.AdminMoneyLive do
                       <div class="truncate" title={item.description}>
                         {item.description}
                       </div>
+                      <%= if item.expense_type == "mileage" do %>
+                        <div class="text-xs text-zinc-500 mt-0.5">
+                          <%= if item.mileage_from_to do %>
+                            {item.mileage_from_to} •
+                          <% end %>
+                          <%= if item.miles_driven do %>
+                            {item.miles_driven} mi
+                          <% end %>
+                        </div>
+                      <% end %>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap font-medium">
                       {Money.to_string!(item.amount)}
                     </td>
                     <td class="px-4 py-2">
-                      <%= if item.receipt_s3_path do %>
-                        <a
-                          href={ExpenseReports.receipt_url(item.receipt_s3_path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-blue-600 hover:text-blue-800 text-xs"
-                        >
-                          View Receipt
-                        </a>
-                      <% else %>
-                        <span class="text-zinc-400 text-xs">No receipt</span>
+                      <%= cond do %>
+                        <% item.receipt_s3_path -> %>
+                          <a
+                            href={ExpenseReports.receipt_url(item.receipt_s3_path)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-blue-600 hover:text-blue-800 text-xs"
+                          >
+                            View Receipt
+                          </a>
+                        <% item.expense_type == "mileage" -> %>
+                          <span class="text-zinc-400 text-xs">Mileage — no receipt required</span>
+                        <% true -> %>
+                          <span class="text-zinc-400 text-xs">No receipt</span>
                       <% end %>
                     </td>
                   </tr>

@@ -967,12 +967,16 @@ defmodule YscWeb.ExpenseReportLive do
           item_params = %{
             "_persistent_id" => to_string(index),
             "date" => format_date_for_input(item),
+            "expense_type" =>
+              get_field_from_item(item, :expense_type) || "purchase",
             "vendor" => get_field_from_item(item, :vendor),
             "description" => get_field_from_item(item, :description),
             "amount" =>
               Ysc.MoneyHelper.format_money_for_input(
                 get_field_from_item(item, :amount)
-              )
+              ),
+            "miles_driven" => get_field_from_item(item, :miles_driven),
+            "mileage_from_to" => get_field_from_item(item, :mileage_from_to)
           }
 
           item_params =
@@ -1105,10 +1109,13 @@ defmodule YscWeb.ExpenseReportLive do
     |> Enum.map(fn {_index, item_params} ->
       %ExpenseReportItem{
         date: parse_date(item_params["date"]),
+        expense_type: item_params["expense_type"] || "purchase",
         vendor: item_params["vendor"],
         description: item_params["description"],
         amount: parse_money(item_params["amount"]),
-        receipt_s3_path: item_params["receipt_s3_path"]
+        receipt_s3_path: item_params["receipt_s3_path"],
+        miles_driven: parse_integer(item_params["miles_driven"]),
+        mileage_from_to: item_params["mileage_from_to"]
       }
     end)
     |> Enum.filter(fn item -> not expense_item_empty?(item) end)
@@ -1135,7 +1142,9 @@ defmodule YscWeb.ExpenseReportLive do
     is_nil(item.date) &&
       (is_nil(item.vendor) || item.vendor == "") &&
       (is_nil(item.description) || item.description == "") &&
-      (is_nil(item.amount) || item.amount == Money.new(0, :USD))
+      (is_nil(item.amount) || item.amount == Money.new(0, :USD)) &&
+      is_nil(item.miles_driven) &&
+      (is_nil(item.mileage_from_to) || item.mileage_from_to == "")
   end
 
   defp income_item_empty?(%ExpenseReportIncomeItem{} = item) do
@@ -1153,6 +1162,19 @@ defmodule YscWeb.ExpenseReportLive do
       _ -> nil
     end
   end
+
+  defp parse_integer(nil), do: nil
+  defp parse_integer(""), do: nil
+  defp parse_integer(value) when is_integer(value), do: value
+
+  defp parse_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> nil
+    end
+  end
+
+  defp parse_integer(_), do: nil
 
   defp parse_money(nil), do: nil
   defp parse_money(""), do: nil
@@ -1416,6 +1438,16 @@ defmodule YscWeb.ExpenseReportLive do
                             Date: {DateDisplay.format_date_long(item.date)}
                           <% end %>
                         </p>
+                        <%= if item.expense_type == "mileage" do %>
+                          <p class="text-sm text-zinc-500 mt-1">
+                            <%= if item.mileage_from_to do %>
+                              Route: {item.mileage_from_to} •
+                            <% end %>
+                            <%= if item.miles_driven do %>
+                              {item.miles_driven} mi @ {mileage_rate_display()}/mi
+                            <% end %>
+                          </p>
+                        <% end %>
                         <%= if item.receipt_s3_path do %>
                           <%= if pdf?(item.receipt_s3_path) do %>
                             <a
@@ -1897,7 +1929,7 @@ defmodule YscWeb.ExpenseReportLive do
                   id="expense-section-expenses"
                   step={2}
                   title="Expense Items"
-                  subtitle="Add all expenses you want to be reimbursed for. All items must have a receipt."
+                  subtitle="Add all expenses and mileage you want to be reimbursed for. Purchases require a receipt; mileage does not."
                 >
                   <.inputs_for :let={expense_f} field={@form[:expense_items]}>
                     <div class="bg-zinc-50/70 ring-1 ring-zinc-100 rounded-lg p-4 mb-4 space-y-4">
@@ -1915,205 +1947,283 @@ defmodule YscWeb.ExpenseReportLive do
                           <.icon name="hero-x-mark" class="w-5 h-5" />Remove
                         </.button>
                       </div>
-                      <!-- Date, Vendor, Amount in one row for better visibility -->
-                      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <.input
-                            field={expense_f[:date]}
-                            type="date"
-                            label="Date"
-                            max={get_date_max()}
-                            min={get_date_min()}
-                            required
+
+                      <div class="max-w-xs">
+                        <.input
+                          field={expense_f[:expense_type]}
+                          type="select"
+                          label="Expense Type"
+                          options={[
+                            {"Purchase", "purchase"},
+                            {"Mileage", "mileage"}
+                          ]}
+                        />
+                      </div>
+
+                      <% mileage? = expense_f[:expense_type].value == "mileage" %>
+
+                      <%= if mileage? do %>
+                        <div class="rounded-lg bg-blue-50/50 border border-blue-100 p-3 text-xs text-zinc-600 flex gap-2">
+                          <.icon
+                            name="hero-information-circle"
+                            class="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5"
                           />
-                          <%= if expense_f[:date].value do %>
-                            <%= cond do %>
-                              <% date_older_than_30_days?(expense_f[:date].value) -> %>
-                                <div class="mt-1 flex items-center gap-1 text-sm text-amber-600">
-                                  <.icon
-                                    name="hero-exclamation-triangle"
-                                    class="w-4 h-4"
-                                  />
-                                  <span>
-                                    This date is more than 30 days ago. Please contact the treasurer if you need to submit older expenses.
-                                  </span>
-                                </div>
-                              <% date_close_to_30_day_limit?(expense_f[:date].value) -> %>
-                                <div class="mt-1 flex items-center gap-1 text-sm text-amber-600">
-                                  <.icon
-                                    name="hero-information-circle"
-                                    class="w-4 h-4"
-                                  />
-                                  <span>
-                                    Note: This is close to the 30-day limit.
-                                  </span>
-                                </div>
-                              <% true -> %>
-                            <% end %>
-                          <% end %>
-                          <p
-                            :for={error <- expense_f[:date].errors}
-                            class="mt-1 text-sm text-red-600"
-                          >
-                            {error_to_string(error)}
-                          </p>
+                          <span>
+                            No receipt is needed for mileage. To document the trip we just need the date, the route, the business purpose, and the miles driven.
+                          </span>
                         </div>
-                        <div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
                             <.input
-                              field={expense_f[:vendor]}
-                              type="text"
-                              label="Vendor"
-                              placeholder="Costco, Amazon, etc."
-                              list={"vendor-list-#{expense_f.index}"}
+                              field={expense_f[:date]}
+                              type="date"
+                              label="Date"
+                              max={get_date_max()}
+                              min={get_date_min()}
                               required
                             />
-                            <datalist id={"vendor-list-#{expense_f.index}"}>
-                              <!-- Most common vendors first -->
-                              <option value="Costco">Costco</option>
-                              <option value="Amazon">Amazon</option>
-                              <option value="Target">Target</option>
-                              <option value="Walmart">Walmart</option>
-                              <option value="Safeway">Safeway</option>
-                              <!-- Club-specific vendors -->
-                              <option value="Kelseyville Lumber">
-                                Kelseyville Lumber
-                              </option>
-                              <option value="Riviera Foods">Riviera Foods</option>
-                              <!-- Other common vendors -->
-                              <option value="Whole Foods">Whole Foods</option>
-                              <option value="Trader Joe's">Trader Joe's</option>
-                              <option value="Home Depot">Home Depot</option>
-                              <option value="Total Wine & More">
-                                Total Wine & More
-                              </option>
-                              <option value="Lowe's">Lowe's</option>
-                              <option value="Staples">Staples</option>
-                              <option value="Ikea">Ikea</option>
-                              <option value="Office Depot">Office Depot</option>
-                              <option value="FedEx">FedEx</option>
-                              <option value="UPS">UPS</option>
-                              <option value="USPS">USPS</option>
-                            </datalist>
+                            <%= if expense_f[:date].value do %>
+                              <%= cond do %>
+                                <% date_older_than_30_days?(expense_f[:date].value) -> %>
+                                  <div class="mt-1 flex items-center gap-1 text-sm text-amber-600">
+                                    <.icon
+                                      name="hero-exclamation-triangle"
+                                      class="w-4 h-4"
+                                    />
+                                    <span>
+                                      This date is more than 30 days ago. Please contact the treasurer if you need to submit older expenses.
+                                    </span>
+                                  </div>
+                                <% date_close_to_30_day_limit?(expense_f[:date].value) -> %>
+                                  <div class="mt-1 flex items-center gap-1 text-sm text-amber-600">
+                                    <.icon
+                                      name="hero-information-circle"
+                                      class="w-4 h-4"
+                                    />
+                                    <span>
+                                      Note: This is close to the 30-day limit.
+                                    </span>
+                                  </div>
+                                <% true -> %>
+                              <% end %>
+                            <% end %>
+                            <p
+                              :for={error <- expense_f[:date].errors}
+                              class="mt-1 text-sm text-red-600"
+                            >
+                              {error_to_string(error)}
+                            </p>
                           </div>
-                          <p
-                            :for={error <- expense_f[:vendor].errors}
-                            class="mt-1 text-sm text-red-600"
-                          >
-                            {error_to_string(error)}
-                          </p>
+                          <div>
+                            <.input
+                              field={expense_f[:miles_driven]}
+                              type="number"
+                              label="Miles Driven"
+                              min="0"
+                              step="1"
+                              placeholder="0"
+                              required
+                            />
+                            <p
+                              :for={error <- expense_f[:miles_driven].errors}
+                              class="mt-1 text-sm text-red-600"
+                            >
+                              {error_to_string(error)}
+                            </p>
+                          </div>
+                          <div>
+                            <.input
+                              field={expense_f[:mileage_from_to]}
+                              type="text"
+                              label="From / To"
+                              placeholder="Home to YSC Cabin"
+                              required
+                            />
+                            <p
+                              :for={error <- expense_f[:mileage_from_to].errors}
+                              class="mt-1 text-sm text-red-600"
+                            >
+                              {error_to_string(error)}
+                            </p>
+                          </div>
                         </div>
+
                         <div>
                           <.input
-                            field={expense_f[:amount]}
-                            type="text"
-                            label="Amount"
-                            phx-hook="MoneyInput"
-                            value={
-                              Ysc.MoneyHelper.format_money_for_input(
-                                expense_f[:amount].value
-                              )
-                            }
-                            placeholder="0.00"
+                            field={expense_f[:description]}
+                            type="textarea"
+                            label="Business Purpose"
+                            placeholder="Board meeting, work weekend, cabin maintenance, etc."
                             required
-                          >
-                            <div class="text-zinc-700">$</div>
-                          </.input>
+                          />
                           <p
-                            :for={error <- expense_f[:amount].errors}
+                            :for={error <- expense_f[:description].errors}
                             class="mt-1 text-sm text-red-600"
                           >
                             {error_to_string(error)}
                           </p>
                         </div>
-                      </div>
 
-                      <div>
-                        <.input
-                          field={expense_f[:description]}
-                          type="textarea"
-                          label="Description"
-                          placeholder="What did you buy?"
-                          required
-                        />
-                        <p
-                          :for={error <- expense_f[:description].errors}
-                          class="mt-1 text-sm text-red-600"
-                        >
-                          {error_to_string(error)}
-                        </p>
-                      </div>
-
-                      <fieldset class="min-w-0 border-0 p-0 m-0">
-                        <legend class="block text-sm font-medium text-zinc-700 mb-2">
-                          Receipt
-                        </legend>
-                        <p
-                          id={"receipt-help-#{expense_f.index}"}
-                          class="text-xs text-zinc-500 mb-3"
-                        >
-                          Upload a photo or PDF of your receipt. Accepted formats: PDF, JPG, JPEG, PNG, WEBP (max 10MB)
-                        </p>
-                        <!-- Show uploaded receipt with inline preview -->
-                        <div
-                          :if={expense_f[:receipt_s3_path].value}
-                          class="mb-3 p-4 bg-green-50/80 border border-green-200 rounded-lg"
-                          phx-hook="ReceiptLightbox"
-                          id={"receipt-preview-#{expense_f.index}"}
-                        >
-                          <div class="flex items-start gap-4">
-                            <div class="flex-shrink-0">
-                              <%= if pdf?(expense_f[:receipt_s3_path].value) do %>
-                                <a
-                                  href={
-                                    ExpenseReports.receipt_url(
-                                      expense_f[:receipt_s3_path].value
-                                    )
-                                  }
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  class="block"
-                                >
-                                  <div class="w-24 h-24 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
+                        <div>
+                          <label class="block text-sm font-semibold leading-6 text-zinc-700 mb-2">
+                            Mileage Reimbursement ({mileage_rate_display()}/mile)
+                          </label>
+                          <div class="rounded-lg border border-zinc-200 bg-zinc-100 px-3 py-2.5 text-sm text-zinc-700">
+                            {mileage_amount_display(
+                              expense_f[:miles_driven].value,
+                              expense_f[:amount].value
+                            )}
+                          </div>
+                        </div>
+                      <% else %>
+                        <!-- Date, Vendor, Amount in one row for better visibility -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <.input
+                              field={expense_f[:date]}
+                              type="date"
+                              label="Date"
+                              max={get_date_max()}
+                              min={get_date_min()}
+                              required
+                            />
+                            <%= if expense_f[:date].value do %>
+                              <%= cond do %>
+                                <% date_older_than_30_days?(expense_f[:date].value) -> %>
+                                  <div class="mt-1 flex items-center gap-1 text-sm text-amber-600">
                                     <.icon
-                                      name="hero-document-text"
-                                      class="w-12 h-12 text-red-600"
+                                      name="hero-exclamation-triangle"
+                                      class="w-4 h-4"
                                     />
+                                    <span>
+                                      This date is more than 30 days ago. Please contact the treasurer if you need to submit older expenses.
+                                    </span>
                                   </div>
-                                </a>
-                              <% else %>
-                                <a
-                                  href={
-                                    ExpenseReports.receipt_url(
-                                      expense_f[:receipt_s3_path].value
-                                    )
-                                  }
-                                  data-lightbox="receipt"
-                                  class="block cursor-zoom-in"
-                                >
-                                  <img
-                                    src={
-                                      ExpenseReports.receipt_url(
-                                        expense_f[:receipt_s3_path].value
-                                      )
-                                    }
-                                    alt="Receipt preview"
-                                    class="w-24 h-24 object-cover rounded-lg border border-green-200 hover:border-blue-400 transition-colors"
-                                  />
-                                </a>
+                                <% date_close_to_30_day_limit?(expense_f[:date].value) -> %>
+                                  <div class="mt-1 flex items-center gap-1 text-sm text-amber-600">
+                                    <.icon
+                                      name="hero-information-circle"
+                                      class="w-4 h-4"
+                                    />
+                                    <span>
+                                      Note: This is close to the 30-day limit.
+                                    </span>
+                                  </div>
+                                <% true -> %>
                               <% end %>
+                            <% end %>
+                            <p
+                              :for={error <- expense_f[:date].errors}
+                              class="mt-1 text-sm text-red-600"
+                            >
+                              {error_to_string(error)}
+                            </p>
+                          </div>
+                          <div>
+                            <div>
+                              <.input
+                                field={expense_f[:vendor]}
+                                type="text"
+                                label="Vendor"
+                                placeholder="Costco, Amazon, etc."
+                                list={"vendor-list-#{expense_f.index}"}
+                                required
+                              />
+                              <datalist id={"vendor-list-#{expense_f.index}"}>
+                                <!-- Most common vendors first -->
+                                <option value="Costco">Costco</option>
+                                <option value="Amazon">Amazon</option>
+                                <option value="Target">Target</option>
+                                <option value="Walmart">Walmart</option>
+                                <option value="Safeway">Safeway</option>
+                                <!-- Club-specific vendors -->
+                                <option value="Kelseyville Lumber">
+                                  Kelseyville Lumber
+                                </option>
+                                <option value="Riviera Foods">Riviera Foods</option>
+                                <!-- Other common vendors -->
+                                <option value="Whole Foods">Whole Foods</option>
+                                <option value="Trader Joe's">Trader Joe's</option>
+                                <option value="Home Depot">Home Depot</option>
+                                <option value="Total Wine & More">
+                                  Total Wine & More
+                                </option>
+                                <option value="Lowe's">Lowe's</option>
+                                <option value="Staples">Staples</option>
+                                <option value="Ikea">Ikea</option>
+                                <option value="Office Depot">Office Depot</option>
+                                <option value="FedEx">FedEx</option>
+                                <option value="UPS">UPS</option>
+                                <option value="USPS">USPS</option>
+                              </datalist>
                             </div>
-                            <div class="flex-1 min-w-0">
-                              <div class="flex items-center gap-2 mb-2">
-                                <.icon
-                                  name="hero-check-circle"
-                                  class="w-5 h-5 text-green-600 flex-shrink-0"
-                                />
-                                <span class="text-sm font-medium text-green-800">
-                                  Receipt attached
-                                </span>
-                              </div>
-                              <div class="flex items-center gap-3">
+                            <p
+                              :for={error <- expense_f[:vendor].errors}
+                              class="mt-1 text-sm text-red-600"
+                            >
+                              {error_to_string(error)}
+                            </p>
+                          </div>
+                          <div>
+                            <.input
+                              field={expense_f[:amount]}
+                              type="text"
+                              label="Amount"
+                              phx-hook="MoneyInput"
+                              value={
+                                Ysc.MoneyHelper.format_money_for_input(
+                                  expense_f[:amount].value
+                                )
+                              }
+                              placeholder="0.00"
+                              required
+                            >
+                              <div class="text-zinc-700">$</div>
+                            </.input>
+                            <p
+                              :for={error <- expense_f[:amount].errors}
+                              class="mt-1 text-sm text-red-600"
+                            >
+                              {error_to_string(error)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <.input
+                            field={expense_f[:description]}
+                            type="textarea"
+                            label="Description"
+                            placeholder="What did you buy?"
+                            required
+                          />
+                          <p
+                            :for={error <- expense_f[:description].errors}
+                            class="mt-1 text-sm text-red-600"
+                          >
+                            {error_to_string(error)}
+                          </p>
+                        </div>
+
+                        <fieldset class="min-w-0 border-0 p-0 m-0">
+                          <legend class="block text-sm font-medium text-zinc-700 mb-2">
+                            Receipt
+                          </legend>
+                          <p
+                            id={"receipt-help-#{expense_f.index}"}
+                            class="text-xs text-zinc-500 mb-3"
+                          >
+                            Upload a photo or PDF of your receipt. Accepted formats: PDF, JPG, JPEG, PNG, WEBP (max 10MB)
+                          </p>
+                          <!-- Show uploaded receipt with inline preview -->
+                          <div
+                            :if={expense_f[:receipt_s3_path].value}
+                            class="mb-3 p-4 bg-green-50/80 border border-green-200 rounded-lg"
+                            phx-hook="ReceiptLightbox"
+                            id={"receipt-preview-#{expense_f.index}"}
+                          >
+                            <div class="flex items-start gap-4">
+                              <div class="flex-shrink-0">
                                 <%= if pdf?(expense_f[:receipt_s3_path].value) do %>
                                   <a
                                     href={
@@ -2123,159 +2233,212 @@ defmodule YscWeb.ExpenseReportLive do
                                     }
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                                    class="block"
                                   >
-                                    Open PDF
+                                    <div class="w-24 h-24 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
+                                      <.icon
+                                        name="hero-document-text"
+                                        class="w-12 h-12 text-red-600"
+                                      />
+                                    </div>
                                   </a>
                                 <% else %>
-                                  <span class="text-sm text-zinc-500">
-                                    Click image to preview
-                                  </span>
+                                  <a
+                                    href={
+                                      ExpenseReports.receipt_url(
+                                        expense_f[:receipt_s3_path].value
+                                      )
+                                    }
+                                    data-lightbox="receipt"
+                                    class="block cursor-zoom-in"
+                                  >
+                                    <img
+                                      src={
+                                        ExpenseReports.receipt_url(
+                                          expense_f[:receipt_s3_path].value
+                                        )
+                                      }
+                                      alt="Receipt preview"
+                                      class="w-24 h-24 object-cover rounded-lg border border-green-200 hover:border-blue-400 transition-colors"
+                                    />
+                                  </a>
                                 <% end %>
-                                <.button
-                                  type="button"
-                                  phx-click="remove-receipt"
-                                  phx-value-index={expense_f.index}
-                                  variant="outline"
-                                  color="red"
-                                >
-                                  Remove
-                                </.button>
+                              </div>
+                              <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-2">
+                                  <.icon
+                                    name="hero-check-circle"
+                                    class="w-5 h-5 text-green-600 flex-shrink-0"
+                                  />
+                                  <span class="text-sm font-medium text-green-800">
+                                    Receipt attached
+                                  </span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                  <%= if pdf?(expense_f[:receipt_s3_path].value) do %>
+                                    <a
+                                      href={
+                                        ExpenseReports.receipt_url(
+                                          expense_f[:receipt_s3_path].value
+                                        )
+                                      }
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      class="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                                    >
+                                      Open PDF
+                                    </a>
+                                  <% else %>
+                                    <span class="text-sm text-zinc-500">
+                                      Click image to preview
+                                    </span>
+                                  <% end %>
+                                  <.button
+                                    type="button"
+                                    phx-click="remove-receipt"
+                                    phx-value-index={expense_f.index}
+                                    variant="outline"
+                                    color="red"
+                                  >
+                                    Remove
+                                  </.button>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                        <!-- Drag-and-drop upload zone with immediate feedback -->
-                        <div
-                          :if={!expense_f[:receipt_s3_path].value}
-                          class="relative"
-                        >
-                          <!-- Upload zone - always rendered but visually hidden when entries exist -->
-                          <label
-                            class={[
-                              "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
-                              not Enum.empty?(@uploads.receipt.entries) && "hidden"
-                            ]}
-                            phx-drop-target={@uploads.receipt.ref}
-                            aria-describedby={"receipt-help-#{expense_f.index}"}
+                          <!-- Drag-and-drop upload zone with immediate feedback -->
+                          <div
+                            :if={!expense_f[:receipt_s3_path].value}
+                            class="relative"
                           >
-                            <.live_file_input
-                              upload={@uploads.receipt}
-                              class="hidden"
-                            />
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
-                              <.icon
-                                name="hero-photo"
-                                class="w-12 h-12 text-zinc-400 mb-3"
+                            <!-- Upload zone - always rendered but visually hidden when entries exist -->
+                            <label
+                              class={[
+                                "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
+                                not Enum.empty?(@uploads.receipt.entries) &&
+                                  "hidden"
+                              ]}
+                              phx-drop-target={@uploads.receipt.ref}
+                              aria-describedby={"receipt-help-#{expense_f.index}"}
+                            >
+                              <.live_file_input
+                                upload={@uploads.receipt}
+                                class="hidden"
                               />
-                              <p class="mb-2 text-sm text-zinc-500">
-                                <span class="font-semibold">Click to upload</span>
-                                or drag and drop
+                              <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
+                                <.icon
+                                  name="hero-photo"
+                                  class="w-12 h-12 text-zinc-400 mb-3"
+                                />
+                                <p class="mb-2 text-sm text-zinc-500">
+                                  <span class="font-semibold">Click to upload</span>
+                                  or drag and drop
+                                </p>
+                                <p class="text-xs text-zinc-400">
+                                  PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
+                                </p>
+                              </div>
+                            </label>
+                            <%= for err <- upload_errors(@uploads.receipt) do %>
+                              <p class="mt-2 text-sm text-red-600">
+                                {YscWeb.UploadErrors.error_to_string(err, :expense)}
                               </p>
-                              <p class="text-xs text-zinc-400">
-                                PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
-                              </p>
-                            </div>
-                          </label>
-                          <%= for err <- upload_errors(@uploads.receipt) do %>
-                            <p class="mt-2 text-sm text-red-600">
-                              {YscWeb.UploadErrors.error_to_string(err, :expense)}
-                            </p>
-                          <% end %>
-                          <!-- Upload progress for entries - only show if entry matches this expense item index -->
-                          <%= for entry <- @uploads.receipt.entries do %>
-                            <%= if entry.client_name do %>
-                              <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <div class="flex items-start gap-4">
-                                  <div class="flex-shrink-0">
-                                    <%= if pdf?(entry.client_name) do %>
-                                      <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
-                                        <.icon
-                                          name="hero-document-text"
-                                          class="w-10 h-10 text-red-600"
-                                        />
-                                      </div>
-                                    <% else %>
-                                      <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
-                                        <.icon
-                                          name="hero-photo"
-                                          class="w-10 h-10 text-blue-600"
-                                        />
-                                      </div>
-                                    <% end %>
-                                  </div>
-                                  <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 mb-2">
-                                      <.icon
-                                        name="hero-arrow-up-tray"
-                                        class="w-5 h-5 text-blue-600 flex-shrink-0"
-                                      />
-                                      <span class="text-sm font-medium text-blue-800">
-                                        File selected: {entry.client_name}
-                                      </span>
+                            <% end %>
+                            <!-- Upload progress for entries - only show if entry matches this expense item index -->
+                            <%= for entry <- @uploads.receipt.entries do %>
+                              <%= if entry.client_name do %>
+                                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                  <div class="flex items-start gap-4">
+                                    <div class="flex-shrink-0">
+                                      <%= if pdf?(entry.client_name) do %>
+                                        <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
+                                          <.icon
+                                            name="hero-document-text"
+                                            class="w-10 h-10 text-red-600"
+                                          />
+                                        </div>
+                                      <% else %>
+                                        <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
+                                          <.icon
+                                            name="hero-photo"
+                                            class="w-10 h-10 text-blue-600"
+                                          />
+                                        </div>
+                                      <% end %>
                                     </div>
-                                    <%= for err <- upload_errors(@uploads.receipt, entry) do %>
-                                      <p class="mb-2 text-sm text-red-600">
-                                        {YscWeb.UploadErrors.error_to_string(
-                                          err,
-                                          :expense
-                                        )}
-                                      </p>
-                                    <% end %>
-                                    <progress
-                                      value={entry.progress}
-                                      max="100"
-                                      class="w-full h-2 mb-3"
-                                      id={"receipt-progress-#{entry.ref}"}
-                                      data-ref={entry.ref}
-                                      data-index={expense_f.index}
-                                      data-upload-type="receipt"
-                                      phx-hook="AutoConsumeUpload"
-                                    >
-                                      {entry.progress}%
-                                    </progress>
-                                    <div class="flex gap-2">
-                                      <.button
-                                        type="button"
-                                        phx-click="consume-receipt"
-                                        phx-value-ref={entry.ref}
-                                        phx-value-index={expense_f.index}
-                                        phx-disable-with="Attaching..."
-                                        disabled={
-                                          !entry.done? || entry.progress != 100
-                                        }
-                                        id={"receipt-consume-#{entry.ref}"}
+                                    <div class="flex-1 min-w-0">
+                                      <div class="flex items-center gap-2 mb-2">
+                                        <.icon
+                                          name="hero-arrow-up-tray"
+                                          class="w-5 h-5 text-blue-600 flex-shrink-0"
+                                        />
+                                        <span class="text-sm font-medium text-blue-800">
+                                          File selected: {entry.client_name}
+                                        </span>
+                                      </div>
+                                      <%= for err <- upload_errors(@uploads.receipt, entry) do %>
+                                        <p class="mb-2 text-sm text-red-600">
+                                          {YscWeb.UploadErrors.error_to_string(
+                                            err,
+                                            :expense
+                                          )}
+                                        </p>
+                                      <% end %>
+                                      <progress
+                                        value={entry.progress}
+                                        max="100"
+                                        class="w-full h-2 mb-3"
+                                        id={"receipt-progress-#{entry.ref}"}
                                         data-ref={entry.ref}
-                                        data-done={entry.done?}
-                                        data-progress={entry.progress}
+                                        data-index={expense_f.index}
+                                        data-upload-type="receipt"
+                                        phx-hook="AutoConsumeUpload"
                                       >
-                                        <%= cond do %>
-                                          <% entry.done? && entry.progress == 100 -> %>
-                                            Attach Receipt
-                                          <% entry.done? -> %>
-                                            Processing...
-                                          <% true -> %>
-                                            Uploading... ({entry.progress}%)
-                                        <% end %>
-                                      </.button>
-                                      <.button
-                                        type="button"
-                                        phx-click="cancel-upload"
-                                        phx-value-ref={entry.ref}
-                                        phx-disable-with="Cancelling..."
-                                        variant="outline"
-                                        color="red"
-                                      >
-                                        Cancel
-                                      </.button>
+                                        {entry.progress}%
+                                      </progress>
+                                      <div class="flex gap-2">
+                                        <.button
+                                          type="button"
+                                          phx-click="consume-receipt"
+                                          phx-value-ref={entry.ref}
+                                          phx-value-index={expense_f.index}
+                                          phx-disable-with="Attaching..."
+                                          disabled={
+                                            !entry.done? || entry.progress != 100
+                                          }
+                                          id={"receipt-consume-#{entry.ref}"}
+                                          data-ref={entry.ref}
+                                          data-done={entry.done?}
+                                          data-progress={entry.progress}
+                                        >
+                                          <%= cond do %>
+                                            <% entry.done? && entry.progress == 100 -> %>
+                                              Attach Receipt
+                                            <% entry.done? -> %>
+                                              Processing...
+                                            <% true -> %>
+                                              Uploading... ({entry.progress}%)
+                                          <% end %>
+                                        </.button>
+                                        <.button
+                                          type="button"
+                                          phx-click="cancel-upload"
+                                          phx-value-ref={entry.ref}
+                                          phx-disable-with="Cancelling..."
+                                          variant="outline"
+                                          color="red"
+                                        >
+                                          Cancel
+                                        </.button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
+                              <% end %>
                             <% end %>
-                          <% end %>
-                        </div>
-                      </fieldset>
+                          </div>
+                        </fieldset>
+                      <% end %>
                     </div>
                   </.inputs_for>
 
@@ -3373,12 +3536,14 @@ defmodule YscWeb.ExpenseReportLive do
     expense_items_has_error =
       expense_items == [] && form.source.action == :validate
 
-    # Check all expense items have receipts
+    # Check all expense items have receipts (mileage items don't need one)
     all_receipts_attached =
       expense_items
       |> Enum.all?(fn item ->
         receipt_path = get_receipt_path_from_item(item)
-        !is_nil(receipt_path) && receipt_path != ""
+
+        get_field_from_item(item, :expense_type) == "mileage" ||
+          (!is_nil(receipt_path) && receipt_path != "")
       end)
 
     receipts_has_error =
@@ -3500,7 +3665,9 @@ defmodule YscWeb.ExpenseReportLive do
       |> Enum.with_index()
       |> Enum.filter(fn {item, _index} ->
         receipt_path = get_receipt_path_from_item(item)
-        is_nil(receipt_path) || receipt_path == ""
+
+        get_field_from_item(item, :expense_type) != "mileage" &&
+          (is_nil(receipt_path) || receipt_path == "")
       end)
 
     errors =
@@ -3523,6 +3690,23 @@ defmodule YscWeb.ExpenseReportLive do
       {:ok, amount} -> amount
       _ -> "N/A"
     end
+  end
+
+  defp mileage_rate_display do
+    display_money(ExpenseReportItem.mileage_rate())
+  end
+
+  defp mileage_amount_display(miles, amount) do
+    miles_prefix =
+      case miles do
+        miles when is_integer(miles) and miles > 0 ->
+          "#{miles} mi × #{mileage_rate_display()}/mi = "
+
+        _ ->
+          ""
+      end
+
+    "#{miles_prefix}#{display_money(amount)}"
   end
 
   # Timeline component for expense report status
