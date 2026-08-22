@@ -82,7 +82,6 @@ defmodule Ysc.Posts.Post do
   @editor_fields [
     :title,
     :url_name,
-    :rendered_body,
     :raw_body,
     :image_id,
     :preview_text
@@ -93,10 +92,14 @@ defmodule Ysc.Posts.Post do
 
   Publishing state and featured-post flags must use dedicated actions
   (`publish-post`, `restore-post`, `delete-post`), not LiveView form params.
+
+  `rendered_body` is derived server-side from `raw_body` and is never cast from
+  client params (Atom feeds and other sinks consume `rendered_body` as HTML).
   """
   def editor_changeset(post, attrs, opts \\ []) do
     post
     |> cast(attrs, @editor_fields)
+    |> maybe_put_rendered_body_from_raw()
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
     |> foreign_key_constraint(:image_id)
@@ -119,6 +122,7 @@ defmodule Ysc.Posts.Post do
       :deleted_on,
       :board_position_at_publish
     ])
+    |> maybe_put_rendered_body_from_raw()
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
     |> foreign_key_constraint(:image_id)
@@ -141,6 +145,7 @@ defmodule Ysc.Posts.Post do
       :comment_count,
       :board_position_at_publish
     ])
+    |> maybe_put_rendered_body_from_raw()
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
     |> foreign_key_constraint(:image_id)
@@ -149,6 +154,24 @@ defmodule Ysc.Posts.Post do
 
   def update_comment_count_changeset(post, attrs, _opts \\ []) do
     post |> cast(attrs, [:comment_count])
+  end
+
+  defp maybe_put_rendered_body_from_raw(changeset) do
+    case get_change(changeset, :raw_body) do
+      nil ->
+        # Drop any client-supplied rendered_body so mass assignment cannot inject HTML.
+        delete_change(changeset, :rendered_body)
+
+      raw_body ->
+        put_change(
+          changeset,
+          :rendered_body,
+          HtmlSanitizeEx.Scrubber.scrub(
+            raw_body,
+            HtmlSanitizeEx.Scrubber.BasicHTML
+          )
+        )
+    end
   end
 
   defp maybe_validate_unique_url_name(changeset, opts) do

@@ -385,10 +385,32 @@ defmodule Ysc.AppleWallet do
 
   # tmp_path is constructed from System.tmp_dir!() + random hex, not user input
   @sobelow_skip ["Traversal.FileModule"]
-  defp download_image_to_tmp(url) do
+  defp download_image_to_tmp(url) when is_binary(url) do
+    case Ysc.Http.UrlFetchGuard.validate_url_for_server_fetch(url) do
+      :ok ->
+        do_download_image_to_tmp(url)
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Apple Wallet: cover image URL rejected by UrlFetchGuard",
+          extra: %{reason: reason}
+        )
+
+        :error
+    end
+  end
+
+  defp download_image_to_tmp(_), do: :error
+
+  defp do_download_image_to_tmp(url) do
     task =
       Task.async(fn ->
-        Req.get(url, receive_timeout: @strip_download_timeout_ms)
+        # max_redirects: 0 — do not follow Location hops past the guard-checked URL
+        Req.get(url,
+          receive_timeout: @strip_download_timeout_ms,
+          max_redirects: 0,
+          retry: false
+        )
       end)
 
     req_result =

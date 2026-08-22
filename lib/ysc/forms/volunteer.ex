@@ -40,11 +40,19 @@ defmodule Ysc.Forms.Volunteer do
       :interest_clear_lake,
       :interest_tahoe,
       :interest_marketing,
-      :interest_website,
-      :user_id
+      :interest_website
     ])
     |> validate_required([:email, :name])
     # Basic email validation
     |> validate_format(:email, ~r/@/)
   end
+
+  @doc """
+  Applies the submitting user's id after public params are validated.
+  """
+  def put_submitter(changeset, %User{id: user_id}) do
+    put_change(changeset, :user_id, user_id)
+  end
+
+  def put_submitter(changeset, _), do: changeset
 end

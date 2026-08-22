@@ -89,6 +89,7 @@ defmodule YscWeb.Emails.EventUpdateNotification do
 
   defp constrain_media(html) do
     html
+    |> HtmlSanitizeEx.Scrubber.scrub(Ysc.TrixScrubber)
     |> inject_style("img", "max-width:100%;height:auto;")
     |> inject_style("figure", "max-width:100%;margin:8px 0;overflow:hidden;")
   end

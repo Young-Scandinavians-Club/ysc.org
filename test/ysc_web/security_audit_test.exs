@@ -31,6 +31,15 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 33 (MEDIUM)   QuickBooks refresh token logged in full on rotation
   Finding 34 (MEDIUM)   Media library S3 uploads used guessable public/<filename> keys
   Finding 35 (HIGH)     Gmail uniqueness ignored legacy dotted/plus stored addresses, allowing login shadowing
+  Finding 36 (MEDIUM)   Who's Going preview still fell back to attendee email for nameless users
+  Finding 37 (MEDIUM)   Mileage expense items had no miles_driven upper bound (receipt-free QB bills)
+  Finding 38 (MEDIUM)   Gmail canonicalization kept googlemail.com distinct from gmail.com
+  Finding 39 (MEDIUM)   Newsletter email_safe_html allowed iframe/object/data: URIs past sanitizer
+  Finding 40 (MEDIUM)   Post rendered_body mass-assignable → Atom feed stored XSS
+  Finding 41 (MEDIUM)   Event updates / Atom HTML rendered without re-scrub (defense-in-depth)
+  Finding 42 (MEDIUM)   Apple Wallet cover fetch lacked UrlFetchGuard / followed redirects
+  Finding 43 (MEDIUM)   Flowroute webhooks logged full SMS payloads (PII/secrets in logs)
+  Finding 44 (MEDIUM)   Contact/volunteer forms cast user_id from client params
   Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -2361,6 +2370,239 @@ defmodule YscWeb.SecurityAuditTest do
 
       refute changeset.valid?
       assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 38 (MEDIUM): googlemail.com must collide with gmail.com
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 38: Googlemail and Gmail share one canonical mailbox" do
+    test "register_user cannot create googlemail twin of an existing gmail member" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      gmail_email = "twin#{tag}@gmail.com"
+      googlemail_email = "twin#{tag}@googlemail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: gmail_email,
+        first_name: "Existing",
+        last_name: "Gmail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      assert {:error, changeset} =
+               Accounts.register_user(%{
+                 email: googlemail_email,
+                 phone_number: unique_user_phone(),
+                 first_name: "Attacker",
+                 last_name: "Twin",
+                 password: "valid password"
+               })
+
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+
+      assert %User{email: ^gmail_email} =
+               Accounts.get_user_by_email(googlemail_email)
+    end
+
+    test "legacy googlemail row is found when looking up gmail form" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      googlemail_email = "legacy#{tag}@googlemail.com"
+      gmail_email = "legacy#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: googlemail_email,
+        first_name: "Legacy",
+        last_name: "Googlemail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      assert %User{email: ^googlemail_email} =
+               Accounts.get_user_by_email(gmail_email)
+
+      assert {:error, changeset} =
+               Accounts.register_user(%{
+                 email: gmail_email,
+                 phone_number: unique_user_phone(),
+                 first_name: "Attacker",
+                 last_name: "Shadow",
+                 password: "valid password"
+               })
+
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 39 (MEDIUM): Newsletter email HTML must not allow iframe/object/data:
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 39: newsletter email_safe_html blocks dangerous tags and URIs" do
+    test "strips iframe, object, embed, base, meta and data: URLs" do
+      html = """
+      <p>Hello</p>
+      <iframe src="https://evil.example/phish"></iframe>
+      <object data="https://evil.example/x"></object>
+      <embed src="https://evil.example/e"></embed>
+      <base href="https://evil.example/">
+      <meta http-equiv="refresh" content="0;url=https://evil.example/">
+      <a href="data:text/html,<script>alert(1)</script>">click</a>
+      <img src="data:image/gif;base64,AAAA">
+      """
+
+      result = YscWeb.Emails.NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Hello"
+      refute result =~ "<iframe"
+      refute result =~ "<object"
+      refute result =~ "<embed"
+      refute result =~ "<base"
+      refute result =~ "<meta"
+      refute result =~ "data:"
+      refute result =~ "evil.example/phish"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 40 (MEDIUM): Post rendered_body must not be client-mass-assignable
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 40: post editor ignores client rendered_body" do
+    test "editor_changeset ignores forged rendered_body without raw_body" do
+      admin =
+        user_fixture(%{
+          role: :admin,
+          state: :active,
+          email_verified_at: DateTime.utc_now()
+        })
+
+      {:ok, post} =
+        Ysc.Posts.create_post(
+          %{
+            "title" => "Safe Post",
+            "url_name" => "safe-post-#{System.unique_integer([:positive])}",
+            "raw_body" => "<p>Original</p>",
+            "rendered_body" => "<p>Original</p>",
+            "state" => "draft"
+          },
+          admin
+        )
+
+      assert {:ok, updated} =
+               Ysc.Posts.update_post_editor(
+                 post,
+                 %{
+                   "title" => "Safe Post",
+                   "rendered_body" =>
+                     "<p>Injected</p><script>document.cookie</script><iframe src='https://evil.example'></iframe>"
+                 },
+                 admin
+               )
+
+      refute updated.rendered_body =~ "<script"
+      refute updated.rendered_body =~ "<iframe"
+      assert updated.rendered_body == "<p>Original</p>"
+    end
+
+    test "atom feed re-scrubs HTML content" do
+      html =
+        "<p>News</p><script>alert(1)</script><iframe src='https://evil.example'></iframe>"
+
+      feed =
+        YscWeb.Feeds.AtomFeed.posts_feed([
+          %{
+            id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            title: "Test",
+            url_name: "test",
+            updated_at: DateTime.utc_now(),
+            published_on: DateTime.utc_now(),
+            inserted_at: DateTime.utc_now(),
+            rendered_body: html,
+            raw_body: html,
+            preview_text: nil,
+            author: nil
+          }
+        ])
+
+      refute feed =~ "<script"
+      refute feed =~ "<iframe"
+      assert feed =~ "News"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 42 (MEDIUM): Apple Wallet must not SSRF on cover image download
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 42: Apple Wallet cover image SSRF hardening" do
+    test "download path rejects private/metadata URLs via UrlFetchGuard" do
+      source = File.read!(Path.join(File.cwd!(), "lib/ysc/apple_wallet.ex"))
+
+      assert source =~ "UrlFetchGuard.validate_url_for_server_fetch"
+      assert source =~ "max_redirects: 0"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 43 (MEDIUM): Flowroute must not log full webhook payloads
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 43: Flowroute webhook payload logging redacted" do
+    test "controller source does not inspect full params into logs" do
+      source =
+        File.read!(
+          Path.join(
+            File.cwd!(),
+            "lib/ysc_web/controllers/flowroute_webhook_controller.ex"
+          )
+        )
+
+      refute source =~ "payload: inspect(params)"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 44 (MEDIUM): Contact/volunteer forms must not cast user_id
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 44: contact and volunteer forms ignore client user_id" do
+    test "contact form changeset does not cast user_id from attrs" do
+      victim = user_fixture()
+
+      changeset =
+        Ysc.Forms.ContactForm.changeset(%Ysc.Forms.ContactForm{}, %{
+          name: "Attacker",
+          email: "attacker@example.com",
+          subject: "Hello",
+          message: "This is a long enough message",
+          user_id: victim.id
+        })
+
+      refute Map.has_key?(changeset.changes, :user_id)
+
+      with_submitter =
+        Ysc.Forms.ContactForm.put_submitter(changeset, victim)
+
+      assert Ecto.Changeset.get_change(with_submitter, :user_id) == victim.id
+    end
+
+    test "volunteer form changeset does not cast user_id from attrs" do
+      victim = user_fixture()
+
+      changeset =
+        Ysc.Forms.Volunteer.changeset(%Ysc.Forms.Volunteer{}, %{
+          name: "Attacker",
+          email: "attacker@example.com",
+          user_id: victim.id
+        })
+
+      refute Map.has_key?(changeset.changes, :user_id)
     end
   end
 end
