@@ -2017,4 +2017,15 @@ defmodule Ysc.TicketsTest do
                )
     end
   end
+
+  describe "ci_query_explain_* query builders" do
+    test "ci_query_explain_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = Tickets.ci_query_explain_query()
+    end
+
+    test "ci_query_explain_order_tickets_for_refund_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_order_tickets_for_refund_query()
+    end
+  end
 end

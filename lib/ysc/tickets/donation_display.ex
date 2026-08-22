@@ -139,9 +139,5 @@ defmodule Ysc.Tickets.DonationDisplay do
 
   defp free_ticket?(_), do: false
 
-  defp format_amount(%Money{} = amount) do
-    MoneyHelper.format_money!(amount)
-  rescue
-    _ -> "Donation"
-  end
+  defp format_amount(%Money{} = amount), do: MoneyHelper.format_money!(amount)
 end

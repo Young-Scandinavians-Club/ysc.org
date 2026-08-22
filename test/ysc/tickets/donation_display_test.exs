@@ -98,5 +98,89 @@ defmodule Ysc.Tickets.DonationDisplayTest do
       assert DonationDisplay.amount_for_ticket(order, "ticket-d1") == "$10.00"
       assert DonationDisplay.amount_for_ticket(order, "missing") == "Donation"
     end
+
+    test "returns empty maps for orders without a ticket list" do
+      assert DonationDisplay.amounts_by_ticket_id(%{}) == %{}
+      assert DonationDisplay.amounts_by_ticket_id(nil) == %{}
+      assert DonationDisplay.money_amounts_by_ticket_id(%{}) == %{}
+      assert DonationDisplay.money_amounts_by_ticket_id(nil) == %{}
+    end
+
+    test "falls back to Donation when money amounts cannot be computed" do
+      donation = %{id: "ticket-d1", ticket_tier: %{type: :donation, price: nil}}
+
+      assert DonationDisplay.amounts_by_ticket_id(%{tickets: [donation]}) == %{
+               "ticket-d1" => "Donation"
+             }
+    end
+
+    test "treats free tickets as zero regardless of listed price" do
+      order = %{
+        total_amount: Money.new(:USD, "0.00"),
+        tickets: [
+          %{
+            id: "free-atom",
+            ticket_tier: %{type: :free, price: Money.new(:USD, "50.00")},
+            discount_amount: Money.new(0, :USD)
+          },
+          %{
+            id: "free-string",
+            ticket_tier: %{type: "free", price: Money.new(:USD, "50.00")}
+          }
+        ]
+      }
+
+      amounts = DonationDisplay.money_amounts_by_ticket_id(order)
+      assert Money.zero?(amounts["free-atom"])
+      assert Money.zero?(amounts["free-string"])
+    end
+
+    test "floors over-discounted paid tickets and nil prices at zero" do
+      order = %{
+        total_amount: Money.new(:USD, "0.00"),
+        tickets: [
+          %{
+            id: "over-discount",
+            ticket_tier: %{type: :paid, price: Money.new(:USD, "20.00")},
+            discount_amount: Money.new(:USD, "50.00")
+          },
+          %{
+            id: "nil-price",
+            ticket_tier: %{type: :paid, price: nil},
+            discount_amount: Money.new(:USD, "5.00")
+          }
+        ]
+      }
+
+      amounts = DonationDisplay.money_amounts_by_ticket_id(order)
+      assert Money.zero?(amounts["over-discount"])
+      assert Money.zero?(amounts["nil-price"])
+    end
+
+    test "skips mismatched-currency paid tickets when totaling donation remainder" do
+      donation = %{id: "d1", ticket_tier: %{type: :donation, price: nil}}
+
+      order = %{
+        total_amount: Money.new(:USD, "40.00"),
+        tickets: [
+          %{
+            id: "usd",
+            ticket_tier: %{type: :paid, price: Money.new(:USD, "30.00")},
+            discount_amount: Money.new(0, :USD)
+          },
+          %{
+            id: "eur",
+            ticket_tier: %{type: :paid, price: Money.new(:EUR, "10.00")},
+            discount_amount: Money.new(0, :USD)
+          },
+          donation
+        ]
+      }
+
+      amounts = DonationDisplay.money_amounts_by_ticket_id(order)
+      assert Money.equal?(amounts["usd"], Money.new(:USD, "30.00"))
+      assert Money.equal?(amounts["eur"], Money.new(:EUR, "10.00"))
+      assert Money.equal?(amounts["d1"], Money.new(:USD, "10.00"))
+    end
   end
 end
