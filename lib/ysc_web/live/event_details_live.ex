@@ -720,7 +720,7 @@ defmodule YscWeb.EventDetailsLive do
                       </span>
                     </div>
                     <article class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none text-zinc-600 leading-relaxed">
-                      {raw(event_update_body(update))}
+                      {raw(update.rendered_body)}
                     </article>
                     <p :if={update.sent_by} class="mt-4 text-sm text-zinc-400">
                       Posted by {update.sent_by.first_name} {update.sent_by.last_name}
@@ -771,7 +771,7 @@ defmodule YscWeb.EventDetailsLive do
                     <% display_name =
                       if attendee_name != "",
                         do: attendee_name,
-                        else: "Member" %>
+                        else: attendee.email || "Member" %>
                     <div
                       class="flex flex-col items-center gap-2 w-16"
                       {if is_me, do: ["data-attendee-you": "true"], else: []}
@@ -6657,14 +6657,6 @@ defmodule YscWeb.EventDetailsLive do
   defp event_body(event) do
     html =
       Map.get(event, :rendered_details) || Map.get(event, :raw_details) || ""
-
-    html
-    |> Scrubber.scrub(Ysc.TrixScrubber)
-    |> Ysc.Html.Links.open_in_new_tab()
-  end
-
-  defp event_update_body(update) do
-    html = Map.get(update, :rendered_body) || Map.get(update, :raw_body) || ""
 
     html
     |> Scrubber.scrub(Ysc.TrixScrubber)
