@@ -3,6 +3,12 @@ defmodule Ysc.ExpenseReports.ExpenseReportItemTest do
 
   alias Ysc.ExpenseReports.ExpenseReportItem
 
+  describe "mileage_rate/0" do
+    test "returns the club's per-mile reimbursement rate" do
+      assert ExpenseReportItem.mileage_rate() == Money.new(:USD, "0.30")
+    end
+  end
+
   describe "changeset/2" do
     test "rejects non-USD currency" do
       cs =

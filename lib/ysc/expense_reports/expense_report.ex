@@ -207,8 +207,6 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
     item.expense_type
   end
 
-  defp get_expense_type(_), do: nil
-
   defp validate_reimbursement_method(changeset, _opts) do
     # This validation is handled in the context module's validate_reimbursement_setup
     # to have access to the full user struct. This is kept for basic validation.
