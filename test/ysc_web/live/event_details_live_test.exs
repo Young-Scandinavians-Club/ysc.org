@@ -2254,6 +2254,11 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute has_element?(view, "#attendees-modal", named.email)
       refute has_element?(view, "#attendees-modal", nameless.email)
       refute has_element?(view, "#attendees-modal", host.email)
+
+      # Preview list (outside the modal) must also hide emails for nameless attendees
+      refute has_element?(view, "#attendees-list", nameless.email)
+      refute has_element?(view, "#attendees-list", named.email)
+      assert has_element?(view, "#attendees-list", "Member")
     end
 
     test "Who's Going modal still shows ticket count for hosts who bought tickets",
