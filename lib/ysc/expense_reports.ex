@@ -275,8 +275,6 @@ defmodule Ysc.ExpenseReports do
     item.expense_type
   end
 
-  defp get_expense_type_from_item(_), do: nil
-
   defp validate_reimbursement_setup(changeset, %User{} = user) do
     method = Ecto.Changeset.get_field(changeset, :reimbursement_method)
 

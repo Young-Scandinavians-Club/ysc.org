@@ -3,7 +3,7 @@ defmodule Ysc.ExpenseReports.ExpenseReportTest do
 
   import Ysc.AccountsFixtures
 
-  alias Ysc.ExpenseReports.ExpenseReport
+  alias Ysc.ExpenseReports.{ExpenseReport, ExpenseReportItem}
 
   setup do
     %{user: user_fixture()}
@@ -114,6 +114,38 @@ defmodule Ysc.ExpenseReports.ExpenseReportTest do
             }
           ]
         })
+
+      assert cs.valid?
+    end
+
+    test "allows a mileage item with no receipt when expense_items is preloaded as real structs (not a cast_assoc changeset)",
+         %{user: user} do
+      # Mirrors Ysc.ExpenseReports.submit_expense_report/1, which calls
+      # ExpenseReport.changeset(expense_report, %{status: "submitted"}) on an
+      # already-loaded report — cast_assoc leaves :expense_items untouched
+      # since "expense_items" isn't in the attrs, so the association stays as
+      # real %ExpenseReportItem{} structs rather than changesets.
+      report = %ExpenseReport{
+        user_id: user.id,
+        purpose: "Trip",
+        reimbursement_method: "check",
+        certification_accepted: true,
+        expense_items: [
+          %ExpenseReportItem{
+            date: ~D[2024-01-01],
+            expense_type: "mileage",
+            vendor: "Mileage",
+            description: "Board meeting",
+            mileage_from_to: "Home to YSC Cabin",
+            miles_driven: 20,
+            amount: Money.new(:USD, "6.00"),
+            receipt_s3_path: nil
+          }
+        ],
+        income_items: []
+      }
+
+      cs = ExpenseReport.changeset(report, %{status: "submitted"})
 
       assert cs.valid?
     end
