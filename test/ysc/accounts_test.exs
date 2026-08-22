@@ -1839,6 +1839,40 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "generate_mobile_redirect_token/1 and verify_and_consume_mobile_redirect_token/1" do
+    test "round-trips to the same user and is single-use" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      code = Accounts.generate_mobile_redirect_token(user)
+
+      assert user_token = Repo.get_by(UserToken, context: "mobile_redirect")
+      assert user_token.user_id == user.id
+      refute user_token.token == code
+
+      assert {:ok, verified_user} = Accounts.verify_and_consume_mobile_redirect_token(code)
+      assert verified_user.id == user.id
+
+      # Consumed — a second exchange of the same code must fail.
+      assert Accounts.verify_and_consume_mobile_redirect_token(code) ==
+               {:error, :invalid_or_expired}
+    end
+
+    test "rejects an unknown code" do
+      assert Accounts.verify_and_consume_mobile_redirect_token("not-a-real-code") ==
+               {:error, :invalid_or_expired}
+    end
+
+    test "rejects an expired code" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      code = Accounts.generate_mobile_redirect_token(user)
+
+      {1, nil} =
+        Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
+
+      assert Accounts.verify_and_consume_mobile_redirect_token(code) ==
+               {:error, :invalid_or_expired}
+    end
+  end
+
   describe "deliver_user_reset_password_instructions/2" do
     setup do
       %{user: user_fixture(%{phone_number: "+14159098268"})}

@@ -2187,6 +2187,29 @@ defmodule Ysc.Accounts do
     )
   end
 
+  @doc """
+  Generates a short-lived, one-time code for handing a successful web login
+  off to the admin/volunteer mobile app.
+
+  Returns the raw (URL-safe Base64) code. Only the hash is stored in the DB.
+  """
+  def generate_mobile_redirect_token(user) do
+    generate_one_time_login_token(user, &UserToken.build_mobile_redirect_token/1)
+  end
+
+  @doc """
+  Verifies a mobile browser-handoff code and returns the associated user if
+  valid, consuming it in the same transaction so it cannot be replayed.
+
+  Uses the same cluster-safe one-time consumption semantics as passkey login.
+  """
+  def verify_and_consume_mobile_redirect_token(token) do
+    verify_and_consume_one_time_login_token(
+      token,
+      &UserToken.verify_mobile_redirect_token_query/1
+    )
+  end
+
   defp generate_one_time_login_token(user, builder) do
     {token, user_token} = builder.(user)
     Repo.insert!(user_token)

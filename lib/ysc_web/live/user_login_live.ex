@@ -222,6 +222,11 @@ defmodule YscWeb.UserLoginLive do
         onsubmit="this.querySelector('[type=submit]')?.setAttribute('disabled','disabled')"
       >
         <input type="hidden" name="redirect_to" value={@redirect_to || ""} />
+        <input
+          type="hidden"
+          name="mobile_redirect_uri"
+          value={@mobile_redirect_uri || ""}
+        />
         <div class="space-y-4">
           <.input
             field={@form[:email]}
@@ -294,6 +299,19 @@ defmodule YscWeb.UserLoginLive do
           end
       end
 
+    # Mobile app browser-handoff: only ever a URL param (the app opens this
+    # page directly with it, there's no server-side session fallback the way
+    # redirect_to has), and validated against a strict exact-match allowlist
+    # rather than valid_internal_redirect? (see YscWeb.UserAuth for why).
+    mobile_redirect_uri =
+      case params["mobile_redirect_uri"] do
+        uri when is_binary(uri) and uri != "" ->
+          if YscWeb.UserAuth.valid_mobile_redirect_uri?(uri), do: uri, else: nil
+
+        _ ->
+          nil
+      end
+
     # Show toast when redirected from auto_login with expired/invalid token (query param
     # avoids session flash overwriting a concurrent successful login).
     socket =
@@ -317,6 +335,7 @@ defmodule YscWeb.UserLoginLive do
      )
      |> assign(:failed_login_attempts, failed_login_attempts)
      |> assign(:redirect_to, redirect_to)
+     |> assign(:mobile_redirect_uri, mobile_redirect_uri)
      |> assign(:is_ios_mobile, false)
      |> assign(:passkey_supported, false)
      |> assign(:banner_dismissed, false)
@@ -378,31 +397,13 @@ defmodule YscWeb.UserLoginLive do
   end
 
   def handle_event("sign_in_with_google", _params, socket) do
-    # Pass redirect_to as query parameter - Ueberauth will preserve it through OAuth flow
-    redirect_to = socket.assigns.redirect_to
-
-    oauth_url =
-      if redirect_to && YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
-        ~p"/auth/google?redirect_to=#{URI.encode(redirect_to)}"
-      else
-        ~p"/auth/google"
-      end
-
+    oauth_url = oauth_start_url("/auth/google", socket.assigns)
     # Redirect to OAuth provider (full page redirect, not LiveView navigation)
     {:noreply, socket |> redirect(to: oauth_url)}
   end
 
   def handle_event("sign_in_with_facebook", _params, socket) do
-    # Pass redirect_to as query parameter - Ueberauth will preserve it through OAuth flow
-    redirect_to = socket.assigns.redirect_to
-
-    oauth_url =
-      if redirect_to && YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
-        ~p"/auth/facebook?redirect_to=#{URI.encode(redirect_to)}"
-      else
-        ~p"/auth/facebook"
-      end
-
+    oauth_url = oauth_start_url("/auth/facebook", socket.assigns)
     # Redirect to OAuth provider (full page redirect, not LiveView navigation)
     {:noreply, socket |> redirect(to: oauth_url)}
   end
@@ -809,6 +810,37 @@ defmodule YscWeb.UserLoginLive do
      |> assign(:banner_dismissed, true)
      |> redirect(to: ~p"/users/log-in/reset-attempts")}
   end
+
+  # Builds the OAuth request-phase URL, carrying redirect_to and/or
+  # mobile_redirect_uri as query params — Ueberauth's strategies don't
+  # round-trip arbitrary params through the provider themselves, so
+  # StoreOAuthRedirect stashes whatever arrives here into the session before
+  # the provider redirect (see that plug for the read-back side).
+  defp oauth_start_url(base_path, assigns) do
+    redirect_to = assigns.redirect_to
+    mobile_redirect_uri = assigns[:mobile_redirect_uri]
+
+    params =
+      %{}
+      |> maybe_put_query(
+        "redirect_to",
+        redirect_to && YscWeb.UserAuth.valid_internal_redirect?(redirect_to) && redirect_to
+      )
+      |> maybe_put_query(
+        "mobile_redirect_uri",
+        mobile_redirect_uri && YscWeb.UserAuth.valid_mobile_redirect_uri?(mobile_redirect_uri) &&
+          mobile_redirect_uri
+      )
+
+    if params == %{} do
+      base_path
+    else
+      "#{base_path}?#{URI.encode_query(params)}"
+    end
+  end
+
+  defp maybe_put_query(params, _key, falsy) when falsy in [nil, false], do: params
+  defp maybe_put_query(params, key, value), do: Map.put(params, key, value)
 
   defp verify_passkey_authentication(
          socket,

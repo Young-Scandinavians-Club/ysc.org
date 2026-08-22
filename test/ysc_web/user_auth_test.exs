@@ -768,6 +768,72 @@ defmodule YscWeb.UserAuthTest do
     end
   end
 
+  describe "valid_mobile_redirect_uri?/1" do
+    test "allows the known admin app deep link" do
+      assert UserAuth.valid_mobile_redirect_uri?("ysc-admin://auth-callback")
+    end
+
+    test "rejects anything else" do
+      refute UserAuth.valid_mobile_redirect_uri?("ysc-admin://something-else")
+      refute UserAuth.valid_mobile_redirect_uri?("evil-app://auth-callback")
+      refute UserAuth.valid_mobile_redirect_uri?("https://evil.com")
+      refute UserAuth.valid_mobile_redirect_uri?("/events/123")
+      refute UserAuth.valid_mobile_redirect_uri?(nil)
+      refute UserAuth.valid_mobile_redirect_uri?(123)
+    end
+  end
+
+  describe "log_in_user/5 with mobile_redirect_uri" do
+    test "redirects externally to the app with a one-time code", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        UserAuth.log_in_user(conn, user, %{}, nil, "ysc-admin://auth-callback")
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      %{"code" => code} = location |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+      assert {:ok, %Ysc.Accounts.User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(code)
+
+      assert id == user.id
+    end
+
+    test "ignores an unknown mobile_redirect_uri and falls back to the normal redirect", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn = UserAuth.log_in_user(conn, user, %{}, nil, "evil-app://steal-token")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "mobile_redirect_uri takes precedence over redirect_to", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        UserAuth.log_in_user(
+          conn,
+          user,
+          %{},
+          "/events/123",
+          "ysc-admin://auth-callback"
+        )
+
+      assert redirected_to(conn, 302) =~ ~r{^ysc-admin://auth-callback\?code=}
+    end
+  end
+
   describe "on_mount(:ensure_admin, ...)" do
     test "allows admin users to proceed", %{conn: conn} do
       admin = user_fixture(%{role: "admin"})

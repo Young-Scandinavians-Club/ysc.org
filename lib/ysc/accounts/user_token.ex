@@ -141,6 +141,9 @@ defmodule Ysc.Accounts.UserToken do
   @passkey_login_validity_in_seconds 120
   # Auto-login magic links expire after 90 seconds (matches UserSessionController)
   @auto_login_validity_in_seconds 90
+  # Mobile app browser-handoff codes expire after 2 minutes, same as passkey_login —
+  # the app should exchange it for a bearer token within seconds of the redirect.
+  @mobile_redirect_validity_in_seconds 120
 
   @doc """
   Builds a one-time token for completing a passkey login.
@@ -207,6 +210,46 @@ defmodule Ysc.Accounts.UserToken do
       token,
       "auto_login",
       @auto_login_validity_in_seconds
+    )
+  end
+
+  @doc """
+  Builds a one-time code for handing a successful web login off to the
+  admin/volunteer mobile app (see `YscWeb.UserAuth.log_in_user/5`).
+
+  The raw (unhashed) code is returned for embedding in the custom-scheme
+  redirect URL the mobile app opened the login page with. Only the hash is
+  stored in the database. The code must be consumed (deleted) on first use —
+  it proves "this browser just completed a real web login", not just a
+  destination, which is why it exists instead of passing the app's redirect
+  URI straight through unauthenticated (same rationale as passkey_login).
+  """
+  def build_mobile_redirect_token(user) do
+    token = :crypto.strong_rand_bytes(@rand_size)
+    hashed_token = :crypto.hash(@hash_algorithm, token)
+
+    {Base.url_encode64(token, padding: false),
+     %UserToken{
+       token: hashed_token,
+       context: "mobile_redirect",
+       user_id: user.id
+     }}
+  end
+
+  @doc """
+  Verifies a mobile browser-handoff code and returns a query for the
+  associated user.
+
+  The code must have been issued within the last
+  #{@mobile_redirect_validity_in_seconds} seconds. The caller is responsible
+  for deleting it after a successful lookup to ensure it can only be used
+  once.
+  """
+  def verify_mobile_redirect_token_query(token) do
+    verify_one_time_login_token_query(
+      token,
+      "mobile_redirect",
+      @mobile_redirect_validity_in_seconds
     )
   end
 

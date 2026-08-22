@@ -125,6 +125,14 @@ defmodule YscWeb.UserSessionController do
         _ -> get_session(conn, :user_return_to)
       end
 
+    # Mobile app browser-handoff (see YscWeb.UserAuth.log_in_user/5): passed as
+    # a hidden field from the login LiveView, only when opened by the app.
+    mobile_redirect_uri =
+      case params["mobile_redirect_uri"] do
+        uri when is_binary(uri) and uri != "" -> uri
+        _ -> nil
+      end
+
     if user = Accounts.get_user_by_email_and_password(email, password) do
       # Check if user's email is verified - if not, redirect to account setup
       if is_nil(user.email_verified_at) do
@@ -160,7 +168,8 @@ defmodule YscWeb.UserSessionController do
           |> UserAuth.log_in_user(
             user,
             user_params_with_method,
-            validated_redirect
+            validated_redirect,
+            mobile_redirect_uri
           )
         else
           # Log failed sign-in attempt due to account state

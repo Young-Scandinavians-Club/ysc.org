@@ -161,6 +161,7 @@ defmodule YscWeb.Router do
     pipe_through [:api, :app_api_auth_rate_limit]
 
     post "/password", AppAuthController, :create_password_session
+    post "/exchange", AppAuthController, :create_exchange_session
     delete "/logout", AppAuthController, :logout
   end
 

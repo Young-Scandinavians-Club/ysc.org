@@ -46,7 +46,7 @@ defmodule YscWeb.UserAuth do
   disconnected on sign out. The line can be safely removed
   if you are not using LiveView.
   """
-  def log_in_user(conn, user, params \\ %{}, redirect_to \\ nil) do
+  def log_in_user(conn, user, params \\ %{}, redirect_to \\ nil, mobile_redirect_uri \\ nil) do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
 
@@ -76,7 +76,17 @@ defmodule YscWeb.UserAuth do
     # Log sign-in after session is set so auth_events.session_id is populated (for "Current session" on Security page)
     AuthService.log_login_success(user, conn, params)
 
-    redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
+    if mobile_redirect_uri && valid_mobile_redirect_uri?(mobile_redirect_uri) do
+      # Hand off to the mobile app instead of the normal web redirect: a
+      # one-time code proves to the app's backend that this browser just
+      # completed a real login (same rationale as the passkey_login token),
+      # rather than handing the app a session cookie or long-lived token
+      # directly inside a URL that ends up in browser/OS history.
+      code = Accounts.generate_mobile_redirect_token(user)
+      redirect(conn, external: "#{mobile_redirect_uri}?code=#{code}")
+    else
+      redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
+    end
   end
 
   # Post-login destination: onboarding wins over redirect_to / return_to, then account setup, etc.
@@ -718,6 +728,23 @@ defmodule YscWeb.UserAuth do
   end
 
   def valid_internal_redirect?(_), do: false
+
+  # Custom-scheme deep links the admin/volunteer mobile app may ask the web
+  # login page to hand off to after a successful login (see `log_in_user/5`).
+  # Deliberately a strict allowlist of exact values, not a prefix/scheme
+  # check — `valid_internal_redirect?/1` above is the wrong tool here since it
+  # rejects any URI with a scheme by design (that's what makes it safe for
+  # same-origin paths); a mobile deep link needs the opposite treatment.
+  @allowed_mobile_redirect_uris ["ysc-admin://auth-callback"]
+
+  @doc """
+  Validates that a mobile app redirect URI is one of the known, exact
+  custom-scheme deep links this app is allowed to hand a login off to.
+  """
+  def valid_mobile_redirect_uri?(uri) when is_binary(uri),
+    do: uri in @allowed_mobile_redirect_uris
+
+  def valid_mobile_redirect_uri?(_), do: false
 
   defp contains_dangerous_redirect_token?(value) do
     String.contains?(value, [

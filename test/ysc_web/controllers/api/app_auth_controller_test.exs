@@ -87,6 +87,52 @@ defmodule YscWeb.Api.AppAuthControllerTest do
     end
   end
 
+  describe "POST /api/v1/app/auth/exchange" do
+    test "exchanges a valid code for a bearer token", %{conn: conn} do
+      user = user_fixture(%{role: :admin})
+      code = Accounts.generate_mobile_redirect_token(user)
+
+      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
+
+      assert %{"token" => token, "user" => user_json} = json_response(response, 200)
+      assert is_binary(token) and token != ""
+      assert user_json["id"] == to_string(user.id)
+
+      assert Accounts.get_user_by_mobile_token(token).id == user.id
+    end
+
+    test "rejects a plain member's code even though it was validly issued", %{conn: conn} do
+      user = user_fixture(%{role: :member})
+      code = Accounts.generate_mobile_redirect_token(user)
+
+      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
+
+      assert json_response(response, 401)
+    end
+
+    test "rejects an unknown code", %{conn: conn} do
+      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => "not-a-real-code"})
+
+      assert json_response(response, 401)
+    end
+
+    test "a code cannot be exchanged twice", %{conn: conn} do
+      user = user_fixture(%{role: :admin})
+      code = Accounts.generate_mobile_redirect_token(user)
+
+      post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
+      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
+
+      assert json_response(response, 401)
+    end
+
+    test "returns 400 when code is missing", %{conn: conn} do
+      response = post(conn, ~p"/api/v1/app/auth/exchange", %{})
+
+      assert json_response(response, 400)
+    end
+  end
+
   describe "DELETE /api/v1/app/auth/logout" do
     test "revokes the token", %{conn: conn} do
       user = user_fixture(%{role: :admin})
