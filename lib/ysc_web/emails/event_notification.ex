@@ -86,40 +86,31 @@ defmodule YscWeb.Emails.EventNotification do
   - Map with all necessary data for the email template
   """
   def prepare_email_data(event, user) do
-    # Validate input
-    if is_nil(event) do
-      raise ArgumentError, "Event cannot be nil"
-    end
-
     if is_nil(user) do
       raise ArgumentError, "User cannot be nil"
     end
 
-    # Ensure event is loaded with necessary associations
-    event =
-      if Ecto.assoc_loaded?(event.organizer) &&
-           Ecto.assoc_loaded?(event.cover_image) do
-        event
-      else
-        case Repo.get(Event, event.id)
-             |> Repo.preload([:organizer, :cover_image]) do
-          nil ->
-            raise ArgumentError, "Event not found: #{event.id}"
+    event
+    |> prepare_shared_email_data()
+    |> Map.put(:first_name, member_greeting_name(user))
+  end
 
-          loaded_event ->
-            loaded_event
-        end
-      end
+  @doc """
+  Event fields shared by every recipient of an event notification blast.
 
-    # Format event date and time
+  Compute this once per event, then `Map.put(:first_name, ...)` per user so
+  we do not re-render dates, URLs, and organizer data for every member.
+  """
+  def prepare_shared_email_data(event) do
+    if is_nil(event) do
+      raise ArgumentError, "Event cannot be nil"
+    end
+
+    event = ensure_event_associations(event)
+
     event_date_time =
       format_event_start_datetime(event.start_date, event.start_time)
 
-    # Get event image URL
-    event_image_url = get_event_image_url(event)
-
-    # Convert event struct to plain map for JSON serialization
-    # Only include fields needed by the email template
     event_map = %{
       id: event.id,
       title: event.title,
@@ -142,13 +133,28 @@ defmodule YscWeb.Emails.EventNotification do
     }
 
     %{
-      first_name: member_greeting_name(user),
       event: event_map,
       event_date_time: event_date_time,
       event_url: event_url(event.id),
-      event_image_url: event_image_url,
+      event_image_url: get_event_image_url(event),
       notification_settings_url: notification_settings_url()
     }
+  end
+
+  defp ensure_event_associations(event) do
+    if Ecto.assoc_loaded?(event.organizer) &&
+         Ecto.assoc_loaded?(event.cover_image) do
+      event
+    else
+      case Repo.get(Event, event.id)
+           |> Repo.preload([:organizer, :cover_image]) do
+        nil ->
+          raise ArgumentError, "Event not found: #{event.id}"
+
+        loaded_event ->
+          loaded_event
+      end
+    end
   end
 
   defp get_event_image_url(event) do

@@ -65,7 +65,7 @@ defmodule Ysc.Search do
       join: u in assoc(t, :user),
       where:
         ilike(t.reference_id, ^search_like) or
-          fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
+          fragment("SIMILARITY(?::text, ?) > 0.2", u.email, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term),
       preload: [event: e, user: u],
@@ -81,7 +81,7 @@ defmodule Ysc.Search do
 
     from(u in User,
       where:
-        fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
+        fragment("SIMILARITY(?::text, ?) > 0.2", u.email, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
           ilike(u.phone_number, ^phone_like),
@@ -98,7 +98,7 @@ defmodule Ysc.Search do
       join: u in assoc(b, :user),
       where:
         ilike(b.reference_id, ^search_like) or
-          fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
+          fragment("SIMILARITY(?::text, ?) > 0.2", u.email, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
           ilike(u.phone_number, ^phone_like),
@@ -138,7 +138,7 @@ defmodule Ysc.Search do
       join: u in assoc(t, :user),
       where:
         ilike(t.reference_id, ^search_like) or
-          fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
+          fragment("SIMILARITY(?::text, ?) > 0.2", u.email, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term),
       preload: [event: e, user: u],
@@ -155,7 +155,7 @@ defmodule Ysc.Search do
 
     from(u in User,
       where:
-        fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
+        fragment("SIMILARITY(?::text, ?) > 0.2", u.email, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
           ilike(u.phone_number, ^phone_like),

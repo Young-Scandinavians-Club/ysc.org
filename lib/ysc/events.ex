@@ -3259,13 +3259,27 @@ defmodule Ysc.Events do
   Get all users subscribed to a notification type for an event.
   """
   def get_event_notification_subscribers(event_id, notification_type) do
+    event_id
+    |> event_notification_subscribers_query(notification_type)
+    |> Repo.all()
+  end
+
+  @doc false
+  def event_notification_subscribers_query(event_id, notification_type) do
     from(s in EventNotificationSubscription,
       join: u in assoc(s, :user),
       where: s.event_id == ^event_id,
       where: s.notification_type == ^notification_type,
-      select: u
+      select: struct(u, [:id, :email, :first_name])
     )
-    |> Repo.all()
+  end
+
+  @doc false
+  def ci_query_explain_event_notification_subscribers_query do
+    event_notification_subscribers_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      "save_the_date"
+    )
   end
 
   @doc """

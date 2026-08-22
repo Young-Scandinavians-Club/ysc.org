@@ -406,6 +406,13 @@ defmodule Ysc.Accounts do
 
   """
   def search_users(query, opts \\ []) when is_binary(query) do
+    query
+    |> search_users_query(opts)
+    |> Repo.all()
+  end
+
+  @doc false
+  def search_users_query(query, opts \\ []) when is_binary(query) do
     limit = Keyword.get(opts, :limit, 10)
     state = Keyword.get(opts, :state, :active)
     search_term = "%#{query}%"
@@ -415,7 +422,7 @@ defmodule Ysc.Accounts do
       where:
         ilike(u.first_name, ^search_term) or
           ilike(u.last_name, ^search_term) or
-          ilike(u.email, ^search_term) or
+          ilike(fragment("(?::text)", u.email), ^search_term) or
           ilike(
             fragment("? || ' ' || ?", u.first_name, u.last_name),
             ^search_term
@@ -424,7 +431,26 @@ defmodule Ysc.Accounts do
       limit: ^limit,
       preload: [:current_avatar]
     )
-    |> Repo.all()
+  end
+
+  @doc """
+  Active members who opted in to event notification emails.
+
+  Selects only the columns needed to address and greet the recipient so
+  event/season blasts do not load `hashed_password` and the rest of the
+  user row for every member.
+  """
+  def list_event_notification_recipients do
+    Repo.all(event_notification_recipients_query())
+  end
+
+  @doc false
+  def event_notification_recipients_query do
+    from(u in User,
+      where: u.event_notifications == true,
+      where: u.state == :active,
+      select: [:id, :email, :first_name]
+    )
   end
 
   @doc """
@@ -4620,5 +4646,15 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_application_statistics_query do
     application_statistics_query(Ysc.Ci.QueryExplain.Fixtures.now())
+  end
+
+  @doc false
+  def ci_query_explain_search_users_query do
+    search_users_query("ci")
+  end
+
+  @doc false
+  def ci_query_explain_event_notification_recipients_query do
+    event_notification_recipients_query()
   end
 end
