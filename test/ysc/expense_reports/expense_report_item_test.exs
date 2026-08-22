@@ -113,6 +113,36 @@ defmodule Ysc.ExpenseReports.ExpenseReportItemTest do
       assert %{miles_driven: ["must be greater than 0"]} = errors_on(cs)
     end
 
+    test "rejects miles_driven above the per-item cap" do
+      cs =
+        ExpenseReportItem.changeset(%ExpenseReportItem{}, %{
+          date: ~D[2026-01-15],
+          expense_type: "mileage",
+          description: "Club event drive",
+          mileage_from_to: "Home to Clear Lake",
+          miles_driven: 10_001
+        })
+
+      refute cs.valid?
+
+      assert %{miles_driven: ["must be less than or equal to 10000"]} =
+               errors_on(cs)
+    end
+
+    test "accepts miles_driven at the per-item cap" do
+      cs =
+        ExpenseReportItem.changeset(%ExpenseReportItem{}, %{
+          date: ~D[2026-01-15],
+          expense_type: "mileage",
+          description: "Club event drive",
+          mileage_from_to: "Home to Clear Lake",
+          miles_driven: 10_000
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :amount) == Money.new(:USD, "3000.00")
+    end
+
     test "rejects an unknown expense type" do
       cs =
         ExpenseReportItem.changeset(%ExpenseReportItem{}, %{
