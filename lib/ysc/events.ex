@@ -2077,35 +2077,32 @@ defmodule Ysc.Events do
   Get ticket purchase summary for an event.
   """
   def get_ticket_purchase_summary(event_id) do
-    from(t in Ticket,
-      where: t.event_id == ^event_id and t.status == :confirmed,
-      join: tt in assoc(t, :ticket_tier),
-      join: u in assoc(t, :user),
-      group_by: [
-        tt.id,
-        tt.name,
-        u.id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        u.most_connected_country,
-        tt.price
-      ],
-      select: %{
-        ticket_tier_id: tt.id,
-        ticket_tier_name: tt.name,
-        user_id: u.id,
-        user_first_name: u.first_name,
-        user_last_name: u.last_name,
-        user_email: u.email,
-        most_connected_country: u.most_connected_country,
-        ticket_count: count(t.id),
-        ticket_tier_price: tt.price,
-        purchased_at: max(t.inserted_at)
-      }
-    )
-    |> Repo.all()
-    |> Enum.map(fn purchase ->
+    purchases =
+      from(t in Ticket,
+        where: t.event_id == ^event_id and t.status == :confirmed,
+        join: tt in assoc(t, :ticket_tier),
+        group_by: [tt.id, tt.name, t.user_id, tt.price],
+        select: %{
+          ticket_tier_id: tt.id,
+          ticket_tier_name: tt.name,
+          user_id: t.user_id,
+          ticket_count: count(t.id),
+          ticket_tier_price: tt.price,
+          purchased_at: max(t.inserted_at)
+        }
+      )
+      |> Repo.all()
+
+    user_ids = purchases |> Enum.map(& &1.user_id) |> Enum.uniq()
+
+    # Preload :current_avatar so `.user_card` can show the user's actual
+    # profile picture instead of falling back to the default flag avatar.
+    users_by_id =
+      from(u in User, where: u.id in ^user_ids, preload: :current_avatar)
+      |> Repo.all()
+      |> Map.new(&{&1.id, &1})
+
+    Enum.map(purchases, fn purchase ->
       # Calculate total amount by multiplying price by count
       total_amount =
         try do
@@ -2124,19 +2121,9 @@ defmodule Ysc.Events do
             Money.new(0, :USD)
         end
 
-      # Lightweight user map (not a full %User{}) for display in `.user_card` —
-      # avatar falls back to the default flag image since `current_avatar` isn't preloaded.
-      user = %{
-        id: purchase.user_id,
-        first_name: purchase.user_first_name,
-        last_name: purchase.user_last_name,
-        email: purchase.user_email,
-        most_connected_country: purchase.most_connected_country
-      }
-
       purchase
       |> Map.put(:total_amount, total_amount)
-      |> Map.put(:user, user)
+      |> Map.put(:user, Map.get(users_by_id, purchase.user_id))
       |> Map.delete(:ticket_tier_price)
     end)
   end
