@@ -574,6 +574,26 @@ defmodule YscWeb.AuthControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Google"
     end
 
+    test "successfully authenticates with Google when stored email is legacy googlemail.com",
+         %{conn: conn} do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      googlemail_email = "oauth.#{tag}@googlemail.com"
+      gmail_email = "oauth#{tag}@gmail.com"
+
+      legacy_gmail_user_fixture(%{email: googlemail_email})
+      auth = build_oauth_auth(gmail_email, :google)
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn)
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Google"
+    end
+
     test "successfully authenticates with Facebook", %{conn: conn} do
       user = user_fixture_fast(%{state: "active", email: "fbuser@facebook.com"})
       auth = build_oauth_auth(user.email, :facebook)

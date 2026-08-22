@@ -202,6 +202,22 @@ defmodule Ysc.AccountsTest do
 
       assert %User{id: ^id} =
                Accounts.get_user_by_email("johndoe+test@googlemail.com")
+
+      assert %User{id: ^id} = Accounts.get_user_by_email("johndoe@gmail.com")
+    end
+
+    test "finds Googlemail users stored in the database when lookup uses gmail.com" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      googlemail_email = "legacy.#{tag}@googlemail.com"
+      gmail_email = "legacy#{tag}@gmail.com"
+
+      legacy_gmail_user_fixture(%{email: googlemail_email})
+
+      assert %User{email: ^googlemail_email} =
+               Accounts.get_user_by_email(gmail_email)
+
+      assert %User{email: ^googlemail_email} =
+               Accounts.get_user_by_email("legacy.#{tag}+inbox@gmail.com")
     end
 
     test "does not apply Gmail normalization to other email providers" do

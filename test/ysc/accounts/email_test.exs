@@ -105,4 +105,12 @@ defmodule Ysc.Accounts.EmailTest do
       assert Email.gmail?("test@GmAiL.cOm")
     end
   end
+
+  describe "equiv?/2" do
+    test "treats googlemail.com as the same mailbox as gmail.com" do
+      assert Email.equiv?("user@gmail.com", "user@googlemail.com")
+      assert Email.equiv?("john.doe+tag@googlemail.com", "johndoe@gmail.com")
+      refute Email.equiv?("user@gmail.com", "other@googlemail.com")
+    end
+  end
 end

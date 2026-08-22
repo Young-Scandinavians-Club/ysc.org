@@ -31,6 +31,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 33 (MEDIUM)   QuickBooks refresh token logged in full on rotation
   Finding 34 (MEDIUM)   Media library S3 uploads used guessable public/<filename> keys
   Finding 35 (HIGH)     Gmail uniqueness ignored legacy dotted/plus stored addresses, allowing login shadowing
+  Finding 38 (HIGH)     Gmail canonicalization kept googlemail.com distinct from gmail.com, allowing a twin account for the same mailbox
   Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -2358,6 +2359,98 @@ defmodule YscWeb.SecurityAuditTest do
       attacker = user_fixture(%{email: "attacker#{tag}@example.com"})
 
       changeset = User.email_changeset(attacker, %{email: canonical_email})
+
+      refute changeset.valid?
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+    end
+  end
+
+  # Finding 38 (HIGH): googlemail.com is the same mailbox as gmail.com.
+  # Finding 35 closed dotted/plus shadowing but left the domain split, so a new
+  # @gmail.com signup could steal Google/OAuth lookups from a legacy
+  # @googlemail.com row (Google typically returns gmail.com today).
+  describe "Finding 38: Googlemail and Gmail share one canonical mailbox" do
+    test "register_user cannot create a gmail twin of a legacy googlemail member" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      googlemail_email = "legacy#{tag}@googlemail.com"
+      gmail_email = "legacy#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: googlemail_email,
+        first_name: "Legacy",
+        last_name: "Googlemail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      assert {:error, changeset} =
+               Accounts.register_user(%{
+                 email: gmail_email,
+                 phone_number: unique_user_phone(),
+                 first_name: "Attacker",
+                 last_name: "Shadow",
+                 password: "valid password"
+               })
+
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+
+      assert %User{email: ^googlemail_email} =
+               Accounts.get_user_by_email(gmail_email)
+
+      assert %User{email: ^googlemail_email} =
+               Accounts.get_user_by_email(googlemail_email)
+    end
+
+    test "register_user cannot create a googlemail twin of an existing gmail member" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      gmail_email = "twin#{tag}@gmail.com"
+      googlemail_email = "twin#{tag}@googlemail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: gmail_email,
+        first_name: "Existing",
+        last_name: "Gmail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      assert {:error, changeset} =
+               Accounts.register_user(%{
+                 email: googlemail_email,
+                 phone_number: unique_user_phone(),
+                 first_name: "Attacker",
+                 last_name: "Twin",
+                 password: "valid password"
+               })
+
+      assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+
+      assert %User{email: ^gmail_email} =
+               Accounts.get_user_by_email(googlemail_email)
+    end
+
+    test "email change cannot target the googlemail form of another member's gmail" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      gmail_email = "change#{tag}@gmail.com"
+      googlemail_email = "change#{tag}@googlemail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: gmail_email,
+        first_name: "Existing",
+        last_name: "Gmail",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      attacker = user_fixture(%{email: "attacker#{tag}@example.com"})
+
+      changeset = User.email_changeset(attacker, %{email: googlemail_email})
 
       refute changeset.valid?
       assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
