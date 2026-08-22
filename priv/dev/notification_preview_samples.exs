@@ -368,14 +368,27 @@
             description: "Decorations",
             date: "Nov 15, 2026",
             amount: "$40.00",
-            has_receipt: true
+            has_receipt: true,
+            mileage: false,
+            mileage_info: nil
           },
           %{
             vendor: "Grocery Co",
             description: "Food",
             date: "Nov 16, 2026",
             amount: "$60.00",
-            has_receipt: false
+            has_receipt: false,
+            mileage: false,
+            mileage_info: nil
+          },
+          %{
+            vendor: "Mileage",
+            description: "Board meeting",
+            date: "Nov 17, 2026",
+            amount: "$6.00",
+            has_receipt: false,
+            mileage: true,
+            mileage_info: "Home to YSC Cabin — 20 mi"
           }
         ],
         income_items: [],
@@ -405,14 +418,27 @@
             description: "Decorations",
             date: "Nov 15, 2026",
             amount: "$40.00",
-            has_receipt: true
+            has_receipt: true,
+            mileage: false,
+            mileage_info: nil
           },
           %{
             vendor: "Grocery Co",
             description: "Food",
             date: "Nov 16, 2026",
             amount: "$60.00",
-            has_receipt: false
+            has_receipt: false,
+            mileage: false,
+            mileage_info: nil
+          },
+          %{
+            vendor: "Mileage",
+            description: "Board meeting",
+            date: "Nov 17, 2026",
+            amount: "$6.00",
+            has_receipt: false,
+            mileage: true,
+            mileage_info: "Home to YSC Cabin — 20 mi"
           }
         ],
         income_items: [],

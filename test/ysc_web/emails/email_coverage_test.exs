@@ -1199,7 +1199,9 @@ defmodule YscWeb.Emails.EmailCoverageTest do
               description: "Supplies",
               amount: "$100.00",
               date: "Dec 1, 2024",
-              has_receipt: false
+              has_receipt: false,
+              mileage: false,
+              mileage_info: nil
             }
           ],
           income_items: [
