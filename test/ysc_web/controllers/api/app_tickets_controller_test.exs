@@ -39,10 +39,11 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
     {:ok, conn: conn}
   end
 
-  describe "POST /api/v1/app/tickets/:ticket_tier_id/payment_intent" do
-    test "creates a ticket order and a card-present payment intent", %{
-      conn: conn
-    } do
+  describe "POST /api/v1/app/events/:event_id/tickets/payment_intent" do
+    test "creates a ticket order and a card-present payment intent for a single tier",
+         %{
+           conn: conn
+         } do
       member = member_with_active_membership()
       event = event_fixture()
       tier = ticket_tier_fixture(%{event_id: event.id})
@@ -65,8 +66,9 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       end)
 
       response =
-        post(conn, ~p"/api/v1/app/tickets/#{tier.id}/payment_intent", %{
-          "member_id" => member.id
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
         })
 
       assert %{
@@ -78,6 +80,52 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert is_binary(ticket_order_id)
     end
 
+    test "creates a single order across multiple tiers with different quantities",
+         %{
+           conn: conn
+         } do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      general =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "General",
+          price: Money.new(50, :USD)
+        })
+
+      vip =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "VIP",
+          price: Money.new(100, :USD)
+        })
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        # 2 x $50 General + 1 x $100 VIP = $200
+        assert params.amount == 20_000
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_multi",
+           client_secret: "pi_multi_secret",
+           amount: 20_000,
+           currency: "usd"
+         }}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{general.id => 2, vip.id => 1}
+        })
+
+      assert %{"client_secret" => "pi_multi_secret", "amount" => 20_000} =
+               json_response(response, 200)
+    end
+
     test "returns an error when the member has no active membership", %{
       conn: conn
     } do
@@ -87,27 +135,73 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       tier = ticket_tier_fixture(%{event_id: event.id})
 
       response =
-        post(conn, ~p"/api/v1/app/tickets/#{tier.id}/payment_intent", %{
-          "member_id" => member.id
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
         })
 
       assert json_response(response, 422)
     end
 
-    test "returns 404 for an unknown ticket tier", %{conn: conn} do
+    test "returns an error when a tier belongs to a different event", %{
+      conn: conn
+    } do
+      member = member_with_active_membership()
+      event = event_fixture()
+      other_event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: other_event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert json_response(response, 422)
+    end
+
+    test "returns an error for a zero quantity", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 0}
+        })
+
+      assert %{"error" => "one or more selected ticket quantities are invalid"} =
+               json_response(response, 422)
+    end
+
+    test "returns 404 for an unknown event", %{conn: conn} do
       member = member_with_active_membership()
 
       response =
         post(
           conn,
-          ~p"/api/v1/app/tickets/01ARZ3NDEKTSV4RRFFQ69G5FAV/payment_intent",
+          ~p"/api/v1/app/events/01ARZ3NDEKTSV4RRFFQ69G5FAV/tickets/payment_intent",
           %{
-            "member_id" => member.id
+            "member_id" => member.id,
+            "tiers" => %{"01ARZ3NDEKTSV4RRFFQ69G5FAV" => 1}
           }
         )
 
-      assert %{"error" => "ticket tier not found"} =
-               json_response(response, 404)
+      assert %{"error" => "event not found"} = json_response(response, 404)
+    end
+
+    test "returns 404 for an unknown member", %{conn: conn} do
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert %{"error" => "member not found"} = json_response(response, 404)
     end
 
     test "returns 400 when member_id is missing", %{conn: conn} do
@@ -115,7 +209,34 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       tier = ticket_tier_fixture(%{event_id: event.id})
 
       response =
-        post(conn, ~p"/api/v1/app/tickets/#{tier.id}/payment_intent", %{})
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert json_response(response, 400)
+    end
+
+    test "returns 400 when tiers is missing", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id
+        })
+
+      assert json_response(response, 400)
+    end
+
+    test "returns 400 when tiers is empty", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{}
+        })
 
       assert json_response(response, 400)
     end
@@ -125,9 +246,10 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
         conn
         |> Plug.Conn.delete_req_header("authorization")
         |> post(
-          ~p"/api/v1/app/tickets/01ARZ3NDEKTSV4RRFFQ69G5FAV/payment_intent",
+          ~p"/api/v1/app/events/01ARZ3NDEKTSV4RRFFQ69G5FAV/tickets/payment_intent",
           %{
-            "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+            "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "tiers" => %{"01ARZ3NDEKTSV4RRFFQ69G5FAV" => 1}
           }
         )
 

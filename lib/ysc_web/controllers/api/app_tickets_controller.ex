@@ -4,10 +4,11 @@ defmodule YscWeb.Api.AppTicketsController do
 
   Creates a normal `Ysc.Tickets.TicketOrder` for the member being charged —
   the same order/fulfillment pipeline the website's Stripe Elements checkout
-  uses — but requests a card-present PaymentIntent that the app's Stripe
-  Terminal SDK collects and confirms locally (tap-to-pay or an inserted/swiped
-  card reader). The existing webhook handler fulfills the order on
-  `payment_intent.succeeded` exactly as it does for web purchases.
+  uses, including buying multiple ticket tiers with different quantities in
+  one order — but requests a card-present PaymentIntent that the app's
+  Stripe Terminal SDK collects and confirms locally (tap-to-pay or an
+  inserted/swiped card reader). The existing webhook handler fulfills the
+  order on `payment_intent.succeeded` exactly as it does for web purchases.
   """
   use YscWeb, :controller
 
@@ -19,13 +20,16 @@ defmodule YscWeb.Api.AppTicketsController do
   action_fallback YscWeb.Api.FallbackController
 
   def create_payment_intent(conn, %{
-        "ticket_tier_id" => ticket_tier_id,
-        "member_id" => member_id
-      }) do
-    with {:ok, tier} <- fetch_ticket_tier(ticket_tier_id),
+        "event_id" => event_id,
+        "member_id" => member_id,
+        "tiers" => tiers
+      })
+      when is_map(tiers) and map_size(tiers) > 0 do
+    with {:ok, event} <- fetch_event(event_id),
          {:ok, member} <- fetch_member(member_id),
+         {:ok, selections} <- parse_ticket_selections(tiers),
          {:ok, ticket_order} <-
-           Tickets.create_ticket_order(member.id, tier.event_id, %{tier.id => 1}),
+           Tickets.create_ticket_order(member.id, event.id, selections),
          {:ok, payment_intent} <-
            StripeService.create_payment_intent(ticket_order,
              user: member,
@@ -41,15 +45,18 @@ defmodule YscWeb.Api.AppTicketsController do
   def create_payment_intent(conn, _params) do
     conn
     |> put_status(:bad_request)
-    |> json(%{error: "ticket_tier_id and member_id are required"})
+    |> json(%{
+      error:
+        "event_id, member_id, and tiers (ticket_tier_id => quantity) are required"
+    })
   end
 
-  defp fetch_ticket_tier(id) do
+  defp fetch_event(id) do
     with {:ok, cast_id} <- Ecto.ULID.cast(id),
-         %Events.TicketTier{} = tier <- Events.get_ticket_tier(cast_id) do
-      {:ok, tier}
+         %Events.Event{} = event <- Events.get_event(cast_id) do
+      {:ok, event}
     else
-      _ -> {:error, :ticket_tier_not_found}
+      _ -> {:error, :event_not_found}
     end
   end
 
@@ -60,5 +67,16 @@ defmodule YscWeb.Api.AppTicketsController do
     else
       _ -> {:error, :member_not_found}
     end
+  end
+
+  defp parse_ticket_selections(tiers) do
+    Enum.reduce_while(tiers, {:ok, %{}}, fn {tier_id, quantity}, {:ok, acc} ->
+      with {:ok, cast_id} <- Ecto.ULID.cast(tier_id),
+           true <- is_integer(quantity) and quantity > 0 do
+        {:cont, {:ok, Map.put(acc, cast_id, quantity)}}
+      else
+        _ -> {:halt, {:error, :invalid_ticket_selection}}
+      end
+    end)
   end
 end

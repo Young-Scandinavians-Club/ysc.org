@@ -180,7 +180,7 @@ defmodule YscWeb.Router do
 
     post "/payments/connection_token", AppPaymentsController, :connection_token
 
-    post "/tickets/:ticket_tier_id/payment_intent",
+    post "/events/:event_id/tickets/payment_intent",
          AppTicketsController,
          :create_payment_intent
   end

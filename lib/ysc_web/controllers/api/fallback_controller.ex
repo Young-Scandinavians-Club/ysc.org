@@ -55,6 +55,7 @@ defmodule YscWeb.Api.FallbackController do
   @app_error_messages %{
     member_not_found: "member not found",
     ticket_tier_not_found: "ticket tier not found",
+    event_not_found: "event not found",
     membership_required: "member does not have an active membership",
     invalid_plan: "invalid membership plan",
     terminal_not_configured:
@@ -62,10 +63,27 @@ defmodule YscWeb.Api.FallbackController do
     user_already_has_active_subscription:
       "member already has an active membership",
     sub_accounts_cannot_create_subscriptions:
-      "sub-accounts cannot sign up for their own membership"
+      "sub-accounts cannot sign up for their own membership",
+    invalid_ticket_selection:
+      "one or more selected ticket quantities are invalid",
+    tier_validation_failed:
+      "one or more selected ticket tiers are sold out or unavailable",
+    insufficient_capacity:
+      "not enough tickets remaining for the selected tiers",
+    event_capacity_exceeded: "this event is at capacity",
+    event_not_available: "this event is not available for ticket sales",
+    event_cancelled: "this event has been cancelled",
+    event_in_past: "this event has already happened",
+    reservation_lapsed: "the ticket reservation expired — please try again",
+    checkout_payment_in_progress:
+      "a payment is already in progress for this member and event"
   }
 
-  @app_not_found_errors [:member_not_found, :ticket_tier_not_found]
+  @app_not_found_errors [
+    :member_not_found,
+    :ticket_tier_not_found,
+    :event_not_found
+  ]
 
   for {reason, message} <- Map.take(@app_error_messages, @app_not_found_errors) do
     def call(conn, {:error, unquote(reason)}) do
