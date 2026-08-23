@@ -4,11 +4,17 @@ defmodule YscWeb.Api.AppMembershipsController do
   mobile app.
 
   Memberships are Stripe subscriptions, not one-off charges. The in-person
-  flow is: the app's Stripe Terminal SDK collects the member's card (yielding
-  a Stripe `PaymentMethod`), that method is attached to the member's Stripe
-  customer, and a subscription is created with it as the default payment
-  method — reusing `Ysc.Customers.create_subscription/2`, the same function
-  used elsewhere, so subscription fulfillment/sync is unchanged.
+  flow is: the app first calls `create_setup_intent/2` below, whose Stripe
+  Terminal SDK collects the member's card and — because that SetupIntent is
+  created with the member's `customer` set — Stripe attaches the resulting
+  `PaymentMethod` to the customer automatically as part of confirming it.
+  `subscribe/2` then only needs to create the subscription with that already-
+  attached payment method as the default — reusing
+  `Ysc.Customers.create_subscription/2`, the same function used elsewhere, so
+  subscription fulfillment/sync is unchanged. It must NOT attach the payment
+  method again: Stripe's attach call errors if the method is already attached
+  to a customer, which is exactly what happens here every time and was
+  breaking every in-person membership sign-up with a generic payment error.
   """
   use YscWeb, :controller
 
@@ -53,8 +59,6 @@ defmodule YscWeb.Api.AppMembershipsController do
       }) do
     with {:ok, member} <- fetch_member(member_id),
          {:ok, plan} <- fetch_plan(plan_id),
-         {:ok, _payment_method} <-
-           attach_payment_method(member, payment_method_id),
          {:ok, subscription} <-
            Customers.create_subscription(member,
              prices: [%{price: plan.stripe_price_id, quantity: 1}],
@@ -118,14 +122,6 @@ defmodule YscWeb.Api.AppMembershipsController do
       nil -> {:error, :invalid_plan}
       plan -> {:ok, plan}
     end
-  end
-
-  defp attach_payment_method(member, payment_method_id) do
-    member = Customers.ensure_stripe_customer(member)
-
-    stripe_client().attach_payment_method(payment_method_id, %{
-      customer: member.stripe_id
-    })
   end
 
   defp stripe_client do

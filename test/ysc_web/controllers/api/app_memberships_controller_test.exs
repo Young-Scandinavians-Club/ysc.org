@@ -53,7 +53,10 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
   end
 
   describe "POST /api/v1/app/memberships/subscribe" do
-    test "attaches the payment method and creates a subscription", %{conn: conn} do
+    test "creates a subscription with the already-attached payment method as default",
+         %{
+           conn: conn
+         } do
       member = user_fixture()
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
@@ -63,11 +66,10 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
         |> Enum.find(&(&1.id == :single))
         |> Map.fetch!(:stripe_price_id)
 
-      Mox.expect(Ysc.StripeMock, :attach_payment_method, fn "pm_test_card",
-                                                            params ->
-        assert is_binary(params.customer)
-        {:ok, %Stripe.PaymentMethod{id: "pm_test_card"}}
-      end)
+      # Deliberately does NOT stub/expect attach_payment_method: the payment
+      # method arrives here already attached (via the prior SetupIntent flow
+      # in create_setup_intent/2), and re-attaching an already-attached
+      # payment method is a Stripe API error — see the moduledoc.
 
       Mox.stub(Stripe.SubscriptionMock, :create, fn params, opts ->
         assert params.default_payment_method == "pm_test_card"
