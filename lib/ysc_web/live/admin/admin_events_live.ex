@@ -308,6 +308,17 @@ defmodule YscWeb.AdminEventsLive do
       >
         Check in
       </.dropdown_menu_item>
+      <.dropdown_menu_item
+        :if={@event.state == :draft}
+        id={"#{@menu_id}-delete"}
+        icon="hero-trash"
+        tone={:danger}
+        phx-click="delete-event"
+        phx-value-id={@event.id}
+        data-confirm="Delete this draft event? This cannot be undone."
+      >
+        Delete
+      </.dropdown_menu_item>
     </.row_actions_dropdown>
     """
   end
@@ -424,7 +435,7 @@ defmodule YscWeb.AdminEventsLive do
   def handle_event("copy-event", %{"id" => id}, socket) do
     event = Events.get_event!(id)
 
-    case Events.copy_event(event) do
+    case Events.copy_event(event, socket.assigns.current_user.id) do
       {:ok, new_event} ->
         {:noreply,
          push_navigate(socket, to: ~p"/admin/events/#{new_event.id}/edit")}
@@ -434,6 +445,29 @@ defmodule YscWeb.AdminEventsLive do
          socket
          |> put_flash(:error, "Failed to copy event")
          |> push_patch(to: ~p"/admin/events")}
+    end
+  end
+
+  def handle_event("delete-event", %{"id" => id}, socket) do
+    event = Events.get_event!(id)
+
+    if event.state == :draft do
+      case Events.delete_event(event) do
+        {:ok, _event} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Event deleted.")
+           |> stream_delete(:events, event)
+           |> assign(
+             :events_by_id,
+             Map.delete(socket.assigns.events_by_id, event.id)
+           )}
+
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to delete event")}
+      end
+    else
+      {:noreply, socket}
     end
   end
 

@@ -211,6 +211,88 @@ defmodule YscWeb.AdminEventsLiveTest do
 
       assert copied.state == :draft
     end
+
+    test "copy event sets the organizer to the admin performing the copy", %{
+      conn: conn,
+      admin: admin
+    } do
+      original_creator = user_fixture(%{role: "admin"})
+
+      event =
+        event_fixture(%{
+          title: "Organizer Reset Test",
+          organizer_id: original_creator.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      view
+      |> element(
+        "#admin_events_list button[phx-click='copy-event'][phx-value-id='#{event.id}']"
+      )
+      |> render_click()
+
+      assert_redirect(view)
+
+      [copied] =
+        Events.list_events(%{})
+        |> Enum.filter(&(&1.title == "Copy of Organizer Reset Test"))
+
+      assert copied.organizer_id == admin.id
+      refute copied.organizer_id == original_creator.id
+    end
+
+    test "delete option in dropdown removes a draft event", %{
+      conn: conn,
+      admin: admin
+    } do
+      draft_title = "Delete Me Draft #{System.unique_integer([:positive])}"
+
+      {:ok, event} =
+        %Events.Event{}
+        |> Events.Event.changeset(%{
+          title: draft_title,
+          description: "Draft description",
+          state: :draft,
+          organizer_id: admin.id,
+          published_at: nil,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 5, :day)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 6, :day)
+            |> DateTime.truncate(:second),
+          max_attendees: 50
+        })
+        |> Ysc.Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events?tab=drafts")
+
+      assert has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-delete"
+             )
+
+      view
+      |> element(
+        "#admin_events_list button[phx-click='delete-event'][phx-value-id='#{event.id}']"
+      )
+      |> render_click()
+
+      assert Events.get_event!(event.id).state == :deleted
+    end
+
+    test "delete option is not shown for published events", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{title: "Published, no delete", organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      refute has_element?(view, "#event-actions-dt-#{event.id}-delete")
+    end
   end
 
   describe "editing presence" do
