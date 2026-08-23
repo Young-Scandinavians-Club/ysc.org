@@ -1273,7 +1273,9 @@ defmodule YscWeb.AccountSetupLiveTest do
       html = render(view)
 
       assert has_element?(view, "#retry-membership-activation")
+      assert has_element?(view, "#pay-on-membership-page")
       assert html =~ "Activate Your Membership"
+      assert html =~ "Or pay on the Membership page"
     end
 
     test "shows payment step when active without membership or payment method",

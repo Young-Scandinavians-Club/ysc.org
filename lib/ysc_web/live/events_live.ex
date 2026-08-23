@@ -64,7 +64,7 @@ defmodule YscWeb.EventsLive do
                 Stay Connected
               </h4>
               <p class="text-base text-zinc-600 leading-relaxed mb-4">
-                Join our community to see what members are planning informally.
+                Read club news, or join the groups where members post informal get-togethers.
               </p>
               <div class="space-y-3">
                 <.link
@@ -113,7 +113,7 @@ defmodule YscWeb.EventsLive do
                           d="M12.416 37.896c-1.942 0-2.757-1.322-2.757-3.363c0-6.333 12.145-8.187 12.145-13.892c0-4.899-10.07-2.66-10.07-6.532c0-2.449 2.822-3.067 5.988-3.067c6.63 0 13.78 2.858 13.78 8.683c0 3.265-1.947 7.266-6.647 7.266c-.816 0-1.413-.253-2.44-.253c-8.074 0-3.56 11.169-10.01 11.169h.01z"
                         />
                       </svg>
-                      Partiful
+                      Informal events on Partiful
                     </a>
                     <a
                       :if={@current_user && @site_setting_socials_whatsapp}
@@ -123,7 +123,7 @@ defmodule YscWeb.EventsLive do
                       class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                       <.icon name="hero-device-phone-mobile" class="w-4 h-4 mr-2" />
-                      WhatsApp
+                      Member WhatsApp group
                     </a>
                   </div>
                 </div>

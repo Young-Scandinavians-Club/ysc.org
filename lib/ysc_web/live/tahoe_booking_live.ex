@@ -3815,7 +3815,7 @@ defmodule YscWeb.TahoeBookingLive do
                           />
                           <p class="text-sm text-blue-900">
                             <strong>Individual room bookings:</strong>
-                            Available all winter, year-round. Room limits per membership apply — see Winter Season Room Limits below.
+                            You can book individual rooms throughout the winter. Room limits per membership apply — see Winter Season Room Limits below.
                           </p>
                         </div>
                         <div class="flex items-start gap-2">
