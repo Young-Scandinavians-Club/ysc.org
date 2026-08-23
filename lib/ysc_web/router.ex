@@ -168,7 +168,7 @@ defmodule YscWeb.Router do
   scope "/api/v1/app", YscWeb.Api do
     pipe_through [:api, :app_api]
 
-    get "/events", EventsController, :index
+    get "/events", AppEventsController, :index
     get "/memberships/plans", AppMembershipsController, :plans
     post "/memberships/subscribe", AppMembershipsController, :subscribe
     post "/payments/connection_token", AppPaymentsController, :connection_token
