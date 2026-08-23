@@ -4,6 +4,7 @@ defmodule YscWeb.Api.AppMembersJSON do
   """
 
   alias Ysc.Accounts
+  alias YscWeb.UserAvatar
 
   def search(%{users: users}) do
     %{data: Enum.map(users, &member/1)}
@@ -15,7 +16,13 @@ defmodule YscWeb.Api.AppMembersJSON do
       first_name: u.first_name,
       last_name: u.last_name,
       email: u.email,
-      has_active_membership: Accounts.has_active_membership?(u)
+      has_active_membership: Accounts.has_active_membership?(u),
+      avatar_url:
+        UserAvatar.url(
+          Ysc.Avatars.resolve_user_avatar_url(u, :thumb),
+          u.id,
+          u.most_connected_country
+        )
     }
   end
 end

@@ -39,6 +39,42 @@ defmodule YscWeb.Api.AppMembersControllerTest do
       assert result["first_name"] == member.first_name
       assert result["email"] == member.email
       assert Map.has_key?(result, "has_active_membership")
+      assert is_binary(result["avatar_url"]) and result["avatar_url"] != ""
+    end
+
+    test "falls back to a default avatar when the member has none uploaded", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      response = get(conn, ~p"/api/v1/app/members/search?q=#{member.email}")
+
+      assert %{"data" => [result]} = json_response(response, 200)
+      assert result["avatar_url"] =~ "/images/default_avatars/"
+    end
+
+    test "uses the member's uploaded avatar when one is set", %{conn: conn} do
+      member = user_fixture()
+
+      avatar =
+        %Ysc.Avatars.Avatar{
+          user_id: member.id,
+          source: :upload,
+          original_path: "orig.jpg",
+          processing_state: :completed,
+          thumb_path: "https://cdn.example.com/avatar_thumb.webp",
+          profile_path: "https://cdn.example.com/avatar_profile.webp"
+        }
+        |> Ysc.Repo.insert!()
+
+      member
+      |> Ecto.Changeset.change(current_avatar_id: avatar.id)
+      |> Ysc.Repo.update!()
+
+      response = get(conn, ~p"/api/v1/app/members/search?q=#{member.email}")
+
+      assert %{"data" => [result]} = json_response(response, 200)
+      assert result["avatar_url"] == "https://cdn.example.com/avatar_thumb.webp"
     end
 
     test "finds a member by email", %{conn: conn} do

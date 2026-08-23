@@ -12,6 +12,7 @@ defmodule YscWeb.Api.AppAuthController do
   use YscWeb, :controller
 
   alias Ysc.Accounts
+  alias Ysc.Repo
 
   action_fallback YscWeb.Api.FallbackController
 
@@ -23,7 +24,11 @@ defmodule YscWeb.Api.AppAuthController do
          true <- user.role in [:admin, :volunteer],
          true <- Accounts.login_allowed_state?(user) do
       token = Accounts.generate_user_mobile_token(user)
-      render(conn, :session, token: token, user: user)
+
+      render(conn, :session,
+        token: token,
+        user: Repo.preload(user, :current_avatar)
+      )
     else
       {:error, :rate_limited, retry_after_sec} ->
         conn
@@ -62,7 +67,11 @@ defmodule YscWeb.Api.AppAuthController do
          true <- user.role in [:admin, :volunteer],
          true <- Accounts.login_allowed_state?(user) do
       token = Accounts.generate_user_mobile_token(user)
-      render(conn, :session, token: token, user: user)
+
+      render(conn, :session,
+        token: token,
+        user: Repo.preload(user, :current_avatar)
+      )
     else
       _ ->
         conn

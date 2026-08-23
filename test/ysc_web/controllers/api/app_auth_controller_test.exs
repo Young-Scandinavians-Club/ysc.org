@@ -30,6 +30,9 @@ defmodule YscWeb.Api.AppAuthControllerTest do
       assert user_json["id"] == to_string(user.id)
       assert user_json["role"] == "admin"
 
+      assert is_binary(user_json["avatar_url"]) and
+               user_json["avatar_url"] != ""
+
       assert Accounts.get_user_by_mobile_token(token).id == user.id
     end
 
@@ -94,14 +97,18 @@ defmodule YscWeb.Api.AppAuthControllerTest do
 
       response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
 
-      assert %{"token" => token, "user" => user_json} = json_response(response, 200)
+      assert %{"token" => token, "user" => user_json} =
+               json_response(response, 200)
+
       assert is_binary(token) and token != ""
       assert user_json["id"] == to_string(user.id)
 
       assert Accounts.get_user_by_mobile_token(token).id == user.id
     end
 
-    test "rejects a plain member's code even though it was validly issued", %{conn: conn} do
+    test "rejects a plain member's code even though it was validly issued", %{
+      conn: conn
+    } do
       user = user_fixture(%{role: :member})
       code = Accounts.generate_mobile_redirect_token(user)
 
@@ -111,7 +118,8 @@ defmodule YscWeb.Api.AppAuthControllerTest do
     end
 
     test "rejects an unknown code", %{conn: conn} do
-      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => "not-a-real-code"})
+      response =
+        post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => "not-a-real-code"})
 
       assert json_response(response, 401)
     end
