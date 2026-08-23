@@ -183,15 +183,13 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
                   else: "bg-white border-l-4 border-blue-500"
                 )
               ]}>
-                <div class={[
-                  "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
-                  if(is_child,
-                    do: "bg-green-100 text-green-600",
-                    else: "bg-blue-100 text-blue-600"
-                  )
-                ]}>
+                <.numbered_badge
+                  id={"guest-number-#{index_str}"}
+                  size={:md}
+                  tone={if(is_child, do: :success, else: :info)}
+                >
                   {index}
-                </div>
+                </.numbered_badge>
                 <div class="flex-1 space-y-3">
                   <div class="flex justify-between items-center">
                     <h3 class="font-bold text-zinc-800">

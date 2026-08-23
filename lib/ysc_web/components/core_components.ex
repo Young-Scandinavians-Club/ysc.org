@@ -2479,6 +2479,100 @@ defmodule YscWeb.CoreComponents do
     |> JS.remove_class("overflow-hidden", to: "body")
   end
 
+  @doc """
+  Circular numbered marker for ordered steps and indexed rows.
+
+  Used for checkout "what happens next" lists and guest index circles.
+  Pass an avatar or icon in the slot when the marker is a person instead of a number.
+
+  ## Examples
+
+      <.numbered_badge>1</.numbered_badge>
+      <.numbered_badge size={:md} tone={:success}>2</.numbered_badge>
+  """
+  attr :id, :string, default: nil
+
+  attr :size, :atom,
+    default: :sm,
+    values: [:sm, :md],
+    doc: ":sm is 24px (step lists); :md is 32px (guest rows)"
+
+  attr :tone, :atom,
+    default: :info,
+    values: [:info, :success],
+    doc: ":info is blue (adults / default); :success is green (children)"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the marker"
+
+  attr :rest, :global
+  slot :inner_block, required: true
+
+  def numbered_badge(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "inline-flex shrink-0 items-center justify-center rounded-full font-bold overflow-hidden",
+        numbered_badge_size_class(@size),
+        numbered_badge_tone_class(@tone),
+        @class
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  defp numbered_badge_size_class(:sm), do: "w-6 h-6 text-xs"
+  defp numbered_badge_size_class(:md), do: "w-8 h-8 text-sm"
+
+  defp numbered_badge_tone_class(:info), do: "bg-blue-100 text-blue-600"
+  defp numbered_badge_tone_class(:success), do: "bg-green-100 text-green-600"
+
+  @doc """
+  Numbered "what happens next" list with circular step markers.
+
+  Step numbers are assigned in slot order (1-based). Hide unused steps with
+  `:if` on `<:step>` so remaining items stay sequentially numbered.
+
+  ## Examples
+
+      <.step_list id="checkout-next-steps">
+        <:step>Enter guest names</:step>
+        <:step>Pay to confirm your dates</:step>
+      </.step_list>
+  """
+  attr :id, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the list"
+
+  attr :rest, :global, include: ~w(aria-labelledby)
+  slot :step, required: true
+
+  def step_list(assigns) do
+    ~H"""
+    <ol
+      id={@id}
+      class={["list-none space-y-3 text-sm text-zinc-600", @class]}
+      {@rest}
+    >
+      <li
+        :for={{step, index} <- Enum.with_index(@step, 1)}
+        id={@id && "#{@id}-step-#{index}"}
+        class="flex items-start gap-3"
+      >
+        <.numbered_badge>{index}</.numbered_badge>
+        <span>{render_slot(step)}</span>
+      </li>
+    </ol>
+    """
+  end
+
   attr :type, :string, default: "default"
   attr :class, :string, default: ""
   slot :inner_block, required: true

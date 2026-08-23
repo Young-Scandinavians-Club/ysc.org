@@ -325,6 +325,89 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "numbered_badge/1" do
+    test "renders a small info marker by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.numbered_badge id="step-1">1</.numbered_badge>
+        """)
+
+      assert html =~ ~s(id="step-1")
+      assert html =~ "w-6 h-6"
+      assert html =~ "bg-blue-100"
+      assert html =~ "text-blue-600"
+      assert html =~ "1"
+    end
+
+    test "renders a medium success marker" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.numbered_badge size={:md} tone={:success}>2</.numbered_badge>
+        """)
+
+      assert html =~ "w-8 h-8"
+      assert html =~ "bg-green-100"
+      assert html =~ "text-green-600"
+      assert html =~ "2"
+      refute html =~ "bg-blue-100"
+    end
+
+    test "merges custom class onto the marker" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.numbered_badge class="ring-2 ring-blue-200">3</.numbered_badge>
+        """)
+
+      assert html =~ "ring-2 ring-blue-200"
+      assert html =~ "3"
+    end
+  end
+
+  describe "step_list/1" do
+    test "numbers steps in slot order" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.step_list id="checkout-next-steps">
+          <:step>Enter guest names</:step>
+          <:step>Pay to confirm</:step>
+        </.step_list>
+        """)
+
+      assert html =~ ~s(id="checkout-next-steps")
+      assert html =~ ~s(id="checkout-next-steps-step-1")
+      assert html =~ ~s(id="checkout-next-steps-step-2")
+      assert html =~ "Enter guest names"
+      assert html =~ "Pay to confirm"
+      assert html =~ "1"
+      assert html =~ "2"
+    end
+
+    test "skips hidden steps so remaining items stay sequential" do
+      assigns = %{show_first?: false}
+
+      html =
+        rendered_to_string(~H"""
+        <.step_list id="filtered-steps">
+          <:step :if={@show_first?}>Hidden first</:step>
+          <:step>Visible second</:step>
+        </.step_list>
+        """)
+
+      refute html =~ "Hidden first"
+      assert html =~ "Visible second"
+      assert html =~ ~s(id="filtered-steps-step-1")
+      refute html =~ ~s(id="filtered-steps-step-2")
+    end
+  end
+
   describe "dropdown JS helpers" do
     test "toggle_dropdown/1 toggles visibility, aria-expanded, and dropdown-open class" do
       js = toggle_dropdown("#test-dropdown")
