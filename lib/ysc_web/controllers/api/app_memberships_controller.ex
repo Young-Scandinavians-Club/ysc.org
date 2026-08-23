@@ -13,6 +13,7 @@ defmodule YscWeb.Api.AppMembershipsController do
   use YscWeb, :controller
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
   alias Ysc.Customers
 
   action_fallback YscWeb.Api.FallbackController
@@ -24,6 +25,25 @@ defmodule YscWeb.Api.AppMembershipsController do
   def plans(conn, _params) do
     plans = Application.get_env(:ysc, :membership_plans, [])
     render(conn, :plans, plans: plans)
+  end
+
+  @doc """
+  Looks up a member's current membership so the app can show its details
+  (and block a duplicate sign-up) instead of offering the plan list, reusing
+  the same `MembershipCache`/`UserAuth` helpers the website's account pages
+  use to display membership status.
+  """
+  def status(conn, %{"member_id" => member_id}) do
+    with {:ok, member} <- fetch_member(member_id) do
+      membership = MembershipCache.get_active_membership(member)
+      render(conn, :status, membership: membership)
+    end
+  end
+
+  def status(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "member_id is required"})
   end
 
   def subscribe(conn, %{
@@ -67,8 +87,11 @@ defmodule YscWeb.Api.AppMembershipsController do
              customer: member.stripe_id,
              payment_method_types: ["card_present"]
            }) do
-        {:ok, setup_intent} -> render(conn, :setup_intent, setup_intent: setup_intent)
-        {:error, reason} -> {:error, reason}
+        {:ok, setup_intent} ->
+          render(conn, :setup_intent, setup_intent: setup_intent)
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end

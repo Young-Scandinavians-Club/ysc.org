@@ -171,8 +171,13 @@ defmodule YscWeb.Router do
     get "/events", AppEventsController, :index
     get "/members/search", AppMembersController, :search
     get "/memberships/plans", AppMembershipsController, :plans
+    get "/memberships/status", AppMembershipsController, :status
     post "/memberships/subscribe", AppMembershipsController, :subscribe
-    post "/memberships/setup_intent", AppMembershipsController, :create_setup_intent
+
+    post "/memberships/setup_intent",
+         AppMembershipsController,
+         :create_setup_intent
+
     post "/payments/connection_token", AppPaymentsController, :connection_token
 
     post "/tickets/:ticket_tier_id/payment_intent",
