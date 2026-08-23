@@ -625,9 +625,9 @@ defmodule Ysc.Accounts.User do
   # `@gmail.com` / `@googlemail.com` row loaded into Elixir.
   #
   # Must stay in sync with `users_gmail_canonical_email_index`
-  # (priv/repo/migrations/20260821080000_add_users_gmail_canonical_email_index.exs)
+  # (priv/repo/migrations/20260822120000_unify_gmail_googlemail_canonical_index.exs)
   # and with `Ysc.Accounts.Email.normalize/1` (strip dots, then plus-tags,
-  # keep the original gmail/googlemail domain).
+  # map googlemail.com → gmail.com).
   defp find_by_gmail_alias(normalized_email) do
     if Email.gmail?(normalized_email) do
       gmail_alias_query(normalized_email)
@@ -644,8 +644,14 @@ defmodule Ysc.Accounts.User do
             regexp_replace(split_part(lower((?)::text), '@', 1), '[.]', '', 'g'),
             '+',
             1
-          ) || '@' || split_part(lower((?)::text), '@', 2)
+          ) || '@' ||
+          case
+            when split_part(lower((?)::text), '@', 2) = 'googlemail.com'
+              then 'gmail.com'
+            else split_part(lower((?)::text), '@', 2)
+          end
           """,
+          u.email,
           u.email,
           u.email
         ) == ^normalized_email,

@@ -18,6 +18,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.AdminGrants
   alias Ysc.Tickets.CheckoutCancel
+  alias Ysc.Tickets.DonationDisplay
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TicketTierHelpers
@@ -651,77 +652,60 @@ defmodule Ysc.Tickets do
   # Read-only: finds the refundable tickets and computes the refund amount,
   # without cancelling anything. Shared by calculate_refund_amount/2 (no
   # mutation) and refund_tickets/3 (calculates then mutates in one transaction).
+  #
+  # Paid tickets refund `price - discount_amount`. Donation tickets refund
+  # their share of `total_amount` after non-donation nets — never the full
+  # order total. Splitting against every donation ticket on the order (any
+  # status) keeps a later refund of a remaining donation at the original
+  # per-ticket amount.
   defp fetch_refundable_tickets(ticket_order, ticket_ids) do
-    tickets_to_refund =
-      from(t in Ticket,
-        where: t.id in ^ticket_ids,
-        where: t.ticket_order_id == ^ticket_order.id,
-        where: t.status in [:confirmed, :pending],
-        preload: [:ticket_tier]
-      )
+    ticket_id_set =
+      ticket_ids
+      |> List.wrap()
+      |> Enum.map(&to_string/1)
+      |> MapSet.new()
+
+    order_tickets =
+      ticket_order.id
+      |> order_tickets_for_refund_query()
       |> Repo.all()
 
-    if Enum.empty?(tickets_to_refund) do
+    tickets_to_refund =
+      Enum.filter(order_tickets, fn ticket ->
+        ticket.status in [:confirmed, :pending] and
+          MapSet.member?(ticket_id_set, to_string(ticket.id))
+      end)
+
+    if tickets_to_refund == [] do
       {:error, :no_valid_tickets}
     else
-      donation_tickets_count =
-        from(t in Ticket,
-          join: tt in TicketTier,
-          on: t.ticket_tier_id == tt.id,
-          where: t.ticket_order_id == ^ticket_order.id,
-          where: tt.type == :donation
-        )
-        |> Repo.aggregate(:count, :id)
+      amounts =
+        DonationDisplay.money_amounts_by_ticket_id(%{
+          tickets: order_tickets,
+          total_amount: ticket_order.total_amount
+        })
 
       refund_amount =
-        tickets_to_refund
-        |> Enum.reduce(Money.new(0, :USD), fn ticket, acc ->
-          case ticket.ticket_tier.type do
-            :free ->
-              acc
-
-            :donation ->
-              # For donation tickets, we need to get the actual donation amount
-              # Since donation tickets store the amount in the payment, we'll use a proportional split
-              # This is a simplification - ideally we'd store the donation amount per ticket
-              if ticket_order.total_amount && ticket_order.payment_id do
-                if donation_tickets_count > 0 do
-                  case Money.div(
-                         ticket_order.total_amount,
-                         donation_tickets_count
-                       ) do
-                    {:ok, ticket_amount} ->
-                      case Money.add(acc, ticket_amount) do
-                        {:ok, new_total} -> new_total
-                        {:error, _} -> acc
-                      end
-
-                    {:error, _} ->
-                      acc
-                  end
-                else
-                  acc
-                end
-              else
-                acc
-              end
-
-            _ ->
-              # For paid tickets, use the tier price
-              if ticket.ticket_tier.price do
-                case Money.add(acc, ticket.ticket_tier.price) do
-                  {:ok, new_total} -> new_total
-                  {:error, _} -> acc
-                end
-              else
-                acc
-              end
+        Enum.reduce(tickets_to_refund, Money.new(0, :USD), fn ticket, acc ->
+          case Money.add(
+                 acc,
+                 Map.get(amounts, ticket.id, Money.new(0, :USD))
+               ) do
+            {:ok, new_total} -> new_total
+            {:error, _} -> acc
           end
         end)
 
       {:ok,
        %{tickets_to_refund: tickets_to_refund, refund_amount: refund_amount}}
     end
+  end
+
+  defp order_tickets_for_refund_query(ticket_order_id) do
+    from(t in Ticket,
+      where: t.ticket_order_id == ^ticket_order_id,
+      preload: [:ticket_tier]
+    )
   end
 
   @doc """
@@ -2372,6 +2356,11 @@ defmodule Ysc.Tickets do
       order_by: [desc: to.inserted_at],
       preload: [:tickets, :event, tickets: :ticket_tier]
     )
+  end
+
+  @doc false
+  def ci_query_explain_order_tickets_for_refund_query do
+    order_tickets_for_refund_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   defp stripe_client do

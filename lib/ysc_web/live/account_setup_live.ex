@@ -196,10 +196,11 @@ defmodule YscWeb.AccountSetupLive do
                 Activate Membership Now
               </.button>
               <.link
+                id="pay-on-membership-page"
                 navigate={~p"/users/membership"}
                 class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-blue-700 hover:underline"
               >
-                Or pay from Membership
+                Or pay on the Membership page
               </.link>
             </div>
           <% else %>

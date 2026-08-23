@@ -202,6 +202,22 @@ defmodule Ysc.AccountsTest do
 
       assert %User{id: ^id} =
                Accounts.get_user_by_email("johndoe+test@googlemail.com")
+
+      assert %User{id: ^id} = Accounts.get_user_by_email("johndoe@gmail.com")
+    end
+
+    test "finds Googlemail users stored in the database when lookup uses gmail.com" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      googlemail_email = "legacy.#{tag}@googlemail.com"
+      gmail_email = "legacy#{tag}@gmail.com"
+
+      legacy_gmail_user_fixture(%{email: googlemail_email})
+
+      assert %User{email: ^googlemail_email} =
+               Accounts.get_user_by_email(gmail_email)
+
+      assert %User{email: ^googlemail_email} =
+               Accounts.get_user_by_email("legacy.#{tag}+inbox@gmail.com")
     end
 
     test "does not apply Gmail normalization to other email providers" do
@@ -762,6 +778,51 @@ defmodule Ysc.AccountsTest do
 
       results = Accounts.search_users("John", limit: 10)
       assert length(results) <= 10
+    end
+  end
+
+  describe "list_event_notification_recipients/0" do
+    test "returns opted-in active users without loading hashed_password" do
+      opted_in =
+        user_fixture(%{
+          first_name: "NotifyIn",
+          phone_number: "+14159098701"
+        })
+
+      {:ok, _} =
+        Accounts.update_notification_preferences(opted_in, %{
+          event_notifications: true
+        })
+
+      opted_out =
+        user_fixture(%{
+          first_name: "NotifyOut",
+          phone_number: "+14159098702"
+        })
+
+      {:ok, _} =
+        Accounts.update_notification_preferences(opted_out, %{
+          event_notifications: false
+        })
+
+      pending =
+        user_fixture(%{
+          first_name: "NotifyPending",
+          state: :pending_approval,
+          phone_number: "+14159098703"
+        })
+
+      recipients = Accounts.list_event_notification_recipients()
+      ids = MapSet.new(recipients, & &1.id)
+
+      assert MapSet.member?(ids, opted_in.id)
+      refute MapSet.member?(ids, opted_out.id)
+      refute MapSet.member?(ids, pending.id)
+
+      recipient = Enum.find(recipients, &(&1.id == opted_in.id))
+      assert recipient.email == opted_in.email
+      assert recipient.first_name == opted_in.first_name
+      assert is_nil(recipient.hashed_password)
     end
   end
 

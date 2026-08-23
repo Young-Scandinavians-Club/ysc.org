@@ -303,6 +303,8 @@ defmodule YscWeb.UserSessionController do
       has_redirect_to: Map.has_key?(parsed_params, "redirect_to")
     )
 
+    mobile_redirect_uri = valid_mobile_redirect_uri_from_params(parsed_params)
+
     case parsed_params do
       %{"token" => token, "redirect_to" => redirect_to}
       when is_binary(token) and token != "" ->
@@ -310,11 +312,18 @@ defmodule YscWeb.UserSessionController do
           conn,
           ~p"/users/log-in/passkey",
           token,
-          redirect_to
+          redirect_to,
+          mobile_redirect_uri
         )
 
       %{"token" => token} when is_binary(token) and token != "" ->
-        render_token_login_form(conn, ~p"/users/log-in/passkey", token, nil)
+        render_token_login_form(
+          conn,
+          ~p"/users/log-in/passkey",
+          token,
+          nil,
+          mobile_redirect_uri
+        )
 
       %{"user_id" => user_id} when is_binary(user_id) and user_id != "" ->
         case Ysc.AuthRateLimit.check_identifier(user_id) do
@@ -375,15 +384,11 @@ defmodule YscWeb.UserSessionController do
     end)
   end
 
-  def create_passkey_login(conn, %{
-        "token" => token,
-        "redirect_to" => redirect_to
-      }) do
-    passkey_login_with_token(conn, token, redirect_to)
-  end
-
-  def create_passkey_login(conn, %{"token" => token}) do
-    passkey_login_with_token(conn, token, "")
+  def create_passkey_login(conn, %{"token" => token} = params)
+      when is_binary(token) and token != "" do
+    redirect_to = Map.get(params, "redirect_to") || ""
+    mobile_redirect_uri = valid_mobile_redirect_uri_from_params(params)
+    passkey_login_with_token(conn, token, redirect_to, mobile_redirect_uri)
   end
 
   def create_passkey_login(conn, _params) do
@@ -392,23 +397,40 @@ defmodule YscWeb.UserSessionController do
     |> redirect(to: ~p"/users/log-in")
   end
 
-  defp render_token_login_form(conn, action, token, redirect_to) do
+  defp render_token_login_form(
+         conn,
+         action,
+         token,
+         redirect_to,
+         mobile_redirect_uri \\ nil
+       ) do
     render(conn, :token_login_form,
       action: action,
       token: token,
       redirect_to: redirect_to,
+      mobile_redirect_uri: mobile_redirect_uri,
       layout: false
     )
   end
 
   # sobelow_skip ["XSS.SendResp"]
-  defp passkey_login_with_token(conn, token, redirect_to) do
+  defp passkey_login_with_token(
+         conn,
+         token,
+         redirect_to,
+         mobile_redirect_uri
+       ) do
     require Ysc.Logging
 
     # Per-identifier rate limit (token is unique per login attempt)
     case Ysc.AuthRateLimit.check_identifier(token) do
       :ok ->
-        do_passkey_login_with_token(conn, token, redirect_to)
+        do_passkey_login_with_token(
+          conn,
+          token,
+          redirect_to,
+          mobile_redirect_uri
+        )
 
       {:error, :rate_limited, retry_after_sec} ->
         body = """
@@ -426,7 +448,12 @@ defmodule YscWeb.UserSessionController do
     end
   end
 
-  defp do_passkey_login_with_token(conn, token, redirect_to) do
+  defp do_passkey_login_with_token(
+         conn,
+         token,
+         redirect_to,
+         mobile_redirect_uri
+       ) do
     require Ysc.Logging
 
     Ysc.Logging.info(
@@ -441,7 +468,7 @@ defmodule YscWeb.UserSessionController do
     # attacks within the token's TTL window.
     case Accounts.verify_and_consume_passkey_login_token(token) do
       {:ok, user} ->
-        do_passkey_login_with_user(conn, user, redirect_to)
+        do_passkey_login_with_user(conn, user, redirect_to, mobile_redirect_uri)
 
       {:error, :invalid_or_expired} ->
         Ysc.Logging.warning(
@@ -459,7 +486,7 @@ defmodule YscWeb.UserSessionController do
     end
   end
 
-  defp do_passkey_login_with_user(conn, user, redirect_to) do
+  defp do_passkey_login_with_user(conn, user, redirect_to, mobile_redirect_uri) do
     require Ysc.Logging
 
     if user.state in [:pending_approval, :active] do
@@ -490,7 +517,8 @@ defmodule YscWeb.UserSessionController do
       |> UserAuth.log_in_user(
         user,
         %{"method" => "passkey", "remember_me" => "true"},
-        validated_redirect
+        validated_redirect,
+        mobile_redirect_uri
       )
     else
       Ysc.Logging.warning(
@@ -508,6 +536,16 @@ defmodule YscWeb.UserSessionController do
         title: "Login"
       )
       |> redirect(to: ~p"/users/log-in")
+    end
+  end
+
+  defp valid_mobile_redirect_uri_from_params(params) when is_map(params) do
+    case params["mobile_redirect_uri"] do
+      uri when is_binary(uri) and uri != "" ->
+        if UserAuth.valid_mobile_redirect_uri?(uri), do: uri, else: nil
+
+      _ ->
+        nil
     end
   end
 end

@@ -22,19 +22,18 @@ defmodule YscWeb.Workers.SeasonWeekendAvailabilityWorker do
   require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 1
 
-  import Ecto.Query
-
-  alias Ysc.Accounts.User
+  alias Ysc.Accounts
   alias Ysc.Bookings
   alias Ysc.Bookings.SeasonCache
   alias Ysc.Bookings.SeasonHelpers
-  alias Ysc.Repo
 
   alias YscWeb.Emails.{
     Notifier,
     TahoeSummerBuyoutAvailable,
     TahoeWinterWeekendAvailable
   }
+
+  alias YscWeb.Emails.Helpers, as: EmailHelpers
 
   @property :tahoe
 
@@ -101,20 +100,39 @@ defmodule YscWeb.Workers.SeasonWeekendAvailabilityWorker do
       recipient_count: length(recipients)
     )
 
-    results =
-      Enum.map(recipients, fn user ->
-        send_notification_email(
-          season,
-          checkin,
-          checkout,
-          cycle_year,
-          cycle_label,
-          user,
-          email_module
-        )
-      end)
+    template_name = email_module.get_template_name()
+    subject = email_module.get_subject(cycle_label)
+    reply_to = Ysc.EmailConfig.booking_reply_to(:tahoe)
 
-    success_count = Enum.count(results, &match?({:ok, _}, &1))
+    shared =
+      email_module.prepare_email_data(checkin, checkout, cycle_label, %{
+        first_name: nil
+      })
+      |> Map.delete(:first_name)
+
+    inserted =
+      recipients
+      |> Enum.map(fn user ->
+        %{
+          recipient: user.email,
+          idempotency_key:
+            "#{template_name}_#{season.id}_#{cycle_year}_#{user.id}",
+          subject: subject,
+          template: template_name,
+          variables:
+            Map.put(
+              shared,
+              :first_name,
+              EmailHelpers.member_greeting_name(user)
+            ),
+          text_body: "",
+          user_id: user.id,
+          opts: [reply_to: reply_to]
+        }
+      end)
+      |> Notifier.schedule_emails()
+
+    success_count = length(inserted)
 
     case Bookings.mark_weekend_notification_sent(
            season,
@@ -140,65 +158,6 @@ defmodule YscWeb.Workers.SeasonWeekendAvailabilityWorker do
   defp cycle_label(_season, cycle_year), do: "#{cycle_year}"
 
   defp notification_recipients do
-    from(u in User,
-      where: u.event_notifications == true,
-      where: u.state == :active
-    )
-    |> Repo.all()
-  end
-
-  defp send_notification_email(
-         season,
-         checkin,
-         checkout,
-         cycle_year,
-         cycle_label,
-         user,
-         email_module
-       ) do
-    template_name = email_module.get_template_name()
-
-    email_data =
-      email_module.prepare_email_data(checkin, checkout, cycle_label, user)
-
-    subject = email_module.get_subject(cycle_label)
-
-    # Cycle year keeps this distinct from next year's occurrence, since the
-    # season row (and thus season.id) is reused annually.
-    idempotency_key =
-      "#{template_name}_#{season.id}_#{cycle_year}_#{user.id}"
-
-    case Notifier.schedule_email(
-           user.email,
-           idempotency_key,
-           subject,
-           template_name,
-           email_data,
-           "",
-           user.id,
-           Ysc.EmailConfig.booking_reply_to(:tahoe)
-         ) do
-      %Oban.Job{} ->
-        {:ok, :scheduled}
-
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "Failed to schedule season weekend availability email",
-          season_id: season.id,
-          user_id: user.id,
-          error: inspect(reason)
-        )
-
-        {:error, reason}
-    end
-  rescue
-    error ->
-      Ysc.Logging.error("Error sending season weekend availability email",
-        season_id: season.id,
-        user_id: user.id,
-        error: Exception.message(error)
-      )
-
-      {:error, error}
+    Accounts.list_event_notification_recipients()
   end
 end

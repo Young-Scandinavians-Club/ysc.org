@@ -46,7 +46,13 @@ defmodule YscWeb.UserAuth do
   disconnected on sign out. The line can be safely removed
   if you are not using LiveView.
   """
-  def log_in_user(conn, user, params \\ %{}, redirect_to \\ nil, mobile_redirect_uri \\ nil) do
+  def log_in_user(
+        conn,
+        user,
+        params \\ %{},
+        redirect_to \\ nil,
+        mobile_redirect_uri \\ nil
+      ) do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
 
@@ -540,7 +546,7 @@ defmodule YscWeb.UserAuth do
   flow itself, which this plug bypasses entirely once already authenticated.
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
-    user = conn.assigns[:current_user]
+    user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
 
     cond do
       is_nil(user) ->

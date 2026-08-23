@@ -548,13 +548,11 @@ defmodule YscWeb.BookingReceiptLive do
                         else: "bg-blue-50 border-blue-300"
                       )
                     ]}>
-                      <div class={[
-                        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
-                        if(guest.is_child,
-                          do: "bg-green-100 text-green-700",
-                          else: "bg-blue-100 text-blue-700"
-                        )
-                      ]}>
+                      <.numbered_badge
+                        id={"receipt-guest-#{guest.id}-badge"}
+                        size={:md}
+                        tone={if(guest.is_child, do: :success, else: :info)}
+                      >
                         <%= if guest.is_booking_user do %>
                           <%= if Ecto.assoc_loaded?(@booking.user) && @booking.user do %>
                             <.user_avatar_image
@@ -567,7 +565,7 @@ defmodule YscWeb.BookingReceiptLive do
                         <% else %>
                           {guest.order_index + 1}
                         <% end %>
-                      </div>
+                      </.numbered_badge>
                       <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
                           <h3 class={[

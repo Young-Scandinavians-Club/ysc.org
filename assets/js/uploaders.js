@@ -52,6 +52,9 @@ Uploaders.S3 = function(entries, onViewError) {
         formData.append("file", entry.file)
         let xhr = new XMLHttpRequest()
         onViewError(() => xhr.abort())
+        // LiveView 1.2.10+: abort the S3 POST when the user cancels this entry
+        // or navigates away (entry.onCancel / external upload cancel).
+        entry.onCancel(() => xhr.abort())
 
         xhr.onload = () => {
             // S3 returns 204 No Content on success, but Tigris returns 200 OK

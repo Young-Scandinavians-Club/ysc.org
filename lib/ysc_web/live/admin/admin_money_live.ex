@@ -966,65 +966,16 @@ defmodule YscWeb.AdminMoneyLive do
     refund_params =
       if ticket_order && refund_params["ticket_ids"] &&
            refund_params["ticket_ids"] != [] do
-        # Convert ticket_ids from strings to proper format for comparison
-        ticket_ids = refund_params["ticket_ids"]
+        case Tickets.calculate_refund_amount(
+               ticket_order,
+               refund_params["ticket_ids"]
+             ) do
+          {:ok, refund_amount} ->
+            Map.put(refund_params, "amount", Money.to_string!(refund_amount))
 
-        # Calculate refund amount based on selected tickets
-        refund_amount =
-          ticket_order.tickets
-          |> Enum.filter(fn ticket ->
-            to_string(ticket.id) in ticket_ids &&
-              ticket.status in [:confirmed, :pending]
-          end)
-          |> Enum.reduce(Money.new(0, :USD), fn ticket, acc ->
-            case ticket.ticket_tier.type do
-              :free ->
-                acc
-
-              :donation ->
-                # For donation tickets, calculate proportionally
-                if ticket_order.total_amount do
-                  donation_tickets_count =
-                    ticket_order.tickets
-                    |> Enum.filter(fn t ->
-                      t.ticket_tier.type == :donation &&
-                        t.status in [:confirmed, :pending]
-                    end)
-                    |> length()
-
-                  if donation_tickets_count > 0 do
-                    {:ok, ticket_amount} =
-                      Money.div(
-                        ticket_order.total_amount,
-                        donation_tickets_count
-                      )
-
-                    case Money.add(acc, ticket_amount) do
-                      {:ok, new_total} -> new_total
-                      {:error, _} -> acc
-                    end
-                  else
-                    acc
-                  end
-                else
-                  acc
-                end
-
-              _ ->
-                # For paid tickets, use the tier price
-                if ticket.ticket_tier.price do
-                  case Money.add(acc, ticket.ticket_tier.price) do
-                    {:ok, new_total} -> new_total
-                    {:error, _} -> acc
-                  end
-                else
-                  acc
-                end
-            end
-          end)
-
-        # Update the amount in refund_params with the calculated value
-        Map.put(refund_params, "amount", Money.to_string!(refund_amount))
+          {:error, _} ->
+            Map.put(refund_params, "amount", "")
+        end
       else
         # If no tickets selected and this is a ticket order, clear the amount
         if ticket_order do
@@ -4072,44 +4023,54 @@ defmodule YscWeb.AdminMoneyLive do
   # against -- producing a second Refund, a second ledger transaction, and a
   # second "your refund has been processed" email for the same payment.
   defp create_stripe_refund_and_record(payment, refund_amount, reason) do
-    if payment.external_payment_id && payment.external_provider == :stripe do
-      amount_cents = MoneyHelper.money_to_cents(refund_amount)
+    amount_cents = MoneyHelper.money_to_cents(refund_amount)
 
-      # Deterministic per (payment, amount) so a retry after a post-refund
-      # failure (e.g. Ledgers.process_refund/1 erroring) reuses the same
-      # Stripe refund instead of issuing a second one. This does mean a
-      # second *intentional* refund of the identical amount on the same
-      # payment within Stripe's 24h idempotency window would be rejected as
-      # a duplicate -- acceptable given how rare that is versus the cost of
-      # a real double refund.
-      idempotency_key =
-        Ysc.Stripe.Idempotency.key("admin_refund_#{payment.id}_#{amount_cents}")
+    cond do
+      # Free tickets (and $0 donation leftovers) have nothing to refund in
+      # Stripe. Sending amount=0 is rejected by Stripe and would block ticket
+      # cancellation after #1077's Stripe-first ordering.
+      amount_cents <= 0 ->
+        {:ok, {:skipped_zero_amount, nil, nil}}
 
-      case Bookings.create_stripe_refund_for_admin(
-             payment.external_payment_id,
-             amount_cents,
-             reason,
-             idempotency_key: idempotency_key
-           ) do
-        {:ok, stripe_refund} ->
-          Ledgers.process_refund(%{
-            payment_id: payment.id,
-            refund_amount: refund_amount,
-            reason: reason,
-            external_refund_id: stripe_refund.id
-          })
-
-        {:error, stripe_reason} ->
-          Ysc.Logging.error("Admin Stripe refund failed",
-            payment_id: payment.id,
-            amount_cents: amount_cents,
-            error: inspect(stripe_reason)
+      payment.external_payment_id && payment.external_provider == :stripe ->
+        # Deterministic per (payment, amount) so a retry after a post-refund
+        # failure (e.g. Ledgers.process_refund/1 erroring) reuses the same
+        # Stripe refund instead of issuing a second one. This does mean a
+        # second *intentional* refund of the identical amount on the same
+        # payment within Stripe's 24h idempotency window would be rejected as
+        # a duplicate -- acceptable given how rare that is versus the cost of
+        # a real double refund.
+        idempotency_key =
+          Ysc.Stripe.Idempotency.key(
+            "admin_refund_#{payment.id}_#{amount_cents}"
           )
 
-          {:error, {:stripe_error, stripe_reason}}
-      end
-    else
-      {:error, :no_stripe_payment}
+        case Bookings.create_stripe_refund_for_admin(
+               payment.external_payment_id,
+               amount_cents,
+               reason,
+               idempotency_key: idempotency_key
+             ) do
+          {:ok, stripe_refund} ->
+            Ledgers.process_refund(%{
+              payment_id: payment.id,
+              refund_amount: refund_amount,
+              reason: reason,
+              external_refund_id: stripe_refund.id
+            })
+
+          {:error, stripe_reason} ->
+            Ysc.Logging.error("Admin Stripe refund failed",
+              payment_id: payment.id,
+              amount_cents: amount_cents,
+              error: inspect(stripe_reason)
+            )
+
+            {:error, {:stripe_error, stripe_reason}}
+        end
+
+      true ->
+        {:error, :no_stripe_payment}
     end
   end
 

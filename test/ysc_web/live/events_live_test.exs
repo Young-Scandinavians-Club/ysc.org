@@ -598,6 +598,7 @@ defmodule YscWeb.EventsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/events")
 
       assert html =~ "chat.whatsapp.com"
+      assert html =~ "Member WhatsApp group"
     end
 
     test "does not show WhatsApp link for unauthenticated users", %{conn: conn} do
@@ -610,7 +611,8 @@ defmodule YscWeb.EventsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/events")
 
       assert html =~ "partiful.com"
-      assert html =~ "Partiful"
+      assert html =~ "Informal events on Partiful"
+      assert html =~ "Read club news"
     end
   end
 

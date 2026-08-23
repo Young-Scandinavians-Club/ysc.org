@@ -824,11 +824,13 @@ defmodule YscWeb.UserLoginLive do
       %{}
       |> maybe_put_query(
         "redirect_to",
-        redirect_to && YscWeb.UserAuth.valid_internal_redirect?(redirect_to) && redirect_to
+        redirect_to && YscWeb.UserAuth.valid_internal_redirect?(redirect_to) &&
+          redirect_to
       )
       |> maybe_put_query(
         "mobile_redirect_uri",
-        mobile_redirect_uri && YscWeb.UserAuth.valid_mobile_redirect_uri?(mobile_redirect_uri) &&
+        mobile_redirect_uri &&
+          YscWeb.UserAuth.valid_mobile_redirect_uri?(mobile_redirect_uri) &&
           mobile_redirect_uri
       )
 
@@ -839,7 +841,9 @@ defmodule YscWeb.UserLoginLive do
     end
   end
 
-  defp maybe_put_query(params, _key, falsy) when falsy in [nil, false], do: params
+  defp maybe_put_query(params, _key, falsy) when falsy in [nil, false],
+    do: params
+
   defp maybe_put_query(params, key, value), do: Map.put(params, key, value)
 
   defp verify_passkey_authentication(
@@ -963,6 +967,18 @@ defmodule YscWeb.UserLoginLive do
           query_params =
             if socket.assigns.redirect_to && socket.assigns.redirect_to != "" do
               Map.put(query_params, "redirect_to", socket.assigns.redirect_to)
+            else
+              query_params
+            end
+
+          query_params =
+            if socket.assigns.mobile_redirect_uri &&
+                 socket.assigns.mobile_redirect_uri != "" do
+              Map.put(
+                query_params,
+                "mobile_redirect_uri",
+                socket.assigns.mobile_redirect_uri
+              )
             else
               query_params
             end

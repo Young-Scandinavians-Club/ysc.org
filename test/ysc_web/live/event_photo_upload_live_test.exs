@@ -220,6 +220,59 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
     refute has_element?(view, "#submit-photos-btn[disabled]")
   end
 
+  test "uploads multiple photos from a single file_input (LiveView 1.2.10)",
+       %{conn: conn, upload_path: path} do
+    {:ok, view, _html} = live(conn, path)
+
+    upload =
+      file_input(view, "#event-photo-upload-form", :photos, [
+        %{
+          last_modified: System.system_time(:millisecond),
+          name: "one.png",
+          content: @tiny_png,
+          type: "image/png"
+        },
+        %{
+          last_modified: System.system_time(:millisecond),
+          name: "two.png",
+          content: @tiny_png,
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "one.png") =~ "Ready"
+    assert render_upload(upload, "two.png") =~ "Ready"
+
+    assert has_element?(view, "div[data-filename='one.png']")
+    assert has_element?(view, "div[data-filename='two.png']")
+    assert has_element?(view, "#submit-photos-btn")
+    refute has_element?(view, "#submit-photos-btn[disabled]")
+  end
+
+  test "cancelling a ready upload removes it from the queue",
+       %{conn: conn, upload_path: path} do
+    {:ok, view, _html} = live(conn, path)
+
+    upload =
+      file_input(view, "#event-photo-upload-form", :photos, [
+        %{
+          last_modified: System.system_time(:millisecond),
+          name: "drop-me.png",
+          content: @tiny_png,
+          type: "image/png"
+        }
+      ])
+
+    assert render_upload(upload, "drop-me.png") =~ "Ready"
+    assert has_element?(view, "div[data-filename='drop-me.png']")
+
+    view
+    |> element("div[data-filename='drop-me.png'] button[aria-label='Remove']")
+    |> render_click()
+
+    refute has_element?(view, "div[data-filename='drop-me.png']")
+  end
+
   test "submits queued files once uploads finish and shows the thank-you state",
        %{conn: conn, upload_path: path} do
     {:ok, view, _html} = live(conn, path)
