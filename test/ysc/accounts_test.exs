@@ -1909,7 +1909,9 @@ defmodule Ysc.AccountsTest do
       assert user_token.user_id == user.id
       refute user_token.token == code
 
-      assert {:ok, verified_user} = Accounts.verify_and_consume_mobile_redirect_token(code)
+      assert {:ok, verified_user} =
+               Accounts.verify_and_consume_mobile_redirect_token(code)
+
       assert verified_user.id == user.id
 
       # Consumed — a second exchange of the same code must fail.
@@ -1918,7 +1920,9 @@ defmodule Ysc.AccountsTest do
     end
 
     test "rejects an unknown code" do
-      assert Accounts.verify_and_consume_mobile_redirect_token("not-a-real-code") ==
+      assert Accounts.verify_and_consume_mobile_redirect_token(
+               "not-a-real-code"
+             ) ==
                {:error, :invalid_or_expired}
     end
 

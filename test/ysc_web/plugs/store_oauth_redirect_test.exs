@@ -86,7 +86,8 @@ defmodule YscWeb.Plugs.StoreOAuthRedirectTest do
     test "stores a known mobile_redirect_uri in session" do
       conn = run_plug(%{"mobile_redirect_uri" => "ysc-admin://auth-callback"})
 
-      assert get_session(conn, :oauth_mobile_redirect_uri) == "ysc-admin://auth-callback"
+      assert get_session(conn, :oauth_mobile_redirect_uri) ==
+               "ysc-admin://auth-callback"
     end
 
     test "does not store an unknown mobile_redirect_uri" do
@@ -146,19 +147,31 @@ defmodule YscWeb.Plugs.StoreOAuthRedirectTest do
       assert conn.halted
     end
 
-    test "stores mobile_redirect_uri in session when initiating Google OAuth", %{
-      conn: conn
-    } do
-      conn = get(conn, ~p"/auth/google?#{%{mobile_redirect_uri: "ysc-admin://auth-callback"}}")
+    test "stores mobile_redirect_uri in session when initiating Google OAuth",
+         %{
+           conn: conn
+         } do
+      conn =
+        get(
+          conn,
+          ~p"/auth/google?#{%{mobile_redirect_uri: "ysc-admin://auth-callback"}}"
+        )
 
-      assert get_session(conn, :oauth_mobile_redirect_uri) == "ysc-admin://auth-callback"
+      assert get_session(conn, :oauth_mobile_redirect_uri) ==
+               "ysc-admin://auth-callback"
+
       assert conn.halted
     end
 
-    test "does not store an unknown mobile_redirect_uri when initiating Google OAuth", %{
-      conn: conn
-    } do
-      conn = get(conn, ~p"/auth/google?#{%{mobile_redirect_uri: "evil-app://steal-token"}}")
+    test "does not store an unknown mobile_redirect_uri when initiating Google OAuth",
+         %{
+           conn: conn
+         } do
+      conn =
+        get(
+          conn,
+          ~p"/auth/google?#{%{mobile_redirect_uri: "evil-app://steal-token"}}"
+        )
 
       assert get_session(conn, :oauth_mobile_redirect_uri) == nil
       assert conn.halted

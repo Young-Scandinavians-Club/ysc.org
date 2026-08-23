@@ -299,15 +299,18 @@ defmodule YscWeb.AuthControllerTest do
       assert redirected_to(conn) =~ redirect_path
     end
 
-    test "hands off to the mobile app when oauth_mobile_redirect_uri was stored", %{
-      conn: conn
-    } do
+    test "hands off to the mobile app when oauth_mobile_redirect_uri was stored",
+         %{
+           conn: conn
+         } do
       user = user_fixture(%{state: "active", email: "mobile-oauth@example.com"})
       auth = build_oauth_auth(user.email)
 
       conn =
         conn
-        |> init_test_session(%{oauth_mobile_redirect_uri: "ysc-admin://auth-callback"})
+        |> init_test_session(%{
+          oauth_mobile_redirect_uri: "ysc-admin://auth-callback"
+        })
         |> fetch_flash()
         |> assign(:ueberauth_auth, auth)
         |> AuthController.callback(%{})

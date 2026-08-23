@@ -70,7 +70,9 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
   # the provider and back, so — same as oauth_redirect_to above — this is
   # stashed in session before the provider redirect and read back in
   # AuthController's callback phase.
-  defp maybe_store_mobile_redirect_uri(%{params: %{"mobile_redirect_uri" => uri}} = conn)
+  defp maybe_store_mobile_redirect_uri(
+         %{params: %{"mobile_redirect_uri" => uri}} = conn
+       )
        when is_binary(uri) do
     conn = delete_session(conn, :oauth_mobile_redirect_uri)
 
@@ -81,5 +83,6 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
     end
   end
 
-  defp maybe_store_mobile_redirect_uri(conn), do: delete_session(conn, :oauth_mobile_redirect_uri)
+  defp maybe_store_mobile_redirect_uri(conn),
+    do: delete_session(conn, :oauth_mobile_redirect_uri)
 end

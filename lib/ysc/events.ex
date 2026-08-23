@@ -969,7 +969,9 @@ defmodule Ysc.Events do
       [event: e],
       exists(
         from(tt in TicketTier,
-          where: tt.event_id == parent_as(:event).id and tt.type in [:paid, :donation]
+          where:
+            tt.event_id == parent_as(:event).id and
+              tt.type in [:paid, :donation]
         )
       )
     )

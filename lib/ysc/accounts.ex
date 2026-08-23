@@ -2220,7 +2220,10 @@ defmodule Ysc.Accounts do
   Returns the raw (URL-safe Base64) code. Only the hash is stored in the DB.
   """
   def generate_mobile_redirect_token(user) do
-    generate_one_time_login_token(user, &UserToken.build_mobile_redirect_token/1)
+    generate_one_time_login_token(
+      user,
+      &UserToken.build_mobile_redirect_token/1
+    )
   end
 
   @doc """

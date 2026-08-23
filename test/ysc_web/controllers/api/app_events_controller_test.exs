@@ -23,7 +23,12 @@ defmodule YscWeb.Api.AppEventsControllerTest do
   describe "GET /api/v1/app/events" do
     test "includes an event with a paid ticket tier", %{conn: conn} do
       event = event_fixture(%{state: :published})
-      ticket_tier_fixture(%{event_id: event.id, type: :paid, price: Money.new(50, :USD)})
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        type: :paid,
+        price: Money.new(50, :USD)
+      })
 
       response = conn |> authed_conn() |> get(~p"/api/v1/app/events")
 
@@ -43,7 +48,12 @@ defmodule YscWeb.Api.AppEventsControllerTest do
 
     test "excludes an event with only a free ticket tier", %{conn: conn} do
       event = event_fixture(%{state: :published})
-      ticket_tier_fixture(%{event_id: event.id, type: :free, price: Money.new(0, :USD)})
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        type: :free,
+        price: Money.new(0, :USD)
+      })
 
       response = conn |> authed_conn() |> get(~p"/api/v1/app/events")
 

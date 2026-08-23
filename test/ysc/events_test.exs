@@ -3560,16 +3560,35 @@ defmodule Ysc.EventsTest do
     setup do
       organizer = user_fixture()
 
-      paid_event = event_fixture(%{organizer_id: organizer.id, state: :published})
-      ticket_tier_fixture(%{event_id: paid_event.id, type: :paid, price: Money.new(50, :USD)})
+      paid_event =
+        event_fixture(%{organizer_id: organizer.id, state: :published})
 
-      donation_event = event_fixture(%{organizer_id: organizer.id, state: :published})
-      ticket_tier_fixture(%{event_id: donation_event.id, type: :donation, price: nil})
+      ticket_tier_fixture(%{
+        event_id: paid_event.id,
+        type: :paid,
+        price: Money.new(50, :USD)
+      })
 
-      free_event = event_fixture(%{organizer_id: organizer.id, state: :published})
-      ticket_tier_fixture(%{event_id: free_event.id, type: :free, price: Money.new(0, :USD)})
+      donation_event =
+        event_fixture(%{organizer_id: organizer.id, state: :published})
 
-      no_tier_event = event_fixture(%{organizer_id: organizer.id, state: :published})
+      ticket_tier_fixture(%{
+        event_id: donation_event.id,
+        type: :donation,
+        price: nil
+      })
+
+      free_event =
+        event_fixture(%{organizer_id: organizer.id, state: :published})
+
+      ticket_tier_fixture(%{
+        event_id: free_event.id,
+        type: :free,
+        price: Money.new(0, :USD)
+      })
+
+      no_tier_event =
+        event_fixture(%{organizer_id: organizer.id, state: :published})
 
       %{
         paid_event: paid_event,
@@ -3605,7 +3624,8 @@ defmodule Ysc.EventsTest do
       free_event: free_event,
       no_tier_event: no_tier_event
     } do
-      {events, _meta} = Events.list_upcoming_events_paginated(%{"page_size" => "100"})
+      {events, _meta} =
+        Events.list_upcoming_events_paginated(%{"page_size" => "100"})
 
       ids = Enum.map(events, & &1.id)
 

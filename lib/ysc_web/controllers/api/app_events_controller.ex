@@ -21,7 +21,9 @@ defmodule YscWeb.Api.AppEventsController do
     - page_size: results per page (default 20, max 100)
   """
   def index(conn, params) do
-    {events, meta} = Events.list_upcoming_events_paginated(params, require_payable_tier: true)
+    {events, meta} =
+      Events.list_upcoming_events_paginated(params, require_payable_tier: true)
+
     render(conn, :index, events: events, meta: meta)
   end
 end

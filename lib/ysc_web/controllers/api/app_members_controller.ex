@@ -21,6 +21,8 @@ defmodule YscWeb.Api.AppMembersController do
   def search(conn, _params) do
     conn
     |> put_status(:bad_request)
-    |> json(%{error: "q (at least #{@min_query_length} characters) is required"})
+    |> json(%{
+      error: "q (at least #{@min_query_length} characters) is required"
+    })
   end
 end
