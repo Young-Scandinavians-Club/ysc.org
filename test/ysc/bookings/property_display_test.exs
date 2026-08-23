@@ -89,4 +89,22 @@ defmodule Ysc.Bookings.PropertyDisplayTest do
       assert PropertyDisplay.training_videos_url(:tahoe) == nil
     end
   end
+
+  describe "thumbnail_path/1" do
+    test "returns cabin image paths for known properties" do
+      assert PropertyDisplay.thumbnail_path(:tahoe) ==
+               "/images/tahoe/tahoe_cabin_main.webp"
+
+      assert PropertyDisplay.thumbnail_path(:clear_lake) ==
+               "/images/clear_lake/clear_lake_dock.webp"
+
+      assert PropertyDisplay.thumbnail_path("tahoe") ==
+               PropertyDisplay.thumbnail_path(:tahoe)
+    end
+
+    test "returns the YSC logo for unknown values" do
+      assert PropertyDisplay.thumbnail_path(:unknown) == "/images/ysc_logo.webp"
+      assert PropertyDisplay.thumbnail_path(nil) == "/images/ysc_logo.webp"
+    end
+  end
 end

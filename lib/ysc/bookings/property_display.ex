@@ -7,6 +7,9 @@ defmodule Ysc.Bookings.PropertyDisplay do
   """
 
   @clear_lake_training_videos_url "https://www.youtube.com/watch?v=53ARqZXuE0o&list=PLCfwh7uBCuiwoTgkTJDsi5wfD__0EHk3l&index=4&t"
+  @tahoe_thumbnail_path "/images/tahoe/tahoe_cabin_main.webp"
+  @clear_lake_thumbnail_path "/images/clear_lake/clear_lake_dock.webp"
+  @fallback_thumbnail_path "/images/ysc_logo.webp"
 
   @doc """
   Short label for emails, SMS, and compact UI (e.g. `"Tahoe"`, `"Clear Lake"`).
@@ -90,4 +93,15 @@ defmodule Ysc.Bookings.PropertyDisplay do
   def training_videos_url(:clear_lake), do: @clear_lake_training_videos_url
   def training_videos_url("clear_lake"), do: training_videos_url(:clear_lake)
   def training_videos_url(_), do: nil
+
+  @doc """
+  Public thumbnail path for a booking property (checkout, receipts, cards).
+
+  Returns the YSC logo path for unknown values.
+  """
+  def thumbnail_path(:tahoe), do: @tahoe_thumbnail_path
+  def thumbnail_path(:clear_lake), do: @clear_lake_thumbnail_path
+  def thumbnail_path("tahoe"), do: thumbnail_path(:tahoe)
+  def thumbnail_path("clear_lake"), do: thumbnail_path(:clear_lake)
+  def thumbnail_path(_), do: @fallback_thumbnail_path
 end

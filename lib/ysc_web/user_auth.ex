@@ -900,21 +900,13 @@ defmodule YscWeb.UserAuth do
         "Active Membership"
 
       plan_id ->
-        plan_id
-        |> Atom.to_string()
-        |> String.split("_")
-        |> Enum.map_join(" ", &String.capitalize/1)
-        |> then(&"#{&1} Membership")
+        membership_plan_label(plan_id)
     end
   end
 
   def get_membership_plan_display_name(%{plan: %{id: plan_id}})
       when not is_nil(plan_id) do
-    plan_id
-    |> Atom.to_string()
-    |> String.split("_")
-    |> Enum.map_join(" ", &String.capitalize/1)
-    |> then(&"#{&1} Membership")
+    membership_plan_label(plan_id)
   end
 
   def get_membership_plan_display_name(_), do: "Active Membership"
@@ -966,10 +958,7 @@ defmodule YscWeb.UserAuth do
         "Unknown"
 
       plan_id ->
-        plan_id
-        |> Atom.to_string()
-        |> String.split("_")
-        |> Enum.map_join(" ", &String.capitalize/1)
+        Ysc.Text.titleize(plan_id)
     end
   end
 
@@ -992,4 +981,7 @@ defmodule YscWeb.UserAuth do
   def get_active_membership(user) do
     MembershipCache.get_active_membership(user)
   end
+
+  defp membership_plan_label(plan_id),
+    do: "#{Ysc.Text.titleize(plan_id)} Membership"
 end

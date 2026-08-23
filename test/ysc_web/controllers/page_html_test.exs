@@ -1,6 +1,6 @@
 defmodule YscWeb.PageHTMLTest do
   @moduledoc """
-  Exercises `YscWeb.PageHTML` embedded templates (including `atom_to_readable/1` branches).
+  Exercises `YscWeb.PageHTML` embedded templates (including `Ysc.Text.titleize/1` branches).
   """
   use ExUnit.Case, async: true
 
@@ -9,7 +9,7 @@ defmodule YscWeb.PageHTMLTest do
   end
 
   describe "board/1" do
-    test "renders HTML with string board_position (binary atom_to_readable branch)" do
+    test "renders HTML with string board_position (binary titleize branch)" do
       html =
         YscWeb.PageHTML.board(%{
           bod_members: [

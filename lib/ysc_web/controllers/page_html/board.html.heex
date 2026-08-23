@@ -40,7 +40,7 @@
                   {member.first_name} {member.last_name}
                 </h3>
                 <p class="text-blue-600 font-medium mt-1">
-                  {atom_to_readable(member.board_position)}
+                  {titleize(member.board_position)}
                 </p>
                 <%= if String.trim(Map.get(member, :board_bio) || "") != "" do %>
                   <p class="text-sm text-zinc-600 mt-3 leading-relaxed whitespace-pre-line">
@@ -86,7 +86,7 @@
                 <div class="flex justify-between items-start gap-4">
                   <div class="flex-1">
                     <h3 class="font-semibold text-zinc-900 mb-1">
-                      {atom_to_readable(position)}
+                      {titleize(position)}
                     </h3>
                     <p class="text-sm text-zinc-600">
                       <%= case position do %>
@@ -115,7 +115,7 @@
                   </div>
                   <.link
                     navigate={
-                      ~p"/contact?subject=Board of Directors&message=#{URI.encode("Hi, I'm interested in the #{atom_to_readable(position)} position on the YSC Board of Directors. I'd love to learn more about the role and how I can contribute.")}"
+                      ~p"/contact?subject=Board of Directors&message=#{URI.encode("Hi, I'm interested in the #{titleize(position)} position on the YSC Board of Directors. I'd love to learn more about the role and how I can contribute.")}"
                     }
                     class="text-sm font-bold text-blue-600 hover:text-blue-600 hover:underline whitespace-nowrap flex-shrink-0 ml-4 transition-colors duration-150"
                   >

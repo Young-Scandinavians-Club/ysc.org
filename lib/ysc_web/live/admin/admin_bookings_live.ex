@@ -4,6 +4,7 @@ defmodule YscWeb.AdminBookingsLive do
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
   import Phoenix.HTML
+  import Ysc.Text, only: [titleize: 1]
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
@@ -682,7 +683,7 @@ defmodule YscWeb.AdminBookingsLive do
                   Property
                 </label>
                 <p class="text-base font-bold text-zinc-900">
-                  {atom_to_readable(@booking.property)}
+                  {titleize(@booking.property)}
                 </p>
               </div>
               <div>
@@ -690,7 +691,7 @@ defmodule YscWeb.AdminBookingsLive do
                   Booking Mode
                 </label>
                 <.badge type="default">
-                  {atom_to_readable(@booking.booking_mode)}
+                  {titleize(@booking.booking_mode)}
                 </.badge>
               </div>
             </div>
@@ -745,7 +746,7 @@ defmodule YscWeb.AdminBookingsLive do
                       :if={room.room_category}
                       class="text-xs text-zinc-600 flex-shrink-0"
                     >
-                      {atom_to_readable(room.room_category.name)}
+                      {titleize(room.room_category.name)}
                     </span>
                   </div>
                 <% end %>
@@ -1363,7 +1364,7 @@ defmodule YscWeb.AdminBookingsLive do
               {@refund_policy.name}
             </p>
             <p class="text-xs text-zinc-600">
-              {atom_to_readable(@refund_policy.property)} • {atom_to_readable(
+              {titleize(@refund_policy.property)} • {titleize(
                 @refund_policy.booking_mode
               )}
             </p>
@@ -1882,7 +1883,7 @@ defmodule YscWeb.AdminBookingsLive do
 
       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-6 gap-3">
         <.admin_page_title>
-          {atom_to_readable(@selected_property)} Bookings
+          {titleize(@selected_property)} Bookings
         </.admin_page_title>
         <.button
           id="admin-bookings-booking-entitlements"
@@ -2078,7 +2079,7 @@ defmodule YscWeb.AdminBookingsLive do
                       :if={room.room_category}
                       class="text-xs text-zinc-500 hidden sm:inline"
                     >
-                      ({atom_to_readable(room.room_category.name)})
+                      ({titleize(room.room_category.name)})
                     </span>
                   </div>
                 </div>
@@ -2415,9 +2416,7 @@ defmodule YscWeb.AdminBookingsLive do
                 All Reservations
               </h2>
               <p class="text-xs sm:text-sm text-zinc-500 mt-1">
-                Search and filter reservations for {atom_to_readable(
-                  @selected_property
-                )}
+                Search and filter reservations for {titleize(@selected_property)}
               </p>
             </div>
           </div>
@@ -2538,7 +2537,7 @@ defmodule YscWeb.AdminBookingsLive do
                           </div>
                           <%= if room.room_category do %>
                             <div class="text-xs text-zinc-500 mt-0.5">
-                              {atom_to_readable(room.room_category.name)}
+                              {titleize(room.room_category.name)}
                             </div>
                           <% end %>
                         </div>
@@ -2802,7 +2801,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Door Codes</h2>
               <p class="text-sm text-zinc-500">
-                Manage door codes for {atom_to_readable(@selected_property)}
+                Manage door codes for {titleize(@selected_property)}
               </p>
             </div>
           </div>
@@ -2970,7 +2969,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3 pr-6">
                     <.badge type="sky">
                       {if season.property,
-                        do: atom_to_readable(season.property),
+                        do: titleize(season.property),
                         else: "—"}
                     </.badge>
                   </td>
@@ -3072,7 +3071,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3 pr-6">
                     <span :if={rule.property}>
                       <.badge type="sky">
-                        {atom_to_readable(rule.property)}
+                        {titleize(rule.property)}
                       </.badge>
                     </span>
                     <span :if={!rule.property} class="text-zinc-400">—</span>
@@ -3080,7 +3079,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3 pr-6">
                     <.badge type="gray">
                       {if rule.booking_mode do
-                        atom_to_readable(rule.booking_mode)
+                        titleize(rule.booking_mode)
                       else
                         "—"
                       end}
@@ -3173,12 +3172,12 @@ defmodule YscWeb.AdminBookingsLive do
                 >
                   <td class="py-3 pr-6">
                     <.badge type="sky">
-                      {atom_to_readable(policy.property)}
+                      {titleize(policy.property)}
                     </.badge>
                   </td>
                   <td class="py-3 pr-6">
                     <.badge type="gray">
-                      {atom_to_readable(policy.booking_mode)}
+                      {titleize(policy.booking_mode)}
                     </.badge>
                   </td>
                   <td class="py-3 pr-6 font-medium text-zinc-800">
@@ -3244,7 +3243,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Rooms</h2>
               <p class="text-sm text-zinc-500">
-                Configure rooms for {atom_to_readable(@selected_property)}
+                Configure rooms for {titleize(@selected_property)}
               </p>
             </div>
             <.button
@@ -3307,7 +3306,7 @@ defmodule YscWeb.AdminBookingsLive do
                   </td>
                   <td class="py-3 pr-6">
                     <span :if={room.room_category} class="text-zinc-600">
-                      {atom_to_readable(room.room_category.name)}
+                      {titleize(room.room_category.name)}
                     </span>
                     <span :if={!room.room_category} class="text-zinc-400">—</span>
                   </td>
@@ -7248,7 +7247,7 @@ defmodule YscWeb.AdminBookingsLive do
 
   defp room_category_options(categories) do
     Enum.map(categories, fn category ->
-      {atom_to_readable(category.name), category.id}
+      {titleize(category.name), category.id}
     end)
   end
 
@@ -7304,10 +7303,10 @@ defmodule YscWeb.AdminBookingsLive do
         "Room: #{rule.room.name}"
 
       rule.room_category_id && rule.room_category ->
-        "Category: #{atom_to_readable(rule.room_category.name)}"
+        "Category: #{titleize(rule.room_category.name)}"
 
       rule.property ->
-        "Property: #{atom_to_readable(rule.property)}"
+        "Property: #{titleize(rule.property)}"
 
       true ->
         "General"
@@ -7320,21 +7319,6 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp format_price(_), do: "$0.00"
-
-  defp atom_to_readable(atom) when is_binary(atom) do
-    atom
-    |> String.split("_")
-    |> Enum.map_join(" ", &String.capitalize/1)
-  end
-
-  defp atom_to_readable(atom) when is_atom(atom) do
-    atom
-    |> Atom.to_string()
-    |> String.split("_")
-    |> Enum.map_join(" ", &String.capitalize/1)
-  end
-
-  defp atom_to_readable(_), do: "—"
 
   defp format_datetime(%DateTime{} = datetime, timezone) do
     datetime
