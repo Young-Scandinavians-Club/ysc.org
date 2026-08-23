@@ -18,13 +18,15 @@ defmodule YscWeb.Workers.EventNotificationWorker do
     ],
     replace: [scheduled: [:scheduled_at]]
 
+  import Ecto.Query
+
   alias Ysc.Events
   alias Ysc.Repo
   alias Ysc.Events.Event
   alias Ysc.Events.EventDateTime
-  alias Ysc.Accounts.User
+  alias Ysc.Accounts
   alias YscWeb.Emails.{Notifier, EventNotification}
-  import Ecto.Query
+  alias YscWeb.Emails.Helpers, as: EmailHelpers
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"event_id" => event_id}}) do
@@ -99,13 +101,10 @@ defmodule YscWeb.Workers.EventNotificationWorker do
     require Ysc.Logging
 
     try do
-      # Get all users with event notifications enabled
-      users =
-        from(u in User,
-          where: u.event_notifications == true,
-          where: u.state == :active
-        )
-        |> Repo.all()
+      users = Accounts.list_event_notification_recipients()
+      shared = EventNotification.prepare_shared_email_data(event)
+      subject = EventNotification.get_subject(event)
+      template_name = EventNotification.get_template_name()
 
       Ysc.Logging.info("Sending event notifications",
         event_id: event.id,
@@ -113,23 +112,35 @@ defmodule YscWeb.Workers.EventNotificationWorker do
         user_count: length(users)
       )
 
-      # Send email to each user
-      results =
-        Enum.map(users, fn user ->
-          send_event_notification_email(event, user)
+      inserted =
+        users
+        |> Enum.map(fn user ->
+          %{
+            recipient: user.email,
+            idempotency_key: "event_notification_#{event.id}_#{user.id}",
+            subject: subject,
+            template: template_name,
+            variables:
+              Map.put(
+                shared,
+                :first_name,
+                EmailHelpers.member_greeting_name(user)
+              ),
+            text_body: "",
+            user_id: user.id
+          }
         end)
+        |> Notifier.schedule_emails()
 
-      # Count successes and failures
-      success_count = Enum.count(results, &match?({:ok, _}, &1))
-      failure_count = length(results) - success_count
+      success_count = length(inserted)
+      recipient_count = length(users)
+      failure_count = recipient_count - success_count
 
       Ysc.Logging.info("Event notifications sent",
         event_id: event.id,
         success_count: success_count,
         failure_count: failure_count
       )
-
-      recipient_count = length(users)
 
       if success_count == recipient_count do
         case Events.mark_event_notification_sent(event, recipient_count) do
@@ -159,51 +170,6 @@ defmodule YscWeb.Workers.EventNotificationWorker do
           event_id: event.id,
           error: Exception.message(error),
           stacktrace: __STACKTRACE__
-        )
-
-        {:error, error}
-    end
-  end
-
-  defp send_event_notification_email(event, user) do
-    require Ysc.Logging
-
-    try do
-      email_module = EventNotification
-      email_data = email_module.prepare_email_data(event, user)
-      subject = email_module.get_subject(event)
-      template_name = email_module.get_template_name()
-
-      # Generate idempotency key to prevent duplicate emails
-      idempotency_key = "event_notification_#{event.id}_#{user.id}"
-
-      case Notifier.schedule_email(
-             user.email,
-             idempotency_key,
-             subject,
-             template_name,
-             email_data,
-             "",
-             user.id
-           ) do
-        %Oban.Job{} ->
-          {:ok, :scheduled}
-
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to schedule event notification",
-            event_id: event.id,
-            user_id: user.id,
-            error: inspect(reason)
-          )
-
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Ysc.Logging.error("Failed to send event notification",
-          event_id: event.id,
-          user_id: user.id,
-          error: Exception.message(error)
         )
 
         {:error, error}

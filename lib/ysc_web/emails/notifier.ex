@@ -180,6 +180,22 @@ defmodule YscWeb.Emails.Notifier do
   end
 
   @doc """
+  Enqueues many email jobs in a single `Oban.insert_all/1` round trip.
+
+  Use this for worker fan-out (event notifications, season weekend mail)
+  instead of calling `schedule_email/8` once per recipient.
+  """
+  def schedule_emails(entries) when is_list(entries) do
+    case entries do
+      [] ->
+        []
+
+      entries ->
+        Oban.insert_all(Enum.map(entries, &email_job_from_attrs/1))
+    end
+  end
+
+  @doc """
   Adds an email job to an `Ecto.Multi`.
 
   The caller must execute the returned multi with the same repository

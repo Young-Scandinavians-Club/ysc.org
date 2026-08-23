@@ -765,6 +765,51 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "list_event_notification_recipients/0" do
+    test "returns opted-in active users without loading hashed_password" do
+      opted_in =
+        user_fixture(%{
+          first_name: "NotifyIn",
+          phone_number: "+14159098701"
+        })
+
+      {:ok, _} =
+        Accounts.update_notification_preferences(opted_in, %{
+          event_notifications: true
+        })
+
+      opted_out =
+        user_fixture(%{
+          first_name: "NotifyOut",
+          phone_number: "+14159098702"
+        })
+
+      {:ok, _} =
+        Accounts.update_notification_preferences(opted_out, %{
+          event_notifications: false
+        })
+
+      pending =
+        user_fixture(%{
+          first_name: "NotifyPending",
+          state: :pending_approval,
+          phone_number: "+14159098703"
+        })
+
+      recipients = Accounts.list_event_notification_recipients()
+      ids = MapSet.new(recipients, & &1.id)
+
+      assert MapSet.member?(ids, opted_in.id)
+      refute MapSet.member?(ids, opted_out.id)
+      refute MapSet.member?(ids, pending.id)
+
+      recipient = Enum.find(recipients, &(&1.id == opted_in.id))
+      assert recipient.email == opted_in.email
+      assert recipient.first_name == opted_in.first_name
+      assert is_nil(recipient.hashed_password)
+    end
+  end
+
   describe "get_user_by_email_and_password/2" do
     test "does not return the user if the email does not exist" do
       refute Accounts.get_user_by_email_and_password(

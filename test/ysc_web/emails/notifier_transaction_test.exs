@@ -63,4 +63,38 @@ defmodule YscWeb.Emails.NotifierTransactionTest do
              ) == 0
     end)
   end
+
+  test "schedule_emails/1 inserts many jobs in one round trip" do
+    Oban.Testing.with_testing_mode(:manual, fn ->
+      jobs =
+        Notifier.schedule_emails([
+          %{
+            recipient: "one@example.com",
+            idempotency_key: "blast_one_#{System.unique_integer([:positive])}",
+            subject: "Subject",
+            template: "event_notification",
+            variables: %{first_name: "One"},
+            text_body: "",
+            user_id: nil
+          },
+          %{
+            recipient: "two@example.com",
+            idempotency_key: "blast_two_#{System.unique_integer([:positive])}",
+            subject: "Subject",
+            template: "event_notification",
+            variables: %{first_name: "Two"},
+            text_body: "",
+            user_id: nil
+          }
+        ])
+
+      assert length(jobs) == 2
+      assert Enum.all?(jobs, &match?(%Oban.Job{}, &1))
+      assert Enum.all?(jobs, &(&1.queue == "bulk_mail"))
+    end)
+  end
+
+  test "schedule_emails/1 is a no-op for an empty list" do
+    assert Notifier.schedule_emails([]) == []
+  end
 end
