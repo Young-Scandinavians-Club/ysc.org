@@ -257,9 +257,11 @@ defmodule YscWeb.AdminEventsLiveTest do
           organizer_id: admin.id,
           published_at: nil,
           start_date:
-            DateTime.add(DateTime.utc_now(), 5, :day) |> DateTime.truncate(:second),
+            DateTime.add(DateTime.utc_now(), 5, :day)
+            |> DateTime.truncate(:second),
           end_date:
-            DateTime.add(DateTime.utc_now(), 6, :day) |> DateTime.truncate(:second),
+            DateTime.add(DateTime.utc_now(), 6, :day)
+            |> DateTime.truncate(:second),
           max_attendees: 50
         })
         |> Ysc.Repo.insert()

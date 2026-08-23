@@ -458,7 +458,10 @@ defmodule YscWeb.AdminEventsLive do
            socket
            |> put_flash(:info, "Event deleted.")
            |> stream_delete(:events, event)
-           |> assign(:events_by_id, Map.delete(socket.assigns.events_by_id, event.id))}
+           |> assign(
+             :events_by_id,
+             Map.delete(socket.assigns.events_by_id, event.id)
+           )}
 
         {:error, _reason} ->
           {:noreply, put_flash(socket, :error, "Failed to delete event")}
