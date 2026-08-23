@@ -1739,7 +1739,7 @@ defmodule YscWeb.AccountSetupLive do
         {:error, _reason} ->
           YscWeb.Flash.send_toast(
             :error,
-            "We couldn't activate your membership. Please try again or pay from Membership.",
+            "We couldn't activate your membership. Please try again, or pay on the Membership page.",
             title: "Membership"
           )
 
