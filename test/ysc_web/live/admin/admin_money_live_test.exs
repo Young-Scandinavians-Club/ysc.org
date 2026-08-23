@@ -120,6 +120,75 @@ defmodule YscWeb.AdminMoneyLiveTest do
     %{payment: payment, ticket_order: completed, tickets: tickets}
   end
 
+  defp completed_mixed_paid_and_donation_order! do
+    user = user_fixture()
+
+    user =
+      user
+      |> Ecto.Changeset.change(
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Repo.update!()
+
+    event = event_fixture()
+    paid_tier = ticket_tier_fixture(%{event_id: event.id})
+
+    {:ok, donation_tier} =
+      Ysc.Events.create_ticket_tier(%{
+        name: "Donation",
+        type: :donation,
+        price: nil,
+        quantity: 50,
+        event_id: event.id
+      })
+
+    {:ok, order} =
+      Tickets.create_ticket_order(user.id, event.id, %{
+        paid_tier.id => 1,
+        donation_tier.id => 1_000
+      })
+
+    {:ok, {payment, _transaction, _entries}} =
+      Ledgers.process_event_payment_with_donations(%{
+        user_id: user.id,
+        total_amount: order.total_amount,
+        event_amount: Money.new(50, :USD),
+        donation_amount: Money.new(10, :USD),
+        event_id: event.id,
+        external_payment_id:
+          "pi_admin_refund_#{System.unique_integer([:positive])}",
+        stripe_fee: Money.new(320, :USD),
+        description: "Event tickets",
+        payment_method_id: nil
+      })
+
+    {:ok, completed} = Tickets.complete_ticket_order(order, payment.id)
+
+    from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+    |> Repo.update_all(set: [status: :confirmed])
+
+    tickets =
+      from(t in Ysc.Events.Ticket,
+        where: t.ticket_order_id == ^order.id,
+        order_by: t.id,
+        preload: [:ticket_tier]
+      )
+      |> Repo.all()
+
+    donation_ticket =
+      Enum.find(tickets, &(&1.ticket_tier.type == :donation))
+
+    paid_ticket = Enum.find(tickets, &(&1.ticket_tier.type == :paid))
+
+    %{
+      payment: payment,
+      ticket_order: completed,
+      donation_ticket: donation_ticket,
+      paid_ticket: paid_ticket
+    }
+  end
+
   defp refunds_for_payment(payment_id) do
     from(r in Refund, where: r.payment_id == ^payment_id) |> Repo.all()
   end
@@ -721,6 +790,45 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert Repo.get!(Ysc.Events.Ticket, second.id).status == :confirmed
       assert Repo.get!(TicketOrder, ticket_order.id).status == :completed
       assert Ledgers.get_payment(payment.id).status == :completed
+    end
+
+    test "partial donation refund charges Stripe the donation remainder not the order total",
+         %{conn: conn} do
+      %{
+        payment: payment,
+        ticket_order: ticket_order,
+        donation_ticket: donation_ticket,
+        paid_ticket: paid_ticket
+      } = completed_mixed_paid_and_donation_order!()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
+
+      html =
+        view
+        |> form("#refund-form", %{
+          "refund" => %{
+            "ticket_ids" => [donation_ticket.id],
+            "reason" => "Donation unused"
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "Refunded 1 ticket(s) successfully"
+
+      [refund] = refunds_for_payment(payment.id)
+      expected_amount = Money.new(10, :USD)
+
+      assert refund.external_refund_id ==
+               expected_stripe_refund_id(payment, expected_amount)
+
+      assert Money.equal?(refund.amount, expected_amount)
+
+      assert Repo.get!(Ysc.Events.Ticket, donation_ticket.id).status ==
+               :cancelled
+
+      assert Repo.get!(Ysc.Events.Ticket, paid_ticket.id).status == :confirmed
+      assert Repo.get!(TicketOrder, ticket_order.id).status == :completed
     end
   end
 end
