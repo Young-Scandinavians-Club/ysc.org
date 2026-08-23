@@ -27,4 +27,6 @@ defmodule Ysc.StripeBehaviour do
               {:ok, Stripe.Terminal.ConnectionToken.t()} | {:error, any()}
   @callback attach_payment_method(String.t(), map()) ::
               {:ok, Stripe.PaymentMethod.t()} | {:error, any()}
+  @callback create_setup_intent(map()) ::
+              {:ok, Stripe.SetupIntent.t()} | {:error, any()}
 end

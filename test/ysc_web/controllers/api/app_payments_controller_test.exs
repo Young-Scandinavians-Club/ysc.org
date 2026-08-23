@@ -56,7 +56,8 @@ defmodule YscWeb.Api.AppPaymentsControllerTest do
 
       response = post(conn, ~p"/api/v1/app/payments/connection_token")
 
-      assert %{"secret" => "pst_test_secret"} = json_response(response, 200)
+      assert %{"secret" => "pst_test_secret", "location_id" => "tml_test_123"} =
+               json_response(response, 200)
     end
 
     test "returns a Stripe error instead of terminal_not_configured when the provider fails",

@@ -30,7 +30,10 @@ defmodule YscWeb.Api.AppPaymentsController do
                location: location_id
              }) do
           {:ok, connection_token} ->
-            render(conn, :connection_token, connection_token: connection_token)
+            render(conn, :connection_token,
+              connection_token: connection_token,
+              location_id: location_id
+            )
 
           {:error, %Stripe.Error{} = error} = result ->
             Ysc.Logging.error(

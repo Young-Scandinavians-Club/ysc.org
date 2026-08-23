@@ -45,4 +45,7 @@ defmodule Ysc.StripeClient do
 
   def attach_payment_method(id, params),
     do: stripe_retry(fn -> Stripe.PaymentMethod.attach(id, params) end)
+
+  def create_setup_intent(params),
+    do: stripe_retry(fn -> Stripe.SetupIntent.create(params) end)
 end

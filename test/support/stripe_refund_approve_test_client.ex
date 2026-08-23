@@ -53,6 +53,10 @@ defmodule Ysc.StripeRefundApproveTestClient do
   def attach_payment_method(_id, _params),
     do: unexpected!(:attach_payment_method)
 
+  @impl true
+  def create_setup_intent(_params),
+    do: unexpected!(:create_setup_intent)
+
   defp unexpected!(op),
     do:
       raise(

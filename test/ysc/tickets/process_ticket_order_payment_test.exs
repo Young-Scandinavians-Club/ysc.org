@@ -60,6 +60,9 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
           def attach_payment_method(_id, _params),
             do: {:error, :not_implemented}
 
+          def create_setup_intent(_params),
+            do: {:error, :not_implemented}
+
           def retrieve_payment_intent(id, _opts) do
             {:ok,
              %Stripe.PaymentIntent{

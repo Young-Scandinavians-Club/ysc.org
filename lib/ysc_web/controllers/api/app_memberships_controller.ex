@@ -52,6 +52,33 @@ defmodule YscWeb.Api.AppMembershipsController do
     |> json(%{error: "member_id, plan, and payment_method_id are required"})
   end
 
+  @doc """
+  Creates a Stripe Terminal SetupIntent for a member so the app can collect
+  a card via tap-to-pay and save it (rather than charge it) — the resulting
+  `payment_method_id` is then passed to `subscribe/2` above to create the
+  actual subscription. Separate from `subscribe/2` because collecting the
+  card is a client-side Terminal SDK step that happens in between.
+  """
+  def create_setup_intent(conn, %{"member_id" => member_id}) do
+    with {:ok, member} <- fetch_member(member_id) do
+      member = Customers.ensure_stripe_customer(member)
+
+      case stripe_client().create_setup_intent(%{
+             customer: member.stripe_id,
+             payment_method_types: ["card_present"]
+           }) do
+        {:ok, setup_intent} -> render(conn, :setup_intent, setup_intent: setup_intent)
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  def create_setup_intent(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "member_id is required"})
+  end
+
   defp fetch_member(id) do
     with {:ok, cast_id} <- Ecto.ULID.cast(id),
          %Accounts.User{} = member <- Accounts.get_user(cast_id) do

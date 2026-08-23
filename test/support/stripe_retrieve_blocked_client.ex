@@ -41,4 +41,7 @@ defmodule Ysc.StripeRetrieveBlockedClient do
 
   @impl true
   defdelegate attach_payment_method(id, p), to: Ysc.TestStripeClient
+
+  @impl true
+  defdelegate create_setup_intent(p), to: Ysc.TestStripeClient
 end

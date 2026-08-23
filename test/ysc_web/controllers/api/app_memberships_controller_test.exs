@@ -120,4 +120,42 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
       assert %{"error" => "member not found"} = json_response(response, 404)
     end
   end
+
+  describe "POST /api/v1/app/memberships/setup_intent" do
+    test "creates a card-present SetupIntent for the member's Stripe customer", %{conn: conn} do
+      member = user_fixture()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :create_setup_intent, fn params ->
+        assert is_binary(params.customer)
+        assert params.payment_method_types == ["card_present"]
+
+        {:ok,
+         %Stripe.SetupIntent{
+           id: "seti_test_123",
+           client_secret: "seti_test_123_secret_abc"
+         }}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/setup_intent", %{"member_id" => member.id})
+
+      assert %{"client_secret" => "seti_test_123_secret_abc"} = json_response(response, 200)
+    end
+
+    test "returns 404 for an unknown member", %{conn: conn} do
+      response =
+        post(conn, ~p"/api/v1/app/memberships/setup_intent", %{
+          "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+        })
+
+      assert %{"error" => "member not found"} = json_response(response, 404)
+    end
+
+    test "returns 400 when member_id is missing", %{conn: conn} do
+      response = post(conn, ~p"/api/v1/app/memberships/setup_intent", %{})
+
+      assert json_response(response, 400)
+    end
+  end
 end

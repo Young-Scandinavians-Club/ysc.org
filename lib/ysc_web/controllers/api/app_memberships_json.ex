@@ -27,4 +27,10 @@ defmodule YscWeb.Api.AppMembershipsJSON do
       status: subscription.status
     }
   end
+
+  def setup_intent(%{setup_intent: setup_intent}) do
+    %{
+      client_secret: setup_intent.client_secret
+    }
+  end
 end
