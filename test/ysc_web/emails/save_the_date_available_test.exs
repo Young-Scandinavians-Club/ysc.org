@@ -60,6 +60,17 @@ defmodule YscWeb.Emails.SaveTheDateAvailableTest do
       assert data.notification_settings_url =~ "/users/notifications"
     end
 
+    test "prepare_shared_email_data omits first_name", %{
+      user: user,
+      event: event
+    } do
+      shared = SaveTheDateAvailable.prepare_shared_email_data(event)
+      refute Map.has_key?(shared, :first_name)
+
+      data = SaveTheDateAvailable.prepare_email_data(event, user)
+      assert data == Map.put(shared, :first_name, data.first_name)
+    end
+
     test "loads event from database when organizer not loaded", %{user: user} do
       organizer = user_fixture()
 

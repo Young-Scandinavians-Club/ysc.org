@@ -68,6 +68,60 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
       assert updated.recipient_count == 1
     end
 
+    test "schedules one mailer job per attendee", %{
+      event: event,
+      organizer: organizer
+    } do
+      buyer_a = user_fixture()
+      buyer_b = user_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      for buyer <- [buyer_a, buyer_b] do
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: buyer.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+      end
+
+      {:ok, update} =
+        Events.create_event_update(event, %{
+          title: "Batch Update",
+          raw_body: "<p>Hello everyone</p>",
+          rendered_body: "<p>Hello everyone</p>",
+          sent_by_id: organizer.id
+        })
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_update_id" => update.id},
+        worker: "YscWeb.Workers.EventUpdateNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = EventUpdateNotificationWorker.perform(job)
+
+      updated = Repo.get!(Events.EventUpdate, update.id)
+      assert updated.recipient_count == 2
+
+      for buyer <- [buyer_a, buyer_b] do
+        idempotency_key =
+          "event_update_#{update.id}_#{String.downcase(buyer.email)}"
+
+        assert Repo.get_by(Ysc.Messages.MessageIdempotency,
+                 idempotency_key: idempotency_key
+               )
+      end
+    end
+
     test "handles missing event update gracefully" do
       job = %Oban.Job{
         id: 1,

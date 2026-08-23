@@ -67,20 +67,30 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
       subject = template.get_subject(event)
       template_name = template.get_template_name()
       upload_url = EventPhotos.upload_url(collection)
+      shared = template.prepare_shared_email_data(event, upload_url)
 
-      results =
-        Enum.map(recipients, fn recipient ->
-          send_single(
-            event,
-            recipient,
-            subject,
-            template_name,
-            template,
-            upload_url
-          )
+      inserted =
+        recipients
+        |> Enum.map(fn recipient ->
+          %{
+            recipient: recipient.email,
+            idempotency_key:
+              "event_photo_reminder_#{event.id}_#{String.downcase(recipient.email)}",
+            subject: subject,
+            template: template_name,
+            variables:
+              Map.put(
+                shared,
+                :first_name,
+                recipient[:first_name] || recipient["first_name"] || "there"
+              ),
+            text_body: "",
+            user_id: nil
+          }
         end)
+        |> Notifier.schedule_emails()
 
-      success_count = Enum.count(results, &match?({:ok, _}, &1))
+      success_count = length(inserted)
       recipient_count = length(recipients)
 
       Ysc.Logging.info("Event photo reminders scheduled",
@@ -210,39 +220,4 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   defp should_send?(%Event{state: :published}, _collection), do: true
   defp should_send?(%Event{state: "published"}, _collection), do: true
   defp should_send?(_, _), do: false
-
-  defp send_single(
-         event,
-         recipient,
-         subject,
-         template_name,
-         template,
-         upload_url
-       ) do
-    email_data = template.prepare_email_data(event, recipient, upload_url)
-
-    idempotency_key =
-      "event_photo_reminder_#{event.id}_#{String.downcase(recipient.email)}"
-
-    case Notifier.schedule_email(
-           recipient.email,
-           idempotency_key,
-           subject,
-           template_name,
-           email_data,
-           ""
-         ) do
-      %Oban.Job{} ->
-        {:ok, :scheduled}
-
-      {:error, reason} ->
-        Ysc.Logging.error("Failed to schedule event photo reminder",
-          event_id: event.id,
-          recipient: recipient.email,
-          error: inspect(reason)
-        )
-
-        {:error, reason}
-    end
-  end
 end
