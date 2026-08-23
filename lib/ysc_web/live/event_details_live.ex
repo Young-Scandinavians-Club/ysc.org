@@ -935,7 +935,7 @@ defmodule YscWeb.EventDetailsLive do
                                 Limited Availability
                               </p>
                               <p class="text-xs font-mono text-zinc-400">
-                                {sold_percentage}% Booked
+                                {sold_percentage}% full
                               </p>
                             </div>
                             <div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
@@ -1114,11 +1114,14 @@ defmodule YscWeb.EventDetailsLive do
                         <% end %>
                       <% else %>
                         <%= if !@event.tickets_tbd do %>
-                          <div class="w-full text-center py-2">
-                            <p class="font-bold text-green-700 text-sm">
-                              Tickets aren't sold here
+                          <div
+                            id="tickets-not-sold-online"
+                            class="w-full text-center py-2"
+                          >
+                            <p class="font-bold text-amber-800 text-sm">
+                              Tickets aren't sold on this website
                             </p>
-                            <p class="text-xs text-green-600 mt-1">
+                            <p class="text-xs text-amber-700 mt-1">
                               See the event description above for how to RSVP or get tickets.
                             </p>
                           </div>
@@ -1301,8 +1304,11 @@ defmodule YscWeb.EventDetailsLive do
                           <% end %>
                         <% else %>
                           <%= if !@event.tickets_tbd do %>
-                            <span class="text-xs font-black text-green-700 uppercase tracking-widest">
-                              Tickets aren't sold here
+                            <span
+                              id="tickets-not-sold-online-mobile"
+                              class="text-xs font-bold text-amber-800"
+                            >
+                              Tickets aren't sold on this website
                             </span>
                           <% else %>
                             <%= if @current_user == nil do %>

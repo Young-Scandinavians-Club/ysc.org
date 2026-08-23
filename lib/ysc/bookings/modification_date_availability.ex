@@ -13,6 +13,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
   alias Ysc.Bookings.{
     Booking,
     BookingLocker,
+    BookingValidator,
     PropertyInventory,
     Room,
     RoomInventory,
@@ -747,7 +748,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
           if one_night_to_sunday? do
             nil
           else
-            "Check-ins on Saturday must check out on Sunday (one-night stay only)"
+            BookingValidator.saturday_checkin_one_night_message()
           end
 
         true ->
@@ -760,7 +761,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
             Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 7))
 
           if has_saturday? and not has_sunday? do
-            "Bookings containing Saturday must also include Sunday (full weekend required)"
+            BookingValidator.saturday_requires_sunday_message()
           else
             nil
           end

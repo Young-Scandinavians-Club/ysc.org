@@ -212,6 +212,23 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert html =~ "Mountain Hike"
     end
 
+    test "explains when tickets are not sold on the website", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Potluck Picnic", tickets_tbd: false}
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "#tickets-not-sold-online") or
+               has_element?(view, "#tickets-not-sold-online-mobile")
+
+      html = render(view)
+      assert html =~ "sold on this website"
+      refute html =~ "Tickets aren't sold here"
+    end
+
     test "displays event description", %{conn: conn} do
       event =
         event_with_state(:upcoming,
