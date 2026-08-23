@@ -410,6 +410,40 @@ defmodule YscWeb.UserAuthTest do
       refute conn.halted
       refute conn.status
     end
+
+    test "hands off to the mobile app instead of the normal redirect when already authenticated with a valid mobile_redirect_uri",
+         %{conn: conn, user: user} do
+      conn =
+        conn
+        |> Map.put(:params, %{"mobile_redirect_uri" => "ysc-admin://auth-callback"})
+        |> assign(:current_user, user)
+        |> UserAuth.redirect_if_user_is_authenticated([])
+
+      assert conn.halted
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      assert {:ok, %Accounts.User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(
+                 location |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query() |> Map.fetch!("code")
+               )
+
+      assert id == user.id
+    end
+
+    test "falls back to the normal redirect when mobile_redirect_uri is unknown", %{
+      conn: conn,
+      user: user
+    } do
+      conn =
+        conn
+        |> Map.put(:params, %{"mobile_redirect_uri" => "evil-app://steal-token"})
+        |> assign(:current_user, user)
+        |> UserAuth.redirect_if_user_is_authenticated([])
+
+      assert conn.halted
+      assert redirected_to(conn) == ~p"/"
+    end
   end
 
   describe "require_authenticated_user/2" do
@@ -947,6 +981,47 @@ defmodule YscWeb.UserAuthTest do
 
       {:halt, _updated_socket} =
         UserAuth.on_mount(:ensure_active, %{}, session, socket)
+    end
+  end
+
+  describe "on_mount(:redirect_if_user_is_authenticated, ...)" do
+    test "allows unauthenticated users to proceed", %{conn: conn} do
+      session = conn |> get_session()
+
+      {:cont, _updated_socket} =
+        UserAuth.on_mount(:redirect_if_user_is_authenticated, %{}, session, %LiveView.Socket{})
+    end
+
+    test "redirects an authenticated user to the signed-in path", %{conn: conn} do
+      user = user_fixture(%{state: "active"})
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      {:halt, socket} =
+        UserAuth.on_mount(:redirect_if_user_is_authenticated, %{}, session, %LiveView.Socket{})
+
+      assert {:redirect, %{to: "/"}} = socket.redirected
+    end
+
+    # Deliberately does not hand off to the mobile app even when
+    # mobile_redirect_uri is present — see the moduledoc note on the
+    # on_mount clause itself for why (Phoenix.LiveView.redirect/2 can't
+    # target a custom URL scheme; the plug above is what actually handles
+    # the mobile case on a fresh page load).
+    test "ignores mobile_redirect_uri and redirects to the signed-in path anyway", %{conn: conn} do
+      user = user_fixture(%{state: "active"})
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      {:halt, socket} =
+        UserAuth.on_mount(
+          :redirect_if_user_is_authenticated,
+          %{"mobile_redirect_uri" => "ysc-admin://auth-callback"},
+          session,
+          %LiveView.Socket{}
+        )
+
+      assert {:redirect, %{to: "/"}} = socket.redirected
     end
   end
 

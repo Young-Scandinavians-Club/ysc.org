@@ -428,6 +428,16 @@ defmodule YscWeb.UserAuth do
      end)}
   end
 
+  # Note: unlike the redirect_if_user_is_authenticated/2 plug above, this
+  # on_mount hook deliberately does NOT hand off to the mobile app —
+  # Phoenix.LiveView.redirect/2 only allows http(s) external destinations
+  # (raises ArgumentError for a custom scheme like ysc-admin://...), unlike
+  # Phoenix.Controller.redirect/2 which the plug uses. In practice this
+  # doesn't matter: on a fresh page load the plug (part of the router
+  # pipeline) always runs first and halts before the LiveView ever mounts,
+  # so this hook only fires the plain path here on a live socket reconnect
+  # while already sitting on the login page — a rare case where falling
+  # back to the normal signed-in page is an acceptable outcome.
   def on_mount(:redirect_if_user_is_authenticated, _params, session, socket) do
     socket = mount_current_user(socket, session)
     socket = mount_current_membership(socket, session)
@@ -520,16 +530,47 @@ defmodule YscWeb.UserAuth do
 
   @doc """
   Used for routes that require the user to not be authenticated.
+
+  If the mobile app opened this page (mobile_redirect_uri present and valid)
+  and the browser already had a signed-in session — e.g. a retry after an
+  earlier successful login whose redirect back to the app didn't complete —
+  this still hands off to the app via the one-time-code redirect instead of
+  just rendering the normal signed-in web page. Otherwise the app would be
+  silently stuck: the mobile handoff only otherwise happens inside the login
+  flow itself, which this plug bypasses entirely once already authenticated.
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
-    if conn.assigns[:current_user] do
-      conn
-      |> redirect(to: signed_in_path(conn))
-      |> halt()
-    else
-      conn
+    user = conn.assigns[:current_user]
+
+    cond do
+      is_nil(user) ->
+        conn
+
+      mobile_redirect_uri = valid_mobile_redirect_param(conn.params) ->
+        code = Accounts.generate_mobile_redirect_token(user)
+
+        conn
+        |> redirect(external: "#{mobile_redirect_uri}?code=#{code}")
+        |> halt()
+
+      true ->
+        conn
+        |> redirect(to: signed_in_path(conn))
+        |> halt()
     end
   end
+
+  # Pattern-matched directly on a plain map (rather than params["key"], which
+  # uses the Access behaviour) so this safely returns nil for a
+  # %Plug.Conn.Unfetched{} params struct (e.g. a conn built directly in a
+  # test without going through the router's query-param-fetching plugs)
+  # instead of raising.
+  defp valid_mobile_redirect_param(%{"mobile_redirect_uri" => uri})
+       when is_binary(uri) and uri != "" do
+    if valid_mobile_redirect_uri?(uri), do: uri, else: nil
+  end
+
+  defp valid_mobile_redirect_param(_params), do: nil
 
   @doc """
   Used for routes that require the user to be authenticated.
