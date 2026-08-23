@@ -108,6 +108,25 @@ defmodule YscWeb.Emails.EventUpdateNotificationTest do
     end
   end
 
+  describe "prepare_shared_email_data/2" do
+    test "omits first_name and matches prepare_email_data when it is added", %{
+      event: event,
+      update: update,
+      recipient: recipient
+    } do
+      event =
+        Repo.get!(Event, event.id) |> Repo.preload([:organizer, :cover_image])
+
+      shared = EventUpdateNotification.prepare_shared_email_data(event, update)
+      refute Map.has_key?(shared, :first_name)
+
+      data =
+        EventUpdateNotification.prepare_email_data(event, update, recipient)
+
+      assert data == Map.put(shared, :first_name, "Alex")
+    end
+  end
+
   describe "prepare_email_data/3 with event cover image" do
     test "includes optimized image URL when cover image is preloaded", %{
       event: event,

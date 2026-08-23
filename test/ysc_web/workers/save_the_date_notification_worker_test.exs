@@ -73,6 +73,15 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorkerTest do
                event.id,
                "save_the_date"
              ) == []
+
+      for subscriber <- [sub_a, sub_b] do
+        idempotency_key =
+          "save_the_date_available_#{event.id}_#{subscriber.id}"
+
+        assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+                 idempotency_key: idempotency_key
+               )
+      end
     end
 
     test "returns :ok and sends emails to subscribers", %{organizer: organizer} do

@@ -55,21 +55,31 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
       template_module = EventUpdateNotification
       subject = template_module.get_subject(event, update)
       template_name = template_module.get_template_name()
+      shared = template_module.prepare_shared_email_data(event, update)
 
-      results =
-        Enum.map(recipients, fn recipient ->
-          send_single_notification(
-            event,
-            update,
-            recipient,
-            subject,
-            template_name,
-            template_module
-          )
+      inserted =
+        recipients
+        |> Enum.map(fn recipient ->
+          %{
+            recipient: recipient.email,
+            idempotency_key:
+              "event_update_#{update.id}_#{String.downcase(recipient.email)}",
+            subject: subject,
+            template: template_name,
+            variables:
+              Map.put(
+                shared,
+                :first_name,
+                recipient[:first_name] || recipient["first_name"] || "there"
+              ),
+            text_body: "",
+            user_id: nil
+          }
         end)
+        |> Notifier.schedule_emails()
 
-      success_count = Enum.count(results, &match?({:ok, _}, &1))
-      failure_count = length(results) - success_count
+      success_count = length(inserted)
+      failure_count = length(recipients) - success_count
 
       Ysc.Logging.info("Event update notifications sent",
         event_id: event.id,
@@ -211,51 +221,5 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
 
   defp sms_notifier do
     Application.get_env(:ysc, :event_update_sms_notifier, SmsNotifier)
-  end
-
-  defp send_single_notification(
-         event,
-         update,
-         recipient,
-         subject,
-         template_name,
-         template_module
-       ) do
-    try do
-      email_data = template_module.prepare_email_data(event, update, recipient)
-
-      idempotency_key =
-        "event_update_#{update.id}_#{String.downcase(recipient.email)}"
-
-      case Notifier.schedule_email(
-             recipient.email,
-             idempotency_key,
-             subject,
-             template_name,
-             email_data,
-             ""
-           ) do
-        %Oban.Job{} ->
-          {:ok, :scheduled}
-
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to schedule event update notification",
-            event_update_id: update.id,
-            recipient: recipient.email,
-            error: inspect(reason)
-          )
-
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Ysc.Logging.error("Failed to send event update notification",
-          event_update_id: update.id,
-          recipient: recipient.email,
-          error: Exception.message(error)
-        )
-
-        {:error, error}
-    end
   end
 end

@@ -13,6 +13,7 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorker do
   alias Ysc.Events
   alias Ysc.Events.Event
   alias YscWeb.Emails.{Notifier, SaveTheDateAvailable}
+  alias YscWeb.Emails.Helpers, as: EmailHelpers
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"event_id" => event_id}}) do
@@ -52,13 +53,32 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorker do
       subscriber_count: length(subscribers)
     )
 
-    results =
-      Enum.map(subscribers, fn user ->
-        send_notification_email(event, user)
-      end)
+    shared = SaveTheDateAvailable.prepare_shared_email_data(event)
+    subject = SaveTheDateAvailable.get_subject(event)
+    template_name = SaveTheDateAvailable.get_template_name()
 
-    success_count = Enum.count(results, &match?({:ok, _}, &1))
-    failure_count = length(results) - success_count
+    inserted =
+      subscribers
+      |> Enum.map(fn user ->
+        %{
+          recipient: user.email,
+          idempotency_key: "save_the_date_available_#{event.id}_#{user.id}",
+          subject: subject,
+          template: template_name,
+          variables:
+            Map.put(
+              shared,
+              :first_name,
+              EmailHelpers.member_greeting_name(user)
+            ),
+          text_body: "",
+          user_id: user.id
+        }
+      end)
+      |> Notifier.schedule_emails()
+
+    success_count = length(inserted)
+    failure_count = length(subscribers) - success_count
 
     Ysc.Logging.info("Save-the-date notifications sent",
       event_id: event.id,
@@ -69,45 +89,5 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorker do
     Events.delete_event_notification_subscriptions(event.id, "save_the_date")
 
     :ok
-  end
-
-  defp send_notification_email(event, user) do
-    try do
-      email_data = SaveTheDateAvailable.prepare_email_data(event, user)
-      subject = SaveTheDateAvailable.get_subject(event)
-      template_name = SaveTheDateAvailable.get_template_name()
-      idempotency_key = "save_the_date_available_#{event.id}_#{user.id}"
-
-      case Notifier.schedule_email(
-             user.email,
-             idempotency_key,
-             subject,
-             template_name,
-             email_data,
-             "",
-             user.id
-           ) do
-        %Oban.Job{} ->
-          {:ok, :scheduled}
-
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to schedule save-the-date email",
-            event_id: event.id,
-            user_id: user.id,
-            error: inspect(reason)
-          )
-
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Ysc.Logging.error("Error sending save-the-date notification",
-          event_id: event.id,
-          user_id: user.id,
-          error: Exception.message(error)
-        )
-
-        {:error, error}
-    end
   end
 end
