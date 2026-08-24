@@ -5,6 +5,8 @@ defmodule YscWeb.AdminSettingsLive do
   alias Oban.Job
   alias Phoenix.LiveView.JS
   alias YscWeb.Admin.DateTimeDisplay
+  alias Ysc.PropertyOutages.Queries, as: OutageQueries
+  alias Ysc.Bookings.PropertyDisplay
 
   use YscWeb, :admin_live_view
 
@@ -218,6 +220,99 @@ defmodule YscWeb.AdminSettingsLive do
               class=" text-zinc-100 w-4 h-4 -mt-1 mr-2"
             /> System Dashboard
           </.link>
+        </div>
+        <!-- Reported Outages -->
+        <div class="w-full py-4">
+          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-4">
+            Reported Outages
+          </h2>
+          <div
+            :if={!@outages_loaded}
+            class="bg-white shadow rounded-lg overflow-hidden animate-pulse"
+          >
+            <div class="h-12 bg-zinc-100"></div>
+            <%= for _i <- 1..3 do %>
+              <div class="h-14 border-t border-zinc-200 flex items-center px-6 gap-4">
+                <div class="h-4 bg-zinc-200 rounded w-24"></div>
+                <div class="h-4 bg-zinc-200 rounded w-20"></div>
+                <div class="h-4 bg-zinc-200 rounded w-40"></div>
+                <div class="h-4 bg-zinc-200 rounded w-32"></div>
+              </div>
+            <% end %>
+          </div>
+          <div
+            :if={@outages_loaded}
+            class="bg-white shadow rounded-lg overflow-hidden"
+          >
+            <table class="min-w-full divide-y divide-zinc-200">
+              <thead class="bg-zinc-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Property
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Company
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Incident Date
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Reported
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-zinc-200">
+                <tr :for={outage <- @recent_outages}>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {PropertyDisplay.short_name(outage.property)}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <.badge
+                      type={get_outage_type_color(outage.incident_type)}
+                      class="!me-0"
+                    >
+                      {outage.incident_type
+                      |> to_string()
+                      |> String.replace("_", " ")}
+                    </.badge>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {outage.company_name || "—"}
+                  </td>
+                  <td class="px-6 py-4 text-sm text-zinc-900">
+                    {outage.description || "—"}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {DateTimeDisplay.format_calendar_date_long(outage.incident_date)}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    <span
+                      id={"outage-time-#{outage.id}"}
+                      phx-hook="LocalTime"
+                      data-utc-time={DateTime.to_iso8601(outage.inserted_at)}
+                      data-prefix=""
+                    >
+                      {DateTimeDisplay.format_utc_iso(outage.inserted_at)}
+                    </span>
+                  </td>
+                </tr>
+                <tr :if={Enum.empty?(@recent_outages)}>
+                  <td
+                    colspan="6"
+                    class="px-6 py-4 text-center text-sm text-zinc-500"
+                  >
+                    No outages reported.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <!-- Queue Statistics -->
         <div class="w-full py-4">
@@ -560,6 +655,8 @@ defmodule YscWeb.AdminSettingsLive do
       |> assign(:recent_jobs, [])
       |> assign(:queue_stats, %{})
       |> assign(:oban_data_loaded, false)
+      |> assign(:recent_outages, [])
+      |> assign(:outages_loaded, false)
       |> assign(:selected_job, nil)
       |> assign(:show_job_modal, false)
       |> assign(:form, nil)
@@ -586,6 +683,7 @@ defmodule YscWeb.AdminSettingsLive do
               queue_stats: get_queue_stats()
             }
           end)
+          |> start_async(:load_outages, fn -> OutageQueries.recent(20) end)
         else
           s
         end
@@ -651,6 +749,25 @@ defmodule YscWeb.AdminSettingsLive do
        title: "Settings"
      )
      |> assign(:oban_data_loaded, true)}
+  end
+
+  @impl true
+  def handle_async(:load_outages, {:ok, outages}, socket) do
+    {:noreply,
+     socket
+     |> assign(:recent_outages, outages)
+     |> assign(:outages_loaded, true)}
+  end
+
+  def handle_async(:load_outages, {:exit, reason}, socket) do
+    Ysc.Logging.warning("Failed to load outages async", error: reason)
+
+    {:noreply,
+     socket
+     |> YscWeb.Flash.put_toast(:error, "Failed to load reported outages",
+       title: "Settings"
+     )
+     |> assign(:outages_loaded, true)}
   end
 
   @impl true
@@ -907,6 +1024,11 @@ defmodule YscWeb.AdminSettingsLive do
       _ -> "bg-zinc-100 text-zinc-800"
     end
   end
+
+  defp get_outage_type_color(:power_outage), do: "yellow"
+  defp get_outage_type_color(:water_outage), do: "sky"
+  defp get_outage_type_color(:internet_outage), do: "violet"
+  defp get_outage_type_color(_), do: "zinc"
 
   defp google_photos_scopes_stale?(scopes),
     do: not Ysc.GooglePhotos.OAuth.scopes_grant_complete?(scopes)
