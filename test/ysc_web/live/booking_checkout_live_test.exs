@@ -1226,7 +1226,15 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            conn: conn,
            user: user
          } do
-      {checkin, checkout} = tahoe_booking_dates(50)
+      # Fixed anchor dates (both Mondays, both deep in Tahoe Summer) instead of
+      # tahoe_booking_dates(50) + Date.add(checkin, 14): that combination could
+      # push expensive_booking's stay past Oct 31 into Winter depending on
+      # Date.utc_today(), silently flipping booking_fixture/1 to :room mode
+      # (no buyout allowed in Winter) — a mode this test never sets up pricing
+      # for, so checkout would fail with :no_pricing_rules_found. See
+      # @tahoe_test_anchor above.
+      checkin = tahoe_test_date(54)
+      checkout = Date.add(checkin, 3)
 
       cheap_booking =
         booking_fixture(%{
@@ -1237,12 +1245,14 @@ defmodule YscWeb.BookingCheckoutLiveTest do
           total_price: Money.new(200, :USD)
         })
 
+      expensive_checkin = tahoe_test_date(68)
+
       expensive_booking =
         booking_fixture(%{
           user_id: user.id,
           status: :hold,
-          checkin_date: Date.add(checkin, 14),
-          checkout_date: Date.add(checkout, 14),
+          checkin_date: expensive_checkin,
+          checkout_date: Date.add(expensive_checkin, 3),
           total_price: Money.new(500, :USD)
         })
 
