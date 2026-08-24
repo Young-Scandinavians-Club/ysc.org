@@ -548,9 +548,11 @@ defmodule YscWeb.AdminUsersLive do
 
           <div :if={@meta}>
             <!-- Mobile Card View -->
+            <%!-- Cards use user_list, not @streams.users. Flop.Phoenix.table
+                 consumes that stream, so stream diffs never update card DOM. --%>
             <.admin_mobile_list id="admin-users-mobile">
               <.admin_mobile_list_card
-                :for={{_, user} <- @streams.users}
+                :for={user <- @user_list}
                 id={"admin-user-card-#{user.id}"}
                 clickable
                 phx-click={
@@ -763,6 +765,7 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
      |> assign(:show_reject_form, false)
      |> assign(:meta, nil)
+     |> assign(:user_list, [])
      |> stream(:users, [], reset: true)}
   end
 
@@ -785,6 +788,7 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:form, to_form(%{}, as: "csv_export"))
      |> assign(:user_edit_form, nil)
      |> assign(:meta, nil)
+     |> assign(:user_list, [])
      |> stream(:users, [], reset: true)}
   end
 
@@ -835,6 +839,7 @@ defmodule YscWeb.AdminUsersLive do
              |> assign(:empty, no_results?(users))
              |> assign(:params, params)
              |> assign(:focus_search_input, nil)
+             |> assign(:user_list, users)
              |> stream(:users, users, reset: true)}
 
           {:error, _meta} ->

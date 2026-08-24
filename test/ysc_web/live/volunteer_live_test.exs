@@ -1,8 +1,12 @@
 defmodule YscWeb.VolunteerLiveTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+
+  alias Ysc.Forms.Volunteer
+  alias Ysc.Repo
 
   describe "mount/3 - unauthenticated" do
     test "loads volunteer page successfully", %{conn: conn} do
@@ -388,6 +392,32 @@ defmodule YscWeb.VolunteerLiveTest do
 
       assert html =~ "Välkommen"
       assert html =~ "board members will reach out"
+    end
+
+    test "binds the volunteer signup to the session user, not a client user_id",
+         %{conn: conn} do
+      attacker = user_fixture()
+      victim = user_fixture()
+      conn = log_in_user(conn, attacker)
+
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+
+      render_submit(view, "save", %{
+        "volunteer" => %{
+          "name" => "#{attacker.first_name} #{attacker.last_name}",
+          "email" => attacker.email,
+          "interest_events" => "true",
+          "user_id" => victim.id
+        }
+      })
+
+      volunteer =
+        Repo.one!(
+          from v in Volunteer, order_by: [desc: v.inserted_at], limit: 1
+        )
+
+      assert volunteer.user_id == attacker.id
+      refute volunteer.user_id == victim.id
     end
 
     test "validate event updates form on change", %{conn: conn} do

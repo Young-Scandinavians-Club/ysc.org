@@ -13,6 +13,11 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
   # rate applied to every mileage expense item going forward.
   @mileage_rate Money.new(:USD, "0.30")
 
+  # Per-line cap so a receipt-free mileage item cannot create an arbitrarily
+  # large QuickBooks bill on submit. 10,000 miles is well above any realistic
+  # club trip and still leaves room for a cross-country drive.
+  @max_miles_driven 10_000
+
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
   @timestamps_opts [type: :utc_datetime]
@@ -41,6 +46,11 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
   The reimbursement rate applied to mileage expense items.
   """
   def mileage_rate, do: @mileage_rate
+
+  @doc """
+  Maximum miles allowed on a single mileage expense line.
+  """
+  def max_miles_driven, do: @max_miles_driven
 
   @doc """
   Creates a changeset for an expense report item.
@@ -101,7 +111,10 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
     if get_field(changeset, :expense_type) == "mileage" do
       changeset
       |> validate_required([:miles_driven, :mileage_from_to])
-      |> validate_number(:miles_driven, greater_than: 0)
+      |> validate_number(:miles_driven,
+        greater_than: 0,
+        less_than_or_equal_to: @max_miles_driven
+      )
       |> validate_length(:mileage_from_to, max: 255)
     else
       changeset

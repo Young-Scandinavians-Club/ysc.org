@@ -390,8 +390,13 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "2"
     end
 
-    test "skips hidden steps so remaining items stay sequential" do
-      assigns = %{show_first?: false}
+    test "skips hidden steps so remaining items stay sequential", context do
+      # Read show_first? out of the (dynamically typed) test context instead of
+      # assigning the `false` literal directly: the compiler's set-theoretic
+      # type checker narrows a literal to the singleton type `false` and then
+      # flags the slot's `:if={@show_first?}` branch as unreachable dead code.
+      show_first? = Map.get(context, :show_first?, false)
+      assigns = %{show_first?: show_first?}
 
       html =
         rendered_to_string(~H"""

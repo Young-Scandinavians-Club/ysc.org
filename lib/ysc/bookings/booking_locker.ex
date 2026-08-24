@@ -2122,17 +2122,12 @@ defmodule Ysc.Bookings.BookingLocker do
   - `{:error, reason}` on failure
   """
   def release_hold(booking_id) do
-    require Ysc.Logging
-
     Repo.transaction(fn ->
       booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
 
       if booking.status != :hold do
         Repo.rollback({:error, :invalid_status})
       end
-
-      # Cancel PaymentIntent in Stripe if it exists (search by metadata)
-      cancel_booking_payment_intent(booking)
 
       case booking.booking_mode do
         :buyout ->
@@ -2206,7 +2201,7 @@ defmodule Ysc.Bookings.BookingLocker do
           Repo.rollback({:error, changeset})
       end
     end)
-    |> invalidate_availability_cache()
+    |> finish_hold_release()
   end
 
   @doc """
@@ -2215,16 +2210,12 @@ defmodule Ysc.Bookings.BookingLocker do
   Like `release_hold/1`, but leaves the booking in draft instead of canceled.
   """
   def revert_hold_to_draft(booking_id) do
-    require Ysc.Logging
-
     Repo.transaction(fn ->
       booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
 
       if booking.status != :hold do
         Repo.rollback({:error, :invalid_status})
       end
-
-      cancel_booking_payment_intent(booking)
 
       case booking.booking_mode do
         :buyout ->
@@ -2293,89 +2284,7 @@ defmodule Ysc.Bookings.BookingLocker do
           Repo.rollback({:error, changeset})
       end
     end)
-    |> invalidate_availability_cache()
-  end
-
-  defp stripe_payment_intent_module do
-    Application.get_env(
-      :ysc,
-      :stripe_payment_intent_module,
-      Stripe.PaymentIntent
-    )
-  end
-
-  # Helper function to cancel PaymentIntent for a booking by searching Stripe metadata
-  # Note: This searches recent PaymentIntents since bookings don't store payment_intent_id.
-  # For better performance, consider storing payment_intent_id in the booking schema.
-  defp cancel_booking_payment_intent(booking) do
-    require Ysc.Logging
-
-    # Search for recent PaymentIntents (last 100) with this booking_id in metadata
-    # Since bookings expire after 30 minutes, we only need to check recent PaymentIntents
-    case stripe_payment_intent_module().list(%{
-           limit: 100,
-           expand: ["data.metadata"]
-         }) do
-      {:ok, %{data: payment_intents}} ->
-        # Find PaymentIntent with matching booking_id in metadata
-        matching_intent =
-          Enum.find(payment_intents, fn pi ->
-            case pi.metadata do
-              %{"booking_id" => booking_id} when is_binary(booking_id) ->
-                booking_id == booking.id
-
-              _ ->
-                false
-            end
-          end)
-
-        if matching_intent do
-          # Only cancel if it's still in a cancelable state
-          cancelable_statuses = [
-            "requires_payment_method",
-            "requires_confirmation",
-            "requires_action"
-          ]
-
-          if matching_intent.status in cancelable_statuses do
-            case Ysc.Tickets.StripeService.cancel_payment_intent(
-                   matching_intent.id
-                 ) do
-              :ok ->
-                Ysc.Logging.info("Canceled PaymentIntent for expired booking",
-                  booking_id: booking.id,
-                  payment_intent_id: matching_intent.id
-                )
-
-              {:error, reason} ->
-                Ysc.Logging.warning(
-                  "Failed to cancel PaymentIntent for expired booking (continuing anyway)",
-                  booking_id: booking.id,
-                  payment_intent_id: matching_intent.id,
-                  error: reason
-                )
-            end
-          else
-            Ysc.Logging.debug("PaymentIntent already in non-cancelable state",
-              booking_id: booking.id,
-              payment_intent_id: matching_intent.id,
-              status: matching_intent.status
-            )
-          end
-        else
-          Ysc.Logging.debug(
-            "No PaymentIntent found for expired booking (may have been canceled already)",
-            booking_id: booking.id
-          )
-        end
-
-      {:error, error} ->
-        Ysc.Logging.warning(
-          "Failed to search for PaymentIntent for expired booking (continuing anyway)",
-          booking_id: booking.id,
-          error: inspect(error)
-        )
-    end
+    |> finish_hold_release()
   end
 
   @doc """
@@ -3997,6 +3906,43 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   ## Private Functions
+
+  # Cancel the stored checkout PaymentIntent after inventory is released.
+  # Stripe is kept out of the DB transaction so hold expiry / sibling-hold
+  # cleanup does not hold inventory locks on a list-of-100 Stripe round trip.
+  defp finish_hold_release(result) do
+    result = invalidate_availability_cache(result)
+
+    case result do
+      {:ok, booking} ->
+        cancel_stored_booking_payment_intent(booking)
+        {:ok, booking}
+
+      other ->
+        other
+    end
+  end
+
+  defp cancel_stored_booking_payment_intent(%Booking{
+         payment_intent_id: payment_intent_id
+       })
+       when is_binary(payment_intent_id) and payment_intent_id != "" do
+    case Ysc.Tickets.StripeService.cancel_payment_intent(payment_intent_id) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Failed to cancel PaymentIntent for released hold (continuing anyway)",
+          payment_intent_id: payment_intent_id,
+          error: inspect(reason)
+        )
+
+        :ok
+    end
+  end
+
+  defp cancel_stored_booking_payment_intent(_booking), do: :ok
 
   defp invalidate_availability_cache({:ok, _} = result) do
     Ysc.Bookings.AvailabilityCache.invalidate()

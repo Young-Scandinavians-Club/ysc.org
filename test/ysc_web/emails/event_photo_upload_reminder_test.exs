@@ -37,4 +37,20 @@ defmodule YscWeb.Emails.EventPhotoUploadReminderTest do
     assert data.first_name == "Alex"
     assert data.event_title == event.title
   end
+
+  test "prepare_shared_email_data omits first_name", %{
+    event: event,
+    recipient: recipient,
+    upload_url: upload_url
+  } do
+    shared =
+      EventPhotoUploadReminder.prepare_shared_email_data(event, upload_url)
+
+    refute Map.has_key?(shared, :first_name)
+
+    data =
+      EventPhotoUploadReminder.prepare_email_data(event, recipient, upload_url)
+
+    assert data == Map.put(shared, :first_name, "Alex")
+  end
 end

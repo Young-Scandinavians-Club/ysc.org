@@ -2239,6 +2239,29 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert {:ok, _} = Sync.sync_payout(payout)
     end
 
+    test "rejects a negative payout amount without creating a deposit", %{
+      user: _user
+    } do
+      # Stripe sends payout.paid with a negative amount when it debits our
+      # bank account to cover a negative Stripe balance - that's a
+      # withdrawal, not a deposit, and must not be synced automatically.
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          arrival_date: ~N[2024-01-15 12:00:00],
+          amount: Money.new(-68_145, :USD),
+          stripe_payout_id: "po_negative_amount",
+          currency: "USD",
+          status: "paid",
+          fee_total: nil
+        })
+
+      payout = Repo.preload(payout, [:payments, :refunds])
+
+      deny(ClientMock, :create_deposit, 2)
+
+      assert {:error, :negative_payout_amount} = Sync.sync_payout(payout)
+    end
+
     test "passes idempotency key with length at most 255 to create_deposit", %{
       user: _user
     } do

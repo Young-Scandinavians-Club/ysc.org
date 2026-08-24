@@ -289,5 +289,35 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
       assert {:error, "QuickBooks API unavailable"} =
                QuickbooksSyncPayoutWorker.perform(job)
     end
+
+    test "returns discard for a negative payout amount" do
+      # Stripe sends payout.paid with a negative amount when it debits our
+      # bank account to cover a negative Stripe balance - a QuickBooks
+      # Deposit can't represent a withdrawal, so this must not retry.
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(-68_145, :USD),
+          stripe_payout_id: "po_negative",
+          description: "Withdrawal to cover a negative balance",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      deny(Ysc.Quickbooks.ClientMock, :create_deposit, 2)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"payout_id" => payout.id},
+        worker: "YscWeb.Workers.QuickbooksSyncPayoutWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert {:discard, :negative_payout_amount} =
+               QuickbooksSyncPayoutWorker.perform(job)
+    end
   end
 end

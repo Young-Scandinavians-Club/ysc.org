@@ -699,6 +699,7 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     with :ok <- verify_all_transactions_synced(payout),
+         :ok <- verify_payout_amount_syncable(payout),
          {:ok, deposit} <- create_payout_deposit(payout) do
       deposit_id = Map.get(deposit, "Id")
 
@@ -3344,6 +3345,25 @@ defmodule Ysc.Quickbooks.Sync do
       )
 
       {:error, :transactions_not_fully_synced}
+    end
+  end
+
+  # A QuickBooks Deposit represents money arriving in a bank account. Stripe
+  # sometimes sends payout.paid with a negative amount when it debits our
+  # bank account to cover a negative Stripe balance - that's a withdrawal,
+  # not a deposit, and create_payout_deposit/1 has no correct way to
+  # represent it as one. Bail out here rather than sending QuickBooks a
+  # Deposit with a negative TotalAmt; a human needs to book this manually.
+  defp verify_payout_amount_syncable(%Payout{amount: amount}) do
+    if Money.negative?(amount) do
+      Ysc.Logging.warning(
+        "[QB Sync] Cannot sync payout - amount is negative, needs manual QuickBooks entry",
+        amount: Money.to_string!(amount)
+      )
+
+      {:error, :negative_payout_amount}
+    else
+      :ok
     end
   end
 

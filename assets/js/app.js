@@ -297,6 +297,40 @@ if (document.fonts?.ready) {
 // connect if there are any LiveViews on the page
 liveSocket.connect();
 
+// Mobile browsers suspend JS timers (including the LiveView heartbeat) while a tab
+// or app is backgrounded, which can leave the socket stuck in a stale state that
+// the default heartbeat/backoff timers never recover from on their own.
+//
+// Gating the forced reconnect on `liveSocket.isConnected()` (as this used to do,
+// and as Phoenix's own built-in visibilitychange handler in phoenix.js still
+// does) doesn't work here: isConnected() just reflects the raw WebSocket's
+// readyState, and on iOS Safari and several Android browsers that readyState
+// keeps reporting "open" for a connection that's actually dead, because the
+// close/error event is never delivered while the tab is suspended in the
+// background. That's why the banner could still hang forever after this
+// "fix" shipped in #1104 — the condition guarding the reconnect was exactly
+// the signal that's unreliable in this scenario.
+//
+// Instead, track how long the page was hidden and force a fresh teardown +
+// reconnect unconditionally once we've been hidden long enough for the
+// connection to plausibly have gone stale, regardless of what isConnected()
+// reports. Reconnecting when the socket was actually still healthy just
+// causes a quick, harmless rejoin.
+const STALE_AFTER_HIDDEN_MS = 3000;
+let hiddenAt = null;
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+    }
+
+    if (hiddenAt !== null && Date.now() - hiddenAt > STALE_AFTER_HIDDEN_MS) {
+        liveSocket.disconnect(() => liveSocket.connect());
+    }
+    hiddenAt = null;
+});
+
 // Handle map toggle text updates
 window.addEventListener("phx:toggle-map-text", () => {
     const buttonText = document.getElementById("map-button-text");

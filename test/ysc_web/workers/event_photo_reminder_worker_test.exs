@@ -162,6 +162,43 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
                idempotency_key: idempotency_key
              )
     end
+
+    test "schedules mailer jobs for multiple attendees", %{
+      event: event,
+      collection: collection
+    } do
+      buyer_a = user_fixture()
+      buyer_b = user_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      for buyer <- [buyer_a, buyer_b] do
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: buyer.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+      end
+
+      assert :ok = EventPhotoReminderWorker.send_reminders(event, collection)
+
+      updated = Repo.get!(EventPhotos.Collection, collection.id)
+      assert updated.reminder_recipient_count == 2
+
+      for buyer <- [buyer_a, buyer_b] do
+        idempotency_key =
+          "event_photo_reminder_#{event.id}_#{String.downcase(buyer.email)}"
+
+        assert Repo.get_by(Ysc.Messages.MessageIdempotency,
+                 idempotency_key: idempotency_key
+               )
+      end
+    end
   end
 
   describe "schedule_reminder/1" do

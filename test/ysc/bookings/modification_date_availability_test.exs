@@ -10,6 +10,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
   alias Ysc.Bookings.{
     Booking,
     BookingLocker,
+    BookingValidator,
     ModificationDateAvailability,
     RoomCategory,
     Season
@@ -948,7 +949,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     monday = Date.add(saturday, 2)
 
     assert tooltips[Date.to_iso8601(monday)] =~
-             "Saturday must check out on Sunday"
+             BookingValidator.saturday_checkin_one_night_message()
 
     refute Map.has_key?(tooltips, Date.to_iso8601(sunday))
   end

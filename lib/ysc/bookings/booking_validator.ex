@@ -28,6 +28,20 @@ defmodule Ysc.Bookings.BookingValidator do
   alias Ysc.Subscriptions
 
   @doc """
+  Copy shown when a Saturday check-in is not a one-night stay through Sunday.
+  """
+  def saturday_checkin_one_night_message do
+    "If you check in on Saturday, you must check out on Sunday (one-night stay only). For a longer stay, choose a different arrival day."
+  end
+
+  @doc """
+  Copy shown when a stay includes Saturday but not Sunday.
+  """
+  def saturday_requires_sunday_message do
+    "If your stay includes Saturday, it must also include Sunday."
+  end
+
+  @doc """
   Validates a booking changeset according to all business rules.
 
   ## Options
@@ -176,7 +190,7 @@ defmodule Ysc.Bookings.BookingValidator do
       Ecto.Changeset.add_error(
         changeset,
         :checkout_date,
-        "Check-ins on Saturday must check out on Sunday (one-night stay only)"
+        saturday_checkin_one_night_message()
       )
     end
   end
@@ -327,7 +341,7 @@ defmodule Ysc.Bookings.BookingValidator do
             Ecto.Changeset.add_error(
               changeset,
               :booking_mode,
-              "You cannot book a full buyout while you have an active or future reservation. Please complete or cancel your existing reservation first."
+              "You cannot book the entire cabin while you already have an active or upcoming booking. Finish or cancel that booking first."
             )
           else
             changeset
@@ -338,7 +352,7 @@ defmodule Ysc.Bookings.BookingValidator do
             Ecto.Changeset.add_error(
               changeset,
               :booking_mode,
-              "You cannot book rooms while you have an active or future full buyout reservation. Please complete or cancel your buyout first."
+              "You cannot book rooms while you already have the entire cabin booked. Finish or cancel that booking first."
             )
           else
             changeset
@@ -668,14 +682,14 @@ defmodule Ysc.Bookings.BookingValidator do
       Ecto.Changeset.add_error(
         changeset,
         :checkout_date,
-        "Bookings containing Saturday must also include Sunday (full weekend required)"
+        saturday_requires_sunday_message()
       )
     end
   end
 
   defp build_overlapping_booking_error_message(membership_type) do
     if membership_type in [:family, :lifetime] do
-      "Your family can only have 2 cabin bookings at the same time. You already have 2 reservations during these dates — cancel or complete one before booking again."
+      "Your family can only have 2 cabin bookings at the same time. You already have 2 bookings during these dates — cancel or complete one before booking again."
     else
       "You can only have one active booking at a time. Please complete your existing booking first."
     end
@@ -683,9 +697,9 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp build_room_limit_error_message(membership_type, max_rooms) do
     if membership_type in [:family, :lifetime] do
-      "Your family membership allows maximum #{max_rooms} room(s) in the same time period"
+      "Your family membership allows up to #{max_rooms} room(s) at the same time"
     else
-      "#{String.capitalize("#{membership_type}")} membership allows maximum #{max_rooms} room(s) in the same time period"
+      "#{String.capitalize("#{membership_type}")} membership allows up to #{max_rooms} room(s) at the same time"
     end
   end
 

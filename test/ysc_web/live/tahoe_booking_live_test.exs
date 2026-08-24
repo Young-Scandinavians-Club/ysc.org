@@ -148,6 +148,26 @@ defmodule YscWeb.TahoeBookingLiveTest do
       refute html =~ "NOT A HOTEL"
     end
 
+    test "booking rules tab explains both Saturday weekend rules", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      html = render_click(view, "switch-info-tab", %{"tab" => "rules"})
+
+      assert html =~ "Weekend Policy"
+      assert html =~ "If you arrive Saturday, stay only one night"
+
+      assert html =~
+               "Any stay that includes Saturday must also include Sunday"
+
+      refute html =~ "Saturday bookings must include Sunday"
+    end
+
     test "sets page title", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)

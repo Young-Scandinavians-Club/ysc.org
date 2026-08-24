@@ -1584,6 +1584,14 @@ defmodule Ysc.Ledgers do
 
   @doc """
   Creates double-entry ledger entries for a Stripe payout.
+
+  `payout_amount` is normally positive (money arriving in our bank account),
+  but Stripe also sends `payout.paid` with a negative amount when it debits
+  our bank account to cover a negative Stripe balance ("Withdrawal to cover
+  a negative balance"). `LedgerEntry` amounts must always be positive, so we
+  book the absolute value and flip debit/credit direction for a negative
+  payout: cash goes out (credit) and the Stripe receivable is increased
+  (debit) instead of reduced.
   """
   def create_payout_entries(attrs) do
     %{
@@ -1597,27 +1605,37 @@ defmodule Ysc.Ledgers do
     cash_account = get_account_by_name("cash")
     stripe_account = get_account_by_name("stripe_account")
 
-    # Entry 1: Debit Cash (Asset) - money coming into our bank account
+    entry_amount = Money.abs(payout_amount)
+
+    {cash_debit_credit, stripe_debit_credit, cash_description} =
+      if Money.negative?(payout_amount) do
+        {:credit, :debit, "Stripe payout withdrawal: #{description}"}
+      else
+        {:debit, :credit, "Stripe payout received: #{description}"}
+      end
+
+    # Entry 1: Cash (Asset) - money moving in/out of our bank account
     {:ok, cash_entry} =
       create_entry(%{
         account_id: cash_account.id,
         payment_id: payment.id,
-        amount: payout_amount,
-        debit_credit: :debit,
-        description: "Stripe payout received: #{description}",
+        amount: entry_amount,
+        debit_credit: cash_debit_credit,
+        description: cash_description,
         related_entity_type: :administration,
         related_entity_id: payment.id
       })
 
     entries = [cash_entry | entries]
 
-    # Entry 2: Credit Stripe Account (Asset) - reducing our receivable
+    # Entry 2: Stripe Account (Asset) - receivable reduced (normal payout) or
+    # increased (withdrawal covering a negative balance)
     {:ok, stripe_credit_entry} =
       create_entry(%{
         account_id: stripe_account.id,
         payment_id: payment.id,
-        amount: payout_amount,
-        debit_credit: :credit,
+        amount: entry_amount,
+        debit_credit: stripe_debit_credit,
         description: "Stripe payout processed: #{description}",
         related_entity_type: :administration,
         related_entity_id: payment.id

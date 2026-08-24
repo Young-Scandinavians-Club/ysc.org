@@ -316,8 +316,12 @@ defmodule YscWeb.BookingCheckoutLive do
     else
       case create_payment_intent(booking, total_price, user) do
         {:ok, payment_intent} ->
+          {booking, payment_intent} =
+            persist_checkout_payment_intent(booking, payment_intent)
+
           {:ok,
            assign(socket,
+             booking: booking,
              payment_intent: payment_intent,
              show_payment_form: true,
              stripe_payment_element_ready: false
@@ -1383,6 +1387,9 @@ defmodule YscWeb.BookingCheckoutLive do
                      user
                    ) do
                 {:ok, payment_intent} ->
+                  {booking, payment_intent} =
+                    persist_checkout_payment_intent(booking, payment_intent)
+
                   {:noreply,
                    socket
                    |> assign(
@@ -1882,6 +1889,23 @@ defmodule YscWeb.BookingCheckoutLive do
 
       _ ->
         {:error, :invalid_booking_mode}
+    end
+  end
+
+  defp persist_checkout_payment_intent(booking, payment_intent) do
+    case Bookings.attach_payment_intent(booking, payment_intent.id) do
+      {:ok, updated} ->
+        {updated, payment_intent}
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Failed to persist booking payment_intent_id",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        {booking, payment_intent}
     end
   end
 

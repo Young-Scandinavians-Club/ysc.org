@@ -820,6 +820,29 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Records the Stripe PaymentIntent created for a hold at checkout.
+
+  Used later to cancel that intent by id when the hold is released, instead of
+  listing recent PaymentIntents and scanning metadata.
+  """
+  def attach_payment_intent(%Booking{} = booking, payment_intent_id)
+      when is_binary(payment_intent_id) do
+    previous_id = booking.payment_intent_id
+
+    result =
+      booking
+      |> Booking.payment_changeset(%{payment_intent_id: payment_intent_id})
+      |> Repo.update()
+
+    if match?({:ok, _}, result) and is_binary(previous_id) and
+         previous_id != payment_intent_id do
+      Ysc.Tickets.StripeService.cancel_payment_intent(previous_id)
+    end
+
+    result
+  end
+
+  @doc """
   Returns the total amount paid for a booking across all recorded Stripe payments.
   """
   def get_booking_total_paid_amount(booking) do

@@ -4767,6 +4767,62 @@ defmodule Ysc.LedgersTest do
              )
     end
 
+    test "create_payout_entries/1 credits cash and debits stripe receivable for a negative payout",
+         %{user: user} do
+      # Stripe sends payout.paid with a negative amount when it debits our
+      # bank account to cover a negative Stripe balance.
+      payment =
+        insert_payment_for_entries(
+          user,
+          "pi_negative_payout_entries_#{System.unique_integer([:positive])}"
+        )
+
+      cash = Ledgers.get_account_by_name("cash")
+      stripe = Ledgers.get_account_by_name("stripe_account")
+
+      assert {:ok, entries} =
+               Repo.transaction(fn ->
+                 Ledgers.create_payout_entries(%{
+                   payment: payment,
+                   payout_amount: Money.new(-8_000, :USD),
+                   description: "Withdrawal to cover a negative balance"
+                 })
+               end)
+
+      assert length(entries) == 2
+      assert Enum.all?(entries, &(&1.amount == Money.new(8_000, :USD)))
+
+      assert Enum.any?(
+               entries,
+               &(&1.account_id == cash.id and &1.debit_credit == :credit)
+             )
+
+      assert Enum.any?(
+               entries,
+               &(&1.account_id == stripe.id and &1.debit_credit == :debit)
+             )
+    end
+
+    test "process_stripe_payout/1 processes a negative payout amount without raising",
+         %{user: _user} do
+      assert {:ok, {payout_payment, _transaction, entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(-68_145, :USD),
+                 stripe_payout_id:
+                   "po_negative_#{System.unique_integer([:positive])}",
+                 description: "Withdrawal to cover a negative balance",
+                 currency: "usd",
+                 status: "paid",
+                 arrival_date: DateTime.utc_now(),
+                 metadata: %{}
+               })
+
+      assert payout_payment.amount == Money.new(-68_145, :USD)
+      assert payout.amount == Money.new(-68_145, :USD)
+      assert length(entries) == 2
+      assert Enum.all?(entries, &(&1.amount == Money.new(68_145, :USD)))
+    end
+
     test "create_credit_entries/1 uses administration when entity fields are nil",
          %{
            user: user

@@ -35,6 +35,8 @@ RUN chmod +x etc/scripts/install_hex.sh && \
 # Install mix dependencies
 # Cache mounts avoid re-downloading deps on every build (host-local cache, not in image)
 COPY mix.exs mix.lock ./
+# Path deps (currently vendor/blurhash) must exist before mix deps.get / deps.compile
+COPY vendor vendor
 RUN --mount=type=cache,target=/root/.hex \
     --mount=type=cache,target=/root/.mix \
     mix deps.get --only prod
