@@ -362,7 +362,7 @@ defmodule YscWeb.BookingReceiptLive do
               if(@booking.status == :canceled, do: "opacity-50 grayscale")
             ]}>
               <img
-                src={get_property_thumbnail(@booking.property)}
+                src={PropertyDisplay.thumbnail_path(@booking.property)}
                 alt={PropertyDisplay.full_name(@booking.property)}
                 class="w-full h-full object-cover"
               />
@@ -2573,14 +2573,6 @@ defmodule YscWeb.BookingReceiptLive do
 
       {:error, _} ->
         stripe_fallback
-    end
-  end
-
-  defp get_property_thumbnail(property) do
-    case property do
-      :tahoe -> ~p"/images/tahoe/tahoe_cabin_main.webp"
-      :clear_lake -> ~p"/images/clear_lake/clear_lake_dock.webp"
-      _ -> ~p"/images/ysc_logo.webp"
     end
   end
 

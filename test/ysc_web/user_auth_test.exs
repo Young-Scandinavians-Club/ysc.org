@@ -1062,6 +1062,28 @@ defmodule YscWeb.UserAuthTest do
       assert UserAuth.get_membership_plan_display_name(subscription) ==
                "Active Membership"
     end
+
+    test "returns formatted plan name from a Subscription with a matching price" do
+      family_price_id =
+        :ysc
+        |> Application.get_env(:membership_plans, [])
+        |> Enum.find_value(fn
+          %{id: :family, stripe_price_id: id} -> id
+          _ -> nil
+        end)
+
+      subscription = %Ysc.Subscriptions.Subscription{
+        stripe_id: "sub_test_family",
+        subscription_items: [
+          %Ysc.Subscriptions.SubscriptionItem{
+            stripe_price_id: family_price_id
+          }
+        ]
+      }
+
+      assert UserAuth.get_membership_plan_display_name(subscription) ==
+               "Family Membership"
+    end
   end
 
   describe "get_membership_type_display_string/1" do

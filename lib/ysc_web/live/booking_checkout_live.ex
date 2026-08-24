@@ -2,13 +2,22 @@ defmodule YscWeb.BookingCheckoutLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, BookingLocker, Entitlements, SeasonCache}
+
+  alias Ysc.Bookings.{
+    Booking,
+    BookingLocker,
+    Entitlements,
+    PropertyDisplay,
+    SeasonCache
+  }
+
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Stripe.PaymentIntentHelpers
   alias YscWeb.BookingGuestForm
   alias YscWeb.BookingUserMessages
   import Ecto.Query
+  import Ysc.Text, only: [titleize: 1]
   import YscWeb.Components.BookingGuestInfoForm
   require Ysc.Logging
 
@@ -386,14 +395,14 @@ defmodule YscWeb.BookingCheckoutLive do
           <div class="flex items-center gap-6 p-6 bg-zinc-50 rounded-lg border border-zinc-200">
             <div class="h-20 w-20 bg-zinc-200 rounded-lg overflow-hidden flex-shrink-0">
               <img
-                src={get_property_thumbnail(@booking.property)}
-                alt={atom_to_readable(@booking.property) <> " Cabin"}
+                src={PropertyDisplay.thumbnail_path(@booking.property)}
+                alt={titleize(@booking.property) <> " Cabin"}
                 class="object-cover h-full w-full"
               />
             </div>
             <div class="flex-1">
               <h2 class="text-2xl font-bold text-zinc-900">
-                {atom_to_readable(@booking.property)} Cabin
+                {titleize(@booking.property)} Cabin
               </h2>
               <p class="text-zinc-500 mt-1">
                 {format_date_short(@booking.checkin_date, @timezone)} — {format_date_short(
@@ -2501,14 +2510,6 @@ defmodule YscWeb.BookingCheckoutLive do
     end
   end
 
-  defp get_property_thumbnail(property) do
-    case property do
-      :tahoe -> ~p"/images/tahoe/tahoe_cabin_main.webp"
-      :clear_lake -> ~p"/images/clear_lake/clear_lake_dock.webp"
-      _ -> ~p"/images/ysc_logo.webp"
-    end
-  end
-
   defp render_price_breakdown_sidebar(assigns) do
     ~H"""
     <%= if @booking.booking_mode == :room do %>
@@ -2804,21 +2805,6 @@ defmodule YscWeb.BookingCheckoutLive do
         true
     end
   end
-
-  defp atom_to_readable(atom) when is_binary(atom) do
-    atom
-    |> String.split("_")
-    |> Enum.map_join(" ", &String.capitalize/1)
-  end
-
-  defp atom_to_readable(atom) when is_atom(atom) do
-    atom
-    |> Atom.to_string()
-    |> String.split("_")
-    |> Enum.map_join(" ", &String.capitalize/1)
-  end
-
-  defp atom_to_readable(_), do: "—"
 
   ## Guest Information Helpers
 
