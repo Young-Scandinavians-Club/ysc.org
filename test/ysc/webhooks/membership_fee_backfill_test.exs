@@ -69,6 +69,9 @@ defmodule Ysc.Webhooks.MembershipFeeBackfillTest do
       Req.Test.stub(ReqStub, fn conn ->
         cond do
           conn.request_path == invoice_path ->
+            conn = Plug.Conn.fetch_query_params(conn)
+            assert Map.values(conn.query_params["expand"]) == ["payments"]
+
             Req.Test.json(conn, %{
               "id" => invoice_id,
               "object" => "invoice",
