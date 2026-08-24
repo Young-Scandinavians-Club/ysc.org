@@ -40,15 +40,49 @@ defmodule Ysc.Stripe.InvoiceHelpers do
   defp charge_id_from_payments(invoice) do
     case payment_intent_id(invoice) do
       pi_id when is_binary(pi_id) ->
+        charge_id_from_payment_intent(pi_id)
+
+      _ ->
+        charge_id_from_refetched_invoice(invoice)
+    end
+  end
+
+  # Webhook payloads carry `payments: null` - Stripe only populates an
+  # invoice's `payments` collection when explicitly expanded on a live API
+  # call, never on the webhook-delivered object. So for any invoice that
+  # reached here without a local payment intent id, re-fetch it live before
+  # giving up; this is the only way webhook-driven invoices ever resolve a
+  # charge (and therefore a Stripe fee) on newer API versions.
+  defp charge_id_from_refetched_invoice(invoice) do
+    case field(invoice, :id) do
+      invoice_id when is_binary(invoice_id) ->
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.PaymentIntent.retrieve(pi_id)
+               Stripe.Invoice.retrieve(invoice_id, %{expand: ["payments"]})
              end) do
-          {:ok, payment_intent} ->
-            Ysc.Stripe.PaymentIntentHelpers.charge_id(payment_intent)
+          {:ok, refetched_invoice} ->
+            case payment_intent_id(refetched_invoice) do
+              pi_id when is_binary(pi_id) ->
+                charge_id_from_payment_intent(pi_id)
+
+              _ ->
+                nil
+            end
 
           _ ->
             nil
         end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp charge_id_from_payment_intent(pi_id) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.PaymentIntent.retrieve(pi_id)
+         end) do
+      {:ok, payment_intent} ->
+        Ysc.Stripe.PaymentIntentHelpers.charge_id(payment_intent)
 
       _ ->
         nil
