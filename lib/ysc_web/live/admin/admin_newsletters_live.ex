@@ -34,6 +34,8 @@ defmodule YscWeb.AdminNewslettersLive do
       |> assign(:creator_filter, [])
       |> assign(:editors_by_edition, editors_by_edition)
       |> assign(:editions_by_id, %{})
+      |> assign(:edition_list, [])
+      |> assign(:subscriber_list, [])
       |> assign(:empty, false)
       |> assign(:meta, nil)
       |> assign(:params, %{})
@@ -91,6 +93,7 @@ defmodule YscWeb.AdminNewslettersLive do
             subscriber_params = build_subscriber_flop_params(params)
 
             socket
+            |> assign(:subscriber_list, [])
             |> stream(:subscribers, [], reset: true)
             |> start_async(:load_subscribers, fn ->
               Newsletter.list_paginated_subscribers(subscriber_params)
@@ -108,6 +111,7 @@ defmodule YscWeb.AdminNewslettersLive do
             date_to = Map.get(params, "date_to", "")
 
             socket
+            |> assign(:edition_list, [])
             |> stream(:editions, [], reset: true)
             |> start_async(:load_editions, fn ->
               Newsletter.list_paginated_editions(params,
@@ -163,6 +167,7 @@ defmodule YscWeb.AdminNewslettersLive do
      |> assign(:search_query, search_query)
      |> assign(:creator_filter, Newsletter.get_all_creators())
      |> assign(:editions_by_id, Map.new(editions, &{&1.id, &1}))
+     |> assign(:edition_list, editions)
      |> stream(:editions, editions, reset: true)}
   end
 
@@ -181,6 +186,7 @@ defmodule YscWeb.AdminNewslettersLive do
     {:noreply,
      socket
      |> assign(:sub_meta, meta)
+     |> assign(:subscriber_list, subscribers)
      |> stream(:subscribers, subscribers, reset: true)}
   end
 
@@ -189,6 +195,7 @@ defmodule YscWeb.AdminNewslettersLive do
     {:noreply,
      socket
      |> assign(:sub_meta, meta)
+     |> assign(:subscriber_list, [])
      |> stream(:subscribers, [], reset: true)}
   end
 
@@ -257,7 +264,18 @@ defmodule YscWeb.AdminNewslettersLive do
       :editions_by_id,
       Map.put(socket.assigns.editions_by_id, edition.id, edition)
     )
+    |> assign(
+      :edition_list,
+      upsert_list_item(socket.assigns.edition_list, edition)
+    )
     |> stream_insert(:editions, edition)
+  end
+
+  defp upsert_list_item(items, item) do
+    case Enum.find_index(items, &(&1.id == item.id)) do
+      nil -> [item | items]
+      index -> List.replace_at(items, index, item)
+    end
   end
 
   defp allowed_tab("subscribers"), do: "subscribers"
@@ -435,9 +453,11 @@ defmodule YscWeb.AdminNewslettersLive do
 
           <div :if={@meta} class="space-y-6">
             <%!-- Mobile Card View --%>
+            <%!-- Cards use edition_list, not @streams.editions. Flop.Phoenix.table
+                 consumes that stream, so stream diffs never update card DOM. --%>
             <.admin_mobile_list id="admin-newsletters-mobile">
               <.admin_mobile_list_card
-                :for={{_, edition} <- @streams.editions}
+                :for={edition <- @edition_list}
                 id={"admin-newsletter-card-#{edition.id}"}
               >
                 <.link
@@ -711,9 +731,11 @@ defmodule YscWeb.AdminNewslettersLive do
 
           <div :if={!subscribers_loading?(@sub_meta)}>
             <%!-- Mobile card view --%>
+            <%!-- Cards use subscriber_list, not @streams.subscribers. Flop.Phoenix.table
+                 consumes that stream, so stream diffs never update card DOM. --%>
             <.admin_mobile_list id="admin-subscribers-mobile">
               <.admin_mobile_list_card
-                :for={{_, subscriber} <- @streams.subscribers}
+                :for={subscriber <- @subscriber_list}
                 id={"admin-subscriber-card-#{subscriber.id}"}
                 interactive={false}
               >
@@ -1296,6 +1318,10 @@ defmodule YscWeb.AdminNewslettersLive do
          |> assign(
            :editions_by_id,
            Map.delete(socket.assigns.editions_by_id, edition.id)
+         )
+         |> assign(
+           :edition_list,
+           Enum.reject(socket.assigns.edition_list, &(&1.id == edition.id))
          )
          |> stream_delete(:editions, edition)
          |> YscWeb.Flash.put_toast(:info, "Newsletter deleted.",

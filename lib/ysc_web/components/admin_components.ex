@@ -1887,7 +1887,7 @@ defmodule YscWeb.AdminComponents do
 
       <.admin_mobile_list id="admin-posts-mobile">
         <.admin_mobile_list_card
-          :for={{_, post} <- @streams.posts}
+          :for={post <- @post_list}
           id={"admin-post-card-\#{post.id}"}
           clickable
           phx-click={JS.navigate(~p"/admin/posts/\#{post.id}")}
