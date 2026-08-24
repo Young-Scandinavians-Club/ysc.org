@@ -53,6 +53,10 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
       {:error, :not_stubbed}
     end)
 
+    stub(StripeMock, :cancel_payment_intent, fn id, _opts ->
+      {:ok, %Stripe.PaymentIntent{id: id, status: "canceled"}}
+    end)
+
     stub(Stripe.PaymentIntentMock, :list, fn _params ->
       {:ok,
        %Stripe.List{
