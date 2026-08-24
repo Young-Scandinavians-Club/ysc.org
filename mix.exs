@@ -184,7 +184,9 @@ defmodule Ysc.MixProject do
       # and invalid element/attribute names; fixed in xml_builder 2.4.1+. atomex
       # still lists ~> 2.1, so pin the patched floor (used for Atom feeds).
       {:xml_builder, "~> 2.4.1", override: true},
-      {:blurhash, "~> 2.0"},
+      # Vendored to fix a Range.new/2 deprecation warning upstream hasn't
+      # released a fix for — see vendor/blurhash/README.md.
+      {:blurhash, path: "vendor/blurhash"},
       {:brotli, ">= 0.0.0", runtime: false},
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
