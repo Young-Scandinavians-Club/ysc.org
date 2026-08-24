@@ -1,8 +1,12 @@
 defmodule YscWeb.ContactLiveTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+
+  alias Ysc.Forms.ContactForm
+  alias Ysc.Repo
 
   describe "mount/3 - unauthenticated" do
     test "loads contact page successfully", %{conn: conn} do
@@ -211,6 +215,33 @@ defmodule YscWeb.ContactLiveTest do
       |> render_submit()
 
       assert render(view) =~ "Thank you! Your message has been sent"
+    end
+
+    test "binds the submitted contact form to the session user, not a client user_id",
+         %{conn: conn} do
+      attacker = user_fixture()
+      victim = user_fixture()
+      conn = log_in_user(conn, attacker)
+
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      render_submit(view, "save", %{
+        "contact_form" => %{
+          "subject" => "General Inquiry",
+          "message" => "Hello from LiveView test message body.",
+          "user_id" => victim.id
+        }
+      })
+
+      assert render(view) =~ "Thank you! Your message has been sent"
+
+      form =
+        Repo.one!(
+          from c in ContactForm, order_by: [desc: c.inserted_at], limit: 1
+        )
+
+      assert form.user_id == attacker.id
+      refute form.user_id == victim.id
     end
 
     test "keeps form visible when validation fails for logged-in user", %{

@@ -82,7 +82,6 @@ defmodule Ysc.Posts.Post do
   @editor_fields [
     :title,
     :url_name,
-    :rendered_body,
     :raw_body,
     :image_id,
     :preview_text
@@ -97,6 +96,7 @@ defmodule Ysc.Posts.Post do
   def editor_changeset(post, attrs, opts \\ []) do
     post
     |> cast(attrs, @editor_fields)
+    |> put_rendered_body_from_raw()
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
     |> foreign_key_constraint(:image_id)
@@ -158,6 +158,25 @@ defmodule Ysc.Posts.Post do
       |> unique_constraint(:url_name)
     else
       changeset
+    end
+  end
+
+  # `rendered_body` is derived from `raw_body` so clients cannot persist
+  # unsanitized HTML by omitting raw_body or forging rendered_body.
+  defp put_rendered_body_from_raw(changeset) do
+    case get_change(changeset, :raw_body) do
+      raw when is_binary(raw) ->
+        put_change(
+          changeset,
+          :rendered_body,
+          HtmlSanitizeEx.Scrubber.scrub(
+            raw,
+            HtmlSanitizeEx.Scrubber.BasicHTML
+          )
+        )
+
+      _ ->
+        changeset
     end
   end
 end

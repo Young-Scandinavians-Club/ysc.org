@@ -2273,6 +2273,34 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute has_element?(view, "#attendees-modal", host.email)
     end
 
+    test "Who's Going preview hides emails for attendees without a name", %{
+      conn: conn
+    } do
+      viewer = user_with_membership(:lifetime)
+      conn = log_in_user(conn, viewer)
+
+      nameless =
+        user_with_membership(:lifetime, %{
+          first_name: "Temp",
+          last_name: "Name",
+          email:
+            "preview-nameless-#{System.unique_integer([:positive])}@ysc.test"
+        })
+        |> Ecto.Changeset.change(%{first_name: nil, last_name: nil})
+        |> Repo.update!()
+
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+      confirmed_ticket(event, tier, nameless)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert has_element?(view, "#attendees-list", "Member")
+      refute has_element?(view, "#attendees-list", nameless.email)
+    end
+
     test "Who's Going modal still shows ticket count for hosts who bought tickets",
          %{conn: conn} do
       viewer = user_with_membership(:lifetime)
