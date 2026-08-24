@@ -642,15 +642,7 @@ defmodule Ysc.Accounts.VerificationCodesTest do
       assert :ok = VerificationCodes.store(user, :email, "123456")
       assert :ok = VerificationCodes.store(user, :phone, "654321")
 
-      limit =
-        Application.get_env(:ysc, Ysc.EmailVerificationRateLimit, [])[
-          :attempt_limit_per_minute
-        ] || 12
-
-      for _ <- 1..limit do
-        assert {:error, :invalid_code} =
-                 VerificationCodes.verify(user, :email, "000001")
-      end
+      exhaust_verify_attempts(user, :email)
 
       assert {:error, :rate_limited} =
                VerificationCodes.verify(user, :email, "123456")
@@ -665,15 +657,7 @@ defmodule Ysc.Accounts.VerificationCodesTest do
     } do
       VerificationCodes.store(user, :email, "123456")
 
-      limit =
-        Application.get_env(:ysc, Ysc.EmailVerificationRateLimit, [])[
-          :attempt_limit_per_minute
-        ] || 12
-
-      for _ <- 1..limit do
-        assert {:error, :invalid_code} =
-                 VerificationCodes.verify(user, :email, "000001")
-      end
+      exhaust_verify_attempts(user, :email)
 
       assert {:error, :rate_limited} =
                VerificationCodes.verify(user, :email, "123456")
@@ -696,16 +680,7 @@ defmodule Ysc.Accounts.VerificationCodesTest do
     test "verifies without counting toward attempt rate limit", %{user: user} do
       assert :ok = VerificationCodes.store(user, :email, "123456")
 
-      limit =
-        Application.get_env(:ysc, Ysc.EmailVerificationRateLimit, [])[
-          :attempt_limit_per_minute
-        ] || 12
-
-      # Exhaust rate limit via verify/3
-      for _ <- 1..limit do
-        assert {:error, :invalid_code} =
-                 VerificationCodes.verify(user, :email, "000001")
-      end
+      exhaust_verify_attempts(user, :email)
 
       assert {:error, :rate_limited} =
                VerificationCodes.verify(user, :email, "123456")
@@ -827,6 +802,24 @@ defmodule Ysc.Accounts.VerificationCodesTest do
         )
       end)
     end
+  end
+
+  # Hammer's 1-minute window can roll over mid-loop, so keep attempting
+  # until we actually get :rate_limited rather than assuming `limit`
+  # consecutive hits land in the same bucket.
+  defp exhaust_verify_attempts(user, channel) do
+    limit =
+      Application.get_env(:ysc, Ysc.EmailVerificationRateLimit, [])[
+        :attempt_limit_per_minute
+      ] || 12
+
+    assert Enum.any?(1..(limit * 3), fn _ ->
+             case VerificationCodes.verify(user, channel, "000001") do
+               {:error, :rate_limited} -> true
+               {:error, :invalid_code} -> false
+               other -> flunk("unexpected verify result: #{inspect(other)}")
+             end
+           end)
   end
 end
 

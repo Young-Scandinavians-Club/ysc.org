@@ -3,6 +3,8 @@ defmodule QueryConsole.Runner.SQL do
   Parse multi-statement SQL with PgQuery and enforce read-only preflight.
   """
 
+  alias QueryConsole.Runner.UlidRewrite
+
   @allowed_node_types MapSet.new([
                         :select_stmt,
                         :explain_stmt
@@ -121,7 +123,7 @@ defmodule QueryConsole.Runner.SQL do
 
               %Statement{
                 index: idx,
-                sql: String.trim(stmt_sql),
+                sql: stmt_sql |> String.trim() |> UlidRewrite.rewrite(),
                 node_type: node_type,
                 location: location,
                 length: length
