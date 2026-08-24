@@ -140,6 +140,24 @@ defmodule YscWeb.AdminDashboardLive do
               </p>
             </div>
           </div>
+          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-center">
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">
+                Approved (YTD)
+              </p>
+              <p class="text-sm font-black font-mono text-zinc-700">
+                {@applications_approved_ytd}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">
+                Rejected (YTD)
+              </p>
+              <p class="text-sm font-black font-mono text-zinc-700">
+                {@applications_rejected_ytd}
+              </p>
+            </div>
+          </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             Review applications →
           </p>
@@ -160,31 +178,43 @@ defmodule YscWeb.AdminDashboardLive do
               <span class="text-xs font-bold text-zinc-500">now</span>
             </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100">
-            <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
-              New members (YTD)
-            </p>
-            <div class="flex items-end justify-between gap-2">
-              <div>
+          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3">
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                Net new (YTD)
+              </p>
+              <div class="flex items-end gap-2">
                 <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
                   {@membership_joins_current_ytd}
                 </p>
-                <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
-                  {@membership_joins_prior_ytd} in same span · {@membership_joins_prior_year_label}
-                </p>
+                <%= if @membership_joins_ytd_change_percent != nil do %>
+                  <span class={[
+                    "text-xs font-black font-mono shrink-0",
+                    membership_joins_ytd_change_class(
+                      @membership_joins_ytd_change_percent
+                    )
+                  ]}>
+                    {if(@membership_joins_ytd_change_percent >= 0,
+                      do: "+",
+                      else: ""
+                    )}{@membership_joins_ytd_change_percent}%
+                  </span>
+                <% end %>
               </div>
-              <%= if @membership_joins_ytd_change_percent != nil do %>
-                <span class={[
-                  "text-xs font-black font-mono shrink-0",
-                  membership_joins_ytd_change_class(
-                    @membership_joins_ytd_change_percent
-                  )
-                ]}>
-                  {if(@membership_joins_ytd_change_percent >= 0, do: "+", else: "")}{@membership_joins_ytd_change_percent}%
-                </span>
-              <% else %>
-                <span class="text-xs font-bold text-zinc-400 shrink-0">—</span>
-              <% end %>
+              <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
+                {@membership_joins_prior_ytd} in same span · {@membership_joins_prior_year_label}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                Renewals (YTD)
+              </p>
+              <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
+                {@membership_renewals_ytd}
+              </p>
+              <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
+                Existing members who renewed
+              </p>
             </div>
           </div>
           <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-3 gap-2 text-center">
@@ -204,6 +234,24 @@ defmodule YscWeb.AdminDashboardLive do
               <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
               <p class="text-sm font-black font-mono text-zinc-700">
                 {@membership_stats.lifetime}
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-center">
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">
+                Primary members
+              </p>
+              <p class="text-sm font-black font-mono text-zinc-700">
+                {@membership_stats.primary_members}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-zinc-400 uppercase">
+                Family members
+              </p>
+              <p class="text-sm font-black font-mono text-zinc-700">
+                {@membership_stats.family_sub_accounts}
               </p>
             </div>
           </div>
@@ -1110,6 +1158,8 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:applications_last_year, 0)
       |> assign(:applications_month_change, 0)
       |> assign(:applications_year_change, 0)
+      |> assign(:applications_approved_ytd, 0)
+      |> assign(:applications_rejected_ytd, 0)
       |> assign(:revenue_bookings, Money.new(:USD, 0))
       |> assign(:revenue_events, Money.new(:USD, 0))
       |> assign(:revenue_membership, Money.new(:USD, 0))
@@ -1159,12 +1209,15 @@ defmodule YscWeb.AdminDashboardLive do
         total: 0,
         single: 0,
         family: 0,
-        lifetime: 0
+        lifetime: 0,
+        primary_members: 0,
+        family_sub_accounts: 0
       })
       |> assign(:membership_joins_current_ytd, 0)
       |> assign(:membership_joins_prior_ytd, 0)
       |> assign(:membership_joins_prior_year_label, "—")
       |> assign(:membership_joins_ytd_change_percent, nil)
+      |> assign(:membership_renewals_ytd, 0)
       |> assign(:memberships_renewing_30_days, 0)
       |> assign(:ytd_revenue, Money.new(:USD, 0))
       |> assign(:ytd_revenue_label, "—")
@@ -1263,6 +1316,8 @@ defmodule YscWeb.AdminDashboardLive do
              fn -> Newsletter.list_recent_sent_editions_with_stats(5) end},
             {:application_statistics,
              fn -> Accounts.get_application_statistics() end},
+            {:application_outcome_stats,
+             fn -> Accounts.get_application_outcome_stats_ytd() end},
             {:property_stats, fn -> get_property_stats() end},
             {:membership_stats, fn -> Accounts.get_membership_stats() end},
             {:membership_joins_ytd,
@@ -1289,6 +1344,8 @@ defmodule YscWeb.AdminDashboardLive do
          applications_month_change, applications_year_change} =
           Map.fetch!(data, :application_statistics)
 
+        application_outcome_stats = Map.fetch!(data, :application_outcome_stats)
+
         joins_ytd = Map.fetch!(data, :membership_joins_ytd)
 
         {newsletter_subscriber_count, newsletter_subscribers_this_month} =
@@ -1309,6 +1366,14 @@ defmodule YscWeb.AdminDashboardLive do
         |> assign(:applications_last_year, applications_last_year)
         |> assign(:applications_month_change, applications_month_change)
         |> assign(:applications_year_change, applications_year_change)
+        |> assign(
+          :applications_approved_ytd,
+          application_outcome_stats.approved
+        )
+        |> assign(
+          :applications_rejected_ytd,
+          application_outcome_stats.rejected
+        )
         |> assign(:property_stats, Map.fetch!(data, :property_stats))
         |> assign(:membership_stats, Map.fetch!(data, :membership_stats))
         |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
@@ -1321,6 +1386,7 @@ defmodule YscWeb.AdminDashboardLive do
           :membership_joins_ytd_change_percent,
           joins_ytd.joins_ytd_change_percent
         )
+        |> assign(:membership_renewals_ytd, joins_ytd.renewals_ytd)
         |> assign(
           :memberships_renewing_30_days,
           Map.fetch!(data, :memberships_renewing_30_days)
@@ -1838,7 +1904,13 @@ defmodule YscWeb.AdminDashboardLive do
     {:noreply, push_navigate(socket, to: build_review_url(user_id))}
   end
 
+  # Counts distinct primary members (not sub-accounts, which can carry their
+  # own Subscription rows) with a currently-valid membership renewing in the
+  # next 30 days. Filtering to primary users and deduping by user_id avoids
+  # double-counting a single family membership whose primary and a linked
+  # sub-account both happen to have a qualifying Subscription row.
   defp get_renewals_in_30_days do
+    alias Ysc.Accounts.User
     alias Ysc.Repo
     import Ecto.Query
 
@@ -1847,11 +1919,15 @@ defmodule YscWeb.AdminDashboardLive do
 
     Repo.one(
       from s in Ysc.Subscriptions.Subscription,
+        join: u in User,
+        on: s.user_id == u.id,
+        where: is_nil(u.primary_user_id),
+        where: u.state == :active,
         where: s.stripe_status in ["active", "trialing"],
         where: not is_nil(s.current_period_end),
         where: s.current_period_end >= ^now,
         where: s.current_period_end <= ^in_30_days,
-        select: count()
+        select: count(s.user_id, :distinct)
     ) || 0
   end
 

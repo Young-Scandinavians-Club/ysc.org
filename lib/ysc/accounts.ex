@@ -4031,8 +4031,16 @@ defmodule Ysc.Accounts do
 
   Uses SQL `COUNT` queries instead of loading every active primary user.
 
+  `total`/`single`/`family`/`lifetime` count primary account holders (one
+  per membership, regardless of household size). `primary_members` is the
+  same as `total`; `family_sub_accounts` is the number of linked family
+  members (accounts with `primary_user_id` set) riding under those active
+  memberships, so `primary_members + family_sub_accounts` is the total
+  number of covered people.
+
   ## Returns
-  `%{total: integer, single: integer, family: integer, lifetime: integer}`
+  `%{total: integer, single: integer, family: integer, lifetime: integer,
+     primary_members: integer, family_sub_accounts: integer}`
   """
   def get_membership_stats do
     base = active_membership_primary_users_query()
@@ -4074,8 +4082,25 @@ defmodule Ysc.Accounts do
       total: total,
       single: total - lifetime - family,
       family: family,
-      lifetime: lifetime
+      lifetime: lifetime,
+      primary_members: total,
+      family_sub_accounts: active_family_sub_account_count(base)
     }
+  end
+
+  # Counts family members (accounts with `primary_user_id` set) linked to a
+  # currently active primary membership. Kept separate from `total`/`family`
+  # above, which count primary account holders (households), not people.
+  defp active_family_sub_account_count(active_primary_users_query) do
+    active_primary_ids = from(u in active_primary_users_query, select: u.id)
+
+    from(u in User,
+      where: not is_nil(u.primary_user_id),
+      where: u.state == :active,
+      where: u.primary_user_id in subquery(active_primary_ids),
+      select: count(u.id)
+    )
+    |> Repo.one() || 0
   end
 
   # Composable so it can be layered on top of a plain `User` query or a
@@ -4322,15 +4347,25 @@ defmodule Ysc.Accounts do
   @membership_joins_change_percent_min_baseline 5
 
   @doc """
-  YTD comparison of **new membership joins** (not active headcount).
+  YTD comparison of **net-new membership joins** (not active headcount),
+  alongside a **renewals** count for the current period.
 
-  Counts distinct primary `User` accounts that either:
+  `current_ytd_joins`/`prior_ytd_joins` count distinct primary `User`
+  accounts that either:
 
   - had `lifetime_membership_awarded_at` fall in the half-open interval
     `[range_start, range_end)`, or
   - had their **first** ever `Subscription` that reached a paid status
     (i.e. excluding "incomplete"/"incomplete_expired" checkout attempts
     that never converted) fall in that interval, by `inserted_at`.
+
+  These never double-count renewals: a recurring subscription's row is
+  reused across billing cycles (see `Subscriptions.create_subscription_from_stripe/3`),
+  so only its original `inserted_at` can ever land in a join window.
+
+  `renewals_ytd` separately counts distinct primary users whose subscription
+  started a new billing period (not its first) within the current
+  year-to-date window — see `membership_renewals_in_interval/2`.
 
   Used on the admin dashboard to compare this year-to-date with the same
   calendar-aligned span last year (Jan 1 through the same instant, shifted back one year).
@@ -4356,10 +4391,14 @@ defmodule Ysc.Accounts do
     prior_count =
       membership_joins_in_interval(prior_year_start, prior_period_end)
 
-    %DateTime{year: prior_year} =
-      DateTime.shift_zone!(prior_year_start, "America/Los_Angeles")
+    renewals_count = membership_renewals_in_interval(year_start, now)
 
-    prior_year_label = Integer.to_string(prior_year)
+    # `prior_year_start` is already a UTC instant at Jan 1 00:00:00 of the
+    # prior calendar year (it's derived from `year_start`, itself built from
+    # `now`'s UTC date parts) — its `.year` is the label directly. Converting
+    # through `DateTime.shift_zone!/2` first would roll it back to Dec 31 in
+    # any zone west of UTC, mislabeling the prior year by one.
+    prior_year_label = Integer.to_string(prior_year_start.year)
 
     change_percent =
       if prior_count >= @membership_joins_change_percent_min_baseline do
@@ -4372,7 +4411,8 @@ defmodule Ysc.Accounts do
       current_ytd_joins: current_count,
       prior_ytd_joins: prior_count,
       prior_year_label: prior_year_label,
-      joins_ytd_change_percent: change_percent
+      joins_ytd_change_percent: change_percent,
+      renewals_ytd: renewals_count
     }
   end
 
@@ -4411,6 +4451,34 @@ defmodule Ysc.Accounts do
       |> Repo.all()
 
     (lifetime_ids ++ sub_ids) |> Enum.uniq() |> length()
+  end
+
+  # Distinct primary users whose subscription entered a **new billing
+  # period** starting in `[start_dt, end_dt)`, for a subscription that isn't
+  # brand new — i.e. `current_period_start` is after the row's own
+  # `inserted_at`, which only happens once Stripe has pushed the period
+  # forward at least once (an initial subscribe's first period starts at
+  # or before the row is inserted). This is the renewal counterpart to
+  # `membership_joins_in_interval/2`'s first-ever-subscription check.
+  defp membership_renewals_in_interval(
+         %DateTime{} = start_dt,
+         %DateTime{} = end_dt
+       ) do
+    from(s in Subscription,
+      join: u in User,
+      on: s.user_id == u.id,
+      where: is_nil(u.primary_user_id),
+      where: u.state == :active,
+      where: s.stripe_status in ["active", "trialing"],
+      where: not is_nil(s.current_period_start),
+      where:
+        s.current_period_start >= ^start_dt and s.current_period_start < ^end_dt,
+      where: s.current_period_start > s.inserted_at,
+      distinct: s.user_id,
+      select: s.user_id
+    )
+    |> Repo.all()
+    |> length()
   end
 
   defp get_membership_type_for_primary(user) do
@@ -4580,6 +4648,38 @@ defmodule Ysc.Accounts do
 
     {this_month, this_year, last_month, last_year_month, month_change,
      year_change}
+  end
+
+  @doc """
+  Outcome breakdown (approved vs. rejected) for applications submitted
+  year-to-date, for the admin dashboard's Applications card.
+
+  Counts by `inserted_at` (submission date), not decision date, so it
+  answers "of the people who applied this year, how many were approved vs.
+  rejected so far" rather than "how many decisions were made this year."
+  Applications still awaiting review are the remainder of `this_year` (from
+  `get_application_statistics/1`) not covered by either count here.
+  """
+  def get_application_outcome_stats_ytd(%DateTime{} = now \\ DateTime.utc_now()) do
+    year_start = %DateTime{
+      now
+      | month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    from(u in User,
+      where: u.inserted_at >= ^year_start,
+      where: u.inserted_at < ^now,
+      select: %{
+        approved: count(u.id) |> filter(u.state == :active),
+        rejected: count(u.id) |> filter(u.state == :rejected)
+      }
+    )
+    |> Repo.one!()
   end
 
   defp percent_change(_current, 0), do: 0

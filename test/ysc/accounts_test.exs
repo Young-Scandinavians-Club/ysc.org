@@ -2972,6 +2972,73 @@ defmodule Ysc.AccountsTest do
       assert after_count == before
     end
 
+    test "get_membership_joins_ytd_comparison labels the prior year without an off-by-one" do
+      current_year = DateTime.utc_now().year
+
+      assert Accounts.get_membership_joins_ytd_comparison().prior_year_label ==
+               Integer.to_string(current_year - 1)
+    end
+
+    test "get_membership_joins_ytd_comparison counts a renewal separately from a net-new join" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+
+      returning_member =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      [subscription] = Subscriptions.list_subscriptions(returning_member)
+
+      # Simulate a member who first joined last year and whose subscription
+      # just renewed into a new period this year: the row itself is old
+      # (inserted_at backdated), but current_period_start just advanced.
+      subscription
+      |> Ysc.Subscriptions.Subscription.changeset(%{
+        current_period_start:
+          DateTime.utc_now()
+          |> DateTime.add(-1, :day)
+          |> DateTime.truncate(:second)
+      })
+      |> Repo.update!()
+
+      Repo.update_all(
+        from(s in Ysc.Subscriptions.Subscription,
+          where: s.id == ^subscription.id
+        ),
+        set: [
+          inserted_at:
+            DateTime.utc_now()
+            |> Timex.shift(years: -1)
+            |> DateTime.truncate(:second)
+        ]
+      )
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.renewals_ytd == before.renewals_ytd + 1
+      assert after_stats.current_ytd_joins == before.current_ytd_joins
+    end
+
+    test "get_membership_stats reports family sub-accounts separately from primary members" do
+      family_primary =
+        user_with_family_subscription(%{phone_number: unique_user_phone()})
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+      before = Accounts.get_membership_stats()
+
+      if family_plan do
+        user_fixture(%{phone_number: unique_user_phone()})
+        |> Ecto.Changeset.change(%{primary_user_id: family_primary.id})
+        |> Repo.update!()
+
+        stats = Accounts.get_membership_stats()
+
+        assert stats.total == before.total
+        assert stats.primary_members == stats.total
+        assert stats.family_sub_accounts == before.family_sub_accounts + 1
+      end
+    end
+
     test "get_membership_stats and list_memberships include lifetime and family primaries" do
       lifetime_primary =
         user_with_lifetime_membership(%{phone_number: unique_user_phone()})
