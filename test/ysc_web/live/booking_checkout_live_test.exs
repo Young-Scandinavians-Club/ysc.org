@@ -40,6 +40,10 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       {:error, :not_stubbed}
     end)
 
+    stub(StripeMock, :cancel_payment_intent, fn id, _opts ->
+      {:ok, %Stripe.PaymentIntent{id: id, status: "canceled"}}
+    end)
+
     stub(Stripe.PaymentIntentMock, :list, fn _params ->
       {:ok,
        %Stripe.List{
@@ -87,6 +91,15 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       assert html =~
                "Enter your payment details in the payment section to complete your booking"
+    end
+
+    test "persists the PaymentIntent id on the hold", %{
+      conn: conn,
+      booking: booking
+    } do
+      {:ok, _view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert Repo.reload!(booking).payment_intent_id == "pi_test_123"
     end
 
     test "renders Clear Lake property title", %{conn: conn, user: user} do
