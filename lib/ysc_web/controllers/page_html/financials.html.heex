@@ -11,10 +11,12 @@
 
   <%!-- Quick Stats Section (Current Year) --%>
   <div class="mb-10 bg-gradient-to-br from-blue-50 to-zinc-50 border border-blue-200 rounded-xl p-6 shadow-sm">
-    <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-      <.icon name="hero-chart-bar" class="w-6 h-6 text-blue-600" />
+    <.icon_heading id="financials-at-a-glance-heading">
+      <:leading>
+        <.icon name="hero-chart-bar" class="w-6 h-6 text-blue-600" />
+      </:leading>
       FY 2025 At a Glance
-    </h2>
+    </.icon_heading>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="bg-white rounded-xl p-4 border border-zinc-200">
         <div class="text-sm text-zinc-500 uppercase tracking-wider mb-1">

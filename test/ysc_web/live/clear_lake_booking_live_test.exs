@@ -279,6 +279,40 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Clear Lake"
     end
 
+    test "renders reusable step heading on the booking form", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      render_async(view, 2_000)
+
+      assert has_element?(view, "#booking-step-mode", "Choose Booking Type")
+    end
+
+    test "renders nearby destinations on the information tab", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(conn, ~p"/bookings/clear-lake?tab=information")
+
+      render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#clear-lake-nearby-heading",
+               "Nearby Destinations"
+             )
+
+      assert has_element?(view, "#clear-lake-nearby-destinations")
+
+      assert has_element?(
+               view,
+               "#clear-lake-nearby-destinations-0",
+               "Red Hills Wineries"
+             )
+    end
+
     test "sets page title", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)

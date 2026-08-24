@@ -1305,12 +1305,9 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="lg:col-span-2 space-y-8">
               <!-- Step 1: Booking Mode Selection -->
               <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
-                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                  <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                    1
-                  </span>
+                <.step_heading id="booking-step-mode" step={1} class="mb-4">
                   Choose Booking Type
-                </h2>
+                </.step_heading>
                 <p class="text-base text-zinc-600 mb-6">
                   Select how you'd like to book the Tahoe cabin:
                 </p>
@@ -1524,12 +1521,13 @@ defmodule YscWeb.TahoeBookingLive do
               <div :if={@selected_booking_mode == :room}>
                 <!-- Section 1: Stay Details -->
                 <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
-                  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                      2
-                    </span>
+                  <.step_heading
+                    id="booking-step-stay-details"
+                    step={2}
+                    class="mb-4"
+                  >
                     Stay Details
-                  </h2>
+                  </.step_heading>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Date Selection -->
                     <div>
@@ -1821,12 +1819,9 @@ defmodule YscWeb.TahoeBookingLive do
               <div :if={@selected_booking_mode == :buyout}>
                 <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
                   <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold flex items-center gap-2">
-                      <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                        2
-                      </span>
+                    <.step_heading id="booking-step-buyout-dates" step={2}>
                       Select Dates
-                    </h2>
+                    </.step_heading>
                     <button
                       :if={@checkin_date || @checkout_date}
                       type="button"
@@ -1907,17 +1902,14 @@ defmodule YscWeb.TahoeBookingLive do
               <section :if={
                 @selected_booking_mode == :room && @checkin_date && @checkout_date
               }>
-                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                  <span class="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                    3
-                  </span>
+                <.step_heading id="booking-step-rooms" step={3} class="mb-4">
                   Choose Your Rooms
                   <%= if can_select_multiple_rooms?(assigns) && length(@selected_room_ids) > 0 do %>
                     <span class="text-sm font-normal text-zinc-500">
                       ({length(@selected_room_ids)}/{max_rooms_for_user(assigns)})
                     </span>
                   <% end %>
-                </h2>
+                </.step_heading>
                 <!-- Family Membership Notice -->
                 <div
                   :if={
@@ -3289,10 +3281,14 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- About the Cabin -->
                 <section id="general-info">
-                  <h2 class="text-2xl font-bold text-zinc-900 mb-6 flex items-center gap-2">
-                    <span>🌲</span>
-                    <span>About the Cabin</span>
-                  </h2>
+                  <.icon_heading
+                    id="tahoe-about-heading"
+                    icon="🌲"
+                    size={:lg}
+                    class="text-zinc-900 mb-6"
+                  >
+                    About the Cabin
+                  </.icon_heading>
                   <p class="mb-8 text-zinc-700">
                     The Lake Tahoe region offers endless outdoor opportunities:
                   </p>
@@ -3360,48 +3356,31 @@ defmodule YscWeb.TahoeBookingLive do
                   />
                   <!-- Nearby Destinations -->
                   <section class="mb-12">
-                    <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                      <span>🏔️</span>
-                      <span>Nearby Destinations</span>
-                    </h2>
-                    <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
-                      <div class="flex items-center justify-between p-4 border-b border-zinc-100">
-                        <div class="flex items-center gap-3">
-                          <span class="text-xl">⛷️</span>
-                          <span class="font-semibold">Palisades Tahoe</span>
-                        </div>
-                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
-                          20 MINS
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between p-4 border-b border-zinc-100">
-                        <div class="flex items-center gap-3">
-                          <span class="text-xl">❄️</span>
-                          <span class="font-semibold">Northstar Ski Resort</span>
-                        </div>
-                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
-                          30 MINS
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between p-4 border-b border-zinc-100">
-                        <div class="flex items-center gap-3">
-                          <span class="text-xl">🛷</span>
-                          <span class="font-semibold">Granlibakken (Sledding)</span>
-                        </div>
-                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
-                          5 MINS
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between p-4">
-                        <div class="flex items-center gap-3">
-                          <span class="text-xl">🎿</span>
-                          <span class="font-semibold">Tahoe XC (Cross-country skiing)</span>
-                        </div>
-                        <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
-                          20 MINS
-                        </span>
-                      </div>
-                    </div>
+                    <.icon_heading id="tahoe-nearby-heading" icon="🏔️">
+                      Nearby Destinations
+                    </.icon_heading>
+                    <.nearby_destination_list id="tahoe-nearby-destinations">
+                      <:destination
+                        icon="⛷️"
+                        name="Palisades Tahoe"
+                        minutes={20}
+                      />
+                      <:destination
+                        icon="❄️"
+                        name="Northstar Ski Resort"
+                        minutes={30}
+                      />
+                      <:destination
+                        icon="🛷"
+                        name="Granlibakken (Sledding)"
+                        minutes={5}
+                      />
+                      <:destination
+                        icon="🎿"
+                        name="Tahoe XC (Cross-country skiing)"
+                        minutes={20}
+                      />
+                    </.nearby_destination_list>
                     <p class="text-sm text-zinc-600 mt-4">
                       <strong>📍 Location:</strong>
                       South of Tahoe City, near the lake's west shore.
@@ -3410,10 +3389,9 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- How to Book -->
                 <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🗓️</span>
-                    <span>How to Book</span>
-                  </h2>
+                  <.icon_heading id="tahoe-how-to-book-heading" icon="🗓️">
+                    How to Book
+                  </.icon_heading>
                   <div>
                     <h3 class="font-semibold text-zinc-900 mb-3">
                       Booking steps
@@ -3448,10 +3426,13 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- Getting There -->
                 <section id="getting-there">
-                  <h2 class="text-2xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🚗</span>
-                    <span>Getting There</span>
-                  </h2>
+                  <.icon_heading
+                    id="tahoe-getting-there-heading"
+                    icon="🚗"
+                    size={:lg}
+                  >
+                    Getting There
+                  </.icon_heading>
                   <div class="grid md:grid-cols-2 gap-8 items-start">
                     <div>
                       <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-6">
@@ -3626,10 +3607,13 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- Winter Driving & Weather Tips -->
                 <section class="bg-blue-50 border border-blue-200 rounded-xl p-6">
-                  <h2 class="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
-                    <span>❄️</span>
-                    <span>Winter Driving & Weather Tips</span>
-                  </h2>
+                  <.icon_heading
+                    id="tahoe-winter-driving-heading"
+                    icon="❄️"
+                    class="text-blue-900 mb-4"
+                  >
+                    Winter Driving & Weather Tips
+                  </.icon_heading>
                   <div>
                     <ul class="list-disc list-inside space-y-2 mb-4 text-blue-900">
                       <li>
@@ -3703,10 +3687,9 @@ defmodule YscWeb.TahoeBookingLive do
                   id="parking-transportation"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
                 >
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🚙</span>
-                    <span>Parking & Transportation</span>
-                  </h2>
+                  <.icon_heading id="tahoe-parking-heading" icon="🚙">
+                    Parking & Transportation
+                  </.icon_heading>
                   <div class="grid md:grid-cols-2 gap-6">
                     <div>
                       <p class="font-semibold mb-2 text-zinc-900">
@@ -3835,10 +3818,15 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- Booking Policies -->
                 <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12">
-                  <h2 class="text-xl font-bold text-zinc-900 mb-6 flex items-center gap-2">
-                    <.icon name="hero-document-text" class="w-6 h-6" />
-                    <span>Booking Policies</span>
-                  </h2>
+                  <.icon_heading
+                    id="tahoe-booking-policies-heading"
+                    class="text-zinc-900 mb-6"
+                  >
+                    <:leading>
+                      <.icon name="hero-document-text" class="w-6 h-6" />
+                    </:leading>
+                    Booking Policies
+                  </.icon_heading>
                   <div class="space-y-4">
                     <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
                       <h3 class="font-semibold text-zinc-900 mb-2">
@@ -3919,10 +3907,9 @@ defmodule YscWeb.TahoeBookingLive do
                   id="booking-rules"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12"
                 >
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>📋</span>
-                    <span>Booking Rules</span>
-                  </h2>
+                  <.icon_heading id="tahoe-booking-rules-heading" icon="📋">
+                    Booking Rules
+                  </.icon_heading>
                   <div class="bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden">
                     <div class="overflow-x-auto">
                       <table class="w-full border-collapse">
@@ -4005,10 +3992,13 @@ defmodule YscWeb.TahoeBookingLive do
                   id="bear-safety"
                   class="bg-red-50 border border-red-200 rounded-xl p-6 mb-12"
                 >
-                  <h2 class="text-xl font-bold text-red-900 mb-4 flex items-center gap-2">
-                    <span>🐻</span>
-                    <span>Bear Safety Instructions</span>
-                  </h2>
+                  <.icon_heading
+                    id="tahoe-bear-safety-heading"
+                    icon="🐻"
+                    class="text-red-900 mb-4"
+                  >
+                    Bear Safety Instructions
+                  </.icon_heading>
                   <div class="space-y-6">
                     <div class="p-5 bg-white rounded-xl border border-red-200">
                       <p class="text-base text-red-900 leading-relaxed">
@@ -4131,10 +4121,9 @@ defmodule YscWeb.TahoeBookingLive do
                   id="cancellation-policy"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12"
                 >
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🧾</span>
-                    <span>Cancellation Policy</span>
-                  </h2>
+                  <.icon_heading id="tahoe-cancellation-heading" icon="🧾">
+                    Cancellation Policy
+                  </.icon_heading>
                   <div>
                     <!-- Comparison Table -->
                     <div class="bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden mb-4">
@@ -4294,10 +4283,9 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- Cabin Rules & Etiquette -->
                 <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12">
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🧺</span>
-                    <span>Cabin Rules & Etiquette</span>
-                  </h2>
+                  <.icon_heading id="tahoe-cabin-rules-heading" icon="🧺">
+                    Cabin Rules & Etiquette
+                  </.icon_heading>
                   <div class="space-y-4">
                     <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
                       <h3 class="font-semibold text-zinc-900 mb-2">
@@ -4354,10 +4342,9 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- What to Bring -->
                 <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12">
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🎒</span>
-                    <span>Packing List</span>
-                  </h2>
+                  <.icon_heading id="tahoe-packing-list-heading" icon="🎒">
+                    Packing List
+                  </.icon_heading>
                   <div>
                     <div class="mb-6 p-5 bg-red-50 border border-red-200 rounded-xl">
                       <div class="flex items-start gap-3">
@@ -4446,10 +4433,9 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- Rates & Seasonal Rules -->
                 <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12">
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>💰</span>
-                    <span>Rates & Seasonal Rules</span>
-                  </h2>
+                  <.icon_heading id="tahoe-rates-heading" icon="💰">
+                    Rates & Seasonal Rules
+                  </.icon_heading>
                   <div class="space-y-4">
                     <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
                       <p class="font-semibold mb-2 text-zinc-900">
@@ -4508,10 +4494,13 @@ defmodule YscWeb.TahoeBookingLive do
                 <!-- Cleanliness & Chores (Accordion) -->
                 <details class="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
                   <summary class="cursor-pointer p-6 list-none flex items-center justify-between hover:bg-zinc-50 transition-colors">
-                    <h2 class="text-xl font-bold text-zinc-900 flex items-center gap-2">
-                      <span>🧹</span>
-                      <span>Cleanliness & Chores</span>
-                    </h2>
+                    <.icon_heading
+                      id="tahoe-cleanliness-heading"
+                      icon="🧹"
+                      class="text-zinc-900"
+                    >
+                      Cleanliness & Chores
+                    </.icon_heading>
                     <.icon
                       name="hero-chevron-down"
                       class="w-6 h-6 text-zinc-500 chevron-icon flex-shrink-0"

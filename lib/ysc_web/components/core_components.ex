@@ -2489,6 +2489,8 @@ defmodule YscWeb.CoreComponents do
 
       <.numbered_badge>1</.numbered_badge>
       <.numbered_badge size={:md} tone={:success}>2</.numbered_badge>
+      <.numbered_badge tone={:solid}>1</.numbered_badge>
+      <.numbered_badge tone={:teal}>2</.numbered_badge>
   """
   attr :id, :string, default: nil
 
@@ -2499,8 +2501,9 @@ defmodule YscWeb.CoreComponents do
 
   attr :tone, :atom,
     default: :info,
-    values: [:info, :success],
-    doc: ":info is blue (adults / default); :success is green (children)"
+    values: [:info, :success, :solid, :teal],
+    doc:
+      ":info is blue (adults / default); :success is green (children); :solid is filled blue (Tahoe booking steps); :teal is filled teal (Clear Lake booking steps)"
 
   attr :class, :any,
     default: nil,
@@ -2531,6 +2534,8 @@ defmodule YscWeb.CoreComponents do
 
   defp numbered_badge_tone_class(:info), do: "bg-blue-100 text-blue-600"
   defp numbered_badge_tone_class(:success), do: "bg-green-100 text-green-600"
+  defp numbered_badge_tone_class(:solid), do: "bg-blue-600 text-white"
+  defp numbered_badge_tone_class(:teal), do: "bg-teal-600 text-white"
 
   @doc """
   Numbered "what happens next" list with circular step markers.
@@ -2572,6 +2577,47 @@ defmodule YscWeb.CoreComponents do
     </ol>
     """
   end
+
+  @doc """
+  Numbered section heading for multi-step booking forms.
+
+  Uses `numbered_badge/1` with a filled accent matching the property
+  (`:blue` for Tahoe, `:teal` for Clear Lake). Extra title content (counts,
+  hints) can go in the inner block.
+
+  ## Examples
+
+      <.step_heading step={1} class="mb-4">Choose Booking Type</.step_heading>
+      <.step_heading step={2} accent={:teal}>Select Dates</.step_heading>
+  """
+  attr :id, :string, default: nil
+  attr :step, :integer, required: true
+
+  attr :accent, :atom,
+    default: :blue,
+    values: [:blue, :teal],
+    doc: ":blue for Tahoe; :teal for Clear Lake"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the heading (e.g. `mb-4`)"
+
+  slot :inner_block, required: true
+
+  def step_heading(assigns) do
+    ~H"""
+    <h2
+      id={@id}
+      class={["text-lg font-bold flex items-center gap-2", @class]}
+    >
+      <.numbered_badge tone={step_heading_tone(@accent)}>{@step}</.numbered_badge>
+      {render_slot(@inner_block)}
+    </h2>
+    """
+  end
+
+  defp step_heading_tone(:blue), do: :solid
+  defp step_heading_tone(:teal), do: :teal
 
   attr :type, :string, default: "default"
   attr :class, :string, default: ""
@@ -3812,6 +3858,135 @@ defmodule YscWeb.CoreComponents do
   defp at_glance_hover_border(:teal), do: "hover:border-teal-200"
   defp at_glance_icon_bg(:blue), do: "bg-blue-50"
   defp at_glance_icon_bg(:teal), do: "bg-teal-50"
+
+  @doc """
+  Section heading with a leading emoji or custom icon.
+
+  Used on booking landing pages and similar member-facing content. Pass an
+  emoji via `icon`, or a hero icon via the `:leading` slot. Default color
+  and spacing is `text-zinc-900 mb-4`; override with `class`.
+
+  ## Examples
+
+      <.icon_heading icon="🏔️">Nearby Destinations</.icon_heading>
+
+      <.icon_heading icon="🌲" size={:lg} class="text-zinc-900 mb-6">
+        About the Cabin
+      </.icon_heading>
+
+      <.icon_heading class="text-zinc-900 mb-6">
+        <:leading>
+          <.icon name="hero-document-text" class="w-6 h-6" />
+        </:leading>
+        Booking Policies
+      </.icon_heading>
+  """
+  attr :id, :string, default: nil
+
+  attr :icon, :string,
+    default: nil,
+    doc: "Emoji or short icon text; ignored when `:leading` is provided"
+
+  attr :size, :atom,
+    default: :md,
+    values: [:sm, :md, :lg],
+    doc: ":sm is text-lg; :md is text-xl; :lg is text-2xl"
+
+  attr :class, :any,
+    default: "text-zinc-900 mb-4",
+    doc: "Additional Tailwind classes merged onto the heading"
+
+  slot :leading,
+    doc: "Custom leading icon (e.g. a hero icon); takes precedence over `icon`"
+
+  slot :inner_block, required: true
+
+  def icon_heading(assigns) do
+    ~H"""
+    <h2
+      id={@id}
+      class={[
+        "flex items-center gap-2 font-bold",
+        icon_heading_size_class(@size),
+        @class
+      ]}
+    >
+      <%= if @leading != [] do %>
+        {render_slot(@leading)}
+      <% else %>
+        <span :if={@icon}>{@icon}</span>
+      <% end %>
+      <span>{render_slot(@inner_block)}</span>
+    </h2>
+    """
+  end
+
+  defp icon_heading_size_class(:sm), do: "text-lg"
+  defp icon_heading_size_class(:md), do: "text-xl"
+  defp icon_heading_size_class(:lg), do: "text-2xl"
+
+  @doc """
+  Nearby-destination list with travel-time pills on booking landing pages.
+
+  Pass `accent={:teal}` for Clear Lake; Tahoe uses the default `:blue`.
+
+  ## Examples
+
+      <.nearby_destination_list id="tahoe-nearby-destinations">
+        <:destination icon="⛷️" name="Palisades Tahoe" minutes={20} />
+        <:destination icon="❄️" name="Northstar Ski Resort" minutes={30} />
+      </.nearby_destination_list>
+
+      <.nearby_destination_list id="clear-lake-nearby-destinations" accent={:teal}>
+        <:destination icon="🍷" name="Red Hills Wineries" minutes={10} />
+      </.nearby_destination_list>
+  """
+  attr :id, :string, default: nil
+
+  attr :accent, :atom,
+    default: :blue,
+    values: [:blue, :teal],
+    doc: ":blue for Tahoe; :teal for Clear Lake"
+
+  attr :class, :any, default: nil
+
+  slot :destination, required: true do
+    attr :icon, :string, required: true
+    attr :name, :string, required: true
+    attr :minutes, :integer, required: true
+  end
+
+  def nearby_destination_list(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm",
+        @class
+      ]}
+    >
+      <div
+        :for={{dest, index} <- Enum.with_index(@destination)}
+        id={@id && "#{@id}-#{index}"}
+        class="flex items-center justify-between p-4 border-b border-zinc-100 last:border-b-0"
+      >
+        <div class="flex items-center gap-3">
+          <span class="text-xl">{dest.icon}</span>
+          <span class="font-semibold">{dest.name}</span>
+        </div>
+        <span class={[
+          "px-3 py-1 rounded-full text-xs font-bold",
+          nearby_destination_badge_class(@accent)
+        ]}>
+          {dest.minutes} MINS
+        </span>
+      </div>
+    </div>
+    """
+  end
+
+  defp nearby_destination_badge_class(:blue), do: "bg-blue-100 text-blue-700"
+  defp nearby_destination_badge_class(:teal), do: "bg-teal-100 text-teal-700"
 
   @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.

@@ -679,12 +679,14 @@ defmodule YscWeb.ClearLakeBookingLive do
             <div class="lg:col-span-2 space-y-8">
               <!-- Step 1: Booking Mode Selection -->
               <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
-                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                  <span class="w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                    1
-                  </span>
+                <.step_heading
+                  id="booking-step-mode"
+                  step={1}
+                  accent={:teal}
+                  class="mb-4"
+                >
                   Choose Booking Type
-                </h2>
+                </.step_heading>
                 <p class="text-base text-zinc-600 mb-6">
                   Select how you'd like to book the Clear Lake cabin:
                 </p>
@@ -860,12 +862,14 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div :if={@selected_booking_mode == :day}>
                 <!-- Section 1: Stay Details -->
                 <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
-                  <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <span class="w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                      2
-                    </span>
+                  <.step_heading
+                    id="booking-step-stay-details"
+                    step={2}
+                    accent={:teal}
+                    class="mb-4"
+                  >
                     Stay Details
-                  </h2>
+                  </.step_heading>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Guests and Children Selection (Dropdown) -->
                     <div class="py-1">
@@ -991,12 +995,13 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div :if={@selected_booking_mode == :buyout}>
                 <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
                   <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold flex items-center gap-2">
-                      <span class="w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                        2
-                      </span>
+                    <.step_heading
+                      id="booking-step-buyout-dates"
+                      step={2}
+                      accent={:teal}
+                    >
                       Select Dates
-                    </h2>
+                    </.step_heading>
                     <button
                       :if={@checkin_date || @checkout_date}
                       type="button"
@@ -1055,12 +1060,13 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div :if={@selected_booking_mode == :day}>
                 <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
                   <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold flex items-center gap-2">
-                      <span class="w-6 h-6 bg-teal-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                        3
-                      </span>
+                    <.step_heading
+                      id="booking-step-day-dates"
+                      step={3}
+                      accent={:teal}
+                    >
                       Select Your Dates
-                    </h2>
+                    </.step_heading>
                     <button
                       :if={@checkin_date || @checkout_date}
                       type="button"
@@ -1653,10 +1659,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                 </section>
                 <!-- About the Cabin -->
                 <section id="general-info">
-                  <h2 class="text-2xl font-bold text-zinc-900 mb-6 flex items-center gap-2">
-                    <span>🌲</span>
-                    <span>About the Cabin</span>
-                  </h2>
+                  <.icon_heading
+                    id="clear-lake-about-heading"
+                    icon="🌲"
+                    size={:lg}
+                    class="text-zinc-900 mb-6"
+                  >
+                    About the Cabin
+                  </.icon_heading>
                   <p class="mb-8 text-zinc-700">
                     Clear Lake and the surrounding region offer year-round outdoor opportunities:
                   </p>
@@ -1701,39 +1711,29 @@ defmodule YscWeb.ClearLakeBookingLive do
                   />
                   <!-- Nearby Destinations -->
                   <section class="mb-12">
-                    <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                      <span>🏔️</span>
-                      <span>Nearby Destinations</span>
-                    </h2>
-                    <div class="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
-                      <div class="flex items-center justify-between p-4 border-b border-zinc-100">
-                        <div class="flex items-center gap-3">
-                          <span class="text-xl">🍷</span>
-                          <span class="font-semibold">Red Hills Wineries</span>
-                        </div>
-                        <span class="bg-teal-100 text-teal-700 px-3 py-1 rounded-full text-xs font-bold">
-                          10 MINS
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between p-4 border-b border-zinc-100">
-                        <div class="flex items-center gap-3">
-                          <span class="text-xl">🥾</span>
-                          <span class="font-semibold">Mt. Konocti Trails</span>
-                        </div>
-                        <span class="bg-teal-100 text-teal-700 px-3 py-1 rounded-full text-xs font-bold">
-                          15 MINS
-                        </span>
-                      </div>
-                      <div class="flex items-center justify-between p-4">
-                        <div class="flex items-center gap-3">
-                          <span class="text-xl">🏘️</span>
-                          <span class="font-semibold">Historic Kelseyville</span>
-                        </div>
-                        <span class="bg-teal-100 text-teal-700 px-3 py-1 rounded-full text-xs font-bold">
-                          10 MINS
-                        </span>
-                      </div>
-                    </div>
+                    <.icon_heading id="clear-lake-nearby-heading" icon="🏔️">
+                      Nearby Destinations
+                    </.icon_heading>
+                    <.nearby_destination_list
+                      id="clear-lake-nearby-destinations"
+                      accent={:teal}
+                    >
+                      <:destination
+                        icon="🍷"
+                        name="Red Hills Wineries"
+                        minutes={10}
+                      />
+                      <:destination
+                        icon="🥾"
+                        name="Mt. Konocti Trails"
+                        minutes={15}
+                      />
+                      <:destination
+                        icon="🏘️"
+                        name="Historic Kelseyville"
+                        minutes={10}
+                      />
+                    </.nearby_destination_list>
                     <p class="text-sm text-zinc-600 mt-4">
                       Times are approximate from the cabin.
                     </p>
@@ -1741,10 +1741,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                 </section>
                 <!-- How to Book -->
                 <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🗓️</span>
-                    <span>How to Book</span>
-                  </h2>
+                  <.icon_heading id="clear-lake-how-to-book-heading" icon="🗓️">
+                    How to Book
+                  </.icon_heading>
                   <ul class="space-y-2 text-zinc-700">
                     <li>
                       Use the <strong>booking form above</strong>
@@ -1761,10 +1760,13 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </ul>
                 </section>
                 <section id="getting-there">
-                  <h2 class="text-2xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🚗</span>
-                    <span>Getting There</span>
-                  </h2>
+                  <.icon_heading
+                    id="clear-lake-getting-there-heading"
+                    icon="🚗"
+                    size={:lg}
+                  >
+                    Getting There
+                  </.icon_heading>
                   <div class="grid md:grid-cols-2 gap-8 items-start">
                     <div>
                       <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-6">
@@ -2045,10 +2047,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                   id="parking-transportation"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
                 >
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🚙</span>
-                    <span>Parking</span>
-                  </h2>
+                  <.icon_heading id="clear-lake-parking-heading" icon="🚙">
+                    Parking
+                  </.icon_heading>
                   <ul class="list-disc list-inside space-y-1 text-zinc-700">
                     <li>
                       Park parallel in the lot along the water line, as close to the next car as possible.
@@ -2106,10 +2107,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                   id="before-you-go"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
                 >
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>📋</span>
-                    <span>Before you go</span>
-                  </h2>
+                  <.icon_heading id="clear-lake-before-you-go-heading" icon="📋">
+                    Before you go
+                  </.icon_heading>
                   <p class="text-sm text-zinc-600 mb-6">
                     On-site details for after you book. The dumpster padlock code is in your check-in email.
                   </p>
@@ -2264,10 +2264,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                   id="amenities"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
                 >
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <span>🏠</span>
-                    <span>On the property</span>
-                  </h2>
+                  <.icon_heading id="clear-lake-on-property-heading" icon="🏠">
+                    On the property
+                  </.icon_heading>
                   <ul class="space-y-3 text-zinc-700">
                     <li class="flex gap-3">
                       <span class="text-teal-600 font-bold">•</span>
@@ -2436,10 +2435,15 @@ defmodule YscWeb.ClearLakeBookingLive do
                 </section>
                 <!-- Booking Policies -->
                 <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12">
-                  <h2 class="text-xl font-bold text-zinc-900 mb-6 flex items-center gap-2">
-                    <.icon name="hero-document-text" class="w-6 h-6" />
-                    <span>Booking Policies</span>
-                  </h2>
+                  <.icon_heading
+                    id="clear-lake-booking-policies-heading"
+                    class="text-zinc-900 mb-6"
+                  >
+                    <:leading>
+                      <.icon name="hero-document-text" class="w-6 h-6" />
+                    </:leading>
+                    Booking Policies
+                  </.icon_heading>
                   <div class="space-y-4">
                     <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
                       <h3 class="font-semibold text-zinc-900 mb-2">
@@ -2457,10 +2461,12 @@ defmodule YscWeb.ClearLakeBookingLive do
                   id="cancellation-policy"
                   class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12"
                 >
-                  <h2 class="text-xl font-bold text-zinc-900 mb-4 flex items-center gap-2">
-                    <.icon name="hero-receipt-refund" class="w-6 h-6" />
-                    <span>Cancellation Policy</span>
-                  </h2>
+                  <.icon_heading id="clear-lake-cancellation-heading">
+                    <:leading>
+                      <.icon name="hero-receipt-refund" class="w-6 h-6" />
+                    </:leading>
+                    Cancellation Policy
+                  </.icon_heading>
                   <div>
                     <div class="bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden mb-4">
                       <div class="overflow-x-auto">
