@@ -222,7 +222,8 @@ defmodule YscWeb.UserLoginLive do
         onsubmit="this.querySelector('[type=submit]')?.setAttribute('disabled','disabled')"
       >
         <input type="hidden" name="redirect_to" value={@redirect_to || ""} />
-        <input
+        <.input
+          id="mobile_redirect_uri"
           type="hidden"
           name="mobile_redirect_uri"
           value={@mobile_redirect_uri || ""}
