@@ -117,6 +117,33 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert html =~ "Tahoe"
     end
 
+    test "renders reusable step heading on the booking form", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      assert has_element?(view, "#booking-step-mode", "Choose Booking Type")
+    end
+
+    test "renders nearby destinations on the information tab", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?tab=information")
+      render_async(view, 2_000)
+
+      assert has_element?(view, "#tahoe-nearby-heading", "Nearby Destinations")
+      assert has_element?(view, "#tahoe-nearby-destinations")
+
+      assert has_element?(
+               view,
+               "#tahoe-nearby-destinations-0",
+               "Palisades Tahoe"
+             )
+    end
+
     test "uses book, not rent or reserve, for the entire-cabin option", %{
       conn: conn
     } do

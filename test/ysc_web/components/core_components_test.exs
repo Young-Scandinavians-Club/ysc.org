@@ -182,6 +182,141 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "icon_heading/1" do
+    test "renders an emoji heading at the default size" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.icon_heading id="nearby-heading" icon="🏔️">
+          Nearby Destinations
+        </.icon_heading>
+        """)
+
+      assert html =~ ~s(id="nearby-heading")
+      assert html =~ "text-xl"
+      assert html =~ "text-zinc-900"
+      assert html =~ "mb-4"
+      assert html =~ "🏔️"
+      assert html =~ "Nearby Destinations"
+      refute html =~ "text-2xl"
+    end
+
+    test "renders a large heading with custom spacing" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.icon_heading icon="🌲" size={:lg} class="text-zinc-900 mb-6">
+          About the Cabin
+        </.icon_heading>
+        """)
+
+      assert html =~ "text-2xl"
+      assert html =~ "mb-6"
+      assert html =~ "🌲"
+      assert html =~ "About the Cabin"
+    end
+
+    test "renders a custom leading icon via the leading slot" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.icon_heading id="policies-heading" class="text-zinc-900 mb-6">
+          <:leading>
+            <.icon name="hero-document-text" class="w-6 h-6" />
+          </:leading>
+          Booking Policies
+        </.icon_heading>
+        """)
+
+      assert html =~ ~s(id="policies-heading")
+      assert html =~ "hero-document-text"
+      assert html =~ "Booking Policies"
+    end
+  end
+
+  describe "nearby_destination_list/1" do
+    test "renders destination rows with blue travel-time pills by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.nearby_destination_list id="tahoe-nearby-destinations">
+          <:destination icon="⛷️" name="Palisades Tahoe" minutes={20} />
+          <:destination icon="❄️" name="Northstar Ski Resort" minutes={30} />
+        </.nearby_destination_list>
+        """)
+
+      assert html =~ ~s(id="tahoe-nearby-destinations")
+      assert html =~ ~s(id="tahoe-nearby-destinations-0")
+      assert html =~ ~s(id="tahoe-nearby-destinations-1")
+      assert html =~ "Palisades Tahoe"
+      assert html =~ "Northstar Ski Resort"
+      assert html =~ "20 MINS"
+      assert html =~ "30 MINS"
+      assert html =~ "bg-blue-100"
+      assert html =~ "text-blue-700"
+      refute html =~ "bg-teal-100"
+    end
+
+    test "renders teal travel-time pills" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.nearby_destination_list id="clear-lake-nearby-destinations" accent={:teal}>
+          <:destination icon="🍷" name="Red Hills Wineries" minutes={10} />
+        </.nearby_destination_list>
+        """)
+
+      assert html =~ "Red Hills Wineries"
+      assert html =~ "10 MINS"
+      assert html =~ "bg-teal-100"
+      assert html =~ "text-teal-700"
+      refute html =~ "bg-blue-100"
+    end
+  end
+
+  describe "step_heading/1" do
+    test "renders a numbered Tahoe step heading" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.step_heading id="booking-step-mode" step={1} class="mb-4">
+          Choose Booking Type
+        </.step_heading>
+        """)
+
+      assert html =~ ~s(id="booking-step-mode")
+      assert html =~ "text-lg"
+      assert html =~ "mb-4"
+      assert html =~ "bg-blue-600"
+      assert html =~ "text-white"
+      assert html =~ "1"
+      assert html =~ "Choose Booking Type"
+    end
+
+    test "renders a teal Clear Lake step heading" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.step_heading id="booking-step-stay-details" step={2} accent={:teal}>
+          Stay Details
+        </.step_heading>
+        """)
+
+      assert html =~ ~s(id="booking-step-stay-details")
+      assert html =~ "bg-teal-600"
+      assert html =~ "2"
+      assert html =~ "Stay Details"
+      refute html =~ "bg-blue-600"
+    end
+  end
+
   describe "oauth_button/1" do
     test "renders Google sign-in button with brand icon and phx-click" do
       assigns = %{}
@@ -366,6 +501,32 @@ defmodule YscWeb.CoreComponentsTest do
 
       assert html =~ "ring-2 ring-blue-200"
       assert html =~ "3"
+    end
+
+    test "renders a filled blue marker" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.numbered_badge tone={:solid}>1</.numbered_badge>
+        """)
+
+      assert html =~ "bg-blue-600"
+      assert html =~ "text-white"
+      refute html =~ "bg-blue-100"
+    end
+
+    test "renders a filled teal marker" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.numbered_badge tone={:teal}>2</.numbered_badge>
+        """)
+
+      assert html =~ "bg-teal-600"
+      assert html =~ "text-white"
+      refute html =~ "bg-blue-100"
     end
   end
 
