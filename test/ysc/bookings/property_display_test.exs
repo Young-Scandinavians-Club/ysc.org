@@ -100,6 +100,9 @@ defmodule Ysc.Bookings.PropertyDisplayTest do
 
       assert PropertyDisplay.thumbnail_path("tahoe") ==
                PropertyDisplay.thumbnail_path(:tahoe)
+
+      assert PropertyDisplay.thumbnail_path("clear_lake") ==
+               PropertyDisplay.thumbnail_path(:clear_lake)
     end
 
     test "returns the YSC logo for unknown values" do
