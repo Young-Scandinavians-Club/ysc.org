@@ -41,6 +41,11 @@ defmodule YscWeb.Emails.NewsletterEdition do
     end
   end
 
+  @dropped_email_tags ~w(
+    script style iframe object embed form svg link meta base
+    video audio applet
+  )
+
   defp transform_nodes_for_email(nodes) do
     Enum.flat_map(nodes, &transform_node_for_email/1)
   end
@@ -154,9 +159,9 @@ defmodule YscWeb.Emails.NewsletterEdition do
     end
   end
 
-  # Strip data-trix-* and class attrs from all other tags, recurse into children
+  # Strip dangerous tags entirely. Remaining tags keep safe attrs only.
   defp transform_node_for_email({tag, _attrs, _children})
-       when tag in ["script", "style"] do
+       when tag in @dropped_email_tags do
     []
   end
 
@@ -168,7 +173,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
           (is_binary(value) and
              String.match?(
                String.trim(value) |> String.downcase(),
-               ~r/^javascript:/
+               ~r/^(javascript|data|vbscript):/
              ))
       end)
 

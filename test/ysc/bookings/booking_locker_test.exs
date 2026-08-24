@@ -1515,8 +1515,9 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "release_hold/1" do
-    test "searches PaymentIntents and attempts cancel when metadata matches booking",
-         %{user: user} do
+    test "cancels the stored PaymentIntent after releasing inventory", %{
+      user: user
+    } do
       {checkin, checkout} = locker_buyout_dates(409)
 
       {:ok, booking} =
@@ -1528,27 +1529,37 @@ defmodule Ysc.Bookings.BookingLockerTest do
           4
         )
 
-      stub(Stripe.PaymentIntentMock, :list, fn _params ->
-        {:ok,
-         %Stripe.List{
-           data: [
-             %Stripe.PaymentIntent{
-               id: "pi_test_booking_locker_release",
-               metadata: %{"booking_id" => booking.id},
-               status: "requires_payment_method"
-             }
-           ],
-           has_more: false,
-           object: "list",
-           url: "/v1/payment_intents"
-         }}
-      end)
+      {:ok, booking} =
+        Bookings.attach_payment_intent(
+          booking,
+          "pi_test_booking_locker_release"
+        )
 
-      assert {:ok, released} = BookingLocker.release_hold(booking.id)
-      assert released.status == :canceled
+      test_pid = self()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+          send(test_pid, {:canceled_payment_intent, id})
+          {:ok, %Stripe.PaymentIntent{id: id, status: "canceled"}}
+        end)
+
+        stub(Stripe.PaymentIntentMock, :list, fn _params ->
+          flunk("must not list PaymentIntents when the booking stores an id")
+        end)
+
+        assert {:ok, released} = BookingLocker.release_hold(booking.id)
+        assert released.status == :canceled
+
+        assert_received {:canceled_payment_intent,
+                         "pi_test_booking_locker_release"}
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
     end
 
-    test "successfully cancels a matching cancelable PaymentIntent", %{
+    test "does not call Stripe when the hold has no PaymentIntent", %{
       user: user
     } do
       {checkin, checkout} = locker_buyout_dates(410)
@@ -1563,37 +1574,14 @@ defmodule Ysc.Bookings.BookingLockerTest do
         )
 
       stub(Stripe.PaymentIntentMock, :list, fn _params ->
-        {:ok,
-         %Stripe.List{
-           data: [
-             %Stripe.PaymentIntent{
-               id: "pi_test_booking_locker_release_ok",
-               metadata: %{"booking_id" => booking.id},
-               status: "requires_confirmation"
-             }
-           ],
-           has_more: false,
-           object: "list",
-           url: "/v1/payment_intents"
-         }}
+        flunk("must not list PaymentIntents when the booking has no stored id")
       end)
 
-      stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
-        {:ok, %Stripe.PaymentIntent{id: "pi_test_booking_locker_release_ok"}}
-      end)
-
-      previous_client = Application.get_env(:ysc, :stripe_client)
-      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
-
-      try do
-        assert {:ok, released} = BookingLocker.release_hold(booking.id)
-        assert released.status == :canceled
-      after
-        Application.put_env(:ysc, :stripe_client, previous_client)
-      end
+      assert {:ok, released} = BookingLocker.release_hold(booking.id)
+      assert released.status == :canceled
     end
 
-    test "skips cancellation when matching PaymentIntent is not cancelable", %{
+    test "continues releasing the hold when PaymentIntent cancel fails", %{
       user: user
     } do
       {checkin, checkout} = locker_buyout_dates(411)
@@ -1607,46 +1595,25 @@ defmodule Ysc.Bookings.BookingLockerTest do
           4
         )
 
-      stub(Stripe.PaymentIntentMock, :list, fn _params ->
-        {:ok,
-         %Stripe.List{
-           data: [
-             %Stripe.PaymentIntent{
-               id: "pi_test_booking_locker_release_noncancelable",
-               metadata: %{"booking_id" => booking.id},
-               status: "succeeded"
-             }
-           ],
-           has_more: false,
-           object: "list",
-           url: "/v1/payment_intents"
-         }}
-      end)
-
-      assert {:ok, released} = BookingLocker.release_hold(booking.id)
-      assert released.status == :canceled
-    end
-
-    test "continues releasing the hold when the PaymentIntent search fails", %{
-      user: user
-    } do
-      {checkin, checkout} = locker_buyout_dates(412)
-
       {:ok, booking} =
-        BookingLocker.create_buyout_booking(
-          user.id,
-          :tahoe,
-          checkin,
-          checkout,
-          4
+        Bookings.attach_payment_intent(
+          booking,
+          "pi_test_booking_locker_release_fail"
         )
 
-      stub(Stripe.PaymentIntentMock, :list, fn _params ->
-        {:error, :search_unavailable}
-      end)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
-      assert {:ok, released} = BookingLocker.release_hold(booking.id)
-      assert released.status == :canceled
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
+          {:error, :stripe_unavailable}
+        end)
+
+        assert {:ok, released} = BookingLocker.release_hold(booking.id)
+        assert released.status == :canceled
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
     end
 
     test "releases a hold booking", %{user: user} do

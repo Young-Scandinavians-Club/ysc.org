@@ -184,7 +184,9 @@ defmodule Ysc.MixProject do
       # and invalid element/attribute names; fixed in xml_builder 2.4.1+. atomex
       # still lists ~> 2.1, so pin the patched floor (used for Atom feeds).
       {:xml_builder, "~> 2.4.1", override: true},
-      {:blurhash, "~> 2.0"},
+      # Vendored to fix a Range.new/2 deprecation warning upstream hasn't
+      # released a fix for — see vendor/blurhash/README.md.
+      {:blurhash, path: "vendor/blurhash"},
       {:brotli, ">= 0.0.0", runtime: false},
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
@@ -267,7 +269,9 @@ defmodule Ysc.MixProject do
       {:remote_ip, "~> 1.2"},
       {:req, "~> 0.7"},
       {:retry_on, "~> 0.1"},
-      {:sentry, "~> 13.4"},
+      # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing
+      # span/parent fixes. We do not enable Sentry.Integrations.Oban or OpenTelemetry.
+      {:sentry, "~> 13.5"},
       {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.

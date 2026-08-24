@@ -70,6 +70,52 @@ defmodule YscWeb.Sms.NotifierTest do
     end
   end
 
+  describe "schedule_smses/1" do
+    test "inserts many jobs in one round trip" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        inserted =
+          Notifier.schedule_smses([
+            %{
+              phone_number: @valid_phone,
+              idempotency_key:
+                "sms-batch-a-#{System.unique_integer([:positive])}",
+              template: "event_update_notification",
+              variables: %{body: "Hello A"},
+              user_id: nil
+            },
+            %{
+              phone_number: "+1 (206) 555-9999",
+              idempotency_key:
+                "sms-batch-b-#{System.unique_integer([:positive])}",
+              template: "event_update_notification",
+              variables: %{body: "Hello B"},
+              user_id: nil
+            }
+          ])
+
+        assert length(inserted) == 2
+        assert Enum.all?(inserted, &match?(%Oban.Job{}, &1))
+      end)
+    end
+
+    test "skips invalid phone numbers and is a no-op for an empty list" do
+      assert Notifier.schedule_smses([]) == []
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert Notifier.schedule_smses([
+                 %{
+                   phone_number: "000",
+                   idempotency_key:
+                     "sms-bad-#{System.unique_integer([:positive])}",
+                   template: "event_update_notification",
+                   variables: %{body: "Nope"},
+                   user_id: nil
+                 }
+               ]) == []
+      end)
+    end
+  end
+
   describe "send_sms_idempotent/5" do
     test "returns error when template is unknown" do
       assert {:error, msg} =
