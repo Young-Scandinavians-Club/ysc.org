@@ -75,6 +75,9 @@ defmodule Ysc.Stripe.InvoiceHelpersTest do
       Req.Test.stub(ReqStub, fn conn ->
         case conn.request_path do
           "/v1/invoices/in_from_webhook" ->
+            conn = Plug.Conn.fetch_query_params(conn)
+            assert Map.values(conn.query_params["expand"]) == ["payments"]
+
             Req.Test.json(conn, %{
               "id" => "in_from_webhook",
               "object" => "invoice",

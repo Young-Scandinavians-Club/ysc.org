@@ -57,7 +57,7 @@ defmodule Ysc.Stripe.InvoiceHelpers do
     case field(invoice, :id) do
       invoice_id when is_binary(invoice_id) ->
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.Invoice.retrieve(invoice_id, expand: ["payments"])
+               Stripe.Invoice.retrieve(invoice_id, %{expand: ["payments"]})
              end) do
           {:ok, refetched_invoice} ->
             case payment_intent_id(refetched_invoice) do
