@@ -3391,5 +3391,26 @@ defmodule Ysc.Ledgers.ReconciliationTest do
                disc.stripe_payout_id == payout.stripe_payout_id
              end)
     end
+
+    test "handles a negative payout (withdrawal to cover a negative balance) without a false composition mismatch" do
+      # Stripe sends payout.paid with a negative amount when it debits our
+      # bank account to cover a negative Stripe balance. There are no
+      # linked payments/refunds to reconcile it against.
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(-68_145, :USD),
+                 stripe_payout_id: "po_negative_#{System.unique_integer()}",
+                 description: "Withdrawal to cover a negative balance",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(0, :USD)
+               })
+
+      report = Reconciliation.reconcile_payouts()
+
+      refute Enum.any?(report.discrepancies, fn disc ->
+               disc.stripe_payout_id == payout.stripe_payout_id
+             end)
+    end
   end
 end

@@ -43,6 +43,25 @@ defmodule Ysc.Forms.ContactFormTest do
         name: "John Doe",
         email: "john@example.com",
         subject: "Question",
+        message: "This is my question."
+      }
+
+      changeset =
+        %ContactForm{}
+        |> ContactForm.changeset(attrs)
+        |> ContactForm.put_submitter(user)
+
+      assert changeset.valid?
+      assert changeset.changes.user_id == user.id
+    end
+
+    test "ignores client-supplied user_id" do
+      user = user_fixture()
+
+      attrs = %{
+        name: "John Doe",
+        email: "john@example.com",
+        subject: "Question",
         message: "This is my question.",
         user_id: user.id
       }
@@ -50,7 +69,7 @@ defmodule Ysc.Forms.ContactFormTest do
       changeset = ContactForm.changeset(%ContactForm{}, attrs)
 
       assert changeset.valid?
-      assert changeset.changes.user_id == user.id
+      refute Map.has_key?(changeset.changes, :user_id)
     end
 
     test "requires name" do
@@ -203,13 +222,13 @@ defmodule Ysc.Forms.ContactFormTest do
         name: "Anonymous",
         email: "anonymous@example.com",
         subject: "Question",
-        message: "This is an anonymous question.",
-        user_id: nil
+        message: "This is an anonymous question."
       }
 
       changeset = ContactForm.changeset(%ContactForm{}, attrs)
 
       assert changeset.valid?
+      refute Map.has_key?(changeset.changes, :user_id)
     end
   end
 
@@ -221,11 +240,14 @@ defmodule Ysc.Forms.ContactFormTest do
         name: "Test User",
         email: "test@example.com",
         subject: "Test Subject",
-        message: "This is a test message that is long enough.",
-        user_id: user.id
+        message: "This is a test message that is long enough."
       }
 
-      changeset = ContactForm.changeset(%ContactForm{}, attrs)
+      changeset =
+        %ContactForm{}
+        |> ContactForm.changeset(attrs)
+        |> ContactForm.put_submitter(user)
+
       {:ok, contact_form} = Repo.insert(changeset)
 
       retrieved = Repo.get(ContactForm, contact_form.id)

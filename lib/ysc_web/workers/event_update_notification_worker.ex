@@ -55,21 +55,31 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
       template_module = EventUpdateNotification
       subject = template_module.get_subject(event, update)
       template_name = template_module.get_template_name()
+      shared = template_module.prepare_shared_email_data(event, update)
 
-      results =
-        Enum.map(recipients, fn recipient ->
-          send_single_notification(
-            event,
-            update,
-            recipient,
-            subject,
-            template_name,
-            template_module
-          )
+      inserted =
+        recipients
+        |> Enum.map(fn recipient ->
+          %{
+            recipient: recipient.email,
+            idempotency_key:
+              "event_update_#{update.id}_#{String.downcase(recipient.email)}",
+            subject: subject,
+            template: template_name,
+            variables:
+              Map.put(
+                shared,
+                :first_name,
+                recipient[:first_name] || recipient["first_name"] || "there"
+              ),
+            text_body: "",
+            user_id: nil
+          }
         end)
+        |> Notifier.schedule_emails()
 
-      success_count = Enum.count(results, &match?({:ok, _}, &1))
-      failure_count = length(results) - success_count
+      success_count = length(inserted)
+      failure_count = length(recipients) - success_count
 
       Ysc.Logging.info("Event update notifications sent",
         event_id: event.id,
@@ -120,28 +130,24 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
       segment_count: sms_analysis.segment_count
     )
 
-    # Propagate Oban testing mode into async tasks (Process dict is not inherited).
-    oban_testing = Process.get(:oban_testing)
-
-    results =
+    inserted =
       recipients
-      |> Task.async_stream(
-        fn recipient ->
-          if oban_testing, do: Process.put(:oban_testing, oban_testing)
-
-          send_single_sms(update, recipient, sms_body, template_name)
-        end,
-        timeout: :infinity,
-        ordered: false
-      )
-      |> Enum.map(fn
-        {:ok, result} -> result
-        {:exit, reason} -> {:error, reason}
+      |> Enum.map(fn recipient ->
+        %{
+          phone_number: recipient.phone_number,
+          idempotency_key:
+            "event_update_sms_#{update.id}_#{recipient.phone_number}",
+          template: template_name,
+          variables:
+            EventUpdateSms.prepare_sms_data(sms_body, recipient.first_name),
+          user_id: recipient.user_id
+        }
       end)
+      |> sms_notifier().schedule_smses()
 
-    scheduled_count = Enum.count(results, &match?({:ok, :scheduled}, &1))
-    skipped_count = Enum.count(results, &match?({:ok, :skipped}, &1))
-    failure_count = Enum.count(results, &match?({:error, _}, &1))
+    scheduled_count = length(inserted)
+    skipped_count = length(recipients) - scheduled_count
+    failure_count = 0
 
     case Events.mark_event_update_sms_sent(update, scheduled_count, sms_body) do
       {:ok, _updated} ->
@@ -166,96 +172,7 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
     end
   end
 
-  defp send_single_sms(update, recipient, sms_body, template_name) do
-    try do
-      variables =
-        EventUpdateSms.prepare_sms_data(sms_body, recipient.first_name)
-
-      idempotency_key =
-        "event_update_sms_#{update.id}_#{recipient.phone_number}"
-
-      case sms_notifier().schedule_sms(
-             recipient.phone_number,
-             idempotency_key,
-             template_name,
-             variables,
-             recipient.user_id
-           ) do
-        {:ok, %Oban.Job{}} ->
-          {:ok, :scheduled}
-
-        {:error, :notifications_disabled} ->
-          {:ok, :skipped}
-
-        {:error, reason} ->
-          Ysc.Logging.warning("Failed to schedule event update SMS",
-            event_update_id: update.id,
-            phone_number: recipient.phone_number,
-            error: inspect(reason)
-          )
-
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Ysc.Logging.error("Failed to send event update SMS",
-          event_update_id: update.id,
-          phone_number: recipient.phone_number,
-          error: Exception.message(error),
-          stacktrace: __STACKTRACE__
-        )
-
-        {:error, error}
-    end
-  end
-
   defp sms_notifier do
     Application.get_env(:ysc, :event_update_sms_notifier, SmsNotifier)
-  end
-
-  defp send_single_notification(
-         event,
-         update,
-         recipient,
-         subject,
-         template_name,
-         template_module
-       ) do
-    try do
-      email_data = template_module.prepare_email_data(event, update, recipient)
-
-      idempotency_key =
-        "event_update_#{update.id}_#{String.downcase(recipient.email)}"
-
-      case Notifier.schedule_email(
-             recipient.email,
-             idempotency_key,
-             subject,
-             template_name,
-             email_data,
-             ""
-           ) do
-        %Oban.Job{} ->
-          {:ok, :scheduled}
-
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to schedule event update notification",
-            event_update_id: update.id,
-            recipient: recipient.email,
-            error: inspect(reason)
-          )
-
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Ysc.Logging.error("Failed to send event update notification",
-          event_update_id: update.id,
-          recipient: recipient.email,
-          error: Exception.message(error)
-        )
-
-        {:error, error}
-    end
   end
 end

@@ -25,6 +25,7 @@ defmodule YscWeb.TahoeBookingLive do
     Room,
     RoomsListCache,
     BookingLocker,
+    BookingValidator,
     ConfigCacheTelemetry,
     PropertyInventory,
     RefundPolicyCache,
@@ -3947,7 +3948,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <tr class="border-b border-zinc-100 hover:bg-white">
                             <td class="py-3 px-4 font-semibold">Weekend Policy</td>
                             <td class="py-3 px-4">
-                              Saturday bookings must include Sunday
+                              If you arrive Saturday, stay only one night (leave Sunday). Any stay that includes Saturday must also include Sunday.
                             </td>
                           </tr>
                           <tr class="border-b border-zinc-100 hover:bg-white">
@@ -6805,7 +6806,7 @@ defmodule YscWeb.TahoeBookingLive do
             Map.put(
               errors,
               :weekend,
-              "Check-ins on Saturday must check out on Sunday (one-night stay only)"
+              BookingValidator.saturday_checkin_one_night_message()
             )
           end
 
@@ -6822,7 +6823,7 @@ defmodule YscWeb.TahoeBookingLive do
             Map.put(
               errors,
               :weekend,
-              "Bookings containing Saturday must also include Sunday (full weekend required)"
+              BookingValidator.saturday_requires_sunday_message()
             )
           else
             errors

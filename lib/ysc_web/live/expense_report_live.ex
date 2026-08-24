@@ -2022,7 +2022,8 @@ defmodule YscWeb.ExpenseReportLive do
                               field={expense_f[:miles_driven]}
                               type="number"
                               label="Miles Driven"
-                              min="0"
+                              min="1"
+                              max={ExpenseReportItem.max_miles_driven()}
                               step="1"
                               placeholder="0"
                               required

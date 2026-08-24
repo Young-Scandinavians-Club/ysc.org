@@ -1862,7 +1862,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("copy-event", _, socket) do
     event = socket.assigns.event
 
-    case Events.copy_event(event) do
+    case Events.copy_event(event, socket.assigns.current_user.id) do
       {:ok, new_event} ->
         {:noreply,
          push_patch(socket, to: ~p"/admin/events/#{new_event.id}/edit")}

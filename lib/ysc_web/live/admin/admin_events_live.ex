@@ -114,9 +114,11 @@ defmodule YscWeb.AdminEventsLive do
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>
+            <%!-- Cards use event_list, not @streams.events. Flop.Phoenix.table
+                 consumes that stream, so stream diffs never update card DOM. --%>
             <.admin_mobile_list id="admin-events-mobile">
               <.admin_mobile_list_card
-                :for={{_, event} <- @streams.events}
+                :for={event <- @event_list}
                 id={"admin-event-card-#{event.id}"}
                 footer_align={:between}
               >
@@ -308,6 +310,17 @@ defmodule YscWeb.AdminEventsLive do
       >
         Check in
       </.dropdown_menu_item>
+      <.dropdown_menu_item
+        :if={@event.state == :draft}
+        id={"#{@menu_id}-delete"}
+        icon="hero-trash"
+        tone={:danger}
+        phx-click="delete-event"
+        phx-value-id={@event.id}
+        data-confirm="Delete this draft event? This cannot be undone."
+      >
+        Delete
+      </.dropdown_menu_item>
     </.row_actions_dropdown>
     """
   end
@@ -339,6 +352,7 @@ defmodule YscWeb.AdminEventsLive do
      |> assign(:author_filter, [])
      |> assign(:editors_by_event, editors_by_event)
      |> assign(:events_by_id, %{})
+     |> assign(:event_list, [])
      |> stream(:events, [], reset: true)}
   end
 
@@ -406,6 +420,7 @@ defmodule YscWeb.AdminEventsLive do
            |> assign(:date_to, date_to)
            |> assign(:open_check_in_sessions, open_check_in_sessions)
            |> assign(:events_by_id, Map.new(events, &{&1.id, &1}))
+           |> assign(:event_list, events)
            |> stream(:events, events, reset: true)}
 
         {:error, _meta} ->
@@ -424,7 +439,7 @@ defmodule YscWeb.AdminEventsLive do
   def handle_event("copy-event", %{"id" => id}, socket) do
     event = Events.get_event!(id)
 
-    case Events.copy_event(event) do
+    case Events.copy_event(event, socket.assigns.current_user.id) do
       {:ok, new_event} ->
         {:noreply,
          push_navigate(socket, to: ~p"/admin/events/#{new_event.id}/edit")}
@@ -434,6 +449,33 @@ defmodule YscWeb.AdminEventsLive do
          socket
          |> put_flash(:error, "Failed to copy event")
          |> push_patch(to: ~p"/admin/events")}
+    end
+  end
+
+  def handle_event("delete-event", %{"id" => id}, socket) do
+    event = Events.get_event!(id)
+
+    if event.state == :draft do
+      case Events.delete_event(event) do
+        {:ok, _event} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Event deleted.")
+           |> stream_delete(:events, event)
+           |> assign(
+             :events_by_id,
+             Map.delete(socket.assigns.events_by_id, event.id)
+           )
+           |> assign(
+             :event_list,
+             Enum.reject(socket.assigns.event_list, &(&1.id == event.id))
+           )}
+
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to delete event")}
+      end
+    else
+      {:noreply, socket}
     end
   end
 

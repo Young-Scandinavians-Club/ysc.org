@@ -35,6 +35,7 @@ defmodule YscWeb.AdminNewslettersLive do
       |> assign(:editors_by_edition, editors_by_edition)
       |> assign(:editions_by_id, %{})
       |> assign(:edition_list, [])
+      |> assign(:subscriber_list, [])
       |> assign(:empty, false)
       |> assign(:meta, nil)
       |> assign(:params, %{})
@@ -92,6 +93,7 @@ defmodule YscWeb.AdminNewslettersLive do
             subscriber_params = build_subscriber_flop_params(params)
 
             socket
+            |> assign(:subscriber_list, [])
             |> stream(:subscribers, [], reset: true)
             |> start_async(:load_subscribers, fn ->
               Newsletter.list_paginated_subscribers(subscriber_params)
@@ -184,6 +186,7 @@ defmodule YscWeb.AdminNewslettersLive do
     {:noreply,
      socket
      |> assign(:sub_meta, meta)
+     |> assign(:subscriber_list, subscribers)
      |> stream(:subscribers, subscribers, reset: true)}
   end
 
@@ -192,6 +195,7 @@ defmodule YscWeb.AdminNewslettersLive do
     {:noreply,
      socket
      |> assign(:sub_meta, meta)
+     |> assign(:subscriber_list, [])
      |> stream(:subscribers, [], reset: true)}
   end
 
@@ -262,15 +266,15 @@ defmodule YscWeb.AdminNewslettersLive do
     )
     |> assign(
       :edition_list,
-      upsert_edition_list(socket.assigns.edition_list, edition)
+      upsert_list_item(socket.assigns.edition_list, edition)
     )
     |> stream_insert(:editions, edition)
   end
 
-  defp upsert_edition_list(editions, edition) do
-    case Enum.find_index(editions, &(&1.id == edition.id)) do
-      nil -> [edition | editions]
-      index -> List.replace_at(editions, index, edition)
+  defp upsert_list_item(items, item) do
+    case Enum.find_index(items, &(&1.id == item.id)) do
+      nil -> [item | items]
+      index -> List.replace_at(items, index, item)
     end
   end
 
@@ -449,6 +453,8 @@ defmodule YscWeb.AdminNewslettersLive do
 
           <div :if={@meta} class="space-y-6">
             <%!-- Mobile Card View --%>
+            <%!-- Cards use edition_list, not @streams.editions. Flop.Phoenix.table
+                 consumes that stream, so stream diffs never update card DOM. --%>
             <.admin_mobile_list id="admin-newsletters-mobile">
               <.admin_mobile_list_card
                 :for={edition <- @edition_list}
@@ -725,9 +731,11 @@ defmodule YscWeb.AdminNewslettersLive do
 
           <div :if={!subscribers_loading?(@sub_meta)}>
             <%!-- Mobile card view --%>
+            <%!-- Cards use subscriber_list, not @streams.subscribers. Flop.Phoenix.table
+                 consumes that stream, so stream diffs never update card DOM. --%>
             <.admin_mobile_list id="admin-subscribers-mobile">
               <.admin_mobile_list_card
-                :for={{_, subscriber} <- @streams.subscribers}
+                :for={subscriber <- @subscriber_list}
                 id={"admin-subscriber-card-#{subscriber.id}"}
                 interactive={false}
               >

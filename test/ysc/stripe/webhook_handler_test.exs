@@ -2404,6 +2404,28 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
                WebhookHandler.handle_webhook_event("payout.paid", payout_map)
     end
 
+    test "payout.paid with a negative amount (withdrawal to cover a negative balance) processes without failing" do
+      payout_id = "po_negative_#{System.unique_integer()}"
+      arrival = System.os_time(:second)
+
+      payout_map = %{
+        "id" => payout_id,
+        "amount" => -68_145,
+        "currency" => "usd",
+        "status" => "paid",
+        "arrival_date" => arrival,
+        "description" => "Withdrawal to cover a negative balance",
+        "metadata" => %{}
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      payout = Ledgers.get_payout_by_stripe_id(payout_id)
+      assert payout != nil
+      assert payout.amount == Money.new(:USD, "-681.45")
+    end
+
     test "payout.paid skips ledger when STRIPE_PROCESS_PAYOUT_WEBHOOKS disables processing" do
       previous = Application.get_env(:ysc, :process_stripe_payout_webhooks)
       Application.put_env(:ysc, :process_stripe_payout_webhooks, false)

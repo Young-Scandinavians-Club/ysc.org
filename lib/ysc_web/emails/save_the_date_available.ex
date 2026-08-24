@@ -45,20 +45,23 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
   end
 
   def prepare_email_data(event, user) do
-    if is_nil(event), do: raise(ArgumentError, "Event cannot be nil")
     if is_nil(user), do: raise(ArgumentError, "User cannot be nil")
 
-    event =
-      if Ecto.assoc_loaded?(event.organizer) &&
-           Ecto.assoc_loaded?(event.cover_image) do
-        event
-      else
-        case Repo.get(Event, event.id)
-             |> Repo.preload([:organizer, :cover_image]) do
-          nil -> raise ArgumentError, "Event not found: #{event.id}"
-          loaded -> loaded
-        end
-      end
+    event
+    |> prepare_shared_email_data()
+    |> Map.put(:first_name, member_greeting_name(user))
+  end
+
+  @doc """
+  Event fields shared by every recipient of a save-the-date blast.
+
+  Compute this once per event, then `Map.put(:first_name, ...)` per subscriber
+  so we do not re-render dates, URLs, and cover images for every opt-in.
+  """
+  def prepare_shared_email_data(event) do
+    if is_nil(event), do: raise(ArgumentError, "Event cannot be nil")
+
+    event = ensure_event_associations(event)
 
     event_map = %{
       id: event.id,
@@ -73,21 +76,34 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
       age_restriction: event.age_restriction
     }
 
-    event_image_url =
-      if Ecto.assoc_loaded?(event.cover_image) && event.cover_image do
-        Image.display_path(event.cover_image)
-      else
-        nil
-      end
-
     %{
-      first_name: member_greeting_name(user),
       event: event_map,
       event_date_time:
         format_event_start_datetime(event.start_date, event.start_time),
       event_url: event_url(event.id),
-      event_image_url: event_image_url,
+      event_image_url: event_image_url(event),
       notification_settings_url: notification_settings_url()
     }
+  end
+
+  defp ensure_event_associations(event) do
+    if Ecto.assoc_loaded?(event.organizer) &&
+         Ecto.assoc_loaded?(event.cover_image) do
+      event
+    else
+      case Repo.get(Event, event.id)
+           |> Repo.preload([:organizer, :cover_image]) do
+        nil -> raise ArgumentError, "Event not found: #{event.id}"
+        loaded -> loaded
+      end
+    end
+  end
+
+  defp event_image_url(event) do
+    if Ecto.assoc_loaded?(event.cover_image) && event.cover_image do
+      Image.display_path(event.cover_image)
+    else
+      nil
+    end
   end
 end

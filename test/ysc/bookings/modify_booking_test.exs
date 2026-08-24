@@ -355,7 +355,7 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       refute changeset.valid?
 
       assert [message] = errors_on(changeset).checkout_date
-      assert message =~ "full weekend required"
+      assert message =~ "must also include Sunday"
     end
 
     test "returns error when modified dates overlap another room booking", %{

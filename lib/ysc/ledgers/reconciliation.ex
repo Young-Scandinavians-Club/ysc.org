@@ -313,6 +313,12 @@ defmodule Ysc.Ledgers.Reconciliation do
             | issues
           ]
 
+        # A negative payout is Stripe withdrawing from our bank account to
+        # cover a negative Stripe balance, not a payout composed of customer
+        # payments/refunds - there's nothing to reconcile it against.
+        Money.negative?(payout.amount) and payments == [] and refunds == [] ->
+          issues
+
         Money.equal?(computed_net, payout.amount) ->
           issues
 

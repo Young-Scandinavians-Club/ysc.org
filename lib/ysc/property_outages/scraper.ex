@@ -18,8 +18,20 @@ defmodule Ysc.PropertyOutages.Scraper do
 
   @type provider :: :optimum | :pge | :scg | :liberty | :other
 
-  # Optimum (Kubra.io) API endpoint for Tahoe property
-  @optimum_api_url "https://kubra.io/cluster-data/300/f3329a2e-4d64-4800-b363-5c752421877e/f62a4326-f41f-4a4c-87d8-3ef912d07a16/public/cluster-2/02301012302231003.json"
+  # Optimum (Kubra.io) StormCenter powering optimum.com/outage-map.
+  # The actual outage data lives under a dataset id that Kubra rotates on
+  # every publish cycle (observed every 15-60 min), so it cannot be
+  # hardcoded - we resolve it fresh from `currentState` on every scrape
+  # (its response embeds the view-cluster id and current dataset id in
+  # `data.cluster_interval_generation_data`). The quadkey/bucket below
+  # are stable identifiers for the map tile covering the Tahoe cabin
+  # (2685 Cedar Lane, Homewood, CA 96141), reverse-engineered from the
+  # public map.
+  @optimum_stormcenter_id "741d8eb7-db4c-4ef1-b92a-7a4dd82f6e38"
+  @optimum_view_id "52993416-6665-4f4a-a5e9-bbff91b4fc3a"
+  @optimum_current_state_url "https://kubra.io/stormcenter/api/v1/stormcenters/#{@optimum_stormcenter_id}/views/#{@optimum_view_id}/currentState?preview=false"
+  @optimum_quadkey_hash_bucket "300"
+  @optimum_quadkey_filename "02301012302231003"
 
   # Liberty Utilities API endpoint for Tahoe property
   @liberty_api_url "https://libertycf2-svc.smartcmobile.com/OutageAPI/api/1/Outage/GetAllOutages/?companyGroupCode=LUCA"
@@ -124,7 +136,7 @@ defmodule Ysc.PropertyOutages.Scraper do
 
   defp fetch_outages_from_provider(:optimum) do
     Ysc.Logging.info("Fetching outages from Optimum (Kubra.io)",
-      url: @optimum_api_url
+      current_state_url: @optimum_current_state_url
     )
 
     case fetch_optimum_outages() do
@@ -143,7 +155,7 @@ defmodule Ysc.PropertyOutages.Scraper do
         Ysc.Logging.error("Failed to fetch Optimum outages",
           error: reason,
           error_type: inspect(reason),
-          url: @optimum_api_url
+          current_state_url: @optimum_current_state_url
         )
 
         []
@@ -201,7 +213,44 @@ defmodule Ysc.PropertyOutages.Scraper do
   # Optimum-specific scraping functions
 
   defp fetch_optimum_outages do
-    headers = [
+    case resolve_optimum_cluster_data_url() do
+      {:ok, cluster_data_url} ->
+        fetch_optimum_cluster_data(cluster_data_url)
+
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to resolve current Optimum dataset",
+          error: inspect(reason),
+          current_state_url: @optimum_current_state_url
+        )
+
+        {:error, reason}
+    end
+  end
+
+  # Kubra republishes outage data under a fresh dataset id on every cycle,
+  # so we look up the current one instead of relying on a hardcoded URL
+  # that inevitably goes stale (returns 404 for a dataset that no longer
+  # exists, silently masking real outages).
+  defp resolve_optimum_cluster_data_url do
+    request = Finch.build(:get, @optimum_current_state_url, optimum_headers())
+
+    with {:ok, %{status: 200, body: body}} <- Finch.request(request, Ysc.Finch),
+         {:ok, json} <- Jason.decode(body),
+         template when is_binary(template) <-
+           get_in(json, ["data", "cluster_interval_generation_data"]) do
+      path = String.replace(template, "{qkh}", @optimum_quadkey_hash_bucket)
+
+      {:ok,
+       "https://kubra.io/#{path}/public/cluster-2/#{@optimum_quadkey_filename}.json"}
+    else
+      {:ok, %{status: status}} -> {:error, {:unexpected_status, status}}
+      {:error, reason} -> {:error, reason}
+      nil -> {:error, :missing_cluster_data_template}
+    end
+  end
+
+  defp optimum_headers do
+    [
       {"accept", "application/json, text/plain, */*"},
       {"accept-encoding", "gzip, deflate, br, zstd"},
       {"accept-language", "en-US,en;q=0.9,sv-SE;q=0.8,sv;q=0.7"},
@@ -209,12 +258,14 @@ defmodule Ysc.PropertyOutages.Scraper do
       {"dnt", "1"},
       {"pragma", "no-cache"},
       {"referer",
-       "https://kubra.io/stormcenter/views/52993416-6665-4f4a-a5e9-bbff91b4fc3a?address=94102"},
+       "https://kubra.io/stormcenter/views/#{@optimum_view_id}?address=96141"},
       {"user-agent",
        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"}
     ]
+  end
 
-    request = Finch.build(:get, @optimum_api_url, headers)
+  defp fetch_optimum_cluster_data(cluster_data_url) do
+    request = Finch.build(:get, cluster_data_url, optimum_headers())
 
     case Finch.request(request, Ysc.Finch) do
       {:ok, %{status: 200, body: body, headers: headers}} ->
@@ -316,7 +367,7 @@ defmodule Ysc.PropertyOutages.Scraper do
           error: inspect(reason),
           error_details: inspect(error_details),
           error_type: get_error_type(reason),
-          url: @optimum_api_url
+          url: cluster_data_url
         )
 
         {:error, :network_error}

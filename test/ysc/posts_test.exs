@@ -38,6 +38,21 @@ defmodule Ysc.PostsTest do
 
       assert {:error, :unauthorized} = Posts.create_post(attrs, user)
     end
+
+    test "scrubs raw_body and ignores client-supplied rendered_body", %{
+      author: author
+    } do
+      attrs = %{
+        "title" => "XSS Post",
+        "url_name" => "xss-post-#{System.unique_integer([:positive])}",
+        "raw_body" => "<p>Hello</p><script>alert(1)</script>",
+        "rendered_body" => "<script>document.cookie</script>"
+      }
+
+      assert {:ok, %Post{} = post} = Posts.create_post(attrs, author)
+      assert post.rendered_body =~ "Hello"
+      refute post.rendered_body =~ "<script"
+    end
   end
 
   describe "list_posts_by_ids/2" do
@@ -498,6 +513,43 @@ defmodule Ysc.PostsTest do
 
       assert {:error, :unauthorized} =
                Posts.update_post_editor(post, %{"title" => "Edited"}, user)
+    end
+
+    test "ignores forged rendered_body and derives HTML from raw_body", %{
+      author: author
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Safe",
+            "raw_body" => "<p>Safe</p>",
+            "url_name" =>
+              "editor-rendered-body-#{System.unique_integer([:positive])}"
+          },
+          author
+        )
+
+      assert {:ok, updated} =
+               Posts.update_post_editor(
+                 post,
+                 %{
+                   "raw_body" => "<p>Updated</p><script>alert(1)</script>",
+                   "rendered_body" => "<script>document.cookie</script>"
+                 },
+                 author
+               )
+
+      assert updated.rendered_body =~ "Updated"
+      refute updated.rendered_body =~ "<script"
+
+      assert {:ok, unchanged_html} =
+               Posts.update_post_editor(
+                 post,
+                 %{"rendered_body" => "<script>alert(1)</script>"},
+                 author
+               )
+
+      refute unchanged_html.rendered_body =~ "<script"
     end
   end
 

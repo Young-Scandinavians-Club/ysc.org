@@ -482,7 +482,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert {msg, _} = Keyword.get(changeset.errors, :checkout_date)
 
       assert msg =~
-               "Check-ins on Saturday must check out on Sunday"
+               "If you check in on Saturday, you must check out on Sunday"
     end
 
     test "accepts weekday bookings without Saturday", %{
@@ -947,7 +947,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         refute changeset.valid?
 
         {message, _} = Keyword.fetch!(changeset.errors, :booking_mode)
-        assert message =~ "active or future full buyout"
+        assert message =~ "entire cabin booked"
       else
         assert changeset.valid?
       end
@@ -1081,7 +1081,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
       assert Keyword.has_key?(changeset.errors, :booking_mode)
 
-      assert {"You cannot book rooms while you have an active or future full buyout reservation. Please complete or cancel your buyout first.",
+      assert {"You cannot book rooms while you already have the entire cabin booked. Finish or cancel that booking first.",
               _} = Keyword.get(changeset.errors, :booking_mode)
     end
 
@@ -1249,7 +1249,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       {message, _} = Keyword.fetch!(changeset.errors, :booking_mode)
 
       assert message =~
-               "You cannot book rooms while you have an active or future full buyout reservation"
+               "You cannot book rooms while you already have the entire cabin booked"
     end
 
     test "single membership: sub-account cannot add room when primary already booked one on same dates",

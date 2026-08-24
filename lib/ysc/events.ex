@@ -564,10 +564,11 @@ defmodule Ysc.Events do
 
   @doc """
   Deep-copy an event as a new draft, including agendas (with items), ticket tiers, and FAQ questions.
-  The new event is unpublished (state: :draft). No tickets are copied.
+  The new event is unpublished (state: :draft), owned by `organizer_id` (the user performing the
+  copy). No tickets are copied.
   Returns `{:ok, new_event}` or `{:error, reason}`.
   """
-  def copy_event(%Event{} = event) do
+  def copy_event(%Event{} = event, organizer_id) do
     event =
       Repo.preload(event, [
         :ticket_tiers,
@@ -579,7 +580,7 @@ defmodule Ysc.Events do
       state: :draft,
       published_at: nil,
       publish_at: nil,
-      organizer_id: event.organizer_id,
+      organizer_id: organizer_id,
       title: "Copy of #{event.title}",
       description: event.description,
       max_attendees: event.max_attendees,
@@ -2269,16 +2270,45 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  The overall ticket sale window for an event: the earliest ticket tier
-  `start_date` and latest `end_date` across all its ticket tiers. Either value
-  is `nil` when no tier sets a sale window.
+  The overall ticket sale window for an event: the union of every (non-donation)
+  ticket tier's own `start_date`..`end_date` sale window.
+
+  A tier with no `start_date`/`end_date` is on sale without that bound (e.g. a
+  "late" tier with no end date is on sale indefinitely). Because the window is a
+  union, not an intersection, a single unbounded tier makes the whole window
+  unbounded on that side too — taking `min`/`max` of only the bounded tiers
+  would otherwise produce a nonsensical window (e.g. a "regular" tier ending
+  8/14 and a "late" tier starting 8/14, with no gap between them, must not
+  collapse to a single-day "on sale 8/14 - 8/14" window).
+
+  Either value is `nil` when unbounded on that side, including when no tier
+  sets a sale window at all.
   """
   def get_event_ticket_sale_window(event_id) do
-    from(tt in TicketTier,
-      where: tt.event_id == ^event_id,
-      select: %{start_date: min(tt.start_date), end_date: max(tt.end_date)}
-    )
-    |> Repo.one() || %{start_date: nil, end_date: nil}
+    tiers =
+      from(tt in TicketTier,
+        where: tt.event_id == ^event_id and tt.type != :donation,
+        select: %{start_date: tt.start_date, end_date: tt.end_date}
+      )
+      |> Repo.all()
+
+    %{
+      start_date: sale_window_bound(Enum.map(tiers, & &1.start_date), :min),
+      end_date: sale_window_bound(Enum.map(tiers, & &1.end_date), :max)
+    }
+  end
+
+  defp sale_window_bound([], _direction), do: nil
+
+  defp sale_window_bound(dates, direction) do
+    if Enum.any?(dates, &is_nil/1) do
+      nil
+    else
+      case direction do
+        :min -> Enum.min(dates, DateTime)
+        :max -> Enum.max(dates, DateTime)
+      end
+    end
   end
 
   defp fill_sales_timeline(rows, window) do

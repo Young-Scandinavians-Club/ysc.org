@@ -25,15 +25,23 @@ defmodule YscWeb.Emails.EventPhotoUploadReminder do
 
   @doc "Prepares email data for the photo upload reminder template."
   def prepare_email_data(event, recipient, upload_url) do
-    event =
-      if Ecto.assoc_loaded?(event.cover_image) do
-        event
-      else
-        Repo.preload(event, :cover_image, force: true)
-      end
+    event
+    |> prepare_shared_email_data(upload_url)
+    |> Map.put(
+      :first_name,
+      recipient[:first_name] || recipient["first_name"] || "there"
+    )
+  end
+
+  @doc """
+  Event fields shared by every recipient of a photo-upload reminder blast.
+
+  Compute this once per send, then `Map.put(:first_name, ...)` per attendee.
+  """
+  def prepare_shared_email_data(event, upload_url) do
+    event = ensure_cover_image(event)
 
     %{
-      first_name: recipient[:first_name] || recipient["first_name"] || "there",
       event_title: event.title,
       event_date_time:
         format_event_start_datetime(event.start_date, event.start_time),
@@ -41,6 +49,14 @@ defmodule YscWeb.Emails.EventPhotoUploadReminder do
       upload_url: upload_url,
       notification_settings_url: notification_settings_url()
     }
+  end
+
+  defp ensure_cover_image(event) do
+    if Ecto.assoc_loaded?(event.cover_image) do
+      event
+    else
+      Repo.preload(event, :cover_image, force: true)
+    end
   end
 
   defp event_image_url(event) do

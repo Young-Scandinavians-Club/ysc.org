@@ -24,7 +24,9 @@ defmodule Ysc.TestStripeClient do
   end
 
   @impl true
-  def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+  def cancel_payment_intent(id, _opts) when is_binary(id) do
+    {:ok, %Stripe.PaymentIntent{id: id, status: "canceled"}}
+  end
 
   @impl true
   def create_customer(params) do

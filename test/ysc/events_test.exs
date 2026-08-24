@@ -339,7 +339,7 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now()
         })
 
-      assert {:ok, copied} = Events.copy_event(source)
+      assert {:ok, copied} = Events.copy_event(source, user.id)
 
       assert copied.state == :draft
       assert copied.title == "Copy of Original Event"
@@ -349,6 +349,26 @@ defmodule Ysc.EventsTest do
       assert copied.published_at == nil
       assert copied.publish_at == nil
       assert copied.id != source.id
+    end
+
+    test "sets the organizer to the user performing the copy, not the original creator",
+         %{user: original_creator} do
+      copying_user = user_fixture()
+
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Original Event",
+          description: "Original description",
+          state: :published,
+          organizer_id: original_creator.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert {:ok, copied} = Events.copy_event(source, copying_user.id)
+
+      assert copied.organizer_id == copying_user.id
+      refute copied.organizer_id == original_creator.id
     end
 
     test "copies agendas and agenda items", %{user: user} do
@@ -371,7 +391,7 @@ defmodule Ysc.EventsTest do
       source =
         Events.get_event!(source.id) |> Repo.preload(agendas: :agenda_items)
 
-      assert {:ok, copied} = Events.copy_event(source)
+      assert {:ok, copied} = Events.copy_event(source, user.id)
 
       copied =
         Events.get_event!(copied.id) |> Repo.preload(agendas: :agenda_items)
@@ -405,7 +425,7 @@ defmodule Ysc.EventsTest do
 
       source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
 
-      assert {:ok, copied} = Events.copy_event(source)
+      assert {:ok, copied} = Events.copy_event(source, user.id)
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
       assert length(copied.ticket_tiers) == 1
@@ -436,7 +456,7 @@ defmodule Ysc.EventsTest do
 
       source = Events.get_event!(source.id) |> Repo.preload(:faq_questions)
 
-      assert {:ok, copied} = Events.copy_event(source)
+      assert {:ok, copied} = Events.copy_event(source, user.id)
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:faq_questions)
       assert length(copied.faq_questions) == 1
@@ -2451,6 +2471,66 @@ defmodule Ysc.EventsTest do
                end_date: nil
              }
     end
+
+    test "is unbounded on a side when any tier is unbounded on that side, even if other tiers have a bound there" do
+      # A "regular" tier that stops selling on the cutover date, and a "late"
+      # tier that starts selling on that same date with no end. Together
+      # they're on sale without a gap, so the combined window must not
+      # collapse to a single-day "cutover - cutover" range.
+      {:ok, event} = create_event_fixture()
+
+      cutover =
+        DateTime.add(DateTime.utc_now(), 5, :day) |> DateTime.truncate(:second)
+
+      {:ok, _regular} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          start_date: nil,
+          end_date: cutover
+        })
+
+      {:ok, _late} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          start_date: cutover,
+          end_date: nil
+        })
+
+      assert Events.get_event_ticket_sale_window(event.id) == %{
+               start_date: nil,
+               end_date: nil
+             }
+    end
+
+    test "ignores donation tiers when computing the window" do
+      {:ok, event} = create_event_fixture()
+
+      start_date =
+        DateTime.add(DateTime.utc_now(), -3, :day) |> DateTime.truncate(:second)
+
+      end_date =
+        DateTime.add(DateTime.utc_now(), 3, :day) |> DateTime.truncate(:second)
+
+      {:ok, _tier} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          start_date: start_date,
+          end_date: end_date
+        })
+
+      {:ok, _donation} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :donation,
+          start_date: nil,
+          end_date: nil
+        })
+
+      window = Events.get_event_ticket_sale_window(event.id)
+
+      assert DateTime.compare(window.start_date, start_date) == :eq
+      assert DateTime.compare(window.end_date, end_date) == :eq
+    end
   end
 
   describe "get_event_stripe_fees_total/1" do
@@ -3863,7 +3943,7 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now() |> DateTime.truncate(:second)
         })
 
-      assert {:error, %Ecto.Changeset{}} = Events.copy_event(source)
+      assert {:error, %Ecto.Changeset{}} = Events.copy_event(source, user.id)
     end
   end
 

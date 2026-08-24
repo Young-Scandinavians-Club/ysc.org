@@ -386,7 +386,11 @@ defmodule Ysc.Posts do
 
   def create_post(params, %User{} = current_user) do
     with :ok <- Policy.authorize(:post_create, current_user) do
-      new_params = Map.put(params, "user_id", current_user.id)
+      new_params =
+        params
+        |> Map.drop(["rendered_body", :rendered_body])
+        |> Map.put("user_id", current_user.id)
+        |> put_scrubbed_rendered_body()
 
       result =
         Post.new_post_changeset(%Post{}, new_params)
@@ -395,6 +399,29 @@ defmodule Ysc.Posts do
 
       maybe_invalidate_public_post_cache(result)
       result
+    end
+  end
+
+  defp put_scrubbed_rendered_body(params) do
+    raw = Map.get(params, "raw_body") || Map.get(params, :raw_body)
+
+    if is_binary(raw) do
+      rendered =
+        HtmlSanitizeEx.Scrubber.scrub(raw, HtmlSanitizeEx.Scrubber.BasicHTML)
+
+      params
+      |> Map.put("rendered_body", rendered)
+      |> maybe_put_atom_rendered_body(params, rendered)
+    else
+      params
+    end
+  end
+
+  defp maybe_put_atom_rendered_body(params, original, rendered) do
+    if Map.has_key?(original, :raw_body) do
+      Map.put(params, :rendered_body, rendered)
+    else
+      params
     end
   end
 

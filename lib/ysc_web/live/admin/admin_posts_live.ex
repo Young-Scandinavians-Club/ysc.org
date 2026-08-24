@@ -96,9 +96,11 @@ defmodule YscWeb.AdminPostsLive do
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>
+            <%!-- Cards use post_list, not @streams.posts. Flop.Phoenix.table
+                 consumes that stream, so stream diffs never update card DOM. --%>
             <.admin_mobile_list id="admin-posts-mobile">
               <.admin_mobile_list_card
-                :for={{_, post} <- @streams.posts}
+                :for={post <- @post_list}
                 id={"admin-post-card-#{post.id}"}
                 clickable
                 phx-click={JS.navigate(~p"/admin/posts/#{post.id}")}
@@ -330,6 +332,7 @@ defmodule YscWeb.AdminPostsLive do
      |> assign(:author_filter, [])
      |> assign(:editors_by_post, editors_by_post)
      |> assign(:posts_by_id, %{})
+     |> assign(:post_list, [])
      |> stream(:posts, [], reset: true)}
   end
 
@@ -383,6 +386,7 @@ defmodule YscWeb.AdminPostsLive do
            |> assign(:date_from, date_from)
            |> assign(:date_to, date_to)
            |> assign(:posts_by_id, Map.new(posts, &{&1.id, &1}))
+           |> assign(:post_list, posts)
            |> stream(:posts, posts, reset: true)}
 
         {:error, _meta} ->
@@ -440,6 +444,10 @@ defmodule YscWeb.AdminPostsLive do
        |> assign(
          :posts_by_id,
          Map.delete(socket.assigns.posts_by_id, target.id)
+       )
+       |> assign(
+         :post_list,
+         Enum.reject(socket.assigns.post_list, &(&1.id == target.id))
        )
        |> stream_delete(:posts, target)
        |> YscWeb.Flash.put_toast(:info, "Post deleted.", title: "Post deleted")}
@@ -531,6 +539,14 @@ defmodule YscWeb.AdminPostsLive do
   defp maybe_stream_update_post(socket, %Post{} = post) do
     socket
     |> assign(:posts_by_id, Map.put(socket.assigns.posts_by_id, post.id, post))
+    |> assign(:post_list, upsert_list_item(socket.assigns.post_list, post))
     |> stream_insert(:posts, post)
+  end
+
+  defp upsert_list_item(items, item) do
+    case Enum.find_index(items, &(&1.id == item.id)) do
+      nil -> [item | items]
+      index -> List.replace_at(items, index, item)
+    end
   end
 end
