@@ -48,17 +48,15 @@ defmodule YscWeb.Sms.Notifier do
            category
          ) do
       {:ok, validated_phone_number} ->
-        # Oban jobs require string keys in args
         job =
-          %{
-            "phone_number" => validated_phone_number,
-            "idempotency_key" => idempotency_key,
-            "template" => template,
-            "params" => variables,
-            "user_id" => user_id,
-            "category" => category
-          }
-          |> YscWeb.Workers.SmsNotifier.new()
+          build_sms_job(
+            validated_phone_number,
+            idempotency_key,
+            template,
+            variables,
+            user_id,
+            category
+          )
 
         case Oban.insert(job) do
           {:ok, %Oban.Job{} = inserted_job} ->
@@ -87,6 +85,69 @@ defmodule YscWeb.Sms.Notifier do
       {:error, _reason} = error ->
         error
     end
+  end
+
+  @doc """
+  Enqueues many SMS jobs in a single `Oban.insert_all/1` round trip.
+
+  Use this for worker fan-out (event update blasts) instead of calling
+  `schedule_sms/5` once per recipient. Phone numbers are normalized and
+  validated here; user preference checks belong in the recipient query
+  (`Events.list_event_update_sms_recipients/1`) so this path does not
+  `get_user/1` per row.
+  """
+  def schedule_smses(entries) when is_list(entries) do
+    case Enum.flat_map(entries, &sms_job_from_attrs/1) do
+      [] ->
+        []
+
+      jobs ->
+        Oban.insert_all(jobs)
+    end
+  end
+
+  defp sms_job_from_attrs(attrs) when is_map(attrs) do
+    phone_number = Map.fetch!(attrs, :phone_number)
+    template = Map.fetch!(attrs, :template)
+
+    if valid_phone_number?(phone_number) do
+      [
+        build_sms_job(
+          normalize_phone_number(phone_number),
+          Map.fetch!(attrs, :idempotency_key),
+          template,
+          Map.fetch!(attrs, :variables),
+          Map.get(attrs, :user_id),
+          Ysc.Accounts.SmsCategories.get_category(template)
+        )
+      ]
+    else
+      Ysc.Logging.warning("SMS not scheduled - invalid phone number format",
+        phone_number: phone_number,
+        template: template
+      )
+
+      []
+    end
+  end
+
+  defp build_sms_job(
+         phone_number,
+         idempotency_key,
+         template,
+         variables,
+         user_id,
+         category
+       ) do
+    %{
+      "phone_number" => phone_number,
+      "idempotency_key" => idempotency_key,
+      "template" => template,
+      "params" => variables,
+      "user_id" => user_id,
+      "category" => category
+    }
+    |> YscWeb.Workers.SmsNotifier.new()
   end
 
   defp validate_and_get_phone_number(phone_number, template, user_id, category) do

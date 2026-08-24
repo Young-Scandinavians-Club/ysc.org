@@ -3638,7 +3638,10 @@ defmodule YscWeb.AdminMoneyLive do
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-zinc-200">
-                  <tr :for={item <- @selected_expense_report.expense_items}>
+                  <tr
+                    :for={item <- @selected_expense_report.expense_items}
+                    id={"expense-report-item-#{item.id}"}
+                  >
                     <td class="px-4 py-2 whitespace-nowrap">
                       {Calendar.strftime(item.date, "%Y-%m-%d")}
                     </td>
@@ -3648,7 +3651,10 @@ defmodule YscWeb.AdminMoneyLive do
                         {item.description}
                       </div>
                       <%= if item.expense_type == "mileage" do %>
-                        <div class="text-xs text-zinc-500 mt-0.5">
+                        <div
+                          id={"expense-report-item-#{item.id}-mileage"}
+                          class="text-xs text-zinc-500 mt-0.5"
+                        >
                           <%= if item.mileage_from_to do %>
                             {item.mileage_from_to} •
                           <% end %>
@@ -3658,10 +3664,16 @@ defmodule YscWeb.AdminMoneyLive do
                         </div>
                       <% end %>
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap font-medium">
+                    <td
+                      id={"expense-report-item-#{item.id}-amount"}
+                      class="px-4 py-2 whitespace-nowrap font-medium"
+                    >
                       {Money.to_string!(item.amount)}
                     </td>
-                    <td class="px-4 py-2">
+                    <td
+                      id={"expense-report-item-#{item.id}-receipt"}
+                      class="px-4 py-2"
+                    >
                       <%= cond do %>
                         <% item.receipt_s3_path -> %>
                           <a

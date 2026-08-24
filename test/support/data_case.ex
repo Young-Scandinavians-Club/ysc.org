@@ -86,8 +86,8 @@ defmodule Ysc.DataCase do
       {:ok, :sent}
     end)
 
-    # Stripe PaymentIntent list: return empty list so cancel_booking_payment_intent
-    # skips gracefully without making real Stripe API calls
+    # Stripe PaymentIntent list: leftover no-op for tests that still stub list/1.
+    # Hold release now cancels by stored payment_intent_id instead of listing.
     stub(Stripe.PaymentIntentMock, :list, fn _params ->
       {:ok,
        %Stripe.List{

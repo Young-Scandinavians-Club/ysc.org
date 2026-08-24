@@ -5594,6 +5594,44 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "attach_payment_intent/2" do
+    test "stores the PaymentIntent id on the booking" do
+      booking = booking_fixture(%{status: :hold})
+
+      assert {:ok, updated} =
+               Bookings.attach_payment_intent(booking, "pi_attach_test")
+
+      assert updated.payment_intent_id == "pi_attach_test"
+      assert Repo.reload!(booking).payment_intent_id == "pi_attach_test"
+    end
+
+    test "cancels the previous PaymentIntent when checkout creates a new one" do
+      booking = booking_fixture(%{status: :hold})
+
+      assert {:ok, booking} =
+               Bookings.attach_payment_intent(booking, "pi_old")
+
+      test_pid = self()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+          send(test_pid, {:canceled_stale_payment_intent, id})
+          {:ok, %Stripe.PaymentIntent{id: id, status: "canceled"}}
+        end)
+
+        assert {:ok, updated} =
+                 Bookings.attach_payment_intent(booking, "pi_new")
+
+        assert updated.payment_intent_id == "pi_new"
+        assert_received {:canceled_stale_payment_intent, "pi_old"}
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+  end
+
   describe "ci_query_explain_* query builders" do
     test "each helper builds a runnable Ecto query" do
       assert %Ecto.Query{} = Bookings.ci_query_explain_query()

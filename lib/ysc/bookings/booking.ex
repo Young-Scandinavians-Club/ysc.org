@@ -76,6 +76,7 @@ defmodule Ysc.Bookings.Booking do
     field :pricing_items, :map
     field :checked_in, :boolean, default: false
     field :refund_forfeited_at, :utc_datetime
+    field :payment_intent_id, :string
 
     belongs_to :applied_booking_entitlement, Ysc.Bookings.BookingEntitlement,
       foreign_key: :applied_booking_entitlement_id,
@@ -169,6 +170,20 @@ defmodule Ysc.Bookings.Booking do
       name: :bookings_one_hold_per_entitlement_idx
     )
     |> foreign_key_constraint(:user_id)
+  end
+
+  @doc """
+  Sets the Stripe PaymentIntent id created at checkout.
+
+  Not part of `changeset/3` so user-facing booking forms cannot overwrite it.
+  """
+  def payment_changeset(booking, attrs) do
+    booking
+    |> cast(attrs, [:payment_intent_id])
+    |> validate_required([:payment_intent_id])
+    |> unique_constraint(:payment_intent_id,
+      name: :bookings_payment_intent_id_index
+    )
   end
 
   @doc """

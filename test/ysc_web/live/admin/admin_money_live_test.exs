@@ -7,6 +7,8 @@ defmodule YscWeb.AdminMoneyLiveTest do
   import Mox
   import Ecto.Query
 
+  alias Ysc.ExpenseReports
+  alias Ysc.ExpenseReports.ExpenseReportItem
   alias Ysc.Ledgers
   alias Ysc.Ledgers.Refund
   alias Ysc.LedgersFixtures
@@ -972,5 +974,129 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert Repo.get!(Ysc.Events.Ticket, ticket.id).status == :cancelled
       assert Repo.get!(TicketOrder, ticket_order.id).status == :cancelled
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Expense report modal — mileage vs purchase display (#1086 leftover)
+  # ---------------------------------------------------------------------------
+  describe "expense report mileage details" do
+    setup [:create_admin]
+
+    test "shows route, miles, derived amount, and no-receipt copy for mileage items",
+         %{conn: conn} do
+      member = user_fixture()
+
+      {report, mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      assert has_element?(view, "#expense-inbox-review-#{report.id}")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(view, "#expense-report-modal")
+      assert has_element?(view, "#expense-report-item-#{mileage.id}")
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{mileage.id}-mileage",
+               "Home to YSC Cabin"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{mileage.id}-mileage",
+               "20 mi"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{mileage.id}-amount",
+               "$6.00"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{mileage.id}-receipt",
+               "Mileage — no receipt required"
+             )
+
+      refute has_element?(
+               view,
+               "#expense-report-item-#{mileage.id}-receipt",
+               "No receipt"
+             )
+
+      assert has_element?(view, "#expense-report-item-#{purchase.id}")
+      refute has_element?(view, "#expense-report-item-#{purchase.id}-mileage")
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-receipt",
+               "No receipt"
+             )
+
+      refute has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-receipt",
+               "Mileage — no receipt required"
+             )
+    end
+  end
+
+  defp submitted_mileage_and_purchase_report!(user) do
+    {:ok, bank_account} =
+      ExpenseReports.create_bank_account(
+        %{"routing_number" => "021000021", "account_number" => "1234567890"},
+        user
+      )
+
+    {:ok, report} =
+      ExpenseReports.create_expense_report(
+        %{
+          "user_id" => user.id,
+          "status" => "draft",
+          "purpose" => "Board meeting mileage",
+          "reimbursement_method" => "bank_transfer",
+          "bank_account_id" => bank_account.id
+        },
+        user
+      )
+
+    mileage =
+      %ExpenseReportItem{}
+      |> ExpenseReportItem.changeset(%{
+        expense_report_id: report.id,
+        date: Date.utc_today(),
+        expense_type: "mileage",
+        description: "Board meeting",
+        mileage_from_to: "Home to YSC Cabin",
+        miles_driven: 20
+      })
+      |> Repo.insert!()
+
+    purchase =
+      %ExpenseReportItem{}
+      |> ExpenseReportItem.changeset(%{
+        expense_report_id: report.id,
+        date: Date.utc_today(),
+        vendor: "Costco",
+        description: "Snacks",
+        amount: "12.50"
+      })
+      |> Repo.insert!()
+
+    report =
+      report
+      |> Ecto.Changeset.change(%{
+        status: "submitted",
+        certification_accepted: true
+      })
+      |> Repo.update!()
+
+    {report, mileage, purchase}
   end
 end

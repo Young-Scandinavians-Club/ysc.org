@@ -1,5 +1,4 @@
 defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
-  # async: false because Task.async_stream spawns processes that share the sandbox.
   use Ysc.DataCase, async: false
 
   alias YscWeb.Workers.EventUpdateNotificationWorker
@@ -10,14 +9,14 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
   import Ysc.EventsFixtures
 
   defmodule NotificationsDisabledSmsNotifier do
+    def schedule_smses(_entries), do: []
+
     def schedule_sms(_phone, _key, _template, _vars, _user_id) do
       {:error, :notifications_disabled}
     end
   end
 
   setup do
-    # Task.async_stream needs shared sandbox access for spawned processes.
-    Ecto.Adapters.SQL.Sandbox.mode(Ysc.Repo, {:shared, self()})
     Ysc.Ledgers.ensure_basic_accounts()
     organizer = user_fixture()
     event = event_fixture(%{organizer_id: organizer.id})
@@ -445,6 +444,71 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
         assert updated.recipient_count == 1
         assert updated.sms_recipient_count == 0
         refute_enqueued(worker: YscWeb.Workers.SmsNotifier)
+      end)
+    end
+
+    test "schedules one SMS job per opted-in purchaser", %{
+      event: event,
+      organizer: organizer
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        buyers =
+          for _ <- 1..2 do
+            user_fixture()
+            |> Ecto.Changeset.change(event_notifications_sms: true)
+            |> Repo.update!()
+          end
+
+        tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+        for buyer <- buyers do
+          %Ticket{
+            id: Ecto.ULID.generate(),
+            event_id: event.id,
+            user_id: buyer.id,
+            ticket_tier_id: tier.id,
+            status: :confirmed,
+            expires_at:
+              DateTime.add(DateTime.utc_now(), 1, :day)
+              |> DateTime.truncate(:second)
+          }
+          |> Repo.insert!()
+        end
+
+        {:ok, update} =
+          Events.create_event_update(event, %{
+            title: "Blast",
+            raw_body: "<p>Hello everyone</p>",
+            rendered_body: "<p>Hello everyone</p>",
+            send_sms: true,
+            sms_body: "[YSC] Blast: Hello everyone",
+            sent_by_id: organizer.id
+          })
+
+        job = %Oban.Job{
+          id: 1,
+          args: %{"event_update_id" => update.id},
+          worker: "YscWeb.Workers.EventUpdateNotificationWorker",
+          queue: "mailers",
+          state: "available",
+          attempt: 1
+        }
+
+        assert :ok = EventUpdateNotificationWorker.perform(job)
+
+        updated = Repo.get!(Events.EventUpdate, update.id)
+        assert updated.sms_recipient_count == 2
+
+        for buyer <- buyers do
+          assert_enqueued(
+            worker: YscWeb.Workers.SmsNotifier,
+            args: %{
+              "idempotency_key" =>
+                "event_update_sms_#{update.id}_#{buyer.phone_number}",
+              "template" => "event_update_notification"
+            }
+          )
+        end
       end)
     end
   end

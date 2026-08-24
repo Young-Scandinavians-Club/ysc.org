@@ -41,11 +41,13 @@ defmodule Ysc.Forms.VolunteerTest do
         interest_clear_lake: false,
         interest_tahoe: true,
         interest_marketing: false,
-        interest_website: true,
-        user_id: user.id
+        interest_website: true
       }
 
-      changeset = Volunteer.changeset(%Volunteer{}, attrs)
+      changeset =
+        %Volunteer{}
+        |> Volunteer.changeset(attrs)
+        |> Volunteer.put_submitter(user)
 
       assert changeset.valid?
       assert changeset.changes.email == "volunteer@example.com"
@@ -57,6 +59,21 @@ defmodule Ysc.Forms.VolunteerTest do
       assert changeset.changes.interest_marketing == false
       assert changeset.changes.interest_website == true
       assert changeset.changes.user_id == user.id
+    end
+
+    test "ignores client-supplied user_id" do
+      user = user_fixture()
+
+      attrs = %{
+        email: "volunteer@example.com",
+        name: "Jane Doe",
+        user_id: user.id
+      }
+
+      changeset = Volunteer.changeset(%Volunteer{}, attrs)
+
+      assert changeset.valid?
+      refute Map.has_key?(changeset.changes, :user_id)
     end
 
     test "requires email" do
@@ -168,13 +185,13 @@ defmodule Ysc.Forms.VolunteerTest do
     test "allows user_id to be nil (anonymous volunteer)" do
       attrs = %{
         email: "anonymous@example.com",
-        name: "Anonymous Volunteer",
-        user_id: nil
+        name: "Anonymous Volunteer"
       }
 
       changeset = Volunteer.changeset(%Volunteer{}, attrs)
 
       assert changeset.valid?
+      refute Map.has_key?(changeset.changes, :user_id)
     end
   end
 
@@ -190,11 +207,14 @@ defmodule Ysc.Forms.VolunteerTest do
         interest_clear_lake: true,
         interest_tahoe: false,
         interest_marketing: true,
-        interest_website: false,
-        user_id: user.id
+        interest_website: false
       }
 
-      changeset = Volunteer.changeset(%Volunteer{}, attrs)
+      changeset =
+        %Volunteer{}
+        |> Volunteer.changeset(attrs)
+        |> Volunteer.put_submitter(user)
+
       {:ok, volunteer} = Repo.insert(changeset)
 
       retrieved = Repo.get(Volunteer, volunteer.id)
