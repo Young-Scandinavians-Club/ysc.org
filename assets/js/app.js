@@ -297,6 +297,16 @@ if (document.fonts?.ready) {
 // connect if there are any LiveViews on the page
 liveSocket.connect();
 
+// Mobile browsers suspend JS timers (including the LiveView heartbeat) while a tab
+// or app is backgrounded, which can leave the socket stuck in a stale connecting
+// state that the default heartbeat/backoff timers never recover from on their own.
+// Force a fresh reconnect when the page becomes visible again if that happened.
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !liveSocket.isConnected()) {
+        liveSocket.disconnect(() => liveSocket.connect());
+    }
+});
+
 // Handle map toggle text updates
 window.addEventListener("phx:toggle-map-text", () => {
     const buttonText = document.getElementById("map-button-text");
