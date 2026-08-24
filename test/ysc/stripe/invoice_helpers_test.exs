@@ -56,8 +56,61 @@ defmodule Ysc.Stripe.InvoiceHelpersTest do
     end
 
     test "returns nil when no charge or payments are present" do
+      Req.Test.stub(ReqStub, fn conn ->
+        Req.Test.json(conn, %{
+          "id" => "in_test",
+          "object" => "invoice",
+          "payments" => %{"object" => "list", "data" => [], "has_more" => false}
+        })
+      end)
+
       assert InvoiceHelpers.charge_id(%Stripe.Invoice{id: "in_test"}) == nil
       assert InvoiceHelpers.charge_id(%{}) == nil
+    end
+
+    test "re-fetches the invoice live when the webhook payload's payments field is nil" do
+      # Stripe webhook payloads never carry an expanded `payments` collection
+      # (it's `null` as delivered) - the only way to resolve a charge for a
+      # webhook-driven invoice is a live re-fetch with `expand: ["payments"]`.
+      Req.Test.stub(ReqStub, fn conn ->
+        case conn.request_path do
+          "/v1/invoices/in_from_webhook" ->
+            Req.Test.json(conn, %{
+              "id" => "in_from_webhook",
+              "object" => "invoice",
+              "payments" => %{
+                "object" => "list",
+                "data" => [
+                  %{
+                    "id" => "inpay_1",
+                    "object" => "invoice_payment",
+                    "payment" => %{
+                      "type" => "payment_intent",
+                      "payment_intent" => "pi_from_refetch"
+                    }
+                  }
+                ],
+                "has_more" => false
+              }
+            })
+
+          "/v1/payment_intents/pi_from_refetch" ->
+            Req.Test.json(conn, %{
+              "id" => "pi_from_refetch",
+              "object" => "payment_intent",
+              "latest_charge" => "ch_from_refetch"
+            })
+        end
+      end)
+
+      invoice = %{"id" => "in_from_webhook", "charge" => nil, "payments" => nil}
+
+      assert InvoiceHelpers.charge_id(invoice) == "ch_from_refetch"
+    end
+
+    test "returns nil when the invoice has no id to re-fetch" do
+      assert InvoiceHelpers.charge_id(%{"charge" => nil, "payments" => nil}) ==
+               nil
     end
   end
 
