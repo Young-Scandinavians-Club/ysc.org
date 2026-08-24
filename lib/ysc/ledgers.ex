@@ -1607,11 +1607,11 @@ defmodule Ysc.Ledgers do
 
     entry_amount = Money.abs(payout_amount)
 
-    {cash_debit_credit, stripe_debit_credit} =
+    {cash_debit_credit, stripe_debit_credit, cash_description} =
       if Money.negative?(payout_amount) do
-        {:credit, :debit}
+        {:credit, :debit, "Stripe payout withdrawal: #{description}"}
       else
-        {:debit, :credit}
+        {:debit, :credit, "Stripe payout received: #{description}"}
       end
 
     # Entry 1: Cash (Asset) - money moving in/out of our bank account
@@ -1621,7 +1621,7 @@ defmodule Ysc.Ledgers do
         payment_id: payment.id,
         amount: entry_amount,
         debit_credit: cash_debit_credit,
-        description: "Stripe payout received: #{description}",
+        description: cash_description,
         related_entity_type: :administration,
         related_entity_id: payment.id
       })
