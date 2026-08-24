@@ -273,7 +273,10 @@ defmodule YscWeb.AdminSettingsLive do
                     {PropertyDisplay.short_name(outage.property)}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap">
-                    <.badge type={get_outage_type_color(outage.incident_type)} class="!me-0">
+                    <.badge
+                      type={get_outage_type_color(outage.incident_type)}
+                      class="!me-0"
+                    >
                       {outage.incident_type
                       |> to_string()
                       |> String.replace("_", " ")}
