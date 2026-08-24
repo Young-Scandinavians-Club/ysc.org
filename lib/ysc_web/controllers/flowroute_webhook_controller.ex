@@ -17,7 +17,10 @@ defmodule YscWeb.FlowrouteWebhookController do
   """
   def handle_inbound_sms(conn, params) do
     Ysc.Logging.info("Received FlowRoute inbound SMS webhook",
-      payload: inspect(params)
+      provider_message_id: get_in(params, ["data", "id"]),
+      from: get_in(params, ["data", "attributes", "from"]),
+      to: get_in(params, ["data", "attributes", "to"]),
+      is_mms: get_in(params, ["data", "attributes", "is_mms"])
     )
 
     try do
@@ -28,7 +31,8 @@ defmodule YscWeb.FlowrouteWebhookController do
 
       if is_nil(message_id) or is_nil(attributes) do
         Ysc.Logging.warning("Invalid inbound SMS webhook payload",
-          payload: inspect(params)
+          provider_message_id: message_id,
+          has_attributes?: not is_nil(attributes)
         )
 
         send_resp(conn, 400, "Invalid payload")
@@ -115,7 +119,9 @@ defmodule YscWeb.FlowrouteWebhookController do
   """
   def handle_delivery_receipt(conn, params) do
     Ysc.Logging.info("Received FlowRoute delivery receipt webhook",
-      payload: inspect(params)
+      provider_message_id: get_in(params, ["data", "id"]),
+      status: get_in(params, ["data", "attributes", "status"]),
+      to: get_in(params, ["data", "attributes", "to"])
     )
 
     try do
@@ -126,7 +132,8 @@ defmodule YscWeb.FlowrouteWebhookController do
 
       if is_nil(message_id) or is_nil(attributes) do
         Ysc.Logging.warning("Invalid delivery receipt webhook payload",
-          payload: inspect(params)
+          provider_message_id: message_id,
+          has_attributes?: not is_nil(attributes)
         )
 
         send_resp(conn, 400, "Invalid payload")

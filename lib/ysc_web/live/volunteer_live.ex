@@ -166,15 +166,20 @@ defmodule YscWeb.VolunteerLive do
 
   @impl true
   def handle_event("validate", %{"volunteer" => volunteer_params}, socket) do
-    params = add_user_id(volunteer_params, socket.assigns[:current_user])
-    changeset = Ysc.Forms.Volunteer.changeset(%Ysc.Forms.Volunteer{}, params)
+    changeset =
+      %Ysc.Forms.Volunteer{}
+      |> Ysc.Forms.Volunteer.changeset(volunteer_params)
+      |> Ysc.Forms.Volunteer.put_submitter(socket.assigns[:current_user])
+
     {:noreply, assign_form(socket, changeset)}
   end
 
   @impl true
   def handle_event("save", %{"volunteer" => volunteer_params} = values, socket) do
-    params = add_user_id(volunteer_params, socket.assigns[:current_user])
-    changeset = Ysc.Forms.Volunteer.changeset(%Ysc.Forms.Volunteer{}, params)
+    changeset =
+      %Ysc.Forms.Volunteer{}
+      |> Ysc.Forms.Volunteer.changeset(volunteer_params)
+      |> Ysc.Forms.Volunteer.put_submitter(socket.assigns[:current_user])
 
     if socket.assigns.logged_in? do
       case Ysc.Forms.create_volunteer(changeset) do
@@ -238,13 +243,9 @@ defmodule YscWeb.VolunteerLive do
   defp starting_params(user) do
     %{
       name: "#{user.first_name} #{user.last_name}",
-      email: user.email,
-      user_id: user.id
+      email: user.email
     }
   end
-
-  defp add_user_id(params, nil), do: params
-  defp add_user_id(params, user), do: Map.put(params, "user_id", user.id)
 
   defp volunteer_interest_cards do
     [

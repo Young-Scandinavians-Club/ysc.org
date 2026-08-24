@@ -154,6 +154,20 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       refute result =~ "<style"
       refute result =~ css
     end
+
+    test "strips iframe, object, embed, and data URIs" do
+      html =
+        ~s(<p>Hi</p><iframe src="https://evil.test"></iframe><object data="https://evil.test"></object><embed src="https://evil.test"><a href="data:text/html,xss">link</a>)
+
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Hi"
+      assert result =~ "link"
+      refute result =~ "<iframe"
+      refute result =~ "<object"
+      refute result =~ "<embed"
+      refute result =~ "data:text/html"
+    end
   end
 
   # ---------------------------------------------------------------------------

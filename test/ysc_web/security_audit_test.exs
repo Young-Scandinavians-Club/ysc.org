@@ -33,6 +33,12 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 35 (HIGH)     Gmail uniqueness ignored legacy dotted/plus stored addresses, allowing login shadowing
   Finding 38 (HIGH)     Gmail canonicalization kept googlemail.com distinct from gmail.com, allowing a twin account for the same mailbox
   Trix attachments (MEDIUM) Non-image editor uploads used predictable public S3 keys
+  Finding 36 (MEDIUM)   Who's Going preview leaked attendee emails when name was blank
+  Finding 37 (MEDIUM)   Mileage expense items had no upper bound on miles_driven
+  Finding 39 (MEDIUM)   Newsletter HTML allowed iframe/object/embed and data: URIs
+  Finding 40 (MEDIUM)   Post editor accepted client rendered_body, bypassing HTML scrubbing
+  Finding 43 (MEDIUM)   Flowroute webhooks logged full SMS payloads
+  Finding 44 (MEDIUM)   Contact/volunteer forms cast client-supplied user_id
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
