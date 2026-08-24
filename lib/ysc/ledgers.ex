@@ -1750,6 +1750,132 @@ defmodule Ysc.Ledgers do
     end
   end
 
+  @doc """
+  Backfills a missing Stripe processing fee ledger entry for a payment whose
+  fee was never booked at payment time (see the invoice `charge_id`
+  resolution fix - webhook-delivered invoices couldn't resolve a charge id,
+  so the fee silently defaulted to $0 for every membership payment processed
+  before that fix).
+
+  Books the same double-entry as `process_payment/1`'s fee entry: debit
+  `stripe_fees` (expense), credit `stripe_account` (reduce receivable).
+
+  Idempotent: no-ops if a fee entry already exists for this payment.
+  """
+  def backfill_payment_stripe_fee(%Payment{} = payment, %Money{} = fee_amount) do
+    require Ysc.Logging
+
+    cond do
+      not Money.positive?(fee_amount) ->
+        {:ok, :no_fee}
+
+      payment_stripe_fee_already_booked?(payment.id) ->
+        Ysc.Logging.debug(
+          "Payment Stripe fee already booked; skipping backfill",
+          payment_id: payment.id
+        )
+
+        {:ok, :already_booked}
+
+      true ->
+        ensure_basic_accounts()
+
+        stripe_fee_account = get_account_by_name("stripe_fees")
+        stripe_account = get_account_by_name("stripe_account")
+
+        if is_nil(stripe_fee_account) or is_nil(stripe_account) do
+          {:error, :accounts_not_found}
+        else
+          Repo.transaction(fn ->
+            {:ok, fee_expense_entry} =
+              create_entry(%{
+                account_id: stripe_fee_account.id,
+                payment_id: payment.id,
+                amount: fee_amount,
+                debit_credit: :debit,
+                description:
+                  "Stripe processing fee for payment #{payment.reference_id}",
+                related_entity_type: :administration,
+                related_entity_id: payment.id
+              })
+
+            {:ok, stripe_fee_deduction_entry} =
+              create_entry(%{
+                account_id: stripe_account.id,
+                payment_id: payment.id,
+                amount: fee_amount,
+                debit_credit: :credit,
+                description:
+                  "Stripe fee deduction from receivable - #{payment.reference_id}",
+                related_entity_type: :administration,
+                related_entity_id: payment.id
+              })
+
+            Ysc.Logging.info("Backfilled missing payment Stripe fee",
+              payment_id: payment.id,
+              fee_amount: Money.to_string!(fee_amount)
+            )
+
+            [fee_expense_entry, stripe_fee_deduction_entry]
+          end)
+        end
+    end
+  end
+
+  defp payment_stripe_fee_already_booked?(payment_id)
+       when is_binary(payment_id) do
+    stripe_fee_account = get_account_by_name("stripe_fees")
+
+    if is_nil(stripe_fee_account) do
+      false
+    else
+      from(e in LedgerEntry,
+        where: e.payment_id == ^payment_id,
+        where: e.account_id == ^stripe_fee_account.id,
+        where: e.debit_credit == "debit",
+        where: like(e.description, "Stripe processing fee for %")
+      )
+      |> Repo.exists?()
+    end
+  end
+
+  @doc """
+  Lists Stripe-provided, invoice-billed payments (membership/subscription
+  payments) with no Stripe processing fee ledger entry booked.
+
+  These are payments affected by the invoice `charge_id` resolution bug:
+  webhook-delivered invoices never carry an expanded `payments` collection,
+  so `extract_stripe_fee_from_invoice/1` couldn't resolve a charge and fell
+  back to a $0 fee, silently skipping the fee entry every time.
+  """
+  def list_payments_missing_stripe_fee(opts \\ []) do
+    limit = Keyword.get(opts, :limit, 1000)
+    stripe_fee_account = get_account_by_name("stripe_fees")
+
+    if is_nil(stripe_fee_account) do
+      []
+    else
+      fee_booked_payment_ids =
+        from(e in LedgerEntry,
+          where: e.account_id == ^stripe_fee_account.id,
+          where: e.debit_credit == "debit",
+          where: like(e.description, "Stripe processing fee for %"),
+          select: e.payment_id,
+          distinct: true
+        )
+
+      from(p in Payment,
+        where: p.external_provider == :stripe,
+        where: like(p.external_payment_id, "in_%"),
+        where: p.status == :completed,
+        where: p.id not in subquery(fee_booked_payment_ids),
+        order_by: [asc: p.payment_date],
+        limit: ^limit
+      )
+      |> Repo.all()
+    end
+  end
+
   ## Payout Management
 
   @doc """
