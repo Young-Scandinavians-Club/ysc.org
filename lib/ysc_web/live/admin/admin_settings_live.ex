@@ -228,6 +228,7 @@ defmodule YscWeb.AdminSettingsLive do
           </h2>
           <div
             :if={!@outages_loaded}
+            id="reported-outages-loading"
             class="bg-white shadow rounded-lg overflow-hidden animate-pulse"
           >
             <div class="h-12 bg-zinc-100"></div>
@@ -242,6 +243,7 @@ defmodule YscWeb.AdminSettingsLive do
           </div>
           <div
             :if={@outages_loaded}
+            id="reported-outages"
             class="bg-white shadow rounded-lg overflow-hidden"
           >
             <table class="min-w-full divide-y divide-zinc-200">
@@ -268,7 +270,7 @@ defmodule YscWeb.AdminSettingsLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={outage <- @recent_outages}>
+                <tr :for={outage <- @recent_outages} id={"outage-row-#{outage.id}"}>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                     {PropertyDisplay.short_name(outage.property)}
                   </td>
@@ -302,7 +304,7 @@ defmodule YscWeb.AdminSettingsLive do
                     </span>
                   </td>
                 </tr>
-                <tr :if={Enum.empty?(@recent_outages)}>
+                <tr :if={Enum.empty?(@recent_outages)} id="reported-outages-empty">
                   <td
                     colspan="6"
                     class="px-6 py-4 text-center text-sm text-zinc-500"

@@ -238,15 +238,22 @@ defmodule Ysc.PropertyOutages.Scraper do
          {:ok, json} <- Jason.decode(body),
          template when is_binary(template) <-
            get_in(json, ["data", "cluster_interval_generation_data"]) do
-      path = String.replace(template, "{qkh}", @optimum_quadkey_hash_bucket)
-
-      {:ok,
-       "https://kubra.io/#{path}/public/cluster-2/#{@optimum_quadkey_filename}.json"}
+      {:ok, optimum_cluster_data_url(template)}
     else
       {:ok, %{status: status}} -> {:error, {:unexpected_status, status}}
       {:error, reason} -> {:error, reason}
       nil -> {:error, :missing_cluster_data_template}
     end
+  end
+
+  # Builds the Tahoe-cabin cluster JSON URL from Kubra's rotating
+  # `cluster_interval_generation_data` template. `{qkh}` is replaced with
+  # the stable quadkey hash bucket for 2685 Cedar Lane, Homewood, CA.
+  @doc false
+  def optimum_cluster_data_url(template) when is_binary(template) do
+    path = String.replace(template, "{qkh}", @optimum_quadkey_hash_bucket)
+
+    "https://kubra.io/#{path}/public/cluster-2/#{@optimum_quadkey_filename}.json"
   end
 
   defp optimum_headers do
