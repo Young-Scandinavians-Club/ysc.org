@@ -157,6 +157,44 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert html =~ "Book the entire cabin"
       refute html =~ "Rent the entire cabin"
       refute html =~ "Reserve the entire cabin"
+      refute html =~ "Entire-cabin rentals"
+      refute html =~ "You can rent the entire cabin"
+    end
+
+    test "cabin rules use book, not reserve or rent, for winter room limits", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      html = render_click(view, "switch-info-tab", %{"tab" => "rules"})
+
+      assert html =~ "Can only book"
+      assert html =~ "Allowed to book"
+      assert html =~ "both rooms must be booked for the same dates"
+      refute html =~ "Can only reserve"
+      refute html =~ "Allowed to reserve"
+      refute html =~ "must be reserved for the same dates"
+      refute html =~ "You cannot rent the entire cabin"
+    end
+
+    test "entire-cabin calendar explains booking, not rental", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      html =
+        render_click(view, "booking-mode-changed", %{"booking_mode" => "buyout"})
+
+      assert html =~ "available for booking the entire cabin"
+      assert html =~ "available for the entire cabin because other members"
+      refute html =~ "full cabin rental"
+      refute html =~ "whole-cabin rental"
     end
 
     test "shows readable essential alerts for members", %{conn: conn} do
