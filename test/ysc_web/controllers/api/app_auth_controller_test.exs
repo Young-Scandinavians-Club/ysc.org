@@ -161,6 +161,31 @@ defmodule YscWeb.Api.AppAuthControllerTest do
       assert json_response(response, 401)
     end
 
+    test "many wrong-verifier attempts against the same code don't lock out the eventual correct one",
+         %{conn: conn, verifier: verifier, challenge: challenge} do
+      user = user_fixture(%{role: :admin})
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
+
+      for _ <- 1..20 do
+        response =
+          post(conn, ~p"/api/v1/app/auth/exchange", %{
+            "code" => code,
+            "code_verifier" => "wrong-verifier"
+          })
+
+        assert json_response(response, 401)
+      end
+
+      response =
+        post(conn, ~p"/api/v1/app/auth/exchange", %{
+          "code" => code,
+          "code_verifier" => verifier
+        })
+
+      assert %{"token" => token} = json_response(response, 200)
+      assert is_binary(token) and token != ""
+    end
+
     test "a code cannot be exchanged twice", %{
       conn: conn,
       verifier: verifier,

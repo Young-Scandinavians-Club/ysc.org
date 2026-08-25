@@ -67,14 +67,23 @@ defmodule YscWeb.Api.AppAuthController do
   matters: `ysc-admin://` is a private-use scheme another app could also
   register, and without this check that app could redeem a bare intercepted
   code itself.
+
+  Deliberately not rate-limited: an identifier scoped to this request (the
+  code, or even the requester's IP, since the threat model here is another
+  app on the *same* device) would let whoever merely intercepted the bare
+  code exhaust that budget with wrong-verifier guesses, denying the
+  legitimate app's own correct attempt — turning a defense-in-depth measure
+  into a worse DoS than the one it's meant to guard against. Unnecessary
+  anyway: code_verifier is a random 256-bit value, so brute-forcing it
+  within the code's 120-second validity window is computationally
+  infeasible regardless.
   """
   def create_exchange_session(conn, %{
         "code" => code,
         "code_verifier" => code_verifier
       })
       when is_binary(code) and is_binary(code_verifier) do
-    with :ok <- Ysc.AuthRateLimit.check_identifier("mobile_exchange:#{code}"),
-         {:ok, %Accounts.User{} = user} <-
+    with {:ok, %Accounts.User{} = user} <-
            Accounts.verify_and_consume_mobile_redirect_token(
              code,
              code_verifier
@@ -88,12 +97,6 @@ defmodule YscWeb.Api.AppAuthController do
         user: Repo.preload(user, :current_avatar)
       )
     else
-      {:error, :rate_limited, retry_after_sec} ->
-        conn
-        |> put_resp_header("retry-after", Integer.to_string(retry_after_sec))
-        |> put_status(:too_many_requests)
-        |> json(%{error: "Too many attempts"})
-
       _ ->
         conn
         |> put_status(:unauthorized)
