@@ -27,6 +27,9 @@ defmodule Ysc.Accounts.UserToken do
     field :token, :binary
     field :context, :string
     field :sent_to, :string
+    # Only ever set for "mobile_redirect" tokens — see
+    # build_mobile_redirect_token/2.
+    field :code_challenge, :string
     belongs_to :user, Ysc.Accounts.User, foreign_key: :user_id, references: :id
 
     timestamps(updated_at: false)
@@ -215,7 +218,7 @@ defmodule Ysc.Accounts.UserToken do
 
   @doc """
   Builds a one-time code for handing a successful web login off to the
-  admin/volunteer mobile app (see `YscWeb.UserAuth.log_in_user/5`).
+  admin/volunteer mobile app (see `YscWeb.UserAuth.log_in_user/6`).
 
   The raw (unhashed) code is returned for embedding in the custom-scheme
   redirect URL the mobile app opened the login page with. Only the hash is
@@ -223,8 +226,19 @@ defmodule Ysc.Accounts.UserToken do
   it proves "this browser just completed a real web login", not just a
   destination, which is why it exists instead of passing the app's redirect
   URI straight through unauthenticated (same rationale as passkey_login).
+
+  `code_challenge` binds the code to the specific app instance that started
+  this sign-in (PKCE-style): the app generates a random `code_verifier`,
+  sends its digest here as `code_challenge`, and must present the original
+  `code_verifier` again when exchanging the code (see
+  `Ysc.Accounts.verify_and_consume_mobile_redirect_token/2`). `ysc-admin://`
+  is a private-use URI scheme another installed app could also register, so
+  without this, an app that merely wins the OS's "open this link" race could
+  redeem the bare code itself; it can't also produce the verifier, which
+  never leaves the legitimate app.
   """
-  def build_mobile_redirect_token(user) do
+  def build_mobile_redirect_token(user, code_challenge)
+      when is_binary(code_challenge) do
     token = :crypto.strong_rand_bytes(@rand_size)
     hashed_token = :crypto.hash(@hash_algorithm, token)
 
@@ -232,6 +246,7 @@ defmodule Ysc.Accounts.UserToken do
      %UserToken{
        token: hashed_token,
        context: "mobile_redirect",
+       code_challenge: code_challenge,
        user_id: user.id
      }}
   end

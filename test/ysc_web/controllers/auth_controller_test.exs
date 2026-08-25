@@ -299,11 +299,34 @@ defmodule YscWeb.AuthControllerTest do
       assert redirected_to(conn) =~ redirect_path
     end
 
-    test "hands off to the mobile app when oauth_mobile_redirect_uri was stored",
+    test "hands off to the mobile app when oauth_mobile_redirect_uri and oauth_code_challenge were stored",
          %{
            conn: conn
          } do
       user = user_fixture(%{state: "active", email: "mobile-oauth@example.com"})
+      auth = build_oauth_auth(user.email)
+
+      conn =
+        conn
+        |> init_test_session(%{
+          oauth_mobile_redirect_uri: "ysc-admin://auth-callback",
+          oauth_code_challenge: String.duplicate("a", 64)
+        })
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn, 302) =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert get_session(conn, :user_token) != nil
+    end
+
+    test "does not hand off to the mobile app without a stored oauth_code_challenge",
+         %{
+           conn: conn
+         } do
+      user =
+        user_fixture(%{state: "active", email: "mobile-oauth2@example.com"})
+
       auth = build_oauth_auth(user.email)
 
       conn =
@@ -315,8 +338,7 @@ defmodule YscWeb.AuthControllerTest do
         |> assign(:ueberauth_auth, auth)
         |> AuthController.callback(%{})
 
-      assert redirected_to(conn, 302) =~ ~r{^ysc-admin://auth-callback\?code=}
-      assert get_session(conn, :user_token) != nil
+      refute redirected_to(conn, 302) =~ "ysc-admin://"
     end
   end
 

@@ -69,7 +69,24 @@ defmodule YscWeb.PasskeyLoginTest do
       assert get_session(conn, :user_token) != nil
     end
 
-    test "hands off to the mobile app when mobile_redirect_uri is valid", %{
+    test "hands off to the mobile app when mobile_redirect_uri and code_challenge are valid",
+         %{
+           conn: conn,
+           user: user
+         } do
+      conn =
+        post_passkey_login(conn, %{
+          "token" => valid_passkey_token(user),
+          "mobile_redirect_uri" => "ysc-admin://auth-callback",
+          "code_challenge" => String.duplicate("a", 64)
+        })
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert get_session(conn, :user_token)
+    end
+
+    test "does not hand off to the mobile app without a code_challenge", %{
       conn: conn,
       user: user
     } do
@@ -79,9 +96,7 @@ defmodule YscWeb.PasskeyLoginTest do
           "mobile_redirect_uri" => "ysc-admin://auth-callback"
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
-      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
     end
 
     test "records login_success auth event with passkey method", %{

@@ -95,8 +95,29 @@ defmodule YscWeb.UserSessionControllerTest do
       assert response =~ ~p"/users/log-out"
     end
 
-    test "hands off to the mobile app instead of the normal redirect when mobile_redirect_uri is valid",
+    test "hands off to the mobile app instead of the normal redirect when mobile_redirect_uri and code_challenge are valid",
          %{conn: conn, user: user} do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{
+            "email" => user.email,
+            "password" => valid_user_password()
+          },
+          "mobile_redirect_uri" => "ysc-admin://auth-callback",
+          "code_challenge" => String.duplicate("a", 64)
+        })
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert get_session(conn, :user_token)
+    end
+
+    test "does not hand off to the mobile app without a code_challenge", %{
+      conn: conn,
+      user: user
+    } do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       conn =
@@ -108,9 +129,7 @@ defmodule YscWeb.UserSessionControllerTest do
           "mobile_redirect_uri" => "ysc-admin://auth-callback"
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
-      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
     end
 
     test "ignores an unknown mobile_redirect_uri and redirects normally", %{
