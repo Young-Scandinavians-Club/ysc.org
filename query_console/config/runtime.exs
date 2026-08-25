@@ -56,7 +56,12 @@ if config_env() == :prod do
   config :query_console, QueryConsole.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    socket_options: maybe_ipv6
+    socket_options: maybe_ipv6,
+    # Fly Postgres may still be starting when this Machine (or release_command)
+    # boots. Default queue_target of 50ms drops checkouts after ~6s.
+    queue_target: 5_000,
+    queue_interval: 2_000,
+    connect_timeout: 15_000
 
   config :query_console, QueryConsole.AnalyticsRepo,
     url: analytics_database_url,
