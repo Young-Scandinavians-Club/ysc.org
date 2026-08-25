@@ -524,6 +524,21 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       refute html =~ "Reserve space for your group"
     end
 
+    test "whole-cabin calendar explains booking, not rental", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      html =
+        render_click(view, "booking-mode-changed", %{"booking_mode" => "buyout"})
+
+      assert html =~
+               "The calendar shows which dates are available for booking the whole cabin."
+
+      refute html =~ "full cabin rental"
+    end
+
     test "handles subscription members", %{conn: conn} do
       user = user_with_membership(:subscription)
       conn = log_in_user(conn, user)
