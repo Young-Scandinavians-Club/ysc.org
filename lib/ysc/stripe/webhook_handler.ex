@@ -2152,42 +2152,7 @@ defmodule Ysc.Stripe.WebhookHandler do
     require Ysc.Logging
 
     try do
-      # Fetch the charge with expanded balance transaction to get actual fees
-      case stripe_client().retrieve_charge(charge_id,
-             expand: ["balance_transaction"]
-           ) do
-        {:ok,
-         %Stripe.Charge{
-           balance_transaction: %Stripe.BalanceTransaction{fee: fee}
-         }} ->
-          # fee is already in cents, convert to dollars
-          # Log the fee for debugging
-          Ysc.Logging.info("Extracted Stripe fee from balance transaction",
-            charge_id: charge_id,
-            fee_cents: fee,
-            fee_dollars: MoneyHelper.cents_to_dollars(fee)
-          )
-
-          Money.new(MoneyHelper.cents_to_dollars(fee), :USD)
-
-        {:ok, %Stripe.Charge{}} ->
-          Ysc.Logging.warning(
-            "Charge retrieved but no balance transaction fee found",
-            charge_id: charge_id
-          )
-
-          # Fallback to estimated fee
-          calculate_estimated_fee_from_charge_amount(charge_id)
-
-        {:error, reason} ->
-          log_stripe_fetch_failure("Failed to fetch charge for fee calculation",
-            charge_id: charge_id,
-            error: reason
-          )
-
-          # Fallback to estimated fee
-          calculate_estimated_fee_from_charge_amount(charge_id)
-      end
+      fetch_actual_stripe_fee_from_charge(charge_id, 0)
     rescue
       error ->
         Ysc.Logging.error("Exception while fetching charge for fee calculation",
@@ -2205,6 +2170,69 @@ defmodule Ysc.Stripe.WebhookHandler do
     Ysc.Logging.warning("No charge ID provided for fee calculation")
     # Return zero fee if no charge ID
     Money.new(0, :USD)
+  end
+
+  # A very fresh charge's balance transaction is sometimes not attached yet
+  # when the webhook fires (seen on Stripe Link charges) - Stripe typically
+  # settles it within a couple of seconds. Retry a few times before falling
+  # back to the (domestic-card-rate) estimate, which understates the real
+  # fee for foreign-card charges - a real gap for a club whose members often
+  # pay with non-US cards.
+  @balance_transaction_max_retries 3
+  @balance_transaction_retry_delay_ms 1_000
+
+  defp fetch_actual_stripe_fee_from_charge(charge_id, attempt) do
+    require Ysc.Logging
+
+    # Fetch the charge with expanded balance transaction to get actual fees
+    case stripe_client().retrieve_charge(charge_id,
+           expand: ["balance_transaction"]
+         ) do
+      {:ok,
+       %Stripe.Charge{
+         balance_transaction: %Stripe.BalanceTransaction{fee: fee}
+       }} ->
+        # fee is already in cents, convert to dollars
+        # Log the fee for debugging
+        Ysc.Logging.info("Extracted Stripe fee from balance transaction",
+          charge_id: charge_id,
+          fee_cents: fee,
+          fee_dollars: MoneyHelper.cents_to_dollars(fee)
+        )
+
+        Money.new(MoneyHelper.cents_to_dollars(fee), :USD)
+
+      {:ok, %Stripe.Charge{}} when attempt < @balance_transaction_max_retries ->
+        Ysc.Logging.info(
+          "Balance transaction not yet attached to charge, retrying",
+          charge_id: charge_id,
+          attempt: attempt + 1
+        )
+
+        unless Ysc.Env.test?() do
+          Process.sleep(@balance_transaction_retry_delay_ms)
+        end
+
+        fetch_actual_stripe_fee_from_charge(charge_id, attempt + 1)
+
+      {:ok, %Stripe.Charge{}} ->
+        Ysc.Logging.warning(
+          "Charge retrieved but no balance transaction fee found after retries",
+          charge_id: charge_id
+        )
+
+        # Fallback to estimated fee
+        calculate_estimated_fee_from_charge_amount(charge_id)
+
+      {:error, reason} ->
+        log_stripe_fetch_failure("Failed to fetch charge for fee calculation",
+          charge_id: charge_id,
+          error: reason
+        )
+
+        # Fallback to estimated fee
+        calculate_estimated_fee_from_charge_amount(charge_id)
+    end
   end
 
   @doc """
