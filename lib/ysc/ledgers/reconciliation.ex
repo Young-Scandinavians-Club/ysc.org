@@ -274,6 +274,19 @@ defmodule Ysc.Ledgers.Reconciliation do
     }
   end
 
+  # Payouts migrated from the pre-Elixir WordPress/WooCommerce site are
+  # marked with this sentinel deposit id. Their underlying payments/refunds
+  # were never migrated into this system's ledger, so there's nothing to
+  # reconcile them against - composition and fee-booking checks would always
+  # spuriously fail.
+  @wordpress_legacy_deposit_id "wordpress-legacy"
+
+  defp check_payout_consistency(%Payout{
+         quickbooks_deposit_id: @wordpress_legacy_deposit_id
+       }) do
+    {:ok, :legacy_migrated_payout}
+  end
+
   defp check_payout_consistency(%Payout{} = payout) do
     payments = payout.payments || []
     refunds = payout.refunds || []

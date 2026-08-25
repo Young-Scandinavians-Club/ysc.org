@@ -3412,5 +3412,49 @@ defmodule Ysc.Ledgers.ReconciliationTest do
                disc.stripe_payout_id == payout.stripe_payout_id
              end)
     end
+
+    test "skips composition and fee-booking checks for WordPress-legacy migrated payouts" do
+      # Payouts migrated from the pre-Elixir WordPress/WooCommerce site are
+      # marked quickbooks_deposit_id: "wordpress-legacy" and never had their
+      # payments/refunds migrated into this system - there's nothing to
+      # reconcile them against.
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          stripe_payout_id: "po_legacy_#{System.unique_integer()}",
+          amount: Money.new(15_287, :USD),
+          fee_total: Money.new(713, :USD),
+          currency: "USD",
+          status: "paid",
+          quickbooks_deposit_id: "wordpress-legacy",
+          quickbooks_sync_status: "synced"
+        })
+
+      report = Reconciliation.reconcile_payouts()
+
+      refute Enum.any?(report.discrepancies, fn disc ->
+               disc.stripe_payout_id == payout.stripe_payout_id
+             end)
+    end
+
+    test "still flags the same composition mismatch for a non-legacy payout" do
+      # Same shape as the legacy-payout test above (no linked payments/
+      # refunds, nonzero fee_total) but without the legacy marker - confirms
+      # the skip is scoped to wordpress-legacy payouts, not zero-linked
+      # payouts in general.
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          stripe_payout_id: "po_not_legacy_#{System.unique_integer()}",
+          amount: Money.new(15_287, :USD),
+          fee_total: Money.new(713, :USD),
+          currency: "USD",
+          status: "paid"
+        })
+
+      report = Reconciliation.reconcile_payouts()
+
+      assert Enum.any?(report.discrepancies, fn disc ->
+               disc.stripe_payout_id == payout.stripe_payout_id
+             end)
+    end
   end
 end
