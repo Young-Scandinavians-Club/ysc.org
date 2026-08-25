@@ -3451,6 +3451,64 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
     end
   end
 
+  describe "fetch_actual_stripe_fee_from_charge/1 balance transaction retry" do
+    import Mox
+
+    setup :verify_on_exit!
+
+    setup do
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      on_exit(fn ->
+        if previous_client,
+          do: Application.put_env(:ysc, :stripe_client, previous_client),
+          else: Application.delete_env(:ysc, :stripe_client)
+      end)
+
+      :ok
+    end
+
+    test "retries when the balance transaction isn't attached yet, then succeeds" do
+      charge_id = "ch_retry_success_#{System.unique_integer()}"
+
+      expect(Ysc.StripeMock, :retrieve_charge, 2, fn ^charge_id, _opts ->
+        {:ok, %Stripe.Charge{id: charge_id, balance_transaction: nil}}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_charge, fn ^charge_id, _opts ->
+        {:ok,
+         %Stripe.Charge{
+           id: charge_id,
+           balance_transaction: %Stripe.BalanceTransaction{fee: 3770}
+         }}
+      end)
+
+      fee = WebhookHandler.fetch_actual_stripe_fee_from_charge(charge_id)
+
+      assert fee == Money.new(:USD, "37.70")
+    end
+
+    test "falls back to the estimated fee after exhausting retries" do
+      charge_id = "ch_retry_exhausted_#{System.unique_integer()}"
+
+      # Initial attempt + 3 retries, all still missing the balance
+      # transaction, then one more call from the estimate fallback itself.
+      expect(Ysc.StripeMock, :retrieve_charge, 4, fn ^charge_id, _opts ->
+        {:ok, %Stripe.Charge{id: charge_id, balance_transaction: nil}}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_charge, fn ^charge_id, _opts ->
+        {:ok, %Stripe.Charge{id: charge_id, amount: 85_000}}
+      end)
+
+      fee = WebhookHandler.fetch_actual_stripe_fee_from_charge(charge_id)
+
+      assert fee ==
+               WebhookHandler.calculate_estimated_fee(Decimal.new("850.00"))
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # extract_id_from_expandable/1
   # Stripe fields like `payment_intent` or `charge` may be returned as a plain
