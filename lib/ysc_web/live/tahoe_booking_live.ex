@@ -42,6 +42,7 @@ defmodule YscWeb.TahoeBookingLive do
   alias Ysc.Subscriptions
   alias Ysc.Repo
   alias YscWeb.DateDisplay
+  alias YscWeb.BookingDisplay
   require Ysc.Logging
   import Ecto.Query
 
@@ -1569,9 +1570,10 @@ defmodule YscWeb.TahoeBookingLive do
                           class="w-full px-3 py-2 border border-zinc-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span class="text-zinc-900">
-                            {format_guests_display(
+                            {BookingDisplay.guests_label(
                               @guests_count,
-                              @children_count
+                              @children_count,
+                              separator: " • "
                             )}
                           </span>
                           <.icon
@@ -2394,14 +2396,9 @@ defmodule YscWeb.TahoeBookingLive do
                     <div class="flex justify-between items-start text-sm">
                       <span class="text-zinc-500 font-medium">Nights</span>
                       <span class="font-semibold text-zinc-900">
-                        {Date.diff(@checkout_date, @checkin_date)} {if Date.diff(
-                                                                         @checkout_date,
-                                                                         @checkin_date
-                                                                       ) ==
-                                                                         1,
-                                                                       do: "night",
-                                                                       else:
-                                                                         "nights"}
+                        {BookingDisplay.nights_label(
+                          Date.diff(@checkout_date, @checkin_date)
+                        )}
                       </span>
                     </div>
                   </div>
@@ -2412,7 +2409,11 @@ defmodule YscWeb.TahoeBookingLive do
                   >
                     <span class="text-zinc-500 font-medium">Guests</span>
                     <span class="font-semibold text-zinc-900">
-                      {format_guests_display(@guests_count, @children_count)}
+                      {BookingDisplay.guests_label(
+                        @guests_count,
+                        @children_count,
+                        separator: " • "
+                      )}
                     </span>
                   </div>
                   <!-- Family Membership Notice in Summary Card -->
@@ -2571,10 +2572,9 @@ defmodule YscWeb.TahoeBookingLive do
                           <%= if @price_breakdown.nights && @price_breakdown.price_per_night do %>
                             ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
-                            )} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                 1,
-                                                               do: "night",
-                                                               else: "nights"})
+                            )} × {BookingDisplay.nights_label(
+                              @price_breakdown.nights
+                            )})
                           <% end %>
                         </span>
                         <span class="font-semibold text-zinc-900">
@@ -2606,14 +2606,9 @@ defmodule YscWeb.TahoeBookingLive do
                               <% adult_count =
                                 @price_breakdown[:billable_people] ||
                                   @price_breakdown[:guests_count] ||
-                                  0 %> ({adult_count} {if adult_count == 1,
-                                do: "adult",
-                                else: "adults"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                                  1,
-                                                                                do:
-                                                                                  "night",
-                                                                                else:
-                                                                                  "nights"})
+                                  0 %> ({BookingDisplay.adults_label(adult_count)} × {BookingDisplay.nights_label(
+                                @price_breakdown.nights
+                              )})
                             <% end %>
                           </span>
                           <span class="font-semibold text-zinc-900">
@@ -2631,17 +2626,11 @@ defmodule YscWeb.TahoeBookingLive do
                           <span class="text-zinc-600">
                             Children
                             <%= if @price_breakdown.nights do %>
-                              <% ch = @price_breakdown[:children_count] || 0 %> ({ch} {if ch ==
-                                                                                            1,
-                                                                                          do:
-                                                                                            "child",
-                                                                                          else:
-                                                                                            "children"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                                                                                          1,
-                                                                                                                                        do:
-                                                                                                                                          "night",
-                                                                                                                                        else:
-                                                                                                                                          "nights"})
+                              <% ch = @price_breakdown[:children_count] || 0 %> ({BookingDisplay.children_label(
+                                ch
+                              )} × {BookingDisplay.nights_label(
+                                @price_breakdown.nights
+                              )})
                             <% end %>
                           </span>
                           <span class="font-semibold text-zinc-900">
@@ -7375,24 +7364,6 @@ defmodule YscWeb.TahoeBookingLive do
 
       _ ->
         0
-    end
-  end
-
-  defp format_guests_display(guests_count, children_count) do
-    guests_text =
-      if guests_count == 1, do: "1 adult", else: "#{guests_count} adults"
-
-    children_text =
-      cond do
-        children_count == 0 -> nil
-        children_count == 1 -> "1 child"
-        true -> "#{children_count} children"
-      end
-
-    if children_text do
-      "#{guests_text} • #{children_text}"
-    else
-      guests_text
     end
   end
 

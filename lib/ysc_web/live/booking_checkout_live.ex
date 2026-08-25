@@ -16,6 +16,7 @@ defmodule YscWeb.BookingCheckoutLive do
   alias Ysc.Stripe.PaymentIntentHelpers
   alias YscWeb.BookingGuestForm
   alias YscWeb.BookingUserMessages
+  alias YscWeb.BookingDisplay
   import Ecto.Query
   import Ysc.Text, only: [titleize: 1]
   import YscWeb.Components.BookingGuestInfoForm
@@ -408,27 +409,19 @@ defmodule YscWeb.BookingCheckoutLive do
                 {format_date_short(@booking.checkin_date, @timezone)} — {format_date_short(
                   @booking.checkout_date,
                   @timezone
-                )}, {Calendar.strftime(@booking.checkout_date, "%Y")} ({Date.diff(
-                  @booking.checkout_date,
-                  @booking.checkin_date
-                )} {if Date.diff(
-                         @booking.checkout_date,
-                         @booking.checkin_date
-                       ) == 1,
-                       do: "night",
-                       else: "nights"})
+                )}, {Calendar.strftime(@booking.checkout_date, "%Y")} ({BookingDisplay.nights_label(
+                  Date.diff(
+                    @booking.checkout_date,
+                    @booking.checkin_date
+                  )
+                )})
               </p>
               <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
                 <span class="text-zinc-600">
-                  {@booking.guests_count} {if @booking.guests_count == 1,
-                    do: "adult",
-                    else: "adults"}
-                  <%= if @booking.children_count && @booking.children_count > 0 do %>
-                    , {@booking.children_count} {if @booking.children_count ==
-                                                      1,
-                                                    do: "child",
-                                                    else: "children"}
-                  <% end %>
+                  {BookingDisplay.guests_label(
+                    @booking.guests_count,
+                    @booking.children_count
+                  )}
                 </span>
                 <%= if @booking.booking_mode == :room && Ecto.assoc_loaded?(@booking.rooms) &&
                       length(@booking.rooms) > 0 do %>
@@ -2549,9 +2542,7 @@ defmodule YscWeb.BookingCheckoutLive do
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <div class="text-zinc-400">
-              {billable_people} {if billable_people == 1,
-                do: "adult",
-                else: "adults"}
+              {BookingDisplay.adults_label(billable_people)}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
               <%= if adult_price_per_night do %>
@@ -2559,7 +2550,7 @@ defmodule YscWeb.BookingCheckoutLive do
               <% end %>
             </div>
             <div class="text-zinc-400 text-xs">
-              × {nights} {if nights == 1, do: "night", else: "nights"}
+              × {BookingDisplay.nights_label(nights)}
             </div>
             <div class="text-right font-medium tabular-nums">
               <%= if final_base_total do %>
@@ -2598,9 +2589,7 @@ defmodule YscWeb.BookingCheckoutLive do
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm mt-3">
             <div class="text-zinc-400">
-              {children_count} {if children_count == 1,
-                do: "child",
-                else: "children"}
+              {BookingDisplay.children_label(children_count)}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
               <%= if calculated_children_price_per_night do %>
@@ -2608,7 +2597,7 @@ defmodule YscWeb.BookingCheckoutLive do
               <% end %>
             </div>
             <div class="text-zinc-400 text-xs">
-              × {nights} {if nights == 1, do: "night", else: "nights"}
+              × {BookingDisplay.nights_label(nights)}
             </div>
             <div class="text-right font-medium tabular-nums">
               <%= if final_children_total do %>
@@ -2628,7 +2617,7 @@ defmodule YscWeb.BookingCheckoutLive do
         <%= if guests_count > 0 && length(segments) > 1 do %>
           <!-- Stay spans more than one season: show a line per season -->
           <div class="text-xs text-zinc-500 mb-1">
-            {guests_count} {if guests_count == 1, do: "guest", else: "guests"} · rate varies by season
+            {BookingDisplay.people_label(guests_count)} · rate varies by season
           </div>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <%= for segment <- segments do %>
@@ -2639,9 +2628,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 {MoneyHelper.format_money!(segment.price_per_guest_per_night)}/guest/night
               </div>
               <div class="text-zinc-400 text-xs">
-                × {segment.nights} {if segment.nights == 1,
-                  do: "night",
-                  else: "nights"}
+                × {BookingDisplay.nights_label(segment.nights)}
               </div>
               <div class="text-right font-medium tabular-nums">
                 {MoneyHelper.format_money!(segment.total)}
@@ -2652,15 +2639,13 @@ defmodule YscWeb.BookingCheckoutLive do
           <%= if guests_count > 0 && price_per_guest_per_night do %>
             <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
               <div class="text-zinc-400">
-                {guests_count} {if guests_count == 1,
-                  do: "guest",
-                  else: "guests"}
+                {BookingDisplay.people_label(guests_count)}
               </div>
               <div class="text-right text-zinc-500 text-xs tabular-nums">
                 {MoneyHelper.format_money!(price_per_guest_per_night)}/night
               </div>
               <div class="text-zinc-400 text-xs">
-                × {nights} {if nights == 1, do: "night", else: "nights"}
+                × {BookingDisplay.nights_label(nights)}
               </div>
               <div class="text-right font-medium tabular-nums">
                 <% {:ok, total} =
@@ -2672,7 +2657,7 @@ defmodule YscWeb.BookingCheckoutLive do
             <!-- Fallback if price_per_guest_per_night not available -->
             <div class="flex justify-between text-sm">
               <span class="text-zinc-400">
-                {nights} {if nights == 1, do: "night", else: "nights"}
+                {BookingDisplay.nights_label(nights)}
               </span>
               <span class="font-medium">
                 {MoneyHelper.format_money!(@total_price)}
@@ -2699,9 +2684,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 <% end %>
               </div>
               <div class="text-zinc-400 text-xs">
-                × {segment.nights} {if segment.nights == 1,
-                  do: "night",
-                  else: "nights"}
+                × {BookingDisplay.nights_label(segment.nights)}
               </div>
               <div class="text-right font-medium tabular-nums">
                 {MoneyHelper.format_money!(segment.total)}
@@ -2712,9 +2695,7 @@ defmodule YscWeb.BookingCheckoutLive do
           <%= if @price_breakdown[:nights] do %>
             <div class="flex justify-between text-sm">
               <span class="text-zinc-400">
-                {@price_breakdown.nights} {if @price_breakdown.nights == 1,
-                  do: "night",
-                  else: "nights"}
+                {BookingDisplay.nights_label(@price_breakdown.nights)}
               </span>
               <span class="font-medium">
                 {MoneyHelper.format_money!(
@@ -3109,14 +3090,7 @@ defmodule YscWeb.BookingCheckoutLive do
     adults = booking.guests_count || 1
     children = booking.children_count || 0
 
-    children_text =
-      if children > 0 do
-        " and #{children} #{if children == 1, do: "child", else: "children"}"
-      else
-        ""
-      end
-
-    "You are booking #{room_names} for #{adults} #{if adults == 1, do: "adult", else: "adults"}#{children_text}."
+    "You are booking #{room_names} for #{BookingDisplay.guests_label(adults, children, separator: " and ")}."
   end
 
   defp checkout_guest_info_submit_label(true), do: "Continue to confirmation"

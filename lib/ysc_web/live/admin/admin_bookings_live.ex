@@ -17,6 +17,7 @@ defmodule YscWeb.AdminBookingsLive do
   alias Ysc.Ledgers.{Payment, Refund}
   alias Ysc.Repo
   alias YscWeb.DateDisplay
+  alias YscWeb.BookingDisplay
   alias YscWeb.AdminBadgeHelpers
   import Ecto.Query
   require Ysc.Logging
@@ -1186,13 +1187,10 @@ defmodule YscWeb.AdminBookingsLive do
                           )}
                         </span>
                         <span>
-                          {booking.guests_count} {if booking.guests_count == 1,
-                            do: "adult",
-                            else: "adults"}
-                          {if (booking.children_count || 0) > 0,
-                            do:
-                              ", #{booking.children_count} #{if booking.children_count == 1, do: "child", else: "children"}",
-                            else: ""}
+                          {BookingDisplay.guests_label(
+                            booking.guests_count,
+                            booking.children_count
+                          )}
                         </span>
                       </div>
                     </div>
@@ -2502,28 +2500,17 @@ defmodule YscWeb.AdminBookingsLive do
                   </span>
                 </:col>
                 <:col :let={{_, booking}} label="Guests" field={:guests_count}>
-                  <% adults_count = booking.guests_count
-
-                  total_guests =
-                    booking.guests_count + (booking.children_count || 0) %>
                   <div class="text-sm text-zinc-600">
-                    <%= if adults_count > 0 do %>
-                      {adults_count} {if adults_count == 1,
-                        do: "adult",
-                        else: "adults"}
-                    <% end %>
-                    <%= if (booking.children_count || 0) > 0 do %>
-                      {if adults_count > 0, do: ", ", else: ""}{booking.children_count} {if booking.children_count ==
-                                                                                              1,
-                                                                                            do:
-                                                                                              "child",
-                                                                                            else:
-                                                                                              "children"}
-                    <% end %>
+                    {BookingDisplay.guests_label(
+                      booking.guests_count,
+                      booking.children_count,
+                      omit_zero_adults: true
+                    )}
                     <span class="text-zinc-500 ml-1">
-                      (Total: {total_guests} {if total_guests == 1,
-                        do: "guest",
-                        else: "guests"})
+                      ({BookingDisplay.guests_total_label(
+                        booking.guests_count,
+                        booking.children_count
+                      )})
                     </span>
                   </div>
                 </:col>
@@ -7413,19 +7400,7 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp format_calendar_guests(booking) do
-    adults = booking.guests_count || 0
-    children = booking.children_count || 0
-
-    adults_label = if adults == 1, do: "adult", else: "adults"
-
-    adults_part = "#{adults} #{adults_label}"
-
-    if children > 0 do
-      children_label = if children == 1, do: "child", else: "children"
-      adults_part <> ", #{children} #{children_label}"
-    else
-      adults_part
-    end
+    BookingDisplay.guests_label(booking.guests_count, booking.children_count)
   end
 
   defp calendar_continuation_classes(extends_before, extends_after, _scheme) do
