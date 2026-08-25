@@ -524,12 +524,12 @@ defmodule Ysc.Tickets do
 
         {:error, :checkout_payment_in_progress}
 
-      {:error, reason} ->
+      {:error, stripe_error} ->
         Ysc.Logging.warning(
           "Could not reconcile checkout payment with Stripe, not cancelling order",
           ticket_order_id: ticket_order.id,
           payment_intent_id: ticket_order.payment_intent_id,
-          error: inspect(reason)
+          error: inspect(stripe_error)
         )
 
         {:error, :checkout_payment_in_progress}
@@ -1720,6 +1720,18 @@ defmodule Ysc.Tickets do
             to.status == :pending
       )
       |> Repo.all()
+      # Stripe accepts cancelling a PaymentIntent in requires_action (e.g. a
+      # live 3DS challenge), it doesn't refuse it - so this pre-check must run
+      # before cancel_ticket_order/3's atomic cancel, same as
+      # maybe_cancel_pending_ticket_order/3 does, or starting a new checkout
+      # here would cancel a payment the user is actively completing elsewhere.
+      # Orders that fail this check are left pending and caught below by
+      # blocking_pending_orders/2.
+      |> Enum.filter(
+        &CheckoutCancel.pending_order_safe_to_cancel?(&1,
+          context: "create_ticket_order"
+        )
+      )
       |> Enum.map(fn order ->
         cancel_ticket_order(order, "Superseded by new checkout",
           context: "create_ticket_order"

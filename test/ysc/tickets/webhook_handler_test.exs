@@ -149,7 +149,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       assert :ok == result
     end
 
-    test "payment_intent.payment_failed cancels ticket order when metadata references order" do
+    test "payment_intent.payment_failed leaves a retryable order pending when metadata references order" do
       Ysc.Ledgers.ensure_basic_accounts()
 
       Oban.Testing.with_testing_mode(:manual, fn ->
@@ -178,14 +178,15 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
         # No `cancel_payment_intent` expectation: a decline leaves the
         # PaymentIntent open for retry with a different card, so this webhook
-        # must cancel only the local order, never Stripe's PaymentIntent.
+        # must leave the order pending and fulfillable, never touching Stripe
+        # or the local order's status.
         assert :ok =
                  WebhookHandler.handle_webhook_event(
                    "payment_intent.payment_failed",
                    %{"id" => payment_intent_id}
                  )
 
-        assert %TicketOrder{status: :cancelled} =
+        assert %TicketOrder{status: :pending} =
                  Repo.get!(TicketOrder, ticket_order.id)
       end)
     end

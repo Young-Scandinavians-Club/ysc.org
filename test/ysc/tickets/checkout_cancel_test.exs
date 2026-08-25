@@ -535,7 +535,16 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
     end
 
     test "fulfills the order instead of orphaning the payment when Stripe reveals it already succeeded" do
+      original_quickbooks_client = Application.get_env(:ysc, :quickbooks_client)
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      on_exit(fn ->
+        Application.put_env(
+          :ysc,
+          :quickbooks_client,
+          original_quickbooks_client
+        )
+      end)
 
       stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
         {:ok, %{"Id" => "qb_customer_default"}}
@@ -743,17 +752,11 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
 
-      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
-                                                        _opts ->
-        {:error,
-         %Stripe.Error{
-           source: :stripe,
-           code: :payment_intent_unexpected_state,
-           message: "cannot cancel",
-           extra: %{}
-         }}
-      end)
-
+      # The safety pre-check (matching maybe_cancel_pending_ticket_order/3)
+      # sees "processing" and skips the atomic cancel entirely - Stripe can
+      # in rare cases accept a cancel while processing, and this order might
+      # be an active ACH payment in another tab. blocking_pending_orders/2
+      # then does its own read to confirm it's still blocking.
       expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
                                                              _opts ->
         {:ok, payment_intent("processing", payment_intent_id)}
@@ -768,7 +771,16 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
     end
 
     test "blocks a second checkout instead of double-charging when cleanup fulfills the old order" do
+      original_quickbooks_client = Application.get_env(:ysc, :quickbooks_client)
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      on_exit(fn ->
+        Application.put_env(
+          :ysc,
+          :quickbooks_client,
+          original_quickbooks_client
+        )
+      end)
 
       stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
         {:ok, %{"Id" => "qb_customer_default"}}
@@ -806,6 +818,16 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
               "user_id" => order.user_id
             }
           })
+
+        # Simulates the TOCTOU race the atomic cancel exists to close: the
+        # safety pre-check reads a still-safe status (so prepare_new_checkout_session
+        # doesn't skip this order the way it would for a genuinely in-flight
+        # one), but by the time the atomic cancel reaches Stripe moments
+        # later, the client has actually finished confirming the payment.
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+        end)
 
         expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                           _opts ->

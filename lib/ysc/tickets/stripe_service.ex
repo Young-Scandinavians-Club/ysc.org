@@ -185,7 +185,26 @@ defmodule Ysc.Tickets.StripeService do
   end
 
   @doc """
-  Handles a failed payment intent and cancels the ticket order.
+  Handles a failed or canceled payment intent.
+
+  Pass `keep_retryable_order: true` (default `false`) for webhook-driven
+  callers reacting to `payment_intent.payment_failed`: that event usually
+  means Stripe reverted the PaymentIntent to `requires_payment_method` - it's
+  still open for the customer to retry with a different card against the
+  same PaymentIntent, inline, without ever leaving the checkout page.
+  Cancelling the local order in that case would leave it unable to be
+  fulfilled if the retry succeeds (`process_ticket_order_payment/2` only
+  completes `:pending`/`:expired` orders), stranding a captured charge with
+  no ticket and no refund - the same failure mode this module's abandonment
+  handling exists to prevent. With this flag, the order is only cancelled
+  once Stripe confirms the PaymentIntent itself is terminally `canceled`; a
+  still-retryable decline is a no-op that leaves the order pending for a
+  later succeeded webhook (or an explicit user/timeout cancel) to resolve.
+
+  Callers with no inline retry UI (e.g. the dedicated payment-failure
+  redirect page, where the customer is sent back to pick tickets again
+  rather than retry the same PaymentIntent) should leave this `false` to
+  keep releasing the order unconditionally, as before.
 
   ## Parameters:
   - `payment_intent_id`: The Stripe payment intent ID
@@ -197,8 +216,11 @@ defmodule Ysc.Tickets.StripeService do
   """
   def handle_failed_payment(
         payment_intent_id,
-        failure_reason \\ "Payment failed"
+        failure_reason \\ "Payment failed",
+        opts \\ []
       ) do
+    keep_retryable_order? = Keyword.get(opts, :keep_retryable_order, false)
+
     with {:ok, payment_intent} <-
            stripe_client().retrieve_payment_intent(payment_intent_id, %{}),
          {:ok, ticket_order} <-
@@ -208,6 +230,18 @@ defmodule Ysc.Tickets.StripeService do
           process_successful_payment(payment_intent)
 
         ticket_order.status == :completed ->
+          {:ok, ticket_order}
+
+        keep_retryable_order? and payment_intent.status != "canceled" ->
+          require Ysc.Logging
+
+          Ysc.Logging.info(
+            "PaymentIntent still retryable after failure, not cancelling order",
+            ticket_order_id: ticket_order.id,
+            payment_intent_id: payment_intent.id,
+            payment_intent_status: payment_intent.status
+          )
+
           {:ok, ticket_order}
 
         true ->

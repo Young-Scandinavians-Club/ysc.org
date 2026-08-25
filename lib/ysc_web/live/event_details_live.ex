@@ -5551,7 +5551,9 @@ defmodule YscWeb.EventDetailsLive do
     # succeeded, fulfills the order instead of orphaning the charge - see
     # Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2.
     if pending_checkout_safe_to_cancel?(ticket_order, opts) do
-      case Ysc.Tickets.cancel_ticket_order(ticket_order, reason) do
+      case Ysc.Tickets.cancel_ticket_order(ticket_order, reason,
+             context: Keyword.get(opts, :context, "cancel_ticket_order")
+           ) do
         {:ok, %{status: :completed} = completed_order} ->
           {:fulfilled, completed_order}
 
