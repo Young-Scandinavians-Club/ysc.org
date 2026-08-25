@@ -1559,6 +1559,69 @@ defmodule Ysc.LedgersTest do
                Ledgers.book_payout_stripe_fees(payout, Money.new(0, :USD))
     end
 
+    test "backfill_payment_stripe_fee/2 books expense and receivable reduction",
+         %{user: user} do
+      payment =
+        insert_payment_for_entries(
+          user,
+          "in_backfill_#{System.unique_integer([:positive])}"
+        )
+
+      fee = Money.new(:USD, "2.19")
+
+      assert {:ok, [fee_expense, stripe_credit]} =
+               Ledgers.backfill_payment_stripe_fee(payment, fee)
+
+      assert fee_expense.debit_credit == :debit
+      assert fee_expense.amount == fee
+
+      assert String.contains?(
+               fee_expense.description,
+               "Stripe processing fee for payment #{payment.reference_id}"
+             )
+
+      assert stripe_credit.debit_credit == :credit
+      assert stripe_credit.amount == fee
+
+      fee_account = Ledgers.get_account_by_name("stripe_fees")
+      stripe_account = Ledgers.get_account_by_name("stripe_account")
+      assert fee_expense.account_id == fee_account.id
+      assert stripe_credit.account_id == stripe_account.id
+
+      # Idempotent on re-run
+      assert {:ok, :already_booked} =
+               Ledgers.backfill_payment_stripe_fee(payment, fee)
+    end
+
+    test "backfill_payment_stripe_fee/2 no-ops for zero fee", %{user: user} do
+      payment =
+        insert_payment_for_entries(
+          user,
+          "in_backfill_zero_#{System.unique_integer([:positive])}"
+        )
+
+      assert {:ok, :no_fee} =
+               Ledgers.backfill_payment_stripe_fee(payment, Money.new(0, :USD))
+    end
+
+    test "list_payments_missing_stripe_fee/1 finds invoice payments with no fee entry",
+         %{user: user} do
+      unique = System.unique_integer([:positive])
+      missing = insert_payment_for_entries(user, "in_missing_#{unique}")
+      booked = insert_payment_for_entries(user, "in_booked_#{unique}")
+      not_invoice = insert_payment_for_entries(user, "pi_ticket_#{unique}")
+
+      {:ok, _} =
+        Ledgers.backfill_payment_stripe_fee(booked, Money.new(:USD, "1.50"))
+
+      results = Ledgers.list_payments_missing_stripe_fee()
+      result_ids = Enum.map(results, & &1.id)
+
+      assert missing.id in result_ids
+      refute booked.id in result_ids
+      refute not_invoice.id in result_ids
+    end
+
     test "link_payment_to_payout/2 links payment to payout", %{
       payment1: payment1,
       payment2: payment2
