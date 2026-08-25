@@ -46,6 +46,24 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
     %Stripe.PaymentIntent{id: id, status: status, amount: 2500}
   end
 
+  defp stripe_unexpected_state_error do
+    %Stripe.Error{
+      source: :stripe,
+      code: :payment_intent_unexpected_state,
+      message: "cannot cancel",
+      extra: %{}
+    }
+  end
+
+  defp stripe_api_error(message) do
+    %Stripe.Error{
+      source: :stripe,
+      code: :api_error,
+      message: message,
+      extra: %{}
+    }
+  end
+
   describe "pending_order_safe_to_cancel?/2" do
     test "returns true when order has no payment intent" do
       assert CheckoutCancel.pending_order_safe_to_cancel?(order_struct())
@@ -240,6 +258,132 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
 
         assert CheckoutCancel.checkout_payment_in_flight?(order)
       end
+    end
+  end
+
+  describe "cancel_payment_intent_for_abandoned_checkout/2" do
+    test "returns {:cancel, nil} when the order has no payment intent" do
+      assert {:cancel, nil} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order_struct()
+               )
+    end
+
+    test "returns {:cancel, payment_intent} when Stripe accepts the cancel" do
+      payment_intent_id = "pi_abandon_ok"
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok, payment_intent("canceled", payment_intent_id)}
+      end)
+
+      assert {:cancel, %Stripe.PaymentIntent{id: ^payment_intent_id}} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
+    end
+
+    test "returns {:already_succeeded, payment_intent} when Stripe refuses because payment succeeded" do
+      payment_intent_id = "pi_abandon_succeeded"
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("succeeded", payment_intent_id)}
+      end)
+
+      assert {:already_succeeded, %Stripe.PaymentIntent{status: "succeeded"}} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
+    end
+
+    test "returns {:cancel, payment_intent} when Stripe refused cancel but PI is already canceled" do
+      payment_intent_id = "pi_abandon_already_canceled"
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("canceled", payment_intent_id)}
+      end)
+
+      assert {:cancel, %Stripe.PaymentIntent{status: "canceled"}} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
+    end
+
+    test "returns {:in_progress, payment_intent} when Stripe refuses cancel while processing" do
+      payment_intent_id = "pi_abandon_processing"
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:in_progress, %Stripe.PaymentIntent{status: "processing"}} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
+    end
+
+    test "returns {:error, reason} when retrieve fails after Stripe refused the cancel" do
+      payment_intent_id = "pi_abandon_retrieve_fail"
+      retrieve_error = stripe_api_error("not found")
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:error, retrieve_error}
+      end)
+
+      assert {:error, ^retrieve_error} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
+    end
+
+    test "returns {:error, reason} when cancel fails with a non-Stripe error" do
+      payment_intent_id = "pi_abandon_timeout"
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, :timeout}
+      end)
+
+      assert {:error, :timeout} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
     end
   end
 
@@ -452,6 +596,119 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
 
         assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
       end)
+    end
+
+    test "cancels the order when Stripe refused cancel but the PaymentIntent is already canceled" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_already_canceled_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("canceled", payment_intent_id)}
+      end)
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(order, "User cancelled")
+
+      assert cancelled.status == :cancelled
+    end
+
+    test "rejects cancellation when Stripe cancel fails with a non-Stripe error" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_cancel_timeout_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, :timeout}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.cancel_ticket_order(order, "User cancelled")
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "rejects cancellation when retrieve fails after Stripe refused the cancel" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_cancel_retrieve_fail_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:error, stripe_api_error("not found")}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.cancel_ticket_order(order, "User cancelled")
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "rejects cancellation when a payment redirect is in progress" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_redirect_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.cancel_ticket_order(order, "User cancelled",
+                 payment_redirect_in_progress: true
+               )
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "returns fulfillment error when succeeded payment cannot complete the order" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_fulfillment_fail_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      succeeded_payment_intent =
+        struct(Stripe.PaymentIntent, %{
+          id: payment_intent_id,
+          status: "succeeded",
+          amount: 1,
+          metadata: %{
+            "ticket_order_id" => order.id,
+            "user_id" => order.user_id
+          }
+        })
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
+
+      assert {:error, :amount_mismatch} =
+               Tickets.cancel_ticket_order(order, "User left checkout")
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
 
     test "still cancels completed orders after refund without payment guard" do
