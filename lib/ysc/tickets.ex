@@ -1713,6 +1713,16 @@ defmodule Ysc.Tickets do
   defp prepare_new_checkout_session(user_id, event_id) do
     require Ysc.Logging
 
+    # Same cheap pre-check EventDetailsLive uses before teardown cancel: skip
+    # orders whose PaymentIntent is already in 3DS / processing / succeeded.
+    # Stripe accepts cancelling a requires_action PaymentIntent instead of
+    # refusing it, so without this, starting a second checkout could cancel
+    # a payment the user is actively completing elsewhere. Orders that look
+    # safe here still go through cancel_ticket_order/3's atomic cancel below,
+    # which can still discover the payment succeeded moments later (the same
+    # TOCTOU race the atomic cancel closes) - that's what
+    # fulfilled_during_cleanup? catches. Orders filtered out here are left
+    # pending, caught below by blocking_pending_orders/2.
     fulfilled_during_cleanup? =
       from(to in TicketOrder,
         where:
@@ -1720,13 +1730,6 @@ defmodule Ysc.Tickets do
             to.status == :pending
       )
       |> Repo.all()
-      # Stripe accepts cancelling a PaymentIntent in requires_action (e.g. a
-      # live 3DS challenge), it doesn't refuse it - so this pre-check must run
-      # before cancel_ticket_order/3's atomic cancel, same as
-      # maybe_cancel_pending_ticket_order/3 does, or starting a new checkout
-      # here would cancel a payment the user is actively completing elsewhere.
-      # Orders that fail this check are left pending and caught below by
-      # blocking_pending_orders/2.
       |> Enum.filter(
         &CheckoutCancel.pending_order_safe_to_cancel?(&1,
           context: "create_ticket_order"
