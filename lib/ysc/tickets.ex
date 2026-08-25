@@ -441,10 +441,20 @@ defmodule Ysc.Tickets do
   Pending checkout orders with in-flight Stripe payments are not cancelled so a
   concurrent user cancel cannot race a processing or 3DS payment into a charge
   without ticket fulfillment.
+
+  Pass `reconcile_with_stripe: false` (default `true`) to skip the atomic
+  Stripe PaymentIntent cancel and just cancel the local order. Stripe-driven
+  callers (e.g. `StripeService.handle_failed_payment/2`, reacting to a
+  `payment_intent.payment_failed`/`canceled` webhook) must use this: Stripe has
+  already decided that PaymentIntent's fate, and a card decline typically
+  leaves it in `requires_payment_method` so the customer can retry with a
+  different payment method against the same PaymentIntent - actively
+  cancelling it here would foreclose that retry.
   """
   def cancel_ticket_order(ticket_order, reason \\ "User cancelled", opts \\ []) do
     from_statuses = Keyword.get(opts, :from_statuses, [:pending])
     context = Keyword.get(opts, :context, "cancel_ticket_order")
+    reconcile_with_stripe = Keyword.get(opts, :reconcile_with_stripe, true)
 
     cond do
       from_statuses != [:pending] ->
@@ -452,6 +462,9 @@ defmodule Ysc.Tickets do
 
       Keyword.get(opts, :payment_redirect_in_progress, false) ->
         {:error, :checkout_payment_in_progress}
+
+      not reconcile_with_stripe ->
+        do_cancel_ticket_order(ticket_order, reason, from_statuses)
 
       true ->
         resolve_abandoned_checkout(ticket_order, reason, from_statuses, context)
@@ -488,7 +501,7 @@ defmodule Ysc.Tickets do
 
             ok
 
-          {:error, fulfillment_error} = error ->
+          {:error, fulfillment_error} ->
             Ysc.Logging.error(
               "Payment succeeded during checkout abandonment but order could not be fulfilled",
               ticket_order_id: ticket_order.id,
@@ -496,7 +509,10 @@ defmodule Ysc.Tickets do
               error: inspect(fulfillment_error)
             )
 
-            error
+            # Tagged distinctly from a plain cancel failure: the customer's
+            # card was already charged, so callers must tell them that rather
+            # than silently treating this like an ordinary cancel error.
+            {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
         end
 
       {:in_progress, _payment_intent} ->
@@ -1695,33 +1711,55 @@ defmodule Ysc.Tickets do
   ## Private Functions
 
   defp prepare_new_checkout_session(user_id, event_id) do
-    from(to in TicketOrder,
-      where:
-        to.user_id == ^user_id and to.event_id == ^event_id and
-          to.status == :pending
-    )
-    |> Repo.all()
-    |> Enum.each(fn order ->
-      cancel_ticket_order(order, "Superseded by new checkout",
-        context: "create_ticket_order"
+    require Ysc.Logging
+
+    fulfilled_during_cleanup? =
+      from(to in TicketOrder,
+        where:
+          to.user_id == ^user_id and to.event_id == ^event_id and
+            to.status == :pending
       )
-    end)
+      |> Repo.all()
+      |> Enum.map(fn order ->
+        cancel_ticket_order(order, "Superseded by new checkout",
+          context: "create_ticket_order"
+        )
+      end)
+      |> Enum.any?(fn
+        {:ok, %TicketOrder{status: :completed}} -> true
+        _ -> false
+      end)
 
-    case CheckoutCancel.blocking_pending_orders(user_id, event_id) do
-      [] ->
-        :ok
-
-      orders ->
-        require Ysc.Logging
-
+    cond do
+      fulfilled_during_cleanup? ->
+        # A stale pending order's payment turned out to have already
+        # succeeded with Stripe, and cancel_ticket_order/3 just fulfilled it
+        # instead of orphaning that charge. Block starting a brand-new
+        # checkout for this event so the user doesn't pay twice - they
+        # already have tickets from the order we just completed.
         Ysc.Logging.info(
-          "Blocked new ticket checkout while another payment is in flight",
+          "Blocked new ticket checkout: an abandoned order for this event was fulfilled during cleanup",
           user_id: user_id,
-          event_id: event_id,
-          pending_order_ids: Enum.map(orders, & &1.id)
+          event_id: event_id
         )
 
         {:error, :checkout_payment_in_progress}
+
+      true ->
+        case CheckoutCancel.blocking_pending_orders(user_id, event_id) do
+          [] ->
+            :ok
+
+          orders ->
+            Ysc.Logging.info(
+              "Blocked new ticket checkout while another payment is in flight",
+              user_id: user_id,
+              event_id: event_id,
+              pending_order_ids: Enum.map(orders, & &1.id)
+            )
+
+            {:error, :checkout_payment_in_progress}
+        end
     end
   end
 

@@ -157,6 +157,12 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
         cancel_timeout_jobs_for_order!(ticket_order.id)
         payment_intent_id = "pi_failed_with_order_#{ticket_order.id}"
 
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
+
         expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
           assert id == payment_intent_id
 
@@ -170,6 +176,9 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
         pin_stripe_mock!()
 
+        # No `cancel_payment_intent` expectation: a decline leaves the
+        # PaymentIntent open for retry with a different card, so this webhook
+        # must cancel only the local order, never Stripe's PaymentIntent.
         assert :ok =
                  WebhookHandler.handle_webhook_event(
                    "payment_intent.payment_failed",
@@ -188,6 +197,12 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
         ticket_order = ticket_order_fixture()
         cancel_timeout_jobs_for_order!(ticket_order.id)
         payment_intent_id = "pi_canceled_with_order_#{ticket_order.id}"
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
 
         expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
           assert id == payment_intent_id

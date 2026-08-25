@@ -5558,6 +5558,9 @@ defmodule YscWeb.EventDetailsLive do
         {:ok, _} ->
           :cancelled
 
+        {:error, {:payment_succeeded_fulfillment_failed, _fulfillment_error}} ->
+          :payment_succeeded_fulfillment_failed
+
         _ ->
           :cancel_failed
       end
@@ -5716,15 +5719,25 @@ defmodule YscWeb.EventDetailsLive do
 
       other ->
         socket =
-          if other == :unsafe do
-            YscWeb.Flash.put_toast(
-              socket,
-              :info,
-              "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation.",
-              title: "Payment"
-            )
-          else
-            socket
+          cond do
+            other == :unsafe ->
+              YscWeb.Flash.put_toast(
+                socket,
+                :info,
+                "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation.",
+                title: "Payment"
+              )
+
+            other == :payment_succeeded_fulfillment_failed ->
+              YscWeb.Flash.put_toast(
+                socket,
+                :warning,
+                "Your payment went through, but we hit a snag finishing your order. We're on it - you'll get a confirmation email shortly, or contact info@ysc.org if you don't hear from us soon.",
+                title: "Payment"
+              )
+
+            true ->
+              socket
           end
 
         {:noreply,

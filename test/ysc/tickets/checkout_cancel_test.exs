@@ -705,7 +705,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
         {:ok, succeeded_payment_intent}
       end)
 
-      assert {:error, :amount_mismatch} =
+      assert {:error, {:payment_succeeded_fulfillment_failed, :amount_mismatch}} =
                Tickets.cancel_ticket_order(order, "User left checkout")
 
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
@@ -765,6 +765,78 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
                })
 
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "blocks a second checkout instead of double-charging when cleanup fulfills the old order" do
+      Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_default"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
+        {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn _name ->
+        {:ok, %{"Id" => "qb_account_default"}}
+      end)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        order =
+          ticket_order_fixture()
+          |> Ysc.Repo.preload(tickets: :ticket_tier)
+
+        [ticket] = order.tickets
+        payment_intent_id = "pi_already_succeeded_new_checkout_#{order.id}"
+
+        assert {:ok, order} =
+                 Tickets.update_payment_intent(order, payment_intent_id)
+
+        amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+        succeeded_payment_intent =
+          struct(Stripe.PaymentIntent, %{
+            id: payment_intent_id,
+            status: "succeeded",
+            amount: amount_cents,
+            metadata: %{
+              "ticket_order_id" => order.id,
+              "user_id" => order.user_id
+            }
+          })
+
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, succeeded_payment_intent}
+        end)
+
+        # Simulates the user re-clicking "buy tickets" for the same event
+        # while their earlier (seemingly abandoned) checkout's payment had
+        # actually already gone through with Stripe. The cleanup step fulfills
+        # that old order instead of orphaning the charge - starting a brand
+        # new checkout here must be blocked, not silently allowed, or the
+        # user would pay twice for the same event.
+        assert {:error, :checkout_payment_in_progress} =
+                 Tickets.create_ticket_order(order.user_id, order.event_id, %{
+                   ticket.ticket_tier_id => 1
+                 })
+
+        assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
+      end)
     end
   end
 end

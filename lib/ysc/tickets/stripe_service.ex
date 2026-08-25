@@ -211,7 +211,15 @@ defmodule Ysc.Tickets.StripeService do
           {:ok, ticket_order}
 
         true ->
-          Tickets.cancel_ticket_order(ticket_order, failure_reason)
+          # Stripe (via this webhook) already decided this PaymentIntent's
+          # fate - a decline typically leaves it in requires_payment_method so
+          # the customer can retry with a different card against the same
+          # PaymentIntent. Skip the atomic Stripe-cancel reconciliation (that's
+          # only for closing the abandonment race) so we don't foreclose that
+          # retry; just cancel the local order.
+          Tickets.cancel_ticket_order(ticket_order, failure_reason,
+            reconcile_with_stripe: false
+          )
       end
     end
   end

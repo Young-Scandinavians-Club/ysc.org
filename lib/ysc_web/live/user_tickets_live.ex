@@ -533,6 +533,10 @@ defmodule YscWeb.UserTicketsLive do
     do:
       "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation."
 
+  defp cancel_order_error_message({:payment_succeeded_fulfillment_failed, _}),
+    do:
+      "Your payment went through, but we hit a snag finishing your order. We're on it - you'll get a confirmation email shortly, or contact info@ysc.org if you don't hear from us soon."
+
   defp cancel_order_error_message(_reason),
     do:
       "We couldn't cancel these tickets. Please try again, or contact info@ysc.org for help."

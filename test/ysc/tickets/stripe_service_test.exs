@@ -483,12 +483,18 @@ defmodule Ysc.Tickets.StripeServiceTest do
       struct(Stripe.PaymentIntent, Map.merge(defaults, Map.new(overrides)))
     end
 
-    test "cancels a pending ticket order after payment failure" do
+    test "cancels a pending ticket order after payment failure without touching Stripe" do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
         payment_intent_id = "pi_fail_cancel_#{ticket_order.id}"
 
         cancel_timeout_jobs_for_order!(ticket_order.id)
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
 
         payment_intent =
           failed_payment_intent_for_order(ticket_order, id: payment_intent_id)
@@ -498,6 +504,11 @@ defmodule Ysc.Tickets.StripeServiceTest do
           {:ok, payment_intent}
         end)
 
+        # No `cancel_payment_intent` expectation is set: a card decline
+        # typically leaves the PaymentIntent in requires_payment_method so
+        # the customer can retry with a different card, so this path must
+        # cancel only the local order and never call Stripe's cancel
+        # endpoint. Mox's strict mode fails this test if it did.
         assert {:ok, cancelled} =
                  StripeService.handle_failed_payment(
                    payment_intent_id,
