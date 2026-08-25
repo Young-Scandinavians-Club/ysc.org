@@ -444,22 +444,79 @@ defmodule Ysc.Tickets do
   """
   def cancel_ticket_order(ticket_order, reason \\ "User cancelled", opts \\ []) do
     from_statuses = Keyword.get(opts, :from_statuses, [:pending])
+    context = Keyword.get(opts, :context, "cancel_ticket_order")
 
-    if from_statuses == [:pending] and
-         CheckoutCancel.checkout_payment_in_flight?(ticket_order,
-           context: Keyword.get(opts, :context, "cancel_ticket_order")
+    cond do
+      from_statuses != [:pending] ->
+        do_cancel_ticket_order(ticket_order, reason, from_statuses)
+
+      Keyword.get(opts, :payment_redirect_in_progress, false) ->
+        {:error, :checkout_payment_in_progress}
+
+      true ->
+        resolve_abandoned_checkout(ticket_order, reason, from_statuses, context)
+    end
+  end
+
+  # Reconciles a checkout-abandonment cancel with Stripe before touching the
+  # local order. See CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2
+  # for why this must cancel (not just read) the PaymentIntent: a status read can
+  # go stale between the check and the cancel, letting a client finish confirming
+  # payment against an order we're about to throw away. Cancelling atomically closes
+  # that gap - and when Stripe reveals the payment already succeeded, we fulfill the
+  # order right here instead of orphaning a captured charge with no ticket granted.
+  defp resolve_abandoned_checkout(ticket_order, reason, from_statuses, context) do
+    require Ysc.Logging
+
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           ticket_order,
+           context
          ) do
-      require Ysc.Logging
+      {:cancel, _payment_intent} ->
+        do_cancel_ticket_order(ticket_order, reason, from_statuses)
 
-      Ysc.Logging.info(
-        "Skipped ticket order cancellation while checkout payment is in flight",
-        ticket_order_id: ticket_order.id,
-        payment_intent_id: ticket_order.payment_intent_id
-      )
+      {:already_succeeded, payment_intent} ->
+        case Ysc.Tickets.StripeService.process_successful_payment(
+               payment_intent
+             ) do
+          {:ok, completed_order} = ok ->
+            Ysc.Logging.info(
+              "Fulfilled ticket order from an abandoned checkout after payment succeeded",
+              ticket_order_id: completed_order.id,
+              payment_intent_id: payment_intent.id
+            )
 
-      {:error, :checkout_payment_in_progress}
-    else
-      do_cancel_ticket_order(ticket_order, reason, from_statuses)
+            ok
+
+          {:error, fulfillment_error} = error ->
+            Ysc.Logging.error(
+              "Payment succeeded during checkout abandonment but order could not be fulfilled",
+              ticket_order_id: ticket_order.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(fulfillment_error)
+            )
+
+            error
+        end
+
+      {:in_progress, _payment_intent} ->
+        Ysc.Logging.info(
+          "Skipped ticket order cancellation while checkout payment is in flight",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id
+        )
+
+        {:error, :checkout_payment_in_progress}
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Could not reconcile checkout payment with Stripe, not cancelling order",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id,
+          error: inspect(reason)
+        )
+
+        {:error, :checkout_payment_in_progress}
     end
   end
 

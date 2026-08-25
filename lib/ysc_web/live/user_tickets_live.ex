@@ -352,6 +352,27 @@ defmodule YscWeb.UserTicketsLive do
 
       ticket_order ->
         case Tickets.cancel_ticket_order(ticket_order, "User cancelled") do
+          # The payment actually succeeded just before the cancel reached Stripe -
+          # cancel_ticket_order/3 fulfills the order instead of orphaning the
+          # charge. See Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2.
+          {:ok, %{status: :completed} = completed_order} ->
+            ticket_orders =
+              Tickets.list_user_upcoming_ticket_orders(
+                socket.assigns.current_user.id
+              )
+
+            {:noreply,
+             socket
+             |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Your payment had already gone through, so we confirmed your tickets instead of cancelling.",
+               title: "Order"
+             )
+             |> push_navigate(
+               to: ~p"/orders/#{completed_order.id}/confirmation"
+             )}
+
           {:ok, _cancelled_order} ->
             ticket_orders =
               Tickets.list_user_upcoming_ticket_orders(

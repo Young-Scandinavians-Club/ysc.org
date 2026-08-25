@@ -237,13 +237,32 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert {:ok, _order} =
                Tickets.update_payment_intent(order, payment_intent_id)
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
-                                                             _opts ->
+      # stub (not a pinned expect): asserts on the resulting flash/order state
+      # below, not on exact Stripe call count - a strict pinned expect here is
+      # fragile under this file's global Mox mode, where a stray call from an
+      # unrelated dangling LiveView (see other tests' terminate/2 cleanup) can
+      # land on whatever expectation is next in the shared queue.
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
         {:ok,
          build_payment_intent(%{
-           id: payment_intent_id,
+           id: id,
            status: "processing"
          })}
+      end)
+
+      # Real Stripe refuses to cancel a PaymentIntent that's actively
+      # processing - override the file's default "always succeeds" stub so
+      # cancel_ticket_order/3's atomic cancel attempt correctly falls back to
+      # reading status (above) instead of treating the blocking order as
+      # cancellable. See Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2.
+      stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :payment_intent_unexpected_state,
+           message: "cannot cancel",
+           extra: %{}
+         }}
       end)
 
       conn = log_in_user(build_conn(), user)
@@ -899,8 +918,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
         assert money_to_cents(recalculated_total) == new_amount_cents
 
-        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
-          {:ok, build_payment_intent(%{id: pi_id, status: "canceled"})}
+        # stub (not expect): the repricing flow cancels the stale PI, and
+        # cancel_ticket_order/3 may make its own best-effort cancel call when
+        # this test's LiveView terminates with an open checkout - see
+        # Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2.
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+          {:ok, build_payment_intent(%{id: id, status: "canceled"})}
         end)
 
         expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
@@ -971,8 +994,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         view = wait_for_async(view)
         assert has_element?(view, "#payment-modal")
 
-        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
-          {:ok, build_payment_intent(%{id: pi_id, status: "canceled"})}
+        # stub (not expect): the repricing flow cancels the stale PI, and
+        # cancel_ticket_order/3 may make its own best-effort cancel call when
+        # this test's LiveView terminates with an open checkout - see
+        # Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2.
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+          {:ok, build_payment_intent(%{id: id, status: "canceled"})}
         end)
 
         expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
