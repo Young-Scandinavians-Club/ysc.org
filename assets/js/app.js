@@ -316,20 +316,37 @@ liveSocket.connect();
 // connection to plausibly have gone stale, regardless of what isConnected()
 // reports. Reconnecting when the socket was actually still healthy just
 // causes a quick, harmless rejoin.
+//
+// Chrome 149+ (and installed PWAs) can skip `visibilitychange` after a freeze;
+// the Page Lifecycle `resume` event still fires. Phoenix 1.8.13 listens for
+// that too — keep this more aggressive reconnect on the same path.
 const STALE_AFTER_HIDDEN_MS = 3000;
 let hiddenAt = null;
 
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
+function markPageHidden() {
+    if (hiddenAt === null) {
         hiddenAt = Date.now();
-        return;
     }
+}
 
+function reconnectIfStaleAfterHidden() {
     if (hiddenAt !== null && Date.now() - hiddenAt > STALE_AFTER_HIDDEN_MS) {
         liveSocket.disconnect(() => liveSocket.connect());
     }
     hiddenAt = null;
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        markPageHidden();
+        return;
+    }
+
+    reconnectIfStaleAfterHidden();
 });
+
+document.addEventListener("freeze", markPageHidden);
+document.addEventListener("resume", reconnectIfStaleAfterHidden);
 
 // Handle map toggle text updates
 window.addEventListener("phx:toggle-map-text", () => {
