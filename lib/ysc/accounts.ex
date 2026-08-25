@@ -4445,8 +4445,8 @@ defmodule Ysc.Accounts do
   YTD comparison of **net-new membership joins** (not active headcount),
   alongside a **renewals** count for the current period.
 
-  `current_ytd_joins`/`prior_ytd_joins` count distinct primary `User`
-  accounts that either:
+  `current_ytd_joins`/`prior_ytd_joins` are *gross* join counts: distinct
+  primary `User` accounts that either:
 
   - had `lifetime_membership_awarded_at` fall in the half-open interval
     `[range_start, range_end)`, or
@@ -4457,6 +4457,16 @@ defmodule Ysc.Accounts do
   These never double-count renewals: a recurring subscription's row is
   reused across billing cycles (see `Subscriptions.create_subscription_from_stripe/3`),
   so only its original `inserted_at` can ever land in a join window.
+
+  `current_ytd_losses`/`prior_ytd_losses` count distinct primary users
+  whose subscription lapsed (`stripe_status` of "canceled"/"cancelled"/
+  "unpaid") with a `current_period_end` falling in that same interval —
+  see `membership_losses_in_interval/2`.
+
+  `current_ytd_net_new`/`prior_ytd_net_new` are joins minus losses for
+  each span — this is the figure actually worth calling "net new", since
+  gross joins alone can (and does) run well above the active membership
+  total once mid-year cancellations are ignored.
 
   `renewals_ytd` separately counts distinct primary users whose subscription
   started a new billing period (not its first) within the current
@@ -4486,6 +4496,14 @@ defmodule Ysc.Accounts do
     prior_count =
       membership_joins_in_interval(prior_year_start, prior_period_end)
 
+    current_losses = membership_losses_in_interval(year_start, now)
+
+    prior_losses =
+      membership_losses_in_interval(prior_year_start, prior_period_end)
+
+    current_net_new = current_count - current_losses
+    prior_net_new = prior_count - prior_losses
+
     renewals_count = membership_renewals_in_interval(year_start, now)
 
     # `prior_year_start` is already a UTC instant at Jan 1 00:00:00 of the
@@ -4496,8 +4514,8 @@ defmodule Ysc.Accounts do
     prior_year_label = Integer.to_string(prior_year_start.year)
 
     change_percent =
-      if prior_count >= @membership_joins_change_percent_min_baseline do
-        round((current_count - prior_count) / prior_count * 100)
+      if prior_net_new >= @membership_joins_change_percent_min_baseline do
+        round((current_net_new - prior_net_new) / prior_net_new * 100)
       else
         nil
       end
@@ -4505,6 +4523,10 @@ defmodule Ysc.Accounts do
     %{
       current_ytd_joins: current_count,
       prior_ytd_joins: prior_count,
+      current_ytd_losses: current_losses,
+      prior_ytd_losses: prior_losses,
+      current_ytd_net_new: current_net_new,
+      prior_ytd_net_new: prior_net_new,
       prior_year_label: prior_year_label,
       joins_ytd_change_percent: change_percent,
       renewals_ytd: renewals_count
@@ -4546,6 +4568,37 @@ defmodule Ysc.Accounts do
       |> Repo.all()
 
     (lifetime_ids ++ sub_ids) |> Enum.uniq() |> length()
+  end
+
+  # Distinct primary users whose subscription lapsed with a coverage end
+  # date (`current_period_end`) falling in `[start_dt, end_dt)`. There is
+  # no `canceled_at` timestamp on `Subscription` — `current_period_end` is
+  # the best available proxy for "when this member actually lost
+  # coverage", and matches the same status set + column already used by
+  # `Accounts.MembershipReport.list_expired/2` for the same purpose.
+  #
+  # A subscription that lapsed and was later reactivated (a new billing
+  # period pushing `current_period_end` forward, or a fresh subscription
+  # row) will no longer show up as a loss in that earlier window, since
+  # only the subscription's *current* status/period is stored — there's
+  # no historical ledger of past cancel/reactivate cycles to query.
+  defp membership_losses_in_interval(
+         %DateTime{} = start_dt,
+         %DateTime{} = end_dt
+       ) do
+    from(s in Subscription,
+      join: u in User,
+      on: s.user_id == u.id,
+      where: is_nil(u.primary_user_id),
+      where: s.stripe_status in ["canceled", "cancelled", "unpaid"],
+      where: not is_nil(s.current_period_end),
+      where:
+        s.current_period_end >= ^start_dt and s.current_period_end < ^end_dt,
+      distinct: s.user_id,
+      select: s.user_id
+    )
+    |> Repo.all()
+    |> length()
   end
 
   # Distinct primary users whose subscription entered a **new billing
