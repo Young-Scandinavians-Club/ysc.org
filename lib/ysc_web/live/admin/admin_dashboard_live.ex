@@ -355,8 +355,7 @@ defmodule YscWeb.AdminDashboardLive do
           <div>
             <div class="flex items-center justify-between mb-2">
               <p class="flex items-center gap-1.5 text-xs font-black text-sky-600 uppercase tracking-[0.2em]">
-                <.icon name="hero-map-pin" class="w-3.5 h-3.5" />
-                Tahoe
+                <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> Tahoe
               </p>
               <span class="flex items-center gap-1.5">
                 <span class={[
@@ -444,8 +443,7 @@ defmodule YscWeb.AdminDashboardLive do
           <div>
             <div class="flex items-center justify-between mb-2">
               <p class="flex items-center gap-1.5 text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
-                <.icon name="hero-map-pin" class="w-3.5 h-3.5" />
-                Clear Lake
+                <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> Clear Lake
               </p>
               <span class="flex items-center gap-1.5">
                 <span class={[
