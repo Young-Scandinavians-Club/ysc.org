@@ -1833,9 +1833,9 @@ defmodule YscWeb.TahoeBookingLive do
                   </div>
                   <div class="mb-4">
                     <p class="text-sm font-medium text-zinc-800 mb-2">
-                      The calendar shows which dates are available for exclusive full cabin rental.
+                      The calendar shows which dates are available for booking the entire cabin.
                       <span class="font-semibold text-blue-700">
-                        Some dates are unavailable for whole-cabin rental because other members have already booked rooms on those dates.
+                        Some dates aren't available for the entire cabin because other members have already booked rooms on those dates.
                       </span>
                     </p>
                     <p class="text-xs text-zinc-600">
@@ -2715,7 +2715,7 @@ defmodule YscWeb.TahoeBookingLive do
                           @selected_booking_mode == :buyout &&
                           @date_validation_errors[:availability]
                       }>
-                        Entire-cabin booking isn't available for these dates. Try different dates or book individual rooms.
+                        Booking the entire cabin isn't available for these dates. Try different dates or book individual rooms.
                       </li>
                       <li :if={@form_errors && map_size(@form_errors) > 0}>
                         Complete the required fields above
@@ -3020,7 +3020,7 @@ defmodule YscWeb.TahoeBookingLive do
                               Family Members: Max 2 rooms (must be same dates).
                             </li>
                             <li>
-                              You cannot rent the entire cabin during winter ({season_month_span_label(
+                              You cannot book the entire cabin during winter ({season_month_span_label(
                                 @seasons,
                                 "Winter",
                                 "winter"
@@ -3852,15 +3852,15 @@ defmodule YscWeb.TahoeBookingLive do
                       <ul class="list-disc list-inside space-y-2 text-zinc-700">
                         <li>
                           <strong>Single membership holders:</strong>
-                          Can only reserve <strong>1 room</strong>
+                          Can only book <strong>1 room</strong>
                           during winter season
                         </li>
                         <li>
                           <strong>Family membership holders:</strong>
-                          Allowed to reserve <strong>2 rooms</strong>
+                          Allowed to book <strong>2 rooms</strong>
                           for the same stay during winter season
                           <span class="text-sm text-zinc-600">
-                            (both rooms must be reserved for the same dates)
+                            (both rooms must be booked for the same dates)
                           </span>
                         </li>
                       </ul>
@@ -5842,7 +5842,7 @@ defmodule YscWeb.TahoeBookingLive do
        ) do
     error_message =
       if has_existing_booking && membership_type in [:family, :lifetime] do
-        "You already have a room reserved. You can only select one room for your second booking. Please deselect the current room to select a different one."
+        "You already have a room booked. You can only select one room for your second booking. Please deselect the current room to select a different one."
       else
         "Single membership allows only one room per booking. Please deselect the current room to select a different one."
       end
@@ -6009,12 +6009,12 @@ defmodule YscWeb.TahoeBookingLive do
           "non-winter seasons"
         end
 
-      "Booking options for your dates: You can rent the entire cabin or book individual rooms (#{span})."
+      "Booking options for your dates: You can book the entire cabin or individual rooms (#{span})."
     else
       winter_span =
         if winter, do: format_season_month_span(winter), else: "winter"
 
-      "Winter booking (#{winter_span}): Individual rooms only. Renting the entire cabin is not available for winter nights in this stay."
+      "Winter booking (#{winter_span}): Individual rooms only. Booking the entire cabin isn't available for winter nights in this stay."
     end
   end
 
@@ -6037,12 +6037,12 @@ defmodule YscWeb.TahoeBookingLive do
         "Not available for winter nights (#{format_season_month_span(winter)})."
 
       true ->
-        "Entire-cabin rentals depend on the seasons covered by your stay."
+        "Booking the entire cabin depends on the seasons covered by your stay."
     end
   end
 
   defp buyout_mode_availability_copy(_),
-    do: "Entire-cabin rentals depend on the seasons covered by your stay."
+    do: "Booking the entire cabin depends on the seasons covered by your stay."
 
   defp seasonal_availability_notice_seasons(seasons) when is_list(seasons) do
     seasons
@@ -6702,7 +6702,7 @@ defmodule YscWeb.TahoeBookingLive do
         Map.put(
           errors,
           :season_booking_mode,
-          "Renting the entire cabin is not available for the selected dates"
+          "Booking the entire cabin isn't available for the selected dates"
         )
       end
     else
@@ -6745,7 +6745,7 @@ defmodule YscWeb.TahoeBookingLive do
           Map.put(
             errors,
             :availability,
-            "You cannot rent the entire cabin while you have an active or future booking. Please complete or cancel your existing booking first."
+            "You cannot book the entire cabin while you have an active or future booking. Please complete or cancel your existing booking first."
           )
         else
           # 2. Check for blackouts

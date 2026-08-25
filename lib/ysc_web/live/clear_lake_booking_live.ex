@@ -1013,7 +1013,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                   <div class="mb-4">
                     <p class="text-sm font-medium text-zinc-800 mb-2">
-                      The calendar shows which dates are available for exclusive full cabin rental.
+                      The calendar shows which dates are available for booking the whole cabin.
                     </p>
                     <p class="text-xs text-zinc-600">
                       Click on a date to start your selection, then click another date to complete your range.

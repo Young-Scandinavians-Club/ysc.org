@@ -281,7 +281,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert elem(Keyword.get(changeset.errors, :booking_mode), 0) ==
-               "Entire-cabin rentals are not available for winter nights in this stay"
+               "Booking the entire cabin isn't available for winter nights in this stay"
     end
 
     test "Summer: allows room bookings", %{user: user, rooms: rooms} do
@@ -339,7 +339,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert elem(Keyword.get(changeset.errors, :booking_mode), 0) ==
-               "Entire-cabin rentals are not available for winter nights in this stay"
+               "Booking the entire cabin isn't available for winter nights in this stay"
     end
 
     test "rejects buyout spanning Summer into Winter when Summer ends Jul 31",
@@ -401,7 +401,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert elem(Keyword.get(changeset.errors, :booking_mode), 0) ==
-               "Entire-cabin rentals are not available for winter nights in this stay"
+               "Booking the entire cabin isn't available for winter nights in this stay"
     end
   end
 

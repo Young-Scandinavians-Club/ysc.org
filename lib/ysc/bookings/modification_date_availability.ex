@@ -393,7 +393,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
         weekend_message
 
       buyout_winter_blocked?(booking, checkin, checkout, seasons) ->
-        "Entire-cabin rentals are not available for winter nights in this stay"
+        "Booking the entire cabin isn't available for winter nights in this stay"
 
       true ->
         case modification_availability_error(snapshot, checkin, checkout) do

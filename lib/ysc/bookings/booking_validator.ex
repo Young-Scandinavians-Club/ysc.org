@@ -662,7 +662,7 @@ defmodule Ysc.Bookings.BookingValidator do
       Ecto.Changeset.add_error(
         changeset,
         :booking_mode,
-        "Entire-cabin rentals are not available for winter nights in this stay"
+        "Booking the entire cabin isn't available for winter nights in this stay"
       )
     else
       changeset

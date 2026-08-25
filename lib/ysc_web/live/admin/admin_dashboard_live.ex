@@ -82,7 +82,8 @@ defmodule YscWeb.AdminDashboardLive do
           ]}
         >
           <div>
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+            <p class="flex items-center gap-1.5 text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+              <.icon name="hero-clipboard-document-list" class="w-3.5 h-3.5" />
               Applications
             </p>
             <div class="flex items-baseline gap-2">
@@ -98,7 +99,7 @@ defmodule YscWeb.AdminDashboardLive do
               <.badge type="yellow">Pending</.badge>
             </div>
           </div>
-          <div class="mt-4 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3">
+          <div class="mt-4 pt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3">
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">This Month</p>
               <p class="text-sm font-black font-mono text-zinc-700">
@@ -139,8 +140,6 @@ defmodule YscWeb.AdminDashboardLive do
                 <% end %>
               </p>
             </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-center">
             <div>
               <p class="text-xs font-bold text-zinc-400 uppercase">
                 Approved (YTD)
@@ -168,7 +167,8 @@ defmodule YscWeb.AdminDashboardLive do
           class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
         >
           <div>
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+            <p class="flex items-center gap-1.5 text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+              <.icon name="hero-identification" class="w-3.5 h-3.5" />
               Active memberships
             </p>
             <div class="flex items-baseline gap-2">
@@ -178,90 +178,108 @@ defmodule YscWeb.AdminDashboardLive do
               <span class="text-xs font-bold text-zinc-500">now</span>
             </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3">
-            <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
-                Net new (YTD)
-              </p>
-              <div class="flex items-end gap-2">
-                <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
-                  {@membership_joins_current_ytd}
+          <div class="mt-3 pt-3 rounded-lg bg-zinc-50 p-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                  Net new (YTD)
                 </p>
-                <%= if @membership_joins_ytd_change_percent != nil do %>
-                  <span class={[
-                    "text-xs font-black font-mono shrink-0",
-                    membership_joins_ytd_change_class(
-                      @membership_joins_ytd_change_percent
-                    )
-                  ]}>
-                    {if(@membership_joins_ytd_change_percent >= 0,
-                      do: "+",
-                      else: ""
-                    )}{@membership_joins_ytd_change_percent}%
-                  </span>
-                <% end %>
+                <div class="flex items-end gap-2">
+                  <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
+                    {@membership_net_new_ytd}
+                  </p>
+                  <%= if @membership_joins_ytd_change_percent != nil do %>
+                    <span class={[
+                      "text-xs font-black font-mono shrink-0",
+                      membership_joins_ytd_change_class(
+                        @membership_joins_ytd_change_percent
+                      )
+                    ]}>
+                      {if(@membership_joins_ytd_change_percent >= 0,
+                        do: "+",
+                        else: ""
+                      )}{@membership_joins_ytd_change_percent}% vs {@membership_joins_prior_year_label}
+                    </span>
+                  <% end %>
+                </div>
+                <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
+                  {@membership_joins_current_ytd} joined · {@membership_losses_current_ytd} left
+                </p>
               </div>
-              <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
-                {@membership_joins_prior_ytd} in same span · {@membership_joins_prior_year_label}
-              </p>
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                  Renewals (YTD)
+                </p>
+                <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
+                  {@membership_renewals_ytd}
+                </p>
+                <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
+                  Existing members who renewed
+                </p>
+              </div>
             </div>
-            <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
-                Renewals (YTD)
+            <div class="mt-3 pt-3 border-t border-zinc-200">
+              <p class="text-xs font-bold text-zinc-400 uppercase mb-1.5">
+                Plan mix
               </p>
-              <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
-                {@membership_renewals_ytd}
-              </p>
-              <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
-                Existing members who renewed
-              </p>
+              <div class="flex h-2 w-full overflow-hidden rounded-full bg-zinc-200">
+                <div
+                  class="bg-blue-500"
+                  style={"width: #{membership_type_share(@membership_stats.single, @membership_stats.total)}%"}
+                >
+                </div>
+                <div
+                  class="bg-violet-500"
+                  style={"width: #{membership_type_share(@membership_stats.family, @membership_stats.total)}%"}
+                >
+                </div>
+                <div
+                  class="bg-amber-500"
+                  style={"width: #{membership_type_share(@membership_stats.lifetime, @membership_stats.total)}%"}
+                >
+                </div>
+              </div>
+              <div class="mt-2 flex items-center justify-between text-[11px] font-semibold text-zinc-600">
+                <span class="flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                  Single {@membership_stats.single}
+                </span>
+                <span class="flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+                  Family {@membership_stats.family}
+                </span>
+                <span class="flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                  Lifetime {@membership_stats.lifetime}
+                </span>
+              </div>
             </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">Single</p>
-              <p class="text-sm font-black font-mono text-zinc-700">
-                {@membership_stats.single}
-              </p>
+            <div class="mt-3 pt-3 border-t border-zinc-200 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">
+                  Primary
+                </p>
+                <p class="text-sm font-black font-mono text-zinc-700">
+                  {@membership_stats.primary_members}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">
+                  Family
+                </p>
+                <p class="text-sm font-black font-mono text-zinc-700">
+                  {@membership_stats.family_sub_accounts}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-zinc-400 uppercase">
+                  Renew ≤30d
+                </p>
+                <p class="text-sm font-black font-mono text-zinc-700">
+                  {@memberships_renewing_30_days}
+                </p>
+              </div>
             </div>
-            <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">Family</p>
-              <p class="text-sm font-black font-mono text-zinc-700">
-                {@membership_stats.family}
-              </p>
-            </div>
-            <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">Lifetime</p>
-              <p class="text-sm font-black font-mono text-zinc-700">
-                {@membership_stats.lifetime}
-              </p>
-            </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-2 text-center">
-            <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">
-                Primary members
-              </p>
-              <p class="text-sm font-black font-mono text-zinc-700">
-                {@membership_stats.primary_members}
-              </p>
-            </div>
-            <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">
-                Family members
-              </p>
-              <p class="text-sm font-black font-mono text-zinc-700">
-                {@membership_stats.family_sub_accounts}
-              </p>
-            </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 flex items-center justify-between text-xs">
-            <span class="font-bold text-zinc-400 uppercase">
-              Renewing in 30 days
-            </span>
-            <span class="font-black font-mono text-zinc-700 tabular-nums">
-              {@memberships_renewing_30_days}
-            </span>
           </div>
           <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
             View all memberships →
@@ -279,7 +297,8 @@ defmodule YscWeb.AdminDashboardLive do
         >
           <%= if @pending_refunds_summary.total > 0 do %>
             <div>
-              <p class="text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-2">
+              <p class="flex items-center gap-1.5 text-xs font-black text-rose-600 uppercase tracking-[0.2em] mb-2">
+                <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5" />
                 Refunds to review
               </p>
               <p class="text-3xl font-black font-mono text-rose-900">
@@ -301,21 +320,21 @@ defmodule YscWeb.AdminDashboardLive do
               Open pending refunds →
             </.link>
           <% else %>
-            <div>
-              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+            <div class="flex-1 flex flex-col items-center justify-center text-center py-2">
+              <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
+                <.icon name="hero-check-circle" class="w-7 h-7 text-emerald-600" />
+              </div>
+              <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em]">
                 Pending Refunds
               </p>
-              <div class="flex items-baseline gap-2 mt-1">
-                <p class="text-3xl font-black font-mono text-emerald-600">0</p>
-                <.badge type="green">All clear</.badge>
-              </div>
-              <p class="text-xs text-zinc-400 font-medium mt-2">
+              <p class="text-sm font-black text-emerald-700 mt-1">All caught up</p>
+              <p class="text-xs text-zinc-400 font-medium mt-1">
                 No refunds awaiting review
               </p>
             </div>
             <.link
               navigate={~p"/admin/bookings"}
-              class="text-xs text-zinc-400 font-medium mt-3 hover:underline"
+              class="text-xs text-zinc-400 font-medium mt-3 text-center hover:underline"
             >
               View bookings →
             </.link>
@@ -1214,7 +1233,8 @@ defmodule YscWeb.AdminDashboardLive do
         family_sub_accounts: 0
       })
       |> assign(:membership_joins_current_ytd, 0)
-      |> assign(:membership_joins_prior_ytd, 0)
+      |> assign(:membership_losses_current_ytd, 0)
+      |> assign(:membership_net_new_ytd, 0)
       |> assign(:membership_joins_prior_year_label, "—")
       |> assign(:membership_joins_ytd_change_percent, nil)
       |> assign(:membership_renewals_ytd, 0)
@@ -1377,7 +1397,11 @@ defmodule YscWeb.AdminDashboardLive do
         |> assign(:property_stats, Map.fetch!(data, :property_stats))
         |> assign(:membership_stats, Map.fetch!(data, :membership_stats))
         |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
-        |> assign(:membership_joins_prior_ytd, joins_ytd.prior_ytd_joins)
+        |> assign(
+          :membership_losses_current_ytd,
+          joins_ytd.current_ytd_losses
+        )
+        |> assign(:membership_net_new_ytd, joins_ytd.current_ytd_net_new)
         |> assign(
           :membership_joins_prior_year_label,
           joins_ytd.prior_year_label
@@ -1529,6 +1553,12 @@ defmodule YscWeb.AdminDashboardLive do
 
   defp membership_joins_ytd_change_class(0), do: "text-zinc-600"
   defp membership_joins_ytd_change_class(_), do: "text-rose-600"
+
+  # Width (as a percent) of one membership-type segment in the "plan mix"
+  # bar. Guards against a zero total so the bar renders empty instead of
+  # raising on the div-by-zero before any memberships exist.
+  defp membership_type_share(_count, 0), do: 0
+  defp membership_type_share(count, total), do: count / total * 100
 
   defp get_revenue_change_color_class(direction) do
     case direction do
