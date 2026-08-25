@@ -9,6 +9,15 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
 
   alias Ysc.Accounts
 
+  defp lifetime_member do
+    user_fixture()
+    |> Ecto.Changeset.change(
+      lifetime_membership_awarded_at:
+        DateTime.truncate(DateTime.utc_now(), :second)
+    )
+    |> Ysc.Repo.update!()
+  end
+
   setup %{conn: conn} do
     admin = user_fixture(%{role: :admin})
     token = Accounts.generate_user_mobile_token(admin)
@@ -39,6 +48,7 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
         assert Map.has_key?(plan, "name")
         assert Map.has_key?(plan, "amount")
         refute Map.has_key?(plan, "stripe_price_id")
+        refute plan["id"] == "lifetime"
       end)
     end
 
@@ -121,6 +131,67 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
 
       assert %{"error" => "member not found"} = json_response(response, 404)
     end
+
+    test "does not charge a lifetime member for a new annual plan", %{
+      conn: conn
+    } do
+      member = lifetime_member()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a Stripe subscription for a lifetime member")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_test_card"
+        })
+
+      assert %{"error" => "member already has an active membership"} =
+               json_response(response, 422)
+    end
+
+    test "does not charge a family sub-account who already inherits membership",
+         %{conn: conn} do
+      primary = lifetime_member()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Ysc.Repo.update!()
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a Stripe subscription for a family sub-account")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_test_card"
+        })
+
+      assert %{"error" => "member already has an active membership"} =
+               json_response(response, 422)
+    end
+
+    test "rejects the non-purchasable lifetime plan", %{conn: conn} do
+      member = user_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "lifetime",
+          "payment_method_id" => "pm_test_card"
+        })
+
+      assert %{"error" => "invalid membership plan"} =
+               json_response(response, 422)
+    end
   end
 
   describe "POST /api/v1/app/memberships/setup_intent" do
@@ -162,6 +233,23 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
       response = post(conn, ~p"/api/v1/app/memberships/setup_intent", %{})
 
       assert json_response(response, 400)
+    end
+
+    test "does not collect a card for a lifetime member", %{conn: conn} do
+      member = lifetime_member()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.stub(Ysc.StripeMock, :create_setup_intent, fn _params ->
+        flunk("must not create a SetupIntent for a lifetime member")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/setup_intent", %{
+          "member_id" => member.id
+        })
+
+      assert %{"error" => "member already has an active membership"} =
+               json_response(response, 422)
     end
   end
 

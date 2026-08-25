@@ -27,10 +27,12 @@ defmodule YscWeb.Api.AppMembershipsController do
   @doc """
   Lists the available membership plans (mirrors `config :ysc, :membership_plans`,
   the same config the web membership settings page reads from).
+
+  Lifetime is a board-awarded status with no Stripe price, so it is not
+  offered as an in-person purchase — matching the website membership page.
   """
   def plans(conn, _params) do
-    plans = Application.get_env(:ysc, :membership_plans, [])
-    render(conn, :plans, plans: plans)
+    render(conn, :plans, plans: purchasable_membership_plans())
   end
 
   @doc """
@@ -58,6 +60,7 @@ defmodule YscWeb.Api.AppMembershipsController do
         "payment_method_id" => payment_method_id
       }) do
     with {:ok, member} <- fetch_member(member_id),
+         :ok <- reject_duplicate_membership(member),
          {:ok, plan} <- fetch_plan(plan_id),
          {:ok, subscription} <-
            Customers.create_subscription(member,
@@ -84,18 +87,25 @@ defmodule YscWeb.Api.AppMembershipsController do
   card is a client-side Terminal SDK step that happens in between.
   """
   def create_setup_intent(conn, %{"member_id" => member_id}) do
-    with {:ok, member} <- fetch_member(member_id) do
+    with {:ok, member} <- fetch_member(member_id),
+         :ok <- reject_duplicate_membership(member) do
       member = Customers.ensure_stripe_customer(member)
 
-      case stripe_client().create_setup_intent(%{
-             customer: member.stripe_id,
-             payment_method_types: ["card_present"]
-           }) do
-        {:ok, setup_intent} ->
-          render(conn, :setup_intent, setup_intent: setup_intent)
+      case member.stripe_id do
+        customer_id when is_binary(customer_id) and customer_id != "" ->
+          case stripe_client().create_setup_intent(%{
+                 customer: customer_id,
+                 payment_method_types: ["card_present"]
+               }) do
+            {:ok, setup_intent} ->
+              render(conn, :setup_intent, setup_intent: setup_intent)
 
-        {:error, reason} ->
-          {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+
+        _ ->
+          {:error, "could not create a Stripe customer for this member"}
       end
     end
   end
@@ -115,10 +125,35 @@ defmodule YscWeb.Api.AppMembershipsController do
     end
   end
 
-  defp fetch_plan(plan_id) do
-    plans = Application.get_env(:ysc, :membership_plans, [])
+  # `Customers.create_subscription/2` only inspects Stripe subscription
+  # rows. Lifetime members and family sub-accounts who already inherit
+  # membership have no such row, so without this check the door flow
+  # would bill them for a new annual plan.
+  defp reject_duplicate_membership(member) do
+    if Accounts.has_active_membership?(member) do
+      {:error, :user_already_has_active_subscription}
+    else
+      :ok
+    end
+  end
 
-    case Enum.find(plans, &(Atom.to_string(&1.id) == plan_id)) do
+  defp purchasable_membership_plans do
+    :ysc
+    |> Application.get_env(:membership_plans, [])
+    |> Enum.filter(&purchasable_plan?/1)
+  end
+
+  defp purchasable_plan?(%{stripe_price_id: price_id})
+       when is_binary(price_id) and price_id != "",
+       do: true
+
+  defp purchasable_plan?(_), do: false
+
+  defp fetch_plan(plan_id) do
+    case Enum.find(
+           purchasable_membership_plans(),
+           &(Atom.to_string(&1.id) == plan_id)
+         ) do
       nil -> {:error, :invalid_plan}
       plan -> {:ok, plan}
     end
