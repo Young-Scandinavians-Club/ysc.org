@@ -26,6 +26,12 @@ export AWS_SECRET_ACCESS_KEY 	?= minioadmin
 export PGPASSWORD 		?= postgres
 export DBNAME 			?= ysc_dev
 
+# LAN IP for exposing avatar/media image URLs when testing the mobile app
+# (ysc-admin-mobile) on a physical device — `localhost:9000` only resolves to
+# this machine, not the phone. Leave unset for normal web development.
+# e.g. `make dev HOST=192.168.0.126`.
+HOST ?=
+
 .DEFAULT_GOAL := help
 
 ##
@@ -33,12 +39,18 @@ export DBNAME 			?= ysc_dev
 ##
 
 .PHONY: dev
-dev: ## Start the local dev server
+dev: ## Start the local dev server. HOST=<lan-ip> to expose avatar/media image URLs for mobile device testing
 	@BOLD="$(BOLD)" RESET="$(RESET)" RED="$(RED)" GREEN="$(GREEN)" TEAL="$(TEAL)" \
 		DOCKER_COMPOSE_FILE="$(DOCKER_COMPOSE_FILE)" \
 		PGPASSWORD="$(PGPASSWORD)" DBNAME="$(DBNAME)" \
 		./etc/scripts/check_dev_prerequisites.sh
-	@set -a; [ -f .env ] && . .env; set +a; mix phx.server
+	@set -a; [ -f .env ] && . .env; set +a; \
+		if [ -n "$(HOST)" ]; then \
+			export S3_AVATARS_PUBLIC_BASE_URL="http://$(HOST):9000/avatars"; \
+			export S3_MEDIA_PUBLIC_BASE_URL="http://$(HOST):9000/media"; \
+			echo "==> Exposing avatar/media image URLs on the LAN: http://$(HOST):9000"; \
+		fi; \
+		mix phx.server
 
 .PHONY: dev-setup
 dev-setup:  ## Set up local dev environment

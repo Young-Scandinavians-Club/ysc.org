@@ -359,9 +359,9 @@
         purpose: "Event supplies",
         submitted_date: "Dec 1, 2026 at 10:00 AM",
         reimbursement_method: "Bank Transfer",
-        expense_total: "$100.00",
+        expense_total: "$106.00",
         income_total: "$0.00",
-        net_total: "$100.00",
+        net_total: "$106.00",
         expense_items: [
           %{
             vendor: "Party Store",
@@ -409,9 +409,9 @@
         purpose: "Event supplies",
         submitted_date: "Dec 1, 2026 at 10:00 AM",
         reimbursement_method: "Bank Transfer",
-        expense_total: "$100.00",
+        expense_total: "$106.00",
         income_total: "$0.00",
-        net_total: "$100.00",
+        net_total: "$106.00",
         expense_items: [
           %{
             vendor: "Party Store",

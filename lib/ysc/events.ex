@@ -864,28 +864,37 @@ defmodule Ysc.Events do
     - "page"      – 1-based page number (default 1)
     - "page_size" – records per page (default 20, max 100)
 
+  `opts`:
+    - `:require_payable_tier` – when `true`, only includes events that have
+      at least one `:paid` or `:donation` ticket tier (excludes events with
+      no ticket tiers yet, or only `:free` ones). Used by the admin/volunteer
+      mobile app's event list, which only cares about events it might need to
+      take a payment for; the kiosk API leaves this off to show everything.
+
   Returns `{events, meta}` where meta contains pagination details and each
   event is enriched with pricing_info, ticket_tiers, ticket_count, and image
   (same shape as `list_upcoming_events/1`).
   """
-  def list_upcoming_events_paginated(params \\ %{}) do
+  def list_upcoming_events_paginated(params \\ %{}, opts \\ []) do
     page = parse_page_param(params, "page", 1)
     page_size = parse_page_param(params, "page_size", 20) |> min(100)
     offset = (page - 1) * page_size
+    require_payable_tier? = Keyword.get(opts, :require_payable_tier, false)
 
     now = DateTime.utc_now()
     three_days_ago = DateTime.add(now, -3, :day)
 
     total_count =
-      from(e in Event,
-        where: e.start_date > ^now,
-        where: e.state in [:published, :cancelled],
-        select: count(e.id)
-      )
+      from(e in Event, as: :event)
+      |> where([e], e.start_date > ^now)
+      |> where([e], e.state in [:published, :cancelled])
+      |> maybe_require_payable_tier(require_payable_tier?)
+      |> select([e], count(e.id))
       |> Repo.one()
 
     events =
       from(e in Event,
+        as: :event,
         where: e.start_date > ^now,
         where: e.state in [:published, :cancelled],
         left_join: t in Ticket,
@@ -935,6 +944,7 @@ defmodule Ysc.Events do
         limit: ^page_size,
         offset: ^offset
       )
+      |> maybe_require_payable_tier(require_payable_tier?)
       |> Repo.all()
       |> add_pricing_info_batch()
 
@@ -950,6 +960,22 @@ defmodule Ysc.Events do
     }
 
     {events, meta}
+  end
+
+  defp maybe_require_payable_tier(query, false), do: query
+
+  defp maybe_require_payable_tier(query, true) do
+    where(
+      query,
+      [event: e],
+      exists(
+        from(tt in TicketTier,
+          where:
+            tt.event_id == parent_as(:event).id and
+              tt.type in [:paid, :donation]
+        )
+      )
+    )
   end
 
   defp parse_page_param(params, key, default) do

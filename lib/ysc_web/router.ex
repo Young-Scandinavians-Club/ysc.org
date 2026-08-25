@@ -144,6 +144,47 @@ defmodule YscWeb.Router do
     post "/check-in", CheckInsController, :create
   end
 
+  # Admin/volunteer mobile app (Expo) — sign-in, then per-user bearer-token
+  # authenticated access to events/memberships/payments. Distinct from the
+  # /api/v1/mobile scope above, which is an unauthenticated-by-user shared
+  # secret used by the property check-in kiosk.
+  pipeline :app_api_auth_rate_limit do
+    plug YscWeb.Plugs.AppAuthRateLimitPlug
+  end
+
+  pipeline :app_api do
+    plug :accepts, ["json"]
+    plug YscWeb.Plugs.MobileUserAuth
+  end
+
+  scope "/api/v1/app/auth", YscWeb.Api do
+    pipe_through [:api, :app_api_auth_rate_limit]
+
+    post "/password", AppAuthController, :create_password_session
+    post "/exchange", AppAuthController, :create_exchange_session
+    delete "/logout", AppAuthController, :logout
+  end
+
+  scope "/api/v1/app", YscWeb.Api do
+    pipe_through [:api, :app_api]
+
+    get "/events", AppEventsController, :index
+    get "/members/search", AppMembersController, :search
+    get "/memberships/plans", AppMembershipsController, :plans
+    get "/memberships/status", AppMembershipsController, :status
+    post "/memberships/subscribe", AppMembershipsController, :subscribe
+
+    post "/memberships/setup_intent",
+         AppMembershipsController,
+         :create_setup_intent
+
+    post "/payments/connection_token", AppPaymentsController, :connection_token
+
+    post "/events/:event_id/tickets/payment_intent",
+         AppTicketsController,
+         :create_payment_intent
+  end
+
   scope "/", YscWeb do
     pipe_through [:feed]
 

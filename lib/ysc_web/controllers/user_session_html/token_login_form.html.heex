@@ -14,6 +14,13 @@
       <%= if @redirect_to && @redirect_to != "" do %>
         <input type="hidden" name="redirect_to" value={@redirect_to} />
       <% end %>
+      <%= if @mobile_redirect_uri && @mobile_redirect_uri != "" do %>
+        <input
+          type="hidden"
+          name="mobile_redirect_uri"
+          value={@mobile_redirect_uri}
+        />
+      <% end %>
       <noscript>
         <p>
           <button type="submit">Continue signing in</button>

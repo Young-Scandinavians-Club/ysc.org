@@ -23,4 +23,10 @@ defmodule Ysc.StripeBehaviour do
               {:ok, Stripe.Payout.t()} | {:error, any()}
   @callback list_balance_transactions(map(), keyword()) ::
               {:ok, Stripe.List.t(any())} | {:error, any()}
+  @callback create_terminal_connection_token(map()) ::
+              {:ok, Stripe.Terminal.ConnectionToken.t()} | {:error, any()}
+  @callback attach_payment_method(String.t(), map()) ::
+              {:ok, Stripe.PaymentMethod.t()} | {:error, any()}
+  @callback create_setup_intent(map()) ::
+              {:ok, Stripe.SetupIntent.t()} | {:error, any()}
 end

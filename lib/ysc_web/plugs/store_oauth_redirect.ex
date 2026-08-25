@@ -49,6 +49,7 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
       conn
       |> delete_session(:oauth_redirect_to)
       |> UserAuth.clear_reauth_session()
+      |> maybe_store_mobile_redirect_uri()
 
     if UserAuth.valid_internal_redirect?(redirect_to) do
       put_session(conn, :oauth_redirect_to, redirect_to)
@@ -61,5 +62,27 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
     conn
     |> delete_session(:oauth_redirect_to)
     |> UserAuth.clear_reauth_session()
+    |> maybe_store_mobile_redirect_uri()
   end
+
+  # Mobile app browser-handoff (see YscWeb.UserAuth.log_in_user/5). Ueberauth's
+  # OAuth2 strategies don't round-trip arbitrary extra query params through
+  # the provider and back, so — same as oauth_redirect_to above — this is
+  # stashed in session before the provider redirect and read back in
+  # AuthController's callback phase.
+  defp maybe_store_mobile_redirect_uri(
+         %{params: %{"mobile_redirect_uri" => uri}} = conn
+       )
+       when is_binary(uri) do
+    conn = delete_session(conn, :oauth_mobile_redirect_uri)
+
+    if UserAuth.valid_mobile_redirect_uri?(uri) do
+      put_session(conn, :oauth_mobile_redirect_uri, uri)
+    else
+      conn
+    end
+  end
+
+  defp maybe_store_mobile_redirect_uri(conn),
+    do: delete_session(conn, :oauth_mobile_redirect_uri)
 end

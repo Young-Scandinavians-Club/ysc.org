@@ -141,6 +141,9 @@ defmodule Ysc.Accounts.UserToken do
   @passkey_login_validity_in_seconds 120
   # Auto-login magic links expire after 90 seconds (matches UserSessionController)
   @auto_login_validity_in_seconds 90
+  # Mobile app browser-handoff codes expire after 2 minutes, same as passkey_login —
+  # the app should exchange it for a bearer token within seconds of the redirect.
+  @mobile_redirect_validity_in_seconds 120
 
   @doc """
   Builds a one-time token for completing a passkey login.
@@ -210,6 +213,46 @@ defmodule Ysc.Accounts.UserToken do
     )
   end
 
+  @doc """
+  Builds a one-time code for handing a successful web login off to the
+  admin/volunteer mobile app (see `YscWeb.UserAuth.log_in_user/5`).
+
+  The raw (unhashed) code is returned for embedding in the custom-scheme
+  redirect URL the mobile app opened the login page with. Only the hash is
+  stored in the database. The code must be consumed (deleted) on first use —
+  it proves "this browser just completed a real web login", not just a
+  destination, which is why it exists instead of passing the app's redirect
+  URI straight through unauthenticated (same rationale as passkey_login).
+  """
+  def build_mobile_redirect_token(user) do
+    token = :crypto.strong_rand_bytes(@rand_size)
+    hashed_token = :crypto.hash(@hash_algorithm, token)
+
+    {Base.url_encode64(token, padding: false),
+     %UserToken{
+       token: hashed_token,
+       context: "mobile_redirect",
+       user_id: user.id
+     }}
+  end
+
+  @doc """
+  Verifies a mobile browser-handoff code and returns a query for the
+  associated user.
+
+  The code must have been issued within the last
+  #{@mobile_redirect_validity_in_seconds} seconds. The caller is responsible
+  for deleting it after a successful lookup to ensure it can only be used
+  once.
+  """
+  def verify_mobile_redirect_token_query(token) do
+    verify_one_time_login_token_query(
+      token,
+      "mobile_redirect",
+      @mobile_redirect_validity_in_seconds
+    )
+  end
+
   defp verify_one_time_login_token_query(token, context, validity_in_seconds) do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
@@ -222,6 +265,64 @@ defmodule Ysc.Accounts.UserToken do
             select: {user, t}
 
         {:ok, query}
+
+      :error ->
+        :error
+    end
+  end
+
+  # Mobile app bearer tokens (admin/volunteer sign-in) are long-lived so the
+  # app doesn't need to re-prompt for credentials at every event.
+  @mobile_session_validity_in_days 90
+
+  @doc """
+  Builds a long-lived bearer token for the admin/volunteer mobile app.
+
+  Hashed at rest like the email tokens (not stored raw like the web session
+  token) since this value is sent as a bearer credential on every API request
+  rather than living inside a signed/encrypted cookie.
+  """
+  def build_mobile_token(user) do
+    build_hashed_token(user, "mobile_session", nil)
+  end
+
+  @doc """
+  Verifies a mobile bearer token and returns its underlying lookup query.
+
+  The query returns the user found by the token, if any. Valid for
+  #{@mobile_session_validity_in_days} days from issuance.
+  """
+  def verify_mobile_token_query(token) do
+    case Base.url_decode64(token, padding: false) do
+      {:ok, decoded_token} ->
+        hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
+
+        query =
+          from token in by_token_and_context_query(
+                 hashed_token,
+                 "mobile_session"
+               ),
+               join: user in assoc(token, :user),
+               where:
+                 token.inserted_at >
+                   ago(@mobile_session_validity_in_days, "day"),
+               select: user
+
+        {:ok, query}
+
+      :error ->
+        :error
+    end
+  end
+
+  @doc """
+  Hashes a raw mobile token value the same way `build_mobile_token/1` does,
+  so callers can look up/delete a token row without re-verifying it.
+  """
+  def hash_mobile_token(token) do
+    case Base.url_decode64(token, padding: false) do
+      {:ok, decoded_token} ->
+        {:ok, :crypto.hash(@hash_algorithm, decoded_token)}
 
       :error ->
         :error

@@ -105,6 +105,12 @@ config :ex_aws,
 
 config :ysc,
   s3_base_url: "http://localhost:9000",
+  # Overrides for testing on a physical device / Android emulator, where
+  # "localhost:9000" resolves to the device itself, not this machine's MinIO —
+  # set these to this machine's LAN IP (e.g. "http://192.168.1.50:9000") so
+  # avatar/media images actually load. Unset falls back to localhost, unchanged.
+  s3_media_public_url: System.get_env("S3_MEDIA_PUBLIC_BASE_URL"),
+  s3_avatars_public_url: System.get_env("S3_AVATARS_PUBLIC_BASE_URL"),
   aws_access_key_id: "minioadmin",
   aws_secret_access_key: "minioadmin",
   expense_reports_s3_bucket: "expense-reports",
@@ -148,6 +154,13 @@ config :phoenix_live_view, :debug_heex_annotations, true
 
 # Kiosk API key for property kiosk app authentication (can be overridden via env var)
 config :ysc, :kiosk_api_key, System.get_env("KIOSK_API_KEY") || "dev-kiosk-key"
+
+# Stripe Terminal location for the admin/volunteer mobile app's tap-to-pay
+# connection tokens (can be overridden via env var once a real test-mode
+# Location exists in the Stripe Dashboard).
+config :ysc,
+       :stripe_terminal_location_id,
+       System.get_env("STRIPE_TERMINAL_LOCATION_ID")
 
 # OAuth Configuration for development
 # Set these via environment variables or use test values

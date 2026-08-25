@@ -410,6 +410,79 @@ defmodule YscWeb.UserAuthTest do
       refute conn.halted
       refute conn.status
     end
+
+    test "hands off to the mobile app instead of the normal redirect when already authenticated with a valid mobile_redirect_uri",
+         %{conn: conn, user: user} do
+      conn =
+        conn
+        |> Map.put(:params, %{
+          "mobile_redirect_uri" => "ysc-admin://auth-callback"
+        })
+        |> assign(:current_user, user)
+        |> UserAuth.redirect_if_user_is_authenticated([])
+
+      assert conn.halted
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      assert {:ok, %Accounts.User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(
+                 location
+                 |> URI.parse()
+                 |> Map.fetch!(:query)
+                 |> URI.decode_query()
+                 |> Map.fetch!("code")
+               )
+
+      assert id == user.id
+    end
+
+    test "hands off as the real admin, not the impersonated user", %{
+      conn: conn,
+      user: impersonated
+    } do
+      admin = user_fixture()
+
+      conn =
+        conn
+        |> Map.put(:params, %{
+          "mobile_redirect_uri" => "ysc-admin://auth-callback"
+        })
+        |> assign(:current_user, impersonated)
+        |> assign(:real_current_user, admin)
+        |> UserAuth.redirect_if_user_is_authenticated([])
+
+      assert conn.halted
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      assert {:ok, %Accounts.User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(
+                 location
+                 |> URI.parse()
+                 |> Map.fetch!(:query)
+                 |> URI.decode_query()
+                 |> Map.fetch!("code")
+               )
+
+      assert id == admin.id
+      refute id == impersonated.id
+    end
+
+    test "falls back to the normal redirect when mobile_redirect_uri is unknown",
+         %{
+           conn: conn,
+           user: user
+         } do
+      conn =
+        conn
+        |> Map.put(:params, %{"mobile_redirect_uri" => "evil-app://steal-token"})
+        |> assign(:current_user, user)
+        |> UserAuth.redirect_if_user_is_authenticated([])
+
+      assert conn.halted
+      assert redirected_to(conn) == ~p"/"
+    end
   end
 
   describe "require_authenticated_user/2" do
@@ -768,6 +841,75 @@ defmodule YscWeb.UserAuthTest do
     end
   end
 
+  describe "valid_mobile_redirect_uri?/1" do
+    test "allows the known admin app deep link" do
+      assert UserAuth.valid_mobile_redirect_uri?("ysc-admin://auth-callback")
+    end
+
+    test "rejects anything else" do
+      refute UserAuth.valid_mobile_redirect_uri?("ysc-admin://something-else")
+      refute UserAuth.valid_mobile_redirect_uri?("evil-app://auth-callback")
+      refute UserAuth.valid_mobile_redirect_uri?("https://evil.com")
+      refute UserAuth.valid_mobile_redirect_uri?("/events/123")
+      refute UserAuth.valid_mobile_redirect_uri?(nil)
+      refute UserAuth.valid_mobile_redirect_uri?(123)
+    end
+  end
+
+  describe "log_in_user/5 with mobile_redirect_uri" do
+    test "redirects externally to the app with a one-time code", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        UserAuth.log_in_user(conn, user, %{}, nil, "ysc-admin://auth-callback")
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      %{"code" => code} =
+        location |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+      assert {:ok, %Ysc.Accounts.User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(code)
+
+      assert id == user.id
+    end
+
+    test "ignores an unknown mobile_redirect_uri and falls back to the normal redirect",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        UserAuth.log_in_user(conn, user, %{}, nil, "evil-app://steal-token")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "mobile_redirect_uri takes precedence over redirect_to", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        UserAuth.log_in_user(
+          conn,
+          user,
+          %{},
+          "/events/123",
+          "ysc-admin://auth-callback"
+        )
+
+      assert redirected_to(conn, 302) =~ ~r{^ysc-admin://auth-callback\?code=}
+    end
+  end
+
   describe "on_mount(:ensure_admin, ...)" do
     test "allows admin users to proceed", %{conn: conn} do
       admin = user_fixture(%{role: "admin"})
@@ -881,6 +1023,58 @@ defmodule YscWeb.UserAuthTest do
 
       {:halt, _updated_socket} =
         UserAuth.on_mount(:ensure_active, %{}, session, socket)
+    end
+  end
+
+  describe "on_mount(:redirect_if_user_is_authenticated, ...)" do
+    test "allows unauthenticated users to proceed", %{conn: conn} do
+      session = conn |> get_session()
+
+      {:cont, _updated_socket} =
+        UserAuth.on_mount(
+          :redirect_if_user_is_authenticated,
+          %{},
+          session,
+          %LiveView.Socket{}
+        )
+    end
+
+    test "redirects an authenticated user to the signed-in path", %{conn: conn} do
+      user = user_fixture(%{state: "active"})
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      {:halt, socket} =
+        UserAuth.on_mount(
+          :redirect_if_user_is_authenticated,
+          %{},
+          session,
+          %LiveView.Socket{}
+        )
+
+      assert {:redirect, %{to: "/"}} = socket.redirected
+    end
+
+    # Deliberately does not hand off to the mobile app even when
+    # mobile_redirect_uri is present — see the moduledoc note on the
+    # on_mount clause itself for why (Phoenix.LiveView.redirect/2 can't
+    # target a custom URL scheme; the plug above is what actually handles
+    # the mobile case on a fresh page load).
+    test "ignores mobile_redirect_uri and redirects to the signed-in path anyway",
+         %{conn: conn} do
+      user = user_fixture(%{state: "active"})
+      user_token = Accounts.generate_user_session_token(user)
+      session = conn |> put_session(:user_token, user_token) |> get_session()
+
+      {:halt, socket} =
+        UserAuth.on_mount(
+          :redirect_if_user_is_authenticated,
+          %{"mobile_redirect_uri" => "ysc-admin://auth-callback"},
+          session,
+          %LiveView.Socket{}
+        )
+
+      assert {:redirect, %{to: "/"}} = socket.redirected
     end
   end
 

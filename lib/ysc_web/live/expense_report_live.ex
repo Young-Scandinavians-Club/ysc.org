@@ -3480,7 +3480,8 @@ defmodule YscWeb.ExpenseReportLive do
           false
       end
 
-    # Check that all expense items have receipts
+    # Receipts are required for purchases; mileage items document the trip
+    # in the form fields instead of an uploaded receipt.
     changeset = form.source
     expense_items = Ecto.Changeset.get_field(changeset, :expense_items, [])
 
@@ -3488,7 +3489,9 @@ defmodule YscWeb.ExpenseReportLive do
       expense_items
       |> Enum.all?(fn item ->
         receipt_path = get_receipt_path_from_item(item)
-        !is_nil(receipt_path) && receipt_path != ""
+
+        get_field_from_item(item, :expense_type) == "mileage" ||
+          (!is_nil(receipt_path) && receipt_path != "")
       end)
 
     certification_accepted && reimbursement_valid &&

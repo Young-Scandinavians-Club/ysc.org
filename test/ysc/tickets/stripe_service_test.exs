@@ -99,6 +99,30 @@ defmodule Ysc.Tickets.StripeServiceTest do
       assert payment_intent.id == "pi_test_123"
     end
 
+    test "requests a card-present PaymentIntent when card_present: true", %{
+      ticket_order: ticket_order
+    } do
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        assert params.payment_method_types == ["card_present"]
+        assert params.capture_method == "automatic"
+        refute Map.has_key?(params, :automatic_payment_methods)
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_card_present",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
+      end)
+
+      assert {:ok, payment_intent} =
+               StripeService.create_payment_intent(ticket_order,
+                 card_present: true
+               )
+
+      assert payment_intent.id == "pi_card_present"
+    end
+
     test "includes customer_id when provided", %{ticket_order: ticket_order} do
       expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         assert params.customer == "cus_test_123"

@@ -95,6 +95,42 @@ defmodule YscWeb.UserSessionControllerTest do
       assert response =~ ~p"/users/log-out"
     end
 
+    test "hands off to the mobile app instead of the normal redirect when mobile_redirect_uri is valid",
+         %{conn: conn, user: user} do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{
+            "email" => user.email,
+            "password" => valid_user_password()
+          },
+          "mobile_redirect_uri" => "ysc-admin://auth-callback"
+        })
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert get_session(conn, :user_token)
+    end
+
+    test "ignores an unknown mobile_redirect_uri and redirects normally", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{
+            "email" => user.email,
+            "password" => valid_user_password()
+          },
+          "mobile_redirect_uri" => "evil-app://steal-token"
+        })
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
     test "logs the user in with remember me and verified email", %{
       conn: conn,
       user: user

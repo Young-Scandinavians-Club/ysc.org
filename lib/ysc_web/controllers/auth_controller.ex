@@ -206,9 +206,11 @@ defmodule YscWeb.AuthController do
 
           # Get redirect_to from session if it was stored
           redirect_to = get_session(conn, :oauth_redirect_to)
+          mobile_redirect_uri = get_session(conn, :oauth_mobile_redirect_uri)
 
           conn
           |> delete_session(:oauth_redirect_to)
+          |> delete_session(:oauth_mobile_redirect_uri)
           |> YscWeb.Flash.put_toast(
             :info,
             "Successfully signed in with #{String.capitalize(to_string(provider))}!",
@@ -222,7 +224,8 @@ defmodule YscWeb.AuthController do
               "provider" => to_string(provider),
               "remember_me" => "true"
             },
-            redirect_to
+            redirect_to,
+            mobile_redirect_uri
           )
         else
           # Account not in allowed state

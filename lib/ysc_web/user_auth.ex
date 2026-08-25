@@ -46,7 +46,13 @@ defmodule YscWeb.UserAuth do
   disconnected on sign out. The line can be safely removed
   if you are not using LiveView.
   """
-  def log_in_user(conn, user, params \\ %{}, redirect_to \\ nil) do
+  def log_in_user(
+        conn,
+        user,
+        params \\ %{},
+        redirect_to \\ nil,
+        mobile_redirect_uri \\ nil
+      ) do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
 
@@ -76,7 +82,17 @@ defmodule YscWeb.UserAuth do
     # Log sign-in after session is set so auth_events.session_id is populated (for "Current session" on Security page)
     AuthService.log_login_success(user, conn, params)
 
-    redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
+    if mobile_redirect_uri && valid_mobile_redirect_uri?(mobile_redirect_uri) do
+      # Hand off to the mobile app instead of the normal web redirect: a
+      # one-time code proves to the app's backend that this browser just
+      # completed a real login (same rationale as the passkey_login token),
+      # rather than handing the app a session cookie or long-lived token
+      # directly inside a URL that ends up in browser/OS history.
+      code = Accounts.generate_mobile_redirect_token(user)
+      redirect(conn, external: "#{mobile_redirect_uri}?code=#{code}")
+    else
+      redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
+    end
   end
 
   # Post-login destination: onboarding wins over redirect_to / return_to, then account setup, etc.
@@ -418,6 +434,16 @@ defmodule YscWeb.UserAuth do
      end)}
   end
 
+  # Note: unlike the redirect_if_user_is_authenticated/2 plug above, this
+  # on_mount hook deliberately does NOT hand off to the mobile app —
+  # Phoenix.LiveView.redirect/2 only allows http(s) external destinations
+  # (raises ArgumentError for a custom scheme like ysc-admin://...), unlike
+  # Phoenix.Controller.redirect/2 which the plug uses. In practice this
+  # doesn't matter: on a fresh page load the plug (part of the router
+  # pipeline) always runs first and halts before the LiveView ever mounts,
+  # so this hook only fires the plain path here on a live socket reconnect
+  # while already sitting on the login page — a rare case where falling
+  # back to the normal signed-in page is an acceptable outcome.
   def on_mount(:redirect_if_user_is_authenticated, _params, session, socket) do
     socket = mount_current_user(socket, session)
     socket = mount_current_membership(socket, session)
@@ -510,16 +536,47 @@ defmodule YscWeb.UserAuth do
 
   @doc """
   Used for routes that require the user to not be authenticated.
+
+  If the mobile app opened this page (mobile_redirect_uri present and valid)
+  and the browser already had a signed-in session — e.g. a retry after an
+  earlier successful login whose redirect back to the app didn't complete —
+  this still hands off to the app via the one-time-code redirect instead of
+  just rendering the normal signed-in web page. Otherwise the app would be
+  silently stuck: the mobile handoff only otherwise happens inside the login
+  flow itself, which this plug bypasses entirely once already authenticated.
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
-    if conn.assigns[:current_user] do
-      conn
-      |> redirect(to: signed_in_path(conn))
-      |> halt()
-    else
-      conn
+    user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
+
+    cond do
+      is_nil(user) ->
+        conn
+
+      mobile_redirect_uri = valid_mobile_redirect_param(conn.params) ->
+        code = Accounts.generate_mobile_redirect_token(user)
+
+        conn
+        |> redirect(external: "#{mobile_redirect_uri}?code=#{code}")
+        |> halt()
+
+      true ->
+        conn
+        |> redirect(to: signed_in_path(conn))
+        |> halt()
     end
   end
+
+  # Pattern-matched directly on a plain map (rather than params["key"], which
+  # uses the Access behaviour) so this safely returns nil for a
+  # %Plug.Conn.Unfetched{} params struct (e.g. a conn built directly in a
+  # test without going through the router's query-param-fetching plugs)
+  # instead of raising.
+  defp valid_mobile_redirect_param(%{"mobile_redirect_uri" => uri})
+       when is_binary(uri) and uri != "" do
+    if valid_mobile_redirect_uri?(uri), do: uri, else: nil
+  end
+
+  defp valid_mobile_redirect_param(_params), do: nil
 
   @doc """
   Used for routes that require the user to be authenticated.
@@ -718,6 +775,23 @@ defmodule YscWeb.UserAuth do
   end
 
   def valid_internal_redirect?(_), do: false
+
+  # Custom-scheme deep links the admin/volunteer mobile app may ask the web
+  # login page to hand off to after a successful login (see `log_in_user/5`).
+  # Deliberately a strict allowlist of exact values, not a prefix/scheme
+  # check — `valid_internal_redirect?/1` above is the wrong tool here since it
+  # rejects any URI with a scheme by design (that's what makes it safe for
+  # same-origin paths); a mobile deep link needs the opposite treatment.
+  @allowed_mobile_redirect_uris ["ysc-admin://auth-callback"]
+
+  @doc """
+  Validates that a mobile app redirect URI is one of the known, exact
+  custom-scheme deep links this app is allowed to hand a login off to.
+  """
+  def valid_mobile_redirect_uri?(uri) when is_binary(uri),
+    do: uri in @allowed_mobile_redirect_uris
+
+  def valid_mobile_redirect_uri?(_), do: false
 
   defp contains_dangerous_redirect_token?(value) do
     String.contains?(value, [

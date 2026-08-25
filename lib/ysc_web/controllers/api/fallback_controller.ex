@@ -38,10 +38,67 @@ defmodule YscWeb.Api.FallbackController do
     |> json(%{error: "validation failed", errors: errors})
   end
 
+  def call(conn, {:error, %Stripe.Error{} = error}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{error: Ysc.PaymentUserMessages.format_stripe_error(error)})
+  end
+
   def call(conn, {:error, reason}) when is_binary(reason) do
     conn
     |> put_status(:unprocessable_entity)
     |> json(%{error: reason})
+  end
+
+  # Errors surfaced by the admin/volunteer mobile app's endpoints
+  # (AppTicketsController, AppMembershipsController, AppPaymentsController).
+  @app_error_messages %{
+    member_not_found: "member not found",
+    ticket_tier_not_found: "ticket tier not found",
+    event_not_found: "event not found",
+    membership_required: "member does not have an active membership",
+    invalid_plan: "invalid membership plan",
+    terminal_not_configured:
+      "Stripe Terminal is not configured for this environment",
+    user_already_has_active_subscription:
+      "member already has an active membership",
+    sub_accounts_cannot_create_subscriptions:
+      "sub-accounts cannot sign up for their own membership",
+    invalid_ticket_selection:
+      "one or more selected ticket quantities are invalid",
+    tier_validation_failed:
+      "one or more selected ticket tiers are sold out or unavailable",
+    insufficient_capacity:
+      "not enough tickets remaining for the selected tiers",
+    event_capacity_exceeded: "this event is at capacity",
+    event_not_available: "this event is not available for ticket sales",
+    event_cancelled: "this event has been cancelled",
+    event_in_past: "this event has already happened",
+    reservation_lapsed: "the ticket reservation expired — please try again",
+    checkout_payment_in_progress:
+      "a payment is already in progress for this member and event"
+  }
+
+  @app_not_found_errors [
+    :member_not_found,
+    :ticket_tier_not_found,
+    :event_not_found
+  ]
+
+  for {reason, message} <- Map.take(@app_error_messages, @app_not_found_errors) do
+    def call(conn, {:error, unquote(reason)}) do
+      conn
+      |> put_status(:not_found)
+      |> json(%{error: unquote(message)})
+    end
+  end
+
+  for {reason, message} <- Map.drop(@app_error_messages, @app_not_found_errors) do
+    def call(conn, {:error, unquote(reason)}) do
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: unquote(message)})
+    end
   end
 
   def call(conn, {:error, _reason}) do

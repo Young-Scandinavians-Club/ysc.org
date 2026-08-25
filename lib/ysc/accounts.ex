@@ -2213,6 +2213,32 @@ defmodule Ysc.Accounts do
     )
   end
 
+  @doc """
+  Generates a short-lived, one-time code for handing a successful web login
+  off to the admin/volunteer mobile app.
+
+  Returns the raw (URL-safe Base64) code. Only the hash is stored in the DB.
+  """
+  def generate_mobile_redirect_token(user) do
+    generate_one_time_login_token(
+      user,
+      &UserToken.build_mobile_redirect_token/1
+    )
+  end
+
+  @doc """
+  Verifies a mobile browser-handoff code and returns the associated user if
+  valid, consuming it in the same transaction so it cannot be replayed.
+
+  Uses the same cluster-safe one-time consumption semantics as passkey login.
+  """
+  def verify_and_consume_mobile_redirect_token(token) do
+    verify_and_consume_one_time_login_token(
+      token,
+      &UserToken.verify_mobile_redirect_token_query/1
+    )
+  end
+
   defp generate_one_time_login_token(user, builder) do
     {token, user_token} = builder.(user)
     Repo.insert!(user_token)
@@ -2280,10 +2306,14 @@ defmodule Ysc.Accounts do
   Deletes all session tokens for the given user.
 
   Used when an account is suspended, rejected, or deleted so existing cookies
-  stop working immediately instead of remaining valid for up to 60 days.
+  and mobile bearer tokens stop working immediately instead of remaining valid
+  for up to 60 days (web) / 90 days (mobile).
   """
   def revoke_all_user_sessions(%User{} = user) do
-    Repo.delete_all(UserToken.by_user_and_contexts_query(user, ["session"]))
+    Repo.delete_all(
+      UserToken.by_user_and_contexts_query(user, ["session", "mobile_session"])
+    )
+
     :ok
   end
 
@@ -2380,6 +2410,53 @@ defmodule Ysc.Accounts do
     Repo.delete_all(UserToken.by_token_and_context_query(token, "session"))
     :ok
   end
+
+  ## Mobile app bearer tokens
+
+  @doc """
+  Generates a long-lived bearer token for the admin/volunteer mobile app.
+  """
+  def generate_user_mobile_token(user) do
+    {token, user_token} = UserToken.build_mobile_token(user)
+    Repo.insert!(user_token)
+    token
+  end
+
+  @doc """
+  Gets the user for a mobile bearer token, if the token is valid, not
+  expired, and the user is still allowed to be signed in.
+  """
+  def get_user_by_mobile_token(token) when is_binary(token) do
+    case UserToken.verify_mobile_token_query(token) do
+      {:ok, query} ->
+        user = Repo.one(query)
+        if user && login_allowed_state?(user), do: user
+
+      :error ->
+        nil
+    end
+  end
+
+  def get_user_by_mobile_token(_), do: nil
+
+  @doc """
+  Revokes a mobile bearer token (mobile app sign-out).
+  """
+  def delete_user_mobile_token(token) when is_binary(token) do
+    case UserToken.hash_mobile_token(token) do
+      {:ok, hashed_token} ->
+        Repo.delete_all(
+          UserToken.by_token_and_context_query(hashed_token, "mobile_session")
+        )
+
+        :ok
+
+      :error ->
+        :ok
+    end
+  end
+
+  def delete_user_mobile_token(_), do: :ok
 
   @doc """
   Revokes a specific session for the user by encoded session ID (Base64).

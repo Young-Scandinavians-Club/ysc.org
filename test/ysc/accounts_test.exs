@@ -1841,6 +1841,103 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "generate_user_mobile_token/1" do
+    test "generates a hashed token distinct from the raw value" do
+      user = user_fixture(%{role: :admin, phone_number: "+14159098268"})
+      token = Accounts.generate_user_mobile_token(user)
+
+      assert user_token = Repo.get_by(UserToken, context: "mobile_session")
+      assert user_token.user_id == user.id
+      refute user_token.token == token
+    end
+  end
+
+  describe "get_user_by_mobile_token/1" do
+    setup do
+      user = user_fixture(%{role: :volunteer, phone_number: "+14159098268"})
+      token = Accounts.generate_user_mobile_token(user)
+      %{user: user, token: token}
+    end
+
+    test "returns user by token", %{user: user, token: token} do
+      assert mobile_user = Accounts.get_user_by_mobile_token(token)
+      assert mobile_user.id == user.id
+    end
+
+    test "does not return user for invalid token" do
+      refute Accounts.get_user_by_mobile_token("not-a-real-token")
+    end
+
+    test "does not return user for expired token", %{token: token} do
+      {1, nil} =
+        Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
+
+      refute Accounts.get_user_by_mobile_token(token)
+    end
+
+    test "does not return user once the token has been deleted", %{token: token} do
+      assert Accounts.delete_user_mobile_token(token) == :ok
+      refute Accounts.get_user_by_mobile_token(token)
+    end
+
+    test "revokes mobile tokens when the account is blocked, including after reactivation",
+         %{user: user, token: token} do
+      admin = user_fixture(%{role: :admin})
+
+      assert Accounts.get_user_by_mobile_token(token)
+
+      assert {:ok, suspended} =
+               Accounts.update_user(user, %{state: :suspended}, admin)
+
+      assert suspended.state == :suspended
+      refute Accounts.get_user_by_mobile_token(token)
+
+      assert {:ok, reactivated} =
+               Accounts.update_user(suspended, %{state: :active}, admin)
+
+      assert reactivated.state == :active
+      refute Accounts.get_user_by_mobile_token(token)
+    end
+  end
+
+  describe "generate_mobile_redirect_token/1 and verify_and_consume_mobile_redirect_token/1" do
+    test "round-trips to the same user and is single-use" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      code = Accounts.generate_mobile_redirect_token(user)
+
+      assert user_token = Repo.get_by(UserToken, context: "mobile_redirect")
+      assert user_token.user_id == user.id
+      refute user_token.token == code
+
+      assert {:ok, verified_user} =
+               Accounts.verify_and_consume_mobile_redirect_token(code)
+
+      assert verified_user.id == user.id
+
+      # Consumed — a second exchange of the same code must fail.
+      assert Accounts.verify_and_consume_mobile_redirect_token(code) ==
+               {:error, :invalid_or_expired}
+    end
+
+    test "rejects an unknown code" do
+      assert Accounts.verify_and_consume_mobile_redirect_token(
+               "not-a-real-code"
+             ) ==
+               {:error, :invalid_or_expired}
+    end
+
+    test "rejects an expired code" do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      code = Accounts.generate_mobile_redirect_token(user)
+
+      {1, nil} =
+        Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
+
+      assert Accounts.verify_and_consume_mobile_redirect_token(code) ==
+               {:error, :invalid_or_expired}
+    end
+  end
+
   describe "deliver_user_reset_password_instructions/2" do
     setup do
       %{user: user_fixture(%{phone_number: "+14159098268"})}
