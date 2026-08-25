@@ -69,13 +69,17 @@ defmodule Ysc.Tickets.WebhookHandler do
 
     case StripeService.handle_failed_payment(
            payment_intent_id,
-           "Payment failed"
+           "Payment failed",
+           keep_retryable_order: true
          ) do
       {:ok, ticket_order} ->
+        # A still-retryable decline leaves the order :pending (see
+        # StripeService.handle_failed_payment/2) rather than cancelling it.
         Ysc.Logging.info(
-          "Successfully canceled ticket order due to payment failure",
+          "Processed failed ticket payment webhook",
           ticket_order_id: ticket_order.id,
           reference_id: ticket_order.reference_id,
+          ticket_order_status: ticket_order.status,
           payment_intent_id: payment_intent_id
         )
 

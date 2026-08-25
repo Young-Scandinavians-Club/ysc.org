@@ -1,5 +1,7 @@
 defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
-  use Ysc.DataCase, async: true
+  # Deletes globally named revenue accounts that other tests insert ledger
+  # entries against. Running that in parallel deadlocks on FK row locks.
+  use Ysc.DataCase, async: false
 
   import Ecto.Query
 

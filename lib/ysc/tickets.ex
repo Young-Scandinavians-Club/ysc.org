@@ -441,25 +441,98 @@ defmodule Ysc.Tickets do
   Pending checkout orders with in-flight Stripe payments are not cancelled so a
   concurrent user cancel cannot race a processing or 3DS payment into a charge
   without ticket fulfillment.
+
+  Pass `reconcile_with_stripe: false` (default `true`) to skip the atomic
+  Stripe PaymentIntent cancel and just cancel the local order. Stripe-driven
+  callers (e.g. `StripeService.handle_failed_payment/2`, reacting to a
+  `payment_intent.payment_failed`/`canceled` webhook) must use this: Stripe has
+  already decided that PaymentIntent's fate, and a card decline typically
+  leaves it in `requires_payment_method` so the customer can retry with a
+  different payment method against the same PaymentIntent - actively
+  cancelling it here would foreclose that retry.
   """
   def cancel_ticket_order(ticket_order, reason \\ "User cancelled", opts \\ []) do
     from_statuses = Keyword.get(opts, :from_statuses, [:pending])
+    context = Keyword.get(opts, :context, "cancel_ticket_order")
+    reconcile_with_stripe = Keyword.get(opts, :reconcile_with_stripe, true)
 
-    if from_statuses == [:pending] and
-         CheckoutCancel.checkout_payment_in_flight?(ticket_order,
-           context: Keyword.get(opts, :context, "cancel_ticket_order")
+    cond do
+      from_statuses != [:pending] ->
+        do_cancel_ticket_order(ticket_order, reason, from_statuses)
+
+      Keyword.get(opts, :payment_redirect_in_progress, false) ->
+        {:error, :checkout_payment_in_progress}
+
+      not reconcile_with_stripe ->
+        do_cancel_ticket_order(ticket_order, reason, from_statuses)
+
+      true ->
+        resolve_abandoned_checkout(ticket_order, reason, from_statuses, context)
+    end
+  end
+
+  # Reconciles a checkout-abandonment cancel with Stripe before touching the
+  # local order. See CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2
+  # for why this must cancel (not just read) the PaymentIntent: a status read can
+  # go stale between the check and the cancel, letting a client finish confirming
+  # payment against an order we're about to throw away. Cancelling atomically closes
+  # that gap - and when Stripe reveals the payment already succeeded, we fulfill the
+  # order right here instead of orphaning a captured charge with no ticket granted.
+  defp resolve_abandoned_checkout(ticket_order, reason, from_statuses, context) do
+    require Ysc.Logging
+
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           ticket_order,
+           context
          ) do
-      require Ysc.Logging
+      {:cancel, _payment_intent} ->
+        do_cancel_ticket_order(ticket_order, reason, from_statuses)
 
-      Ysc.Logging.info(
-        "Skipped ticket order cancellation while checkout payment is in flight",
-        ticket_order_id: ticket_order.id,
-        payment_intent_id: ticket_order.payment_intent_id
-      )
+      {:already_succeeded, payment_intent} ->
+        case Ysc.Tickets.StripeService.process_successful_payment(
+               payment_intent
+             ) do
+          {:ok, completed_order} = ok ->
+            Ysc.Logging.info(
+              "Fulfilled ticket order from an abandoned checkout after payment succeeded",
+              ticket_order_id: completed_order.id,
+              payment_intent_id: payment_intent.id
+            )
 
-      {:error, :checkout_payment_in_progress}
-    else
-      do_cancel_ticket_order(ticket_order, reason, from_statuses)
+            ok
+
+          {:error, fulfillment_error} ->
+            Ysc.Logging.error(
+              "Payment succeeded during checkout abandonment but order could not be fulfilled",
+              ticket_order_id: ticket_order.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(fulfillment_error)
+            )
+
+            # Tagged distinctly from a plain cancel failure: the customer's
+            # card was already charged, so callers must tell them that rather
+            # than silently treating this like an ordinary cancel error.
+            {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
+        end
+
+      {:in_progress, _payment_intent} ->
+        Ysc.Logging.info(
+          "Skipped ticket order cancellation while checkout payment is in flight",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id
+        )
+
+        {:error, :checkout_payment_in_progress}
+
+      {:error, stripe_error} ->
+        Ysc.Logging.warning(
+          "Could not reconcile checkout payment with Stripe, not cancelling order",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id,
+          error: inspect(stripe_error)
+        )
+
+        {:error, :checkout_payment_in_progress}
     end
   end
 
@@ -1638,33 +1711,70 @@ defmodule Ysc.Tickets do
   ## Private Functions
 
   defp prepare_new_checkout_session(user_id, event_id) do
-    from(to in TicketOrder,
-      where:
-        to.user_id == ^user_id and to.event_id == ^event_id and
-          to.status == :pending
-    )
-    |> Repo.all()
-    |> Enum.each(fn order ->
-      cancel_ticket_order(order, "Superseded by new checkout",
-        context: "create_ticket_order"
+    require Ysc.Logging
+
+    # Same cheap pre-check EventDetailsLive uses before teardown cancel: skip
+    # orders whose PaymentIntent is already in 3DS / processing / succeeded.
+    # Stripe accepts cancelling a requires_action PaymentIntent instead of
+    # refusing it, so without this, starting a second checkout could cancel
+    # a payment the user is actively completing elsewhere. Orders that look
+    # safe here still go through cancel_ticket_order/3's atomic cancel below,
+    # which can still discover the payment succeeded moments later (the same
+    # TOCTOU race the atomic cancel closes) - that's what
+    # fulfilled_during_cleanup? catches. Orders filtered out here are left
+    # pending, caught below by blocking_pending_orders/2.
+    fulfilled_during_cleanup? =
+      from(to in TicketOrder,
+        where:
+          to.user_id == ^user_id and to.event_id == ^event_id and
+            to.status == :pending
       )
-    end)
+      |> Repo.all()
+      |> Enum.filter(
+        &CheckoutCancel.pending_order_safe_to_cancel?(&1,
+          context: "create_ticket_order"
+        )
+      )
+      |> Enum.map(fn order ->
+        cancel_ticket_order(order, "Superseded by new checkout",
+          context: "create_ticket_order"
+        )
+      end)
+      |> Enum.any?(fn
+        {:ok, %TicketOrder{status: :completed}} -> true
+        _ -> false
+      end)
 
-    case CheckoutCancel.blocking_pending_orders(user_id, event_id) do
-      [] ->
-        :ok
-
-      orders ->
-        require Ysc.Logging
-
+    cond do
+      fulfilled_during_cleanup? ->
+        # A stale pending order's payment turned out to have already
+        # succeeded with Stripe, and cancel_ticket_order/3 just fulfilled it
+        # instead of orphaning that charge. Block starting a brand-new
+        # checkout for this event so the user doesn't pay twice - they
+        # already have tickets from the order we just completed.
         Ysc.Logging.info(
-          "Blocked new ticket checkout while another payment is in flight",
+          "Blocked new ticket checkout: an abandoned order for this event was fulfilled during cleanup",
           user_id: user_id,
-          event_id: event_id,
-          pending_order_ids: Enum.map(orders, & &1.id)
+          event_id: event_id
         )
 
         {:error, :checkout_payment_in_progress}
+
+      true ->
+        case CheckoutCancel.blocking_pending_orders(user_id, event_id) do
+          [] ->
+            :ok
+
+          orders ->
+            Ysc.Logging.info(
+              "Blocked new ticket checkout while another payment is in flight",
+              user_id: user_id,
+              event_id: event_id,
+              pending_order_ids: Enum.map(orders, & &1.id)
+            )
+
+            {:error, :checkout_payment_in_progress}
+        end
     end
   end
 

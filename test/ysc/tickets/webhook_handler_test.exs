@@ -149,13 +149,19 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       assert :ok == result
     end
 
-    test "payment_intent.payment_failed cancels ticket order when metadata references order" do
+    test "payment_intent.payment_failed leaves a retryable order pending when metadata references order" do
       Ysc.Ledgers.ensure_basic_accounts()
 
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
         cancel_timeout_jobs_for_order!(ticket_order.id)
         payment_intent_id = "pi_failed_with_order_#{ticket_order.id}"
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
 
         expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
           assert id == payment_intent_id
@@ -170,13 +176,17 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
         pin_stripe_mock!()
 
+        # No `cancel_payment_intent` expectation: a decline leaves the
+        # PaymentIntent open for retry with a different card, so this webhook
+        # must leave the order pending and fulfillable, never touching Stripe
+        # or the local order's status.
         assert :ok =
                  WebhookHandler.handle_webhook_event(
                    "payment_intent.payment_failed",
                    %{"id" => payment_intent_id}
                  )
 
-        assert %TicketOrder{status: :cancelled} =
+        assert %TicketOrder{status: :pending} =
                  Repo.get!(TicketOrder, ticket_order.id)
       end)
     end
@@ -188,6 +198,12 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
         ticket_order = ticket_order_fixture()
         cancel_timeout_jobs_for_order!(ticket_order.id)
         payment_intent_id = "pi_canceled_with_order_#{ticket_order.id}"
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
 
         expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
           assert id == payment_intent_id
