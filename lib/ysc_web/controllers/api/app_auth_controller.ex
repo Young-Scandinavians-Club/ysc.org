@@ -50,7 +50,7 @@ defmodule YscWeb.Api.AppAuthController do
   end
 
   @doc """
-  Exchanges a one-time browser-handoff code (see `YscWeb.UserAuth.log_in_user/5`)
+  Exchanges a one-time browser-handoff code (see `YscWeb.UserAuth.log_in_user/6`)
   for a mobile bearer token.
 
   The app opens the real web login page (password, Google, Facebook — whatever
@@ -60,10 +60,25 @@ defmodule YscWeb.Api.AppAuthController do
   expires within minutes — so this endpoint only needs to check it and the
   same role/state rules as password sign-in, not re-authenticate anything
   itself.
+
+  `code_verifier` must be the same value the app generated before starting
+  the login (sent then as `code_challenge`'s pre-image) — see
+  `Ysc.Accounts.verify_and_consume_mobile_redirect_token/2` for why this
+  matters: `ysc-admin://` is a private-use scheme another app could also
+  register, and without this check that app could redeem a bare intercepted
+  code itself.
   """
-  def create_exchange_session(conn, %{"code" => code}) when is_binary(code) do
-    with {:ok, %Accounts.User{} = user} <-
-           Accounts.verify_and_consume_mobile_redirect_token(code),
+  def create_exchange_session(conn, %{
+        "code" => code,
+        "code_verifier" => code_verifier
+      })
+      when is_binary(code) and is_binary(code_verifier) do
+    with :ok <- Ysc.AuthRateLimit.check_identifier("mobile_exchange:#{code}"),
+         {:ok, %Accounts.User{} = user} <-
+           Accounts.verify_and_consume_mobile_redirect_token(
+             code,
+             code_verifier
+           ),
          true <- user.role in [:admin, :volunteer],
          true <- Accounts.login_allowed_state?(user) do
       token = Accounts.generate_user_mobile_token(user)
@@ -73,6 +88,12 @@ defmodule YscWeb.Api.AppAuthController do
         user: Repo.preload(user, :current_avatar)
       )
     else
+      {:error, :rate_limited, retry_after_sec} ->
+        conn
+        |> put_resp_header("retry-after", Integer.to_string(retry_after_sec))
+        |> put_status(:too_many_requests)
+        |> json(%{error: "Too many attempts"})
+
       _ ->
         conn
         |> put_status(:unauthorized)
@@ -83,7 +104,7 @@ defmodule YscWeb.Api.AppAuthController do
   def create_exchange_session(conn, _params) do
     conn
     |> put_status(:bad_request)
-    |> json(%{error: "code is required"})
+    |> json(%{error: "code and code_verifier are required"})
   end
 
   def logout(conn, _params) do

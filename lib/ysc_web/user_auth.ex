@@ -51,7 +51,8 @@ defmodule YscWeb.UserAuth do
         user,
         params \\ %{},
         redirect_to \\ nil,
-        mobile_redirect_uri \\ nil
+        mobile_redirect_uri \\ nil,
+        code_challenge \\ nil
       ) do
     token = Accounts.generate_user_session_token(user)
     user_return_to = get_session(conn, :user_return_to)
@@ -82,13 +83,16 @@ defmodule YscWeb.UserAuth do
     # Log sign-in after session is set so auth_events.session_id is populated (for "Current session" on Security page)
     AuthService.log_login_success(user, conn, params)
 
-    if mobile_redirect_uri && valid_mobile_redirect_uri?(mobile_redirect_uri) do
+    if mobile_redirect_uri && valid_mobile_redirect_uri?(mobile_redirect_uri) &&
+         valid_code_challenge?(code_challenge) do
       # Hand off to the mobile app instead of the normal web redirect: a
       # one-time code proves to the app's backend that this browser just
       # completed a real login (same rationale as the passkey_login token),
       # rather than handing the app a session cookie or long-lived token
-      # directly inside a URL that ends up in browser/OS history.
-      code = Accounts.generate_mobile_redirect_token(user)
+      # directly inside a URL that ends up in browser/OS history. Requiring
+      # (and binding the code to) a code_challenge closes the gap a bare
+      # code would leave open — see build_mobile_redirect_token/2.
+      code = Accounts.generate_mobile_redirect_token(user, code_challenge)
       redirect(conn, external: "#{mobile_redirect_uri}?code=#{code}")
     else
       redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
@@ -547,13 +551,15 @@ defmodule YscWeb.UserAuth do
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
+    mobile_redirect_uri = valid_mobile_redirect_param(conn.params)
+    code_challenge = valid_code_challenge_param(conn.params)
 
     cond do
       is_nil(user) ->
         conn
 
-      mobile_redirect_uri = valid_mobile_redirect_param(conn.params) ->
-        code = Accounts.generate_mobile_redirect_token(user)
+      mobile_redirect_uri && code_challenge ->
+        code = Accounts.generate_mobile_redirect_token(user, code_challenge)
 
         conn
         |> redirect(external: "#{mobile_redirect_uri}?code=#{code}")
@@ -577,6 +583,13 @@ defmodule YscWeb.UserAuth do
   end
 
   defp valid_mobile_redirect_param(_params), do: nil
+
+  defp valid_code_challenge_param(%{"code_challenge" => challenge})
+       when is_binary(challenge) and challenge != "" do
+    if valid_code_challenge?(challenge), do: challenge, else: nil
+  end
+
+  defp valid_code_challenge_param(_params), do: nil
 
   @doc """
   Used for routes that require the user to be authenticated.
@@ -792,6 +805,23 @@ defmodule YscWeb.UserAuth do
     do: uri in @allowed_mobile_redirect_uris
 
   def valid_mobile_redirect_uri?(_), do: false
+
+  # A lowercase-hex SHA-256 digest (64 chars) — the mobile app's PKCE-style
+  # code_challenge (see build_mobile_redirect_token/2). Not RFC 7636's
+  # base64url encoding: this isn't a spec-compliant OAuth PKCE exchange,
+  # just a same-shape verifier/challenge binding between this backend and
+  # the one app that consumes it, so hex end-to-end avoids any base64url
+  # padding/charset mismatch between the Elixir and JS sides.
+  @code_challenge_pattern ~r/^[a-f0-9]{64}$/
+
+  @doc """
+  Validates that a mobile app's code_challenge is well-formed (a hex SHA-256
+  digest) before it's persisted and bound to a mobile_redirect code.
+  """
+  def valid_code_challenge?(challenge) when is_binary(challenge),
+    do: Regex.match?(@code_challenge_pattern, challenge)
+
+  def valid_code_challenge?(_), do: false
 
   defp contains_dangerous_redirect_token?(value) do
     String.contains?(value, [

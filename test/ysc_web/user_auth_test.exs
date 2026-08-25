@@ -411,12 +411,16 @@ defmodule YscWeb.UserAuthTest do
       refute conn.status
     end
 
-    test "hands off to the mobile app instead of the normal redirect when already authenticated with a valid mobile_redirect_uri",
+    test "hands off to the mobile app instead of the normal redirect when already authenticated with a valid mobile_redirect_uri and code_challenge",
          %{conn: conn, user: user} do
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
       conn =
         conn
         |> Map.put(:params, %{
-          "mobile_redirect_uri" => "ysc-admin://auth-callback"
+          "mobile_redirect_uri" => "ysc-admin://auth-callback",
+          "code_challenge" => challenge
         })
         |> assign(:current_user, user)
         |> UserAuth.redirect_if_user_is_authenticated([])
@@ -431,7 +435,8 @@ defmodule YscWeb.UserAuthTest do
                  |> URI.parse()
                  |> Map.fetch!(:query)
                  |> URI.decode_query()
-                 |> Map.fetch!("code")
+                 |> Map.fetch!("code"),
+                 verifier
                )
 
       assert id == user.id
@@ -442,11 +447,14 @@ defmodule YscWeb.UserAuthTest do
       user: impersonated
     } do
       admin = user_fixture()
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
 
       conn =
         conn
         |> Map.put(:params, %{
-          "mobile_redirect_uri" => "ysc-admin://auth-callback"
+          "mobile_redirect_uri" => "ysc-admin://auth-callback",
+          "code_challenge" => challenge
         })
         |> assign(:current_user, impersonated)
         |> assign(:real_current_user, admin)
@@ -462,11 +470,26 @@ defmodule YscWeb.UserAuthTest do
                  |> URI.parse()
                  |> Map.fetch!(:query)
                  |> URI.decode_query()
-                 |> Map.fetch!("code")
+                 |> Map.fetch!("code"),
+                 verifier
                )
 
       assert id == admin.id
       refute id == impersonated.id
+    end
+
+    test "falls back to the normal redirect when mobile_redirect_uri is valid but code_challenge is missing",
+         %{conn: conn, user: user} do
+      conn =
+        conn
+        |> Map.put(:params, %{
+          "mobile_redirect_uri" => "ysc-admin://auth-callback"
+        })
+        |> assign(:current_user, user)
+        |> UserAuth.redirect_if_user_is_authenticated([])
+
+      assert conn.halted
+      assert redirected_to(conn) == ~p"/"
     end
 
     test "falls back to the normal redirect when mobile_redirect_uri is unknown",
@@ -856,15 +879,30 @@ defmodule YscWeb.UserAuthTest do
     end
   end
 
-  describe "log_in_user/5 with mobile_redirect_uri" do
+  describe "log_in_user/6 with mobile_redirect_uri" do
+    setup do
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+      %{verifier: verifier, challenge: challenge}
+    end
+
     test "redirects externally to the app with a one-time code", %{
       conn: conn,
-      user: user
+      user: user,
+      verifier: verifier,
+      challenge: challenge
     } do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       conn =
-        UserAuth.log_in_user(conn, user, %{}, nil, "ysc-admin://auth-callback")
+        UserAuth.log_in_user(
+          conn,
+          user,
+          %{},
+          nil,
+          "ysc-admin://auth-callback",
+          challenge
+        )
 
       location = redirected_to(conn, 302)
       assert location =~ ~r{^ysc-admin://auth-callback\?code=}
@@ -873,7 +911,7 @@ defmodule YscWeb.UserAuthTest do
         location |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
 
       assert {:ok, %Ysc.Accounts.User{id: id}} =
-               Accounts.verify_and_consume_mobile_redirect_token(code)
+               Accounts.verify_and_consume_mobile_redirect_token(code, verifier)
 
       assert id == user.id
     end
@@ -881,19 +919,40 @@ defmodule YscWeb.UserAuthTest do
     test "ignores an unknown mobile_redirect_uri and falls back to the normal redirect",
          %{
            conn: conn,
-           user: user
+           user: user,
+           challenge: challenge
          } do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       conn =
-        UserAuth.log_in_user(conn, user, %{}, nil, "evil-app://steal-token")
+        UserAuth.log_in_user(
+          conn,
+          user,
+          %{},
+          nil,
+          "evil-app://steal-token",
+          challenge
+        )
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "falls back to the normal redirect when code_challenge is missing", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn =
+        UserAuth.log_in_user(conn, user, %{}, nil, "ysc-admin://auth-callback")
 
       assert redirected_to(conn) == ~p"/"
     end
 
     test "mobile_redirect_uri takes precedence over redirect_to", %{
       conn: conn,
-      user: user
+      user: user,
+      challenge: challenge
     } do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
@@ -903,7 +962,8 @@ defmodule YscWeb.UserAuthTest do
           user,
           %{},
           "/events/123",
-          "ysc-admin://auth-callback"
+          "ysc-admin://auth-callback",
+          challenge
         )
 
       assert redirected_to(conn, 302) =~ ~r{^ysc-admin://auth-callback\?code=}

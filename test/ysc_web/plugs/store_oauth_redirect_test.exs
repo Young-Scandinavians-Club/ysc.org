@@ -102,6 +102,25 @@ defmodule YscWeb.Plugs.StoreOAuthRedirectTest do
       assert get_session(conn, :oauth_mobile_redirect_uri) == nil
     end
 
+    test "stores a well-formed code_challenge in session" do
+      challenge = String.duplicate("a", 64)
+      conn = run_plug(%{"code_challenge" => challenge})
+
+      assert get_session(conn, :oauth_code_challenge) == challenge
+    end
+
+    test "does not store a malformed code_challenge" do
+      conn = run_plug(%{"code_challenge" => "not-hex-and-wrong-length"})
+
+      assert get_session(conn, :oauth_code_challenge) == nil
+    end
+
+    test "handles request without code_challenge parameter" do
+      conn = run_plug(%{})
+
+      assert get_session(conn, :oauth_code_challenge) == nil
+    end
+
     test "no-ops on OAuth callback paths" do
       conn =
         build_conn()

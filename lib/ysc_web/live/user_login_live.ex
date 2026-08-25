@@ -228,6 +228,7 @@ defmodule YscWeb.UserLoginLive do
           name="mobile_redirect_uri"
           value={@mobile_redirect_uri || ""}
         />
+        <.input type="hidden" name="code_challenge" value={@code_challenge || ""} />
         <div class="space-y-4">
           <.input
             field={@form[:email]}
@@ -313,6 +314,19 @@ defmodule YscWeb.UserLoginLive do
           nil
       end
 
+    # PKCE-style binding for the mobile handoff above — see
+    # Ysc.Accounts.UserToken.build_mobile_redirect_token/2.
+    code_challenge =
+      case params["code_challenge"] do
+        challenge when is_binary(challenge) and challenge != "" ->
+          if YscWeb.UserAuth.valid_code_challenge?(challenge),
+            do: challenge,
+            else: nil
+
+        _ ->
+          nil
+      end
+
     # Show toast when redirected from auto_login with expired/invalid token (query param
     # avoids session flash overwriting a concurrent successful login).
     socket =
@@ -337,6 +351,7 @@ defmodule YscWeb.UserLoginLive do
      |> assign(:failed_login_attempts, failed_login_attempts)
      |> assign(:redirect_to, redirect_to)
      |> assign(:mobile_redirect_uri, mobile_redirect_uri)
+     |> assign(:code_challenge, code_challenge)
      |> assign(:is_ios_mobile, false)
      |> assign(:passkey_supported, false)
      |> assign(:banner_dismissed, false)
@@ -820,6 +835,7 @@ defmodule YscWeb.UserLoginLive do
   defp oauth_start_url(base_path, assigns) do
     redirect_to = assigns.redirect_to
     mobile_redirect_uri = assigns[:mobile_redirect_uri]
+    code_challenge = assigns[:code_challenge]
 
     params =
       %{}
@@ -833,6 +849,12 @@ defmodule YscWeb.UserLoginLive do
         mobile_redirect_uri &&
           YscWeb.UserAuth.valid_mobile_redirect_uri?(mobile_redirect_uri) &&
           mobile_redirect_uri
+      )
+      |> maybe_put_query(
+        "code_challenge",
+        code_challenge &&
+          YscWeb.UserAuth.valid_code_challenge?(code_challenge) &&
+          code_challenge
       )
 
     if params == %{} do
@@ -979,6 +1001,18 @@ defmodule YscWeb.UserLoginLive do
                 query_params,
                 "mobile_redirect_uri",
                 socket.assigns.mobile_redirect_uri
+              )
+            else
+              query_params
+            end
+
+          query_params =
+            if socket.assigns[:code_challenge] &&
+                 socket.assigns.code_challenge != "" do
+              Map.put(
+                query_params,
+                "code_challenge",
+                socket.assigns.code_challenge
               )
             else
               query_params

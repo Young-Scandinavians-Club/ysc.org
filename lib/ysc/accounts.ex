@@ -2215,14 +2215,16 @@ defmodule Ysc.Accounts do
 
   @doc """
   Generates a short-lived, one-time code for handing a successful web login
-  off to the admin/volunteer mobile app.
+  off to the admin/volunteer mobile app, bound to the app's `code_challenge`
+  (PKCE-style — see `Ysc.Accounts.UserToken.build_mobile_redirect_token/2`).
 
   Returns the raw (URL-safe Base64) code. Only the hash is stored in the DB.
   """
-  def generate_mobile_redirect_token(user) do
+  def generate_mobile_redirect_token(user, code_challenge)
+      when is_binary(code_challenge) do
     generate_one_time_login_token(
       user,
-      &UserToken.build_mobile_redirect_token/1
+      &UserToken.build_mobile_redirect_token(&1, code_challenge)
     )
   end
 
@@ -2230,12 +2232,26 @@ defmodule Ysc.Accounts do
   Verifies a mobile browser-handoff code and returns the associated user if
   valid, consuming it in the same transaction so it cannot be replayed.
 
+  `code_verifier` must hash to the `code_challenge` the code was issued
+  with. A mismatch fails the exchange but leaves the code itself unconsumed
+  (still redeemable by the legitimate app with the right verifier until it
+  naturally expires) — otherwise anyone who merely observed the bare code
+  could permanently deny the real sign-in by submitting one wrong guess.
+
   Uses the same cluster-safe one-time consumption semantics as passkey login.
   """
-  def verify_and_consume_mobile_redirect_token(token) do
+  def verify_and_consume_mobile_redirect_token(code, code_verifier)
+      when is_binary(code_verifier) do
     verify_and_consume_one_time_login_token(
-      token,
-      &UserToken.verify_mobile_redirect_token_query/1
+      code,
+      &UserToken.verify_mobile_redirect_token_query/1,
+      require: fn token_record ->
+        challenge =
+          :crypto.hash(:sha256, code_verifier) |> Base.encode16(case: :lower)
+
+        is_binary(token_record.code_challenge) &&
+          Plug.Crypto.secure_compare(challenge, token_record.code_challenge)
+      end
     )
   end
 
@@ -2245,7 +2261,9 @@ defmodule Ysc.Accounts do
     token
   end
 
-  defp verify_and_consume_one_time_login_token(token, verify_query) do
+  defp verify_and_consume_one_time_login_token(token, verify_query, opts \\ []) do
+    require_fn = Keyword.get(opts, :require, fn _token_record -> true end)
+
     case verify_query.(token) do
       {:ok, base_query} ->
         result =
@@ -2256,12 +2274,18 @@ defmodule Ysc.Accounts do
 
             case Repo.one(locked_query) do
               {user, token_record} ->
-                case Repo.delete(token_record) do
-                  {:ok, _deleted} ->
-                    user
+                if require_fn.(token_record) do
+                  case Repo.delete(token_record) do
+                    {:ok, _deleted} ->
+                      user
 
-                  {:error, _changeset} ->
-                    Repo.rollback(:invalid_or_expired)
+                    {:error, _changeset} ->
+                      Repo.rollback(:invalid_or_expired)
+                  end
+                else
+                  # Deliberately not consuming the token here — see
+                  # verify_and_consume_mobile_redirect_token/2.
+                  Repo.rollback(:invalid_or_expired)
                 end
 
               nil ->

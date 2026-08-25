@@ -91,11 +91,25 @@ defmodule YscWeb.Api.AppAuthControllerTest do
   end
 
   describe "POST /api/v1/app/auth/exchange" do
-    test "exchanges a valid code for a bearer token", %{conn: conn} do
-      user = user_fixture(%{role: :admin})
-      code = Accounts.generate_mobile_redirect_token(user)
+    setup do
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+      %{verifier: verifier, challenge: challenge}
+    end
 
-      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
+    test "exchanges a valid code for a bearer token", %{
+      conn: conn,
+      verifier: verifier,
+      challenge: challenge
+    } do
+      user = user_fixture(%{role: :admin})
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
+
+      response =
+        post(conn, ~p"/api/v1/app/auth/exchange", %{
+          "code" => code,
+          "code_verifier" => verifier
+        })
 
       assert %{"token" => token, "user" => user_json} =
                json_response(response, 200)
@@ -107,34 +121,69 @@ defmodule YscWeb.Api.AppAuthControllerTest do
     end
 
     test "rejects a plain member's code even though it was validly issued", %{
-      conn: conn
+      conn: conn,
+      verifier: verifier,
+      challenge: challenge
     } do
       user = user_fixture(%{role: :member})
-      code = Accounts.generate_mobile_redirect_token(user)
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
 
-      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
-
-      assert json_response(response, 401)
-    end
-
-    test "rejects an unknown code", %{conn: conn} do
       response =
-        post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => "not-a-real-code"})
+        post(conn, ~p"/api/v1/app/auth/exchange", %{
+          "code" => code,
+          "code_verifier" => verifier
+        })
 
       assert json_response(response, 401)
     end
 
-    test "a code cannot be exchanged twice", %{conn: conn} do
+    test "rejects an unknown code", %{conn: conn, verifier: verifier} do
+      response =
+        post(conn, ~p"/api/v1/app/auth/exchange", %{
+          "code" => "not-a-real-code",
+          "code_verifier" => verifier
+        })
+
+      assert json_response(response, 401)
+    end
+
+    test "rejects a code_verifier that doesn't match the challenge it was issued with",
+         %{conn: conn, challenge: challenge} do
       user = user_fixture(%{role: :admin})
-      code = Accounts.generate_mobile_redirect_token(user)
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
 
-      post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
-      response = post(conn, ~p"/api/v1/app/auth/exchange", %{"code" => code})
+      response =
+        post(conn, ~p"/api/v1/app/auth/exchange", %{
+          "code" => code,
+          "code_verifier" => "wrong-verifier"
+        })
 
       assert json_response(response, 401)
     end
 
-    test "returns 400 when code is missing", %{conn: conn} do
+    test "a code cannot be exchanged twice", %{
+      conn: conn,
+      verifier: verifier,
+      challenge: challenge
+    } do
+      user = user_fixture(%{role: :admin})
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
+
+      post(conn, ~p"/api/v1/app/auth/exchange", %{
+        "code" => code,
+        "code_verifier" => verifier
+      })
+
+      response =
+        post(conn, ~p"/api/v1/app/auth/exchange", %{
+          "code" => code,
+          "code_verifier" => verifier
+        })
+
+      assert json_response(response, 401)
+    end
+
+    test "returns 400 when code or code_verifier is missing", %{conn: conn} do
       response = post(conn, ~p"/api/v1/app/auth/exchange", %{})
 
       assert json_response(response, 400)

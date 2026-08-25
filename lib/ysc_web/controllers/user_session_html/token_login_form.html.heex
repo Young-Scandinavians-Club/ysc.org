@@ -21,6 +21,9 @@
           value={@mobile_redirect_uri}
         />
       <% end %>
+      <%= if @code_challenge && @code_challenge != "" do %>
+        <input type="hidden" name="code_challenge" value={@code_challenge} />
+      <% end %>
       <noscript>
         <p>
           <button type="submit">Continue signing in</button>

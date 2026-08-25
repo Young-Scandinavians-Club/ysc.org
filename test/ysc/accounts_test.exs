@@ -1900,41 +1900,72 @@ defmodule Ysc.AccountsTest do
     end
   end
 
-  describe "generate_mobile_redirect_token/1 and verify_and_consume_mobile_redirect_token/1" do
-    test "round-trips to the same user and is single-use" do
+  describe "generate_mobile_redirect_token/2 and verify_and_consume_mobile_redirect_token/2" do
+    setup do
+      verifier = "a" |> String.duplicate(64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+      %{verifier: verifier, challenge: challenge}
+    end
+
+    test "round-trips to the same user and is single-use", %{
+      verifier: verifier,
+      challenge: challenge
+    } do
       user = user_fixture(%{phone_number: "+14159098268"})
-      code = Accounts.generate_mobile_redirect_token(user)
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
 
       assert user_token = Repo.get_by(UserToken, context: "mobile_redirect")
       assert user_token.user_id == user.id
+      assert user_token.code_challenge == challenge
       refute user_token.token == code
 
       assert {:ok, verified_user} =
-               Accounts.verify_and_consume_mobile_redirect_token(code)
+               Accounts.verify_and_consume_mobile_redirect_token(code, verifier)
 
       assert verified_user.id == user.id
 
       # Consumed — a second exchange of the same code must fail.
-      assert Accounts.verify_and_consume_mobile_redirect_token(code) ==
+      assert Accounts.verify_and_consume_mobile_redirect_token(code, verifier) ==
                {:error, :invalid_or_expired}
     end
 
-    test "rejects an unknown code" do
+    test "rejects an unknown code", %{verifier: verifier} do
       assert Accounts.verify_and_consume_mobile_redirect_token(
-               "not-a-real-code"
+               "not-a-real-code",
+               verifier
              ) ==
                {:error, :invalid_or_expired}
     end
 
-    test "rejects an expired code" do
+    test "rejects an expired code", %{verifier: verifier, challenge: challenge} do
       user = user_fixture(%{phone_number: "+14159098268"})
-      code = Accounts.generate_mobile_redirect_token(user)
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
 
       {1, nil} =
         Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
 
-      assert Accounts.verify_and_consume_mobile_redirect_token(code) ==
+      assert Accounts.verify_and_consume_mobile_redirect_token(code, verifier) ==
                {:error, :invalid_or_expired}
+    end
+
+    test "rejects a code_verifier that doesn't hash to the stored challenge, without consuming the code",
+         %{verifier: verifier, challenge: challenge} do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
+
+      assert Accounts.verify_and_consume_mobile_redirect_token(
+               code,
+               "wrong-verifier"
+             ) ==
+               {:error, :invalid_or_expired}
+
+      # Not consumed by the failed attempt — the legitimate app can still
+      # exchange it with the right verifier (see the doc comment on
+      # Ysc.Accounts.verify_and_consume_mobile_redirect_token/2 for why).
+      assert {:ok, verified_user} =
+               Accounts.verify_and_consume_mobile_redirect_token(code, verifier)
+
+      assert verified_user.id == user.id
     end
   end
 

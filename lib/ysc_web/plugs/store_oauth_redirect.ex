@@ -50,6 +50,7 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
       |> delete_session(:oauth_redirect_to)
       |> UserAuth.clear_reauth_session()
       |> maybe_store_mobile_redirect_uri()
+      |> maybe_store_code_challenge()
 
     if UserAuth.valid_internal_redirect?(redirect_to) do
       put_session(conn, :oauth_redirect_to, redirect_to)
@@ -63,9 +64,10 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
     |> delete_session(:oauth_redirect_to)
     |> UserAuth.clear_reauth_session()
     |> maybe_store_mobile_redirect_uri()
+    |> maybe_store_code_challenge()
   end
 
-  # Mobile app browser-handoff (see YscWeb.UserAuth.log_in_user/5). Ueberauth's
+  # Mobile app browser-handoff (see YscWeb.UserAuth.log_in_user/6). Ueberauth's
   # OAuth2 strategies don't round-trip arbitrary extra query params through
   # the provider and back, so — same as oauth_redirect_to above — this is
   # stashed in session before the provider redirect and read back in
@@ -85,4 +87,23 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
 
   defp maybe_store_mobile_redirect_uri(conn),
     do: delete_session(conn, :oauth_mobile_redirect_uri)
+
+  # Same round-trip problem as mobile_redirect_uri above, for the mobile
+  # app's PKCE-style code_challenge (see
+  # Ysc.Accounts.UserToken.build_mobile_redirect_token/2).
+  defp maybe_store_code_challenge(
+         %{params: %{"code_challenge" => challenge}} = conn
+       )
+       when is_binary(challenge) do
+    conn = delete_session(conn, :oauth_code_challenge)
+
+    if UserAuth.valid_code_challenge?(challenge) do
+      put_session(conn, :oauth_code_challenge, challenge)
+    else
+      conn
+    end
+  end
+
+  defp maybe_store_code_challenge(conn),
+    do: delete_session(conn, :oauth_code_challenge)
 end
