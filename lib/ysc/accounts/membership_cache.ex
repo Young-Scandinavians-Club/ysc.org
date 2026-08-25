@@ -6,13 +6,18 @@ defmodule Ysc.Accounts.MembershipCache do
   This reduces database queries when users interact with the UI.
   """
 
+  import Ecto.Query, warn: false
   require Ysc.Logging
   alias Ysc.Accounts
+  alias Ysc.Accounts.User
   alias Ysc.Customers
+  alias Ysc.Repo
   alias Ysc.Subscriptions
 
   @cache_name :ysc_cache
   @cache_prefix "membership:"
+  # Distinguishes a stored `nil` membership from a Cachex miss (`{:ok, nil}`).
+  @cached_tag :cached
   # 5 minutes in milliseconds
   @default_ttl 5 * 60 * 1000
 
@@ -43,13 +48,13 @@ defmodule Ysc.Accounts.MembershipCache do
     validate? = Keyword.get(opts, :validate, true)
     cache_key = build_cache_key(user.id, "active")
 
-    case Cachex.get(@cache_name, cache_key) do
-      {:ok, nil} ->
+    case read_wrapped(cache_key) do
+      :miss ->
         membership = get_active_membership_db(user)
         cache_with_ttl(cache_key, membership)
         membership
 
-      {:ok, membership} ->
+      {:hit, membership} ->
         if !validate? or membership_valid?(membership) do
           membership
         else
@@ -58,11 +63,20 @@ defmodule Ysc.Accounts.MembershipCache do
           cache_with_ttl(cache_key, membership)
           membership
         end
-
-      {:error, _reason} ->
-        get_active_membership_db(user)
     end
   end
+
+  @doc """
+  True when `Cachex.get/2` for the active-membership key is a real hit.
+
+  Cachex returns `{:ok, nil}` for both a missing key and a stored `nil`, so
+  entries are wrapped as `{:cached, value}`. Session auth uses this to skip
+  subscription preloads for members *and* non-members.
+  """
+  def active_membership_cache_hit?({:ok, {@cached_tag, _value}}), do: true
+  def active_membership_cache_hit?({:ok, nil}), do: false
+  def active_membership_cache_hit?({:ok, _legacy}), do: true
+  def active_membership_cache_hit?(_), do: false
 
   @doc """
   Gets the membership plan type for a user from cache or fetches from database and caches it.
@@ -74,22 +88,15 @@ defmodule Ysc.Accounts.MembershipCache do
   def get_membership_plan_type(user) do
     cache_key = build_cache_key(user.id, "plan_type")
 
-    case Cachex.get(@cache_name, cache_key) do
-      {:ok, nil} ->
-        # Cache miss - fetch from database
+    case read_wrapped(cache_key) do
+      :miss ->
         membership = get_active_membership(user)
         plan_type = get_membership_plan_type_from_membership(membership)
-        # Cache with TTL
         cache_with_ttl(cache_key, plan_type)
         plan_type
 
-      {:ok, plan_type} ->
+      {:hit, plan_type} ->
         plan_type
-
-      {:error, _reason} ->
-        # Cache error - fallback to database
-        membership = get_active_membership_db(user)
-        get_membership_plan_type_from_membership(membership)
     end
   end
 
@@ -111,13 +118,28 @@ defmodule Ysc.Accounts.MembershipCache do
   @doc """
   Returns `{membership, plan_type}` tuples keyed by user id.
 
-  Validates cached subscriptions in a single query instead of one `Repo.get/2`
-  per user — intended for membership check-in search.
+  Cache misses are loaded in one subscriptions query (plus a preload of
+  items) instead of one `Customers.subscriptions/1` per user. Cached
+  subscriptions are then re-validated in a single query.
   """
   def batch_membership_data_for_users(users) when is_list(users) do
-    memberships =
+    lookups =
       Enum.map(users, fn user ->
-        {user.id, get_active_membership(user, validate: false)}
+        {user, read_wrapped(build_cache_key(user.id, "active"))}
+      end)
+
+    uncached_users =
+      Enum.flat_map(lookups, fn
+        {user, :miss} -> [user]
+        _ -> []
+      end)
+
+    fetched_by_id = fetch_and_cache_memberships(uncached_users)
+
+    memberships =
+      Enum.map(lookups, fn
+        {user, {:hit, membership}} -> {user.id, membership}
+        {user, :miss} -> {user.id, Map.get(fetched_by_id, user.id)}
       end)
 
     subscription_ids =
@@ -160,14 +182,28 @@ defmodule Ysc.Accounts.MembershipCache do
       do: MapSet.new()
 
   def batch_validate_subscription_ids(subscription_ids) do
-    import Ecto.Query
-
     Subscriptions.Subscription
     |> where([s], s.id in ^subscription_ids)
-    |> Ysc.Repo.all()
+    |> Repo.all()
     |> Enum.filter(&Subscriptions.valid?/1)
     |> Enum.map(& &1.id)
     |> MapSet.new()
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    ids = [Ysc.Ci.QueryExplain.Fixtures.ulid()]
+
+    from(s in Subscriptions.Subscription,
+      where: s.user_id in ^ids,
+      preload: [:subscription_items]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_primary_users_query do
+    ids = [Ysc.Ci.QueryExplain.Fixtures.ulid()]
+    from(u in User, where: u.id in ^ids)
   end
 
   @doc """
@@ -217,12 +253,127 @@ defmodule Ysc.Accounts.MembershipCache do
 
   defp cache_with_ttl(key, value) do
     ttl_ms = get_ttl()
-    Cachex.put(@cache_name, key, value, expire: ttl_ms)
+    Cachex.put(@cache_name, key, {@cached_tag, value}, expire: ttl_ms)
+  end
+
+  defp read_wrapped(cache_key) do
+    case Cachex.get(@cache_name, cache_key) do
+      {:ok, {@cached_tag, value}} -> {:hit, value}
+      {:ok, nil} -> :miss
+      {:ok, value} -> {:hit, value}
+      {:error, _reason} -> :miss
+    end
   end
 
   defp get_ttl do
-    # Use 5 minutes as default, but can be configured
     Application.get_env(:ysc, :membership_cache_ttl_ms, @default_ttl)
+  end
+
+  defp fetch_and_cache_memberships([]), do: %{}
+
+  defp fetch_and_cache_memberships(users) do
+    memberships_by_id = batch_load_memberships_from_db(users)
+
+    Enum.each(users, fn user ->
+      cache_with_ttl(
+        build_cache_key(user.id, "active"),
+        Map.get(memberships_by_id, user.id)
+      )
+    end)
+
+    memberships_by_id
+  end
+
+  defp batch_load_memberships_from_db(users) do
+    users_by_id = Map.new(users, &{&1.id, &1})
+    primaries_by_id = load_missing_primary_users(users, users_by_id)
+
+    user_to_check_by_id =
+      Map.new(users, fn user ->
+        {user.id,
+         user_to_check_for_membership(user, users_by_id, primaries_by_id)}
+      end)
+
+    {lifetime_pairs, subscription_pairs} =
+      Enum.split_with(user_to_check_by_id, fn {_orig_id, check} ->
+        Accounts.has_lifetime_membership?(check)
+      end)
+
+    lifetime_memberships =
+      Map.new(lifetime_pairs, fn {orig_id, check} ->
+        {orig_id, lifetime_membership(check)}
+      end)
+
+    check_ids =
+      subscription_pairs
+      |> Enum.map(fn {_orig_id, check} -> check.id end)
+      |> Enum.uniq()
+
+    subs_by_user_id = load_subscriptions_by_user_id(check_ids)
+
+    subscription_memberships =
+      Map.new(subscription_pairs, fn {orig_id, check} ->
+        valid =
+          subs_by_user_id
+          |> Map.get(check.id, [])
+          |> Enum.filter(&Subscriptions.valid?/1)
+
+        {orig_id, pick_active_subscription(valid)}
+      end)
+
+    Map.merge(lifetime_memberships, subscription_memberships)
+  end
+
+  defp user_to_check_for_membership(user, users_by_id, primaries_by_id) do
+    if Accounts.sub_account?(user) do
+      Map.get(users_by_id, user.primary_user_id) ||
+        Map.get(primaries_by_id, user.primary_user_id) ||
+        user
+    else
+      user
+    end
+  end
+
+  defp load_missing_primary_users(users, users_by_id) do
+    missing_ids =
+      users
+      |> Enum.filter(&Accounts.sub_account?/1)
+      |> Enum.map(& &1.primary_user_id)
+      |> Enum.uniq()
+      |> Enum.reject(&Map.has_key?(users_by_id, &1))
+
+    if missing_ids == [] do
+      %{}
+    else
+      from(u in User, where: u.id in ^missing_ids)
+      |> Repo.all()
+      |> Map.new(&{&1.id, &1})
+    end
+  end
+
+  defp load_subscriptions_by_user_id([]), do: %{}
+
+  defp load_subscriptions_by_user_id(user_ids) do
+    from(s in Subscriptions.Subscription,
+      where: s.user_id in ^user_ids,
+      preload: [:subscription_items]
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.user_id)
+  end
+
+  defp pick_active_subscription([]), do: nil
+  defp pick_active_subscription([single]), do: single
+
+  defp pick_active_subscription(multiple),
+    do: get_most_expensive_subscription(multiple)
+
+  defp lifetime_membership(user) do
+    %{
+      type: :lifetime,
+      awarded_at: user.lifetime_membership_awarded_at,
+      user_id: user.id
+    }
   end
 
   # Database lookup functions (duplicated from UserAuth to avoid circular dependency)
@@ -238,29 +389,14 @@ defmodule Ysc.Accounts.MembershipCache do
 
     # Check for lifetime membership first (highest priority)
     if Accounts.has_lifetime_membership?(user_to_check) do
-      # Return a special struct representing lifetime membership
-      %{
-        type: :lifetime,
-        awarded_at: user_to_check.lifetime_membership_awarded_at,
-        user_id: user_to_check.id
-      }
+      lifetime_membership(user_to_check)
     else
       subscriptions =
         user_to_check
         |> loaded_subscriptions()
         |> Enum.filter(&Subscriptions.valid?/1)
 
-      case subscriptions do
-        [] ->
-          nil
-
-        [single_subscription] ->
-          single_subscription
-
-        multiple_subscriptions ->
-          # If multiple active subscriptions, pick the most expensive one
-          get_most_expensive_subscription(multiple_subscriptions)
-      end
+      pick_active_subscription(subscriptions)
     end
   end
 
@@ -305,7 +441,7 @@ defmodule Ysc.Accounts.MembershipCache do
   defp get_membership_plan_type_from_membership(
          %Subscriptions.Subscription{} = subscription
        ) do
-    subscription = Ysc.Repo.preload(subscription, :subscription_items)
+    subscription = Repo.preload(subscription, :subscription_items)
 
     case subscription.subscription_items do
       [item | _] ->
@@ -332,6 +468,8 @@ defmodule Ysc.Accounts.MembershipCache do
 
   # Validates that a cached membership is still valid (hasn't expired).
   # Uses cached fields only — do not query here; this runs on every cache hit.
+  # `nil` is a valid cached "no membership" result.
+  defp membership_valid?(nil), do: true
   defp membership_valid?(%{type: :lifetime}), do: true
 
   defp membership_valid?(%Subscriptions.Subscription{} = subscription) do

@@ -82,6 +82,34 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       assert MembershipCache.get_active_membership(user) == nil
     end
 
+    test "caches nil membership so a second lookup does not query subscriptions" do
+      user = user_fixture()
+      assert MembershipCache.get_active_membership(user) == nil
+
+      {_membership, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipCache.get_active_membership(user) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+    end
+
+    test "caches nil plan type so a second lookup does not query subscriptions" do
+      user = user_fixture()
+      assert MembershipCache.get_membership_plan_type(user) == nil
+
+      {_plan_type, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipCache.get_membership_plan_type(user) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+    end
+
     test "loads subscriptions from DB when user struct has subscriptions not preloaded" do
       user = user_fixture()
 
@@ -464,6 +492,64 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       assert {membership, plan_type} = Map.fetch!(data, user.id)
       assert membership.type == :lifetime
       assert plan_type == :lifetime
+    end
+
+    test "inherits primary lifetime membership for uncached sub-accounts" do
+      primary =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      sub =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Ysc.Repo.update!()
+
+      MembershipCache.invalidate_user(primary.id)
+      MembershipCache.invalidate_user(sub.id)
+
+      data = MembershipCache.batch_membership_data_for_users([sub])
+
+      assert {membership, :lifetime} = Map.fetch!(data, sub.id)
+      assert membership.type == :lifetime
+      assert membership.user_id == primary.id
+    end
+
+    test "loads uncached memberships with a bounded number of subscription queries" do
+      users = for _ <- 1..5, do: user_fixture()
+
+      Enum.each(users, fn user ->
+        {:ok, _subscription} =
+          Ysc.Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_cold_#{System.unique_integer([:positive])}",
+            stripe_status: "active",
+            name: "Membership",
+            current_period_end:
+              DateTime.utc_now()
+              |> DateTime.add(30, :day)
+              |> DateTime.truncate(:second)
+          })
+
+        MembershipCache.invalidate_user(user.id)
+      end)
+
+      {data, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipCache.batch_membership_data_for_users(users) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count <= 2
+
+      Enum.each(users, fn user ->
+        assert {%Ysc.Subscriptions.Subscription{}, _plan} =
+                 Map.fetch!(data, user.id)
+      end)
     end
 
     test "validates cached subscriptions in a single query" do
