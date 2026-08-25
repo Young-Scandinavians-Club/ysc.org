@@ -2368,19 +2368,13 @@ defmodule Ysc.Accounts do
     # Code that needs subscriptions should check Ecto.assoc_loaded?/1 or use
     # the membership cache functions which handle this automatically.
     cache_key = "membership:#{user.id}:active"
+    result = Cachex.get(:ysc_cache, cache_key)
 
-    case :ysc_cache |> Cachex.get(cache_key) do
-      {:ok, nil} ->
-        # Cache miss - preload subscriptions for membership check and other uses
-        preload_active_subscriptions_for_auth(user)
-
-      {:ok, _cached_membership} ->
-        # Cache hit - skip subscription preload but still load avatar
-        Repo.preload(user, :current_avatar)
-
-      {:error, _reason} ->
-        # Cache error - fallback to preloading for safety
-        preload_active_subscriptions_for_auth(user)
+    if MembershipCache.active_membership_cache_hit?(result) do
+      # Cache hit (including cached "no membership") — skip subscription preload
+      Repo.preload(user, :current_avatar)
+    else
+      preload_active_subscriptions_for_auth(user)
     end
   end
 

@@ -3375,6 +3375,13 @@ defmodule Ysc.EventsTest do
       assert is_list(rows)
       assert meta.page >= 1
       assert meta.total_count >= 1
+
+      event = Enum.find(rows, &(&1.title == "Paginated upcoming"))
+      assert event
+      refute Map.has_key?(event, :raw_details)
+      refute Map.has_key?(event, :rendered_details)
+      assert Map.has_key?(event, :title)
+      assert Map.has_key?(event, :image_id)
     end
 
     test "list_upcoming_events_with_preload loads events", %{user: user} do

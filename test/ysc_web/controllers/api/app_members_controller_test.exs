@@ -38,8 +38,79 @@ defmodule YscWeb.Api.AppMembersControllerTest do
       assert result["id"] == to_string(member.id)
       assert result["first_name"] == member.first_name
       assert result["email"] == member.email
-      assert Map.has_key?(result, "has_active_membership")
+      assert result["has_active_membership"] == false
       assert is_binary(result["avatar_url"]) and result["avatar_url"] != ""
+    end
+
+    test "reports active membership from a batched lookup", %{conn: conn} do
+      unique = System.unique_integer([:positive])
+
+      member =
+        user_fixture(%{
+          first_name: "Trillian#{unique}",
+          last_name: "McMillan",
+          email: unique_user_email()
+        })
+
+      {:ok, _subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: member.id,
+          stripe_id: "sub_app_search_#{unique}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end:
+            DateTime.utc_now()
+            |> DateTime.add(30, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      Ysc.Accounts.MembershipCache.invalidate_user(member.id)
+
+      response = get(conn, ~p"/api/v1/app/members/search?q=Trillian#{unique}")
+
+      assert %{"data" => [result]} = json_response(response, 200)
+      assert result["id"] == to_string(member.id)
+      assert result["has_active_membership"] == true
+    end
+
+    test "does not query subscriptions once per search hit", %{conn: conn} do
+      unique = System.unique_integer([:positive])
+      prefix = "Zarniwoop#{unique}"
+
+      members =
+        for i <- 1..8 do
+          member =
+            user_fixture(%{
+              first_name: "#{prefix}#{i}",
+              last_name: "Search",
+              email: unique_user_email()
+            })
+
+          {:ok, _subscription} =
+            Ysc.Subscriptions.create_subscription(%{
+              user_id: member.id,
+              stripe_id: "sub_app_n1_#{unique}_#{i}",
+              stripe_status: "active",
+              name: "Membership",
+              current_period_end:
+                DateTime.utc_now()
+                |> DateTime.add(30, :day)
+                |> DateTime.truncate(:second)
+            })
+
+          Ysc.Accounts.MembershipCache.invalidate_user(member.id)
+          member
+        end
+
+      {_response, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> get(conn, ~p"/api/v1/app/members/search?q=#{prefix}") end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count <= 2
+      assert length(members) == 8
     end
 
     test "falls back to a default avatar when the member has none uploaded", %{

@@ -881,70 +881,12 @@ defmodule Ysc.Events do
     offset = (page - 1) * page_size
     require_payable_tier? = Keyword.get(opts, :require_payable_tier, false)
 
-    now = DateTime.utc_now()
-    three_days_ago = DateTime.add(now, -3, :day)
-
     total_count =
-      from(e in Event, as: :event)
-      |> where([e], e.start_date > ^now)
-      |> where([e], e.state in [:published, :cancelled])
-      |> maybe_require_payable_tier(require_payable_tier?)
-      |> select([e], count(e.id))
+      upcoming_events_paginated_count_query(require_payable_tier?)
       |> Repo.one()
 
     events =
-      from(e in Event,
-        as: :event,
-        where: e.start_date > ^now,
-        where: e.state in [:published, :cancelled],
-        left_join: t in Ticket,
-        on:
-          t.event_id == e.id and t.status == :confirmed and
-            t.inserted_at >= ^three_days_ago,
-        left_join: tt in TicketTier,
-        on: t.ticket_tier_id == tt.id and tt.type != :donation,
-        group_by: e.id,
-        select: %{
-          id: e.id,
-          reference_id: e.reference_id,
-          state: e.state,
-          published_at: e.published_at,
-          publish_at: e.publish_at,
-          organizer_id: e.organizer_id,
-          title: e.title,
-          description: e.description,
-          max_attendees: e.max_attendees,
-          age_restriction: e.age_restriction,
-          show_participants: e.show_participants,
-          raw_details: e.raw_details,
-          rendered_details: e.rendered_details,
-          image_id: e.image_id,
-          start_date: e.start_date,
-          start_time: e.start_time,
-          end_date: e.end_date,
-          end_time: e.end_time,
-          location_name: e.location_name,
-          address: e.address,
-          latitude: e.latitude,
-          longitude: e.longitude,
-          place_id: e.place_id,
-          partiful_link: e.partiful_link,
-          tickets_tbd: e.tickets_tbd,
-          lock_version: e.lock_version,
-          inserted_at: e.inserted_at,
-          updated_at: e.updated_at,
-          recent_tickets_count: count(t.id),
-          selling_fast: fragment("count(?) >= 5", t.id)
-        },
-        order_by: [
-          asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
-          asc: e.start_date,
-          asc: e.start_time
-        ],
-        limit: ^page_size,
-        offset: ^offset
-      )
-      |> maybe_require_payable_tier(require_payable_tier?)
+      upcoming_events_paginated_query(page_size, offset, require_payable_tier?)
       |> Repo.all()
       |> add_pricing_info_batch()
 
@@ -960,6 +902,71 @@ defmodule Ysc.Events do
     }
 
     {events, meta}
+  end
+
+  defp upcoming_events_paginated_count_query(require_payable_tier?) do
+    now = DateTime.utc_now()
+
+    from(e in Event, as: :event)
+    |> where([e], e.start_date > ^now)
+    |> where([e], e.state in [:published, :cancelled])
+    |> maybe_require_payable_tier(require_payable_tier?)
+    |> select([e], count(e.id))
+  end
+
+  # List payload for the kiosk/app APIs — omit unused columns such as
+  # raw_details/rendered_details (event body HTML) that EventListCache still
+  # needs for the Atom feed.
+  defp upcoming_events_paginated_query(
+         page_size,
+         offset,
+         require_payable_tier?
+       ) do
+    now = DateTime.utc_now()
+    three_days_ago = DateTime.add(now, -3, :day)
+
+    from(e in Event,
+      as: :event,
+      where: e.start_date > ^now,
+      where: e.state in [:published, :cancelled],
+      left_join: t in Ticket,
+      on:
+        t.event_id == e.id and t.status == :confirmed and
+          t.inserted_at >= ^three_days_ago,
+      left_join: tt in TicketTier,
+      on: t.ticket_tier_id == tt.id and tt.type != :donation,
+      group_by: e.id,
+      select: %{
+        id: e.id,
+        reference_id: e.reference_id,
+        state: e.state,
+        title: e.title,
+        description: e.description,
+        max_attendees: e.max_attendees,
+        age_restriction: e.age_restriction,
+        image_id: e.image_id,
+        start_date: e.start_date,
+        start_time: e.start_time,
+        end_date: e.end_date,
+        end_time: e.end_time,
+        location_name: e.location_name,
+        address: e.address,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        partiful_link: e.partiful_link,
+        tickets_tbd: e.tickets_tbd,
+        recent_tickets_count: count(t.id),
+        selling_fast: fragment("count(?) >= 5", t.id)
+      },
+      order_by: [
+        asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
+        asc: e.start_date,
+        asc: e.start_time
+      ],
+      limit: ^page_size,
+      offset: ^offset
+    )
+    |> maybe_require_payable_tier(require_payable_tier?)
   end
 
   defp maybe_require_payable_tier(query, false), do: query
@@ -3701,4 +3708,14 @@ defmodule Ysc.Events do
 
   @doc false
   def ci_query_explain_query, do: upcoming_events_with_preload_query()
+
+  @doc false
+  def ci_query_explain_upcoming_events_paginated_query do
+    upcoming_events_paginated_query(20, 0, false)
+  end
+
+  @doc false
+  def ci_query_explain_upcoming_events_paginated_payable_query do
+    upcoming_events_paginated_query(20, 0, true)
+  end
 end
