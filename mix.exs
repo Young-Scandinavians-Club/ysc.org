@@ -260,7 +260,8 @@ defmodule Ysc.MixProject do
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+.
       # 1.8.12: clear return_to after login; drop channel messages without a join_ref.
-      {:phoenix, "~> 1.8.12"},
+      # 1.8.13: phoenix.js reconnects after Chrome freeze/resume when visibilitychange is skipped.
+      {:phoenix, "~> 1.8.13"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},
