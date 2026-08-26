@@ -60,6 +60,7 @@ defmodule YscWeb.NewsletterComponentsTest do
         <.newsletter_subscribe_form
           id="home-newsletter-form"
           labelledby="newsletter-heading"
+          describedby="newsletter-privacy-footer"
         >
           <:footer>
             <p id="newsletter-privacy-footer">privacy policy</p>
@@ -68,6 +69,7 @@ defmodule YscWeb.NewsletterComponentsTest do
         """)
 
       assert html =~ ~s(aria-labelledby="newsletter-heading")
+      assert html =~ ~s(aria-describedby="newsletter-privacy-footer")
       assert html =~ ~s(id="newsletter-privacy-footer")
       assert html =~ "privacy policy"
     end
@@ -111,6 +113,37 @@ defmodule YscWeb.NewsletterComponentsTest do
       assert html =~ "Unsubscribe"
       assert html =~ ~s(phx-click="toggle_newsletter_subscription")
       refute html =~ "rounded-xl border"
+    end
+
+    test "compact layout shows subscribe CTA when not subscribed" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.newsletter_member_status
+          id="home-newsletter-member-status"
+          subscribed={false}
+          layout={:compact}
+        />
+        """)
+
+      assert html =~ "Not subscribed"
+      assert html =~ "Get news"
+      assert html =~ "Subscribe"
+      assert html =~ "hero-envelope"
+    end
+
+    test "card layout shows subscribed copy" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.newsletter_member_status id="newsletter-member-status" subscribed />
+        """)
+
+      assert html =~ "You&#39;re subscribed"
+      assert html =~ "Unsubscribe"
+      assert html =~ "rounded-xl border"
     end
   end
 end

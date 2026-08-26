@@ -67,5 +67,10 @@ defmodule YscWeb.NewsletterSubscribeTest do
 
       assert NewsletterSubscribe.guest_error(changeset) =~ "info@ysc.org"
     end
+
+    test "falls back to a generic message for unknown reasons" do
+      assert NewsletterSubscribe.guest_error(:timeout) =~ "info@ysc.org"
+      assert NewsletterSubscribe.guest_error("nope") =~ "info@ysc.org"
+    end
   end
 end
