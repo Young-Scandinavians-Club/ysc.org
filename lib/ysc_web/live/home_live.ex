@@ -9,7 +9,6 @@ defmodule YscWeb.HomeLive do
     Accounts,
     Bookings,
     Events,
-    Newsletter,
     PublicContentCache
   }
 
@@ -20,7 +19,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Posts.Post
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
-  alias YscWeb.{DateDisplay, PlainText}
+  alias YscWeb.{DateDisplay, NewsletterSubscribe, PlainText}
 
   @impl true
   def mount(_params, session, socket) do
@@ -184,7 +183,7 @@ defmodule YscWeb.HomeLive do
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
       {:bookings,
        fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end},
-      {:newsletter_subscribed, fn -> newsletter_subscribed?(email) end}
+      {:newsletter_subscribed, fn -> NewsletterSubscribe.subscribed?(email) end}
     ]
 
     tasks
@@ -1011,81 +1010,28 @@ defmodule YscWeb.HomeLive do
             Sign up for our newsletter to receive updates about YSC and all the fun events we're arranging.
           </p>
 
-          <form
+          <.newsletter_subscribe_form
             id="home-newsletter-form"
-            phx-submit="subscribe_newsletter"
-            class="mt-8"
-            aria-labelledby="newsletter-heading"
-            aria-describedby="newsletter-description"
+            email={@newsletter_email}
+            submitted={@newsletter_submitted}
+            error={@newsletter_error}
+            class="mt-8 max-w-lg mx-auto"
+            labelledby="newsletter-heading"
+            describedby="newsletter-description"
           >
-            <div class="max-w-lg mx-auto space-y-4">
-              <div class="flex flex-col sm:flex-row gap-4">
-                <div class="flex-1 min-w-0">
-                  <label for="newsletter-email" class="sr-only">
-                    Email address for newsletter signup
-                  </label>
-                  <input
-                    type="email"
-                    id="newsletter-email"
-                    name="email"
-                    autocomplete="email"
-                    value={@newsletter_email}
-                    class="w-full px-4 py-3 border border-zinc-300 rounded text-zinc-900 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
-                    placeholder="Email address"
-                    required
-                    disabled={@newsletter_submitted}
-                    aria-invalid={@newsletter_error != nil}
-                    aria-errormessage={
-                      if @newsletter_error != nil, do: "newsletter-error", else: nil
-                    }
-                  />
-                </div>
-                <.button
-                  :if={!@newsletter_submitted}
-                  type="submit"
-                  phx-disable-with="Subscribing..."
-                  class="px-6 py-3 shrink-0"
-                  aria-label="Subscribe to newsletter"
+            <:footer>
+              <p class="mt-4 text-sm text-zinc-600">
+                We don't spam! Read our
+                <.link
+                  navigate={~p"/privacy-policy"}
+                  class="font-medium text-blue-700 underline hover:text-blue-800"
                 >
-                  Subscribe
-                </.button>
-              </div>
-              <%!-- Invisible Turnstile verification --%>
-              <Turnstile.widget appearance="interaction-only" theme="light" />
-            </div>
-            <p
-              :if={@newsletter_error}
-              id="newsletter-error"
-              class="mt-3 text-sm text-red-600"
-              role="alert"
-            >
-              {@newsletter_error}
-            </p>
-            <div
-              :if={@newsletter_submitted}
-              class="mt-3 text-emerald-600"
-            >
-              <div class="flex items-center justify-center">
-                <.icon name="hero-check-circle" class="w-5 h-5 mr-2 shrink-0" />
-                <span class="font-medium">
-                  You're one step away! Check your email right now to confirm your subscription.
-                </span>
-              </div>
-              <p class="mt-2 text-sm text-zinc-600">
-                Look for an email from YSC with the subject "Action Required: Please confirm your subscription." If you don't see it in a couple minutes, check your spam or promotions folder.
+                  privacy policy
+                </.link>
+                for more info.
               </p>
-            </div>
-            <p class="mt-4 text-sm text-zinc-600">
-              We don't spam! Read our
-              <.link
-                navigate={~p"/privacy-policy"}
-                class="font-medium text-blue-700 underline hover:text-blue-800"
-              >
-                privacy policy
-              </.link>
-              for more info.
-            </p>
-          </form>
+            </:footer>
+          </.newsletter_subscribe_form>
         </div>
       </div>
     </section>
@@ -1920,52 +1866,11 @@ defmodule YscWeb.HomeLive do
                 </div>
 
                 <div :if={@async_data_loaded}>
-                  <div class="flex items-center gap-3">
-                    <div class={[
-                      "flex items-center justify-center w-9 h-9 rounded-full shrink-0",
-                      if(@newsletter_subscribed,
-                        do: "bg-emerald-100",
-                        else: "bg-zinc-100"
-                      )
-                    ]}>
-                      <.icon
-                        name={
-                          if(@newsletter_subscribed,
-                            do: "hero-check",
-                            else: "hero-envelope"
-                          )
-                        }
-                        class={[
-                          "w-4 h-4",
-                          if(@newsletter_subscribed,
-                            do: "text-emerald-600",
-                            else: "text-zinc-500"
-                          )
-                        ]}
-                      />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="font-semibold text-zinc-900 text-sm">
-                        {if @newsletter_subscribed,
-                          do: "Subscribed",
-                          else: "Not subscribed"}
-                      </p>
-                      <p class="text-xs text-zinc-500 mt-0.5">
-                        {if @newsletter_subscribed,
-                          do: "You'll get new newsletters in your inbox.",
-                          else: "Get news & updates in your inbox."}
-                      </p>
-                    </div>
-                    <button
-                      phx-click="toggle_newsletter_subscription"
-                      phx-disable-with="Saving..."
-                      class="shrink-0 text-xs font-bold text-blue-600 hover:underline"
-                    >
-                      {if @newsletter_subscribed,
-                        do: "Unsubscribe",
-                        else: "Subscribe"}
-                    </button>
-                  </div>
+                  <.newsletter_member_status
+                    id="home-newsletter-member-status"
+                    subscribed={@newsletter_subscribed}
+                    layout={:compact}
+                  />
                   <.link
                     navigate={~p"/newsletters"}
                     class="mt-3 flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
@@ -2420,164 +2325,13 @@ defmodule YscWeb.HomeLive do
     {:noreply, push_navigate(socket, to: ~p"/users/settings/passkeys/new")}
   end
 
-  @dialyzer {:nowarn_function, handle_event: 3}
   def handle_event("subscribe_newsletter", params, socket) do
-    email = params["email"]
-    remote_ip = socket.assigns.remote_ip
-
-    # Check rate limits first (by IP and email)
-    case Ysc.NewsletterRateLimit.check(remote_ip, email) do
-      :ok ->
-        verify_and_subscribe(params, email, socket)
-
-      {:error, :rate_limited, _retry_after} ->
-        {:noreply,
-         socket
-         |> assign(
-           newsletter_email: email,
-           newsletter_error:
-             "Too many subscription attempts. Please try again later."
-         )}
-    end
+    {:noreply, NewsletterSubscribe.request_guest(socket, params)}
   end
 
   def handle_event("toggle_newsletter_subscription", _params, socket) do
-    user = socket.assigns.current_user
-
-    result =
-      if socket.assigns.newsletter_subscribed do
-        Newsletter.unsubscribe(user.email)
-      else
-        Newsletter.subscribe(user.email,
-          user_id: user.id,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          source: "home_dashboard"
-        )
-      end
-
-    case result do
-      {:ok, _} ->
-        now_subscribed = !socket.assigns.newsletter_subscribed
-
-        {title, body} =
-          if now_subscribed,
-            do:
-              {"Subscribed!",
-               "You'll receive future newsletters in your inbox."},
-            else: {"Unsubscribed", "You won't receive newsletters anymore."}
-
-        {:noreply,
-         socket
-         |> assign(:newsletter_subscribed, now_subscribed)
-         |> YscWeb.Flash.put_toast(:info, body,
-           title: title,
-           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
-         )}
-
-      {:error, _} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "We couldn't update your newsletter subscription. Please try again, or email info@ysc.org if this keeps happening."
-         )}
-    end
-  end
-
-  defp verify_and_subscribe(params, email, socket) do
-    # Verify Turnstile for spam protection
-    # Only verify if the token is present (interaction-only mode may not always generate one)
-    if Map.has_key?(params, "cf-turnstile-response") do
-      case Turnstile.verify(params, socket.assigns.remote_ip) do
-        {:ok, _} ->
-          subscribe_to_newsletter(email, socket)
-
-        {:error, _reason} ->
-          {:noreply,
-           socket
-           |> assign(
-             newsletter_email: email,
-             newsletter_error: "Please complete the verification to continue."
-           )
-           |> Turnstile.refresh()}
-      end
-    else
-      # No token present - Turnstile deemed request safe, proceed
-      subscribe_to_newsletter(email, socket)
-    end
-  end
-
-  defp subscribe_to_newsletter(email, socket) do
-    metadata = %{
-      "signup_date" => DateTime.utc_now() |> DateTime.to_iso8601()
-    }
-
-    opts = [source: "public_signup", metadata: metadata]
-
-    case Newsletter.request_confirmation(email, opts) do
-      {:ok, status} when status in [:pending, :already_subscribed] ->
-        {:noreply,
-         socket
-         |> assign(
-           newsletter_email: email,
-           newsletter_submitted: true,
-           newsletter_error: nil
-         )
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "Check your email to confirm your subscription.",
-           title: "Almost there!",
-           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
-         )}
-
-      {:error, :invalid_email} ->
-        {:noreply,
-         socket
-         |> assign(
-           newsletter_email: email,
-           newsletter_error: "Please enter a valid email address."
-         )}
-
-      {:error, :no_mx_records} ->
-        {:noreply,
-         socket
-         |> assign(
-           newsletter_email: email,
-           newsletter_error:
-             "This email domain appears to be invalid. Please check your email address."
-         )}
-
-      {:error, :disposable_email} ->
-        {:noreply,
-         socket
-         |> assign(
-           newsletter_email: email,
-           newsletter_error:
-             "Temporary email addresses are not allowed. Please use a permanent email address."
-         )}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        error_message =
-          case changeset.errors do
-            [{:email, {msg, _}} | _] -> msg
-            _ -> "Something went wrong. Please try again later."
-          end
-
-        {:noreply,
-         socket
-         |> assign(
-           newsletter_email: email,
-           newsletter_error: error_message
-         )}
-    end
-  end
-
-  defp newsletter_subscribed?(email) do
-    case Newsletter.get_subscriber_by_email(email) do
-      %{subscribed: true} -> true
-      _ -> false
-    end
+    {:noreply,
+     NewsletterSubscribe.toggle_member(socket, source: "home_dashboard")}
   end
 
   defp format_event_time(event_start_date, %Time{} = time) do
