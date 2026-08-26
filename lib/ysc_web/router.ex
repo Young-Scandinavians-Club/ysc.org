@@ -229,6 +229,7 @@ defmodule YscWeb.Router do
     live_session :mount_site_settings,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -283,6 +284,7 @@ defmodule YscWeb.Router do
       live_session :dev_button_showcase,
         on_mount: [
           {YscWeb.LiveToastMount, :mount_toasts_sync},
+          {YscWeb.Plugs.TimeZone, :assign_timezone},
           {YscWeb.UserAuth, :mount_current_user},
           {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
           {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -306,6 +308,7 @@ defmodule YscWeb.Router do
     live_session :redirect_if_user_is_authenticated,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :redirect_if_user_is_authenticated},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -372,6 +375,7 @@ defmodule YscWeb.Router do
     live_session :password_reset,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -392,6 +396,7 @@ defmodule YscWeb.Router do
     live_session :account_setup,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.AccountSetupAccess, :default},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
@@ -409,6 +414,7 @@ defmodule YscWeb.Router do
     live_session :post_migration_onboarding,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :ensure_authenticated},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -444,6 +450,7 @@ defmodule YscWeb.Router do
     live_session :require_authenticated_user,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :ensure_authenticated},
         {YscWeb.UserAuth, :ensure_onboarding_complete},
         {YscWeb.UserAuth, :mount_reauth_session},
@@ -496,6 +503,7 @@ defmodule YscWeb.Router do
     live_session :current_user,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :mount_current_user},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
@@ -548,6 +556,7 @@ defmodule YscWeb.Router do
     live_session :require_admin,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
+        {YscWeb.Plugs.TimeZone, :assign_timezone},
         {YscWeb.UserAuth, :ensure_authenticated},
         {YscWeb.UserAuth, :ensure_admin},
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},

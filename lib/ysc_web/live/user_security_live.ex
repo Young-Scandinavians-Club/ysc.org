@@ -10,7 +10,7 @@ defmodule YscWeb.UserSecurityLive do
     user = socket.assigns.current_user
     current_membership = socket.assigns.current_membership
     active_plan = YscWeb.UserAuth.get_membership_plan_type(current_membership)
-    timezone = get_timezone_from_connect_params(socket)
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     # Initialize password form
     password_changeset = Accounts.change_user_password(user)
@@ -709,11 +709,6 @@ defmodule YscWeb.UserSecurityLive do
       "desktop" -> "hero-computer-desktop"
       _ -> "hero-computer-desktop"
     end
-  end
-
-  defp get_timezone_from_connect_params(socket) do
-    connect_params = get_connect_params(socket) || %{}
-    Map.get(connect_params, "timezone", "America/Los_Angeles")
   end
 
   defp format_login_time(datetime, timezone) do

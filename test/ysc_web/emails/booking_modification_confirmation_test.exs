@@ -4,6 +4,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
   import Ysc.BookingsFixtures
 
   alias Ysc.Repo
+  alias YscWeb.BookingDisplay
   alias YscWeb.Emails.BookingModificationConfirmation
 
   defp booking_with_user(attrs \\ %{}) do
@@ -98,6 +99,31 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
       assert html =~ "cancellation refunds no longer apply"
       assert html =~ "What Changed"
       assert html =~ "View Updated Booking"
+    end
+
+    test "pluralizes guest counts in the change summary and stay details" do
+      booking = booking_with_user(%{guests_count: 2, children_count: 1})
+
+      previous = %{
+        checkin_date: booking.checkin_date,
+        checkout_date: booking.checkout_date,
+        guests_count: 1,
+        children_count: 0,
+        total_price: booking.total_price
+      }
+
+      html =
+        booking
+        |> BookingModificationConfirmation.prepare_email_data(previous)
+        |> BookingModificationConfirmation.render()
+
+      assert html =~ "1 adult → 2 adults, 1 child"
+      assert html =~ "2 adults, 1 child"
+
+      assert html =~
+               BookingDisplay.nights_label(
+                 Date.diff(booking.checkout_date, booking.checkin_date)
+               )
     end
   end
 

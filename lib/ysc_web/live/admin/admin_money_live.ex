@@ -24,9 +24,7 @@ defmodule YscWeb.AdminMoneyLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    # Get timezone from connect params (browser sends via LiveSocket)
-    connect_params = get_connect_params(socket) || %{}
-    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     # Set default date range to current calendar year
     current_year = DateTime.now!("America/Los_Angeles").year

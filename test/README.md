@@ -296,6 +296,8 @@ Two custom Credo checks enforce the above rules automatically:
 |----|-------|-----------------|
 | `EX9001` | `Ysc.Credo.NoSleepInTests` | Any `:timer.sleep/1` or `Process.sleep/1` in `test/` files |
 | `EX9002` | `Ysc.Credo.NoExternalUrlsInTestConfig` | Real external service URLs (Discord, Stripe, SendGrid, …) in `config/test.exs` |
+| `EX9003` | `Ysc.Credo.DateFieldSchemaTypes` | Ambiguous date fields (`start_date`, `checkin_date`, …) missing `Ysc.Ecto.DateKind` |
+| `EX9004` | `Ysc.Credo.DateFieldConversions` | `shift_zone` / browser-TZ formatters on California calendar fields |
 
 Run them as part of the precommit alias:
 

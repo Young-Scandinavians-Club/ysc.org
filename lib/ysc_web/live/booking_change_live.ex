@@ -18,6 +18,7 @@ defmodule YscWeb.BookingChangeLive do
   alias Ysc.Repo
   alias YscWeb.BookingActions
   alias YscWeb.BookingGuestForm
+  alias YscWeb.BookingDisplay
   import YscWeb.Components.BookingGuestInfoForm
   import Ecto.Query
 
@@ -1452,14 +1453,7 @@ defmodule YscWeb.BookingChangeLive do
     adults = preview_booking.guests_count || 1
     children = preview_booking.children_count || 0
 
-    children_text =
-      if children > 0 do
-        " and #{children} #{if children == 1, do: "child", else: "children"}"
-      else
-        ""
-      end
-
-    "You added guests to #{room_names}. Please provide names for all #{adults} #{if adults == 1, do: "adult", else: "adults"}#{children_text}."
+    "You added guests to #{room_names}. Please provide names for all #{BookingDisplay.guests_label(adults, children, separator: " and ")}."
   end
 
   defp guest_info_submit_label(%{delta: delta}) when is_struct(delta, Money) do

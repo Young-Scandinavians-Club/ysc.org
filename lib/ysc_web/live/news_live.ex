@@ -98,9 +98,9 @@ defmodule YscWeb.NewsLive do
 
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
                     <span class="text-sm font-black uppercase tracking-[0.1em]">
-                      {Timex.format!(
+                      {DateDisplay.format_date_short_in_zone(
                         @featured.published_on,
-                        "{Mshort} {D}, {YYYY}"
+                        @timezone
                       )}
                     </span>
                     <span class="h-3 w-px bg-zinc-300 sm:bg-white/40"></span>
@@ -203,7 +203,10 @@ defmodule YscWeb.NewsLive do
             <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
                 <span class="text-sm font-black text-blue-600 uppercase tracking-[0.2em]">
-                  {DateDisplay.format_date_short(post.published_on)}
+                  {DateDisplay.format_date_short_in_zone(
+                    post.published_on,
+                    @timezone
+                  )}
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
                 <span class="text-sm font-bold text-zinc-500 uppercase tracking-widest">

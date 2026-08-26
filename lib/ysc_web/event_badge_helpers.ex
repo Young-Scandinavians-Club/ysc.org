@@ -92,26 +92,13 @@ defmodule YscWeb.EventBadgeHelpers do
 
   @doc """
   Returns the number of Pacific calendar days until an event's start date, or `nil`.
+
+  Events are hosted in California. "Today" is always Pacific, and stored
+  event dates are not timezone-shifted.
   """
   @spec days_until_event_start(map()) :: non_neg_integer() | nil
   def days_until_event_start(event) when is_map(event) do
-    start_date = get_field(event, :start_date)
-
-    if start_date == nil do
-      nil
-    else
-      event_date_only = DateTime.to_date(start_date)
-
-      now_date_only =
-        DateTime.utc_now()
-        |> DateTime.shift_zone!("America/Los_Angeles")
-        |> DateTime.to_date()
-
-      case Date.diff(event_date_only, now_date_only) do
-        diff when diff >= 0 -> diff
-        _ -> nil
-      end
-    end
+    DateDisplay.days_until_event(event)
   end
 
   defp append_proximity(acc, event, :labels) do

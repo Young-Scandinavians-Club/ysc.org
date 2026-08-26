@@ -29,7 +29,7 @@
     <% end %>
     <%= if @guests_changed do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Guests:</strong> <%= @previous.guests_count %> adults<%= if (@previous.children_count || 0) > 0, do: ", #{@previous.children_count} children", else: "" %> → <%= @booking.guests_count %> adults<%= if (@booking.children_count || 0) > 0, do: ", #{@booking.children_count} children", else: "" %>
+      <strong>Guests:</strong> <%= YscWeb.BookingDisplay.guests_label(@previous.guests_count, @previous.children_count) %> → <%= YscWeb.BookingDisplay.guests_label(@booking.guests_count, @booking.children_count) %>
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
@@ -57,10 +57,10 @@
       <strong>Check-out:</strong> <%= @booking.checkout_date %> (11:00 AM)
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Duration:</strong> <%= @booking.nights %> <%= if @booking.nights == 1, do: "night", else: "nights" %>
+      <strong>Duration:</strong> <%= YscWeb.BookingDisplay.nights_label(@booking.nights) %>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Guests:</strong> <%= @booking.guests_count %> adults<%= if (@booking.children_count || 0) > 0, do: ", #{@booking.children_count} children", else: "" %>
+      <strong>Guests:</strong> <%= YscWeb.BookingDisplay.guests_label(@booking.guests_count, @booking.children_count) %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Payment</mj-text>

@@ -48,18 +48,9 @@
       <strong>Check-out:</strong> <%= @booking.checkout_date %>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <%
-        adults_count = @booking.guests_count
-        total_guests = @booking.guests_count + (@booking.children_count || 0)
-      %>
       <strong>Guests:</strong>
-      <%= if adults_count > 0 do %>
-        <%= adults_count %> <%= if adults_count == 1, do: "adult", else: "adults" %>
-      <% end %>
-      <%= if (@booking.children_count || 0) > 0 do %>
-        <%= if adults_count > 0, do: ", ", else: "" %><%= @booking.children_count %> <%= if @booking.children_count == 1, do: "child", else: "children" %>
-      <% end %>
-      <span style="color: #6B7280;"> (Total: <%= total_guests %> <%= if total_guests == 1, do: "guest", else: "guests" %>)</span>
+      <%= YscWeb.BookingDisplay.guests_label(@booking.guests_count, @booking.children_count, omit_zero_adults: true) %>
+      <span style="color: #6B7280;"> (<%= YscWeb.BookingDisplay.guests_total_label(@booking.guests_count, @booking.children_count) %>)</span>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Booking Details →</mj-button>

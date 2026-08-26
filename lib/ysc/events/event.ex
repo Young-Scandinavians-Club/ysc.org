@@ -104,12 +104,12 @@ defmodule Ysc.Events.Event do
       foreign_key: :image_id,
       references: :id
 
-    # When event starts
-    field :start_date, :utc_datetime
-    field :start_time, :time
+    # When event starts (California wall-clock calendar day + Pacific time)
+    field :start_date, Ysc.Ecto.DateKind, kind: :california_calendar_datetime
+    field :start_time, Ysc.Ecto.DateKind, kind: :pacific_time
     # When event ends (if null, then it's a single day event)
-    field :end_date, :utc_datetime
-    field :end_time, :time
+    field :end_date, Ysc.Ecto.DateKind, kind: :california_calendar_datetime
+    field :end_time, Ysc.Ecto.DateKind, kind: :pacific_time
 
     # Location fields
     # Name of the location (e.g., "Central Park")
