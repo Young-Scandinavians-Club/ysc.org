@@ -96,6 +96,9 @@ defmodule Ysc.Tickets.AdminGrantCheckoutBlockTest do
          event: event,
          tier1: tier1
        } do
+    assert {:ok, pending_without_pi} =
+             Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
     assert {:ok, pending_order} =
              Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
 
@@ -132,6 +135,9 @@ defmodule Ysc.Tickets.AdminGrantCheckoutBlockTest do
 
     pending_order = Tickets.get_ticket_order(pending_order.id)
     assert pending_order.status == :pending
+
+    pending_without_pi = Tickets.get_ticket_order(pending_without_pi.id)
+    assert pending_without_pi.status == :cancelled
 
     assert [] ==
              Ysc.Repo.all(

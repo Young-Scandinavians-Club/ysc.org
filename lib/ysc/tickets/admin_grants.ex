@@ -212,12 +212,17 @@ defmodule Ysc.Tickets.AdminGrants do
   defp reconcile_pending_checkouts_for_grant(user_id, event_id) do
     pending_orders_for_event(user_id, event_id)
     |> Enum.reduce_while(:ok, fn order, :ok ->
-      if CheckoutCancel.pending_order_safe_to_cancel?(order,
-           context: "admin_grant"
-         ) do
-        reconcile_safe_pending_checkout(order)
-      else
-        {:cont, :ok}
+      cond do
+        not payment_intent_attached?(order) ->
+          reconcile_safe_pending_checkout(order)
+
+        CheckoutCancel.pending_order_safe_to_cancel?(order,
+          context: "admin_grant"
+        ) ->
+          reconcile_safe_pending_checkout(order)
+
+        true ->
+          {:cont, :ok}
       end
     end)
   end
@@ -455,12 +460,13 @@ defmodule Ysc.Tickets.AdminGrants do
   defp cancel_pending_ticket_orders_for_grant(user_id, event_id, grant_order_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    pending_orders =
-      pending_orders_for_event(user_id, event_id)
-      |> Enum.reject(&(&1.id == grant_order_id))
+    # The grant order is already `:completed`, so it is not in this pending set.
+    pending_orders = pending_orders_for_event(user_id, event_id)
 
     {with_payment_intent, without_payment_intent} =
-      Enum.split_with(pending_orders, &payment_intent_attached?/1)
+      Enum.split_with(pending_orders, fn order ->
+        payment_intent_attached?(order)
+      end)
 
     # A remaining PaymentIntent-backed cart must not be cancelled locally —
     # that is the #1130 orphan-charge race. Fail the grant; in-flight payments
@@ -535,11 +541,12 @@ defmodule Ysc.Tickets.AdminGrants do
     )
   end
 
-  defp payment_intent_attached?(%TicketOrder{payment_intent_id: id})
-       when is_binary(id) and id != "",
-       do: true
-
-  defp payment_intent_attached?(_), do: false
+  defp payment_intent_attached?(order) do
+    case order.payment_intent_id do
+      id when is_binary(id) and id != "" -> true
+      _unattached -> false
+    end
+  end
 
   defp grant_expires_at(%Event{} = event, now) do
     end_date = event.end_date || event.start_date
