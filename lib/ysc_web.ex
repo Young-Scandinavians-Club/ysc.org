@@ -139,6 +139,7 @@ defmodule YscWeb do
       import YscWeb.CoreComponents
       import YscWeb.Components.Autocomplete
       import YscWeb.PaymentMethodComponents
+      import YscWeb.NewsletterComponents
       import YscWeb.Gettext
 
       # Shortcut for generating JS commands
