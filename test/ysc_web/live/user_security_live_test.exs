@@ -80,8 +80,8 @@ defmodule YscWeb.UserSecurityLiveTest do
         |> put_connect_params(%{"timezone" => "Not/A/Real/Zone"})
         |> log_in_user(user)
 
-      assert {:ok, _view, html} = live(conn, ~p"/users/settings/security")
-      assert html =~ "Security Settings"
+      assert {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      assert has_element?(view, "#password_form")
     end
   end
 

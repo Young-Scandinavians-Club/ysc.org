@@ -32,8 +32,8 @@ defmodule YscWeb.UserRegistrationLiveTest do
          %{conn: conn} do
       conn = put_connect_params(conn, %{"timezone" => "Not/A/Real/Zone"})
 
-      assert {:ok, _lv, html} = live(conn, ~p"/users/register")
-      assert html =~ "Check all that describe you"
+      assert {:ok, lv, _html} = live(conn, ~p"/users/register")
+      assert has_element?(lv, "#registration_form")
     end
 
     test "shows scandinavia connection header on additional questions step", %{

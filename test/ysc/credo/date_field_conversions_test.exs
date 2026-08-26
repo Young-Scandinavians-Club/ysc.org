@@ -231,4 +231,28 @@ defmodule Ysc.Credo.DateFieldConversionsTest do
     assert [%Credo.Issue{check: DateFieldConversions}] = issues
     assert hd(issues).message =~ "Do not shift_zone"
   end
+
+  test "does not leak a case-bound variable name into a later, unrelated function" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        def label(event) do
+          case event.start_date do
+            nil ->
+              nil
+
+            start_date ->
+              DateTime.to_date(start_date)
+          end
+        end
+
+        def unrelated(params, timezone) do
+          start_date = params["start_date"]
+          DateTime.shift_zone!(start_date, timezone)
+        end
+      end
+      """)
+
+    assert issues == []
+  end
 end

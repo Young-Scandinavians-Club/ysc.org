@@ -102,6 +102,18 @@ defmodule Ysc.Credo.DateFieldConversions do
     Enum.reverse(issues)
   end
 
+  # Bindings are function-local. Reset them on every def/defp so a variable
+  # name bound inside one function (see the :case clause below) can't leak
+  # into an unrelated same-named local variable in a later function.
+  defp traverse(
+         {def_kind, _, _} = ast,
+         {issues, _bindings},
+         _issue_meta
+       )
+       when def_kind in [:def, :defp] do
+    {ast, {issues, %{}}}
+  end
+
   # case event.start_date do
   #   nil -> nil
   #   start_date -> start_date |> ...
