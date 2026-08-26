@@ -107,6 +107,18 @@ defmodule Ysc.Events.Ticket do
   end
 
   @doc """
+  Changeset for admin reassignment of a ticket to a different user.
+
+  Only touches `:user_id` and skips purchase-time validations (membership,
+  event-in-past) since this is an administrative correction, not a purchase.
+  """
+  def reassign_changeset(ticket, attrs) do
+    ticket
+    |> cast(attrs, [:user_id])
+    |> validate_required([:user_id])
+  end
+
+  @doc """
   Changeset for updating ticket status only.
   Skips validations that shouldn't apply when changing status (e.g., expiring tickets).
   This is used for administrative status changes where business validations don't apply.

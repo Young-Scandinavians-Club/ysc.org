@@ -10,6 +10,7 @@ defmodule Ysc.TicketsTest do
   alias Ysc.Events.Ticket
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
+  alias Ysc.LedgersFixtures
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
   import Ysc.TicketsFixtures
@@ -1375,6 +1376,126 @@ defmodule Ysc.TicketsTest do
       assert Repo.get!(Ticket, first.id).status == :cancelled
       assert Repo.get!(Ticket, second.id).status == :pending
       assert Tickets.get_ticket_order(order.id).status == :pending
+    end
+  end
+
+  describe "reassign_ticket/2" do
+    setup do
+      tickets_setup()
+    end
+
+    test "reassigns the ticket to a different user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+      new_user = user_fixture_unique()
+
+      assert {:ok, updated_ticket} =
+               Tickets.reassign_ticket(ticket, new_user.id)
+
+      assert updated_ticket.user_id == new_user.id
+      assert Repo.get!(Ticket, ticket.id).user_id == new_user.id
+    end
+
+    test "requires a user_id", %{user: user, event: event, tier1: tier1} do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      assert {:error, changeset} = Tickets.reassign_ticket(ticket, nil)
+      assert %{user_id: ["can't be blank"]} = errors_on(changeset)
+    end
+  end
+
+  describe "list_tickets_for_admin/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns tickets for the event preloading tier, user, order, and registration",
+         %{user: user, event: event, tier1: tier1} do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+      ticket |> Ecto.Changeset.change(status: :confirmed) |> Repo.update!()
+
+      {:ok, _registration} =
+        Events.create_registration(%{
+          "ticket_id" => ticket.id,
+          "first_name" => "Ada",
+          "last_name" => "Lovelace",
+          "email" => "ada@example.com"
+        })
+
+      assert [loaded] = Tickets.list_tickets_for_admin(event.id)
+      assert loaded.id == ticket.id
+      assert loaded.ticket_tier.id == tier1.id
+      assert loaded.user.id == user.id
+      assert loaded.ticket_order.id == order.id
+      assert loaded.registration.first_name == "Ada"
+    end
+
+    test "excludes tickets from other events", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+      ticket |> Ecto.Changeset.change(status: :confirmed) |> Repo.update!()
+
+      %{event: other_event, tier1: other_tier} = tickets_setup()
+
+      {:ok, other_order} =
+        Tickets.create_ticket_order(user.id, other_event.id, %{
+          other_tier.id => 1
+        })
+
+      [other_ticket] = tickets_for_order(other_order.id)
+
+      other_ticket
+      |> Ecto.Changeset.change(status: :confirmed)
+      |> Repo.update!()
+
+      assert length(Tickets.list_tickets_for_admin(event.id)) == 1
+    end
+  end
+
+  describe "refund_via_stripe/3" do
+    test "skips Stripe for a zero amount" do
+      assert {:ok, {:skipped_zero_amount, nil, nil}} =
+               Tickets.refund_via_stripe(
+                 %Ysc.Ledgers.Payment{},
+                 Money.new(0, :USD),
+                 "test"
+               )
+    end
+
+    test "returns :no_stripe_payment when the payment has no Stripe payment id" do
+      payment = %Ysc.Ledgers.Payment{
+        id: Ecto.ULID.generate(),
+        external_payment_id: nil,
+        external_provider: :stripe
+      }
+
+      assert {:error, :no_stripe_payment} ==
+               Tickets.refund_via_stripe(payment, Money.new(50, :USD), "test")
+    end
+
+    test "issues a Stripe refund and records it in the ledger" do
+      payment = LedgersFixtures.payment_fixture()
+
+      assert {:ok, {%Ysc.Ledgers.Refund{}, _transaction, _entries}} =
+               Tickets.refund_via_stripe(payment, Money.new(50, :USD), "test")
     end
   end
 
