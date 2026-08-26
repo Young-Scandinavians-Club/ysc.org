@@ -24,6 +24,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.Events.Event
   alias Ysc.Accounts
+  alias Ysc.Bookings
   alias Ysc.Ledgers
 
   @payment_timeout_minutes 15
@@ -720,6 +721,114 @@ defmodule Ysc.Tickets do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  @doc """
+  Issues a refund for `amount` against `payment` via Stripe and records it in
+  the ledger.
+
+  Shared by the admin Payments refund flow and per-ticket refunds. Issues the
+  refund in Stripe first, then records it in the ledger using the
+  Stripe-issued refund id (mirrors AdminBookingsLive's process-booking-refund).
+  `Ledgers.process_refund/1`'s idempotency check only matches on
+  `external_refund_id`, so a ledger-only refund recorded before Stripe
+  confirms the money moved would get a synthetic id that a later webhook for
+  the real Stripe refund can't match against -- producing a second Refund, a
+  second ledger transaction, and a second "your refund has been processed"
+  email for the same payment. The Stripe call itself is idempotent per
+  `(payment, amount)` so a retry after a post-refund failure (e.g.
+  `Ledgers.process_refund/1` erroring) reuses the same Stripe refund instead
+  of issuing a second one.
+
+  ## Returns
+  - `{:ok, {:skipped_zero_amount, nil, nil}}` if `amount` is zero or negative
+  - `{:ok, {refund, transaction, entries}}` on success
+  - `{:error, {:stripe_error, reason}}` if Stripe declines the refund
+  - `{:error, :no_stripe_payment}` if `payment` has no Stripe payment to refund
+  """
+  def refund_via_stripe(payment, amount, reason) do
+    amount_cents = MoneyHelper.money_to_cents(amount)
+
+    cond do
+      # Free tickets (and $0 donation leftovers) have nothing to refund in
+      # Stripe. Sending amount=0 is rejected by Stripe and would block ticket
+      # cancellation after #1077's Stripe-first ordering.
+      amount_cents <= 0 ->
+        {:ok, {:skipped_zero_amount, nil, nil}}
+
+      payment.external_payment_id && payment.external_provider == :stripe ->
+        # Deterministic per (payment, amount) so a retry after a post-refund
+        # failure (e.g. Ledgers.process_refund/1 erroring) reuses the same
+        # Stripe refund instead of issuing a second one. This does mean a
+        # second *intentional* refund of the identical amount on the same
+        # payment within Stripe's 24h idempotency window would be rejected as
+        # a duplicate -- acceptable given how rare that is versus the cost of
+        # a real double refund.
+        idempotency_key =
+          Ysc.Stripe.Idempotency.key(
+            "admin_refund_#{payment.id}_#{amount_cents}"
+          )
+
+        case Bookings.create_stripe_refund_for_admin(
+               payment.external_payment_id,
+               amount_cents,
+               reason,
+               idempotency_key: idempotency_key
+             ) do
+          {:ok, stripe_refund} ->
+            Ledgers.process_refund(%{
+              payment_id: payment.id,
+              refund_amount: amount,
+              reason: reason,
+              external_refund_id: stripe_refund.id
+            })
+
+          {:error, stripe_reason} ->
+            require Ysc.Logging
+
+            Ysc.Logging.error("Admin Stripe refund failed",
+              payment_id: payment.id,
+              amount_cents: amount_cents,
+              error: inspect(stripe_reason)
+            )
+
+            {:error, {:stripe_error, stripe_reason}}
+        end
+
+      true ->
+        {:error, :no_stripe_payment}
+    end
+  end
+
+  @doc """
+  Reassigns a ticket to a different user (the ticket holder, not the ticket
+  order's purchaser). Skips purchase-time validations since this is an
+  administrative correction.
+  """
+  def reassign_ticket(%Ticket{} = ticket, new_user_id) do
+    ticket
+    |> Ticket.reassign_changeset(%{user_id: new_user_id})
+    |> Repo.update()
+  end
+
+  @doc """
+  Lists confirmed tickets for an event for admin display, newest first,
+  preloading ticket tier, ticket holder, attendee registration info, and the
+  order (with its payment, for refunds, and purchaser, for grouping tickets
+  by order). Pending/cancelled/expired tickets aren't actionable from this
+  list, so they're excluded.
+  """
+  def list_tickets_for_admin(event_id) do
+    Ticket
+    |> where([t], t.event_id == ^event_id and t.status == :confirmed)
+    |> order_by([t], desc: t.inserted_at)
+    |> preload([
+      :ticket_tier,
+      :user,
+      :registration,
+      ticket_order: [:payment, :user]
+    ])
+    |> Repo.all()
   end
 
   # Read-only: finds the refundable tickets and computes the refund amount,

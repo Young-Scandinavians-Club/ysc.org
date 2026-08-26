@@ -368,128 +368,12 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <% end %>
         </div>
       </div>
-      <%!-- Ticket Purchases Summary --%>
-      <div class="border border-zinc-200 rounded p-4 sm:p-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div class="flex items-baseline gap-2 min-w-0">
-            <h3 class="text-lg font-semibold">Ticket Purchases</h3>
-            <span class="text-sm text-zinc-600">
-              {length(@ticket_purchases)} purchase{if length(@ticket_purchases) !=
-                                                        1,
-                                                      do: "s"}
-            </span>
-          </div>
-          <.button
-            id="export-tickets-csv"
-            phx-click="export-tickets-csv"
-            phx-target={@myself}
-            phx-disable-with="Exporting..."
-            color="blue"
-            class="w-full sm:w-auto shrink-0"
-          >
-            <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Export CSV
-          </.button>
-        </div>
-
-        <div
-          :if={length(@ticket_purchases) == 0}
-          class="text-center py-8 text-zinc-500"
-        >
-          <p class="font-semibold">No tickets purchased yet.</p>
-          <p class="text-sm">
-            Ticket purchases will appear here once users start buying tickets.
-          </p>
-        </div>
-
-        <div
-          :if={length(@ticket_purchases) > 0}
-          class="overflow-x-auto -mx-4 sm:mx-0"
-        >
-          <table class="min-w-full divide-y divide-zinc-200 text-sm">
-            <thead>
-              <tr class="text-left text-zinc-500">
-                <th class="py-2 pl-4 pr-4 sm:pl-0 font-medium">
-                  <.purchases_sort_button
-                    field="user_name"
-                    label="Purchaser"
-                    myself={@myself}
-                    sort_by={@purchases_sort_by}
-                    sort_dir={@purchases_sort_dir}
-                  />
-                </th>
-                <th class="py-2 pr-4 font-medium">
-                  <.purchases_sort_button
-                    field="ticket_tier_name"
-                    label="Ticket Tier"
-                    myself={@myself}
-                    sort_by={@purchases_sort_by}
-                    sort_dir={@purchases_sort_dir}
-                  />
-                </th>
-                <th class="py-2 pr-4 font-medium">
-                  <.purchases_sort_button
-                    field="ticket_count"
-                    label="Quantity"
-                    myself={@myself}
-                    sort_by={@purchases_sort_by}
-                    sort_dir={@purchases_sort_dir}
-                  />
-                </th>
-                <th class="py-2 pr-4 font-medium">
-                  <.purchases_sort_button
-                    field="total_amount"
-                    label="Total"
-                    myself={@myself}
-                    sort_by={@purchases_sort_by}
-                    sort_dir={@purchases_sort_dir}
-                  />
-                </th>
-                <th class="py-2 pr-4 sm:pr-0 font-medium">
-                  <.purchases_sort_button
-                    field="purchased_at"
-                    label="Purchased"
-                    myself={@myself}
-                    sort_by={@purchases_sort_by}
-                    sort_dir={@purchases_sort_dir}
-                  />
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-zinc-100">
-              <tr
-                :for={
-                  purchase <-
-                    sort_purchases(
-                      @ticket_purchases,
-                      @purchases_sort_by,
-                      @purchases_sort_dir
-                    )
-                }
-                id={"ticket-purchase-#{purchase.user_id}"}
-              >
-                <td class="py-3 pl-4 pr-4 sm:pl-0">
-                  <.user_card user={purchase.user} class="h-auto" />
-                </td>
-                <td class="py-3 pr-4 text-zinc-800">
-                  {purchase.ticket_tier_name}
-                </td>
-                <td class="py-3 pr-4 text-zinc-800">{purchase.ticket_count}</td>
-                <td class="py-3 pr-4 text-zinc-800">
-                  <%= case purchase.total_amount do %>
-                    <% %Money{amount: 0} -> %>
-                      Free
-                    <% amount -> %>
-                      {format_money_safe(amount)}
-                  <% end %>
-                </td>
-                <td class="py-3 pr-4 sm:pr-0 text-zinc-800 whitespace-nowrap">
-                  {format_purchase_date(purchase.purchased_at)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <.live_component
+        id={"ticket-list-#{@event_id}"}
+        module={YscWeb.AdminEventsLive.TicketList}
+        event_id={@event_id}
+        refresh_token={@ticket_list_refresh_token}
+      />
       <%!-- Add Ticket Tier Modal --%>
       <.modal
         :if={@show_add_modal}
@@ -560,10 +444,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def mount(socket) do
-    {:ok,
-     socket
-     |> assign(:purchases_sort_by, :purchased_at)
-     |> assign(:purchases_sort_dir, :desc)}
+    {:ok, assign(socket, :ticket_list_refresh_token, 0)}
   end
 
   @impl true
@@ -614,9 +495,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
           ticket_tiers = Events.list_ticket_tiers_for_event(assigns.event_id)
 
-          ticket_purchases =
-            Events.get_ticket_purchase_summary(assigns.event_id)
-
           {reservations_by_tier, expired_reservations_by_tier} =
             load_reservations_maps(ticket_tiers)
 
@@ -624,7 +502,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           |> assign(assigns)
           |> assign(:event, event)
           |> assign(:ticket_tiers, ticket_tiers)
-          |> assign(:ticket_purchases, ticket_purchases)
           |> assign(:reservations_by_tier, reservations_by_tier)
           |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
           |> assign(:editing_ticket_tier, nil)
@@ -636,6 +513,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         close_grant_modal ->
           socket
           |> refresh_ticket_data()
+          |> bump_ticket_list_refresh_token()
           |> assign(:show_grant_modal, false)
           |> assign(:granting_tier, nil)
           |> maybe_toast_grant_success(grant_success)
@@ -692,17 +570,32 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   defp refresh_ticket_data(socket) do
     ticket_tiers = Events.list_ticket_tiers_for_event(socket.assigns.event_id)
 
-    ticket_purchases =
-      Events.get_ticket_purchase_summary(socket.assigns.event_id)
-
     {reservations_by_tier, expired_reservations_by_tier} =
       load_reservations_maps(ticket_tiers)
 
     socket
     |> assign(:ticket_tiers, ticket_tiers)
-    |> assign(:ticket_purchases, ticket_purchases)
     |> assign(:reservations_by_tier, reservations_by_tier)
     |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
+  end
+
+  # Forces the nested TicketList component to reload its ticket/order data.
+  # Phoenix only re-invokes a live_component's update/2 when the assigns
+  # passed to it change, so simply re-rendering this component's template
+  # with the same static `event_id` prop wouldn't pick up tickets granted
+  # via TicketGrantForm (a sibling component reached through send_update).
+  # Nested live_components only get their update/2 re-invoked when the
+  # assigns passed to them change -- re-rendering this component's template
+  # with the same static `event_id` prop wouldn't pick up tickets granted
+  # via TicketGrantForm (a sibling component reached through send_update).
+  # Bumping a counter prop forces TicketList to see changed assigns and
+  # refresh, synchronously as part of this same render.
+  defp bump_ticket_list_refresh_token(socket) do
+    assign(
+      socket,
+      :ticket_list_refresh_token,
+      socket.assigns.ticket_list_refresh_token + 1
+    )
   end
 
   defp maybe_toast_grant_success(socket, %{
@@ -904,51 +797,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   @impl true
-  def handle_event("sort-purchases", %{"field" => field}, socket) do
-    case sortable_purchase_field(field) do
-      nil ->
-        {:noreply, socket}
-
-      field ->
-        {sort_by, sort_dir} =
-          if socket.assigns.purchases_sort_by == field do
-            {field, toggle_sort_dir(socket.assigns.purchases_sort_dir)}
-          else
-            {field, default_purchases_sort_dir(field)}
-          end
-
-        {:noreply,
-         socket
-         |> assign(:purchases_sort_by, sort_by)
-         |> assign(:purchases_sort_dir, sort_dir)}
-    end
-  end
-
-  @impl true
-  def handle_event("export-tickets-csv", _params, socket) do
-    tickets = Events.list_tickets_for_export(socket.assigns.event_id)
-
-    csv_content =
-      tickets
-      |> build_csv_rows()
-      |> CSV.encode(headers: true)
-      |> Enum.to_list()
-      |> IO.iodata_to_binary()
-
-    filename = "tickets_export_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
-
-    # Base64 encode the content for download
-    encoded_content = Base.encode64(csv_content)
-
-    {:noreply,
-     socket
-     |> push_event("download-csv", %{
-       content: encoded_content,
-       filename: filename
-     })}
-  end
-
-  @impl true
   def handle_event("close-grant-tickets-modal", _params, socket) do
     {:noreply,
      socket
@@ -1092,57 +940,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     end)
   end
 
-  defp build_csv_rows(tickets) do
-    Enum.map(tickets, fn ticket ->
-      # Purchaser information (user who bought the ticket)
-      purchaser_first_name = ticket.user.first_name || ""
-      purchaser_last_name = ticket.user.last_name || ""
-      purchaser_email = ticket.user.email || ""
-
-      phone =
-        (ticket.user.phone_number &&
-           Ysc.Extensions.PhoneNumber.format_for_display(
-             ticket.user.phone_number
-           )) ||
-          ""
-
-      # Attendee information (from ticket_detail if registration was required)
-      {attendee_first_name, attendee_last_name, attendee_email} =
-        if ticket.ticket_tier && ticket.ticket_tier.requires_registration &&
-             ticket.ticket_detail do
-          {
-            ticket.ticket_detail.first_name || "",
-            ticket.ticket_detail.last_name || "",
-            ticket.ticket_detail.email || ""
-          }
-        else
-          # If no registration required, attendee is the same as purchaser
-          {purchaser_first_name, purchaser_last_name, purchaser_email}
-        end
-
-      # Build CSV row with both purchaser and attendee information
-      base_row = %{
-        "Ticket Reference" => ticket.reference_id || "",
-        "Ticket Tier" => (ticket.ticket_tier && ticket.ticket_tier.name) || "",
-        "Purchase Date" => format_purchase_date(ticket.inserted_at),
-        "Purchaser First Name" => purchaser_first_name,
-        "Purchaser Last Name" => purchaser_last_name,
-        "Purchaser Email" => purchaser_email,
-        "Purchaser Phone" => phone,
-        "Attendee First Name" => attendee_first_name,
-        "Attendee Last Name" => attendee_last_name,
-        "Attendee Email" => attendee_email
-      }
-
-      # If ticket details exist, add a note that registration was provided
-      if ticket.ticket_detail do
-        Map.put(base_row, "Registration Provided", "Yes")
-      else
-        Map.put(base_row, "Registration Provided", "No")
-      end
-    end)
-  end
-
   defp format_sales_period(nil, nil), do: "Always available"
 
   defp format_sales_period(start_date, nil),
@@ -1163,91 +960,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   defp format_date(date), do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
-
-  defp format_purchase_date(nil), do: "—"
-
-  defp format_purchase_date(%DateTime{} = datetime) do
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
-  end
-
-  attr :field, :string, required: true
-  attr :label, :string, required: true
-  attr :myself, :any, required: true
-  attr :sort_by, :atom, required: true
-  attr :sort_dir, :atom, required: true
-
-  defp purchases_sort_button(assigns) do
-    ~H"""
-    <button
-      id={"ticket-purchases-sort-#{@field}"}
-      type="button"
-      phx-click="sort-purchases"
-      phx-value-field={@field}
-      phx-target={@myself}
-      class="inline-flex items-center gap-1 hover:text-zinc-900"
-    >
-      {@label}
-      <.icon
-        :if={Atom.to_string(@sort_by) == @field}
-        name={
-          if @sort_dir == :asc, do: "hero-chevron-up", else: "hero-chevron-down"
-        }
-        class="w-3.5 h-3.5 shrink-0"
-      />
-      <.icon
-        :if={Atom.to_string(@sort_by) != @field}
-        name="hero-chevron-up-down"
-        class="w-3.5 h-3.5 shrink-0 text-zinc-300"
-      />
-    </button>
-    """
-  end
-
-  @purchase_sort_fields %{
-    "user_name" => :user_name,
-    "ticket_tier_name" => :ticket_tier_name,
-    "ticket_count" => :ticket_count,
-    "total_amount" => :total_amount,
-    "purchased_at" => :purchased_at
-  }
-
-  defp sortable_purchase_field(field), do: Map.get(@purchase_sort_fields, field)
-
-  defp toggle_sort_dir(:asc), do: :desc
-  defp toggle_sort_dir(:desc), do: :asc
-
-  defp default_purchases_sort_dir(:user_name), do: :asc
-  defp default_purchases_sort_dir(:ticket_tier_name), do: :asc
-  defp default_purchases_sort_dir(_field), do: :desc
-
-  defp sort_purchases(purchases, sort_by, sort_dir) do
-    Enum.sort_by(purchases, &purchase_sort_key(&1, sort_by), sort_dir)
-  end
-
-  defp purchase_sort_key(%{user: nil}, :user_name), do: ""
-
-  defp purchase_sort_key(purchase, :user_name) do
-    "#{purchase.user.first_name} #{purchase.user.last_name}"
-    |> String.downcase()
-  end
-
-  defp purchase_sort_key(purchase, :ticket_tier_name) do
-    String.downcase(purchase.ticket_tier_name || "")
-  end
-
-  defp purchase_sort_key(purchase, :ticket_count), do: purchase.ticket_count
-
-  defp purchase_sort_key(purchase, :total_amount),
-    do: Decimal.to_float(purchase.total_amount.amount)
-
-  defp purchase_sort_key(purchase, :purchased_at) do
-    case purchase.purchased_at do
-      nil -> 0
-      dt -> DateTime.to_unix(dt, :microsecond)
-    end
-  end
 
   defp format_money_safe(nil), do: "—"
   defp format_money_safe(""), do: "—"

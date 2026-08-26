@@ -2070,6 +2070,11 @@ defmodule YscWeb.CoreComponents do
     required: true,
     doc: "Accessible name for the trigger (rendered sr-only)"
 
+  attr :drop_up, :boolean,
+    default: true,
+    doc:
+      "Open the menu above the trigger (default). Pass false for rows near the top of a scrollable container, where opening upward would be clipped by the container's overflow."
+
   slot :inner_block, required: true
 
   def row_actions_dropdown(assigns) do
@@ -2078,7 +2083,7 @@ defmodule YscWeb.CoreComponents do
       <.dropdown
         id={@id}
         right={true}
-        drop_up={true}
+        drop_up={@drop_up}
         class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
       >
         <:button_block>

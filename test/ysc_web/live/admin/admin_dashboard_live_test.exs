@@ -67,6 +67,69 @@ defmodule YscWeb.AdminDashboardLiveTest do
       refute has_element?(view, "#volunteer-stats-row")
     end
 
+    test "memberships card shows net new as joins minus YTD losses", %{
+      conn: conn
+    } do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      joined_at = DateTime.add(now, -5, :second)
+      lapsed_at = DateTime.add(now, -3, :second)
+
+      joiner = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, join_sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: joiner.id,
+          stripe_id: "sub_dash_join_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          current_period_end: DateTime.add(now, 365, :day)
+        })
+
+      {1, _} =
+        Repo.update_all(
+          from(s in Ysc.Subscriptions.Subscription,
+            where: s.id == ^join_sub.id
+          ),
+          set: [inserted_at: joined_at]
+        )
+
+      lapser = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, lapse_sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: lapser.id,
+          stripe_id: "sub_dash_lapse_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Lapsed Membership",
+          current_period_end: lapsed_at
+        })
+
+      {1, _} =
+        Repo.update_all(
+          from(s in Ysc.Subscriptions.Subscription,
+            where: s.id == ^lapse_sub.id
+          ),
+          set: [inserted_at: joined_at]
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      _ = render(view)
+
+      cmp = Ysc.Accounts.get_membership_joins_ytd_comparison()
+
+      assert has_element?(
+               view,
+               "#membership-net-new-ytd",
+               Integer.to_string(cmp.current_ytd_net_new)
+             )
+
+      assert has_element?(
+               view,
+               "#membership-net-new-breakdown",
+               "#{cmp.current_ytd_joins} joined · #{cmp.current_ytd_losses} left"
+             )
+    end
+
     test "shows admin dashboard sections and event timeline", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
 

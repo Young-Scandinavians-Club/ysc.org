@@ -185,7 +185,10 @@ defmodule YscWeb.AdminDashboardLive do
                   Net new (YTD)
                 </p>
                 <div class="flex items-end gap-2">
-                  <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
+                  <p
+                    id="membership-net-new-ytd"
+                    class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none"
+                  >
                     {@membership_net_new_ytd}
                   </p>
                   <%= if @membership_joins_ytd_change_percent != nil do %>
@@ -202,7 +205,10 @@ defmodule YscWeb.AdminDashboardLive do
                     </span>
                   <% end %>
                 </div>
-                <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
+                <p
+                  id="membership-net-new-breakdown"
+                  class="text-[10px] text-zinc-500 mt-1 leading-snug"
+                >
                   {@membership_joins_current_ytd} joined · {@membership_losses_current_ytd} left
                 </p>
               </div>

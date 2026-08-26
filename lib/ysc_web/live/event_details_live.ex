@@ -2326,12 +2326,20 @@ defmodule YscWeb.EventDetailsLive do
                           end
                       end %>
                     <div class={[
-                      "rounded-xl p-4 space-y-4 transition-all duration-200",
+                      "relative rounded-xl p-4 space-y-4 transition-all duration-200",
                       if(is_registration_complete,
                         do: "border-2 border-green-500 bg-green-50/30",
                         else: "border border-zinc-200"
                       )
                     ]}>
+                      <%= if is_registration_complete do %>
+                        <div class="absolute top-4 right-4">
+                          <.icon
+                            name="hero-check-circle"
+                            class="w-6 h-6 text-green-600"
+                          />
+                        </div>
+                      <% end %>
                       <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-3">
                           <div>
@@ -2344,14 +2352,6 @@ defmodule YscWeb.EventDetailsLive do
                               {ticket.ticket_tier.name}
                             </p>
                           </div>
-                          <%= if is_registration_complete do %>
-                            <div class="flex-shrink-0">
-                              <.icon
-                                name="hero-check-circle"
-                                class="w-6 h-6 text-green-600"
-                              />
-                            </div>
-                          <% end %>
                         </div>
                       </div>
 
