@@ -60,7 +60,7 @@
     </mj-text>
     <% end %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Duration:</strong> <%= @nights %> <%= if @nights == 1, do: "night", else: "nights" %>
+      <strong>Duration:</strong> <%= YscWeb.BookingDisplay.nights_label(@nights) %>
     </mj-text>
     <%= if @is_buyout do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
@@ -70,18 +70,9 @@
     </mj-text>
     <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <%
-        adults_count = @guests_count - (@children_count || 0)
-        total_guests = @guests_count
-      %>
       <strong>Guests:</strong>
-      <%= if adults_count > 0 do %>
-        <%= adults_count %> <%= if adults_count == 1, do: "adult", else: "adults" %>
-      <% end %>
-      <%= if (@children_count || 0) > 0 do %>
-        <%= if adults_count > 0, do: ", ", else: "" %><%= @children_count %> <%= if @children_count == 1, do: "child", else: "children" %>
-      <% end %>
-      <span class="gray-text"> (Total: <%= total_guests %> <%= if total_guests == 1, do: "guest", else: "guests" %>)</span>
+      <%= YscWeb.BookingDisplay.guests_label(@guests_count, @children_count, omit_zero_adults: true) %>
+      <span class="gray-text"> (<%= YscWeb.BookingDisplay.guests_total_label(@guests_count, @children_count) %>)</span>
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
