@@ -13,7 +13,7 @@ defmodule Ysc.Bookings.RoomInventory do
   @primary_key false
   schema "room_inventory" do
     belongs_to :room, Room, primary_key: true, type: Ecto.ULID
-    field :day, :date, primary_key: true
+    field :day, Ysc.Ecto.DateKind, kind: :california_date, primary_key: true
 
     field :held, :boolean, default: false
     field :booked, :boolean, default: false

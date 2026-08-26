@@ -923,6 +923,7 @@ defmodule YscWeb.UserSettingsLive do
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
+                timezone={@timezone}
               />
               <div
                 :if={@scheduled_downgrade_info}
@@ -954,7 +955,7 @@ defmodule YscWeb.UserSettingsLive do
                         )}
                       </strong>
                       after <strong>
-                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %>
+                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y", @timezone) %>
                       </strong>. You will keep your current benefits until that date.
                     </p>
                     <div class="mt-3">
@@ -1023,6 +1024,7 @@ defmodule YscWeb.UserSettingsLive do
                 current_membership={@current_membership}
                 primary_user={@primary_user}
                 is_sub_account={@is_sub_account}
+                timezone={@timezone}
               />
               <div
                 :if={@scheduled_downgrade_info}
@@ -1046,7 +1048,7 @@ defmodule YscWeb.UserSettingsLive do
                         )}
                       </strong>
                       after <strong>
-                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %>
+                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y", @timezone) %>
                       </strong>. You will keep your current benefits until that date.
                     </p>
                     <div class="mt-3">
@@ -1395,6 +1397,7 @@ defmodule YscWeb.UserSettingsLive do
                   current_membership={@current_membership}
                   primary_user={@primary_user}
                   is_sub_account={@is_sub_account}
+                  timezone={@timezone}
                 />
 
                 <div
@@ -1453,7 +1456,7 @@ defmodule YscWeb.UserSettingsLive do
                           )}
                         </strong>
                         after <strong>
-                          <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y") %>
+                          <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y", @timezone) %>
                         </strong>. You will keep your current benefits until that date.
                       </p>
                       <div class="mt-3">
@@ -1820,7 +1823,8 @@ defmodule YscWeb.UserSettingsLive do
                       <span class="text-sm font-semibold text-zinc-900">
                         {format_utc_date(
                           @membership_qr_details.member_since,
-                          "%b %-d, %Y"
+                          "%b %-d, %Y",
+                          @timezone
                         )}
                       </span>
                     </div>
@@ -1833,7 +1837,8 @@ defmodule YscWeb.UserSettingsLive do
                       <span class="text-sm font-semibold text-zinc-900">
                         {format_utc_date(
                           @membership_qr_details.renewal_date,
-                          "%b %-d, %Y"
+                          "%b %-d, %Y",
+                          @timezone
                         )}
                       </span>
                     <% else %>
@@ -2434,7 +2439,10 @@ defmodule YscWeb.UserSettingsLive do
                       class="bg-white divide-y divide-zinc-200"
                     >
                       <%= for {id, payment_info} <- @streams.payments do %>
-                        {render_payment_table_row(payment_info, id: id)}
+                        {render_payment_table_row(payment_info,
+                          id: id,
+                          timezone: @timezone
+                        )}
                       <% end %>
                     </tbody>
                   </table>
@@ -2448,7 +2456,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%= for payment_info <- @filtered_payments_list do %>
                     <% card_id = "mobile-card-#{payment_dom_id(payment_info)}" %>
                     <div id={card_id}>
-                      {render_payment_card(payment_info)}
+                      {render_payment_card(payment_info, @timezone)}
                     </div>
                   <% end %>
                 </div>
@@ -2660,15 +2668,8 @@ defmodule YscWeb.UserSettingsLive do
     membership_plans = Application.get_env(:ysc, :membership_plans)
     public_key = Application.get_env(:stripity_stripe, :public_key)
 
-    # Timezone from browser for date inputs (e.g. date of birth max = today in user TZ)
-    connect_params = get_connect_params(socket) || %{}
-    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
-
-    today_max =
-      timezone
-      |> DateTime.now!()
-      |> DateTime.to_date()
-      |> Date.to_iso8601()
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
+    today_max = timezone |> YscWeb.TimeZone.today() |> Date.to_iso8601()
 
     # Basic changesets that don't require DB queries (use existing user data)
     email_changeset = Accounts.change_user_email(user)
@@ -5541,11 +5542,12 @@ defmodule YscWeb.UserSettingsLive do
   # Helper function to safely fetch user invoices
 
   # Render payment card for mobile view
-  defp render_payment_card(payment_info) do
+  defp render_payment_card(payment_info, timezone) do
     row_navigate = payment_row_navigate_js(payment_info)
 
     assigns = %{
       payment_info: payment_info,
+      timezone: timezone,
       row_navigate: row_navigate,
       row_navigate_label:
         payment_row_navigate_aria_label(payment_info, row_navigate)
@@ -5647,12 +5649,12 @@ defmodule YscWeb.UserSettingsLive do
         <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
           Paid on {if @payment_info.payment do
             if @payment_info.payment.payment_date do
-              format_payment_date(@payment_info.payment.payment_date)
+              format_payment_date(@payment_info.payment.payment_date, @timezone)
             else
-              format_payment_date(@payment_info.payment.inserted_at)
+              format_payment_date(@payment_info.payment.inserted_at, @timezone)
             end
           else
-            format_payment_date(@payment_info.ticket_order.inserted_at)
+            format_payment_date(@payment_info.ticket_order.inserted_at, @timezone)
           end}
         </p>
       </div>
@@ -5684,10 +5686,12 @@ defmodule YscWeb.UserSettingsLive do
   # Render payment table row for desktop view
   defp render_payment_table_row(payment_info, opts) do
     id = Keyword.get(opts, :id)
+    timezone = Keyword.get(opts, :timezone, YscWeb.TimeZone.default())
     row_navigate = payment_row_navigate_js(payment_info)
 
     assigns = %{
       payment_info: payment_info,
+      timezone: timezone,
       id: id,
       row_navigate: row_navigate,
       row_navigate_label:
@@ -5756,12 +5760,12 @@ defmodule YscWeb.UserSettingsLive do
         <p class="text-xs text-zinc-400 uppercase tracking-wider font-bold">
           {if @payment_info.payment do
             if @payment_info.payment.payment_date do
-              format_payment_date(@payment_info.payment.payment_date)
+              format_payment_date(@payment_info.payment.payment_date, @timezone)
             else
-              format_payment_date(@payment_info.payment.inserted_at)
+              format_payment_date(@payment_info.payment.inserted_at, @timezone)
             end
           else
-            format_payment_date(@payment_info.ticket_order.inserted_at)
+            format_payment_date(@payment_info.ticket_order.inserted_at, @timezone)
           end}
         </p>
       </td>
@@ -6179,29 +6183,29 @@ defmodule YscWeb.UserSettingsLive do
     end
   end
 
-  defp format_utc_date(%DateTime{} = dt, format) do
+  defp format_utc_date(%DateTime{} = dt, format, timezone) do
     dt
-    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> YscWeb.TimeZone.shift(timezone)
     |> DateTime.to_date()
     |> Calendar.strftime(format)
   end
 
-  defp format_utc_date(%Date{} = date, format),
+  defp format_utc_date(%Date{} = date, format, _timezone),
     do: Calendar.strftime(date, format)
 
-  defp format_utc_date(_, _), do: ""
+  defp format_utc_date(_, _, _), do: ""
 
-  defp format_payment_date(%DateTime{} = dt) do
+  defp format_payment_date(%DateTime{} = dt, timezone) do
     dt
-    |> DateTime.shift_zone!("America/Los_Angeles")
+    |> YscWeb.TimeZone.shift(timezone)
     |> DateTime.to_date()
     |> Calendar.strftime("%b %-d")
   end
 
-  defp format_payment_date(%Date{} = date),
+  defp format_payment_date(%Date{} = date, _timezone),
     do: Calendar.strftime(date, "%b %-d")
 
-  defp format_payment_date(_), do: ""
+  defp format_payment_date(_, _), do: ""
 
   defp member_entitlement_coupon_headline(ent) do
     case ent.benefit_kind do

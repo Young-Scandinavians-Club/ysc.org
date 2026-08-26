@@ -60,8 +60,8 @@ defmodule Ysc.Bookings.Booking do
 
   schema "bookings" do
     field :reference_id, :string
-    field :checkin_date, :date
-    field :checkout_date, :date
+    field :checkin_date, Ysc.Ecto.DateKind, kind: :california_date
+    field :checkout_date, Ysc.Ecto.DateKind, kind: :california_date
     field :guests_count, :integer, default: 1
     field :children_count, :integer, default: 0
     field :property, Ysc.Bookings.BookingProperty

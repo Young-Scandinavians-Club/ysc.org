@@ -176,7 +176,9 @@
           {Credo.Check.Warning.MixEnv, []},
           # Custom checks
           {Ysc.Credo.NoSleepInTests, []},
-          {Ysc.Credo.NoExternalUrlsInTestConfig, []}
+          {Ysc.Credo.NoExternalUrlsInTestConfig, []},
+          {Ysc.Credo.DateFieldSchemaTypes, []},
+          {Ysc.Credo.DateFieldConversions, []}
         ],
         disabled: [
           #

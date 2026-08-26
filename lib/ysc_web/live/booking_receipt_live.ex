@@ -1321,15 +1321,7 @@ defmodule YscWeb.BookingReceiptLive do
       Map.get(params, "redirect_status") == "succeeded"
   end
 
-  defp receipt_timezone(socket) do
-    case get_connect_params(socket) do
-      nil ->
-        "America/Los_Angeles"
-
-      connect_params ->
-        Map.get(connect_params, "timezone", "America/Los_Angeles")
-    end
-  end
+  defp receipt_timezone(socket), do: YscWeb.TimeZone.from_connect_params(socket)
 
   defp loaded_booking_matches?(socket, booking_id) do
     match?(%Booking{id: ^booking_id}, socket.assigns[:booking])
