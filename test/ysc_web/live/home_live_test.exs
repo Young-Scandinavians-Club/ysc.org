@@ -424,6 +424,30 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ "No upcoming event tickets"
     end
 
+    test "sorts and renders event tickets when an event has no start_date", %{
+      conn: conn
+    } do
+      # DateDisplay.event_start_datetime/1 returns nil when start_date is
+      # missing; get_event_datetime_for_sorting/1 falls back to
+      # TimeZone.now() so ticket sorting doesn't crash on a malformed event.
+      data = Ysc.TestDataFactory.complete_ticket_order()
+
+      {:ok, _event} =
+        data.event
+        |> Ecto.Changeset.change(%{start_date: nil})
+        |> Repo.update()
+
+      conn = log_in_user(conn, data.user)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+      html = render(view)
+
+      assert html =~ "Event Tickets"
+      assert html =~ data.event.title
+    end
+
     test "shows upcoming booking on the itinerary", %{conn: conn} do
       user = Ysc.TestDataFactory.user_with_membership(:lifetime)
 
@@ -501,6 +525,60 @@ defmodule YscWeb.HomeLiveTest do
 
       render_click(view, "hide_membership_qr", %{})
       refute has_element?(view, "#membership-qr-modal")
+    end
+  end
+
+  describe "logged-in user with an auto-renewing subscription membership" do
+    test "shows the renewal date in the browser timezone, matching the QR card",
+         %{conn: conn} do
+      # The renewal date shown in the auto-renew description text must use
+      # the browser timezone like every other membership date on this page
+      # (e.g. the "Valid Until" QR card), not silently default to Pacific.
+      # Pick a UTC instant whose Eastern and Pacific calendar dates differ
+      # (before the DST change, so the US-wide 3-hour offset gap applies) so
+      # a Pacific default would visibly disagree with the Eastern-timezone
+      # QR card.
+      user = user_fixture(%{state: :active})
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_home_live_tz_test_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          cancel_at_period_end: false,
+          current_period_end: ~U[2027-03-05 06:00:00Z]
+        })
+
+      {:ok, _item} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_home_live_tz_test_#{System.unique_integer()}",
+          stripe_product_id: "prod_home_live_tz_test",
+          stripe_price_id: "price_1QfrfDIZd8GkARoBcwlNchx4",
+          quantity: 1
+        })
+
+      conn =
+        conn
+        |> put_connect_params(%{"timezone" => "America/New_York"})
+        |> log_in_user(user)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+
+      view
+      |> element("button", "My Membership QR")
+      |> render_click()
+
+      html = render(view)
+
+      assert html =~
+               "will automatically renew on Mar 5, 2027 unless you turn it off"
+
+      assert html =~ "Mar 5, 2027"
+      refute html =~ "Mar 4, 2027"
     end
   end
 

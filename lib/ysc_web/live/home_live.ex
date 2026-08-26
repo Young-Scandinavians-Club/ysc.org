@@ -1336,9 +1336,10 @@ defmodule YscWeb.HomeLive do
                   class="space-y-4"
                 >
                   <%= for booking <- @future_bookings do %>
+                    <% days_until_this_booking = days_until_booking(booking) %>
                     <% is_active =
-                      days_until_booking(booking) == :started ||
-                        days_until_booking(booking) == 0 %>
+                      days_until_this_booking == :started ||
+                        days_until_this_booking == 0 %>
                     <.link
                       navigate={~p"/bookings/#{booking.id}/receipt"}
                       class={[
@@ -1386,7 +1387,7 @@ defmodule YscWeb.HomeLive do
                           </p>
                           <span class={[
                             "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded uppercase tracking-tighter",
-                            case days_until_booking(booking) do
+                            case days_until_this_booking do
                               :started ->
                                 "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
 
@@ -1403,7 +1404,7 @@ defmodule YscWeb.HomeLive do
                                 "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
                             end
                           ]}>
-                            {case days_until_booking(booking) do
+                            {case days_until_this_booking do
                               :started -> "Currently Staying"
                               0 -> "Checking in today"
                               1 -> "Tomorrow"
@@ -1487,18 +1488,19 @@ defmodule YscWeb.HomeLive do
                       end)
                       |> Enum.filter(& &1)
                       |> Enum.uniq() %>
+                    <% days_until_this_event = days_until_event(event) %>
                     <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8">
                       <div class="flex justify-between items-start mb-4">
                         <span class={[
                           "px-2 py-1 text-xs font-bold rounded",
-                          case days_until_event(event) do
+                          case days_until_this_event do
                             0 -> "bg-amber-50 text-amber-700"
                             1 -> "bg-blue-50 text-blue-700"
                             days when days <= 7 -> "bg-emerald-50 text-emerald-700"
                             _ -> "bg-purple-50 text-purple-700"
                           end
                         ]}>
-                          {DateDisplay.relative_days_phrase(days_until_event(event))}
+                          {DateDisplay.relative_days_phrase(days_until_this_event)}
                         </span>
                         <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
                       </div>
@@ -1716,7 +1718,8 @@ defmodule YscWeb.HomeLive do
                         {get_membership_description(
                           @current_membership,
                           @is_sub_account || false,
-                          @primary_user
+                          @primary_user,
+                          @timezone
                         )}
                       <% @current_user.state == :pending_approval -> %>
                         <span class="block mb-2 font-bold text-white">
@@ -2070,11 +2073,21 @@ defmodule YscWeb.HomeLive do
 
   # Helper functions
 
-  defp get_membership_description(nil, _is_sub_account, _primary_user) do
+  defp get_membership_description(
+         nil,
+         _is_sub_account,
+         _primary_user,
+         _timezone
+       ) do
     "You need an active membership to access YSC events and benefits."
   end
 
-  defp get_membership_description(membership, is_sub_account, primary_user) do
+  defp get_membership_description(
+         membership,
+         is_sub_account,
+         primary_user,
+         timezone
+       ) do
     plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
     renewal_date = YscWeb.UserAuth.get_membership_renewal_date(membership)
 
@@ -2103,10 +2116,10 @@ defmodule YscWeb.HomeLive do
         else
           cond do
             scheduled_for_cancellation? && renewal_date ->
-              "Your #{membership_type} membership will not automatically renew. You are still an active member until #{format_membership_date(renewal_date)}."
+              "Your #{membership_type} membership will not automatically renew. You are still an active member until #{format_membership_date(renewal_date, timezone)}."
 
             renewal_date ->
-              "You have an active #{membership_type} membership. Auto-renewal is on—your membership will automatically renew on #{format_membership_date(renewal_date)} unless you turn it off beforehand."
+              "You have an active #{membership_type} membership. Auto-renewal is on—your membership will automatically renew on #{format_membership_date(renewal_date, timezone)} unless you turn it off beforehand."
 
             true ->
               "You have an active #{membership_type} membership."
@@ -2450,9 +2463,6 @@ defmodule YscWeb.HomeLive do
     do: DateDisplay.format_datetime_display(date)
 
   defp format_membership_date(_, _timezone), do: ""
-
-  defp format_membership_date(value),
-    do: format_membership_date(value, TimeZone.default())
 
   defp format_membership_plan_price(plan_id) when is_atom(plan_id) do
     plans = Application.get_env(:ysc, :membership_plans, [])

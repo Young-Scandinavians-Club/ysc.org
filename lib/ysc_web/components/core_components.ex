@@ -4725,7 +4725,7 @@ defmodule YscWeb.CoreComponents do
   attr :primary_user, :any, default: nil
   attr :is_sub_account, :boolean, default: false
   attr :scheduled_downgrade_info, :any, default: nil
-  attr :timezone, :string, default: "America/Los_Angeles"
+  attr :timezone, :string, default: YscWeb.TimeZone.default()
   attr :class, :string, default: ""
 
   def membership_status(assigns) do

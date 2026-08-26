@@ -51,7 +51,7 @@ defmodule YscWeb.TahoeBookingLive do
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
 
-    timezone = get_timezone_from_socket(socket)
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
     today = today_in_timezone(cabin_timezone())
 
     # Load seasons once using cache to avoid multiple queries
@@ -7979,11 +7979,6 @@ defmodule YscWeb.TahoeBookingLive do
       date_form: date_form
     )
     |> update_url_with_dates(nil, nil)
-  end
-
-  defp get_timezone_from_socket(socket) do
-    connect_params = get_connect_params(socket) || %{}
-    Map.get(connect_params, "timezone", "America/Los_Angeles")
   end
 
   defp today_in_timezone(timezone)

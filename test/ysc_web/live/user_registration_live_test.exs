@@ -28,6 +28,14 @@ defmodule YscWeb.UserRegistrationLiveTest do
       assert html =~ "you only need to meet one to qualify"
     end
 
+    test "falls back to Pacific time instead of crashing on an invalid browser timezone",
+         %{conn: conn} do
+      conn = put_connect_params(conn, %{"timezone" => "Not/A/Real/Zone"})
+
+      assert {:ok, _lv, html} = live(conn, ~p"/users/register")
+      assert html =~ "Check all that describe you"
+    end
+
     test "shows scandinavia connection header on additional questions step", %{
       conn: conn
     } do

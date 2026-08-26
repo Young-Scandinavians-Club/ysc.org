@@ -1389,6 +1389,8 @@ defmodule YscWeb.EventDetailsLive do
             </div>
           <% else %>
             <div class="space-y-4 h-full lg:overflow-y-auto lg:max-h-[600px] lg:px-4">
+              <% sale_status_now = DateTime.utc_now() %>
+              <% sale_status_today = YscWeb.TimeZone.today() %>
               <%= for ticket_tier <- @ticket_tiers do %>
                 <% is_donation =
                   ticket_tier.type == "donation" || ticket_tier.type == :donation %>
@@ -1422,7 +1424,12 @@ defmodule YscWeb.EventDetailsLive do
                 <% days_until_sale =
                   if is_donation,
                     do: nil,
-                    else: days_until_sale_starts(ticket_tier) %>
+                    else:
+                      days_until_sale_starts(
+                        ticket_tier,
+                        sale_status_now,
+                        sale_status_today
+                      ) %>
                 <% is_pre_sale =
                   if is_donation, do: false, else: not is_on_sale && !is_sale_ended %>
                 <% sale_schedule_message =
@@ -7702,21 +7709,19 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp days_until_sale_starts(ticket_tier) do
+  defp days_until_sale_starts(ticket_tier, now, today) do
     case ticket_tier.start_date do
       nil ->
         nil
 
       start_date ->
-        now = DateTime.utc_now()
-
         if DateTime.compare(now, start_date) == :lt do
           sale_date =
             start_date
             |> YscWeb.TimeZone.shift(YscWeb.TimeZone.default())
             |> DateTime.to_date()
 
-          max(0, Date.diff(sale_date, YscWeb.TimeZone.today()))
+          max(0, Date.diff(sale_date, today))
         else
           nil
         end

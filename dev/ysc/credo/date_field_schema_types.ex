@@ -23,7 +23,8 @@ defmodule Ysc.Credo.DateFieldSchemaTypes do
           field :start_date, Ysc.Ecto.DateKind, kind: :california_calendar_datetime
 
       Required names: `start_date`, `end_date`, `checkin_date`, `checkout_date`,
-      `start_time`, `end_time`, `published_on`, `day`.
+      `start_time`, `end_time`, `published_on`, `day`, `current_period_start`,
+      `current_period_end`.
 
       See `Ysc.Ecto.DateKind` for the kind list and `mix credo explain EX9004`
       for conversion rules.

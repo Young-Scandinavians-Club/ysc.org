@@ -19,7 +19,9 @@ defmodule Ysc.DateFields do
     :start_time,
     :end_time,
     :published_on,
-    :day
+    :day,
+    :current_period_start,
+    :current_period_end
   ]
 
   @receiver_schemas %{

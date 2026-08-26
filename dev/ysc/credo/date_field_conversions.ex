@@ -57,20 +57,9 @@ defmodule Ysc.Credo.DateFieldConversions do
 
   alias Ysc.DateFields
   alias Ysc.Ecto.DateKind
+  alias YscWeb.TimeZone
 
   @shift_funs MapSet.new([:shift_zone, :shift_zone!, :shift])
-
-  @formatter_funs MapSet.new([
-                    :format_date_in_zone,
-                    :format_date_short_in_zone,
-                    :format_in_zone,
-                    :format_pacific_date,
-                    :format_pacific_date_short,
-                    :format_sale_window_range,
-                    :format_event_date_range,
-                    :days_until_event,
-                    :event_day_label
-                  ])
 
   @never_formatters MapSet.new([
                       :format_date_in_zone,
@@ -95,54 +84,112 @@ defmodule Ysc.Credo.DateFieldConversions do
                               :event_day_label
                             ])
 
+  # Every formatter this check has an opinion about — anything named in one of
+  # the kind-specific sets above. Deriving this instead of listing it a fourth
+  # time means adding a formatter to any one set is enough to make `traverse/3`
+  # actually look at its calls; a name present in `forbidden_formatter?/2` but
+  # missing here would otherwise be silently skipped.
+  @formatter_funs MapSet.union(@never_formatters, @pacific_browser_formatters)
+                  |> MapSet.union(@browser_event_formatters)
+
   @impl Credo.Check
   def run(%Credo.SourceFile{} = source_file, params) do
     issue_meta = IssueMeta.for(source_file, params)
 
-    source_file
-    |> Credo.Code.prewalk(&traverse(&1, &2, issue_meta))
-    |> Enum.reverse()
+    {issues, _bindings} =
+      Credo.Code.prewalk(source_file, &traverse(&1, &2, issue_meta), {[], %{}})
+
+    Enum.reverse(issues)
+  end
+
+  # case event.start_date do
+  #   nil -> nil
+  #   start_date -> start_date |> ...
+  # end
+  #
+  # Binds a bare-variable case clause pattern back to the field its subject
+  # resolved from, so a later reference to the plain variable (not the
+  # `receiver.field` expression) is still recognized as that DateKind field.
+  defp traverse(
+         {:case, _, [subject, [do: clauses]]} = ast,
+         {issues, bindings},
+         _issue_meta
+       )
+       when is_list(clauses) do
+    bindings =
+      case field_access(subject, bindings) do
+        nil ->
+          bindings
+
+        field_ref ->
+          Enum.reduce(clauses, bindings, fn
+            {:->, _, [[{name, _, ctx}], _body]}, acc
+            when is_atom(name) and name != :_ and (is_nil(ctx) or is_atom(ctx)) ->
+              Map.put(acc, name, field_ref)
+
+            _clause, acc ->
+              acc
+          end)
+      end
+
+    {ast, {issues, bindings}}
   end
 
   # event.start_date |> DateTime.shift_zone!(tz)
   defp traverse(
          {:|>, meta, [left, {{:., _, [_, fun]}, _, args}]} = ast,
-         issues,
+         {issues, bindings},
          issue_meta
        )
        when fun in [:shift_zone, :shift_zone!, :shift] do
-    {ast, maybe_shift_issue(left, List.first(args), meta, issue_meta, issues)}
+    issues =
+      maybe_shift_issue(left, List.first(args), meta, issue_meta, issues, bindings)
+
+    {ast, {issues, bindings}}
   end
 
   # DateTime.shift_zone!(event.start_date, tz)
   defp traverse(
          {{:., _, [_, fun]}, meta, [value | rest]} = ast,
-         issues,
+         {issues, bindings},
          issue_meta
        )
        when fun in [:shift_zone, :shift_zone!, :shift] do
-    {ast, maybe_shift_issue(value, List.first(rest), meta, issue_meta, issues)}
+    issues =
+      maybe_shift_issue(
+        value,
+        List.first(rest),
+        meta,
+        issue_meta,
+        issues,
+        bindings
+      )
+
+    {ast, {issues, bindings}}
   end
 
   # DateDisplay.format_date_in_zone(event.start_date, tz)
   # DateDisplay.days_until_event(event, tz)
   defp traverse(
          {{:., _, [_, fun]}, meta, [value | rest]} = ast,
-         issues,
+         {issues, bindings},
          issue_meta
        )
        when is_atom(fun) do
-    if fun in @formatter_funs do
-      {ast, maybe_formatter_issue(fun, value, rest, meta, issue_meta, issues)}
-    else
-      {ast, issues}
-    end
+    issues =
+      if fun in @formatter_funs do
+        maybe_formatter_issue(fun, value, rest, meta, issue_meta, issues, bindings)
+      else
+        issues
+      end
+
+    {ast, {issues, bindings}}
   end
 
-  defp traverse(ast, issues, _issue_meta), do: {ast, issues}
+  defp traverse(ast, acc, _issue_meta), do: {ast, acc}
 
-  defp maybe_shift_issue(value, timezone_arg, meta, issue_meta, issues) do
-    case field_kind(value) do
+  defp maybe_shift_issue(value, timezone_arg, meta, issue_meta, issues, bindings) do
+    case field_kind(value, bindings) do
       {schema, field, kind} ->
         case DateKind.shift_zone_policy(kind) do
           :never ->
@@ -184,9 +231,8 @@ defmodule Ysc.Credo.DateFieldConversions do
     end
   end
 
-  defp pacific_timezone_arg?("America/Los_Angeles"), do: true
-
-  defp pacific_timezone_arg?({:@, _, [{:pacific_timezone, _, _}]}), do: true
+  defp pacific_timezone_arg?(literal) when is_binary(literal),
+    do: literal == TimeZone.default()
 
   defp pacific_timezone_arg?(
          {{:., _, [{:__aliases__, _, parts}, :default]}, _, []}
@@ -196,7 +242,7 @@ defmodule Ysc.Credo.DateFieldConversions do
 
   defp pacific_timezone_arg?(_), do: false
 
-  defp maybe_formatter_issue(fun, value, rest, meta, issue_meta, issues) do
+  defp maybe_formatter_issue(fun, value, rest, meta, issue_meta, issues, bindings) do
     cond do
       fun in [:days_until_event, :event_day_label] and rest != [] ->
         [
@@ -233,7 +279,7 @@ defmodule Ysc.Credo.DateFieldConversions do
         )
 
       true ->
-        case field_kind(value) do
+        case field_kind(value, bindings) do
           {_schema, field, kind} ->
             if forbidden_formatter?(kind, fun) do
               [
@@ -298,8 +344,8 @@ defmodule Ysc.Credo.DateFieldConversions do
 
   defp forbidden_formatter?(_, _), do: false
 
-  defp field_kind(ast) do
-    with {schema, field} <- field_access(ast),
+  defp field_kind(ast, bindings) do
+    with {schema, field} <- field_access(ast, bindings),
          kind when not is_nil(kind) <- DateFields.kind(schema, field) do
       {schema, field, kind}
     else
@@ -308,7 +354,8 @@ defmodule Ysc.Credo.DateFieldConversions do
   end
 
   # event.start_date / @event.start_date / assigns.event.start_date
-  defp field_access({{:., _, [receiver, field]}, _, []}) when is_atom(field) do
+  defp field_access({{:., _, [receiver, field]}, _, []}, _bindings)
+       when is_atom(field) do
     case receiver_schema(receiver) do
       nil -> nil
       schema -> {schema, field}
@@ -317,7 +364,8 @@ defmodule Ysc.Credo.DateFieldConversions do
 
   # Map.get(event, :start_date)
   defp field_access(
-         {{:., _, [{:__aliases__, _, [:Map]}, :get]}, _, [receiver, field]}
+         {{:., _, [{:__aliases__, _, [:Map]}, :get]}, _, [receiver, field]},
+         _bindings
        )
        when is_atom(field) do
     case receiver_schema(receiver) do
@@ -326,7 +374,14 @@ defmodule Ysc.Credo.DateFieldConversions do
     end
   end
 
-  defp field_access(_), do: nil
+  # A bare variable previously bound to a field access via
+  # `case receiver.field do var -> ... end` (see the :case traverse clause).
+  defp field_access({name, _, ctx}, bindings)
+       when is_atom(name) and (is_nil(ctx) or is_atom(ctx)) do
+    Map.get(bindings, name)
+  end
+
+  defp field_access(_ast, _bindings), do: nil
 
   defp receiver_schema({:@, _, [{name, _, _}]}) when is_atom(name),
     do: DateFields.schema_for_receiver(name)

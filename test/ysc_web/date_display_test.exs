@@ -149,6 +149,11 @@ defmodule YscWeb.DateDisplayTest do
     test "accepts a custom default" do
       assert DateDisplay.format_pacific_date_short(nil, "—") == "—"
     end
+
+    test "the default argument only applies to nil/invalid values, not Date values" do
+      assert DateDisplay.format_pacific_date_short(~D[2024-03-05], "—") ==
+               "Mar 5"
+    end
   end
 
   describe "format_datetime_at/1" do

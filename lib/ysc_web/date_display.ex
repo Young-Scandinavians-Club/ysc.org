@@ -43,7 +43,6 @@ defmodule YscWeb.DateDisplay do
   @datetime_display_format "%b %-d, %Y"
   @long_datetime_format "%B %d, %Y at %I:%M %p"
   @long_datetime_with_zone_format "%B %d, %Y at %I:%M %p %Z"
-  @pacific_timezone "America/Los_Angeles"
   @cabin_checkin_time ~T[15:00:00]
 
   @doc """
@@ -140,12 +139,12 @@ defmodule YscWeb.DateDisplay do
     default = Keyword.get(opts, :default, "")
     with_year? = Keyword.get(opts, :with_year, false)
 
-    case pacific_instant_date(start_date) do
+    case in_zone_date(start_date, TimeZone.default()) do
       nil ->
         default
 
       start ->
-        case pacific_instant_date(end_date) do
+        case in_zone_date(end_date, TimeZone.default()) do
           end_date when not is_nil(end_date) ->
             if Date.compare(start, end_date) == :eq do
               format_event_single_date(start, with_year?, default)
@@ -184,17 +183,8 @@ defmodule YscWeb.DateDisplay do
 
   Returns `default` for nil or other non-date values.
   """
-  def format_pacific_date(value, default \\ "")
-
-  def format_pacific_date(nil, default), do: default
-
-  def format_pacific_date(%Date{} = date, _default),
-    do: Calendar.strftime(date, @datetime_display_format)
-
-  def format_pacific_date(%DateTime{} = datetime, default),
-    do: format_date_in_zone(datetime, @pacific_timezone, default)
-
-  def format_pacific_date(_, default), do: default
+  def format_pacific_date(value, default \\ ""),
+    do: format_date_in_zone(value, TimeZone.default(), default)
 
   @doc """
   Formats a UTC datetime as a short Pacific calendar date (e.g. `"Mar 5"`).
@@ -204,17 +194,8 @@ defmodule YscWeb.DateDisplay do
 
   Returns `default` for nil or other non-date values.
   """
-  def format_pacific_date_short(value, default \\ "")
-
-  def format_pacific_date_short(nil, default), do: default
-
-  def format_pacific_date_short(%Date{} = date, _default),
-    do: format_date_short(date)
-
-  def format_pacific_date_short(%DateTime{} = datetime, default),
-    do: format_date_short_in_zone(datetime, @pacific_timezone, default)
-
-  def format_pacific_date_short(_, default), do: default
+  def format_pacific_date_short(value, default \\ ""),
+    do: format_date_short_in_zone(value, TimeZone.default(), default)
 
   @doc """
   Formats a datetime as a long date and time label without timezone conversion
@@ -260,21 +241,12 @@ defmodule YscWeb.DateDisplay do
 
   Invalid timezones fall back to Pacific time.
   """
-  def format_date_in_zone(value, timezone, default \\ "")
-
-  def format_date_in_zone(nil, _timezone, default), do: default
-
-  def format_date_in_zone(%Date{} = date, _timezone, default),
-    do: format_datetime_display(date, default)
-
-  def format_date_in_zone(%DateTime{} = datetime, timezone, default) do
-    datetime
-    |> TimeZone.shift(timezone)
-    |> DateTime.to_date()
-    |> format_datetime_display(default)
+  def format_date_in_zone(value, timezone, default \\ "") do
+    case in_zone_date(value, timezone) do
+      nil -> default
+      date -> format_datetime_display(date, default)
+    end
   end
-
-  def format_date_in_zone(_, _timezone, default), do: default
 
   @doc """
   Formats a UTC instant as a short month/day label in `timezone`
@@ -282,21 +254,22 @@ defmodule YscWeb.DateDisplay do
 
   Invalid timezones fall back to Pacific time.
   """
-  def format_date_short_in_zone(value, timezone, default \\ "")
-
-  def format_date_short_in_zone(nil, _timezone, default), do: default
-
-  def format_date_short_in_zone(%Date{} = date, _timezone, default),
-    do: format_date_short(date, default)
-
-  def format_date_short_in_zone(%DateTime{} = datetime, timezone, default) do
-    datetime
-    |> TimeZone.shift(timezone)
-    |> DateTime.to_date()
-    |> format_date_short(default)
+  def format_date_short_in_zone(value, timezone, default \\ "") do
+    case in_zone_date(value, timezone) do
+      nil -> default
+      date -> format_date_short(date, default)
+    end
   end
 
-  def format_date_short_in_zone(_, _timezone, default), do: default
+  # Extracts the calendar date a date/datetime value represents in `timezone`.
+  # A `%Date{}` is returned as-is (it has no timezone to shift); a `%DateTime{}`
+  # is shifted first. `nil` for nil/unsupported values.
+  defp in_zone_date(%Date{} = date, _timezone), do: date
+
+  defp in_zone_date(%DateTime{} = datetime, timezone),
+    do: datetime |> TimeZone.shift(timezone) |> DateTime.to_date()
+
+  defp in_zone_date(_, _timezone), do: nil
 
   defp format_event_single_date(date, true, _default),
     do: Calendar.strftime(date, "%b %-d, %Y")
@@ -449,18 +422,10 @@ defmodule YscWeb.DateDisplay do
   defp event_wall_clock_time(_), do: nil
 
   defp pacific_wall_clock(date, time) do
-    case DateTime.new(date, time, @pacific_timezone) do
+    case DateTime.new(date, time, TimeZone.default()) do
       {:ok, dt} -> dt
       {:gap, _before, after_dt} -> after_dt
       {:ambiguous, first, _second} -> first
     end
   end
-
-  defp pacific_instant_date(nil), do: nil
-
-  defp pacific_instant_date(%DateTime{} = dt),
-    do: dt |> TimeZone.shift(@pacific_timezone) |> DateTime.to_date()
-
-  defp pacific_instant_date(%Date{} = date), do: date
-  defp pacific_instant_date(_), do: nil
 end

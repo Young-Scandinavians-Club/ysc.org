@@ -168,4 +168,67 @@ defmodule Ysc.Credo.DateFieldConversionsTest do
 
     assert issues == []
   end
+
+  test "flags @timezone shift_zone on a case-bound ticket_tier.start_date variable" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        def days_until_sale_starts(ticket_tier, timezone) do
+          case ticket_tier.start_date do
+            nil ->
+              nil
+
+            start_date ->
+              start_date
+              |> YscWeb.TimeZone.shift(timezone)
+              |> DateTime.to_date()
+          end
+        end
+      end
+      """)
+
+    assert [%Credo.Issue{check: DateFieldConversions}] = issues
+    assert hd(issues).message =~ "Pacific"
+  end
+
+  test "allows Pacific shift_zone on a case-bound ticket_tier.start_date variable" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        def days_until_sale_starts(ticket_tier) do
+          case ticket_tier.start_date do
+            nil ->
+              nil
+
+            start_date ->
+              start_date
+              |> YscWeb.TimeZone.shift(YscWeb.TimeZone.default())
+              |> DateTime.to_date()
+          end
+        end
+      end
+      """)
+
+    assert issues == []
+  end
+
+  test "flags shift_zone on a case-bound event.start_date variable (never shift)" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        def label(event) do
+          case event.start_date do
+            nil ->
+              nil
+
+            start_date ->
+              DateTime.shift_zone!(start_date, "America/Los_Angeles")
+          end
+        end
+      end
+      """)
+
+    assert [%Credo.Issue{check: DateFieldConversions}] = issues
+    assert hd(issues).message =~ "Do not shift_zone"
+  end
 end
