@@ -40,7 +40,11 @@ defmodule YscWeb.AdminEventsLive.TicketList do
           >
             Purchased
             <.icon
-              name={if @order_sort_dir == :asc, do: "hero-arrow-up", else: "hero-arrow-down"}
+              name={
+                if @order_sort_dir == :asc,
+                  do: "hero-arrow-up",
+                  else: "hero-arrow-down"
+              }
               class="w-3.5 h-3.5 shrink-0"
             />
           </button>
@@ -59,7 +63,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
       <div :if={@tickets == []} class="text-center py-8 text-zinc-500">
         <p class="font-semibold">No tickets yet.</p>
-        <p class="text-sm">Tickets will appear here once users start buying tickets.</p>
+        <p class="text-sm">
+          Tickets will appear here once users start buying tickets.
+        </p>
       </div>
 
       <div
@@ -76,7 +82,11 @@ defmodule YscWeb.AdminEventsLive.TicketList do
             class="w-full flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 bg-zinc-50 hover:bg-zinc-100 text-sm text-left transition-colors"
           >
             <.icon
-              name={if order_collapsed?(@collapsed_order_ids, group.order_id), do: "hero-chevron-right", else: "hero-chevron-down"}
+              name={
+                if order_collapsed?(@collapsed_order_ids, group.order_id),
+                  do: "hero-chevron-right",
+                  else: "hero-chevron-down"
+              }
               class="w-3.5 h-3.5 text-zinc-400 shrink-0"
             />
             <.user_card user={group.order && group.order.user} class="h-auto" />
@@ -104,7 +114,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
               <div class="flex-1 min-w-[180px]">
                 <% {attendee_name, attendee_email} = attendee_display(ticket) %>
                 <%= if attendee_name || attendee_email do %>
-                  <div class="font-medium text-zinc-900 text-sm">{attendee_name}</div>
+                  <div class="font-medium text-zinc-900 text-sm">
+                    {attendee_name}
+                  </div>
                   <div class="text-zinc-500 text-sm">{attendee_email}</div>
                 <% else %>
                   <button
@@ -117,13 +129,19 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                     + Add name &amp; email
                   </button>
                 <% end %>
-                <div :if={reassigned?(ticket, group.order)} class="text-xs text-amber-700 mt-0.5">
+                <div
+                  :if={reassigned?(ticket, group.order)}
+                  class="text-xs text-amber-700 mt-0.5"
+                >
                   <.icon name="hero-arrows-right-left" class="w-3 h-3 inline" />
                   Reassigned to {UserDisplay.full_name(ticket.user)}
                 </div>
               </div>
               <div class="w-32 shrink-0">
-                <.badge :if={ticket.ticket_tier} type={tier_badge_color(ticket.ticket_tier)}>
+                <.badge
+                  :if={ticket.ticket_tier}
+                  type={tier_badge_color(ticket.ticket_tier)}
+                >
                   {ticket.ticket_tier.name}
                 </.badge>
               </div>
@@ -140,7 +158,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                     phx-value-id={ticket.id}
                     phx-target={@myself}
                   >
-                    {if ticket.registration, do: "Edit attendee info", else: "Add attendee info"}
+                    {if ticket.registration,
+                      do: "Edit attendee info",
+                      else: "Add attendee info"}
                   </.dropdown_menu_item>
                   <.dropdown_menu_item
                     id={"ticket-actions-#{ticket.id}-reassign"}
@@ -176,7 +196,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         on_cancel={JS.push("close-edit-detail-modal", target: @myself)}
       >
         <.header>
-          {if @editing_ticket.registration, do: "Edit Attendee Info", else: "Add Attendee Info"}
+          {if @editing_ticket.registration,
+            do: "Edit Attendee Info",
+            else: "Add Attendee Info"}
         </.header>
 
         <.simple_form
@@ -186,8 +208,18 @@ defmodule YscWeb.AdminEventsLive.TicketList do
           phx-submit="save-ticket-detail"
           class="mt-8"
         >
-          <.input type="text" label="First name" field={@detail_form[:first_name]} required />
-          <.input type="text" label="Last name" field={@detail_form[:last_name]} required />
+          <.input
+            type="text"
+            label="First name"
+            field={@detail_form[:first_name]}
+            required
+          />
+          <.input
+            type="text"
+            label="Last name"
+            field={@detail_form[:last_name]}
+            required
+          />
           <.input type="email" label="Email" field={@detail_form[:email]} required />
 
           <:actions>
@@ -301,7 +333,10 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
     socket
     |> assign(:tickets, tickets)
-    |> assign(:order_groups, group_by_order(tickets, socket.assigns[:order_sort_dir] || :desc))
+    |> assign(
+      :order_groups,
+      group_by_order(tickets, socket.assigns[:order_sort_dir] || :desc)
+    )
   end
 
   # Enum.group_by/2's map doesn't guarantee order, so groups are explicitly
@@ -310,7 +345,11 @@ defmodule YscWeb.AdminEventsLive.TicketList do
     tickets
     |> Enum.group_by(& &1.ticket_order_id)
     |> Enum.map(fn {order_id, order_tickets} ->
-      %{order_id: order_id, order: hd(order_tickets).ticket_order, tickets: order_tickets}
+      %{
+        order_id: order_id,
+        order: hd(order_tickets).ticket_order,
+        tickets: order_tickets
+      }
     end)
     |> Enum.sort_by(&order_purchased_at/1, {sort_dir, DateTime})
   end
@@ -322,7 +361,8 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   defp order_total(%{order: order}), do: order.total_amount
 
   defp order_purchased_at(%{order: order, tickets: tickets}) do
-    (order && order.completed_at) || Enum.min_by(tickets, & &1.inserted_at).inserted_at
+    (order && order.completed_at) ||
+      Enum.min_by(tickets, & &1.inserted_at).inserted_at
   end
 
   defp reassigned?(_ticket, nil), do: false
@@ -347,7 +387,10 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   @tier_badge_colors ~w(sky green violet red yellow dark zinc default)
 
   defp tier_badge_color(ticket_tier) do
-    Enum.at(@tier_badge_colors, :erlang.phash2(ticket_tier.id, length(@tier_badge_colors)))
+    Enum.at(
+      @tier_badge_colors,
+      :erlang.phash2(ticket_tier.id, length(@tier_badge_colors))
+    )
   end
 
   @impl true
@@ -417,10 +460,13 @@ defmodule YscWeb.AdminEventsLive.TicketList do
          |> assign(:editing_ticket, nil)
          |> assign(:detail_form, nil)
          |> refresh_data()
-         |> YscWeb.Flash.put_toast(:info, "Attendee info saved.", title: "Ticket")}
+         |> YscWeb.Flash.put_toast(:info, "Attendee info saved.",
+           title: "Ticket"
+         )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :detail_form, to_form(changeset, as: "ticket_detail"))}
+        {:noreply,
+         assign(socket, :detail_form, to_form(changeset, as: "ticket_detail"))}
     end
   end
 
@@ -511,7 +557,10 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
           {:error, _changeset} ->
             {:noreply,
-             YscWeb.Flash.put_toast(socket, :error, "Failed to reassign ticket.",
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Failed to reassign ticket.",
                title: "Reassign Ticket"
              )}
         end
@@ -524,8 +573,11 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
     amount_result =
       case ticket.ticket_order do
-        nil -> {:error, :no_ticket_order}
-        ticket_order -> Tickets.calculate_refund_amount(ticket_order, [ticket.id])
+        nil ->
+          {:error, :no_ticket_order}
+
+        ticket_order ->
+          Tickets.calculate_refund_amount(ticket_order, [ticket.id])
       end
 
     case amount_result do
@@ -537,7 +589,10 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
       {:error, _reason} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "This ticket cannot be refunded.",
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "This ticket cannot be refunded.",
            title: "Refund Ticket"
          )}
     end
@@ -685,7 +740,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
       phone =
         (ticket.user.phone_number &&
-           Ysc.Extensions.PhoneNumber.format_for_display(ticket.user.phone_number)) ||
+           Ysc.Extensions.PhoneNumber.format_for_display(
+             ticket.user.phone_number
+           )) ||
           ""
 
       {attendee_first_name, attendee_last_name, attendee_email} =

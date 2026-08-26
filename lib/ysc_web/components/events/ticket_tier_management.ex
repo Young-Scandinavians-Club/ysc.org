@@ -591,7 +591,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   # Bumping a counter prop forces TicketList to see changed assigns and
   # refresh, synchronously as part of this same render.
   defp bump_ticket_list_refresh_token(socket) do
-    assign(socket, :ticket_list_refresh_token, socket.assigns.ticket_list_refresh_token + 1)
+    assign(
+      socket,
+      :ticket_list_refresh_token,
+      socket.assigns.ticket_list_refresh_token + 1
+    )
   end
 
   defp maybe_toast_grant_success(socket, %{

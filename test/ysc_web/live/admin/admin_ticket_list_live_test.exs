@@ -68,14 +68,20 @@ defmodule YscWeb.AdminTicketListLiveTest do
     user =
       user
       |> Ecto.Changeset.change(
-        lifetime_membership_awarded_at: DateTime.truncate(DateTime.utc_now(), :second)
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
       )
       |> Repo.update!()
 
     event = Keyword.get_lazy(opts, :event, fn -> event_fixture() end)
-    tier = Keyword.get_lazy(opts, :tier, fn -> ticket_tier_fixture(%{event_id: event.id}) end)
 
-    {:ok, order} = Tickets.create_ticket_order(user.id, event.id, %{tier.id => quantity})
+    tier =
+      Keyword.get_lazy(opts, :tier, fn ->
+        ticket_tier_fixture(%{event_id: event.id})
+      end)
+
+    {:ok, order} =
+      Tickets.create_ticket_order(user.id, event.id, %{tier.id => quantity})
 
     {:ok, {payment, _transaction, _entries}} =
       Ledgers.process_event_payment_with_donations(%{
@@ -84,7 +90,8 @@ defmodule YscWeb.AdminTicketListLiveTest do
         event_amount: order.total_amount,
         donation_amount: Money.new(0, :USD),
         event_id: event.id,
-        external_payment_id: "pi_admin_ticket_list_#{System.unique_integer([:positive])}",
+        external_payment_id:
+          "pi_admin_ticket_list_#{System.unique_integer([:positive])}",
         stripe_fee: Money.new(320, :USD),
         description: "Event tickets",
         payment_method_id: nil
@@ -101,7 +108,13 @@ defmodule YscWeb.AdminTicketListLiveTest do
       from(t in Ticket, where: t.ticket_order_id == ^order.id, order_by: t.id)
       |> Repo.all()
 
-    %{user: user, event: event, payment: payment, ticket_order: completed, tickets: tickets}
+    %{
+      user: user,
+      event: event,
+      payment: payment,
+      ticket_order: completed,
+      tickets: tickets
+    }
   end
 
   defp order_index(html, order_id) do
@@ -128,7 +141,13 @@ defmodule YscWeb.AdminTicketListLiveTest do
 
       assert has_element?(view, "#ticket-order-#{order.id}", order.reference_id)
       assert has_element?(view, "#ticket-order-#{order.id}", "1 ticket")
-      assert has_element?(view, "#ticket-order-#{order.id}", Money.to_string!(order.total_amount))
+
+      assert has_element?(
+               view,
+               "#ticket-order-#{order.id}",
+               Money.to_string!(order.total_amount)
+             )
+
       assert has_element?(view, "#ticket-row-#{ticket.id}")
     end
 
@@ -156,7 +175,10 @@ defmodule YscWeb.AdminTicketListLiveTest do
   describe "collapsing an order" do
     setup [:create_admin]
 
-    test "hides and reveals its ticket rows, expanded by default", %{conn: conn, admin: admin} do
+    test "hides and reveals its ticket rows, expanded by default", %{
+      conn: conn,
+      admin: admin
+    } do
       event = event_fixture(%{organizer_id: admin.id})
       tier = ticket_tier_fixture(%{event_id: event.id})
       buyer = user_fixture()
@@ -173,13 +195,17 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert has_element?(view, "#ticket-row-#{ticket.id}")
 
       view
-      |> element("#ticket-order-toggle-#{Repo.get!(Ticket, ticket.id).ticket_order_id}")
+      |> element(
+        "#ticket-order-toggle-#{Repo.get!(Ticket, ticket.id).ticket_order_id}"
+      )
       |> render_click()
 
       refute has_element?(view, "#ticket-row-#{ticket.id}")
 
       view
-      |> element("#ticket-order-toggle-#{Repo.get!(Ticket, ticket.id).ticket_order_id}")
+      |> element(
+        "#ticket-order-toggle-#{Repo.get!(Ticket, ticket.id).ticket_order_id}"
+      )
       |> render_click()
 
       assert has_element?(view, "#ticket-row-#{ticket.id}")
@@ -189,7 +215,10 @@ defmodule YscWeb.AdminTicketListLiveTest do
   describe "sorting orders by purchase date" do
     setup [:create_admin]
 
-    test "toggles between newest-first and oldest-first", %{conn: conn, admin: admin} do
+    test "toggles between newest-first and oldest-first", %{
+      conn: conn,
+      admin: admin
+    } do
       event = event_fixture(%{organizer_id: admin.id})
       tier = ticket_tier_fixture(%{event_id: event.id})
 
@@ -214,14 +243,16 @@ defmodule YscWeb.AdminTicketListLiveTest do
       older_order_id = Repo.get!(Ticket, older_ticket.id).ticket_order_id
       newer_order_id = Repo.get!(Ticket, newer_ticket.id).ticket_order_id
 
-      assert order_index(html, newer_order_id) < order_index(html, older_order_id)
+      assert order_index(html, newer_order_id) <
+               order_index(html, older_order_id)
 
       html =
         view
         |> element("#ticket-orders-sort-purchased")
         |> render_click()
 
-      assert order_index(html, older_order_id) < order_index(html, newer_order_id)
+      assert order_index(html, older_order_id) <
+               order_index(html, newer_order_id)
     end
   end
 
@@ -248,10 +279,11 @@ defmodule YscWeb.AdminTicketListLiveTest do
   describe "row action menu direction" do
     setup [:create_admin]
 
-    test "opens upward only for the very last ticket row, downward for the rest", %{
-      conn: conn,
-      admin: admin
-    } do
+    test "opens upward only for the very last ticket row, downward for the rest",
+         %{
+           conn: conn,
+           admin: admin
+         } do
       event = event_fixture(%{organizer_id: admin.id})
       tier = ticket_tier_fixture(%{event_id: event.id})
 
@@ -278,7 +310,11 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert has_element?(view, "#ticket-actions-#{last_ticket.id}.mt-1")
       refute has_element?(view, "#ticket-actions-#{last_ticket.id}.bottom-full")
 
-      assert has_element?(view, "#ticket-actions-#{first_ticket.id}.bottom-full")
+      assert has_element?(
+               view,
+               "#ticket-actions-#{first_ticket.id}.bottom-full"
+             )
+
       refute has_element?(view, "#ticket-actions-#{first_ticket.id}.mt-1")
     end
   end
@@ -286,10 +322,11 @@ defmodule YscWeb.AdminTicketListLiveTest do
   describe "attendee info" do
     setup [:create_admin]
 
-    test "shows the purchaser as attendee by default and lets admin override it", %{
-      conn: conn,
-      admin: admin
-    } do
+    test "shows the purchaser as attendee by default and lets admin override it",
+         %{
+           conn: conn,
+           admin: admin
+         } do
       event = event_fixture(%{organizer_id: admin.id})
       tier = ticket_tier_fixture(%{event_id: event.id})
       buyer = user_fixture()
@@ -306,9 +343,19 @@ defmodule YscWeb.AdminTicketListLiveTest do
       # No separate registration was collected, so the attendee shown is the
       # purchaser (matches the CSV export's fallback) rather than a blank
       # "missing info" state.
-      assert has_element?(view, "#ticket-row-#{ticket.id}", "#{buyer.first_name} #{buyer.last_name}")
+      assert has_element?(
+               view,
+               "#ticket-row-#{ticket.id}",
+               "#{buyer.first_name} #{buyer.last_name}"
+             )
+
       assert has_element?(view, "#ticket-row-#{ticket.id}", buyer.email)
-      assert has_element?(view, "#ticket-actions-#{ticket.id}-edit", "Add attendee info")
+
+      assert has_element?(
+               view,
+               "#ticket-actions-#{ticket.id}-edit",
+               "Add attendee info"
+             )
 
       view
       |> element("#ticket-actions-#{ticket.id}-edit")
@@ -330,7 +377,8 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert has_element?(view, "#ticket-row-#{ticket.id}", "Ada Lovelace")
       assert has_element?(view, "#ticket-row-#{ticket.id}", "ada@example.com")
 
-      assert Repo.get_by!(TicketDetail, ticket_id: ticket.id).first_name == "Ada"
+      assert Repo.get_by!(TicketDetail, ticket_id: ticket.id).first_name ==
+               "Ada"
     end
 
     test "edits existing attendee info", %{conn: conn, admin: admin} do
@@ -423,7 +471,12 @@ defmodule YscWeb.AdminTicketListLiveTest do
 
       refute has_element?(view, "#reassign-ticket-modal")
       assert Repo.get!(Ticket, ticket.id).user_id == new_owner.id
-      assert has_element?(view, "#ticket-row-#{ticket.id}", "Reassigned to New Owner")
+
+      assert has_element?(
+               view,
+               "#ticket-row-#{ticket.id}",
+               "Reassigned to New Owner"
+             )
     end
   end
 

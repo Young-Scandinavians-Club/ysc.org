@@ -822,7 +822,12 @@ defmodule Ysc.Tickets do
     Ticket
     |> where([t], t.event_id == ^event_id and t.status == :confirmed)
     |> order_by([t], desc: t.inserted_at)
-    |> preload([:ticket_tier, :user, :registration, ticket_order: [:payment, :user]])
+    |> preload([
+      :ticket_tier,
+      :user,
+      :registration,
+      ticket_order: [:payment, :user]
+    ])
     |> Repo.all()
   end
 

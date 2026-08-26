@@ -1389,17 +1389,23 @@ defmodule Ysc.TicketsTest do
       event: event,
       tier1: tier1
     } do
-      {:ok, order} = Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
       [ticket] = tickets_for_order(order.id)
       new_user = user_fixture_unique()
 
-      assert {:ok, updated_ticket} = Tickets.reassign_ticket(ticket, new_user.id)
+      assert {:ok, updated_ticket} =
+               Tickets.reassign_ticket(ticket, new_user.id)
+
       assert updated_ticket.user_id == new_user.id
       assert Repo.get!(Ticket, ticket.id).user_id == new_user.id
     end
 
     test "requires a user_id", %{user: user, event: event, tier1: tier1} do
-      {:ok, order} = Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
       [ticket] = tickets_for_order(order.id)
 
       assert {:error, changeset} = Tickets.reassign_ticket(ticket, nil)
@@ -1414,7 +1420,9 @@ defmodule Ysc.TicketsTest do
 
     test "returns tickets for the event preloading tier, user, order, and registration",
          %{user: user, event: event, tier1: tier1} do
-      {:ok, order} = Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
       [ticket] = tickets_for_order(order.id)
       ticket |> Ecto.Changeset.change(status: :confirmed) |> Repo.update!()
 
@@ -1434,15 +1442,29 @@ defmodule Ysc.TicketsTest do
       assert loaded.registration.first_name == "Ada"
     end
 
-    test "excludes tickets from other events", %{user: user, event: event, tier1: tier1} do
-      {:ok, order} = Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+    test "excludes tickets from other events", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
       [ticket] = tickets_for_order(order.id)
       ticket |> Ecto.Changeset.change(status: :confirmed) |> Repo.update!()
 
       %{event: other_event, tier1: other_tier} = tickets_setup()
-      {:ok, other_order} = Tickets.create_ticket_order(user.id, other_event.id, %{other_tier.id => 1})
+
+      {:ok, other_order} =
+        Tickets.create_ticket_order(user.id, other_event.id, %{
+          other_tier.id => 1
+        })
+
       [other_ticket] = tickets_for_order(other_order.id)
-      other_ticket |> Ecto.Changeset.change(status: :confirmed) |> Repo.update!()
+
+      other_ticket
+      |> Ecto.Changeset.change(status: :confirmed)
+      |> Repo.update!()
 
       assert length(Tickets.list_tickets_for_admin(event.id)) == 1
     end
@@ -1451,7 +1473,11 @@ defmodule Ysc.TicketsTest do
   describe "refund_via_stripe/3" do
     test "skips Stripe for a zero amount" do
       assert {:ok, {:skipped_zero_amount, nil, nil}} =
-               Tickets.refund_via_stripe(%Ysc.Ledgers.Payment{}, Money.new(0, :USD), "test")
+               Tickets.refund_via_stripe(
+                 %Ysc.Ledgers.Payment{},
+                 Money.new(0, :USD),
+                 "test"
+               )
     end
 
     test "returns :no_stripe_payment when the payment has no Stripe payment id" do
