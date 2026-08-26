@@ -223,7 +223,17 @@ defmodule YscWeb.AdminEventsLive.TicketList do
           <.input type="email" label="Email" field={@detail_form[:email]} required />
 
           <:actions>
-            <.button phx-disable-with="Saving...">Save</.button>
+            <div class="flex justify-end gap-2 w-full">
+              <.button
+                type="button"
+                variant="outline"
+                phx-click="close-edit-detail-modal"
+                phx-target={@myself}
+              >
+                Cancel
+              </.button>
+              <.button phx-disable-with="Saving...">Save</.button>
+            </div>
           </:actions>
         </.simple_form>
       </.modal>
@@ -257,7 +267,15 @@ defmodule YscWeb.AdminEventsLive.TicketList do
             required
           />
 
-          <div class="flex justify-end">
+          <div class="flex justify-end gap-2">
+            <.button
+              type="button"
+              variant="outline"
+              phx-click="close-reassign-modal"
+              phx-target={@myself}
+            >
+              Cancel
+            </.button>
             <.button
               type="button"
               phx-click="confirm-reassign"
@@ -296,7 +314,22 @@ defmodule YscWeb.AdminEventsLive.TicketList do
           <.input type="text" name="reason" label="Reason (optional)" value="" />
 
           <:actions>
-            <.button phx-disable-with="Refunding...">Refund Ticket</.button>
+            <div class="flex justify-end gap-2 w-full">
+              <.button
+                type="button"
+                variant="outline"
+                phx-click="close-refund-modal"
+                phx-target={@myself}
+              >
+                Cancel
+              </.button>
+              <.button
+                phx-disable-with="Refunding..."
+                class="bg-red-600 hover:bg-red-700"
+              >
+                Refund Ticket
+              </.button>
+            </div>
           </:actions>
         </.simple_form>
       </.modal>
