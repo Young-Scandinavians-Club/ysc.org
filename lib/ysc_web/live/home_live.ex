@@ -20,7 +20,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Posts.Post
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
-  alias YscWeb.{DateDisplay, PlainText}
+  alias YscWeb.{DateDisplay, PlainText, TimeZone}
 
   @impl true
   def mount(_params, session, socket) do
@@ -786,7 +786,7 @@ defmodule YscWeb.HomeLive do
               <div class="p-6 sm:p-8 flex flex-col flex-1">
                 <div class="flex items-center gap-3 mb-3 sm:mb-4">
                   <span class="text-blue-300 font-semibold text-sm tracking-widest uppercase">
-                    {format_event_date(event.start_date)}
+                    {DateDisplay.format_date_short(event.start_date)}
                   </span>
                   <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span>
                   <%= if event.start_time && event.start_time != "" do %>
@@ -891,7 +891,7 @@ defmodule YscWeb.HomeLive do
                 />
               </div>
               <time class="text-xs font-semibold text-blue-700 uppercase tracking-widest">
-                {DateDisplay.format_pacific_date_short(post.published_on)} · {reading_time_for_news(
+                {DateDisplay.format_date_short_in_zone(post.published_on, @timezone)} · {reading_time_for_news(
                   post
                 )} min read
               </time>
@@ -1498,11 +1498,7 @@ defmodule YscWeb.HomeLive do
                             _ -> "bg-purple-50 text-purple-700"
                           end
                         ]}>
-                          {case days_until_event(event) do
-                            0 -> "Today"
-                            1 -> "Tomorrow"
-                            days -> "In #{days} days"
-                          end}
+                          {DateDisplay.relative_days_phrase(days_until_event(event))}
                         </span>
                         <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
                       </div>
@@ -1513,7 +1509,7 @@ defmodule YscWeb.HomeLive do
                       </.link>
                       <p class="text-xs text-zinc-500 flex items-center gap-1 mb-4">
                         <.icon name="hero-calendar" class="w-3 h-3" />
-                        {format_event_date_long(event.start_date)}
+                        {DateDisplay.format_datetime_display(event.start_date)}
                       </p>
                       <div
                         :if={event.location_name}
@@ -1859,7 +1855,8 @@ defmodule YscWeb.HomeLive do
                           </span>
                           <span class="text-sm font-semibold text-zinc-900">
                             {format_membership_date(
-                              @membership_qr_details.member_since
+                              @membership_qr_details.member_since,
+                              @timezone
                             )}
                           </span>
                         </div>
@@ -1871,7 +1868,8 @@ defmodule YscWeb.HomeLive do
                         <%= if @membership_qr_details.renewal_date do %>
                           <span class="text-sm font-semibold text-zinc-900">
                             {format_membership_date(
-                              @membership_qr_details.renewal_date
+                              @membership_qr_details.renewal_date,
+                              @timezone
                             )}
                           </span>
                         <% else %>
@@ -2046,7 +2044,10 @@ defmodule YscWeb.HomeLive do
                       </div>
                       <div>
                         <p class="text-xs font-bold text-blue-600 mb-1">
-                          {DateDisplay.format_pacific_date_short(post.published_on)}
+                          {DateDisplay.format_date_short_in_zone(
+                            post.published_on,
+                            @timezone
+                          )}
                         </p>
                         <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
                           {post.title}
@@ -2150,67 +2151,8 @@ defmodule YscWeb.HomeLive do
     |> Enum.flat_map(fn {_event_datetime, event_tickets} -> event_tickets end)
   end
 
-  # Helper function to get event datetime for sorting (combines date and time)
-  # Returns a DateTime in PST timezone that can be used for sorting
   defp get_event_datetime_for_sorting(event) do
-    case {event.start_date, event.start_time} do
-      {%DateTime{} = date, %Time{} = time} ->
-        # Convert UTC DateTime to PST, then get date and combine with time
-        date_pst = DateTime.shift_zone!(date, "America/Los_Angeles")
-        date_part = DateTime.to_date(date_pst)
-        naive_datetime = NaiveDateTime.new!(date_part, time)
-        DateTime.from_naive!(naive_datetime, "America/Los_Angeles")
-
-      {date, time} when not is_nil(date) and not is_nil(time) ->
-        # Handle DateTime or Date with time
-        date_part =
-          case date do
-            %DateTime{} = dt ->
-              # Convert UTC DateTime to PST, then get date
-              dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-              DateTime.to_date(dt_pst)
-
-            %Date{} = d ->
-              d
-
-            _ ->
-              nil
-          end
-
-        if date_part do
-          naive_datetime = NaiveDateTime.new!(date_part, time)
-          DateTime.from_naive!(naive_datetime, "America/Los_Angeles")
-        else
-          # Fallback: use start_date only at midnight
-          case event.start_date do
-            %DateTime{} = dt ->
-              DateTime.shift_zone!(dt, "America/Los_Angeles")
-
-            %Date{} = d ->
-              DateTime.new!(d, ~T[00:00:00], "America/Los_Angeles")
-
-            _ ->
-              # Ultimate fallback: use current time
-              DateTime.now!("America/Los_Angeles")
-          end
-        end
-
-      _ ->
-        # Fallback to just the date if time is nil
-        case event.start_date do
-          %DateTime{} = dt ->
-            # Convert UTC DateTime to PST
-            DateTime.shift_zone!(dt, "America/Los_Angeles")
-
-          %Date{} = d ->
-            # For Date-only, create a DateTime at midnight PST
-            DateTime.new!(d, ~T[00:00:00], "America/Los_Angeles")
-
-          _ ->
-            # Ultimate fallback: use current time
-            DateTime.now!("America/Los_Angeles")
-        end
-    end
+    DateDisplay.event_start_datetime(event) || TimeZone.now()
   end
 
   defp group_tickets_by_event_and_tier(tickets) do
@@ -2230,111 +2172,11 @@ defmodule YscWeb.HomeLive do
   end
 
   defp days_until_booking(booking) do
-    # Get current time in PST timezone
-    now_pst = DateTime.now!("America/Los_Angeles")
-    today_pst = DateTime.to_date(now_pst)
-    checkin_date = booking.checkin_date
-
-    # Create check-in datetime at 15:00 (3:00 PM) PST on the check-in date
-    checkin_datetime_pst =
-      checkin_date
-      |> DateTime.new!(~T[15:00:00], "America/Los_Angeles")
-
-    case Date.compare(today_pst, checkin_date) do
-      # Check-in date is in the past - booking has started
-      :gt ->
-        :started
-
-      # Check-in is today - need to check if it's before or after 15:00
-      :eq ->
-        if DateTime.compare(now_pst, checkin_datetime_pst) == :lt do
-          # Before 15:00 on check-in date
-          0
-        else
-          # After 15:00 on check-in date - booking has started
-          :started
-        end
-
-      # Check-in is in the future
-      :lt ->
-        # Calculate days difference using calendar days
-        diff = Date.diff(checkin_date, today_pst)
-        diff
-    end
+    DateDisplay.days_until_cabin_checkin(booking)
   end
 
   defp days_until_event(event) do
-    # Get current time in PST timezone
-    now_pst = DateTime.now!("America/Los_Angeles")
-
-    # Combine the date and time properly, converting to PST
-    event_datetime_pst =
-      case {event.start_date, event.start_time} do
-        {%DateTime{} = date, %Time{} = time} ->
-          # Convert UTC DateTime to PST, then get date and combine with time
-          date_pst = DateTime.shift_zone!(date, "America/Los_Angeles")
-          date_part = DateTime.to_date(date_pst)
-          naive_datetime = NaiveDateTime.new!(date_part, time)
-          DateTime.from_naive!(naive_datetime, "America/Los_Angeles")
-
-        {date, time} when not is_nil(date) and not is_nil(time) ->
-          # Handle DateTime or Date with time
-          date_part =
-            case date do
-              %DateTime{} = dt ->
-                # Convert UTC DateTime to PST, then get date
-                dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-                DateTime.to_date(dt_pst)
-
-              %Date{} = d ->
-                d
-
-              _ ->
-                nil
-            end
-
-          if date_part do
-            naive_datetime = NaiveDateTime.new!(date_part, time)
-            DateTime.from_naive!(naive_datetime, "America/Los_Angeles")
-          else
-            nil
-          end
-
-        _ ->
-          # Fallback to just the date if time is nil
-          case event.start_date do
-            %DateTime{} = dt ->
-              # Convert UTC DateTime to PST
-              DateTime.shift_zone!(dt, "America/Los_Angeles")
-
-            %Date{} = d ->
-              # For Date-only, create a DateTime at midnight PST
-              DateTime.new!(d, ~T[00:00:00], "America/Los_Angeles")
-
-            _ ->
-              nil
-          end
-      end
-
-    case event_datetime_pst do
-      nil ->
-        0
-
-      event_dt ->
-        case DateTime.compare(now_pst, event_dt) do
-          # Event is in the past
-          :gt ->
-            0
-
-          _ ->
-            # Calculate days difference using calendar days, not 24-hour periods
-            # This ensures that an event tomorrow shows as "1 day left" even if it's less than 24 hours away
-            event_date_only = DateTime.to_date(event_dt)
-            now_date_only = DateTime.to_date(now_pst)
-            diff = Date.diff(event_date_only, now_date_only)
-            max(0, diff)
-        end
-    end
+    DateDisplay.days_until_event(event) || 0
   end
 
   @impl true
@@ -2580,24 +2422,8 @@ defmodule YscWeb.HomeLive do
     end
   end
 
-  defp format_event_time(event_start_date, %Time{} = time) do
-    # Convert event date and time to PST for display
-    date_part =
-      case event_start_date do
-        %DateTime{} = dt ->
-          dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-          DateTime.to_date(dt_pst)
-
-        %Date{} = d ->
-          d
-
-        _ ->
-          # Get today's date in PST
-          DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-      end
-
-    datetime_pst = DateTime.new!(date_part, time, "America/Los_Angeles")
-    Timex.format!(datetime_pst, "{h12}:{m} {AM}")
+  defp format_event_time(_event_start_date, %Time{} = time) do
+    Calendar.strftime(time, "%-I:%M %p")
   end
 
   defp format_event_time(event_start_date, start_time)
@@ -2616,25 +2442,17 @@ defmodule YscWeb.HomeLive do
 
   defp format_event_time(_, _), do: ""
 
-  defp format_event_date(%DateTime{} = date) do
-    date |> DateTime.to_date() |> Timex.format!("{Mshort} {D}")
+  defp format_membership_date(%DateTime{} = dt, timezone) do
+    DateDisplay.format_date_in_zone(dt, timezone)
   end
 
-  defp format_event_date(%Date{} = date) do
-    Timex.format!(date, "{Mshort} {D}")
-  end
+  defp format_membership_date(%Date{} = date, _timezone),
+    do: DateDisplay.format_datetime_display(date)
 
-  defp format_event_date(_), do: ""
+  defp format_membership_date(_, _timezone), do: ""
 
-  defp format_event_date_long(%DateTime{} = date) do
-    date |> DateTime.to_date() |> Calendar.strftime("%b %d, %Y")
-  end
-
-  defp format_event_date_long(%Date{} = date) do
-    Calendar.strftime(date, "%b %d, %Y")
-  end
-
-  defp format_event_date_long(_), do: ""
+  defp format_membership_date(value),
+    do: format_membership_date(value, TimeZone.default())
 
   defp format_membership_plan_price(plan_id) when is_atom(plan_id) do
     plans = Application.get_env(:ysc, :membership_plans, [])
@@ -2663,27 +2481,12 @@ defmodule YscWeb.HomeLive do
     ArgumentError -> nil
   end
 
-  defp format_membership_date(%DateTime{} = dt) do
-    dt
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> DateTime.to_date()
-    |> Calendar.strftime("%b %-d, %Y")
-  end
-
-  defp format_membership_date(%Date{} = date),
-    do: Calendar.strftime(date, "%b %-d, %Y")
-
-  defp format_membership_date(_), do: ""
-
   defp format_booking_date(%Date{} = date) do
     Calendar.strftime(date, "%b %d")
   end
 
   defp days_since_inserted(%DateTime{} = inserted_at) do
-    # Get current time in PST and convert inserted_at to PST
-    now_pst = DateTime.now!("America/Los_Angeles")
-    inserted_at_pst = DateTime.shift_zone!(inserted_at, "America/Los_Angeles")
-    Timex.diff(now_pst, inserted_at_pst, :days)
+    DateTime.diff(DateTime.utc_now(), inserted_at, :day)
   end
 
   defp days_since_inserted(_), do: 999

@@ -2788,7 +2788,11 @@ defmodule YscWeb.CoreComponents do
       |> assign(:event, assigns.event)
       |> assign(
         :badges,
-        get_event_badges(assigns.event, assigns.sold_out, assigns.selling_fast)
+        get_event_badges(
+          assigns.event,
+          assigns.sold_out,
+          assigns.selling_fast
+        )
       )
 
     ~H"""
@@ -2805,7 +2809,8 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  defp get_event_badges(event, sold_out, selling_fast) when is_map(event) do
+  defp get_event_badges(event, sold_out, selling_fast)
+       when is_map(event) do
     event
     |> YscWeb.EventBadgeHelpers.exclusive_badge_kinds(
       sold_out: sold_out,
@@ -4720,6 +4725,7 @@ defmodule YscWeb.CoreComponents do
   attr :primary_user, :any, default: nil
   attr :is_sub_account, :boolean, default: false
   attr :scheduled_downgrade_info, :any, default: nil
+  attr :timezone, :string, default: "America/Los_Angeles"
   attr :class, :string, default: ""
 
   def membership_status(assigns) do
@@ -4756,11 +4762,11 @@ defmodule YscWeb.CoreComponents do
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
+              <%= DateDisplay.format_date_in_zone(get_membership_ends_at(@current_membership), @timezone) %>
               </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
-              <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
+              <%= DateDisplay.format_date_in_zone(get_membership_ends_at(@current_membership), @timezone) %>
               </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>
@@ -4811,8 +4817,9 @@ defmodule YscWeb.CoreComponents do
             <strong class="text-green-900">automatically renew</strong>
             on
             <strong class="text-green-900">
-              {DateDisplay.format_pacific_date(
-                get_membership_renewal_date(@current_membership)
+              {DateDisplay.format_date_in_zone(
+                get_membership_renewal_date(@current_membership),
+                @timezone
               )}
             </strong>
             unless you turn it off beforehand.
@@ -4864,11 +4871,11 @@ defmodule YscWeb.CoreComponents do
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
+              <%= DateDisplay.format_date_in_zone(get_membership_renewal_date(@current_membership), @timezone) %>
               </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
-              <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
+              <%= DateDisplay.format_date_in_zone(get_membership_renewal_date(@current_membership), @timezone) %>
               </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>

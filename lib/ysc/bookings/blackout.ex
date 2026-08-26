@@ -16,8 +16,8 @@ defmodule Ysc.Bookings.Blackout do
   schema "blackouts" do
     field :reason, :string
     field :property, Ysc.Bookings.BookingProperty
-    field :start_date, :date
-    field :end_date, :date
+    field :start_date, Ysc.Ecto.DateKind, kind: :california_date
+    field :end_date, Ysc.Ecto.DateKind, kind: :california_date
 
     timestamps()
   end

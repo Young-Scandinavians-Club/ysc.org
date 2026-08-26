@@ -182,5 +182,23 @@ defmodule YscWeb.EventBadgeHelpersTest do
                base_event(%{start_date: utc_midnight(Date.add(today, 3))})
              ) == 3
     end
+
+    test "uses Pacific calendar days, not the browser timezone" do
+      pacific_today = pacific_today()
+      auckland_today = DateTime.now!("Pacific/Auckland") |> DateTime.to_date()
+
+      days =
+        EventBadgeHelpers.days_until_event_start(
+          base_event(%{start_date: utc_midnight(auckland_today)})
+        )
+
+      expected = Date.diff(auckland_today, pacific_today)
+
+      if expected >= 0 do
+        assert days == expected
+      else
+        assert days == nil
+      end
+    end
   end
 end

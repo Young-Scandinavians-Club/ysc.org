@@ -9,7 +9,7 @@ defmodule YscWeb.PostLive do
   alias Ysc.Posts.Post
   alias Ysc.Posts.Comment
   alias Ysc.Accounts.UserDisplay
-  alias YscWeb.SEO
+  alias YscWeb.{DateDisplay, SEO}
 
   @impl true
   def render(assigns) do
@@ -52,7 +52,7 @@ defmodule YscWeb.PostLive do
             </span>
             <span class="h-3 w-px bg-zinc-200"></span>
             <span class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
-              {Timex.format!(post_date(@post), "{Mshort} {D}, {YYYY}")}
+              {DateDisplay.format_date_in_zone(post_date(@post), @timezone)}
             </span>
           </div>
           <h1 class="text-4xl md:text-6xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-8">

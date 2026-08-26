@@ -24,7 +24,7 @@ defmodule Ysc.Subscriptions.Subscription do
     # / immediate cancellations for the membership-ended re-engagement email.
     field :cancel_at_period_end, :boolean, default: false
 
-    field :start_date, :utc_datetime
+    field :start_date, Ysc.Ecto.DateKind, kind: :utc_instant
     field :current_period_start, :utc_datetime
     field :current_period_end, :utc_datetime
 

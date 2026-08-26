@@ -67,7 +67,7 @@ defmodule Ysc.Posts.Post do
 
     field :featured_post, :boolean
 
-    field :published_on, :utc_datetime
+    field :published_on, Ysc.Ecto.DateKind, kind: :utc_instant
     field :deleted_on, :utc_datetime
 
     # Snapshot of author's board position when the post was first published

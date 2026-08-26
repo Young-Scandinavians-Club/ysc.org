@@ -2,10 +2,41 @@ defmodule YscWeb.DateDisplay do
   @moduledoc """
   Human-readable date labels for public member-facing views.
 
-  Dates are formatted from their stored calendar values without timezone
-  conversion. Use `YscWeb.Admin.DateTimeDisplay` for admin Pacific-time
-  labels on UTC timestamps.
+  Dates in this app fall into three buckets — do not mix the conversions.
+  The kind is configured on the schema field via `Ysc.Ecto.DateKind`
+  (`field :start_date, Ysc.Ecto.DateKind, kind: :california_calendar_datetime`).
+  Credo `EX9003` / `EX9004` enforce that configuration.
+
+  ## California calendar days (never `shift_zone`)
+
+  Events and cabin stays happen in California. Their dates are **Pacific
+  wall-clock calendar days**:
+
+    * Event `start_date` / `end_date` — stored as DateTimes (typically midnight
+      UTC of that day). Use `calendar_date/1` / `format_event_date_range/2`.
+    * Event `start_time` / `end_time` — `%Time{}` values in Pacific wall-clock.
+    * Booking `checkin_date` / `checkout_date` — `%Date{}` values for Tahoe and
+      Clear Lake. Check-in is 3:00 PM Pacific.
+
+  Relative labels ("Today", "Tomorrow") compare against **today in Pacific**,
+  not the browser timezone.
+
+  ## Pacific-anchored UTC instants (shift to Pacific)
+
+  Ticket-tier sale windows are real timestamps picked in the admin UI as
+  Pacific calendar days. Use `format_sale_window_range/2` / `format_pacific_date/1`.
+
+  ## Other UTC instants (browser timezone, Pacific fallback)
+
+  `published_on`, membership period ends, payment timestamps, and login times
+  are global instants. Shift with `format_date_in_zone/2` into `@timezone`
+  (from LiveSocket), defaulting to Pacific.
+
+  Use `YscWeb.Admin.DateTimeDisplay` for admin Pacific-time labels on UTC
+  timestamps.
   """
+
+  alias YscWeb.TimeZone
 
   @long_date_format "%B %d, %Y"
   @short_date_format "%b %-d"
@@ -13,6 +44,7 @@ defmodule YscWeb.DateDisplay do
   @long_datetime_format "%B %d, %Y at %I:%M %p"
   @long_datetime_with_zone_format "%B %d, %Y at %I:%M %p %Z"
   @pacific_timezone "America/Los_Angeles"
+  @cabin_checkin_time ~T[15:00:00]
 
   @doc """
   Formats a date as a long label (e.g. `"March 15, 2024"`).
@@ -90,9 +122,9 @@ defmodule YscWeb.DateDisplay do
   Formats a ticket tier sale window (real UTC instants, e.g. `start_date`/
   `end_date` on a `TicketTier`) as a date range.
 
-  Unlike `format_event_date_range/2`, boundaries are shifted to
-  `America/Los_Angeles` before formatting, since sale windows are anchored to
-  a specific moment in time rather than a Pacific wall-clock calendar day.
+  Unlike `format_event_date_range/2`, boundaries are shifted to Pacific time
+  before formatting. Sale windows are picked in the admin UI as Pacific
+  calendar days and stored as real UTC instants.
 
   ## Options
 
@@ -108,12 +140,12 @@ defmodule YscWeb.DateDisplay do
     default = Keyword.get(opts, :default, "")
     with_year? = Keyword.get(opts, :with_year, false)
 
-    case pacific_calendar_date(start_date) do
+    case pacific_instant_date(start_date) do
       nil ->
         default
 
       start ->
-        case pacific_calendar_date(end_date) do
+        case pacific_instant_date(end_date) do
           end_date when not is_nil(end_date) ->
             if Date.compare(start, end_date) == :eq do
               format_event_single_date(start, with_year?, default)
@@ -159,12 +191,8 @@ defmodule YscWeb.DateDisplay do
   def format_pacific_date(%Date{} = date, _default),
     do: Calendar.strftime(date, @datetime_display_format)
 
-  def format_pacific_date(%DateTime{} = datetime, default) do
-    datetime
-    |> DateTime.shift_zone!(@pacific_timezone)
-    |> DateTime.to_date()
-    |> format_datetime_display(default)
-  end
+  def format_pacific_date(%DateTime{} = datetime, default),
+    do: format_date_in_zone(datetime, @pacific_timezone, default)
 
   def format_pacific_date(_, default), do: default
 
@@ -183,12 +211,8 @@ defmodule YscWeb.DateDisplay do
   def format_pacific_date_short(%Date{} = date, _default),
     do: format_date_short(date)
 
-  def format_pacific_date_short(%DateTime{} = datetime, default) do
-    datetime
-    |> DateTime.shift_zone!(@pacific_timezone)
-    |> DateTime.to_date()
-    |> format_date_short(default)
-  end
+  def format_pacific_date_short(%DateTime{} = datetime, default),
+    do: format_date_short_in_zone(datetime, @pacific_timezone, default)
 
   def format_pacific_date_short(_, default), do: default
 
@@ -224,11 +248,55 @@ defmodule YscWeb.DateDisplay do
 
   def format_in_zone(%DateTime{} = datetime, timezone, _default) do
     datetime
-    |> DateTime.shift_zone!(timezone)
+    |> TimeZone.shift(timezone)
     |> Calendar.strftime(@long_datetime_with_zone_format)
   end
 
   def format_in_zone(_, _timezone, default), do: default
+
+  @doc """
+  Formats a UTC instant as a short month/day/year label in `timezone`
+  (e.g. `"Mar 15, 2024"`). Dates are formatted without conversion.
+
+  Invalid timezones fall back to Pacific time.
+  """
+  def format_date_in_zone(value, timezone, default \\ "")
+
+  def format_date_in_zone(nil, _timezone, default), do: default
+
+  def format_date_in_zone(%Date{} = date, _timezone, default),
+    do: format_datetime_display(date, default)
+
+  def format_date_in_zone(%DateTime{} = datetime, timezone, default) do
+    datetime
+    |> TimeZone.shift(timezone)
+    |> DateTime.to_date()
+    |> format_datetime_display(default)
+  end
+
+  def format_date_in_zone(_, _timezone, default), do: default
+
+  @doc """
+  Formats a UTC instant as a short month/day label in `timezone`
+  (e.g. `"Mar 5"`). Dates are formatted without conversion.
+
+  Invalid timezones fall back to Pacific time.
+  """
+  def format_date_short_in_zone(value, timezone, default \\ "")
+
+  def format_date_short_in_zone(nil, _timezone, default), do: default
+
+  def format_date_short_in_zone(%Date{} = date, _timezone, default),
+    do: format_date_short(date, default)
+
+  def format_date_short_in_zone(%DateTime{} = datetime, timezone, default) do
+    datetime
+    |> TimeZone.shift(timezone)
+    |> DateTime.to_date()
+    |> format_date_short(default)
+  end
+
+  def format_date_short_in_zone(_, _timezone, default), do: default
 
   defp format_event_single_date(date, true, _default),
     do: Calendar.strftime(date, "%b %-d, %Y")
@@ -253,16 +321,18 @@ defmodule YscWeb.DateDisplay do
   end
 
   @doc """
-  Returns `:today`, `:tomorrow`, or `nil` for an event's start date, compared
-  against the current calendar date in Pacific time.
+  Returns the number of Pacific calendar days until an event's start date.
 
-  Event `start_date` values are Pacific wall-clock calendar days stored as
-  DateTimes (use the date component as-is; do not shift timezones). "Today"
-  is still evaluated in `America/Los_Angeles`.
+  Event `start_date` values are California wall-clock days stored as DateTimes
+  (typically midnight UTC of that day). The date component is used as-is —
+  do not shift timezones, or midnight UTC becomes the previous evening in
+  Pacific time.
 
-  Accepts an event map with a `:start_date` (or `"start_date"`) field.
+  "Today" is always Pacific, because events are hosted in California.
+
+  Returns `nil` when the start date is missing or in the past.
   """
-  def event_day_label(event) do
+  def days_until_event(event) do
     start_date =
       Map.get(event, :start_date) || Map.get(event, "start_date")
 
@@ -271,28 +341,126 @@ defmodule YscWeb.DateDisplay do
         nil
 
       date ->
-        today =
-          DateTime.now!(@pacific_timezone)
-          |> DateTime.to_date()
-
-        case Date.diff(date, today) do
-          0 -> :today
-          1 -> :tomorrow
+        case Date.diff(date, TimeZone.today()) do
+          diff when diff >= 0 -> diff
           _ -> nil
         end
     end
   end
 
-  defp calendar_date(nil), do: nil
-  defp calendar_date(%DateTime{} = dt), do: DateTime.to_date(dt)
-  defp calendar_date(%Date{} = date), do: date
-  defp calendar_date(_), do: nil
+  @doc """
+  Returns `:today`, `:tomorrow`, or `nil` for an event's start date.
 
-  defp pacific_calendar_date(nil), do: nil
+  See `days_until_event/1`. Compared against today in Pacific time.
+  """
+  def event_day_label(event) do
+    case days_until_event(event) do
+      0 -> :today
+      1 -> :tomorrow
+      _ -> nil
+    end
+  end
 
-  defp pacific_calendar_date(%DateTime{} = dt),
-    do: dt |> DateTime.shift_zone!(@pacific_timezone) |> DateTime.to_date()
+  @doc """
+  Human-readable relative day label: `"Today"`, `"Tomorrow"`, or `"In N days"`.
+  """
+  def relative_days_phrase(0), do: "Today"
+  def relative_days_phrase(1), do: "Tomorrow"
 
-  defp pacific_calendar_date(%Date{} = date), do: date
-  defp pacific_calendar_date(_), do: nil
+  def relative_days_phrase(days) when is_integer(days) and days > 1,
+    do: "In #{days} days"
+
+  def relative_days_phrase(_), do: ""
+
+  @doc """
+  Days until cabin check-in, using Pacific time.
+
+  Check-in / check-out are `%Date{}` values for California cabins. Check-in
+  is 3:00 PM Pacific. Returns:
+
+    * `:started` — after 3:00 PM Pacific on the check-in day, or any later day
+    * `0` — check-in is today and it is still before 3:00 PM Pacific
+    * a positive integer — calendar days until check-in
+  """
+  def days_until_cabin_checkin(%{checkin_date: %Date{} = checkin_date}) do
+    now = TimeZone.now()
+    today = DateTime.to_date(now)
+
+    checkin_at =
+      DateTime.new!(checkin_date, @cabin_checkin_time, TimeZone.default())
+
+    cond do
+      Date.compare(today, checkin_date) == :gt ->
+        :started
+
+      Date.compare(today, checkin_date) == :eq and
+          DateTime.compare(now, checkin_at) != :lt ->
+        :started
+
+      Date.compare(today, checkin_date) == :eq ->
+        0
+
+      true ->
+        Date.diff(checkin_date, today)
+    end
+  end
+
+  def days_until_cabin_checkin(_), do: nil
+
+  @doc """
+  Combines an event's stored calendar date with `start_time` as a Pacific
+  wall-clock time.
+
+  Does not shift `start_date` through a timezone. Midnight Pacific is used
+  when time is missing. Returns `nil` when the start date is missing.
+  """
+  def event_start_datetime(event) when is_map(event) do
+    start_date = Map.get(event, :start_date) || Map.get(event, "start_date")
+    start_time = Map.get(event, :start_time) || Map.get(event, "start_time")
+
+    case calendar_date(start_date) do
+      nil ->
+        nil
+
+      date ->
+        time = event_wall_clock_time(start_time) || ~T[00:00:00]
+        pacific_wall_clock(date, time)
+    end
+  end
+
+  @doc """
+  Extracts the stored calendar date from a date or datetime.
+
+  For event `start_date` values, this is the intended wall-clock day and must
+  not be timezone-shifted.
+  """
+  def calendar_date(nil), do: nil
+  def calendar_date(%DateTime{} = dt), do: DateTime.to_date(dt)
+  def calendar_date(%Date{} = date), do: date
+  def calendar_date(%NaiveDateTime{} = ndt), do: NaiveDateTime.to_date(ndt)
+  def calendar_date(_), do: nil
+
+  defp event_wall_clock_time(%Time{} = time), do: time
+
+  defp event_wall_clock_time(%NaiveDateTime{} = dt),
+    do: NaiveDateTime.to_time(dt)
+
+  defp event_wall_clock_time(%DateTime{} = dt), do: DateTime.to_time(dt)
+  defp event_wall_clock_time(_), do: nil
+
+  defp pacific_wall_clock(date, time) do
+    case DateTime.new(date, time, @pacific_timezone) do
+      {:ok, dt} -> dt
+      {:gap, _before, after_dt} -> after_dt
+      {:ambiguous, first, _second} -> first
+    end
+  end
+
+  defp pacific_instant_date(nil), do: nil
+
+  defp pacific_instant_date(%DateTime{} = dt),
+    do: dt |> TimeZone.shift(@pacific_timezone) |> DateTime.to_date()
+
+  defp pacific_instant_date(%Date{} = date), do: date
+  defp pacific_instant_date(_), do: nil
 end

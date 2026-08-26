@@ -57,6 +57,8 @@ defmodule Ysc.MixProject do
           Ysc.Cldr.Unit,
           Ysc.Credo.NoExternalUrlsInTestConfig,
           Ysc.Credo.NoSleepInTests,
+          Ysc.Credo.DateFieldSchemaTypes,
+          Ysc.Credo.DateFieldConversions,
           Ysc.Customers.Behaviour,
           Ysc.Flowroute.Client,
           Ysc.Payments.Behaviour,
