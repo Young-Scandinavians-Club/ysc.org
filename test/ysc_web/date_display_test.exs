@@ -320,6 +320,67 @@ defmodule YscWeb.DateDisplayTest do
       assert DateTime.to_time(dt) == ~T[19:00:00]
       assert dt.time_zone == "America/Los_Angeles"
     end
+
+    test "returns nil when the start date is missing" do
+      assert DateDisplay.event_start_datetime(%{start_time: ~T[19:00:00]}) ==
+               nil
+
+      assert DateDisplay.event_start_datetime(%{
+               start_date: nil,
+               start_time: ~T[19:00:00]
+             }) == nil
+    end
+
+    test "reads string-key maps and Time-like start_time values" do
+      from_naive =
+        DateDisplay.event_start_datetime(%{
+          "start_date" => ~D[2026-08-28],
+          "start_time" => ~N[2026-08-28 19:30:00]
+        })
+
+      assert DateTime.to_date(from_naive) == ~D[2026-08-28]
+      assert DateTime.to_time(from_naive) == ~T[19:30:00]
+
+      from_datetime =
+        DateDisplay.event_start_datetime(%{
+          start_date: ~D[2026-08-28],
+          start_time: ~U[2026-08-28 19:45:00Z]
+        })
+
+      assert DateTime.to_time(from_datetime) == ~T[19:45:00]
+
+      from_unknown_time =
+        DateDisplay.event_start_datetime(%{
+          start_date: ~D[2026-08-28],
+          start_time: :unknown
+        })
+
+      assert DateTime.to_time(from_unknown_time) == ~T[00:00:00]
+    end
+
+    test "resolves Pacific DST spring-forward gaps and fall-back ambiguity" do
+      # 2026-03-08 02:30 never exists in America/Los_Angeles (springs to 03:00).
+      gap =
+        DateDisplay.event_start_datetime(%{
+          start_date: ~D[2026-03-08],
+          start_time: ~T[02:30:00]
+        })
+
+      assert gap.time_zone == "America/Los_Angeles"
+      assert DateTime.to_date(gap) == ~D[2026-03-08]
+      assert DateTime.to_time(gap) == ~T[03:00:00]
+
+      # 2026-11-01 01:30 occurs twice; DateTime.new/3 returns {:ambiguous, first, second}.
+      ambiguous =
+        DateDisplay.event_start_datetime(%{
+          start_date: ~D[2026-11-01],
+          start_time: ~T[01:30:00]
+        })
+
+      assert ambiguous.time_zone == "America/Los_Angeles"
+      assert DateTime.to_date(ambiguous) == ~D[2026-11-01]
+      assert DateTime.to_time(ambiguous) == ~T[01:30:00]
+    end
   end
 
   describe "format_date_in_zone/2" do
