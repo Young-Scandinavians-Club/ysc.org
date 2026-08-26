@@ -209,6 +209,9 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "Member Dashboard"
       assert html =~ user.first_name
+      assert has_element?(view, "#home-quick-action-tahoe", "Book a stay")
+      assert has_element?(view, "#home-quick-action-clear-lake", "Book a stay")
+      refute has_element?(view, "#home-quick-actions", "Reserve Cabin")
     end
 
     test "uses Norwegian greeting when most_connected_country is Norway", %{
@@ -647,6 +650,8 @@ defmodule YscWeb.HomeLiveTest do
       assert has_element?(view, "#membership-family", "Family")
       assert has_element?(view, "#membership-apply-link")
       assert render(view) =~ "Nordic Living"
+      assert has_element?(view, "#home-community-eyebrow", "Velkommen")
+      refute has_element?(view, "#home-community-eyebrow", "Velkommen back")
     end
 
     test "shows guest event card with description, location, and Just Added badge",
