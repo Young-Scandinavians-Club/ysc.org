@@ -64,6 +64,7 @@ defmodule Ysc.Tickets.AdminGrants do
            {:ok, tiers} <- load_and_validate_tiers(event_id, ticket_selections),
            :ok <- validate_recipient_for_registration_tiers(user, tiers),
            :ok <- ensure_no_blocking_pending_checkout(user_id, event_id),
+           :ok <- reconcile_pending_checkouts_for_grant(user_id, event_id),
            :ok <-
              maybe_validate_fulfillment(
                user_id,
@@ -118,6 +119,13 @@ defmodule Ysc.Tickets.AdminGrants do
     from(tt in TicketTier,
       where: tt.id in ^tier_ids and tt.event_id == ^event_id
     )
+  end
+
+  @doc false
+  def ci_query_explain_pending_orders_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    pending_orders_query(Fixtures.ulid(), Fixtures.ulid())
   end
 
   defp fetch_user(user_id) do
@@ -191,6 +199,64 @@ defmodule Ysc.Tickets.AdminGrants do
         )
 
         {:error, :checkout_payment_in_progress}
+    end
+  end
+
+  # Close the same checkout-abandonment race #1130 fixed in cancel_ticket_order/3:
+  # a point-in-time PaymentIntent status read can go stale, so locally cancelling
+  # a cart that still looks like `requires_payment_method` orphans a charge that
+  # completes moments later. Stripe-cancel those carts before inserting the grant.
+  # 3DS / processing / already-succeeded carts are left for
+  # `ensure_no_blocking_pending_checkout/3` rather than cancelled out from under
+  # an in-progress payment.
+  defp reconcile_pending_checkouts_for_grant(user_id, event_id) do
+    pending_orders_for_event(user_id, event_id)
+    |> Enum.reduce_while(:ok, fn order, :ok ->
+      cond do
+        not payment_intent_attached?(order) ->
+          reconcile_safe_pending_checkout(order)
+
+        CheckoutCancel.pending_order_safe_to_cancel?(order,
+          context: "admin_grant"
+        ) ->
+          reconcile_safe_pending_checkout(order)
+
+        true ->
+          {:cont, :ok}
+      end
+    end)
+  end
+
+  defp reconcile_safe_pending_checkout(order) do
+    case Ysc.Tickets.cancel_ticket_order(
+           order,
+           "Superseded by admin ticket grant",
+           context: "admin_grant"
+         ) do
+      {:ok, %TicketOrder{status: :completed} = completed} ->
+        Ysc.Logging.info(
+          "Admin ticket grant aborted: pending checkout payment had already succeeded and was fulfilled",
+          ticket_order_id: completed.id,
+          user_id: completed.user_id,
+          event_id: completed.event_id
+        )
+
+        {:halt, {:error, :checkout_payment_in_progress}}
+
+      {:ok, _} ->
+        {:cont, :ok}
+
+      {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}} ->
+        Ysc.Logging.error(
+          "Admin ticket grant aborted: checkout payment succeeded but could not be fulfilled",
+          ticket_order_id: order.id,
+          error: inspect(fulfillment_error)
+        )
+
+        {:halt, {:error, :checkout_payment_in_progress}}
+
+      {:error, _reason} ->
+        {:halt, {:error, :checkout_payment_in_progress}}
     end
   end
 
@@ -394,19 +460,38 @@ defmodule Ysc.Tickets.AdminGrants do
   defp cancel_pending_ticket_orders_for_grant(user_id, event_id, grant_order_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    pending_order_ids =
-      from(to in TicketOrder,
-        where:
-          to.user_id == ^user_id and to.event_id == ^event_id and
-            to.status == :pending and to.id != ^grant_order_id
+    # The grant order is already `:completed`, so it is not in this pending set.
+    pending_orders = pending_orders_for_event(user_id, event_id)
+
+    {with_payment_intent, without_payment_intent} =
+      Enum.split_with(pending_orders, fn order ->
+        payment_intent_attached?(order)
+      end)
+
+    # A remaining PaymentIntent-backed cart must not be cancelled locally —
+    # that is the #1130 orphan-charge race. Fail the grant; in-flight payments
+    # are also caught by the trailing ensure_no_blocking_pending_checkout/3.
+    if with_payment_intent != [] do
+      {:error, :checkout_payment_in_progress}
+    else
+      cancel_pending_orders_without_payment_intent(
+        without_payment_intent,
+        user_id,
+        event_id,
+        grant_order_id,
+        now
       )
-      |> Repo.all()
-      |> Enum.filter(
-        &CheckoutCancel.pending_order_safe_to_cancel?(&1,
-          context: "admin_grant"
-        )
-      )
-      |> Enum.map(& &1.id)
+    end
+  end
+
+  defp cancel_pending_orders_without_payment_intent(
+         pending_orders,
+         user_id,
+         event_id,
+         grant_order_id,
+         now
+       ) do
+    pending_order_ids = Enum.map(pending_orders, & &1.id)
 
     if pending_order_ids == [] do
       :ok
@@ -439,6 +524,27 @@ defmodule Ysc.Tickets.AdminGrants do
       )
 
       :ok
+    end
+  end
+
+  defp pending_orders_for_event(user_id, event_id) do
+    user_id
+    |> pending_orders_query(event_id)
+    |> Repo.all()
+  end
+
+  defp pending_orders_query(user_id, event_id) do
+    from(to in TicketOrder,
+      where:
+        to.user_id == ^user_id and to.event_id == ^event_id and
+          to.status == :pending
+    )
+  end
+
+  defp payment_intent_attached?(order) do
+    case order.payment_intent_id do
+      id when is_binary(id) and id != "" -> true
+      _unattached -> false
     end
   end
 

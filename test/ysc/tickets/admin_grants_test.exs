@@ -359,4 +359,10 @@ defmodule Ysc.Tickets.AdminGrantsTest do
       assert length(order.tickets) == 2
     end
   end
+
+  describe "ci_query_explain_pending_orders_query/0" do
+    test "builds an Ecto.Query" do
+      assert %Ecto.Query{} = AdminGrants.ci_query_explain_pending_orders_query()
+    end
+  end
 end
