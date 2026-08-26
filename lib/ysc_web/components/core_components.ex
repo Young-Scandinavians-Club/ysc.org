@@ -4762,11 +4762,11 @@ defmodule YscWeb.CoreComponents do
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= DateDisplay.format_date_in_zone(get_membership_ends_at(@current_membership), @timezone) %>
+              {DateDisplay.format_date_in_zone(get_membership_ends_at(@current_membership), @timezone)}
               </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
-              <%= DateDisplay.format_date_in_zone(get_membership_ends_at(@current_membership), @timezone) %>
+              {DateDisplay.format_date_in_zone(get_membership_ends_at(@current_membership), @timezone)}
               </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>
@@ -4871,11 +4871,11 @@ defmodule YscWeb.CoreComponents do
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= DateDisplay.format_date_in_zone(get_membership_renewal_date(@current_membership), @timezone) %>
+              {DateDisplay.format_date_in_zone(get_membership_renewal_date(@current_membership), @timezone)}
               </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
-              <%= DateDisplay.format_date_in_zone(get_membership_renewal_date(@current_membership), @timezone) %>
+              {DateDisplay.format_date_in_zone(get_membership_renewal_date(@current_membership), @timezone)}
               </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>
