@@ -376,8 +376,11 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-20 items-center">
           <div class="lg:col-span-5 min-w-0">
-            <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
-              Velkommen back
+            <span
+              id="home-community-eyebrow"
+              class="text-blue-700 font-semibold text-sm uppercase tracking-widest"
+            >
+              Velkommen
             </span>
             <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight leading-[1.05] break-words">
               A home for Nordic spirits in the Bay.
@@ -1203,6 +1206,7 @@ defmodule YscWeb.HomeLive do
             class="flex overflow-x-auto snap-x scroll-smooth thin-scrollbar lg:grid lg:grid-cols-4 gap-3 lg:gap-4 pb-2 lg:pb-4 -mx-4 px-4 lg:mx-0 lg:px-0 mb-12 mt-4 lg:mt-0"
           >
             <.link
+              id="home-quick-action-tahoe"
               navigate={~p"/bookings/tahoe"}
               class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
@@ -1210,9 +1214,10 @@ defmodule YscWeb.HomeLive do
                 <.icon name="hero-home" class="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
               </div>
               <p class="font-bold text-sm lg:text-base text-zinc-900">Lake Tahoe</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Reserve Cabin</p>
+              <p class="text-xs lg:text-sm text-zinc-500">Book a stay</p>
             </.link>
             <.link
+              id="home-quick-action-clear-lake"
               navigate={~p"/bookings/clear-lake"}
               class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
@@ -1223,7 +1228,7 @@ defmodule YscWeb.HomeLive do
                 />
               </div>
               <p class="font-bold text-sm lg:text-base text-zinc-900">Clear Lake</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Reserve Cabin</p>
+              <p class="text-xs lg:text-sm text-zinc-500">Book a stay</p>
             </.link>
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
               <.link
