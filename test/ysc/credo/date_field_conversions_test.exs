@@ -111,4 +111,61 @@ defmodule Ysc.Credo.DateFieldConversionsTest do
 
     assert issues == []
   end
+
+  test "flags browser-timezone shift_zone on ticket_tier.start_date" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        def label(ticket_tier, timezone) do
+          DateTime.shift_zone!(ticket_tier.start_date, timezone)
+        end
+      end
+      """)
+
+    assert [%Credo.Issue{check: DateFieldConversions}] = issues
+    assert hd(issues).message =~ "Pacific"
+  end
+
+  test "flags @timezone shift_zone on ticket_tier.start_date" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        def label(ticket_tier) do
+          ticket_tier.start_date
+          |> DateTime.shift_zone!(@timezone)
+        end
+      end
+      """)
+
+    assert [%Credo.Issue{check: DateFieldConversions}] = issues
+    assert hd(issues).message =~ "browser timezone"
+  end
+
+  test "allows Pacific shift_zone on ticket_tier.start_date" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        def label(ticket_tier) do
+          DateTime.shift_zone!(ticket_tier.start_date, "America/Los_Angeles")
+        end
+      end
+      """)
+
+    assert issues == []
+  end
+
+  test "allows TimeZone.default/0 shift_zone on ticket_tier.start_date" do
+    issues =
+      issues_for("""
+      defmodule YscWeb.SampleLive do
+        alias YscWeb.TimeZone
+
+        def label(ticket_tier) do
+          DateTime.shift_zone!(ticket_tier.start_date, TimeZone.default())
+        end
+      end
+      """)
+
+    assert issues == []
+  end
 end

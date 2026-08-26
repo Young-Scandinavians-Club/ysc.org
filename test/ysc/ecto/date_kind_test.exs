@@ -3,17 +3,8 @@ defmodule Ysc.Ecto.DateKindTest do
 
   alias Ysc.DateFields
   alias Ysc.Ecto.DateKind
+  alias Ysc.Ecto.DateKindSample
   alias Ysc.Events.Event
-
-  defmodule Sample do
-    use Ecto.Schema
-
-    schema "date_kind_samples" do
-      field :start_date, DateKind, kind: :california_calendar_datetime
-      field :checkin_date, DateKind, kind: :california_date
-      field :start_time, DateKind, kind: :pacific_time
-    end
-  end
 
   describe "schema configuration" do
     test "loads Event.start_date as a california calendar DateTime" do
@@ -33,14 +24,14 @@ defmodule Ysc.Ecto.DateKindTest do
     end
 
     test "casts using the underlying primitive" do
-      type = Sample.__schema__(:type, :start_date)
+      type = DateKindSample.__schema__(:type, :start_date)
 
       assert {:ok, ~U[2026-08-28 00:00:00Z]} =
                Ecto.Type.cast(type, ~U[2026-08-28 00:00:00Z])
 
       assert {:ok, ~D[2026-08-28]} =
                Ecto.Type.cast(
-                 Sample.__schema__(:type, :checkin_date),
+                 DateKindSample.__schema__(:type, :checkin_date),
                  ~D[2026-08-28]
                )
     end

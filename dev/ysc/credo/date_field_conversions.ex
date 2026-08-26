@@ -42,8 +42,9 @@ defmodule Ysc.Credo.DateFieldConversions do
       ## Shift to Pacific (sale windows)
 
       Ticket-tier `start_date` / `end_date` are real UTC instants picked as
-      Pacific days. Use `format_pacific_date/1` / `format_sale_window_range/2`,
-      not the browser timezone.
+      Pacific days. Use `format_pacific_date/1` / `format_sale_window_range/2`.
+      Raw `shift_zone` is allowed only when the zone is Pacific
+      (`"America/Los_Angeles"` or `TimeZone.default()`), not `@timezone`.
 
       ## Shift to the browser timezone (UTC instants)
 
@@ -105,22 +106,22 @@ defmodule Ysc.Credo.DateFieldConversions do
 
   # event.start_date |> DateTime.shift_zone!(tz)
   defp traverse(
-         {:|>, meta, [left, {{:., _, [_, fun]}, _, _args}]} = ast,
+         {:|>, meta, [left, {{:., _, [_, fun]}, _, args}]} = ast,
          issues,
          issue_meta
        )
        when fun in [:shift_zone, :shift_zone!, :shift] do
-    {ast, maybe_shift_issue(left, meta, issue_meta, issues)}
+    {ast, maybe_shift_issue(left, List.first(args), meta, issue_meta, issues)}
   end
 
   # DateTime.shift_zone!(event.start_date, tz)
   defp traverse(
-         {{:., _, [_, fun]}, meta, [value | _]} = ast,
+         {{:., _, [_, fun]}, meta, [value | rest]} = ast,
          issues,
          issue_meta
        )
        when fun in [:shift_zone, :shift_zone!, :shift] do
-    {ast, maybe_shift_issue(value, meta, issue_meta, issues)}
+    {ast, maybe_shift_issue(value, List.first(rest), meta, issue_meta, issues)}
   end
 
   # DateDisplay.format_date_in_zone(event.start_date, tz)
@@ -140,29 +141,60 @@ defmodule Ysc.Credo.DateFieldConversions do
 
   defp traverse(ast, issues, _issue_meta), do: {ast, issues}
 
-  defp maybe_shift_issue(value, meta, issue_meta, issues) do
+  defp maybe_shift_issue(value, timezone_arg, meta, issue_meta, issues) do
     case field_kind(value) do
       {schema, field, kind} ->
-        if DateKind.shift_zone_policy(kind) == :never do
-          [
-            issue(
-              issue_meta,
-              meta,
-              field,
-              "Do not shift_zone #{inspect(schema)}.#{field} " <>
-                "(#{kind}; #{DateKind.display_hint(kind)}). " <>
-                "See `mix credo explain #{id()}`."
-            )
-            | issues
-          ]
-        else
-          issues
+        case DateKind.shift_zone_policy(kind) do
+          :never ->
+            [
+              issue(
+                issue_meta,
+                meta,
+                field,
+                "Do not shift_zone #{inspect(schema)}.#{field} " <>
+                  "(#{kind}; #{DateKind.display_hint(kind)}). " <>
+                  "See `mix credo explain #{id()}`."
+              )
+              | issues
+            ]
+
+          :pacific ->
+            if pacific_timezone_arg?(timezone_arg) do
+              issues
+            else
+              [
+                issue(
+                  issue_meta,
+                  meta,
+                  field,
+                  "Shift #{inspect(schema)}.#{field} only to Pacific time " <>
+                    "(#{kind}; #{DateKind.display_hint(kind)}). " <>
+                    "Do not use the browser timezone. See `mix credo explain #{id()}`."
+                )
+                | issues
+              ]
+            end
+
+          _ ->
+            issues
         end
 
       _ ->
         issues
     end
   end
+
+  defp pacific_timezone_arg?("America/Los_Angeles"), do: true
+
+  defp pacific_timezone_arg?({:@, _, [{:pacific_timezone, _, _}]}), do: true
+
+  defp pacific_timezone_arg?(
+         {{:., _, [{:__aliases__, _, parts}, :default]}, _, []}
+       )
+       when parts in [[:TimeZone], [:YscWeb, :TimeZone]],
+       do: true
+
+  defp pacific_timezone_arg?(_), do: false
 
   defp maybe_formatter_issue(fun, value, rest, meta, issue_meta, issues) do
     cond do
