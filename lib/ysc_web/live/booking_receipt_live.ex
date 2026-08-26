@@ -493,7 +493,11 @@ defmodule YscWeb.BookingReceiptLive do
                     <%= if @booking.booking_mode == :buyout do %>
                       Entire cabin
                     <% else %>
-                      Individual room(s)
+                      <%= if @booking.booking_mode == :room do %>
+                        Individual room(s)
+                      <% else %>
+                        Shared cabin
+                      <% end %>
                     <% end %>
                   <% end %>
                 </p>
