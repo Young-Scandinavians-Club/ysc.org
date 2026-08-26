@@ -25,10 +25,9 @@ defmodule Ysc.Events.TicketTier do
     # a registration attached to them
     field :requires_registration, :boolean
 
-    # Set a start and end date for the ticket tier
-    # when it goes on sale and when the sale ends
-    field :start_date, :utc_datetime
-    field :end_date, :utc_datetime
+    # Sale window: real UTC instants picked in the admin UI as Pacific days
+    field :start_date, Ysc.Ecto.DateKind, kind: :pacific_anchored_datetime
+    field :end_date, Ysc.Ecto.DateKind, kind: :pacific_anchored_datetime
 
     belongs_to :event, Ysc.Events.Event, foreign_key: :event_id, references: :id
 

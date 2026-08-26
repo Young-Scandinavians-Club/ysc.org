@@ -3,6 +3,7 @@ defmodule YscWeb.BookingReceiptLive do
 
   alias YscWeb.BookingGuestForm
   alias YscWeb.DateDisplay
+  alias YscWeb.BookingDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
@@ -394,15 +395,10 @@ defmodule YscWeb.BookingReceiptLive do
                       else: "bg-blue-100 text-blue-700"
                     )
                   ]}>
-                    {Date.diff(@booking.checkout_date, @booking.checkin_date)} {if Date.diff(
-                                                                                     @booking.checkout_date,
-                                                                                     @booking.checkin_date
-                                                                                   ) ==
-                                                                                     1,
-                                                                                   do:
-                                                                                     "Night",
-                                                                                   else:
-                                                                                     "Nights"}
+                    {BookingDisplay.nights_label(
+                      Date.diff(@booking.checkout_date, @booking.checkin_date),
+                      capitalize: true
+                    )}
                   </span>
                 </div>
               </div>
@@ -480,20 +476,26 @@ defmodule YscWeb.BookingReceiptLive do
                     Booking type
                   <% end %>
                 </p>
-                <p class={[
-                  "text-xl font-bold",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500 line-through",
-                    else: "text-zinc-900"
-                  )
-                ]}>
+                <p
+                  id="receipt-booking-type"
+                  class={[
+                    "text-xl font-bold",
+                    if(@booking.status == :canceled,
+                      do: "text-zinc-500 line-through",
+                      else: "text-zinc-900"
+                    )
+                  ]}
+                >
                   <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
                     {Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)}
                   <% else %>
-                    <%= if @booking.booking_mode == :buyout do %>
-                      Entire cabin
-                    <% else %>
-                      Individual room(s)
+                    <%= cond do %>
+                      <% @booking.booking_mode == :buyout -> %>
+                        Entire cabin
+                      <% @booking.booking_mode == :room -> %>
+                        Individual room(s)
+                      <% true -> %>
+                        Shared cabin
                     <% end %>
                   <% end %>
                 </p>
@@ -759,10 +761,9 @@ defmodule YscWeb.BookingReceiptLive do
                               Entire cabin
                               ({MoneyHelper.format_money!(
                                 @price_breakdown.price_per_night
-                              )} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                   1,
-                                                                 do: "night",
-                                                                 else: "nights"})
+                              )} × {BookingDisplay.nights_label(
+                                @price_breakdown.nights
+                              )})
                             </span>
                             <span class={
                               if(@booking.status == :canceled,
@@ -789,15 +790,11 @@ defmodule YscWeb.BookingReceiptLive do
                             )
                           }>
                             Shared cabin stay
-                            ({@price_breakdown.guests_count} {if @price_breakdown.guests_count ==
-                                                                   1,
-                                                                 do: "adult",
-                                                                 else: "adults"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                                                                   1,
-                                                                                                                 do:
-                                                                                                                   "night",
-                                                                                                                 else:
-                                                                                                                   "nights"})
+                            ({BookingDisplay.adults_label(
+                              @price_breakdown.guests_count
+                            )} × {BookingDisplay.nights_label(
+                              @price_breakdown.nights
+                            )})
                           </span>
                           <span class={
                             if(@booking.status == :canceled,
@@ -861,18 +858,11 @@ defmodule YscWeb.BookingReceiptLive do
                               )
                             }>
                               Children
-                              ({@price_breakdown[:children_count]} {if @price_breakdown[
-                                                                         :children_count
-                                                                       ] ==
-                                                                         1,
-                                                                       do: "child",
-                                                                       else:
-                                                                         "children"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                                                                       1,
-                                                                                                                     do:
-                                                                                                                       "night",
-                                                                                                                     else:
-                                                                                                                       "nights"})
+                              ({BookingDisplay.children_label(
+                                @price_breakdown[:children_count]
+                              )} × {BookingDisplay.nights_label(
+                                @price_breakdown.nights
+                              )})
                             </span>
                             <span class={
                               if(@booking.status == :canceled,
@@ -1337,15 +1327,7 @@ defmodule YscWeb.BookingReceiptLive do
       Map.get(params, "redirect_status") == "succeeded"
   end
 
-  defp receipt_timezone(socket) do
-    case get_connect_params(socket) do
-      nil ->
-        "America/Los_Angeles"
-
-      connect_params ->
-        Map.get(connect_params, "timezone", "America/Los_Angeles")
-    end
-  end
+  defp receipt_timezone(socket), do: YscWeb.TimeZone.from_connect_params(socket)
 
   defp loaded_booking_matches?(socket, booking_id) do
     match?(%Booking{id: ^booking_id}, socket.assigns[:booking])

@@ -21,8 +21,8 @@ defmodule Ysc.Events.AgendaItem do
     field :title, :string
     field :description, :string
 
-    field :start_time, :time
-    field :end_time, :time
+    field :start_time, Ysc.Ecto.DateKind, kind: :pacific_time
+    field :end_time, Ysc.Ecto.DateKind, kind: :pacific_time
 
     timestamps()
   end

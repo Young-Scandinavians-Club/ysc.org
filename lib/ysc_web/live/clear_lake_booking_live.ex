@@ -22,12 +22,13 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.Accounts
   alias Ysc.Subscriptions
   alias YscWeb.DateDisplay
+  alias YscWeb.BookingDisplay
 
   @impl true
   def mount(params, _session, socket) do
     user = socket.assigns.current_user
 
-    timezone = get_timezone_from_socket(socket)
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
     today = today_in_timezone(default_timezone())
     seasons = SeasonCache.get_all_for_property(:clear_lake)
 
@@ -891,9 +892,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           class="w-full px-3 py-2 border border-zinc-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span class="text-zinc-900">
-                            {@guests_count} {if @guests_count == 1,
-                              do: "guest",
-                              else: "guests"}
+                            {BookingDisplay.people_label(@guests_count)}
                           </span>
                           <.icon
                             name="hero-chevron-down"
@@ -1187,13 +1186,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <div class="flex justify-between items-start text-sm">
                       <span class="text-zinc-500 font-medium">Nights</span>
                       <span class="font-semibold text-zinc-900">
-                        {Date.diff(@checkout_date, @checkin_date)} {if Date.diff(
-                                                                         @checkout_date,
-                                                                         @checkin_date
-                                                                       ) == 1,
-                                                                       do: "night",
-                                                                       else:
-                                                                         "nights"}
+                        {BookingDisplay.nights_label(
+                          Date.diff(@checkout_date, @checkin_date)
+                        )}
                       </span>
                     </div>
                   </div>
@@ -1204,9 +1199,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   >
                     <span class="text-zinc-500 font-medium">Guests</span>
                     <span class="font-semibold text-zinc-900">
-                      {@guests_count} {if @guests_count == 1,
-                        do: "guest",
-                        else: "guests"}
+                      {BookingDisplay.people_label(@guests_count)}
                     </span>
                   </div>
                   <!-- Booking Mode -->
@@ -1274,27 +1267,18 @@ defmodule YscWeb.ClearLakeBookingLive do
                             (@price_breakdown && @price_breakdown[:segments]) || [] %>
                           <%= if length(segments) > 1 do %>
                             <div class="text-xs text-zinc-500 mb-1">
-                              Shared cabin stay ({@guests_count} {if @guests_count ==
-                                                                       1,
-                                                                     do: "adult",
-                                                                     else: "adults"} × {nights} {if nights ==
-                                                                                                      1,
-                                                                                                    do:
-                                                                                                      "night",
-                                                                                                    else:
-                                                                                                      "nights"}) · rate varies by season
+                              Shared cabin stay ({BookingDisplay.adults_label(
+                                @guests_count
+                              )} × {BookingDisplay.nights_label(nights)}) · rate varies by season
                             </div>
                             <div
                               :for={segment <- segments}
                               class="flex justify-between items-center text-zinc-600 text-xs"
                             >
                               <span>
-                                {segment.season_name || "Unnamed season"} — {segment.nights} {if segment.nights ==
-                                                                                                   1,
-                                                                                                 do:
-                                                                                                   "night",
-                                                                                                 else:
-                                                                                                   "nights"} @ {MoneyHelper.format_money!(
+                                {segment.season_name || "Unnamed season"} — {BookingDisplay.nights_label(
+                                  segment.nights
+                                )} @ {MoneyHelper.format_money!(
                                   segment.price_per_guest_per_night
                                 )}/guest/night
                               </span>
@@ -1330,16 +1314,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 |> elem(1) %>
                             <div class="flex justify-between items-center text-zinc-600">
                               <span>
-                                Shared cabin stay ({@guests_count} {if @guests_count ==
-                                                                         1,
-                                                                       do: "adult",
-                                                                       else:
-                                                                         "adults"} × {nights} {if nights ==
-                                                                                                    1,
-                                                                                                  do:
-                                                                                                    "night",
-                                                                                                  else:
-                                                                                                    "nights"})
+                                Shared cabin stay ({BookingDisplay.adults_label(
+                                  @guests_count
+                                )} × {BookingDisplay.nights_label(nights)})
                               </span>
                               <span class="font-bold text-zinc-900">
                                 {MoneyHelper.format_money!(line_gross)}
@@ -1353,21 +1330,16 @@ defmodule YscWeb.ClearLakeBookingLive do
                             (@price_breakdown && @price_breakdown[:segments]) || [] %>
                           <%= if length(buyout_segments) > 1 do %>
                             <div class="text-xs text-zinc-500 mb-1">
-                              Entire cabin ({nights} night{if nights != 1,
-                                do: "s",
-                                else: ""}) · rate varies by season
+                              Entire cabin ({BookingDisplay.nights_label(nights)}) · rate varies by season
                             </div>
                             <div
                               :for={segment <- buyout_segments}
                               class="flex justify-between items-center text-zinc-600 text-xs"
                             >
                               <span>
-                                {segment.season_name || "Unnamed season"} — {segment.nights} {if segment.nights ==
-                                                                                                   1,
-                                                                                                 do:
-                                                                                                   "night",
-                                                                                                 else:
-                                                                                                   "nights"}
+                                {segment.season_name || "Unnamed season"} — {BookingDisplay.nights_label(
+                                  segment.nights
+                                )}
                                 <%= if segment.price_per_night do %>
                                   @ {MoneyHelper.format_money!(
                                     segment.price_per_night
@@ -1398,9 +1370,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 Money.mult(price_per_night, nights) |> elem(1) %>
                             <div class="flex justify-between items-center text-zinc-600">
                               <span>
-                                Entire cabin ({nights} night{if nights != 1,
-                                  do: "s",
-                                  else: ""})
+                                Entire cabin ({BookingDisplay.nights_label(nights)})
                               </span>
                               <span class="font-bold text-zinc-900">
                                 {MoneyHelper.format_money!(buyout_gross)}
@@ -4195,11 +4165,6 @@ defmodule YscWeb.ClearLakeBookingLive do
         # Default: allow both modes
         {true, true}
     end
-  end
-
-  defp get_timezone_from_socket(socket) do
-    connect_params = get_connect_params(socket) || %{}
-    Map.get(connect_params, "timezone", "America/Los_Angeles")
   end
 
   defp today_in_timezone(timezone)

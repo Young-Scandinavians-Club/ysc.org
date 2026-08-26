@@ -476,20 +476,13 @@ defmodule YscWeb.UserRegistrationLive do
   end
 
   def mount(params, _session, socket) do
-    connect_params =
-      case get_connect_params(socket) do
-        nil -> %{}
-        v -> v
-      end
-
     remote_ip =
       case get_connect_info(socket, :peer_data) do
         %{address: address} -> address
         _ -> nil
       end
 
-    browser_timezone =
-      connect_params |> Map.get("timezone", "America/Los_Angeles")
+    browser_timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     # Today in user's timezone for date input max (so "today" is correct for their locale)
     today_max =

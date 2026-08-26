@@ -70,6 +70,19 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       assert path == "/users/log-in"
     end
+
+    test "falls back to Pacific time instead of crashing on an invalid browser timezone",
+         %{conn: conn} do
+      user = user_fixture()
+
+      conn =
+        conn
+        |> put_connect_params(%{"timezone" => "Not/A/Real/Zone"})
+        |> log_in_user(user)
+
+      assert {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      assert has_element?(view, "#password_form")
+    end
   end
 
   describe "async passkey loading" do

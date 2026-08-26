@@ -14,7 +14,9 @@ config :ysc,
   # Minimum disposable-domain rows expected after loading priv/disposable_domains.txt (tests use this as a floor).
   disposable_domains_threshold: 10_000,
   # Standalone Query Console base URL (admin sidebar link). Override per env / QUERY_CONSOLE_URL.
-  query_console_url: nil
+  query_console_url: nil,
+  # Fallback when the browser timezone is missing or invalid.
+  default_timezone: "America/Los_Angeles"
 
 # Configure Elixir's Calendar to use Timex timezone database
 config :elixir, :time_zone_database, Timex.Timezone.Database

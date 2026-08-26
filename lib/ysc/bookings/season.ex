@@ -30,9 +30,9 @@ defmodule Ysc.Bookings.Season do
     # Property this season applies to
     field :property, Ysc.Bookings.BookingProperty
 
-    # Season date range
-    field :start_date, :date
-    field :end_date, :date
+    # Season date range (California cabin calendar days)
+    field :start_date, Ysc.Ecto.DateKind, kind: :california_date
+    field :end_date, Ysc.Ecto.DateKind, kind: :california_date
 
     # Whether this is the default season for the property
     field :is_default, :boolean, default: false

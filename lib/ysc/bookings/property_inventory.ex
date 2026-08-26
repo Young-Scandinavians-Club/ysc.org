@@ -11,7 +11,7 @@ defmodule Ysc.Bookings.PropertyInventory do
   @primary_key false
   schema "property_inventory" do
     field :property, Ysc.Bookings.BookingProperty, primary_key: true
-    field :day, :date, primary_key: true
+    field :day, Ysc.Ecto.DateKind, kind: :california_date, primary_key: true
 
     field :capacity_total, :integer, default: 0
     field :capacity_held, :integer, default: 0

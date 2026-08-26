@@ -7,6 +7,10 @@ defmodule YscWeb.Admin.EditingPresenceTest do
   alias YscWeb.Admin.EditingPresence
   alias YscWeb.Presence
 
+  # Presence broadcasts diffs from a serialized async fetch task. CI sets
+  # ExUnit assert_receive_timeout to 100ms, which is too tight under load.
+  @presence_diff_timeout 1_000
+
   # Untracks at the end of the test so a lingering entry can't leak into
   # another test sharing the same topic (they run in different processes,
   # but belt-and-suspenders since Presence state isn't sandboxed like the DB).
@@ -237,10 +241,38 @@ defmodule YscWeb.Admin.EditingPresenceTest do
 
       track_fixture(:post, resource_id, editor)
 
-      assert_receive %Phoenix.Socket.Broadcast{
-        topic: "presence:posts",
-        event: "presence_diff"
-      }
+      wait_for_presence_diff(resource_id, @presence_diff_timeout)
+    end
+  end
+
+  # Sibling async tests share "presence:posts", so skip unrelated diffs until
+  # ours arrives (or the remaining timeout elapses).
+  defp wait_for_presence_diff(resource_id, timeout) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    do_wait_for_presence_diff(resource_id, deadline)
+  end
+
+  defp do_wait_for_presence_diff(resource_id, deadline) do
+    remaining = deadline - System.monotonic_time(:millisecond)
+
+    if remaining <= 0 do
+      flunk("no presence_diff for resource #{resource_id} before deadline")
+    else
+      receive do
+        %Phoenix.Socket.Broadcast{
+          topic: "presence:posts",
+          event: "presence_diff",
+          payload: payload
+        } ->
+          if resource_id in EditingPresence.diff_resource_ids(payload) do
+            :ok
+          else
+            do_wait_for_presence_diff(resource_id, deadline)
+          end
+      after
+        remaining ->
+          flunk("no presence_diff for resource #{resource_id} after timeout")
+      end
     end
   end
 end
