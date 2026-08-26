@@ -50,5 +50,76 @@ defmodule Ysc.Ecto.DateKindTest do
       assert_raise ArgumentError, fn -> DateKind.init(kind: :not_a_kind) end
       assert_raise ArgumentError, fn -> DateKind.init([]) end
     end
+
+    test "exposes type metadata and equality through the parameterized type" do
+      params = DateKind.init(kind: :utc_instant)
+      type = {:parameterized, {DateKind, params}}
+
+      assert DateKind.type(params) == :utc_datetime
+      assert DateKind.embed_as(:json, params) == :self
+      assert DateKind.valid_kind?(:utc_instant)
+      refute DateKind.valid_kind?(:not_a_kind)
+      assert :utc_instant in DateKind.kinds()
+      assert is_binary(DateKind.display_hint(:utc_instant))
+
+      assert {:ok, ~U[2026-08-28 00:00:00Z]} =
+               DateKind.load(
+                 ~U[2026-08-28 00:00:00Z],
+                 fn v -> {:ok, v} end,
+                 params
+               )
+
+      assert {:ok, ~U[2026-08-28 00:00:00Z]} =
+               DateKind.dump(
+                 ~U[2026-08-28 00:00:00Z],
+                 fn v -> {:ok, v} end,
+                 params
+               )
+
+      assert DateKind.equal?(
+               ~U[2026-08-28 00:00:00Z],
+               ~U[2026-08-28 00:00:00Z],
+               params
+             )
+
+      refute DateKind.equal?(
+               ~U[2026-08-28 00:00:00Z],
+               ~U[2026-08-29 00:00:00Z],
+               params
+             )
+
+      assert Ecto.Type.equal?(
+               type,
+               ~U[2026-08-28 00:00:00Z],
+               ~U[2026-08-28 00:00:00Z]
+             )
+    end
+  end
+
+  describe "DateFields.kind/2" do
+    test "returns nil for unknown schemas, fields, and non-atom arguments" do
+      assert DateFields.kind(String, :start_date) == nil
+      assert DateFields.kind(Event, :not_a_date_field) == nil
+      assert DateFields.kind("Event", :start_date) == nil
+      assert DateFields.kind(Event, "start_date") == nil
+    end
+
+    test "unwraps both parameterized type tuple shapes" do
+      params = %{kind: :utc_instant}
+
+      assert DateFields.unwrap_kind({:parameterized, {DateKind, params}}) ==
+               :utc_instant
+
+      assert DateFields.unwrap_kind({:parameterized, DateKind, params}) ==
+               :utc_instant
+
+      assert DateFields.unwrap_kind(:utc_datetime) == nil
+    end
+
+    test "maps receiver names to schemas" do
+      assert DateFields.schema_for_receiver(:event) == Event
+      assert DateFields.schema_for_receiver(:unknown) == nil
+      assert :start_date in DateFields.required_field_names()
+    end
   end
 end

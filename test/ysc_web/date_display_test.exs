@@ -334,5 +334,59 @@ defmodule YscWeb.DateDisplayTest do
                "UTC"
              ) == "Dec 1, 2024"
     end
+
+    test "formats Date values without shifting and falls back for nil" do
+      assert DateDisplay.format_date_in_zone(~D[2024-12-01], "UTC") ==
+               "Dec 1, 2024"
+
+      assert DateDisplay.format_date_in_zone(nil, "UTC") == ""
+      assert DateDisplay.format_date_in_zone("nope", "UTC", "TBD") == "TBD"
+    end
+
+    test "falls back to Pacific when the timezone is invalid" do
+      assert DateDisplay.format_date_in_zone(
+               ~U[2024-12-01 06:00:00Z],
+               "Not/A/Zone"
+             ) == "Nov 30, 2024"
+    end
+  end
+
+  describe "format_date_short_in_zone/2" do
+    test "shifts UTC instants into the given timezone" do
+      assert DateDisplay.format_date_short_in_zone(
+               ~U[2024-12-01 06:00:00Z],
+               "America/Los_Angeles"
+             ) == "Nov 30"
+
+      assert DateDisplay.format_date_short_in_zone(~D[2024-03-05], "UTC") ==
+               "Mar 5"
+
+      assert DateDisplay.format_date_short_in_zone(nil, "UTC") == ""
+    end
+  end
+
+  describe "calendar_date/1" do
+    test "extracts a calendar date from supported types" do
+      assert DateDisplay.calendar_date(~U[2026-08-28 00:00:00Z]) ==
+               ~D[2026-08-28]
+
+      assert DateDisplay.calendar_date(~D[2026-08-28]) == ~D[2026-08-28]
+
+      assert DateDisplay.calendar_date(~N[2026-08-28 12:00:00]) ==
+               ~D[2026-08-28]
+
+      assert DateDisplay.calendar_date(nil) == nil
+      assert DateDisplay.calendar_date("nope") == nil
+    end
+  end
+
+  describe "relative_days_phrase/1" do
+    test "covers today, tomorrow, future, and invalid values" do
+      assert DateDisplay.relative_days_phrase(0) == "Today"
+      assert DateDisplay.relative_days_phrase(1) == "Tomorrow"
+      assert DateDisplay.relative_days_phrase(4) == "In 4 days"
+      assert DateDisplay.relative_days_phrase(-1) == ""
+      assert DateDisplay.relative_days_phrase(nil) == ""
+    end
   end
 end
