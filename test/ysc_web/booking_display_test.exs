@@ -71,6 +71,14 @@ defmodule YscWeb.BookingDisplayTest do
       assert BookingDisplay.nights_label("1") == "1 night"
       assert BookingDisplay.nights_label(nil) == "0 nights"
     end
+
+    test "treats negative, blank, and non-numeric counts as zero" do
+      assert BookingDisplay.nights_label(-3) == "0 nights"
+      assert BookingDisplay.nights_label("-2") == "0 nights"
+      assert BookingDisplay.nights_label("abc") == "0 nights"
+      assert BookingDisplay.nights_label(:unknown) == "0 nights"
+      assert BookingDisplay.count_label(-1, "guest", "guests") == "0 guests"
+    end
   end
 
   describe "adults_label/1 and children_label/1" do

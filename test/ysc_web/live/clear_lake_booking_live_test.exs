@@ -3319,7 +3319,121 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         )
 
       render_async(view, 5_000)
-      assert render(view) =~ "Shared cabin stay"
+      assert has_element?(view, "span", "Shared cabin stay")
+    end
+
+    test "renders multi-season day-mode price segments", %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {checkin, checkout} = clear_lake_booking_dates(400, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "2",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+        )
+
+      render_async(view, 5_000)
+
+      :sys.replace_state(view.pid, fn state ->
+        breakdown = %{
+          nights: 3,
+          guests_count: 2,
+          price_per_guest_per_night: Money.new(:USD, 50),
+          segments: [
+            %{
+              season_name: "Spring",
+              nights: 2,
+              price_per_guest_per_night: Money.new(:USD, 50),
+              total: Money.new(:USD, 200)
+            },
+            %{
+              season_name: "Summer",
+              nights: 1,
+              price_per_guest_per_night: Money.new(:USD, 60),
+              total: Money.new(:USD, 120)
+            }
+          ]
+        }
+
+        %{
+          state
+          | socket:
+              Phoenix.Component.assign(state.socket, price_breakdown: breakdown)
+        }
+      end)
+
+      # Force a render cycle so the test client receives the new assigns.
+      render_click(view, "ignore")
+
+      assert has_element?(view, "div", "rate varies by season")
+      assert has_element?(view, "span", "Spring")
+      assert has_element?(view, "span", "Summer")
+    end
+
+    test "renders multi-season buyout price segments", %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {checkin, checkout} = clear_lake_booking_dates(400, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "2",
+        "booking_mode" => "buyout"
+      }
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+        )
+
+      render_async(view, 5_000)
+
+      :sys.replace_state(view.pid, fn state ->
+        breakdown = %{
+          nights: 3,
+          price_per_night: Money.new(:USD, 500),
+          segments: [
+            %{
+              season_name: "Spring",
+              nights: 2,
+              price_per_night: Money.new(:USD, 500),
+              total: Money.new(:USD, 1000)
+            },
+            %{
+              season_name: nil,
+              nights: 1,
+              price_per_night: Money.new(:USD, 550),
+              total: Money.new(:USD, 550)
+            }
+          ]
+        }
+
+        %{
+          state
+          | socket:
+              Phoenix.Component.assign(state.socket, price_breakdown: breakdown)
+        }
+      end)
+
+      render_click(view, "ignore")
+
+      assert has_element?(view, "div", "rate varies by season")
+      assert has_element?(view, "span", "Spring")
+      assert has_element?(view, "span", "Unnamed season")
     end
 
     test "switching booking mode with dates already selected recalculates the price immediately",
