@@ -2794,10 +2794,34 @@ defmodule YscWeb.BookingReceiptLiveTest do
           booking_mode: :room
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "Individual room(s)"
-      assert html =~ "Booking type"
+      assert has_element?(view, "#receipt-booking-type", "Individual room(s)")
+      assert has_element?(view, "p", "Booking type")
+    end
+
+    test "day mode without preloaded rooms shows Shared cabin label", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :day
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert has_element?(view, "#receipt-booking-type", "Shared cabin")
+
+      refute has_element?(
+               view,
+               "#receipt-booking-type",
+               "Individual room(s)"
+             )
     end
   end
 

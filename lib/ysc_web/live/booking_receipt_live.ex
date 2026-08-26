@@ -476,24 +476,26 @@ defmodule YscWeb.BookingReceiptLive do
                     Booking type
                   <% end %>
                 </p>
-                <p class={[
-                  "text-xl font-bold",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500 line-through",
-                    else: "text-zinc-900"
-                  )
-                ]}>
+                <p
+                  id="receipt-booking-type"
+                  class={[
+                    "text-xl font-bold",
+                    if(@booking.status == :canceled,
+                      do: "text-zinc-500 line-through",
+                      else: "text-zinc-900"
+                    )
+                  ]}
+                >
                   <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
                     {Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)}
                   <% else %>
-                    <%= if @booking.booking_mode == :buyout do %>
-                      Entire cabin
-                    <% else %>
-                      <%= if @booking.booking_mode == :room do %>
+                    <%= cond do %>
+                      <% @booking.booking_mode == :buyout -> %>
+                        Entire cabin
+                      <% @booking.booking_mode == :room -> %>
                         Individual room(s)
-                      <% else %>
+                      <% true -> %>
                         Shared cabin
-                      <% end %>
                     <% end %>
                   <% end %>
                 </p>
