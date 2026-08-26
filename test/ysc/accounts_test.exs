@@ -83,6 +83,36 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  defp insert_lapsed_subscription(user, attrs \\ %{}) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_lapsed_#{System.unique_integer()}",
+        stripe_status: Map.get(attrs, :stripe_status, "canceled"),
+        name: "Lapsed Membership",
+        current_period_end:
+          Map.get(attrs, :current_period_end, DateTime.add(now, -1, :second))
+      })
+
+    case Map.get(attrs, :inserted_at) do
+      nil ->
+        subscription
+
+      inserted_at ->
+        {1, _} =
+          Repo.update_all(
+            from(s in Ysc.Subscriptions.Subscription,
+              where: s.id == ^subscription.id
+            ),
+            set: [inserted_at: inserted_at]
+          )
+
+        subscription
+    end
+  end
+
   defp primary_with_active_subscription_no_items(attrs) do
     user = user_fixture(attrs)
 
@@ -3072,11 +3102,18 @@ defmodule Ysc.AccountsTest do
       assert %{
                current_ytd_joins: a,
                prior_ytd_joins: b,
+               current_ytd_losses: losses,
+               prior_ytd_losses: prior_losses,
+               current_ytd_net_new: net,
+               prior_ytd_net_new: prior_net,
                prior_year_label: y,
                joins_ytd_change_percent: pct
              } = cmp
 
       assert a >= 0 and b >= 0
+      assert losses >= 0 and prior_losses >= 0
+      assert net == a - losses
+      assert prior_net == b - prior_losses
       assert y != ""
       assert pct == nil or is_integer(pct)
     end
@@ -3143,6 +3180,128 @@ defmodule Ysc.AccountsTest do
 
       assert after_stats.renewals_ytd == before.renewals_ytd + 1
       assert after_stats.current_ytd_joins == before.current_ytd_joins
+    end
+
+    test "get_membership_joins_ytd_comparison subtracts a same-year join-and-lapse from net new" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      # `inserted_at` must be strictly before the comparison's `now` so the
+      # first-subscription join lands in `[year_start, now)`.
+      insert_lapsed_subscription(user, %{
+        inserted_at:
+          DateTime.utc_now()
+          |> DateTime.add(-2, :second)
+          |> DateTime.truncate(:second)
+      })
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      # Gross joins still count the first paid subscription this year, but
+      # the same-year lapse is subtracted so "net new" does not inflate.
+      assert after_stats.current_ytd_joins == before.current_ytd_joins + 1
+      assert after_stats.current_ytd_losses == before.current_ytd_losses + 1
+      assert after_stats.current_ytd_net_new == before.current_ytd_net_new
+    end
+
+    test "get_membership_joins_ytd_comparison counts a prior-year member who lapsed this year as a loss" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      insert_lapsed_subscription(user, %{
+        inserted_at:
+          DateTime.utc_now()
+          |> Timex.shift(years: -1)
+          |> DateTime.truncate(:second)
+      })
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.current_ytd_joins == before.current_ytd_joins
+      assert after_stats.current_ytd_losses == before.current_ytd_losses + 1
+      assert after_stats.current_ytd_net_new == before.current_ytd_net_new - 1
+    end
+
+    test "get_membership_joins_ytd_comparison counts unpaid and cancelled spellings as losses" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+
+      unpaid = user_fixture(%{phone_number: unique_user_phone()})
+      cancelled = user_fixture(%{phone_number: unique_user_phone()})
+
+      insert_lapsed_subscription(unpaid, %{stripe_status: "unpaid"})
+      insert_lapsed_subscription(cancelled, %{stripe_status: "cancelled"})
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.current_ytd_losses == before.current_ytd_losses + 2
+    end
+
+    test "get_membership_joins_ytd_comparison ignores lapses outside the YTD window and incomplete checkouts" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      last_year =
+        user_fixture(%{phone_number: unique_user_phone()})
+
+      still_covered =
+        user_fixture(%{phone_number: unique_user_phone()})
+
+      no_period_end =
+        user_fixture(%{phone_number: unique_user_phone()})
+
+      incomplete =
+        user_fixture(%{phone_number: unique_user_phone()})
+
+      insert_lapsed_subscription(last_year, %{
+        current_period_end: Timex.shift(now, years: -1)
+      })
+
+      insert_lapsed_subscription(still_covered, %{
+        current_period_end: DateTime.add(now, 30, :day)
+      })
+
+      insert_lapsed_subscription(no_period_end, %{current_period_end: nil})
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: incomplete.id,
+          stripe_id: "sub_incomplete_loss_#{System.unique_integer()}",
+          stripe_status: "incomplete_expired",
+          name: "Abandoned checkout",
+          current_period_end: DateTime.add(now, -1, :second)
+        })
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.current_ytd_losses == before.current_ytd_losses
+      assert after_stats.current_ytd_joins == before.current_ytd_joins
+      assert after_stats.current_ytd_net_new == before.current_ytd_net_new
+    end
+
+    test "get_membership_joins_ytd_comparison counts distinct primaries and ignores family sub-accounts" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+
+      primary = user_fixture(%{phone_number: unique_user_phone()})
+      insert_lapsed_subscription(primary)
+      insert_lapsed_subscription(primary)
+
+      family_primary =
+        user_with_family_subscription(%{phone_number: unique_user_phone()})
+
+      sub_account =
+        user_fixture(%{phone_number: unique_user_phone()})
+        |> Ecto.Changeset.change(%{primary_user_id: family_primary.id})
+        |> Repo.update!()
+
+      insert_lapsed_subscription(sub_account)
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      # Two lapsed rows on one primary count once; a family sub-account lapse
+      # is not a primary-user loss.
+      assert after_stats.current_ytd_losses == before.current_ytd_losses + 1
     end
 
     test "get_membership_stats reports family sub-accounts separately from primary members" do
