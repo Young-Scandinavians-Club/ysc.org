@@ -2326,12 +2326,20 @@ defmodule YscWeb.EventDetailsLive do
                           end
                       end %>
                     <div class={[
-                      "rounded-xl p-4 space-y-4 transition-all duration-200",
+                      "relative rounded-xl p-4 space-y-4 transition-all duration-200",
                       if(is_registration_complete,
                         do: "border-2 border-green-500 bg-green-50/30",
                         else: "border border-zinc-200"
                       )
                     ]}>
+                      <%= if is_registration_complete do %>
+                        <div class="absolute top-4 right-4">
+                          <.icon
+                            name="hero-check-circle"
+                            class="w-6 h-6 text-green-600"
+                          />
+                        </div>
+                      <% end %>
                       <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-3">
                           <div>
@@ -2344,14 +2352,6 @@ defmodule YscWeb.EventDetailsLive do
                               {ticket.ticket_tier.name}
                             </p>
                           </div>
-                          <%= if is_registration_complete do %>
-                            <div class="flex-shrink-0">
-                              <.icon
-                                name="hero-check-circle"
-                                class="w-6 h-6 text-green-600"
-                              />
-                            </div>
-                          <% end %>
                         </div>
                       </div>
 
@@ -5541,10 +5541,30 @@ defmodule YscWeb.EventDetailsLive do
   defp pending_checkout_safe_to_cancel?(_ticket_order, _opts), do: true
 
   defp maybe_cancel_pending_ticket_order(ticket_order, reason, opts) do
+    # pending_checkout_safe_to_cancel?/2 is a cheap pre-check that skips touching
+    # Stripe at all for statuses already known to be in flight (e.g. a live 3DS
+    # challenge) - deliberately avoided so an abandoned tab doesn't interfere with
+    # a payment the user may still be actively completing elsewhere. It can't fully
+    # close the race on its own (status can flip between the read and the actual
+    # cancel), so cancel_ticket_order/3 does the real work atomically: it attempts
+    # to cancel the PaymentIntent and, if that reveals the payment already
+    # succeeded, fulfills the order instead of orphaning the charge - see
+    # Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2.
     if pending_checkout_safe_to_cancel?(ticket_order, opts) do
-      case Ysc.Tickets.cancel_ticket_order(ticket_order, reason) do
-        {:ok, _} -> :cancelled
-        _ -> :cancel_failed
+      case Ysc.Tickets.cancel_ticket_order(ticket_order, reason,
+             context: Keyword.get(opts, :context, "cancel_ticket_order")
+           ) do
+        {:ok, %{status: :completed} = completed_order} ->
+          {:fulfilled, completed_order}
+
+        {:ok, _} ->
+          :cancelled
+
+        {:error, {:payment_succeeded_fulfillment_failed, _fulfillment_error}} ->
+          :payment_succeeded_fulfillment_failed
+
+        _ ->
+          :cancel_failed
       end
     else
       :unsafe
@@ -5658,7 +5678,7 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("close-payment-modal", _params, socket) do
-    skipped_cancel? =
+    cancel_result =
       case socket.assigns.ticket_order do
         %Ysc.Tickets.TicketOrder{} = ticket_order ->
           maybe_cancel_pending_ticket_order(
@@ -5667,37 +5687,75 @@ defmodule YscWeb.EventDetailsLive do
             payment_redirect_in_progress:
               socket.assigns[:payment_redirect_in_progress],
             context: "close-payment-modal"
-          ) == :unsafe
+          )
 
         _ ->
-          false
+          :no_order
       end
 
-    socket =
-      if skipped_cancel? do
-        YscWeb.Flash.put_toast(
-          socket,
-          :info,
-          "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation.",
-          title: "Payment"
-        )
-      else
-        socket
-      end
+    case cancel_result do
+      {:fulfilled, completed_order} ->
+        # The payment actually succeeded moments before the user closed the
+        # modal - grant the tickets and send them to the confirmation page
+        # instead of discarding a paid-for order.
+        updated_user_tickets =
+          Ysc.Tickets.list_user_tickets_for_event(
+            socket.assigns.current_user.id,
+            socket.assigns.event.id
+          )
 
-    {:noreply,
-     socket
-     |> assign(:show_payment_modal, false)
-     |> assign(:checkout_expired, false)
-     |> assign(:checkout_payment_failed, false)
-     |> assign(:payment_intent, nil)
-     |> assign(:ticket_order, nil)
-     |> assign(:tickets_requiring_registration, [])
-     |> assign(:ticket_details_form, %{})
-     |> assign(:tickets_for_me, %{})
-     |> assign(:payment_redirect_in_progress, false)
-     |> assign(:stripe_payment_element_ready, false)
-     |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
+        {:noreply,
+         socket
+         |> assign(:show_payment_modal, false)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:show_order_completion, true)
+         |> assign(:ticket_order, completed_order)
+         |> assign(:user_tickets, updated_user_tickets)
+         |> assign(:payment_intent, nil)
+         |> clear_selected_tickets()
+         |> assign(:tickets_requiring_registration, [])
+         |> assign(:ticket_details_form, %{})
+         |> redirect(
+           to: ~p"/orders/#{completed_order.id}/confirmation?confetti=true"
+         )}
+
+      other ->
+        socket =
+          cond do
+            other == :unsafe ->
+              YscWeb.Flash.put_toast(
+                socket,
+                :info,
+                "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation.",
+                title: "Payment"
+              )
+
+            other == :payment_succeeded_fulfillment_failed ->
+              YscWeb.Flash.put_toast(
+                socket,
+                :warning,
+                "Your payment went through, but we hit a snag finishing your order. We're on it - you'll get a confirmation email shortly, or contact info@ysc.org if you don't hear from us soon.",
+                title: "Payment"
+              )
+
+            true ->
+              socket
+          end
+
+        {:noreply,
+         socket
+         |> assign(:show_payment_modal, false)
+         |> assign(:checkout_expired, false)
+         |> assign(:checkout_payment_failed, false)
+         |> assign(:payment_intent, nil)
+         |> assign(:ticket_order, nil)
+         |> assign(:tickets_requiring_registration, [])
+         |> assign(:ticket_details_form, %{})
+         |> assign(:tickets_for_me, %{})
+         |> assign(:payment_redirect_in_progress, false)
+         |> assign(:stripe_payment_element_ready, false)
+         |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
+    end
   end
 
   @impl true

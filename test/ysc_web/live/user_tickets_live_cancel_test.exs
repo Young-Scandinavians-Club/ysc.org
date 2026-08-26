@@ -36,6 +36,17 @@ defmodule YscWeb.UserTicketsLiveCancelTest do
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
 
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :payment_intent_unexpected_state,
+           message: "cannot cancel",
+           extra: %{}
+         }}
+      end)
+
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
         {:ok,

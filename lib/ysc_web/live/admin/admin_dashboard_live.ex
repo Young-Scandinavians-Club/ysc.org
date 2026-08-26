@@ -185,7 +185,10 @@ defmodule YscWeb.AdminDashboardLive do
                   Net new (YTD)
                 </p>
                 <div class="flex items-end gap-2">
-                  <p class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none">
+                  <p
+                    id="membership-net-new-ytd"
+                    class="text-xl font-black font-mono text-zinc-900 tabular-nums leading-none"
+                  >
                     {@membership_net_new_ytd}
                   </p>
                   <%= if @membership_joins_ytd_change_percent != nil do %>
@@ -202,7 +205,10 @@ defmodule YscWeb.AdminDashboardLive do
                     </span>
                   <% end %>
                 </div>
-                <p class="text-[10px] text-zinc-500 mt-1 leading-snug">
+                <p
+                  id="membership-net-new-breakdown"
+                  class="text-[10px] text-zinc-500 mt-1 leading-snug"
+                >
                   {@membership_joins_current_ytd} joined · {@membership_losses_current_ytd} left
                 </p>
               </div>
@@ -354,8 +360,8 @@ defmodule YscWeb.AdminDashboardLive do
         >
           <div>
             <div class="flex items-center justify-between mb-2">
-              <p class="text-xs font-black text-sky-600 uppercase tracking-[0.2em]">
-                Tahoe
+              <p class="flex items-center gap-1.5 text-xs font-black text-sky-600 uppercase tracking-[0.2em]">
+                <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> Tahoe
               </p>
               <span class="flex items-center gap-1.5">
                 <span class={[
@@ -380,25 +386,37 @@ defmodule YscWeb.AdminDashboardLive do
               <span class="text-xs font-bold text-zinc-400">staying now</span>
             </div>
             <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div class="rounded bg-emerald-50 border border-emerald-100 p-2">
-                <p class="font-bold text-emerald-700 uppercase text-[10px]">
-                  Checking in
-                </p>
-                <p class="font-black font-mono text-emerald-800 text-lg">
-                  {@property_stats.tahoe.checkins_today}
-                </p>
+              <div class="rounded-lg bg-emerald-50 p-2 flex items-center gap-2">
+                <.icon
+                  name="hero-arrow-right-circle"
+                  class="w-6 h-6 text-emerald-500 shrink-0"
+                />
+                <div>
+                  <p class="font-bold text-emerald-700 uppercase text-[10px] leading-none">
+                    Checking in
+                  </p>
+                  <p class="font-black font-mono text-emerald-800 text-lg leading-tight">
+                    {@property_stats.tahoe.checkins_today}
+                  </p>
+                </div>
               </div>
-              <div class="rounded bg-amber-50 border border-amber-100 p-2">
-                <p class="font-bold text-amber-700 uppercase text-[10px]">
-                  Checking out
-                </p>
-                <p class="font-black font-mono text-amber-800 text-lg">
-                  {@property_stats.tahoe.checkouts_today}
-                </p>
+              <div class="rounded-lg bg-amber-50 p-2 flex items-center gap-2">
+                <.icon
+                  name="hero-arrow-left-circle"
+                  class="w-6 h-6 text-amber-500 shrink-0"
+                />
+                <div>
+                  <p class="font-bold text-amber-700 uppercase text-[10px] leading-none">
+                    Checking out
+                  </p>
+                  <p class="font-black font-mono text-amber-800 text-lg leading-tight">
+                    {@property_stats.tahoe.checkouts_today}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3 text-xs">
+          <div class="mt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3 text-xs">
             <div>
               <p class="font-bold text-zinc-400 uppercase text-[10px]">
                 Next 14 days
@@ -430,8 +448,8 @@ defmodule YscWeb.AdminDashboardLive do
         >
           <div>
             <div class="flex items-center justify-between mb-2">
-              <p class="text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
-                Clear Lake
+              <p class="flex items-center gap-1.5 text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
+                <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> Clear Lake
               </p>
               <span class="flex items-center gap-1.5">
                 <span class={[
@@ -456,25 +474,37 @@ defmodule YscWeb.AdminDashboardLive do
               <span class="text-xs font-bold text-zinc-400">staying now</span>
             </div>
             <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div class="rounded bg-emerald-50 border border-emerald-100 p-2">
-                <p class="font-bold text-emerald-700 uppercase text-[10px]">
-                  Checking in
-                </p>
-                <p class="font-black font-mono text-emerald-800 text-lg">
-                  {@property_stats.clear_lake.checkins_today}
-                </p>
+              <div class="rounded-lg bg-emerald-50 p-2 flex items-center gap-2">
+                <.icon
+                  name="hero-arrow-right-circle"
+                  class="w-6 h-6 text-emerald-500 shrink-0"
+                />
+                <div>
+                  <p class="font-bold text-emerald-700 uppercase text-[10px] leading-none">
+                    Checking in
+                  </p>
+                  <p class="font-black font-mono text-emerald-800 text-lg leading-tight">
+                    {@property_stats.clear_lake.checkins_today}
+                  </p>
+                </div>
               </div>
-              <div class="rounded bg-amber-50 border border-amber-100 p-2">
-                <p class="font-bold text-amber-700 uppercase text-[10px]">
-                  Checking out
-                </p>
-                <p class="font-black font-mono text-amber-800 text-lg">
-                  {@property_stats.clear_lake.checkouts_today}
-                </p>
+              <div class="rounded-lg bg-amber-50 p-2 flex items-center gap-2">
+                <.icon
+                  name="hero-arrow-left-circle"
+                  class="w-6 h-6 text-amber-500 shrink-0"
+                />
+                <div>
+                  <p class="font-bold text-amber-700 uppercase text-[10px] leading-none">
+                    Checking out
+                  </p>
+                  <p class="font-black font-mono text-amber-800 text-lg leading-tight">
+                    {@property_stats.clear_lake.checkouts_today}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-zinc-100 grid grid-cols-2 gap-3 text-xs">
+          <div class="mt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3 text-xs">
             <div>
               <p class="font-bold text-zinc-400 uppercase text-[10px]">
                 Next 14 days

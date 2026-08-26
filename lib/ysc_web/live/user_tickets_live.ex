@@ -352,6 +352,27 @@ defmodule YscWeb.UserTicketsLive do
 
       ticket_order ->
         case Tickets.cancel_ticket_order(ticket_order, "User cancelled") do
+          # The payment actually succeeded just before the cancel reached Stripe -
+          # cancel_ticket_order/3 fulfills the order instead of orphaning the
+          # charge. See Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout/2.
+          {:ok, %{status: :completed} = completed_order} ->
+            ticket_orders =
+              Tickets.list_user_upcoming_ticket_orders(
+                socket.assigns.current_user.id
+              )
+
+            {:noreply,
+             socket
+             |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Your payment had already gone through, so we confirmed your tickets instead of cancelling.",
+               title: "Order"
+             )
+             |> push_navigate(
+               to: ~p"/orders/#{completed_order.id}/confirmation"
+             )}
+
           {:ok, _cancelled_order} ->
             ticket_orders =
               Tickets.list_user_upcoming_ticket_orders(
@@ -511,6 +532,10 @@ defmodule YscWeb.UserTicketsLive do
   defp cancel_order_error_message(:checkout_payment_in_progress),
     do:
       "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation."
+
+  defp cancel_order_error_message({:payment_succeeded_fulfillment_failed, _}),
+    do:
+      "Your payment went through, but we hit a snag finishing your order. We're on it - you'll get a confirmation email shortly, or contact info@ysc.org if you don't hear from us soon."
 
   defp cancel_order_error_message(_reason),
     do:

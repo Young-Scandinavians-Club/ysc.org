@@ -483,13 +483,100 @@ defmodule Ysc.Tickets.StripeServiceTest do
       struct(Stripe.PaymentIntent, Map.merge(defaults, Map.new(overrides)))
     end
 
-    test "cancels a pending ticket order after payment failure" do
+    test "leaves the order pending and untouched when the PaymentIntent is still retryable" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        payment_intent_id = "pi_fail_retryable_#{ticket_order.id}"
+
+        cancel_timeout_jobs_for_order!(ticket_order.id)
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
+
+        payment_intent =
+          failed_payment_intent_for_order(ticket_order, id: payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, payment_intent}
+        end)
+
+        # No `cancel_payment_intent` expectation is set: a card decline
+        # leaves the PaymentIntent in requires_payment_method so the customer
+        # can retry with a different card against the same PaymentIntent.
+        # Cancelling the local order here would make it unfulfillable if that
+        # retry later succeeds, so this must be a no-op. Mox's strict mode
+        # fails this test if Stripe's cancel endpoint were called.
+        assert {:ok, unchanged} =
+                 StripeService.handle_failed_payment(
+                   payment_intent_id,
+                   "Card declined",
+                   keep_retryable_order: true
+                 )
+
+        assert unchanged.status == :pending
+
+        assert Ysc.Repo.get!(Ysc.Tickets.TicketOrder, ticket_order.id).status ==
+                 :pending
+      end)
+    end
+
+    test "cancels the order once Stripe confirms the PaymentIntent is terminally canceled, even with keep_retryable_order: true" do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
         payment_intent_id = "pi_fail_cancel_#{ticket_order.id}"
 
         cancel_timeout_jobs_for_order!(ticket_order.id)
 
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
+
+        payment_intent =
+          failed_payment_intent_for_order(ticket_order,
+            id: payment_intent_id,
+            status: "canceled"
+          )
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, payment_intent}
+        end)
+
+        assert {:ok, cancelled} =
+                 StripeService.handle_failed_payment(
+                   payment_intent_id,
+                   "Payment canceled",
+                   keep_retryable_order: true
+                 )
+
+        assert cancelled.status == :cancelled
+        assert cancelled.cancellation_reason == "Payment canceled"
+      end)
+    end
+
+    test "cancels the order unconditionally when keep_retryable_order is not set (e.g. the failure redirect page)" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        payment_intent_id = "pi_fail_redirect_#{ticket_order.id}"
+
+        cancel_timeout_jobs_for_order!(ticket_order.id)
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
+
+        # Still retryable per Stripe, but this caller has no inline retry UI
+        # (e.g. payment_success_live.ex's failure-redirect page sends the
+        # customer back to pick tickets again) so it must keep releasing the
+        # order unconditionally, as before.
         payment_intent =
           failed_payment_intent_for_order(ticket_order, id: payment_intent_id)
 
@@ -501,11 +588,83 @@ defmodule Ysc.Tickets.StripeServiceTest do
         assert {:ok, cancelled} =
                  StripeService.handle_failed_payment(
                    payment_intent_id,
-                   "Card declined"
+                   "Payment failed"
                  )
 
         assert cancelled.status == :cancelled
-        assert cancelled.cancellation_reason == "Card declined"
+      end)
+    end
+
+    test "a same-PaymentIntent retry after a decline still fulfills the order" do
+      Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_default"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
+        {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn _name ->
+        {:ok, %{"Id" => "qb_account_default"}}
+      end)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        payment_intent_id = "pi_retry_then_succeed_#{ticket_order.id}"
+
+        cancel_timeout_jobs_for_order!(ticket_order.id)
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
+
+        declined_payment_intent =
+          failed_payment_intent_for_order(ticket_order, id: payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, declined_payment_intent}
+        end)
+
+        # First card declines - payment_intent.payment_failed fires but the
+        # order must stay fulfillable.
+        assert {:ok, %{status: :pending}} =
+                 StripeService.handle_failed_payment(
+                   payment_intent_id,
+                   "Card declined",
+                   keep_retryable_order: true
+                 )
+
+        amount_cents = Ysc.MoneyHelper.money_to_cents(ticket_order.total_amount)
+
+        succeeded_payment_intent =
+          struct(Stripe.PaymentIntent, %{
+            id: payment_intent_id,
+            status: "succeeded",
+            amount: amount_cents,
+            metadata: %{
+              "ticket_order_id" => ticket_order.id,
+              "user_id" => ticket_order.user_id
+            }
+          })
+
+        # Customer retries with a different card against the same
+        # PaymentIntent and it succeeds.
+        assert {:ok, fulfilled} =
+                 StripeService.process_successful_payment(
+                   succeeded_payment_intent
+                 )
+
+        assert fulfilled.id == ticket_order.id
+        assert fulfilled.status == :completed
+
+        assert Ysc.Repo.get!(Ysc.Tickets.TicketOrder, ticket_order.id).status ==
+                 :completed
       end)
     end
 
