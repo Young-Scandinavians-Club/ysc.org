@@ -8,9 +8,7 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.Ledgers
   alias Ysc.Accounts
   alias Ysc.Webhooks
-  alias Ysc.Bookings
   alias Ysc.Bookings.BookingLocker
-  alias Ysc.MoneyHelper
   alias Ysc.Tickets
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReport
@@ -694,7 +692,7 @@ defmodule YscWeb.AdminMoneyLive do
     if ticket_order && ticket_ids != [] do
       case Tickets.calculate_refund_amount(ticket_order, ticket_ids) do
         {:ok, calculated_refund_amount} ->
-          case create_stripe_refund_and_record(
+          case Tickets.refund_via_stripe(
                  payment,
                  calculated_refund_amount,
                  refund_params["reason"]
@@ -794,7 +792,7 @@ defmodule YscWeb.AdminMoneyLive do
           # Check if we should release availability
           release_availability = refund_params["release_availability"] == "true"
 
-          case create_stripe_refund_and_record(
+          case Tickets.refund_via_stripe(
                  payment,
                  refund_amount,
                  refund_params["reason"]
@@ -4026,65 +4024,6 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp parse_amount_string(_), do: {:error, :invalid_format}
-
-  # Issues the refund in Stripe first, then records it in the ledger using the
-  # Stripe-issued refund id (mirrors AdminBookingsLive's process-booking-refund).
-  # Ledgers.process_refund's idempotency check only matches on external_refund_id,
-  # so a ledger-only refund recorded before Stripe confirms the money moved would
-  # get a synthetic id that a later webhook for the real Stripe refund can't match
-  # against -- producing a second Refund, a second ledger transaction, and a
-  # second "your refund has been processed" email for the same payment.
-  defp create_stripe_refund_and_record(payment, refund_amount, reason) do
-    amount_cents = MoneyHelper.money_to_cents(refund_amount)
-
-    cond do
-      # Free tickets (and $0 donation leftovers) have nothing to refund in
-      # Stripe. Sending amount=0 is rejected by Stripe and would block ticket
-      # cancellation after #1077's Stripe-first ordering.
-      amount_cents <= 0 ->
-        {:ok, {:skipped_zero_amount, nil, nil}}
-
-      payment.external_payment_id && payment.external_provider == :stripe ->
-        # Deterministic per (payment, amount) so a retry after a post-refund
-        # failure (e.g. Ledgers.process_refund/1 erroring) reuses the same
-        # Stripe refund instead of issuing a second one. This does mean a
-        # second *intentional* refund of the identical amount on the same
-        # payment within Stripe's 24h idempotency window would be rejected as
-        # a duplicate -- acceptable given how rare that is versus the cost of
-        # a real double refund.
-        idempotency_key =
-          Ysc.Stripe.Idempotency.key(
-            "admin_refund_#{payment.id}_#{amount_cents}"
-          )
-
-        case Bookings.create_stripe_refund_for_admin(
-               payment.external_payment_id,
-               amount_cents,
-               reason,
-               idempotency_key: idempotency_key
-             ) do
-          {:ok, stripe_refund} ->
-            Ledgers.process_refund(%{
-              payment_id: payment.id,
-              refund_amount: refund_amount,
-              reason: reason,
-              external_refund_id: stripe_refund.id
-            })
-
-          {:error, stripe_reason} ->
-            Ysc.Logging.error("Admin Stripe refund failed",
-              payment_id: payment.id,
-              amount_cents: amount_cents,
-              error: inspect(stripe_reason)
-            )
-
-            {:error, {:stripe_error, stripe_reason}}
-        end
-
-      true ->
-        {:error, :no_stripe_payment}
-    end
-  end
 
   defp expense_report_status_changeset(params) do
     types = %{
