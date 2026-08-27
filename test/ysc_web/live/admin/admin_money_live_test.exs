@@ -262,11 +262,26 @@ defmodule YscWeb.AdminMoneyLiveTest do
     from(r in Refund, where: r.payment_id == ^payment_id) |> Repo.all()
   end
 
-  defp expected_stripe_refund_id(payment, amount) do
+  defp expected_stripe_refund_id(payment, amount, opts \\ []) do
     amount_cents = Ysc.MoneyHelper.money_to_cents(amount)
 
+    scope =
+      case Keyword.get(opts, :ticket_ids, []) do
+        [] ->
+          "n0"
+
+        ids ->
+          "t" <>
+            (ids
+             |> Enum.map(&to_string/1)
+             |> Enum.sort()
+             |> Enum.join("-"))
+      end
+
     key =
-      Ysc.Stripe.Idempotency.key("admin_refund_#{payment.id}_#{amount_cents}")
+      Ysc.Stripe.Idempotency.key(
+        "admin_refund_#{payment.id}_#{scope}_#{amount_cents}"
+      )
 
     "re_test_#{key}"
   end
@@ -852,7 +867,9 @@ defmodule YscWeb.AdminMoneyLiveTest do
       expected_amount = Money.new(50, :USD)
 
       assert refund.external_refund_id ==
-               expected_stripe_refund_id(payment, expected_amount)
+               expected_stripe_refund_id(payment, expected_amount,
+                 ticket_ids: [first.id]
+               )
 
       assert Money.equal?(refund.amount, expected_amount)
       assert Repo.get!(Ysc.Events.Ticket, first.id).status == :cancelled
@@ -889,7 +906,9 @@ defmodule YscWeb.AdminMoneyLiveTest do
       expected_amount = Money.new(10, :USD)
 
       assert refund.external_refund_id ==
-               expected_stripe_refund_id(payment, expected_amount)
+               expected_stripe_refund_id(payment, expected_amount,
+                 ticket_ids: [donation_ticket.id]
+               )
 
       assert Money.equal?(refund.amount, expected_amount)
 
@@ -968,7 +987,9 @@ defmodule YscWeb.AdminMoneyLiveTest do
       expected_amount = Money.new(30, :USD)
 
       assert refund.external_refund_id ==
-               expected_stripe_refund_id(payment, expected_amount)
+               expected_stripe_refund_id(payment, expected_amount,
+                 ticket_ids: [ticket.id]
+               )
 
       assert Money.equal?(refund.amount, expected_amount)
       assert Repo.get!(Ysc.Events.Ticket, ticket.id).status == :cancelled
