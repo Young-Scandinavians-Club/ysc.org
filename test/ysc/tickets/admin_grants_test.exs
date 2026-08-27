@@ -218,17 +218,20 @@ defmodule Ysc.Tickets.AdminGrantsTest do
                )
     end
 
-    test "returns partiful_event when the event links out to Partiful", %{
+    test "grants tickets for an event that also links out to Partiful", %{
       admin: admin,
-      member: member,
-      tier: tier
+      member: member
     } do
       event = event_fixture(%{partiful_link: "https://partiful.com/e/abc123"})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 5})
 
-      assert {:error, :partiful_event} =
+      assert {:ok, order} =
                AdminGrants.grant_admin_tickets(admin.id, member.id, event.id, %{
                  tier.id => 1
                })
+
+      assert order.event_id == event.id
+      assert length(order.tickets) == 1
     end
 
     test "returns empty_selection when no tiers are selected", %{

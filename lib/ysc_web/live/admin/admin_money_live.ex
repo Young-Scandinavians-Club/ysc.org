@@ -1470,8 +1470,9 @@ defmodule YscWeb.AdminMoneyLive do
                       )}
                     </td>
                     <td
+                      id={"expense-inbox-actions-stop-#{expense_report.id}"}
+                      phx-hook="StopClick"
                       class="px-4 py-3 whitespace-nowrap text-right text-sm"
-                      onclick="event.stopPropagation()"
                     >
                       <button
                         type="button"
@@ -1828,8 +1829,9 @@ defmodule YscWeb.AdminMoneyLive do
                     )}
                   </td>
                   <td
+                    id={"expense-report-actions-stop-#{expense_report.id}"}
+                    phx-hook="StopClick"
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
-                    onclick="event.stopPropagation()"
                   >
                     <button
                       type="button"
@@ -2100,8 +2102,9 @@ defmodule YscWeb.AdminMoneyLive do
                     )}
                   </td>
                   <td
+                    id={"webhook-actions-stop-#{webhook.id}"}
+                    phx-hook="StopClick"
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
-                    onclick="event.stopPropagation()"
                   >
                     <button
                       type="button"
@@ -2598,11 +2601,22 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <%= if @selected_payout.quickbooks_deposit_id do %>
               <div>
-                <p class="font-medium text-zinc-700">QuickBooks Deposit ID</p>
+                <p class="font-medium text-zinc-700">
+                  <%= if @selected_payout.quickbooks_transaction_type == "journal_entry" do %>
+                    QuickBooks Journal Entry ID
+                  <% else %>
+                    QuickBooks Deposit ID
+                  <% end %>
+                </p>
                 <a
                   href={
                     quickbooks_entity_url(
-                      "deposit",
+                      if(
+                        @selected_payout.quickbooks_transaction_type ==
+                          "journal_entry",
+                        do: "journal",
+                        else: "deposit"
+                      ),
                       @selected_payout.quickbooks_deposit_id
                     )
                   }

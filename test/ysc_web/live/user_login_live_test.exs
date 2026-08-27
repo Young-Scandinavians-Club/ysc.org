@@ -14,6 +14,22 @@ defmodule YscWeb.UserLoginLiveTest do
       assert has_element?(lv, "a[href='/users/reset-password']")
     end
 
+    test "wires the submit button loading state via a CSP-safe hook", %{
+      conn: conn
+    } do
+      {:ok, _lv, html} = live(conn, ~p"/users/log-in")
+
+      # The inline onsubmit handler is blocked by CSP; a hook drives it instead.
+      refute html =~ "onsubmit"
+      assert html =~ ~s(id="login_form")
+      assert html =~ ~s(phx-hook="DisableOnSubmit")
+
+      # <.button phx-disable-with> renders the spinner / label-swap markup that
+      # the hook toggles by adding phx-submit-loading.
+      assert html =~ "Signing in..."
+      assert html =~ "group-[.phx-submit-loading]:inline-flex"
+    end
+
     test "renders authentication method buttons", %{conn: conn} do
       {:ok, lv, html} = live(conn, ~p"/users/log-in")
 

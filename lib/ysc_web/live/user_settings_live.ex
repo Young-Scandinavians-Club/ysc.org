@@ -851,11 +851,11 @@ defmodule YscWeb.UserSettingsLive do
                   required
                 />
                 <p class="text-sm text-zinc-600 -mt-2">
-                  For security, you'll need to verify your identity before we change your email.
+                  For security, we'll ask you to confirm it's you before we change your email.
                 </p>
                 <:actions>
-                  <.button phx-disable-with="Opening identity verification...">
-                    Verify my identity to change email
+                  <.button phx-disable-with="Continuing...">
+                    Continue to change email
                   </.button>
                 </:actions>
               </.simple_form>
@@ -987,7 +987,7 @@ defmodule YscWeb.UserSettingsLive do
                   Pending Family Invitations
                 </h3>
                 <p class="text-xs text-zinc-500 mt-1">
-                  You have been invited to join a family membership. Accepting will link your account to the inviter's membership.
+                  You have been invited to join a family membership. Accepting will add you to their family membership.
                 </p>
                 <div class="mt-3 space-y-2">
                   <%= for invite <- @pending_family_invites do %>
@@ -1084,7 +1084,7 @@ defmodule YscWeb.UserSettingsLive do
                   Pending Family Invitations
                 </h3>
                 <p class="text-xs text-zinc-500 mt-1">
-                  You have been invited to join a family membership. Accepting will link your account to the inviter's membership.
+                  You have been invited to join a family membership. Accepting will add you to their family membership.
                 </p>
                 <div class="mt-3 space-y-2">
                   <%= for invite <- @pending_family_invites do %>
@@ -1408,7 +1408,7 @@ defmodule YscWeb.UserSettingsLive do
                     Pending Family Invitations
                   </h3>
                   <p class="text-xs text-zinc-500 mt-1">
-                    You have been invited to join a family membership. Accepting will link your account to the inviter's membership.
+                    You have been invited to join a family membership. Accepting will add you to their family membership.
                   </p>
                   <div class="mt-3 space-y-2">
                     <%= for invite <- @pending_family_invites do %>

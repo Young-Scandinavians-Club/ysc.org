@@ -16,7 +16,7 @@ defmodule YscWeb.UserSessionController do
   end
 
   def create(conn, params) do
-    create(conn, params, "Welcome back! 👋 Good to see you again.")
+    create(conn, params, "Good to see you again.")
   end
 
   def auto_login(conn, %{"token" => token, "redirect_to" => redirect_to})
@@ -546,8 +546,8 @@ defmodule YscWeb.UserSessionController do
       |> put_session(:just_logged_in, true)
       |> YscWeb.Flash.put_toast(
         :info,
-        "Welcome back! 👋 Good to see you again.",
-        title: "Welcome back! 👋"
+        "Good to see you again.",
+        title: "Welcome back!"
       )
       |> UserAuth.log_in_user(
         user,

@@ -27,12 +27,13 @@ defmodule Mix.Tasks.DebugEmails do
     Ysc.Logging.info("Recent jobs to show: #{recent_count}")
     Ysc.Logging.info("")
 
-    # Check Oban configuration
+    # Check Oban configuration (2.24 stores log on the :repo tuple)
     oban_config = Application.get_env(:ysc, Oban)
+    {repo, log} = oban_repo_and_log(oban_config)
     Ysc.Logging.info("Oban Configuration:")
-    Ysc.Logging.info("  Repo: #{inspect(oban_config[:repo])}")
+    Ysc.Logging.info("  Repo: #{inspect(repo)}")
     Ysc.Logging.info("  Queues: #{inspect(oban_config[:queues])}")
-    Ysc.Logging.info("  Log Level: #{inspect(oban_config[:log])}")
+    Ysc.Logging.info("  Log Level: #{inspect(log)}")
     Ysc.Logging.info("")
 
     # Check recent jobs in the mailers queue
@@ -123,5 +124,15 @@ defmodule Mix.Tasks.DebugEmails do
       select: {j.state, count(j.id)}
     )
     |> Ysc.Repo.all()
+  end
+
+  defp oban_repo_and_log(oban_config) do
+    case Keyword.get(oban_config, :repo) do
+      {repo, opts} when is_list(opts) ->
+        {repo, Keyword.get(opts, :log, Keyword.get(oban_config, :log))}
+
+      repo ->
+        {repo, Keyword.get(oban_config, :log)}
+    end
   end
 end
