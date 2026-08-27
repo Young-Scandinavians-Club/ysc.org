@@ -208,9 +208,12 @@ defmodule YscWeb.UserRegistrationLive do
                         <div class="col-span-2 sm:col-span-1">
                           <.input
                             type="select"
-                            options={[Spouse: "spouse", Child: "child"]}
+                            options={[
+                              "Spouse or partner": "spouse",
+                              Child: "child"
+                            ]}
                             field={nested_f[:type]}
-                            label="Type"
+                            label="Relationship"
                           />
                         </div>
                         <.input

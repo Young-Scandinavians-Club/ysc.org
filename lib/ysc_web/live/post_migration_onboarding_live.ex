@@ -811,7 +811,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Set Up Renewal Payment
           <:subtitle>
-            Add a card or bank account so your membership can renew automatically each year. You won't be charged today unless your renewal date has passed. You can skip for now and add a payment method later in account settings.
+            Add a card so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a card later in account settings.
           </:subtitle>
         </.header>
 
@@ -1005,7 +1005,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                   field={form[:relationship]}
                   type="select"
                   label="Relationship"
-                  options={[{"Child", "child"}, {"Spouse", "spouse"}]}
+                  options={[
+                    {"Child", "child"},
+                    {"Spouse or partner", "spouse"}
+                  ]}
                 />
               </div>
             </.simple_form>

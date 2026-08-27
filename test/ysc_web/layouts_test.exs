@@ -45,7 +45,7 @@ defmodule YscWeb.LayoutsTest do
                  flash: %{"info" => msg}
                })
 
-      assert [%LiveToast{title: "Welcome back! 👋", msg: ^msg}] = toasts
+      assert [%LiveToast{title: "Welcome back!", msg: ^msg}] = toasts
       assert flash["info"] == msg
     end
 

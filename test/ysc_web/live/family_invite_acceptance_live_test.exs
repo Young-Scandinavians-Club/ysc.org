@@ -522,7 +522,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       assert html =~ "Phone Number"
       assert html =~ "Password"
       assert html =~ "Confirm Password"
-      assert html =~ "Create Account"
+      assert html =~ "Create login and join"
     end
 
     test "renders invitation details", %{conn: conn} do
