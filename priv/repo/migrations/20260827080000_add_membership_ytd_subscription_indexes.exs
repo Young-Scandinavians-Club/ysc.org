@@ -17,20 +17,23 @@ defmodule Ysc.Repo.Migrations.AddMembershipYtdSubscriptionIndexes do
   use Ecto.Migration
 
   def change do
-    create index(:subscriptions, [:user_id, :inserted_at],
-             where: "stripe_status NOT IN ('incomplete', 'incomplete_expired')",
-             name: :subscriptions_converted_user_inserted_at_index
-           )
+    # create_if_not_exists so a retry after a dropped Fly Postgres connection
+    # does not fail if the previous attempt created an index but did not
+    # record the migration version.
+    create_if_not_exists index(:subscriptions, [:user_id, :inserted_at],
+                           where: "stripe_status NOT IN ('incomplete', 'incomplete_expired')",
+                           name: :subscriptions_converted_user_inserted_at_index
+                         )
 
-    create index(:subscriptions, [:stripe_status, :current_period_end],
-             where: "stripe_status IN ('canceled', 'cancelled', 'unpaid')",
-             name: :subscriptions_lapsed_period_end_index
-           )
+    create_if_not_exists index(:subscriptions, [:stripe_status, :current_period_end],
+                           where: "stripe_status IN ('canceled', 'cancelled', 'unpaid')",
+                           name: :subscriptions_lapsed_period_end_index
+                         )
 
-    create index(:subscriptions, [:stripe_status, :current_period_start],
-             where:
-               "stripe_status IN ('active', 'trialing') AND current_period_start IS NOT NULL",
-             name: :subscriptions_active_period_start_index
-           )
+    create_if_not_exists index(:subscriptions, [:stripe_status, :current_period_start],
+                           where:
+                             "stripe_status IN ('active', 'trialing') AND current_period_start IS NOT NULL",
+                           name: :subscriptions_active_period_start_index
+                         )
   end
 end
