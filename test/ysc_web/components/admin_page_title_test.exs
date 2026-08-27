@@ -72,5 +72,62 @@ defmodule YscWeb.AdminPageTitleTest do
       assert html =~ "Manage active entitlements."
       assert html =~ ~s(<p class="text-sm text-zinc-500 mt-1">)
     end
+
+    test "does not render a help link without help_topic" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_title>Dashboard</.admin_page_title>
+        """)
+
+      refute html =~ "admin-help-link"
+      refute html =~ "flex items-center gap-2"
+    end
+
+    test "renders a help link beside the title when help_topic is set" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_title
+          help_topic="posts/publish"
+          help_label="How to publish a post"
+          help_role={:admin}
+        >
+          Posts
+        </.admin_page_title>
+        """)
+
+      assert html =~ ~s(class="flex items-center gap-2")
+
+      assert html =~
+               ~s(<h1 class="text-2xl font-semibold leading-8 text-zinc-800")
+
+      assert html =~ "Posts"
+      assert html =~ ~s(id="admin-help-link-posts-publish")
+      assert html =~ ~s(href="/admin/help/posts%2Fpublish")
+      assert html =~ "How to publish a post"
+    end
+
+    test "keeps the subtitle below the title and help link" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_title
+          help_topic="media/upload"
+          help_label="Media help"
+          subtitle="All uploaded images."
+        >
+          Media Library
+        </.admin_page_title>
+        """)
+
+      assert html =~ "Media Library"
+      assert html =~ ~s(id="admin-help-link-media-upload")
+      assert html =~ "All uploaded images."
+      assert html =~ ~s(<p class="text-sm text-zinc-500 mt-1">)
+    end
   end
 end

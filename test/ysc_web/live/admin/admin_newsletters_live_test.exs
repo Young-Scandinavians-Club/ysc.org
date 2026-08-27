@@ -58,10 +58,11 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     test "renders the newsletters page with subscriber count", %{conn: conn} do
       Newsletter.subscribe("sub@example.com", source: "test")
 
-      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+      {:ok, view, html} = live(conn, ~p"/admin/newsletters")
 
       assert html =~ "Newsletters"
       assert html =~ "subscriber"
+      assert has_element?(view, "#admin-help-link-newsletters-compose")
     end
 
     test "lists existing editions", %{conn: conn, admin: admin} do

@@ -16,6 +16,7 @@ defmodule YscWeb.AdminComponents do
   alias YscWeb.FormHelpers
 
   import Flop.Phoenix
+  import YscWeb.AdminHelpComponents, only: [admin_help_link: 1]
   import YscWeb.Components.Autocomplete
   import YscWeb.CoreComponents
 
@@ -83,6 +84,21 @@ defmodule YscWeb.AdminComponents do
 
   Use `variant={:emphasis}` for bold modal or panel titles (e.g. review flows).
   Pass extra Tailwind utilities via `class` (e.g. `mb-4`).
+
+  Set `help_topic` to place `<.admin_help_link>` immediately after the heading
+  (the repeated admin index-page pattern).
+
+  ## Examples
+
+      <.admin_page_title>Users</.admin_page_title>
+
+      <.admin_page_title
+        help_topic="posts/publish"
+        help_label="How to publish a post"
+        help_role={@admin_role}
+      >
+        Posts
+      </.admin_page_title>
   """
   attr :level, :integer, default: 1, values: [1, 2]
   attr :variant, :atom, default: :default, values: [:default, :emphasis]
@@ -95,9 +111,50 @@ defmodule YscWeb.AdminComponents do
     default: nil,
     doc: "Optional muted description rendered below the title"
 
+  attr :help_topic, :string,
+    default: nil,
+    doc: "Guide slug passed to `<.admin_help_link>` when present"
+
+  attr :help_label, :string,
+    default: "Open the guide for this page",
+    doc: "Accessible label and tooltip for the help link"
+
+  attr :help_role, :atom,
+    default: nil,
+    doc: "Admin role used to hide the help link when the guide is inaccessible"
+
   slot :inner_block, required: true
 
   def admin_page_title(assigns) do
+    ~H"""
+    <%= if @help_topic do %>
+      <div class="flex items-center gap-2">
+        <.admin_page_title_heading level={@level} variant={@variant} class={@class}>
+          {render_slot(@inner_block)}
+        </.admin_page_title_heading>
+        <.admin_help_link
+          topic={@help_topic}
+          label={@help_label}
+          role={@help_role}
+        />
+      </div>
+    <% else %>
+      <.admin_page_title_heading level={@level} variant={@variant} class={@class}>
+        {render_slot(@inner_block)}
+      </.admin_page_title_heading>
+    <% end %>
+    <p :if={@subtitle} class="text-sm text-zinc-500 mt-1">
+      {@subtitle}
+    </p>
+    """
+  end
+
+  attr :level, :integer, required: true
+  attr :variant, :atom, required: true
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  defp admin_page_title_heading(assigns) do
     ~H"""
     <%= case @level do %>
       <% 1 -> %>
@@ -109,9 +166,6 @@ defmodule YscWeb.AdminComponents do
           {render_slot(@inner_block)}
         </h2>
     <% end %>
-    <p :if={@subtitle} class="text-sm text-zinc-500 mt-1">
-      {@subtitle}
-    </p>
     """
   end
 

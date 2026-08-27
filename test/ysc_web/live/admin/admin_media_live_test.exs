@@ -19,6 +19,7 @@ defmodule YscWeb.AdminMediaLiveTest do
       assert html =~ "Media Library"
       assert has_element?(view, "#media-scroll-container")
       assert has_element?(view, "#images-grid[phx-update=stream]")
+      assert has_element?(view, "#admin-help-link-media-upload")
     end
 
     test "enables viewport infinite scroll when more results exist", %{
