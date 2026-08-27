@@ -2091,7 +2091,7 @@ defmodule Ysc.TicketsTest do
       end)
     end
 
-    test "rejects donation tiers and partiful events", %{
+    test "rejects donation tiers", %{
       admin: admin,
       user: user,
       tier1: tier1
@@ -2112,17 +2112,34 @@ defmodule Ysc.TicketsTest do
                  tier1.event_id,
                  %{donation_tier.id => 1}
                )
+    end
 
+    test "grants tickets for an event that also links out to Partiful", %{
+      admin: admin,
+      user: user
+    } do
       partiful_event =
         event_fixture(%{partiful_link: "https://partiful.com/e/test"})
 
-      assert {:error, :partiful_event} =
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "General Admission",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 50,
+          event_id: partiful_event.id
+        })
+
+      assert {:ok, order} =
                Tickets.grant_admin_tickets(
                  admin.id,
                  user.id,
                  partiful_event.id,
-                 %{tier1.id => 1}
+                 %{tier.id => 1}
                )
+
+      assert order.event_id == partiful_event.id
+      assert length(order.tickets) == 1
     end
   end
 
