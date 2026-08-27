@@ -45,6 +45,9 @@ defmodule Ysc.Quickbooks.Sync do
   defp build_qb_idempotency_key("dep_payout", %Payout{id: id}),
     do: "dep_payout_#{id}"
 
+  defp build_qb_idempotency_key("je_payout", %Payout{id: id}),
+    do: "je_payout_#{id}"
+
   # Varies with *which* lines are being added so a genuine retry of the same
   # attempt (e.g. a network blip) reuses the key, but a later attempt with a
   # different missing set (a different payment showed up) gets a new one -
@@ -228,15 +231,30 @@ defmodule Ysc.Quickbooks.Sync do
     # a payout can be "synced" with a deposit that's since drifted (a payment
     # linked after the deposit was created), and status alone can't tell us
     # that - only asking QuickBooks what the Deposit actually contains can.
-    if is_nil(payout.quickbooks_deposit_id) do
-      Ysc.Logging.debug("[QB Sync] Payout not yet synced, proceeding with sync",
-        payout_id: payout.id,
-        current_status: payout.quickbooks_sync_status
-      )
+    cond do
+      is_nil(payout.quickbooks_deposit_id) ->
+        Ysc.Logging.debug(
+          "[QB Sync] Payout not yet synced, proceeding with sync",
+          payout_id: payout.id,
+          current_status: payout.quickbooks_sync_status
+        )
 
-      do_sync_payout(payout)
-    else
-      reconcile_payout_deposit(payout)
+        do_sync_payout(payout)
+
+      payout.quickbooks_transaction_type == "journal_entry" ->
+        # A JournalEntry has no LinkedTxn, so there's nothing to diff it
+        # against - unlike a Deposit, it can't drift when a payment/refund
+        # links to this payout later. Leave it alone.
+        Ysc.Logging.debug(
+          "[QB Sync] Payout already synced as a JournalEntry, nothing to reconcile",
+          payout_id: payout.id,
+          quickbooks_deposit_id: payout.quickbooks_deposit_id
+        )
+
+        {:ok, %{"Id" => payout.quickbooks_deposit_id}}
+
+      true ->
+        reconcile_payout_deposit(payout)
     end
   end
 
@@ -699,34 +717,41 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     with :ok <- verify_all_transactions_synced(payout),
-         :ok <- verify_payout_amount_syncable(payout),
-         {:ok, deposit} <- create_payout_deposit(payout) do
-      deposit_id = Map.get(deposit, "Id")
+         {:ok, transaction, transaction_type} <-
+           create_payout_transaction(payout) do
+      transaction_id = Map.get(transaction, "Id")
 
       Ysc.Logging.debug(
-        "[QB Sync] do_sync_payout: Deposit created successfully",
+        "[QB Sync] do_sync_payout: #{transaction_type} created successfully",
         payout_id: payout.id,
-        deposit_id: deposit_id,
-        deposit: inspect(deposit, limit: :infinity)
+        transaction_id: transaction_id,
+        transaction_type: transaction_type,
+        transaction: inspect(transaction, limit: :infinity)
       )
 
       # Update payout with sync success
       Ysc.Logging.debug(
         "[QB Sync] do_sync_payout: Updating payout with sync success",
         payout_id: payout.id,
-        deposit_id: deposit_id
+        transaction_id: transaction_id
       )
 
-      update_sync_success_payout(payout, deposit_id, deposit)
+      update_sync_success_payout(
+        payout,
+        transaction_id,
+        transaction,
+        transaction_type
+      )
 
       Ysc.Logging.info("[QB Sync] Successfully synced payout to QuickBooks",
         payout_id: payout.id,
-        deposit_id: deposit_id,
+        transaction_id: transaction_id,
+        transaction_type: transaction_type,
         payments_count: length(payout.payments),
         refunds_count: length(payout.refunds)
       )
 
-      {:ok, deposit}
+      {:ok, transaction}
     else
       {:error, :rate_limited} = error ->
         # Rate limit is expected and not an error - log as warning
@@ -2985,8 +3010,15 @@ defmodule Ysc.Quickbooks.Sync do
           {:ok, account_id} ->
             {:ok, %{value: account_id}}
 
-          _ ->
+          {:error, :not_found} ->
             {:error, :stripe_fees_account_not_found}
+
+          # Transient failures (rate limited, a bad response, etc.) are not
+          # "not configured" - preserve the real reason so callers (e.g. the
+          # payout worker's non-retriable error list) don't treat a blip as
+          # a permanent, unretriable config problem.
+          {:error, _other} = error ->
+            error
         end
     end
   end
@@ -3348,23 +3380,232 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
-  # A QuickBooks Deposit represents money arriving in a bank account. Stripe
-  # sometimes sends payout.paid with a negative amount when it debits our
-  # bank account to cover a negative Stripe balance - that's a withdrawal,
-  # not a deposit, and create_payout_deposit/1 has no correct way to
-  # represent it as one. Bail out here rather than sending QuickBooks a
-  # Deposit with a negative TotalAmt; a human needs to book this manually.
-  defp verify_payout_amount_syncable(%Payout{amount: amount}) do
+  # A QuickBooks Deposit represents money arriving in a bank account and
+  # can't have a negative TotalAmt. Stripe sometimes sends payout.paid with a
+  # negative amount when it debits our bank account to cover a negative
+  # Stripe balance - that's a withdrawal, not a deposit. Route those through
+  # a JournalEntry instead, which has no such sign constraint.
+  defp create_payout_transaction(%Payout{amount: amount} = payout) do
     if Money.negative?(amount) do
-      Ysc.Logging.warning(
-        "[QB Sync] Cannot sync payout - amount is negative, needs manual QuickBooks entry",
-        amount: Money.to_string!(amount)
+      case create_payout_journal_entry(payout) do
+        {:ok, journal_entry} -> {:ok, journal_entry, "journal_entry"}
+        {:error, _reason} = error -> error
+      end
+    else
+      case create_payout_deposit(payout) do
+        {:ok, deposit} -> {:ok, deposit, "deposit"}
+        {:error, _reason} = error -> error
+      end
+    end
+  end
+
+  # Books a negative-amount payout as a balanced JournalEntry:
+  #
+  #   Debit  Undeposited Funds  |net of the already-synced payment/refund
+  #                             |lines that would otherwise have been linked
+  #                             |via a Deposit's LinkedTxn - clears their
+  #                             |combined contribution back to zero. Flips to
+  #                             |a Credit if that net is itself positive
+  #                             |(payments outweigh refunds but fees alone
+  #                             |still push the payout negative).
+  #   Debit  Stripe Fees        |the processing fee expense (only if > 0)
+  #   Credit Bank account       |the actual cash Stripe withdrew
+  #
+  # Unlike a Deposit, JournalEntry lines have no LinkedTxn - QuickBooks won't
+  # show these specific Sales/Refund Receipts as "matched" the way a normal
+  # payout Deposit would, only the aggregate account balances net out
+  # correctly.
+  defp create_payout_journal_entry(%Payout{} = payout) do
+    line_items = build_payout_line_items(payout)
+    net_synced_amount = sum_line_amounts(line_items)
+    fee_amount = payout_fee_amount(payout)
+
+    bank_amount =
+      Money.to_decimal(payout.amount) |> Decimal.round(2) |> Decimal.abs()
+
+    Ysc.Logging.info(
+      "[QB Sync] create_payout_journal_entry: Booking negative payout as a JournalEntry",
+      payout_id: payout.id,
+      stripe_payout_id: payout.stripe_payout_id,
+      net_synced_amount: Decimal.to_string(net_synced_amount),
+      fee_amount: Decimal.to_string(fee_amount),
+      bank_amount: Decimal.to_string(bank_amount),
+      linked_lines_count: length(line_items)
+    )
+
+    with :ok <-
+           verify_journal_entry_balances(
+             net_synced_amount,
+             fee_amount,
+             bank_amount
+           ),
+         {:ok, bank_ref} <- get_bank_account_ref(),
+         {:ok, uf_ref} <- get_undeposited_funds_account_ref(),
+         {:ok, fees_ref} <- maybe_get_stripe_fees_account_ref(fee_amount) do
+      administration_class_ref = get_administration_class_ref()
+
+      lines =
+        build_payout_journal_entry_lines(
+          payout,
+          net_synced_amount,
+          fee_amount,
+          bank_amount,
+          uf_ref,
+          bank_ref,
+          fees_ref,
+          administration_class_ref
+        )
+
+      params = %{
+        line: lines,
+        txn_date: format_payout_date(payout.arrival_date || payout.inserted_at),
+        private_note:
+          "Stripe payout #{payout.stripe_payout_id}: Stripe debited the bank " <>
+            "account to cover refunds exceeding payments (net #{Money.to_string!(payout.amount)}). " <>
+            "Clears #{length(line_items)} already-synced payment/refund " <>
+            "receipt(s) out of Undeposited Funds by net amount - not linked " <>
+            "per-transaction like a normal payout Deposit."
+      }
+
+      client_module().create_journal_entry(params,
+        idempotency_key: qb_idempotency_key("je_payout", payout)
+      )
+    end
+  end
+
+  defp sum_line_amounts(line_items) do
+    Enum.reduce(line_items, Decimal.new(0), fn line, acc ->
+      Decimal.add(acc, line.amount)
+    end)
+  end
+
+  # Mirrors create_payout_deposit/1's fee resolution: prefer the cached
+  # fee_total (set by the webhook handler), falling back to summing ledger
+  # entries for older payouts that predate fee_total being recorded.
+  defp payout_fee_amount(%Payout{fee_total: fee_total} = payout) do
+    fee_total =
+      fee_total || calculate_payout_stripe_fees(payout, payout.payments)
+
+    if fee_total && Money.positive?(fee_total) do
+      Money.to_decimal(fee_total) |> Decimal.round(2)
+    else
+      Decimal.new(0)
+    end
+  end
+
+  # The JournalEntry's Undeposited Funds line (net_synced_amount, sign
+  # flipped) plus its Fees line must exactly equal what it credits out of the
+  # bank - otherwise QuickBooks will reject an unbalanced JournalEntry, or
+  # worse, silently accept one that doesn't reconcile. Refuse to guess a
+  # plug figure; surface the mismatch for manual entry instead.
+  defp verify_journal_entry_balances(net_synced_amount, fee_amount, bank_amount) do
+    uf_debit = Decimal.negate(net_synced_amount) |> Decimal.round(2)
+    expected_bank_amount = Decimal.add(uf_debit, fee_amount) |> Decimal.round(2)
+
+    if Decimal.equal?(expected_bank_amount, bank_amount) do
+      :ok
+    else
+      Ysc.Logging.error(
+        "[QB Sync] create_payout_journal_entry: Journal entry would not balance - refusing to sync",
+        net_synced_amount: Decimal.to_string(net_synced_amount),
+        fee_amount: Decimal.to_string(fee_amount),
+        bank_amount: Decimal.to_string(bank_amount),
+        expected_bank_amount: Decimal.to_string(expected_bank_amount)
       )
 
-      {:error, :negative_payout_amount}
-    else
-      :ok
+      {:error, :payout_journal_entry_unbalanced}
     end
+  end
+
+  defp maybe_get_stripe_fees_account_ref(fee_amount) do
+    if Decimal.positive?(fee_amount) do
+      get_stripe_fees_account_ref()
+    else
+      {:ok, nil}
+    end
+  end
+
+  defp get_bank_account_ref do
+    raw_bank_id = Application.get_env(:ysc, :quickbooks)[:bank_account_id]
+
+    case present_config_string(raw_bank_id) do
+      nil -> {:error, :quickbooks_accounts_not_configured}
+      id -> {:ok, %{value: id}}
+    end
+  end
+
+  defp build_payout_journal_entry_lines(
+         payout,
+         net_synced_amount,
+         fee_amount,
+         bank_amount,
+         uf_ref,
+         bank_ref,
+         fees_ref,
+         class_ref
+       ) do
+    uf_debit = Decimal.negate(net_synced_amount) |> Decimal.round(2)
+
+    uf_line =
+      if Decimal.negative?(uf_debit) do
+        journal_entry_line(
+          Decimal.abs(uf_debit),
+          "Credit",
+          uf_ref,
+          class_ref,
+          "Undeposited Funds clearing for payout #{payout.stripe_payout_id}"
+        )
+      else
+        journal_entry_line(
+          uf_debit,
+          "Debit",
+          uf_ref,
+          class_ref,
+          "Undeposited Funds clearing for payout #{payout.stripe_payout_id}"
+        )
+      end
+
+    bank_line =
+      journal_entry_line(
+        bank_amount,
+        "Credit",
+        bank_ref,
+        class_ref,
+        "Bank withdrawal for payout #{payout.stripe_payout_id}"
+      )
+
+    fee_line =
+      if fees_ref do
+        [
+          journal_entry_line(
+            fee_amount,
+            "Debit",
+            fees_ref,
+            class_ref,
+            "Stripe processing fees for payout #{payout.stripe_payout_id}"
+          )
+        ]
+      else
+        []
+      end
+
+    [uf_line] ++ fee_line ++ [bank_line]
+  end
+
+  defp journal_entry_line(
+         amount,
+         posting_type,
+         account_ref,
+         class_ref,
+         description
+       ) do
+    %{
+      amount: amount,
+      posting_type: posting_type,
+      account_ref: account_ref,
+      class_ref: class_ref,
+      description: description
+    }
   end
 
   # Returns true if payment is the virtual "payout payment" (Payout.payment_id).
@@ -3606,11 +3847,17 @@ defmodule Ysc.Quickbooks.Sync do
     result
   end
 
-  defp update_sync_success_payout(%Payout{} = payout, deposit_id, response) do
+  defp update_sync_success_payout(
+         %Payout{} = payout,
+         deposit_id,
+         response,
+         transaction_type \\ "deposit"
+       ) do
     Ysc.Logging.debug(
       "[QB Sync] update_sync_success_payout: Updating payout with sync success",
       payout_id: payout.id,
-      deposit_id: deposit_id
+      deposit_id: deposit_id,
+      transaction_type: transaction_type
     )
 
     result =
@@ -3622,6 +3869,10 @@ defmodule Ysc.Quickbooks.Sync do
         quickbooks_response: response,
         quickbooks_last_sync_attempt_at: DateTime.utc_now()
       })
+      # Not cast()-able (see Payout.changeset/2) - it's sync-owned state that
+      # must only ever be set here, after QuickBooks has actually confirmed
+      # which kind of transaction it created, never from arbitrary attrs.
+      |> Ecto.Changeset.change(quickbooks_transaction_type: transaction_type)
       |> Repo.update()
 
     Ysc.Logging.debug(

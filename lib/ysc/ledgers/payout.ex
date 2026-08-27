@@ -26,6 +26,11 @@ defmodule Ysc.Ledgers.Payout do
 
     # QuickBooks sync fields
     field :quickbooks_deposit_id, :string
+    # "deposit" (default) or "journal_entry" - which kind of QuickBooks
+    # transaction quickbooks_deposit_id actually points to. Negative-amount
+    # payouts sync as a JournalEntry since a Deposit can't represent a
+    # withdrawal.
+    field :quickbooks_transaction_type, :string
     field :quickbooks_sync_status, :string
     field :quickbooks_sync_error, :map
     field :quickbooks_response, :map
