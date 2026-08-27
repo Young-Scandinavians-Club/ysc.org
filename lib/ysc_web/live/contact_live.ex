@@ -294,8 +294,8 @@ defmodule YscWeb.ContactLive do
         id: "contact-card-web",
         email: "web@ysc.org",
         icon: "hero-computer-desktop",
-        title: "Web",
-        description: "Sign in or website related issues."
+        title: "Website & sign-in",
+        description: "Problems signing in or using the website."
       },
       %{
         id: "contact-card-choir",

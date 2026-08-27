@@ -212,9 +212,10 @@ trix-toolbar * {
 trix-toolbar .trix-button-row {
     border-radius: 0.25rem;
     display: flex;
-    flex-wrap: nowrap;
-    justify-content: space-between;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    align-items: center;
+    /* row-gap / column-gap: replaces per-button and per-group margins */
+    gap: 0.25rem 0.75rem;
     background-color: rgb(250 250 250);
     padding: 0.5rem;
     border: 1px solid rgb(228 228 231);
@@ -230,31 +231,24 @@ trix-toolbar .trix-button-row {
 
 trix-toolbar .trix-button-group {
     display: flex;
-    margin-bottom: 2px;
-    /* border: 1px solid #bbb;
-    border-top-color: #ccc;
-    border-bottom-color: #888;
-    border-radius: 3px; */
+    flex-wrap: wrap;
+    gap: 0.25rem;
 }
 
-trix-toolbar .trix-button-group:not(:first-child) {
-    margin-left: 1.5vw;
+/* Push the history group (undo/redo) to the right when the row has spare
+   space; an auto margin is ignored once the row is full, so it wraps cleanly. */
+trix-toolbar .trix-button-group--history-tools {
+    margin-left: auto;
 }
 
 @media (max-width: 768px) {
-    trix-toolbar .trix-button-group:not(:first-child) {
+    trix-toolbar .trix-button-group--history-tools {
         margin-left: 0;
     }
 }
 
 trix-toolbar .trix-button-group-spacer {
-    flex-grow: 1;
-}
-
-@media (max-width: 768px) {
-    trix-toolbar .trix-button-group-spacer {
-        display: none;
-    }
+    display: none;
 }
 
 trix-toolbar .trix-button {
@@ -265,7 +259,6 @@ trix-toolbar .trix-button {
     font-weight: 600;
     white-space: nowrap;
     padding: 0.5rem;
-    margin-right: 0.5rem;
     outline: none;
     border: none;
     background: transparent;
@@ -311,14 +304,12 @@ trix-toolbar .trix-button--icon {
     font-size: inherit;
     width: 2em;
     height: 1.8em;
-    max-width: calc(0.8em + 4vw);
     text-indent: -9999px;
 }
 
 @media (max-width: 768px) {
     trix-toolbar .trix-button--icon {
         height: 2em;
-        max-width: calc(0.8em + 3.5vw);
     }
 }
 

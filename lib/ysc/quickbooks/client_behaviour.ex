@@ -22,6 +22,17 @@ defmodule Ysc.Quickbooks.ClientBehaviour do
               {:ok, map()} | {:error, atom() | String.t()}
 
   @doc """
+  Creates a JournalEntry in QuickBooks. Used for payouts that a Deposit can't
+  represent (e.g. a negative-amount payout, which is a bank withdrawal, not
+  a deposit).
+  """
+  @callback create_journal_entry(map()) ::
+              {:ok, map()} | {:error, atom() | String.t()}
+
+  @callback create_journal_entry(map(), keyword()) ::
+              {:ok, map()} | {:error, atom() | String.t()}
+
+  @doc """
   Fetches a Deposit by ID from QuickBooks.
   """
   @callback get_deposit_by_id(String.t()) ::

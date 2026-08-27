@@ -1801,7 +1801,7 @@ defmodule YscWeb.AccountSetupLive do
             socket = refresh_setup_user_and_needs(socket)
 
             {socket,
-             "Payment method saved, but we couldn't activate membership yet. Use Activate Membership Now or pay from settings.",
+             "Payment method saved, but we couldn't activate membership yet. Use Activate Membership Now, or pay on the Membership page.",
              false}
         end
       else

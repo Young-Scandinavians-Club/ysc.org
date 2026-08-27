@@ -290,10 +290,13 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
                QuickbooksSyncPayoutWorker.perform(job)
     end
 
-    test "returns discard for a negative payout amount" do
+    test "returns discard for a negative payout with nothing linked to explain it" do
       # Stripe sends payout.paid with a negative amount when it debits our
       # bank account to cover a negative Stripe balance - a QuickBooks
-      # Deposit can't represent a withdrawal, so this must not retry.
+      # Deposit can't represent a withdrawal, so this syncs as a
+      # JournalEntry instead (see Sync.create_payout_journal_entry/1). With
+      # no linked payments/refunds to explain the amount, the entry can't be
+      # made to balance, so this must discard rather than retry or guess.
       {:ok, {_payout_payment, _tx, _entries, payout}} =
         Ledgers.process_stripe_payout(%{
           payout_amount: Money.new(-68_145, :USD),
@@ -305,7 +308,18 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
           metadata: %{}
         })
 
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
       deny(Ysc.Quickbooks.ClientMock, :create_deposit, 2)
+      deny(Ysc.Quickbooks.ClientMock, :create_journal_entry, 2)
 
       job = %Oban.Job{
         id: 1,
@@ -316,7 +330,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorkerTest do
         attempt: 1
       }
 
-      assert {:discard, :negative_payout_amount} =
+      assert {:discard, :payout_journal_entry_unbalanced} =
                QuickbooksSyncPayoutWorker.perform(job)
     end
   end

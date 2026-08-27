@@ -67,6 +67,8 @@ import { createLiveToastHook } from "../vendor/live_toast.esm.js";
 import { ToastFlashBridge } from "./toast_flash_bridge";
 import InteractScrollbar from "./interact_scrollbar";
 import OtpInput from "./otp_input";
+import StopClick from "./stop_click";
+import DisableOnSubmit from "./disable_on_submit";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
 const TOAST_DURATION_MS = 6000;
@@ -110,6 +112,8 @@ let Hooks = {
     AvatarCropper,
     InteractScrollbar,
     OtpInput,
+    StopClick,
+    DisableOnSubmit,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
     ToastFlashBridge,
 };

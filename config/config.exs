@@ -128,7 +128,8 @@ config :argon2_elixir,
   argon2_type: 1
 
 config :ysc, Oban,
-  repo: Ysc.Repo,
+  # 2.24 prefers repo options on the :repo tuple; top-level :log is soft-deprecated.
+  repo: {Ysc.Repo, log: false},
   notifier: Oban.Notifiers.PG,
   queues: [
     default: 10,
@@ -141,47 +142,44 @@ config :ysc, Oban,
     mailers: 2,
     maintenance: 2
   ],
-  log: false,
-  plugins: [
-    # Maintain for 5 days
-    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 5},
-    # Rebuild indexes concurrently nightly to prevent bloat and fragmentation
-    Oban.Plugins.Reindexer,
-    # Rescue jobs left stuck `executing` when a node is killed/deployed mid-job
-    # (e.g. a large event video upload) back to `available` so they retry.
-    # rescue_after is generous because EventPhotoUploadWorker can legitimately
-    # run for a long time downloading + re-uploading multi-GB videos; a
-    # shorter window would rescue still-running jobs and cause duplicate work.
-    {Oban.Plugins.Lifeline, rescue_after: :timer.hours(3)},
-    {Oban.Plugins.Cron,
-     crontab: [
-       {"0 * * * *", YscWeb.Workers.FileExportCleanUp},
-       {"*/30 * * * *", Ysc.PropertyOutages.OutageScraperWorker},
-       {"*/5 * * * *", Ysc.Bookings.HoldExpiryWorker},
-       {"*/5 * * * *", Ysc.Bookings.ModificationHoldExpiryWorker},
-       {"*/5 * * * *", Ysc.Bookings.BookingEntitlementExpiryWorker},
-       {"*/5 * * * *", Ysc.Tickets.TimeoutWorker},
-       {"*/5 * * * *", Ysc.Tickets.TicketReservationExpiryWorker},
-       {"*/5 * * * *", Ysc.Events.EventPublishWorker},
-       {"*/5 * * * *", YscWeb.Workers.NewsletterScheduleChecker},
-       {"*/15 * * * *", Ysc.Subscriptions.ExpirationWorker},
-       # Unused OTP codes expire after ~10 minutes; sweep leftover rows regularly.
-       {"*/15 * * * *", Ysc.VerificationCodeCleanupWorker},
-       {"0 2 * * *", YscWeb.Workers.ImageReprocessor},
-       {"0 2 * * *", Ysc.Stripe.WebhookReconciliationWorker},
-       {"0 0 * * *", Ysc.Ledgers.BalanceCheckWorker},
-       {"0 1 * * *", Ysc.Ledgers.ReconciliationWorker},
-       {"0 3 * * *", YscWeb.Workers.QuickbooksSyncRetryWorker},
-       {"0 3 * * *", YscWeb.Workers.WebhookRetryWorker},
-       {"0 */6 * * *", YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker},
-       {"0 9 * * *",
-        YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker},
-       # 04:00 UTC = 8:00 PM PST (UTC-8) / 9:00 PM PDT (UTC-7)
-       {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker},
-       {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
-       # 17:00 UTC = 9:00 AM PST (UTC-8) / 10:00 AM PDT (UTC-7)
-       {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker}
-     ]}
+  # Maintain completed jobs for 5 days
+  pruner: [max_age: {5, :days}],
+  # Rebuild indexes concurrently nightly to prevent bloat and fragmentation
+  reindexer: Oban.Reindexer,
+  # Rescue jobs left stuck `executing` when a node is killed/deployed mid-job
+  # (e.g. a large event video upload) back to `available` so they retry.
+  # rescue_after is generous because EventPhotoUploadWorker can legitimately
+  # run for a long time downloading + re-uploading multi-GB videos; a
+  # shorter window would rescue still-running jobs and cause duplicate work.
+  lifeline: [rescue_after: {3, :hours}],
+  cron: [
+    crontab: [
+      {"0 * * * *", YscWeb.Workers.FileExportCleanUp},
+      {"*/30 * * * *", Ysc.PropertyOutages.OutageScraperWorker},
+      {"*/5 * * * *", Ysc.Bookings.HoldExpiryWorker},
+      {"*/5 * * * *", Ysc.Bookings.ModificationHoldExpiryWorker},
+      {"*/5 * * * *", Ysc.Bookings.BookingEntitlementExpiryWorker},
+      {"*/5 * * * *", Ysc.Tickets.TimeoutWorker},
+      {"*/5 * * * *", Ysc.Tickets.TicketReservationExpiryWorker},
+      {"*/5 * * * *", Ysc.Events.EventPublishWorker},
+      {"*/5 * * * *", YscWeb.Workers.NewsletterScheduleChecker},
+      {"*/15 * * * *", Ysc.Subscriptions.ExpirationWorker},
+      # Unused OTP codes expire after ~10 minutes; sweep leftover rows regularly.
+      {"*/15 * * * *", Ysc.VerificationCodeCleanupWorker},
+      {"0 2 * * *", YscWeb.Workers.ImageReprocessor},
+      {"0 2 * * *", Ysc.Stripe.WebhookReconciliationWorker},
+      {"0 0 * * *", Ysc.Ledgers.BalanceCheckWorker},
+      {"0 1 * * *", Ysc.Ledgers.ReconciliationWorker},
+      {"0 3 * * *", YscWeb.Workers.QuickbooksSyncRetryWorker},
+      {"0 3 * * *", YscWeb.Workers.WebhookRetryWorker},
+      {"0 */6 * * *", YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker},
+      {"0 9 * * *", YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker},
+      # 04:00 UTC = 8:00 PM PST (UTC-8) / 9:00 PM PDT (UTC-7)
+      {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker},
+      {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
+      # 17:00 UTC = 9:00 AM PST (UTC-8) / 10:00 AM PDT (UTC-7)
+      {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker}
+    ]
   ]
 
 config :ex_cldr, default_backend: Ysc.Cldr

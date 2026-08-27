@@ -16,6 +16,7 @@ defmodule YscWeb.HomeLiveTest do
   alias Ysc.Newsletter
   alias Ysc.Posts
   alias Ysc.Repo
+  alias YscWeb.NewsletterSubscribe
 
   describe "guest" do
     test "renders marketing home with hero and newsletter section", %{
@@ -212,6 +213,42 @@ defmodule YscWeb.HomeLiveTest do
       assert has_element?(view, "#home-quick-action-tahoe", "Book a stay")
       assert has_element?(view, "#home-quick-action-clear-lake", "Book a stay")
       refute has_element?(view, "#home-quick-actions", "Reserve Cabin")
+    end
+
+    test "toggles newsletter subscription from the member dashboard", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/")
+      render_async(view, 5_000)
+
+      assert NewsletterSubscribe.subscribed?(user.email)
+      assert has_element?(view, "#home-newsletter-member-status", "Subscribed")
+
+      view
+      |> element(
+        "#home-newsletter-member-status button[phx-click='toggle_newsletter_subscription']",
+        "Unsubscribe"
+      )
+      |> render_click()
+
+      refute NewsletterSubscribe.subscribed?(user.email)
+
+      assert has_element?(
+               view,
+               "#home-newsletter-member-status",
+               "Not subscribed"
+             )
+
+      view
+      |> element(
+        "#home-newsletter-member-status button[phx-click='toggle_newsletter_subscription']",
+        "Subscribe"
+      )
+      |> render_click()
+
+      assert NewsletterSubscribe.subscribed?(user.email)
+      assert has_element?(view, "#home-newsletter-member-status", "Subscribed")
     end
 
     test "uses Norwegian greeting when most_connected_country is Norway", %{
@@ -1061,6 +1098,18 @@ defmodule YscWeb.HomeLiveTest do
       refute Newsletter.get_subscriber_by_email(email).subscribed
 
       assert html =~ "Check your email"
+    end
+
+    test "subscribe_newsletter shows rate-limit error on a second attempt for the same email",
+         %{conn: conn} do
+      email = "nl_rate_#{System.unique_integer([:positive])}@example.com"
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_submit(view, "subscribe_newsletter", %{"email" => email})
+      html = render_submit(view, "subscribe_newsletter", %{"email" => email})
+
+      assert has_element?(view, "#newsletter-error")
+      assert html =~ "Too many subscription attempts"
     end
   end
 

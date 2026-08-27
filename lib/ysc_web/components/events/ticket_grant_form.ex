@@ -12,21 +12,30 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   def render(assigns) do
     ~H"""
     <div>
-      <.header>
-        Grant Tickets
-        <:subtitle>
-          Immediately assign confirmed tickets to a member (e.g. migration from a legacy system).
-          Double-check the member and quantity before granting; complimentary orders cannot be revoked from this screen.
-        </:subtitle>
-      </.header>
+      <div>
+        <h2
+          id={"#{@dialog_id}-title"}
+          class="text-lg font-semibold leading-8 text-zinc-800"
+        >
+          Grant Tickets
+        </h2>
+        <p
+          id={"#{@dialog_id}-description"}
+          class="mt-2 text-sm leading-6 text-zinc-600"
+        >
+          Immediately assign confirmed tickets to a member (e.g. in-person sales or
+          migration from a legacy system). Double-check the member and quantity before
+          granting; complimentary orders cannot be revoked from this screen.
+        </p>
+      </div>
 
-      <.simple_form
+      <.form
         for={@form}
         id="ticket-grant-form"
         phx-target={@myself}
         phx-change="validate"
         phx-submit="save"
-        class="mt-8"
+        class="mt-8 space-y-6"
       >
         <.input type="hidden" field={@form[:ticket_tier_id]} />
         <.admin_user_autocomplete
@@ -53,41 +62,60 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
           required
         />
 
-        <.input
-          type="checkbox"
-          field={@form[:skip_capacity]}
-          label="Override capacity limits"
-        />
-        <p class="text-sm text-zinc-500 -mt-2">
-          Allow granting when the tier or event is sold out. Publish status, sale windows, and event dates are still enforced.
-        </p>
+        <div class="space-y-1">
+          <.input
+            type="checkbox"
+            field={@form[:override_limits]}
+            label="Override all limits"
+            aria-describedby={"#{@form[:override_limits].id}-description"}
+          />
+          <p
+            id={"#{@form[:override_limits].id}-description"}
+            class="pl-8 text-sm text-zinc-500"
+          >
+            Grant even when the tier or event is sold out, unpublished, past its
+            sale window, or already started. Use for in-person sales and legacy
+            imports.
+          </p>
+        </div>
 
-        <.input
-          type="checkbox"
-          field={@form[:skip_sale_guards]}
-          label="Migration override"
-        />
-        <p class="text-sm text-zinc-500 -mt-2">
-          Also bypass publish status, tier sale windows, and event date checks. Use only when importing tickets from a legacy system.
-        </p>
-
-        <.input
-          type="checkbox"
-          field={@form[:send_email]}
-          label="Send ticket confirmation email"
-        />
+        <div class="space-y-1">
+          <.input
+            type="checkbox"
+            field={@form[:send_email]}
+            label="Send ticket confirmation email"
+            aria-describedby={"#{@form[:send_email].id}-description"}
+          />
+          <p
+            id={"#{@form[:send_email].id}-description"}
+            class="pl-8 text-sm text-zinc-500"
+          >
+            Emails the member their confirmed tickets right away. Turn off for silent
+            imports or in-person grants.
+          </p>
+        </div>
 
         <.input
           type="textarea"
-          label="Notes (Optional)"
+          label="Notes (optional)"
           field={@form[:admin_grant_notes]}
-          placeholder="e.g. Migrated from legacy order #12345"
+          placeholder="e.g. Paid $40 cash at the door, or migrated from legacy order #12345"
         />
 
-        <:actions>
-          <.button phx-disable-with="Granting...">Grant Tickets</.button>
-        </:actions>
-      </.simple_form>
+        <div class="flex justify-end gap-3 border-t border-zinc-200 pt-6">
+          <.button
+            type="button"
+            variant="outline"
+            color="zinc"
+            phx-click={JS.exec("data-cancel", to: "##{@dialog_id}")}
+          >
+            Cancel
+          </.button>
+          <.button type="submit" phx-disable-with="Granting...">
+            Grant Tickets
+          </.button>
+        </div>
+      </.form>
     </div>
     """
   end
@@ -105,6 +133,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
       |> assign_new(:admin_role, fn -> nil end)
       |> assign(assigns)
       |> assign(:ticket_tier_id, ticket_tier_id)
+      |> assign_new(:dialog_id, fn -> "grant-tickets-modal" end)
 
     if socket.assigns[:initialized?] do
       {:ok, socket}
@@ -195,8 +224,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     merged = merge_form_params(socket, params)
     user_id = merged["user_id"]
     quantity = parse_quantity(merged["quantity"])
-    skip_capacity? = checkbox_enabled?(merged["skip_capacity"])
-    skip_sale_guards? = checkbox_enabled?(merged["skip_sale_guards"])
+    override_limits? = checkbox_enabled?(merged["override_limits"])
     skip_email? = not checkbox_enabled?(merged["send_email"])
     notes = blank_to_nil(merged["admin_grant_notes"])
 
@@ -227,8 +255,8 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
                user_id,
                socket.assigns.event_id,
                ticket_selections,
-               skip_capacity: skip_capacity?,
-               skip_sale_guards: skip_sale_guards?,
+               skip_capacity: override_limits?,
+               skip_sale_guards: override_limits?,
                skip_email: skip_email?,
                admin_grant_notes: notes
              ) do
@@ -266,8 +294,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     %{
       "ticket_tier_id" => ticket_tier_id,
       "quantity" => 1,
-      "skip_capacity" => false,
-      "skip_sale_guards" => false,
+      "override_limits" => false,
       "send_email" => true,
       "admin_grant_notes" => ""
     }
@@ -305,14 +332,13 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   defp blank_to_nil(value), do: value
 
   defp checkbox_enabled?(value) do
-    Phoenix.HTML.Form.normalize_value("checkbox", value) == "true"
+    # normalize_value/2 returns a boolean for checkboxes ("true" -> true),
+    # so compare against the boolean, not the string.
+    Phoenix.HTML.Form.normalize_value("checkbox", value) == true
   end
 
   defp grant_error_message(:user_not_found), do: "Member not found."
   defp grant_error_message(:event_not_found), do: "Event not found."
-
-  defp grant_error_message(:partiful_event),
-    do: "Cannot grant tickets for Partiful events."
 
   defp grant_error_message(:donation_tier_not_grantable),
     do: "Donation tiers cannot be granted."

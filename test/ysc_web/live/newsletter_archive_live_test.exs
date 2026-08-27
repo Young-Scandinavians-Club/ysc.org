@@ -185,6 +185,33 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
       assert has_element?(view, "button", "Unsubscribe")
     end
 
+    test "logged-in user can unsubscribe from newsletters page", %{
+      conn: conn
+    } do
+      user = user_fixture()
+
+      assert {:ok, _} =
+               Newsletter.subscribe(user.email,
+                 user_id: user.id,
+                 first_name: user.first_name,
+                 last_name: user.last_name,
+                 source: "test"
+               )
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/newsletters")
+      render_async(view)
+
+      html =
+        view
+        |> element("button", "Unsubscribe")
+        |> render_click()
+
+      assert html =~ "not subscribed" or html =~ "You're not subscribed"
+      refute Newsletter.get_subscriber_by_email(user.email).subscribed
+    end
+
     test "toggle subscription shows error when subscriber row is missing", %{
       conn: conn
     } do

@@ -16,6 +16,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   alias Ysc.Events
   alias Ysc.Events.TicketDetail
   alias Ysc.Tickets
+  alias Ysc.Tickets.DonationDisplay
 
   @impl true
   def render(assigns) do
@@ -82,7 +83,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
             phx-click="toggle-order"
             phx-value-id={group.order_id}
             phx-target={@myself}
-            class="w-full flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 bg-zinc-50 hover:bg-zinc-100 text-sm text-left transition-colors"
+            class="w-full flex items-center gap-x-3 sm:gap-x-4 px-3 py-2 bg-zinc-50 hover:bg-zinc-100 text-sm text-left transition-colors"
           >
             <.icon
               name={
@@ -92,23 +93,28 @@ defmodule YscWeb.AdminEventsLive.TicketList do
               }
               class="w-3.5 h-3.5 text-zinc-400 shrink-0"
             />
-            <.user_card user={group.order && group.order.user} class="h-auto" />
-            <div class="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 shrink-0">
+            <.user_card
+              user={group.order && group.order.user}
+              class="h-auto min-w-0 flex-1"
+              truncate
+            />
+            <div class="hidden md:flex items-center gap-1.5 text-xs font-semibold text-zinc-600 shrink-0">
               <.icon name="hero-shopping-bag" class="w-3.5 h-3.5 text-zinc-400" />
               {order_reference(group.order)}
             </div>
-            <span class="text-xs text-zinc-500 shrink-0">
+            <span class="hidden sm:inline text-xs text-zinc-500 shrink-0">
               {length(group.tickets)} ticket{if length(group.tickets) != 1, do: "s"}
             </span>
-            <span class="sm:ml-auto text-sm font-medium text-zinc-800 shrink-0">
+            <span class="text-sm font-medium text-zinc-800 shrink-0">
               {format_money_safe(order_total(group))}
             </span>
-            <span class="text-xs text-zinc-500 whitespace-nowrap shrink-0">
+            <span class="hidden sm:inline text-xs text-zinc-500 whitespace-nowrap shrink-0">
               {format_datetime(order_purchased_at(group))}
             </span>
           </button>
 
           <div :if={!order_collapsed?(@collapsed_order_ids, group.order_id)}>
+            <% ticket_amounts = order_ticket_amounts(group) %>
             <div
               :for={ticket <- group.tickets}
               id={"ticket-row-#{ticket.id}"}
@@ -147,6 +153,20 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                 >
                   {ticket.ticket_tier.name}
                 </.badge>
+              </div>
+              <div class="w-24 shrink-0 text-right">
+                <div class="text-sm font-medium text-zinc-800">
+                  {format_money_safe(Map.get(ticket_amounts, ticket.id))}
+                </div>
+                <%= if discount = ticket_reservation_discount(ticket) do %>
+                  <div
+                    class="flex items-center justify-end gap-0.5 text-xs text-emerald-700 whitespace-nowrap"
+                    title="Discount applied from a ticket reservation"
+                  >
+                    <.icon name="hero-tag" class="w-3 h-3 shrink-0" />
+                    -{format_money_safe(discount)}
+                  </div>
+                <% end %>
               </div>
               <div class="shrink-0">
                 <.row_actions_dropdown
@@ -420,6 +440,33 @@ defmodule YscWeb.AdminEventsLive.TicketList do
       Enum.min_by(tickets, & &1.inserted_at).inserted_at
   end
 
+  # Per-ticket share of the order, so the rows under an order add up to its
+  # total: paid tickets show `tier price - reservation discount`, free tickets
+  # $0, and donation tickets their even split of what's left. Mirrors the
+  # refund calculation (Tickets.calculate_refund_amount/2). Skipped when the
+  # order or any tier failed to load, in which case rows show "—".
+  defp order_ticket_amounts(%{order: %{total_amount: total}, tickets: tickets})
+       when not is_nil(total) do
+    if Enum.all?(tickets, & &1.ticket_tier) do
+      DonationDisplay.money_amounts_by_ticket_id(%{
+        tickets: tickets,
+        total_amount: total
+      })
+    else
+      %{}
+    end
+  end
+
+  defp order_ticket_amounts(_group), do: %{}
+
+  # The discount a ticket reservation knocked off this ticket's tier price, or
+  # nil when the ticket was bought at full price.
+  defp ticket_reservation_discount(%{discount_amount: %Money{} = discount}) do
+    if Money.positive?(discount), do: discount, else: nil
+  end
+
+  defp ticket_reservation_discount(_ticket), do: nil
+
   defp reassigned?(_ticket, nil), do: false
 
   defp reassigned?(ticket, order) do
@@ -449,8 +496,16 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   end
 
   @impl true
-  def handle_event("toggle-order", %{"id" => order_id}, socket) do
-    order_id = if order_id == "", do: nil, else: order_id
+  def handle_event("toggle-order", params, socket) do
+    # Tickets issued without an order group under `order_id: nil`, so their
+    # toggle button renders no `phx-value-id` and the event arrives with the
+    # key absent (or blank). Normalize both to nil.
+    order_id =
+      case params["id"] do
+        "" -> nil
+        id -> id
+      end
+
     collapsed = socket.assigns.collapsed_order_ids
 
     collapsed =

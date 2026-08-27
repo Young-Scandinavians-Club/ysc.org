@@ -25,7 +25,10 @@ defmodule YscWeb.RowActionsDropdownTest do
       assert html =~ ~s(id="row-actions-1-edit")
       assert html =~ "Edit"
       assert html =~ "hero-pencil-square"
-      assert html =~ "event.stopPropagation()"
+      # Click propagation is stopped via a CSP-safe hook, not an inline handler.
+      refute html =~ "onclick"
+      assert html =~ ~s(phx-hook="StopClick")
+      assert html =~ ~s(id="row-actions-1-stop-click")
       assert html =~ "bottom-full mb-1"
       refute html =~ ~r/\bmt-1\b/
     end
