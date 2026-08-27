@@ -11,6 +11,10 @@ defmodule Ysc.SNS.SignatureVerifier do
   self-signed cert on their own S3 bucket, forge a signed SNS envelope,
   and either fetch an arbitrary `SubscribeURL` or inject SES events
   (including hard-bounce suppressions).
+
+  Topic ARNs are allowlisted separately (`:sns_allowed_topic_arns` /
+  `SNS_TOPIC_ARN`). A valid AWS signature only proves the message came
+  from SNS, not from *your* SES topic.
   """
   require Ysc.Logging
 
@@ -93,6 +97,48 @@ defmodule Ysc.SNS.SignatureVerifier do
       true ->
         {:ok, body_type}
     end
+  end
+
+  @doc """
+  Returns whether an SNS `TopicArn` may confirm a new HTTPS subscription.
+
+  New subscriptions are fail-closed: `sns_allowed_topic_arns` must be
+  configured and must include `topic_arn`. Otherwise anyone with an AWS
+  account can subscribe `POST /webhooks/ses` and later publish forged SES
+  bounce payloads that suppress mail for arbitrary addresses.
+  """
+  @spec allow_subscription_confirmation?(term()) :: boolean()
+  def allow_subscription_confirmation?(topic_arn) when is_binary(topic_arn) do
+    case allowed_topic_arns() do
+      [] -> false
+      allowed -> topic_arn in allowed
+    end
+  end
+
+  def allow_subscription_confirmation?(_topic_arn), do: false
+
+  @doc """
+  Returns whether an SNS Notification `TopicArn` may be processed.
+
+  When no allowlist is configured, notifications are accepted so an already
+  confirmed SES topic keeps delivering. Once `SNS_TOPIC_ARN` is set, only
+  those ARNs are accepted.
+  """
+  @spec allow_notification_topic?(term()) :: boolean()
+  def allow_notification_topic?(topic_arn) when is_binary(topic_arn) do
+    case allowed_topic_arns() do
+      [] -> true
+      allowed -> topic_arn in allowed
+    end
+  end
+
+  def allow_notification_topic?(_topic_arn), do: false
+
+  defp allowed_topic_arns do
+    :ysc
+    |> Application.get_env(:sns_allowed_topic_arns, [])
+    |> List.wrap()
+    |> Enum.filter(&is_binary/1)
   end
 
   defp validate_cert_url(nil), do: {:error, :missing_cert_url}

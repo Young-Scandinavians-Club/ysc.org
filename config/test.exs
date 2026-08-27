@@ -32,6 +32,10 @@ config :ysc, :google_photos_req_opts,
 # Skip SNS signature verification in tests (no real AWS cert to fetch)
 config :ysc, :sns_skip_signature_verification, true
 
+config :ysc, :sns_allowed_topic_arns, [
+  "arn:aws:sns:us-west-1:123456789:ses-events"
+]
+
 # Speed up QuickBooks tests by disabling rate limit backoff delays
 config :ysc,
   quickbooks_max_429_retries: 0,

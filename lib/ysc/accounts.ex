@@ -4461,7 +4461,7 @@ defmodule Ysc.Accounts do
   `current_ytd_losses`/`prior_ytd_losses` count distinct primary users
   whose subscription lapsed (`stripe_status` of "canceled"/"cancelled"/
   "unpaid") with a `current_period_end` falling in that same interval —
-  see `membership_losses_in_interval/2`.
+  see `membership_losses_ytd_query/4`.
 
   `current_ytd_net_new`/`prior_ytd_net_new` are joins minus losses for
   each span — this is the figure actually worth calling "net new", since
@@ -4470,7 +4470,7 @@ defmodule Ysc.Accounts do
 
   `renewals_ytd` separately counts distinct primary users whose subscription
   started a new billing period (not its first) within the current
-  year-to-date window — see `membership_renewals_in_interval/2`.
+  year-to-date window — see `membership_renewals_ytd_query/2`.
 
   Used on the admin dashboard to compare this year-to-date with the same
   calendar-aligned span last year (Jan 1 through the same instant, shifted back one year).
@@ -4478,33 +4478,33 @@ defmodule Ysc.Accounts do
   def get_membership_joins_ytd_comparison do
     %DateTime{} = now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    year_start = %DateTime{
-      now
-      | month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
+    {year_start, now, prior_year_start, prior_period_end} =
+      membership_ytd_windows(now)
 
-    prior_period_end = Timex.shift(now, years: -1)
-    prior_year_start = Timex.shift(year_start, years: -1)
+    %{current: current_count, prior: prior_count} =
+      membership_joins_ytd_query(
+        year_start,
+        now,
+        prior_year_start,
+        prior_period_end
+      )
+      |> Repo.one!()
 
-    current_count = membership_joins_in_interval(year_start, now)
+    %{current: current_losses, prior: prior_losses} =
+      membership_losses_ytd_query(
+        year_start,
+        now,
+        prior_year_start,
+        prior_period_end
+      )
+      |> Repo.one!()
 
-    prior_count =
-      membership_joins_in_interval(prior_year_start, prior_period_end)
-
-    current_losses = membership_losses_in_interval(year_start, now)
-
-    prior_losses =
-      membership_losses_in_interval(prior_year_start, prior_period_end)
+    renewals_count =
+      membership_renewals_ytd_query(year_start, now)
+      |> Repo.one!()
 
     current_net_new = current_count - current_losses
     prior_net_new = prior_count - prior_losses
-
-    renewals_count = membership_renewals_in_interval(year_start, now)
 
     # `prior_year_start` is already a UTC instant at Jan 1 00:00:00 of the
     # prior calendar year (it's derived from `year_start`, itself built from
@@ -4533,45 +4533,65 @@ defmodule Ysc.Accounts do
     }
   end
 
-  defp membership_joins_in_interval(
-         %DateTime{} = start_dt,
-         %DateTime{} = end_dt
+  # One query for both YTD windows: UNION ALL of lifetime awards and each
+  # primary's first converted subscription, then `COUNT(DISTINCT user_id)
+  # FILTER` per window. The previous implementation loaded those id lists
+  # into Elixir (`Repo.all` + `Enum.uniq` + `length`) and grouped every
+  # converted subscription twice (once per window).
+  defp membership_joins_ytd_query(
+         %DateTime{} = current_start,
+         %DateTime{} = current_end,
+         %DateTime{} = prior_start,
+         %DateTime{} = prior_end
        ) do
-    lifetime_ids =
+    lifetime =
       from(u in User,
         where: is_nil(u.primary_user_id),
         where: u.state == :active,
         where: not is_nil(u.lifetime_membership_awarded_at),
         where:
-          u.lifetime_membership_awarded_at >= ^start_dt and
-            u.lifetime_membership_awarded_at < ^end_dt,
-        select: u.id
+          (u.lifetime_membership_awarded_at >= ^current_start and
+             u.lifetime_membership_awarded_at < ^current_end) or
+            (u.lifetime_membership_awarded_at >= ^prior_start and
+               u.lifetime_membership_awarded_at < ^prior_end),
+        select: %{
+          user_id: u.id,
+          joined_at: u.lifetime_membership_awarded_at
+        }
       )
-      |> Repo.all()
 
-    first_sub_q =
+    first_subs =
       from(s in Subscription,
         join: u in User,
         on: s.user_id == u.id,
         where: is_nil(u.primary_user_id),
         where: u.state == :active,
         where: s.stripe_status not in ["incomplete", "incomplete_expired"],
-        group_by: u.id,
-        select: %{user_id: u.id, first_at: min(s.inserted_at)}
+        group_by: s.user_id,
+        having:
+          (min(s.inserted_at) >= ^current_start and
+             min(s.inserted_at) < ^current_end) or
+            (min(s.inserted_at) >= ^prior_start and
+               min(s.inserted_at) < ^prior_end),
+        select: %{user_id: s.user_id, joined_at: min(s.inserted_at)}
       )
 
-    sub_ids =
-      from(f in subquery(first_sub_q),
-        where: f.first_at >= ^start_dt and f.first_at < ^end_dt,
-        select: f.user_id
-      )
-      |> Repo.all()
-
-    (lifetime_ids ++ sub_ids) |> Enum.uniq() |> length()
+    from(j in subquery(union_all(lifetime, ^first_subs)),
+      select: %{
+        current:
+          count(j.user_id, :distinct)
+          |> filter(
+            j.joined_at >= ^current_start and j.joined_at < ^current_end
+          ),
+        prior:
+          count(j.user_id, :distinct)
+          |> filter(j.joined_at >= ^prior_start and j.joined_at < ^prior_end)
+      }
+    )
   end
 
   # Distinct primary users whose subscription lapsed with a coverage end
-  # date (`current_period_end`) falling in `[start_dt, end_dt)`. There is
+  # date (`current_period_end`) falling in either YTD window. There is
   # no `canceled_at` timestamp on `Subscription` — `current_period_end` is
   # the best available proxy for "when this member actually lost
   # coverage", and matches the same status set + column already used by
@@ -4582,9 +4602,11 @@ defmodule Ysc.Accounts do
   # row) will no longer show up as a loss in that earlier window, since
   # only the subscription's *current* status/period is stored — there's
   # no historical ledger of past cancel/reactivate cycles to query.
-  defp membership_losses_in_interval(
-         %DateTime{} = start_dt,
-         %DateTime{} = end_dt
+  defp membership_losses_ytd_query(
+         %DateTime{} = current_start,
+         %DateTime{} = current_end,
+         %DateTime{} = prior_start,
+         %DateTime{} = prior_end
        ) do
     from(s in Subscription,
       join: u in User,
@@ -4593,12 +4615,25 @@ defmodule Ysc.Accounts do
       where: s.stripe_status in ["canceled", "cancelled", "unpaid"],
       where: not is_nil(s.current_period_end),
       where:
-        s.current_period_end >= ^start_dt and s.current_period_end < ^end_dt,
-      distinct: s.user_id,
-      select: s.user_id
+        (s.current_period_end >= ^current_start and
+           s.current_period_end < ^current_end) or
+          (s.current_period_end >= ^prior_start and
+             s.current_period_end < ^prior_end),
+      select: %{
+        current:
+          count(s.user_id, :distinct)
+          |> filter(
+            s.current_period_end >= ^current_start and
+              s.current_period_end < ^current_end
+          ),
+        prior:
+          count(s.user_id, :distinct)
+          |> filter(
+            s.current_period_end >= ^prior_start and
+              s.current_period_end < ^prior_end
+          )
+      }
     )
-    |> Repo.all()
-    |> length()
   end
 
   # Distinct primary users whose subscription entered a **new billing
@@ -4607,8 +4642,8 @@ defmodule Ysc.Accounts do
   # `inserted_at`, which only happens once Stripe has pushed the period
   # forward at least once (an initial subscribe's first period starts at
   # or before the row is inserted). This is the renewal counterpart to
-  # `membership_joins_in_interval/2`'s first-ever-subscription check.
-  defp membership_renewals_in_interval(
+  # `membership_joins_ytd_query/4`'s first-ever-subscription check.
+  defp membership_renewals_ytd_query(
          %DateTime{} = start_dt,
          %DateTime{} = end_dt
        ) do
@@ -4622,11 +4657,8 @@ defmodule Ysc.Accounts do
       where:
         s.current_period_start >= ^start_dt and s.current_period_start < ^end_dt,
       where: s.current_period_start > s.inserted_at,
-      distinct: s.user_id,
-      select: s.user_id
+      select: count(s.user_id, :distinct)
     )
-    |> Repo.all()
-    |> length()
   end
 
   defp get_membership_type_for_primary(user) do
@@ -4904,5 +4936,54 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_event_notification_recipients_query do
     event_notification_recipients_query()
+  end
+
+  @doc false
+  def ci_query_explain_membership_joins_ytd_query do
+    {current_start, current_end, prior_start, prior_end} =
+      membership_ytd_windows(Ysc.Ci.QueryExplain.Fixtures.now())
+
+    membership_joins_ytd_query(
+      current_start,
+      current_end,
+      prior_start,
+      prior_end
+    )
+  end
+
+  @doc false
+  def ci_query_explain_membership_losses_ytd_query do
+    {current_start, current_end, prior_start, prior_end} =
+      membership_ytd_windows(Ysc.Ci.QueryExplain.Fixtures.now())
+
+    membership_losses_ytd_query(
+      current_start,
+      current_end,
+      prior_start,
+      prior_end
+    )
+  end
+
+  @doc false
+  def ci_query_explain_membership_renewals_ytd_query do
+    {current_start, current_end, _prior_start, _prior_end} =
+      membership_ytd_windows(Ysc.Ci.QueryExplain.Fixtures.now())
+
+    membership_renewals_ytd_query(current_start, current_end)
+  end
+
+  defp membership_ytd_windows(%DateTime{} = now) do
+    year_start = %DateTime{
+      now
+      | month: 1,
+        day: 1,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0}
+    }
+
+    {year_start, now, Timex.shift(year_start, years: -1),
+     Timex.shift(now, years: -1)}
   end
 end

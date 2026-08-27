@@ -305,6 +305,23 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "ci_query_explain membership YTD query builders" do
+    test "ci_query_explain_membership_joins_ytd_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_membership_joins_ytd_query()
+    end
+
+    test "ci_query_explain_membership_losses_ytd_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_membership_losses_ytd_query()
+    end
+
+    test "ci_query_explain_membership_renewals_ytd_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_membership_renewals_ytd_query()
+    end
+  end
+
   describe "get_user_by_phone_number/1" do
     test "returns nil for unknown phone number" do
       refute Accounts.get_user_by_phone_number("+15550000000")
@@ -3278,6 +3295,42 @@ defmodule Ysc.AccountsTest do
       assert after_stats.current_ytd_losses == before.current_ytd_losses
       assert after_stats.current_ytd_joins == before.current_ytd_joins
       assert after_stats.current_ytd_net_new == before.current_ytd_net_new
+    end
+
+    test "get_membership_joins_ytd_comparison counts a lifetime award and first subscription as one join" do
+      before = Accounts.get_membership_joins_ytd_comparison().current_ytd_joins
+
+      joined_at =
+        DateTime.utc_now()
+        |> DateTime.add(-2, :second)
+        |> DateTime.truncate(:second)
+
+      user =
+        user_fixture(%{phone_number: unique_user_phone()})
+        |> Ecto.Changeset.change(lifetime_membership_awarded_at: joined_at)
+        |> Repo.update!()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_lifetime_join_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Lifetime billed once",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {1, _} =
+        Repo.update_all(
+          from(s in Ysc.Subscriptions.Subscription,
+            where: s.id == ^subscription.id
+          ),
+          set: [inserted_at: joined_at]
+        )
+
+      after_count =
+        Accounts.get_membership_joins_ytd_comparison().current_ytd_joins
+
+      assert after_count == before + 1
     end
 
     test "get_membership_joins_ytd_comparison counts distinct primaries and ignores family sub-accounts" do

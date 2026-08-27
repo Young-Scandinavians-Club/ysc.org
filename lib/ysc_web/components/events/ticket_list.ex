@@ -21,7 +21,10 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="border border-zinc-200 rounded p-4 sm:p-6">
+    <div
+      id={"ticket-list-#{@event_id}"}
+      class="border border-zinc-200 rounded p-4 sm:p-6"
+    >
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div class="flex items-center gap-3">
           <h3 class="text-lg font-semibold">Tickets</h3>
@@ -183,6 +186,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                       else: "Add attendee info"}
                   </.dropdown_menu_item>
                   <.dropdown_menu_item
+                    :if={@admin_role == :admin}
                     id={"ticket-actions-#{ticket.id}-reassign"}
                     icon="hero-arrows-right-left"
                     phx-click="open-reassign"
@@ -192,6 +196,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                     Reassign ticket
                   </.dropdown_menu_item>
                   <.dropdown_menu_item
+                    :if={@admin_role == :admin}
                     id={"ticket-actions-#{ticket.id}-refund"}
                     icon="hero-banknotes"
                     tone={:danger}
@@ -353,13 +358,30 @@ defmodule YscWeb.AdminEventsLive.TicketList do
           </:actions>
         </.simple_form>
       </.modal>
+      <button
+        id={"ticket-list-open-refund-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="open-refund"
+        phx-target={@myself}
+      />
+      <button
+        id={"ticket-list-open-reassign-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="open-reassign"
+        phx-target={@myself}
+      />
     </div>
     """
   end
 
   @impl true
   def update(assigns, socket) do
-    socket = assign(socket, assigns)
+    socket =
+      socket
+      |> assign_new(:admin_role, fn -> nil end)
+      |> assign(assigns)
 
     if socket.assigns[:initialized?] do
       {:ok, refresh_data(socket)}
@@ -560,14 +582,18 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("open-reassign", %{"id" => id}, socket) do
-    ticket = find_ticket!(socket, id)
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Reassign Ticket")}
+    else
+      ticket = find_ticket!(socket, id)
 
-    {:noreply,
-     socket
-     |> assign(:reassigning_ticket, ticket)
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+      {:noreply,
+       socket
+       |> assign(:reassigning_ticket, ticket)
+       |> assign(:selected_user, nil)
+       |> assign(:user_search, "")
+       |> assign(:user_search_results, [])}
+    end
   end
 
   @impl true
@@ -577,28 +603,36 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("search-users", %{"value" => query}, socket) do
-    results =
-      if String.length(query) >= 2 do
-        Accounts.search_users(query, limit: 10)
-      else
-        []
-      end
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Reassign Ticket")}
+    else
+      results =
+        if String.length(query) >= 2 do
+          Accounts.search_users(query, limit: 10)
+        else
+          []
+        end
 
-    {:noreply,
-     socket
-     |> assign(:user_search, query)
-     |> assign(:user_search_results, results)}
+      {:noreply,
+       socket
+       |> assign(:user_search, query)
+       |> assign(:user_search_results, results)}
+    end
   end
 
   @impl true
   def handle_event("select-user", %{"id" => id}, socket) do
-    user = Accounts.get_user!(id)
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Reassign Ticket")}
+    else
+      user = Accounts.get_user!(id)
 
-    {:noreply,
-     socket
-     |> assign(:selected_user, user)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+      {:noreply,
+       socket
+       |> assign(:selected_user, user)
+       |> assign(:user_search, "")
+       |> assign(:user_search_results, [])}
+    end
   end
 
   @impl true
@@ -608,81 +642,89 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("confirm-reassign", _params, socket) do
-    ticket = socket.assigns.reassigning_ticket
-    user = socket.assigns.selected_user
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Reassign Ticket")}
+    else
+      ticket = socket.assigns.reassigning_ticket
+      user = socket.assigns.selected_user
 
-    cond do
-      is_nil(user) ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Select a member to reassign this ticket to.",
-           title: "Reassign Ticket"
-         )}
+      cond do
+        is_nil(user) ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Select a member to reassign this ticket to.",
+             title: "Reassign Ticket"
+           )}
 
-      user.id == ticket.user_id ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Ticket is already assigned to this member.",
-           title: "Reassign Ticket"
-         )}
+        user.id == ticket.user_id ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Ticket is already assigned to this member.",
+             title: "Reassign Ticket"
+           )}
 
-      true ->
-        case Tickets.reassign_ticket(ticket, user.id) do
-          {:ok, _ticket} ->
-            {:noreply,
-             socket
-             |> assign(:reassigning_ticket, nil)
-             |> refresh_data()
-             |> YscWeb.Flash.put_toast(
-               :info,
-               "Ticket reassigned to #{UserDisplay.full_name(user)}.",
-               title: "Reassign Ticket"
-             )}
+        true ->
+          case Tickets.reassign_ticket(ticket, user.id) do
+            {:ok, _ticket} ->
+              {:noreply,
+               socket
+               |> assign(:reassigning_ticket, nil)
+               |> refresh_data()
+               |> YscWeb.Flash.put_toast(
+                 :info,
+                 "Ticket reassigned to #{UserDisplay.full_name(user)}.",
+                 title: "Reassign Ticket"
+               )}
 
-          {:error, _changeset} ->
-            {:noreply,
-             YscWeb.Flash.put_toast(
-               socket,
-               :error,
-               "Failed to reassign ticket.",
-               title: "Reassign Ticket"
-             )}
-        end
+            {:error, _changeset} ->
+              {:noreply,
+               YscWeb.Flash.put_toast(
+                 socket,
+                 :error,
+                 "Failed to reassign ticket.",
+                 title: "Reassign Ticket"
+               )}
+          end
+      end
     end
   end
 
   @impl true
   def handle_event("open-refund", %{"id" => id}, socket) do
-    ticket = find_ticket!(socket, id)
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Refund Ticket")}
+    else
+      ticket = find_ticket!(socket, id)
 
-    amount_result =
-      case ticket.ticket_order do
-        nil ->
-          {:error, :no_ticket_order}
+      amount_result =
+        case ticket.ticket_order do
+          nil ->
+            {:error, :no_ticket_order}
 
-        ticket_order ->
-          Tickets.calculate_refund_amount(ticket_order, [ticket.id])
+          ticket_order ->
+            Tickets.calculate_refund_amount(ticket_order, [ticket.id])
+        end
+
+      case amount_result do
+        {:ok, amount} ->
+          {:noreply,
+           socket
+           |> assign(:refunding_ticket, ticket)
+           |> assign(:refund_amount, amount)}
+
+        {:error, _reason} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "This ticket cannot be refunded.",
+             title: "Refund Ticket"
+           )}
       end
-
-    case amount_result do
-      {:ok, amount} ->
-        {:noreply,
-         socket
-         |> assign(:refunding_ticket, ticket)
-         |> assign(:refund_amount, amount)}
-
-      {:error, _reason} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "This ticket cannot be refunded.",
-           title: "Refund Ticket"
-         )}
     end
   end
 
@@ -696,76 +738,80 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("confirm-refund", params, socket) do
-    ticket = socket.assigns.refunding_ticket
-    ticket_order = ticket.ticket_order
-    amount = socket.assigns.refund_amount
-    reason = blank_to_default(params["reason"], "Admin refund")
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Refund Ticket")}
+    else
+      ticket = socket.assigns.refunding_ticket
+      ticket_order = ticket.ticket_order
+      amount = socket.assigns.refund_amount
+      reason = blank_to_default(params["reason"], "Admin refund")
 
-    stripe_result =
-      cond do
-        Money.zero?(amount) ->
-          {:ok, :skipped_zero_amount}
+      stripe_result =
+        cond do
+          Money.zero?(amount) ->
+            {:ok, :skipped_zero_amount}
 
-        is_nil(ticket_order.payment) ->
-          {:error, :no_stripe_payment}
+          is_nil(ticket_order.payment) ->
+            {:error, :no_stripe_payment}
 
-        true ->
-          Tickets.refund_via_stripe(ticket_order.payment, amount, reason,
-            ticket_ids: [ticket.id]
-          )
-      end
-
-    case stripe_result do
-      {:ok, _} ->
-        case Tickets.refund_tickets(ticket_order, [ticket.id], reason) do
-          {:ok, refund_info} ->
-            {:noreply,
-             socket
-             |> assign(:refunding_ticket, nil)
-             |> assign(:refund_amount, nil)
-             |> refresh_data()
-             |> YscWeb.Flash.put_toast(
-               :info,
-               "Refunded ticket successfully. Amount: #{Money.to_string!(refund_info.refund_amount)}",
-               title: "Refund Ticket"
-             )}
-
-          {:error, reason} ->
-            require Ysc.Logging
-
-            Ysc.Logging.error(
-              "Ticket refund issued in Stripe but ticket failed to cancel",
-              ticket_id: ticket.id,
-              ticket_order_id: ticket_order.id,
-              error: inspect(reason)
+          true ->
+            Tickets.refund_via_stripe(ticket_order.payment, amount, reason,
+              ticket_ids: [ticket.id]
             )
-
-            {:noreply,
-             YscWeb.Flash.put_toast(
-               socket,
-               :error,
-               "Refund was processed in Stripe, but the ticket could not be marked cancelled. Please cancel it manually.",
-               title: "Refund Ticket"
-             )}
         end
 
-      {:error, {:stripe_error, _msg}} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Stripe declined the refund. Check the payment in the Stripe dashboard, or contact engineering if this persists.",
-           title: "Refund Ticket"
-         )}
+      case stripe_result do
+        {:ok, _} ->
+          case Tickets.refund_tickets(ticket_order, [ticket.id], reason) do
+            {:ok, refund_info} ->
+              {:noreply,
+               socket
+               |> assign(:refunding_ticket, nil)
+               |> assign(:refund_amount, nil)
+               |> refresh_data()
+               |> YscWeb.Flash.put_toast(
+                 :info,
+                 "Refunded ticket successfully. Amount: #{Money.to_string!(refund_info.refund_amount)}",
+                 title: "Refund Ticket"
+               )}
 
-      {:error, :no_stripe_payment} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Cannot process refund: no Stripe payment found for this ticket order.",
-           title: "Refund Ticket"
-         )}
+            {:error, reason} ->
+              require Ysc.Logging
+
+              Ysc.Logging.error(
+                "Ticket refund issued in Stripe but ticket failed to cancel",
+                ticket_id: ticket.id,
+                ticket_order_id: ticket_order.id,
+                error: inspect(reason)
+              )
+
+              {:noreply,
+               YscWeb.Flash.put_toast(
+                 socket,
+                 :error,
+                 "Refund was processed in Stripe, but the ticket could not be marked cancelled. Please cancel it manually.",
+                 title: "Refund Ticket"
+               )}
+          end
+
+        {:error, {:stripe_error, _msg}} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Stripe declined the refund. Check the payment in the Stripe dashboard, or contact engineering if this persists.",
+             title: "Refund Ticket"
+           )}
+
+        {:error, :no_stripe_payment} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Cannot process refund: no Stripe payment found for this ticket order.",
+             title: "Refund Ticket"
+           )}
+      end
     end
   end
 
@@ -871,5 +917,14 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         Map.put(base_row, "Registration Provided", "No")
       end
     end)
+  end
+
+  defp deny_full_admin(socket, title) do
+    YscWeb.Flash.put_toast(
+      socket,
+      :error,
+      "You do not have permission to perform this action.",
+      title: title
+    )
   end
 end

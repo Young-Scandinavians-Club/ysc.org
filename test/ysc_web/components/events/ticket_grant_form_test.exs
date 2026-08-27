@@ -10,7 +10,8 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
 
   defp new_socket(assigns \\ %{}) do
     %Phoenix.LiveView.Socket{
-      assigns: Map.merge(%{__changed__: %{}, flash: %{}}, assigns)
+      assigns:
+        Map.merge(%{__changed__: %{}, flash: %{}, admin_role: :admin}, assigns)
     }
   end
 
@@ -26,7 +27,8 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
           ticket_tier: tier,
           ticket_tier_id: tier.id,
           event_id: event.id,
-          current_user: admin
+          current_user: admin,
+          admin_role: :admin
         })
 
       # render_component/2 returns a static HTML string (no connected
@@ -455,6 +457,64 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       # rather than any other tier-related error the form can surface.
       assert Phoenix.Flash.get(socket.assigns.flash, :error) ==
                "Invalid ticket tier."
+    end
+  end
+
+  describe "volunteer cannot grant tickets (Finding 46)" do
+    setup do
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      volunteer = user_fixture()
+      member = user_fixture()
+
+      {:ok, socket} =
+        TicketGrantForm.update(
+          %{
+            id: "grant-form",
+            ticket_tier: tier,
+            event_id: event.id,
+            current_user: volunteer,
+            admin_role: :volunteer
+          },
+          new_socket(%{admin_role: :volunteer})
+        )
+
+      %{socket: socket, member: member}
+    end
+
+    test "search-users is a no-op", %{socket: socket} do
+      {:noreply, socket} =
+        TicketGrantForm.handle_event(
+          "search-users",
+          %{"value" => "Searchable"},
+          socket
+        )
+
+      assert socket.assigns.user_search == ""
+      assert socket.assigns.user_search_results == []
+    end
+
+    test "select-user is a no-op", %{socket: socket, member: member} do
+      {:noreply, socket} =
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
+
+      assert socket.assigns.selected_user == nil
+    end
+
+    test "save shows a permission error", %{socket: socket} do
+      {:noreply, socket} =
+        TicketGrantForm.handle_event(
+          "save",
+          %{"ticket_grant" => %{"quantity" => "1"}},
+          socket
+        )
+
+      assert Phoenix.Flash.get(socket.assigns.flash, :error) ==
+               "You do not have permission to perform this action."
     end
   end
 end

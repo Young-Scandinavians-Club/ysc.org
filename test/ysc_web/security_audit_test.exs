@@ -39,6 +39,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 40 (MEDIUM)   Post editor accepted client rendered_body, bypassing HTML scrubbing
   Finding 43 (MEDIUM)   Flowroute webhooks logged full SMS payloads
   Finding 44 (MEDIUM)   Contact/volunteer forms cast client-supplied user_id
+  Finding 45 (HIGH)     SES webhook auto-confirmed SNS subscriptions from any AWS account
+  Finding 46 (HIGH)     Volunteers could refund, reassign, and grant tickets on the event Tickets tab
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2460,6 +2462,45 @@ defmodule YscWeb.SecurityAuditTest do
 
       refute changeset.valid?
       assert "has already been taken" in Ysc.DataCase.errors_on(changeset).email
+    end
+  end
+
+  describe "Finding 45: SES webhook TopicArn allowlist" do
+    test "foreign TopicArn cannot confirm a subscription or inject a hard bounce",
+         %{conn: conn} do
+      email = "finding45-#{System.unique_integer([:positive])}@example.com"
+
+      payload =
+        %{
+          "Type" => "Notification",
+          "MessageId" => "finding-45",
+          "TopicArn" => "arn:aws:sns:us-west-1:999999999999:attacker-topic",
+          "Message" =>
+            Jason.encode!(%{
+              "eventType" => "Bounce",
+              "mail" => %{
+                "destination" => [email],
+                "timestamp" => "2026-03-19T12:00:00.000Z",
+                "tags" => %{"env" => ["test"]}
+              },
+              "bounce" => %{
+                "bounceType" => "Permanent",
+                "bounceSubType" => "General"
+              }
+            }),
+          "Timestamp" => "2026-03-19T12:00:00.000Z",
+          "SigningCertURL" => "https://sns.amazonaws.com/cert.pem",
+          "Signature" => "test-signature"
+        }
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      refute Ysc.Newsletter.hard_bounced?(email)
     end
   end
 end

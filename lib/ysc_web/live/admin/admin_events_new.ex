@@ -811,6 +811,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 event_id={@event.id}
                 event={@event}
                 current_user={@current_user}
+                admin_role={@admin_role}
               />
             </div>
           </div>
