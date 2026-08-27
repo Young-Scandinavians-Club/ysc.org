@@ -22,6 +22,33 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ "↵ enter"
     end
 
+    test "defaults to the 1–3 range with no order shortcut" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_keyboard_hints />
+        """)
+
+      assert html =~ "1–3"
+      refute html =~ "check in order"
+      refute html =~ ~s(data-key="shift-mod")
+    end
+
+    test "advertises the wider range and order shortcut when opted in" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_keyboard_hints quick_range="1–8" order_shortcut />
+        """)
+
+      assert html =~ "1–8"
+      refute html =~ "1–3"
+      assert html =~ "check in order"
+      assert html =~ ~s(data-key="shift-mod")
+    end
+
     test "renders nothing when show is false" do
       assigns = %{}
 
@@ -237,6 +264,8 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ ~s(phx-value-order-id="42")
       assert html =~ "Check in all"
       assert html =~ "grid grid-cols-12"
+      assert html =~ "data-checkin-all-btn"
+      assert html =~ "checkin-kbd-order-badge"
     end
 
     test "hides bulk action for single-ticket orders" do
@@ -253,6 +282,7 @@ defmodule YscWeb.AdminCheckInComponentsTest do
 
       assert html =~ "1 ticket"
       refute html =~ "Check in all"
+      refute html =~ "checkin-kbd-order-badge"
     end
 
     test "renders mobile variant with text-only bulk action" do
@@ -290,6 +320,7 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ ~s(id="ghost-check-in-order-all")
       assert html =~ "Check in all"
       refute html =~ ~s(phx-click="check-in-order")
+      refute html =~ "checkin-kbd-order-badge"
     end
   end
 

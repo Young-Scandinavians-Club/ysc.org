@@ -1,23 +1,47 @@
-import { altKeyLabel, applyPlatformKeyLabels } from "./platform_keys";
+import {
+    isMac,
+    altKeyLabel,
+    shiftModKeyLabel,
+    applyPlatformKeyLabels,
+} from "./platform_keys";
 
 // Keyboard navigation hook for the event ticket check-in desk.
 //
 // Attach with phx-hook="EventCheckInKeyboard" on the search form.
 //
 // Supported keys (active anywhere on the page):
-//   ArrowDown / ArrowUp  — move the highlight through pending ticket rows
-//   Enter                — check in (toggle) the highlighted ticket
-//   Alt+1 / Alt+2 / Alt+3 — instantly check in the 1st, 2nd, or 3rd pending ticket
-//   Escape               — clear search and refocus input
+//   ArrowDown / ArrowUp    — move the highlight through pending ticket rows
+//   Enter                  — check in (toggle) the highlighted ticket
+//   Alt+1 … Alt+8          — instantly check in the Nth pending ticket
+//   Shift+Cmd/Ctrl+1 … 8   — check in the whole order the Nth ticket belongs to
+//   Escape                 — clear search and refocus input
 //
-// Shortcut badges (alt 1, alt 2, alt 3) are injected into placeholder spans
-// in the first 3 pending rows. They are refreshed whenever the component
-// updates (e.g. after a check-in removes a row from the list).
+// The quick-check-in shortcuts (and their badges) are only active once the
+// operator has typed a search — on the freshly opened, unfiltered list the
+// numbering would be meaningless, so nothing is shown.
+//
+// Shortcut badges are injected into placeholder spans:
+//   .checkin-kbd-badge        — one per pending row (Alt + N)
+//   .checkin-kbd-order-badge  — one per multi-ticket order group (Shift+mod + N)
+// They are refreshed on every component update (e.g. after a check-in removes a
+// row) and cleared whenever the search is empty.
 
 const ROW_SELECTOR = "[data-checkin-row]";
 const BTN_SELECTOR = "[data-checkin-btn]";
 const BADGE_SELECTOR = ".checkin-kbd-badge";
+const ORDER_BADGE_SELECTOR = ".checkin-kbd-order-badge";
+const ORDER_GROUP_SELECTOR = "[data-checkin-order-group]";
+const ALL_BTN_SELECTOR = "[data-checkin-all-btn]";
+const SEARCH_INPUT_ID = "check-in-search-input";
 const FOCUSED_CLASS = "keyboard-focused";
+const MAX_SHORTCUTS = 8;
+
+const KBD_CLASS =
+    "inline-flex justify-center items-center bg-white border border-zinc-300 font-mono text-zinc-400 rounded leading-none";
+// Inline styles only — this markup is injected at runtime, so Tailwind's JIT
+// never sees it. box-shadow uses zinc-300.
+const KBD_STYLE =
+    "min-height:1rem;min-width:0.85rem;padding:1px 3px;font-size:9px;box-shadow:0 2px 0 0 #d1d5db";
 
 const EventCheckInKeyboard = {
     mounted() {
@@ -47,24 +71,50 @@ const EventCheckInKeyboard = {
         return Array.from(document.querySelectorAll(ROW_SELECTOR));
     },
 
+    _searchActive() {
+        const input = document.getElementById(SEARCH_INPUT_ID);
+        return !!input && input.value.trim() !== "";
+    },
+
     _handleKeyDown(e) {
         const active = document.activeElement;
         const tag = active ? active.tagName : "";
         const isOtherInput =
-            (tag === "INPUT" && active.id !== "check-in-search-input") ||
+            (tag === "INPUT" && active.id !== SEARCH_INPUT_ID) ||
             tag === "TEXTAREA" ||
             tag === "SELECT";
         if (isOtherInput) return;
 
         const rows = this._rows();
 
-        // Handle Alt+1/2/3 before the key switch — must use e.code because on Mac,
-        // Option+number produces a composed character in e.key (e.g. "¡") not a digit.
-        if (e.altKey && ["Digit1", "Digit2", "Digit3"].includes(e.code)) {
-            e.preventDefault();
-            const idx = parseInt(e.code.replace("Digit", ""), 10) - 1;
-            if (idx < rows.length) this._actOn(rows[idx]);
-            return;
+        // Handle the numeric shortcuts before the key switch — must use e.code
+        // because on Mac, Option+number produces a composed character in e.key
+        // (e.g. "¡") rather than a digit.
+        const digitMatch = /^Digit([1-8])$/.exec(e.code);
+        if (digitMatch) {
+            const idx = parseInt(digitMatch[1], 10) - 1;
+            // Whole-order chord: Shift + the platform "command" key (⌘ on Mac,
+            // Ctrl elsewhere), matching the badge label. Alt disqualifies it.
+            const shiftMod =
+                e.shiftKey &&
+                !e.altKey &&
+                (isMac()
+                    ? e.metaKey && !e.ctrlKey
+                    : e.ctrlKey && !e.metaKey);
+            const altOnly =
+                e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
+
+            if (shiftMod || altOnly) {
+                e.preventDefault();
+                if (this._searchActive() && idx < MAX_SHORTCUTS) {
+                    const row = rows[idx];
+                    if (row) {
+                        if (shiftMod) this._actOnOrder(row);
+                        else this._actOn(row);
+                    }
+                }
+                return;
+            }
         }
 
         if (rows.length === 0 && e.key !== "Escape") return;
@@ -131,27 +181,72 @@ const EventCheckInKeyboard = {
         }
     },
 
-    // Inject "alt 1/2/3" badges into the first 3 badge placeholder spans.
-    // Placeholders are rendered by the server as empty <span class="checkin-kbd-badge">.
-    _refreshBadges() {
-        const kbdBase = "inline-flex justify-center items-center py-0.5 bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded";
-        const kbdShadow = "box-shadow: 0 2px 0 0 #d1d5db"; // zinc-300
-        const altLabel = altKeyLabel();
+    // Check in every ticket in the order the row belongs to. Falls back to the
+    // single-ticket action when the order has no "Check in all" control.
+    _actOnOrder(rowEl) {
+        const group = rowEl.closest(ORDER_GROUP_SELECTOR);
+        const btn = group && group.querySelector(ALL_BTN_SELECTOR);
+        if (btn && !btn.disabled) {
+            btn.click();
+            return;
+        }
+        this._actOn(rowEl);
+    },
 
-        const badges = Array.from(document.querySelectorAll(BADGE_SELECTOR));
-        badges.forEach((span, i) => {
-            if (i < 3) {
-                span.style.display = "inline-flex";
-                span.style.alignItems = "center";
-                span.style.gap = "2px";
-                span.innerHTML =
-                    `<kbd class="${kbdBase}" style="min-height:1.375rem;padding-left:0.375rem;padding-right:0.375rem;${kbdShadow}">${altLabel}</kbd>` +
-                    `<kbd class="${kbdBase}" style="min-height:1.375rem;min-width:1.375rem;padding-left:0.25rem;padding-right:0.25rem;${kbdShadow}">${i + 1}</kbd>`;
+    _kbd(label) {
+        return `<kbd class="${KBD_CLASS}" style="${KBD_STYLE}">${label}</kbd>`;
+    },
+
+    // Populate the per-row (Alt + N) and per-order (Shift+mod + N) shortcut
+    // badges. Everything clears when there is no active search.
+    _refreshBadges() {
+        const rowBadges = Array.from(
+            document.querySelectorAll(BADGE_SELECTOR),
+        );
+        const orderBadges = Array.from(
+            document.querySelectorAll(ORDER_BADGE_SELECTOR),
+        );
+
+        const clear = (span) => {
+            span.innerHTML = "";
+            span.setAttribute("hidden", "");
+            span.style.display = "";
+        };
+
+        if (!this._searchActive()) {
+            rowBadges.forEach(clear);
+            orderBadges.forEach(clear);
+            return;
+        }
+
+        const altLabel = altKeyLabel();
+        const modLabel = shiftModKeyLabel();
+
+        rowBadges.forEach((span, i) => {
+            if (i < MAX_SHORTCUTS) {
+                span.style.display = "flex";
+                span.innerHTML = this._kbd(altLabel) + this._kbd(i + 1);
                 span.removeAttribute("hidden");
             } else {
-                span.innerHTML = "";
-                span.setAttribute("hidden", "");
-                span.style.display = "";
+                clear(span);
+            }
+        });
+
+        // Order badges: number each multi-ticket group by the position of its
+        // first pending row in the full row list, so it lines up with that
+        // row's Alt shortcut.
+        const rows = this._rows();
+        orderBadges.forEach((span) => {
+            const group = span.closest(ORDER_GROUP_SELECTOR);
+            const firstRow = group && group.querySelector(ROW_SELECTOR);
+            const idx = firstRow ? rows.indexOf(firstRow) : -1;
+
+            if (idx >= 0 && idx < MAX_SHORTCUTS) {
+                span.style.display = "inline-flex";
+                span.innerHTML = this._kbd(modLabel) + this._kbd(idx + 1);
+                span.removeAttribute("hidden");
+            } else {
+                clear(span);
             }
         });
     },

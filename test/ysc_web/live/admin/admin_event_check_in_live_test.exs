@@ -145,6 +145,31 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       assert render(view) =~ "0 / 0"
     end
 
+    test "hides keyboard shortcut hints until a search is entered", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{event: event} = setup_event_with_tickets(admin)
+
+      {:ok, unsearched, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      refute render(unsearched) =~ "quick check in"
+
+      # A whitespace-only query is treated as no search (matches the JS hook).
+      {:ok, blank, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=%20%20")
+
+      refute render(blank) =~ "quick check in"
+
+      {:ok, searched, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=smith")
+
+      html = render(searched)
+      assert html =~ "quick check in"
+      assert html =~ "check in order"
+    end
+
     test "shows empty state when no confirmed tickets exist", %{
       conn: conn,
       admin: admin

@@ -718,13 +718,6 @@ defmodule YscWeb.AdminGhostComponents do
         </div>
 
         <div class="shrink-0 flex items-center gap-2">
-          <.button
-            variant="outline"
-            color="zinc"
-            class="hidden sm:inline-flex text-sm"
-          >
-            <.icon name="hero-identification" class="w-5 h-5" /> Membership Check-in
-          </.button>
           <.button class="hidden sm:inline-flex text-sm">
             <.icon name="hero-qr-code" class="w-5 h-5" /> QR Scanner
           </.button>
@@ -745,7 +738,7 @@ defmodule YscWeb.AdminGhostComponents do
             class="block w-full pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded bg-zinc-50 pointer-events-none"
           />
         </div>
-        <.admin_check_in_keyboard_hints />
+        <.admin_check_in_keyboard_hints quick_range="1–8" order_shortcut />
       </.admin_check_in_search_section>
 
       <.admin_check_in_content width={:wide}>

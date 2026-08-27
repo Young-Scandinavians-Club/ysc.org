@@ -13,11 +13,21 @@ export function altKeyLabel() {
     return isMac() ? "⌥" : "alt";
 }
 
-// Update all <kbd data-key="alt"> elements in the DOM with the correct label.
+// Label for the "check in whole order" chord: Shift+Cmd on Mac, Shift+Ctrl elsewhere.
+export function shiftModKeyLabel() {
+    return isMac() ? "⇧⌘" : "⇧ ctrl";
+}
+
+// Update all <kbd data-key="…"> elements in the DOM with the correct platform label.
 // Call once after the page is interactive.
 export function applyPlatformKeyLabels() {
-    const label = altKeyLabel();
-    document.querySelectorAll("kbd[data-key='alt']").forEach((el) => {
-        el.textContent = label;
+    const labels = {
+        alt: altKeyLabel(),
+        "shift-mod": shiftModKeyLabel(),
+    };
+    Object.entries(labels).forEach(([key, label]) => {
+        document.querySelectorAll(`kbd[data-key='${key}']`).forEach((el) => {
+            el.textContent = label;
+        });
     });
 }

@@ -254,7 +254,13 @@ defmodule YscWeb.AdminComponents do
   Keyboard shortcut legend shown below admin check-in search bars.
 
   Used on event and membership check-in LiveViews; keeps shortcut copy and
-  `admin_kbd` layout consistent.
+  `admin_kbd` layout consistent. The quick-check-in range and the order-level
+  shortcut differ per desk, so both are configurable:
+
+  - `quick_range` — digit range advertised for `alt` quick check-in (the event
+    desk enumerates up to 8 rows, the membership desk only 3).
+  - `order_shortcut` — when true, also advertises `⇧⌘/⇧ ctrl` + digit for
+    checking in a whole order (event desk only).
   """
   attr :class, :any,
     default: nil,
@@ -263,6 +269,14 @@ defmodule YscWeb.AdminComponents do
   attr :show, :boolean,
     default: true,
     doc: "When false, the shortcut legend is not rendered"
+
+  attr :quick_range, :string,
+    default: "1–3",
+    doc: "Digit range shown next to the `alt` quick-check-in key"
+
+  attr :order_shortcut, :boolean,
+    default: false,
+    doc: "When true, also show the `⇧⌘` + digit whole-order shortcut"
 
   def admin_check_in_keyboard_hints(assigns) do
     ~H"""
@@ -284,9 +298,15 @@ defmodule YscWeb.AdminComponents do
       <span class="text-zinc-300">·</span>
       <span class="flex items-center gap-0.5">
         <.admin_kbd size={:inline} data-key="alt">alt</.admin_kbd>
-        <.admin_kbd size={:compact}>1–3</.admin_kbd>
+        <.admin_kbd size={:compact}>{@quick_range}</.admin_kbd>
       </span>
       <span>quick check in</span>
+      <span :if={@order_shortcut} class="text-zinc-300">·</span>
+      <span :if={@order_shortcut} class="flex items-center gap-0.5">
+        <.admin_kbd size={:inline} data-key="shift-mod">⇧ ctrl</.admin_kbd>
+        <.admin_kbd size={:compact}>{@quick_range}</.admin_kbd>
+      </span>
+      <span :if={@order_shortcut}>check in order</span>
     </p>
     """
   end
@@ -1085,7 +1105,7 @@ defmodule YscWeb.AdminComponents do
           ({ticket_count_label(@ticket_count)})
         </span>
       </div>
-      <div :if={@variant == :desktop} class="col-span-2 flex items-center">
+      <div :if={@variant == :desktop} class="col-span-2 flex items-center gap-1.5">
         <.admin_check_in_all_button
           :if={@ticket_count > 1}
           id={@id}
@@ -1093,6 +1113,11 @@ defmodule YscWeb.AdminComponents do
           variant={:desktop}
           interactive={@interactive}
         />
+        <span
+          :if={@ticket_count > 1 and @interactive}
+          class="checkin-kbd-order-badge hidden select-none items-center gap-0.5"
+          hidden
+        ></span>
       </div>
       <.admin_check_in_all_button
         :if={@variant == :mobile and @ticket_count > 1}
@@ -1148,6 +1173,7 @@ defmodule YscWeb.AdminComponents do
         id={@id}
         phx-click="check-in-order"
         phx-value-order-id={@order_id}
+        data-checkin-all-btn
         class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-1 transition-colors whitespace-nowrap"
       >
         <.icon name="hero-check-circle" class="w-3.5 h-3.5 shrink-0" /> Check in all
@@ -1157,6 +1183,7 @@ defmodule YscWeb.AdminComponents do
         id={@id}
         phx-click="check-in-order"
         phx-value-order-id={@order_id}
+        data-checkin-all-btn
         class="text-xs font-medium text-emerald-700 hover:text-emerald-900"
       >
         Check in all
@@ -1205,24 +1232,28 @@ defmodule YscWeb.AdminComponents do
           id={@id}
           data-checkin-row={@interactive}
           class={[
-            "grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0",
+            "relative grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0",
             @interactive &&
               "hover:bg-zinc-50/60 transition-all duration-100 ease-out"
           ]}
         >
-          <div class="col-span-1 flex items-center justify-center gap-1.5">
+          <div class="col-span-1 flex items-center justify-center">
             <%= if @interactive do %>
-              <button
-                phx-click="toggle-check-in"
-                phx-value-ticket-id={@ticket_id}
-                data-checkin-btn
-                class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
-                aria-label="Mark as checked in"
-              ></button>
-              <span
-                class="checkin-kbd-badge hidden select-none gap-0.5"
-                hidden
-              ></span>
+              <span class="relative flex items-center">
+                <%!-- Keyboard shortcut badge floats in the left gutter so the
+                     checkbox stays put whether or not a shortcut is shown. --%>
+                <span
+                  class="checkin-kbd-badge pointer-events-none absolute right-full mr-1.5 top-1/2 -translate-y-1/2 hidden select-none flex-col items-end gap-0.5"
+                  hidden
+                ></span>
+                <button
+                  phx-click="toggle-check-in"
+                  phx-value-ticket-id={@ticket_id}
+                  data-checkin-btn
+                  class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
+                  aria-label="Mark as checked in"
+                ></button>
+              </span>
             <% else %>
               <span
                 class="w-5 h-5 rounded border-2 border-zinc-300 flex items-center justify-center"
