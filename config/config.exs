@@ -11,6 +11,11 @@ import Config
 config :ysc,
   ecto_repos: [Ysc.Repo],
   environment: "dev",
+  # SES SNS topic ARNs allowed to confirm subscriptions / deliver events to
+  # POST /webhooks/ses. Empty means: reject new SubscriptionConfirmation
+  # (fail closed) but still process Notifications from an already-confirmed
+  # topic. Set SNS_TOPIC_ARN in production (comma-separated for more than one).
+  sns_allowed_topic_arns: [],
   # Minimum disposable-domain rows expected after loading priv/disposable_domains.txt (tests use this as a floor).
   disposable_domains_threshold: 10_000,
   # Standalone Query Console base URL (admin sidebar link). Override per env / QUERY_CONSOLE_URL.
