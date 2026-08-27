@@ -188,8 +188,12 @@ defmodule YscWeb.UserSessionControllerTest do
         })
 
       assert redirected_to(conn) == "/foo/bar"
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Good to see you again."
-      assert Phoenix.Flash.get(conn.assigns.flash, :info_toast_title) == "Login"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+               "Good to see you again."
+
+      assert Phoenix.Flash.get(conn.assigns.flash, "info_toast_title") ==
+               "Login"
     end
 
     test "login following registration redirects to account setup", %{
