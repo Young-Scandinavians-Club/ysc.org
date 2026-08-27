@@ -2248,6 +2248,11 @@ defmodule YscWeb.CoreComponents do
   attr :class, :string, default: ""
   attr :avatar_url, :string, default: nil
 
+  attr :truncate, :boolean,
+    default: false,
+    doc:
+      "Truncate the name/subtitle with an ellipsis instead of letting them set the card's width; the caller must give the card a bounded width (e.g. `flex-1 min-w-0`)"
+
   def user_card(assigns) do
     assigns = derive_user_card_assigns(assigns)
 
@@ -2281,7 +2286,11 @@ defmodule YscWeb.CoreComponents do
     assigns = assign(assigns, :display_name, display_name)
 
     ~H"""
-    <div class={"flex items-center whitespace-nowrap h-10 #{@class}"}>
+    <div class={[
+      "flex items-center whitespace-nowrap h-10",
+      @truncate && "min-w-0",
+      @class
+    ]}>
       <.user_avatar_image
         user={@user}
         email={@email}
@@ -2300,12 +2309,19 @@ defmodule YscWeb.CoreComponents do
       />
       <div class={[
         @right && "order-1 pe-3",
-        !@right && "ps-3"
+        !@right && "ps-3",
+        @truncate && "min-w-0"
       ]}>
-        <div class="text-sm font-semibold text-zinc-800 text-left">
+        <div class={[
+          "text-sm font-semibold text-zinc-800 text-left",
+          @truncate && "truncate"
+        ]}>
           {@display_name}
         </div>
-        <div :if={@show_subtitle} class="font-normal text-sm text-zinc-500">
+        <div
+          :if={@show_subtitle}
+          class={["font-normal text-sm text-zinc-500", @truncate && "truncate"]}
+        >
           {@subtitle}
         </div>
       </div>
