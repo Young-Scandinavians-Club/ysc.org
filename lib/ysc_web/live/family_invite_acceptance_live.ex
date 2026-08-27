@@ -317,7 +317,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
 
             <:actions>
               <.button type="submit" phx-disable-with="Joining...">
-                Create login and join
+                Join Family Membership
               </.button>
             </:actions>
           </.simple_form>

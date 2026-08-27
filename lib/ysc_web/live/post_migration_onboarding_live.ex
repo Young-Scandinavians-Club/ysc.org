@@ -756,7 +756,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
             <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
             <div class="text-sm">
-              <span class="font-medium">Payment method on file:</span>
+              <span class="font-medium">Saved payment:</span>
               {payment_method_display(@default_payment_method)}
             </div>
           </div>
@@ -773,7 +773,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm">
             <.icon name="hero-exclamation-triangle" class="w-5 h-5 mt-0.5 shrink-0" />
             <span>
-              No payment method on file. Please add one to ensure your membership auto-renews on the next billing date.
+              You haven't saved a card or bank account yet. Add one so your membership can renew automatically.
             </span>
           </div>
           <%= if is_nil(@payment_intent_secret) do %>
@@ -811,7 +811,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Set Up Renewal Payment
           <:subtitle>
-            Add a card so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a card later in account settings.
+            Add a card or bank account so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a payment method later in account settings.
           </:subtitle>
         </.header>
 
@@ -834,7 +834,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </span>
           </div>
           <p class="mt-2 text-sm text-zinc-600">
-            You won't be charged today unless your renewal date has already passed.
+            If your renewal date is still in the future, you won't be charged today.
           </p>
           <div class="mt-6 flex items-center justify-between">
             <.button

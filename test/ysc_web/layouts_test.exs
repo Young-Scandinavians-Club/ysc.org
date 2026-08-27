@@ -49,6 +49,19 @@ defmodule YscWeb.LayoutsTest do
       assert flash["info"] == msg
     end
 
+    test "promotes Good to see you again info into the welcome toast" do
+      msg = "Good to see you again."
+
+      assert {toasts, flash} =
+               Layouts.toasts_sync_with_flash(%{
+                 toasts_sync: [],
+                 flash: %{"info" => msg}
+               })
+
+      assert [%LiveToast{title: "Welcome back!", msg: ^msg}] = toasts
+      assert flash["info"] == msg
+    end
+
     test "promotes flash with title for info, error, and warning" do
       assert {toasts, flash} =
                Layouts.toasts_sync_with_flash(%{
