@@ -1468,6 +1468,33 @@ defmodule Ysc.TicketsTest do
 
       assert length(Tickets.list_tickets_for_admin(event.id)) == 1
     end
+
+    test "excludes pending, cancelled, and expired tickets", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [pending] = tickets_for_order(order.id)
+      assert pending.status == :pending
+
+      assert Tickets.list_tickets_for_admin(event.id) == []
+
+      pending
+      |> Ecto.Changeset.change(status: :confirmed)
+      |> Repo.update!()
+
+      assert [%{id: id}] = Tickets.list_tickets_for_admin(event.id)
+      assert id == pending.id
+
+      pending
+      |> Ecto.Changeset.change(status: :cancelled)
+      |> Repo.update!()
+
+      assert Tickets.list_tickets_for_admin(event.id) == []
+    end
   end
 
   describe "refund_via_stripe/3" do

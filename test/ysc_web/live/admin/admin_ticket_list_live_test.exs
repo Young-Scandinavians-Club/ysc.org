@@ -478,6 +478,45 @@ defmodule YscWeb.AdminTicketListLiveTest do
                "Reassigned to New Owner"
              )
     end
+
+    test "refuses to reassign a ticket to its current holder", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      buyer = user_fixture(%{first_name: "Same", last_name: "Owner"})
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: buyer.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-reassign")
+      |> render_click()
+
+      view
+      |> element("#ticket-reassign-user-autocomplete-input")
+      |> render_keyup(%{"value" => buyer.email})
+
+      view
+      |> element(
+        "#ticket-reassign-user-autocomplete button[phx-click='select-user'][phx-value-id='#{buyer.id}']"
+      )
+      |> render_click()
+
+      view
+      |> element("button[phx-click='confirm-reassign']")
+      |> render_click()
+
+      assert has_element?(view, "#reassign-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).user_id == buyer.id
+    end
   end
 
   describe "refund ticket" do
@@ -502,6 +541,61 @@ defmodule YscWeb.AdminTicketListLiveTest do
       refute has_element?(view, "#refund-ticket-modal")
       assert Repo.get!(Ticket, ticket.id).status == :cancelled
       assert Repo.get!(TicketOrder, order.id).status == :cancelled
+    end
+
+    test "does not refund an orphaned ticket with no order", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-refund")
+      |> render_click()
+
+      refute has_element?(view, "#refund-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).status == :confirmed
+    end
+
+    test "does not refund a grant order that has no Stripe payment", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      buyer = user_fixture()
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: buyer.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-refund")
+      |> render_click()
+
+      assert has_element?(view, "#refund-ticket-modal")
+
+      view
+      |> form("#refund-ticket-form", %{"reason" => "Complimentary"})
+      |> render_submit()
+
+      assert has_element?(view, "#refund-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).status == :confirmed
     end
   end
 end
