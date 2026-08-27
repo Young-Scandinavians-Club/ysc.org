@@ -13,6 +13,21 @@ defmodule YscWeb.SesWebhookControllerTest do
 
   import Ysc.AccountsFixtures
 
+  defmodule SubscriptionHitPlug do
+    @moduledoc false
+    import Plug.Conn
+
+    def init(pid), do: pid
+
+    def call(conn, pid) do
+      send(pid, :subscribe_url_fetched)
+
+      conn
+      |> put_resp_content_type("text/plain")
+      |> send_resp(200, "confirmed")
+    end
+  end
+
   defmodule SubscriptionConfirm200Plug do
     @moduledoc false
     import Plug.Conn
@@ -106,6 +121,115 @@ defmodule YscWeb.SesWebhookControllerTest do
 
       assert conn.status == 200
       assert conn.resp_body == "OK"
+    end
+  end
+
+  describe "webhook/2 - TopicArn allowlist (Finding 45)" do
+    test "does not fetch SubscribeURL for a TopicArn outside the allowlist", %{
+      conn: conn
+    } do
+      port = start_subscription_http_server(SubscriptionHitPlug, self())
+
+      payload =
+        build_sns_wrapper("SubscriptionConfirmation", %{}, %{
+          "SubscribeURL" => "http://127.0.0.1:#{port}/confirm",
+          "TopicArn" => "arn:aws:sns:us-west-1:999999999999:attacker-topic"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "SubscriptionConfirmation")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      refute_received :subscribe_url_fetched
+    end
+
+    test "refuses subscription confirmation when the allowlist is empty", %{
+      conn: conn
+    } do
+      prev = Application.get_env(:ysc, :sns_allowed_topic_arns)
+      Application.put_env(:ysc, :sns_allowed_topic_arns, [])
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :sns_allowed_topic_arns, prev)
+      end)
+
+      port = start_subscription_http_server(SubscriptionHitPlug, self())
+
+      payload =
+        build_sns_wrapper("SubscriptionConfirmation", %{}, %{
+          "SubscribeURL" => "http://127.0.0.1:#{port}/confirm",
+          "TopicArn" => "arn:aws:sns:us-west-1:123456789:ses-events"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "SubscriptionConfirmation")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      refute_received :subscribe_url_fetched
+    end
+
+    test "does not suppress mail for a hard bounce from a foreign TopicArn", %{
+      conn: conn
+    } do
+      email = "foreign-bounce-#{System.unique_integer([:positive])}@example.com"
+      {:ok, subscriber} = Newsletter.subscribe(email)
+      assert subscriber.subscribed == true
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: email,
+          env: "test",
+          bounce_type: "Permanent",
+          bounce_sub_type: "General"
+        )
+
+      payload =
+        build_sns_wrapper("Notification", ses_event, %{
+          "TopicArn" => "arn:aws:sns:us-west-1:999999999999:attacker-topic"
+        })
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      assert Repo.reload!(subscriber).subscribed == true
+      refute Newsletter.hard_bounced?(email)
+      refute Repo.get_by(EmailEvent, email: email, event_type: "bounce")
+    end
+
+    test "still records hard bounces when the allowlist is empty", %{conn: conn} do
+      prev = Application.get_env(:ysc, :sns_allowed_topic_arns)
+      Application.put_env(:ysc, :sns_allowed_topic_arns, [])
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :sns_allowed_topic_arns, prev)
+      end)
+
+      email =
+        "empty-allowlist-#{System.unique_integer([:positive])}@example.com"
+
+      {:ok, subscriber} = Newsletter.subscribe(email)
+
+      ses_event =
+        build_ses_event("Bounce",
+          email: email,
+          env: "test",
+          bounce_type: "Permanent"
+        )
+
+      conn = post_notification(conn, ses_event)
+      assert conn.status == 200
+      assert Repo.reload!(subscriber).subscribed == false
+      assert Newsletter.hard_bounced?(email)
     end
   end
 
@@ -1239,7 +1363,7 @@ defmodule YscWeb.SesWebhookControllerTest do
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp start_subscription_http_server(plug_module) do
+  defp start_subscription_http_server(plug_module, plug_opts \\ []) do
     {:ok, socket} =
       :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
 
@@ -1248,7 +1372,7 @@ defmodule YscWeb.SesWebhookControllerTest do
 
     ref = :"ses_sub_http_#{port}_#{System.unique_integer([:positive])}"
 
-    {:ok, _} = Plug.Cowboy.http(plug_module, [], port: port, ref: ref)
+    {:ok, _} = Plug.Cowboy.http(plug_module, plug_opts, port: port, ref: ref)
 
     on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
 

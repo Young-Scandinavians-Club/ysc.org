@@ -1351,6 +1351,33 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert has_element?(view, "#ticket-order-#{order_id}", "GA Migration")
       assert has_element?(view, "#ticket-order-#{order_id}", "2 tickets")
     end
+
+    test "volunteer cannot grant tickets from the tickets tab (Finding 46)", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: "volunteer"})
+      conn = log_in_user(conn, volunteer)
+      member = user_fixture()
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Volunteer Grant",
+          quantity: 50
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-grant")
+
+      view
+      |> element("#ticket-tier-grant-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      refute has_element?(view, "#grant-tickets-modal")
+      assert Events.list_tickets_for_user(member.id) == []
+    end
   end
 
   describe "statistics tab" do

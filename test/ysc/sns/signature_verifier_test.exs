@@ -125,6 +125,35 @@ defmodule Ysc.SNS.SignatureVerifierTest do
     end
   end
 
+  describe "allow_subscription_confirmation?/1" do
+    test "accepts the configured SES topic ARN and rejects others" do
+      assert SignatureVerifier.allow_subscription_confirmation?(
+               "arn:aws:sns:us-west-1:123456789:ses-events"
+             )
+
+      refute SignatureVerifier.allow_subscription_confirmation?(
+               "arn:aws:sns:us-west-1:999999999999:attacker-topic"
+             )
+
+      refute SignatureVerifier.allow_subscription_confirmation?(nil)
+      refute SignatureVerifier.allow_subscription_confirmation?(1)
+    end
+  end
+
+  describe "allow_notification_topic?/1" do
+    test "accepts the configured SES topic ARN and rejects others" do
+      assert SignatureVerifier.allow_notification_topic?(
+               "arn:aws:sns:us-west-1:123456789:ses-events"
+             )
+
+      refute SignatureVerifier.allow_notification_topic?(
+               "arn:aws:sns:us-west-1:999999999999:attacker-topic"
+             )
+
+      refute SignatureVerifier.allow_notification_topic?(nil)
+    end
+  end
+
   describe "signed_message_type/2" do
     test "requires unsigned header to match signed body Type" do
       message = %{"Type" => "Notification"}

@@ -130,6 +130,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
     socket =
       socket
+      |> assign_new(:admin_role, fn -> nil end)
       |> assign(assigns)
       |> assign(:ticket_tier_id, ticket_tier_id)
       |> assign_new(:dialog_id, fn -> "grant-tickets-modal" end)
@@ -158,30 +159,38 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   @impl true
   def handle_event("search-users", %{"value" => query}, socket) do
-    results =
-      if String.length(query) >= 2 do
-        Accounts.search_users(query, limit: 10)
-      else
-        []
-      end
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, socket}
+    else
+      results =
+        if String.length(query) >= 2 do
+          Accounts.search_users(query, limit: 10)
+        else
+          []
+        end
 
-    {:noreply,
-     socket
-     |> assign(:user_search, query)
-     |> assign(:user_search_results, results)}
+      {:noreply,
+       socket
+       |> assign(:user_search, query)
+       |> assign(:user_search_results, results)}
+    end
   end
 
   @impl true
   def handle_event("select-user", %{"id" => id}, socket) do
-    user = Accounts.get_user!(id)
-    merged = merge_form_params(socket, %{"user_id" => user.id})
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, socket}
+    else
+      user = Accounts.get_user!(id)
+      merged = merge_form_params(socket, %{"user_id" => user.id})
 
-    {:noreply,
-     socket
-     |> assign(:selected_user, user)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])
-     |> assign(:form, to_form(merged, as: "ticket_grant"))}
+      {:noreply,
+       socket
+       |> assign(:selected_user, user)
+       |> assign(:user_search, "")
+       |> assign(:user_search_results, [])
+       |> assign(:form, to_form(merged, as: "ticket_grant"))}
+    end
   end
 
   @impl true
@@ -198,6 +207,20 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   @impl true
   def handle_event("save", %{"ticket_grant" => params}, socket) do
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "You do not have permission to perform this action.",
+         title: "Grant Tickets"
+       )}
+    else
+      do_save_grant(params, socket)
+    end
+  end
+
+  defp do_save_grant(params, socket) do
     merged = merge_form_params(socket, params)
     user_id = merged["user_id"]
     quantity = parse_quantity(merged["quantity"])

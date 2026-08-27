@@ -81,33 +81,51 @@ defmodule YscWeb.SesWebhookController do
   end
 
   defp handle_message(conn, sns_message, "SubscriptionConfirmation") do
-    confirm_sns_subscription(
-      sns_message["SubscribeURL"],
-      sns_message["TopicArn"]
-    )
+    topic_arn = sns_message["TopicArn"]
 
-    send_resp(conn, 200, "OK")
+    if SignatureVerifier.allow_subscription_confirmation?(topic_arn) do
+      confirm_sns_subscription(sns_message["SubscribeURL"], topic_arn)
+      send_resp(conn, 200, "OK")
+    else
+      Ysc.Logging.warning(
+        "SES webhook: refusing SNS subscription for TopicArn outside allowlist",
+        topic_arn: topic_arn
+      )
+
+      send_resp(conn, 403, "Forbidden")
+    end
   end
 
   defp handle_message(conn, sns_message, "Notification") do
-    case Jason.decode(sns_message["Message"] || "{}") do
-      {:ok, ses_event} ->
-        process_ses_event(ses_event)
+    topic_arn = sns_message["TopicArn"]
 
-      {:error, reason} ->
-        emit_ses_webhook_telemetry(
-          "unknown",
-          :invalid_payload,
-          System.monotonic_time()
-        )
+    if SignatureVerifier.allow_notification_topic?(topic_arn) do
+      case Jason.decode(sns_message["Message"] || "{}") do
+        {:ok, ses_event} ->
+          process_ses_event(ses_event)
 
-        Ysc.Logging.warning("SES webhook: failed to decode SES event JSON",
-          reason: inspect(reason),
-          message: sns_message["Message"]
-        )
+        {:error, reason} ->
+          emit_ses_webhook_telemetry(
+            "unknown",
+            :invalid_payload,
+            System.monotonic_time()
+          )
+
+          Ysc.Logging.warning("SES webhook: failed to decode SES event JSON",
+            reason: inspect(reason),
+            message: sns_message["Message"]
+          )
+      end
+
+      send_resp(conn, 200, "OK")
+    else
+      Ysc.Logging.warning(
+        "SES webhook: refusing SNS notification for TopicArn outside allowlist",
+        topic_arn: topic_arn
+      )
+
+      send_resp(conn, 403, "Forbidden")
     end
-
-    send_resp(conn, 200, "OK")
   end
 
   defp handle_message(conn, _sns_message, type) do

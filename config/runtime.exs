@@ -441,6 +441,14 @@ if config_env() == :prod do
 
   config :ysc, :ses_configuration_set, System.get_env("SES_CONFIGURATION_SET")
 
+  sns_allowed_topic_arns =
+    (System.get_env("SNS_TOPIC_ARN") || "")
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  config :ysc, :sns_allowed_topic_arns, sns_allowed_topic_arns
+
   ses_max_send_rate =
     case Integer.parse(String.trim(System.get_env("SES_MAX_SEND_RATE") || "")) do
       {rate, _} when rate > 0 -> rate
