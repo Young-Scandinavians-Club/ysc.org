@@ -219,7 +219,7 @@ defmodule YscWeb.UserLoginLive do
         id="login_form"
         action={~p"/users/log-in"}
         phx-update="ignore"
-        onsubmit="this.querySelector('[type=submit]')?.setAttribute('disabled','disabled')"
+        phx-hook="DisableOnSubmit"
       >
         <input type="hidden" name="redirect_to" value={@redirect_to || ""} />
         <.input

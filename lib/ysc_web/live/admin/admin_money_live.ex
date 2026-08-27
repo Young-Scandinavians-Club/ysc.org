@@ -1470,8 +1470,9 @@ defmodule YscWeb.AdminMoneyLive do
                       )}
                     </td>
                     <td
+                      id={"expense-inbox-actions-stop-#{expense_report.id}"}
+                      phx-hook="StopClick"
                       class="px-4 py-3 whitespace-nowrap text-right text-sm"
-                      onclick="event.stopPropagation()"
                     >
                       <button
                         type="button"
@@ -1828,8 +1829,9 @@ defmodule YscWeb.AdminMoneyLive do
                     )}
                   </td>
                   <td
+                    id={"expense-report-actions-stop-#{expense_report.id}"}
+                    phx-hook="StopClick"
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
-                    onclick="event.stopPropagation()"
                   >
                     <button
                       type="button"
@@ -2100,8 +2102,9 @@ defmodule YscWeb.AdminMoneyLive do
                     )}
                   </td>
                   <td
+                    id={"webhook-actions-stop-#{webhook.id}"}
+                    phx-hook="StopClick"
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
-                    onclick="event.stopPropagation()"
                   >
                     <button
                       type="button"

@@ -533,10 +533,11 @@ defmodule YscWeb.AdminSettingsLive do
                     {job.attempt}/{job.max_attempts}
                   </td>
                   <td
+                    id={"job-actions-stop-#{job.id}"}
+                    phx-hook="StopClick"
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium"
                     phx-click="reschedule_job"
                     phx-value-job_id={job.id}
-                    onclick="event.stopPropagation()"
                   >
                     <.button class="bg-green-600 hover:bg-green-700">
                       Re-schedule
