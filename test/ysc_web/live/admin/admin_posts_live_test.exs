@@ -36,6 +36,7 @@ defmodule YscWeb.AdminPostsLiveTest do
       assert html =~ "Viking News"
       assert has_element?(view, "#admin-posts-mobile")
       assert has_element?(view, "#admin-post-card-#{post.id}")
+      assert has_element?(view, "#admin-help-link-posts-publish")
     end
 
     test "navigates to new post editor", %{conn: conn} do

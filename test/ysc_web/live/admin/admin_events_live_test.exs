@@ -25,6 +25,7 @@ defmodule YscWeb.AdminEventsLiveTest do
       assert html =~ "Grand Viking Feast"
       assert has_element?(view, "#admin-events-mobile")
       assert has_element?(view, "#admin-event-card-#{event.id}")
+      assert has_element?(view, "#admin-help-link-events-create")
     end
 
     test "renders date range filter inputs", %{conn: conn} do

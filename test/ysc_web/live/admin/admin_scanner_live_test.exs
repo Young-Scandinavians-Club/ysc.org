@@ -69,6 +69,7 @@ defmodule YscWeb.AdminScannerLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/scanner")
 
       assert has_element?(view, "#scan-setup-form")
+      assert has_element?(view, "#admin-help-link-day-of-scanner")
     end
 
     test "shows membership and event mode options", %{conn: conn} do

@@ -326,14 +326,13 @@ defmodule YscWeb.AdminMediaLive do
       >
         <div class="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div class="flex items-center gap-2">
-              <.admin_page_title>Media Library</.admin_page_title>
-              <.admin_help_link
-                topic="media/upload"
-                label="Media help"
-                role={@admin_role}
-              />
-            </div>
+            <.admin_page_title
+              help_topic="media/upload"
+              help_label="Media help"
+              help_role={@admin_role}
+            >
+              Media Library
+            </.admin_page_title>
             <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
               {@media_count} {if @media_count == 1,
                 do: "image",

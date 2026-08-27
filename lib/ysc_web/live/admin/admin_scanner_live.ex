@@ -422,16 +422,13 @@ defmodule YscWeb.AdminScannerLive do
     >
       <div class="py-6">
         <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-semibold text-zinc-800">
-              Check-in &amp; Scan
-            </h1>
-            <.admin_help_link
-              topic="day-of/scanner"
-              label="Scanner help"
-              role={@admin_role}
-            />
-          </div>
+          <.admin_page_title
+            help_topic="day-of/scanner"
+            help_label="Scanner help"
+            help_role={@admin_role}
+          >
+            Check-in &amp; Scan
+          </.admin_page_title>
           <.link
             navigate={~p"/admin/scanner/sessions"}
             class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold leading-6 border border-zinc-200 hover:bg-zinc-50 text-zinc-700 bg-transparent transition duration-150 ease-in-out"
