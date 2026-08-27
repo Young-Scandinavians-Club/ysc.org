@@ -669,13 +669,45 @@ defmodule Ysc.Tickets.BookingLocker do
     count_sold_tickets_for_tier_locked(tier_id)
   end
 
-  defp calculate_total_amount(tiers, ticket_selections, user_id, event_id) do
-    # Get active reservations for this user and event to calculate discounts
-    active_reservations =
+  defp calculate_total_amount(
+         tiers,
+         ticket_selections,
+         user_id,
+         event_id,
+         opts \\ []
+       ) do
+    # Get reservations for this user and event to calculate discounts.
+    #
+    # When repricing an existing order (`:include_fulfilled_for_order_id`), also
+    # count reservations this order already fulfilled. Fulfillment flips a hold
+    # from "active" to "fulfilled", so without this a 100%-off hold would drop
+    # its discount the moment checkout fulfills it and the order would reprice to
+    # full fare (both when picking the free-vs-paid path and when creating the
+    # Stripe PaymentIntent).
+    fulfilled_order_id = Keyword.get(opts, :include_fulfilled_for_order_id)
+
+    reservation_scope =
       TicketReservation
       |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
       |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
-      |> Events.where_ticket_reservation_hold_active()
+
+    reservation_scope =
+      if fulfilled_order_id do
+        now = DateTime.utc_now()
+
+        where(
+          reservation_scope,
+          [tr],
+          (tr.status == "active" and
+             (is_nil(tr.expires_at) or tr.expires_at > ^now)) or
+            tr.ticket_order_id == ^fulfilled_order_id
+        )
+      else
+        Events.where_ticket_reservation_hold_active(reservation_scope)
+      end
+
+    active_reservations =
+      reservation_scope
       |> order_by([tr], asc: tr.inserted_at)
       |> Repo.all()
 
@@ -1006,12 +1038,19 @@ defmodule Ysc.Tickets.BookingLocker do
   end
 
   @doc """
-  Estimates an order total from current tier prices and active reservations.
+  Estimates an order total from current tier prices and reservations.
 
   Used before checkout to detect stale pending orders when tier pricing changed
   after the order was created.
+
+  ## Options
+
+    * `:include_fulfilled_for_order_id` - also apply discounts from reservations
+      already fulfilled by this order, not just active holds. Pass this when
+      repricing an existing order so a fulfilled 100%-off hold keeps its
+      discount.
   """
-  def estimate_order_total(user_id, event_id, ticket_selections)
+  def estimate_order_total(user_id, event_id, ticket_selections, opts \\ [])
       when is_map(ticket_selections) do
     tier_ids = Map.keys(ticket_selections)
 
@@ -1022,7 +1061,7 @@ defmodule Ysc.Tickets.BookingLocker do
         from(t in TicketTier, where: t.id in ^tier_ids)
         |> Repo.all()
 
-      calculate_total_amount(tiers, ticket_selections, user_id, event_id)
+      calculate_total_amount(tiers, ticket_selections, user_id, event_id, opts)
     end
   end
 

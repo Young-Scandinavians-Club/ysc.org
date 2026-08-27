@@ -1355,7 +1355,8 @@ defmodule Ysc.Tickets do
       BookingLocker.estimate_order_total(
         ticket_order.user_id,
         ticket_order.event_id,
-        selections
+        selections,
+        include_fulfilled_for_order_id: ticket_order.id
       )
     end
   end
@@ -1366,7 +1367,8 @@ defmodule Ysc.Tickets do
     BookingLocker.estimate_order_total(
       ticket_order.user_id,
       ticket_order.event_id,
-      selections
+      selections,
+      include_fulfilled_for_order_id: ticket_order.id
     )
   end
 
