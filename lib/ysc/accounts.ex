@@ -4501,7 +4501,7 @@ defmodule Ysc.Accounts do
 
     renewals_count =
       membership_renewals_ytd_query(year_start, now)
-      |> Repo.one() || 0
+      |> Repo.one!()
 
     current_net_new = current_count - current_losses
     prior_net_new = prior_count - prior_losses

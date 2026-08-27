@@ -305,6 +305,23 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "ci_query_explain membership YTD query builders" do
+    test "ci_query_explain_membership_joins_ytd_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_membership_joins_ytd_query()
+    end
+
+    test "ci_query_explain_membership_losses_ytd_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_membership_losses_ytd_query()
+    end
+
+    test "ci_query_explain_membership_renewals_ytd_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_membership_renewals_ytd_query()
+    end
+  end
+
   describe "get_user_by_phone_number/1" do
     test "returns nil for unknown phone number" do
       refute Accounts.get_user_by_phone_number("+15550000000")
