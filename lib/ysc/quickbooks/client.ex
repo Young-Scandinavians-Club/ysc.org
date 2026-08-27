@@ -724,6 +724,161 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   @doc """
+  Creates a JournalEntry in QuickBooks.
+
+  Unlike a Deposit, a JournalEntry has no single "destination" account and no
+  total-amount sign constraint - each line carries its own Debit/Credit
+  PostingType, so it can represent a negative-amount payout (Stripe debiting
+  the bank account) that a Deposit cannot.
+
+  https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/journalentry
+  """
+  @spec create_journal_entry(map(), keyword()) ::
+          {:ok, map()} | {:error, atom() | String.t()}
+  def create_journal_entry(params, opts \\ []) do
+    with {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      idempotency_key =
+        case Keyword.get(opts, :idempotency_key) do
+          nil -> Keyword.get(opts, :requestid)
+          key -> key
+        end
+
+      url_opts = if idempotency_key, do: [requestid: idempotency_key], else: []
+      url = build_url(company_id, "journalentry", url_opts)
+      headers = build_headers(access_token)
+      body = build_journal_entry_body(params)
+
+      Ysc.Logging.info("Creating QuickBooks JournalEntry",
+        company_id: company_id,
+        idempotency_key: idempotency_key,
+        body: inspect(body, limit: :infinity, pretty: true)
+      )
+
+      request = Finch.build(:post, url, headers, Jason.encode!(body))
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          case Jason.decode(response_body) do
+            {:ok, data} ->
+              journal_entry = get_response_entity(data, "JournalEntry")
+
+              Ysc.Logging.info("Successfully created QuickBooks JournalEntry",
+                journal_entry_id: Map.get(journal_entry, "Id")
+              )
+
+              {:ok, journal_entry}
+
+            {:error, error} ->
+              Ysc.Logging.error(
+                "Failed to parse QuickBooks create_journal_entry response",
+                error: inspect(error),
+                response: response_body
+              )
+
+              {:error, :invalid_response}
+          end
+
+        {:error, {:rate_limited, _resp}} ->
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "journalentry",
+            max_retries: max_429_retries()
+          )
+
+          {:error, :rate_limited}
+
+        {:ok, %Finch.Response{status: 401, body: _response_body}} ->
+          Ysc.Logging.warning(
+            "QuickBooks authentication failed, attempting token refresh"
+          )
+
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              headers = build_headers(new_access_token)
+              request = Finch.build(:post, url, headers, Jason.encode!(body))
+
+              case Finch.request(request, Ysc.Finch) do
+                {:ok,
+                 %Finch.Response{status: status, body: retry_response_body}}
+                when status in 200..299 ->
+                  case Jason.decode(retry_response_body) do
+                    {:ok, data} ->
+                      {:ok, get_response_entity(data, "JournalEntry")}
+
+                    {:error, error} ->
+                      Ysc.Logging.error(
+                        "Failed to parse QuickBooks response after retry",
+                        error: inspect(error)
+                      )
+
+                      {:error, :invalid_response}
+                  end
+
+                {:ok,
+                 %Finch.Response{status: status, body: retry_response_body}} ->
+                  error = parse_error_response(retry_response_body)
+
+                  Ysc.Logging.error("QuickBooks API error after token refresh",
+                    status: status,
+                    error: error
+                  )
+
+                  {:error, error}
+
+                {:error, error} ->
+                  Ysc.Logging.error("Request failed after token refresh",
+                    error: inspect(error)
+                  )
+
+                  {:error, :request_failed}
+              end
+
+            error ->
+              Ysc.Logging.error("Failed to refresh QuickBooks access token",
+                error: inspect(error)
+              )
+
+              {:error, :authentication_failed}
+          end
+
+        {:ok, %Finch.Response{status: status, body: response_body}} ->
+          error = parse_error_response(response_body)
+          error_details = parse_error_details(response_body)
+
+          Ysc.Logging.error("QuickBooks API error",
+            status: status,
+            error: error,
+            endpoint: "journalentry",
+            error_details: error_details,
+            extra: %{
+              endpoint: "journalentry",
+              status_code: status,
+              error_summary: error,
+              quickbooks_errors: error_details[:errors] || [],
+              fault_type: error_details[:fault_type]
+            }
+          )
+
+          {:error, error}
+
+        {:error, error} ->
+          Ysc.Logging.error("Failed to create QuickBooks JournalEntry",
+            error: inspect(error)
+          )
+
+          {:error, :request_failed}
+      end
+    end
+  end
+
+  @doc """
   Fetches a Deposit by ID from QuickBooks.
   """
   @spec get_deposit_by_id(String.t()) :: {:ok, map()} | {:error, atom()}
@@ -1953,6 +2108,43 @@ defmodule Ysc.Quickbooks.Client do
     }
     |> maybe_put("TxnDate", params[:txn_date])
     |> maybe_put("PrivateNote", params[:private_note])
+  end
+
+  # Builds request body per JournalEntry entity spec. Each line carries its
+  # own Debit/Credit PostingType (Amount is always non-negative), unlike a
+  # Deposit line where the sign of Amount conveys direction.
+  # https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/journalentry
+  defp build_journal_entry_body(params) do
+    lines = Enum.map(params.line, &normalize_journal_entry_line_item/1)
+
+    %{"Line" => lines}
+    |> maybe_put("TxnDate", params[:txn_date])
+    |> maybe_put("PrivateNote", params[:private_note])
+  end
+
+  defp normalize_journal_entry_line_item(item) do
+    amount =
+      item.amount
+      |> deposit_line_amount_to_decimal()
+      |> Decimal.round(2)
+      |> Decimal.to_float()
+
+    detail =
+      %{
+        "PostingType" => item.posting_type,
+        "AccountRef" => normalize_ref(item.account_ref)
+      }
+      |> maybe_put(
+        "ClassRef",
+        item[:class_ref] && normalize_ref(item.class_ref)
+      )
+
+    %{
+      "Amount" => amount,
+      "DetailType" => "JournalEntryLineDetail",
+      "JournalEntryLineDetail" => detail
+    }
+    |> maybe_put("Description", item[:description])
   end
 
   defp build_customer_body(params) do

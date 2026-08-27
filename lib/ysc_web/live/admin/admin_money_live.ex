@@ -2598,11 +2598,22 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <%= if @selected_payout.quickbooks_deposit_id do %>
               <div>
-                <p class="font-medium text-zinc-700">QuickBooks Deposit ID</p>
+                <p class="font-medium text-zinc-700">
+                  <%= if @selected_payout.quickbooks_transaction_type == "journal_entry" do %>
+                    QuickBooks Journal Entry ID
+                  <% else %>
+                    QuickBooks Deposit ID
+                  <% end %>
+                </p>
                 <a
                   href={
                     quickbooks_entity_url(
-                      "deposit",
+                      if(
+                        @selected_payout.quickbooks_transaction_type ==
+                          "journal_entry",
+                        do: "journal",
+                        else: "deposit"
+                      ),
                       @selected_payout.quickbooks_deposit_id
                     )
                   }

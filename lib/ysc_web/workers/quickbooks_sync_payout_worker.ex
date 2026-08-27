@@ -29,10 +29,12 @@ defmodule YscWeb.Workers.QuickbooksSyncPayoutWorker do
     :quickbooks_accounts_not_configured,
     :payout_not_found,
     :invalid_bank_account,
-    # Stripe sent a negative payout.paid amount (debiting our bank account to
-    # cover a negative Stripe balance) - a QuickBooks Deposit can't represent
-    # a withdrawal, so this needs a human to book manually. Retrying won't help.
-    :negative_payout_amount,
+    # A negative payout.paid amount (Stripe debiting our bank account to
+    # cover a negative Stripe balance) syncs as a JournalEntry instead of a
+    # Deposit. These two mean the JournalEntry couldn't be built correctly -
+    # a config/data issue that retrying won't fix.
+    :payout_journal_entry_unbalanced,
+    :stripe_fees_account_not_found,
     # A stale SyncToken means the Deposit was edited elsewhere (most likely
     # a human, in QuickBooks) - Sync already sent a Discord alert for it.
     # Retrying just re-reads the same conflicted Deposit and re-alerts up to
