@@ -734,5 +734,32 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert has_element?(view, "#refund-ticket-modal")
       assert Repo.get!(Ticket, ticket.id).status == :confirmed
     end
+
+    test "skips Stripe and cancels when the ticket refund amount is zero", %{
+      conn: conn
+    } do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{event_id: event.id, price: Money.new(0, :USD)})
+
+      %{tickets: [ticket]} =
+        completed_ticket_order_with_payment!(event: event, tier: tier)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-refund")
+      |> render_click()
+
+      assert has_element?(view, "#refund-ticket-modal")
+
+      view
+      |> form("#refund-ticket-form", %{"reason" => "Free ticket"})
+      |> render_submit()
+
+      refute has_element?(view, "#refund-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).status == :cancelled
+    end
   end
 end
