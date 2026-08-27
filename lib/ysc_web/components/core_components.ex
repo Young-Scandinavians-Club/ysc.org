@@ -2079,7 +2079,7 @@ defmodule YscWeb.CoreComponents do
 
   def row_actions_dropdown(assigns) do
     ~H"""
-    <div class="flex justify-end" onclick="event.stopPropagation()">
+    <div id={"#{@id}-stop-click"} phx-hook="StopClick" class="flex justify-end">
       <.dropdown
         id={@id}
         right={true}
