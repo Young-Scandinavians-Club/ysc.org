@@ -65,13 +65,14 @@ defmodule YscWeb.PhoenixUpgradeTest do
       assert js =~ ~s|event === "phx_reply"|
     end
 
-    test "reconnect path separates disconnect() and connect() onto different ticks" do
+    test "reconnect path splits disconnect() and connect() across ticks" do
       js = File.read!(@app_js)
 
       # disconnect() must settle (channels -> "errored", old socket closed)
       # before connect() runs, otherwise the channel never rejoins.
       assert js =~ "function forceReconnect()"
-      assert js =~ ~r/liveSocket\.disconnect\(\);\s*\n\s*setTimeout\(\(\) => liveSocket\.connect\(\), \d+\)/
+      assert js =~ "liveSocket.disconnect();"
+      assert js =~ "setTimeout(() => liveSocket.connect(), 100)"
     end
   end
 end
