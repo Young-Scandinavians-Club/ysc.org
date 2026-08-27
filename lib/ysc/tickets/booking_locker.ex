@@ -669,7 +669,13 @@ defmodule Ysc.Tickets.BookingLocker do
     count_sold_tickets_for_tier_locked(tier_id)
   end
 
-  defp calculate_total_amount(tiers, ticket_selections, user_id, event_id, opts \\ []) do
+  defp calculate_total_amount(
+         tiers,
+         ticket_selections,
+         user_id,
+         event_id,
+         opts \\ []
+       ) do
     # Get reservations for this user and event to calculate discounts.
     #
     # When repricing an existing order (`:include_fulfilled_for_order_id`), also
