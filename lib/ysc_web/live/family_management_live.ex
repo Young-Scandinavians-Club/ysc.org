@@ -483,7 +483,7 @@ defmodule YscWeb.FamilyManagementLive do
       <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
         <p class="text-sm text-amber-800">
           You can't send family invites right now. Invites require an active Family or Lifetime
-          membership, and you can link up to 10 people who have their own login. If you have a
+          membership, and you can invite up to 10 family members to create their own sign-in. If you have a
           Single membership or unpaid dues, update your membership first.
         </p>
       </div>
@@ -500,7 +500,7 @@ defmodule YscWeb.FamilyManagementLive do
       </div>
 
       <p class="text-sm text-zinc-500">
-        People you have added and people with their own login. Send an invite to anyone who does not have login access yet.
+        People on your family membership. Send an invite so they can create their own sign-in and use member benefits.
       </p>
 
       <%= if @active_rows == [] do %>
@@ -667,7 +667,7 @@ defmodule YscWeb.FamilyManagementLive do
       </.modal_title>
 
       <.form_notice kind={:info} id="family-member-form-notice">
-        Saving here updates your account records only. To share membership benefits, send an invitation from the member row.
+        Saving here adds them to your family list. To let them sign in and use membership benefits, send an invitation from their row.
       </.form_notice>
 
       <.form
@@ -705,7 +705,10 @@ defmodule YscWeb.FamilyManagementLive do
             field={@family_member_form[:relationship]}
             type="select"
             label="Relationship"
-            options={[{"Child", "child"}, {"Spouse", "spouse"}]}
+            options={[
+              {"Child", "child"},
+              {"Spouse or partner", "spouse"}
+            ]}
           />
         </div>
 
@@ -918,7 +921,7 @@ defmodule YscWeb.FamilyManagementLive do
             phx-value-user_id={@row.id}
             data-confirm="Are you sure you want to remove this family member from your membership? They will lose access to membership benefits and receive an email notification."
           >
-            Unlink
+            Remove from membership
           </.dropdown_menu_item>
         <% else %>
           <.dropdown_menu_item
@@ -1026,7 +1029,7 @@ defmodule YscWeb.FamilyManagementLive do
           subtitle: sub_account.email,
           relationship:
             FamilyDisplay.relationship_label(sub_account.family_relationship),
-          status_label: "Linked Account",
+          status_label: "Can sign in",
           badge_type: "green"
         }
       end)

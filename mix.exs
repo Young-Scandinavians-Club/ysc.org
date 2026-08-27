@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.29.0",
+      version: "2.30.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -249,7 +249,9 @@ defmodule Ysc.MixProject do
       {:nested_filter, "~> 2.1", override: true},
       {:mjml_eex, "~> 0.13"},
       {:mox, "~> 1.2", only: :test},
-      {:oban, "~> 2.23"},
+      # 2.24: top-level cron/pruner/lifeline/reindexer, Period durations, snooze
+      # no longer consumes attempts. Legacy :plugins names still work.
+      {:oban, "~> 2.24"},
       {:passbook, "~> 0.1"},
       {:phoenix_bakery, "~> 1.0", runtime: false},
       {:phoenix_ecto, "~> 4.7"},

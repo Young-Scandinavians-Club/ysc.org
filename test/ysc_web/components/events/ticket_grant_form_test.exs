@@ -45,11 +45,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       assert doc |> LazyHTML.query("#ticket_grant_quantity") |> Enum.any?()
 
       assert doc
-             |> LazyHTML.query("#ticket_grant_skip_capacity[type=checkbox]")
-             |> Enum.any?()
-
-      assert doc
-             |> LazyHTML.query("#ticket_grant_skip_sale_guards[type=checkbox]")
+             |> LazyHTML.query("#ticket_grant_override_limits[type=checkbox]")
              |> Enum.any?()
 
       assert doc
@@ -370,6 +366,65 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
 
       orders = Ysc.Tickets.list_user_ticket_orders(member.id)
       assert Enum.any?(orders, &(&1.event_id == event.id))
+    end
+
+    test "the single override checkbox bypasses capacity checks", %{
+      event: event,
+      admin: admin,
+      member: member
+    } do
+      tight_tier = ticket_tier_fixture(%{event_id: event.id, quantity: 1})
+
+      {:ok, socket} =
+        TicketGrantForm.update(
+          %{
+            id: "grant-form",
+            ticket_tier: tight_tier,
+            event_id: event.id,
+            current_user: admin
+          },
+          new_socket()
+        )
+
+      {:noreply, socket} =
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
+
+      # Two tickets against a one-seat tier fails without the override...
+      {:noreply, blocked} =
+        TicketGrantForm.handle_event(
+          "save",
+          %{"ticket_grant" => %{"quantity" => "2", "send_email" => "false"}},
+          socket
+        )
+
+      assert Phoenix.Flash.get(blocked.assigns.flash, :error) =~
+               "Not enough tickets available"
+
+      # ...and succeeds with "Override all limits" checked.
+      {:noreply, granted} =
+        TicketGrantForm.handle_event(
+          "save",
+          %{
+            "ticket_grant" => %{
+              "quantity" => "2",
+              "override_limits" => "true",
+              "send_email" => "false"
+            }
+          },
+          socket
+        )
+
+      assert Phoenix.Flash.get(granted.assigns.flash, :error) == nil
+
+      assert_received {:phoenix, :send_update,
+                       {{TicketTierManagement, "ticket-tier-management-" <> _},
+                        %{close_grant_modal: true, grant_success: grant_success}}}
+
+      assert grant_success.quantity == 2
     end
 
     test "shows an error toast when the ticket tier no longer exists", %{

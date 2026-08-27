@@ -2239,16 +2239,19 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert {:ok, _} = Sync.sync_payout(payout)
     end
 
-    test "rejects a negative payout amount without creating a deposit", %{
+    test "rejects a negative payout with nothing linked to explain it", %{
       user: _user
     } do
       # Stripe sends payout.paid with a negative amount when it debits our
       # bank account to cover a negative Stripe balance - that's a
-      # withdrawal, not a deposit, and must not be synced automatically.
+      # withdrawal, not a deposit, so it syncs as a JournalEntry instead
+      # (see create_payout_journal_entry/1). With no linked payments/refunds
+      # to explain the amount, the entry can't be made to balance and this
+      # must not guess a plug figure.
       {:ok, payout} =
         Ledgers.create_payout(%{
           arrival_date: ~N[2024-01-15 12:00:00],
-          amount: Money.new(-68_145, :USD),
+          amount: Money.new(Decimal.new("-681.45"), :USD),
           stripe_payout_id: "po_negative_amount",
           currency: "USD",
           status: "paid",
@@ -2257,9 +2260,148 @@ defmodule Ysc.Quickbooks.SyncTest do
 
       payout = Repo.preload(payout, [:payments, :refunds])
 
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      deny(ClientMock, :create_deposit, 2)
+      deny(ClientMock, :create_journal_entry, 2)
+
+      assert {:error, :payout_journal_entry_unbalanced} =
+               Sync.sync_payout(payout)
+    end
+
+    test "syncs a negative payout (refunds exceeding payments) as a balanced JournalEntry",
+         %{user: user} do
+      # Real scenario: $175 in payments, an $850 refund, and $6.45 in Stripe
+      # fees nets to -$681.45 - Stripe debited the bank account to cover the
+      # shortfall. A Deposit can't represent that, so this must sync as a
+      # JournalEntry: Debit Undeposited Funds $675.00 (clears the linked
+      # payment/refund's net UF contribution), Debit Stripe Fees $6.45,
+      # Credit Bank $681.45.
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(175, :USD),
+          external_payment_id: "pi_negative_payout_payment",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(0, :USD),
+          description: "Test payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "synced",
+        quickbooks_sales_receipt_id: "qb_sr_negative_payout"
+      })
+      |> Repo.update!()
+
+      {:ok, {refund, _refund_transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(850, :USD),
+          external_refund_id: "re_negative_payout_refund",
+          reason: "Booking cancellation refund"
+        })
+
+      refund
+      |> Refund.changeset(%{
+        quickbooks_sync_status: "synced",
+        quickbooks_sales_receipt_id: "qb_rr_negative_payout"
+      })
+      |> Repo.update!()
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(Decimal.new("-681.45"), :USD),
+          stripe_payout_id: "po_negative_with_transactions",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          fee_total: Money.new(Decimal.new("6.45"), :USD),
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+      {:ok, payout} = Ledgers.link_refund_to_payout(payout, refund)
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Administration:Bank Service Charges:Stripe" -> {:ok, "stripe_fees_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
       deny(ClientMock, :create_deposit, 2)
 
-      assert {:error, :negative_payout_amount} = Sync.sync_payout(payout)
+      expect(ClientMock, :create_journal_entry, fn params, _opts ->
+        assert length(params.line) == 3
+
+        uf_line =
+          Enum.find(params.line, fn line ->
+            line.account_ref[:value] == "undeposited_funds_123"
+          end)
+
+        assert uf_line.posting_type == "Debit"
+        assert Decimal.equal?(uf_line.amount, Decimal.new("675.00"))
+
+        fees_line =
+          Enum.find(params.line, fn line ->
+            line.account_ref[:value] == "stripe_fees_123"
+          end)
+
+        assert fees_line.posting_type == "Debit"
+        assert Decimal.equal?(fees_line.amount, Decimal.new("6.45"))
+
+        bank_line =
+          Enum.find(params.line, fn line ->
+            line.account_ref[:value] == "bank_account_123"
+          end)
+
+        assert bank_line.posting_type == "Credit"
+        assert Decimal.equal?(bank_line.amount, Decimal.new("681.45"))
+
+        {:ok, %{"Id" => "qb_je_negative_payout"}}
+      end)
+
+      assert {:ok, journal_entry} = Sync.sync_payout(payout)
+      assert journal_entry["Id"] == "qb_je_negative_payout"
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "synced"
+      assert payout.quickbooks_deposit_id == "qb_je_negative_payout"
+      assert payout.quickbooks_transaction_type == "journal_entry"
     end
 
     test "passes idempotency key with length at most 255 to create_deposit", %{

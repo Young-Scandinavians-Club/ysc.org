@@ -9,7 +9,7 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
 
   ## Scheduling
 
-  Configured to run daily at 2 AM UTC via Oban.Plugins.Cron.
+  Configured to run daily at 2 AM UTC via Oban.Cron.
 
   ## Manual Triggering
 

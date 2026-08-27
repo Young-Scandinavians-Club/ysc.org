@@ -303,6 +303,29 @@ defmodule YscWeb.DateDisplayTest do
              }) == :started
     end
 
+    test "uses the 3:00 PM Pacific cutoff on the check-in day" do
+      checkin = ~D[2026-08-15]
+
+      before_cutoff =
+        DateTime.new!(checkin, ~T[14:59:59], "America/Los_Angeles")
+
+      at_cutoff =
+        DateTime.new!(checkin, ~T[15:00:00], "America/Los_Angeles")
+
+      after_cutoff =
+        DateTime.new!(checkin, ~T[15:00:01], "America/Los_Angeles")
+
+      booking = %{checkin_date: checkin}
+
+      assert DateDisplay.days_until_cabin_checkin(booking, before_cutoff) == 0
+
+      assert DateDisplay.days_until_cabin_checkin(booking, at_cutoff) ==
+               :started
+
+      assert DateDisplay.days_until_cabin_checkin(booking, after_cutoff) ==
+               :started
+    end
+
     test "returns nil when check-in date is missing" do
       assert DateDisplay.days_until_cabin_checkin(%{}) == nil
       assert DateDisplay.days_until_cabin_checkin(%{checkin_date: nil}) == nil
@@ -319,6 +342,48 @@ defmodule YscWeb.DateDisplayTest do
       assert DateTime.to_date(dt) == ~D[2026-08-28]
       assert DateTime.to_time(dt) == ~T[19:00:00]
       assert dt.time_zone == "America/Los_Angeles"
+    end
+
+    test "defaults to midnight Pacific when start_time is missing" do
+      dt =
+        DateDisplay.event_start_datetime(%{
+          start_date: ~D[2026-08-28]
+        })
+
+      assert DateTime.to_date(dt) == ~D[2026-08-28]
+      assert DateTime.to_time(dt) == ~T[00:00:00]
+      assert dt.time_zone == "America/Los_Angeles"
+    end
+
+    test "returns nil when start_date is missing" do
+      assert DateDisplay.event_start_datetime(%{start_time: ~T[19:00:00]}) ==
+               nil
+    end
+
+    test "lands after the spring-forward gap instead of crashing" do
+      # 2026-03-08 02:30 never exists in America/Los_Angeles (PST → PDT).
+      dt =
+        DateDisplay.event_start_datetime(%{
+          start_date: ~D[2026-03-08],
+          start_time: ~T[02:30:00]
+        })
+
+      assert DateTime.to_date(dt) == ~D[2026-03-08]
+      assert DateTime.to_time(dt) == ~T[03:00:00]
+      assert dt.time_zone == "America/Los_Angeles"
+    end
+
+    test "picks the first occurrence of an ambiguous fall-back time" do
+      # 2026-11-01 01:30 occurs twice (PDT then PST).
+      dt =
+        DateDisplay.event_start_datetime(%{
+          start_date: ~D[2026-11-01],
+          start_time: ~T[01:30:00]
+        })
+
+      assert DateTime.to_date(dt) == ~D[2026-11-01]
+      assert DateTime.to_time(dt) == ~T[01:30:00]
+      assert dt.zone_abbr == "PDT"
     end
   end
 

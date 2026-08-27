@@ -211,6 +211,31 @@ defmodule YscWeb.AdminTicketListLiveTest do
 
       assert has_element?(view, "#ticket-row-#{ticket.id}")
     end
+
+    test "collapses the orphaned 'No order' group, whose toggle has no id", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      assert has_element?(view, "#ticket-row-#{ticket.id}")
+
+      view |> element("#ticket-order-toggle-") |> render_click()
+      refute has_element?(view, "#ticket-row-#{ticket.id}")
+
+      view |> element("#ticket-order-toggle-") |> render_click()
+      assert has_element?(view, "#ticket-row-#{ticket.id}")
+    end
   end
 
   describe "sorting orders by purchase date" do
@@ -274,6 +299,69 @@ defmodule YscWeb.AdminTicketListLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
 
       assert has_element?(view, "span.inline-block", "VIP Pass")
+    end
+  end
+
+  describe "per-ticket amount" do
+    setup [:create_admin]
+
+    test "shows each ticket's price so the rows add up to the order total", %{
+      conn: conn
+    } do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{event_id: event.id, price: Money.new(50, :USD)})
+
+      %{ticket_order: order, tickets: tickets} =
+        completed_ticket_order_with_payment!(
+          event: event,
+          tier: tier,
+          quantity: 2
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      for ticket <- tickets do
+        assert has_element?(
+                 view,
+                 "#ticket-row-#{ticket.id}",
+                 Money.to_string!(tier.price)
+               )
+      end
+
+      assert has_element?(
+               view,
+               "#ticket-order-#{order.id}",
+               Money.to_string!(order.total_amount)
+             )
+    end
+
+    test "shows the reservation discount and the discounted price on the ticket",
+         %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      tier =
+        ticket_tier_fixture(%{event_id: event.id, price: Money.new(50, :USD)})
+
+      buyer = user_fixture()
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: buyer.id
+        })
+
+      Repo.get!(Ticket, ticket.id)
+      |> Ecto.Changeset.change(discount_amount: Money.new(20, :USD))
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      assert has_element?(view, "#ticket-row-#{ticket.id}", "-$20.00")
+      # net price after the $20 reservation discount comes off the $50 tier
+      assert has_element?(view, "#ticket-row-#{ticket.id}", "$30.00")
     end
   end
 
@@ -479,6 +567,45 @@ defmodule YscWeb.AdminTicketListLiveTest do
                "Reassigned to New Owner"
              )
     end
+
+    test "refuses to reassign a ticket to its current holder", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      buyer = user_fixture(%{first_name: "Same", last_name: "Owner"})
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: buyer.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-reassign")
+      |> render_click()
+
+      view
+      |> element("#ticket-reassign-user-autocomplete-input")
+      |> render_keyup(%{"value" => buyer.email})
+
+      view
+      |> element(
+        "#ticket-reassign-user-autocomplete button[phx-click='select-user'][phx-value-id='#{buyer.id}']"
+      )
+      |> render_click()
+
+      view
+      |> element("button[phx-click='confirm-reassign']")
+      |> render_click()
+
+      assert has_element?(view, "#reassign-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).user_id == buyer.id
+    end
   end
 
   describe "refund ticket" do
@@ -551,6 +678,61 @@ defmodule YscWeb.AdminTicketListLiveTest do
         end)
 
       assert Money.equal?(total, Money.new(100, :USD))
+    end
+
+    test "does not refund an orphaned ticket with no order", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-refund")
+      |> render_click()
+
+      refute has_element?(view, "#refund-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).status == :confirmed
+    end
+
+    test "does not refund a grant order that has no Stripe payment", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      buyer = user_fixture()
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: buyer.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-refund")
+      |> render_click()
+
+      assert has_element?(view, "#refund-ticket-modal")
+
+      view
+      |> form("#refund-ticket-form", %{"reason" => "Complimentary"})
+      |> render_submit()
+
+      assert has_element?(view, "#refund-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).status == :confirmed
     end
   end
 end

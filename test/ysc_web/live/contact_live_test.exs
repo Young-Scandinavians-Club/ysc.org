@@ -347,6 +347,15 @@ defmodule YscWeb.ContactLiveTest do
                "board@ysc.org"
              )
 
+      assert has_element?(
+               view,
+               "a[href='mailto:web@ysc.org']",
+               "Website & sign-in"
+             )
+
+      assert has_element?(view, "#contact-card-web")
+      assert has_element?(view, "a[href='mailto:web@ysc.org']", "web@ysc.org")
+
       assert has_element?(view, "a[href='mailto:choir@ysc.org']", "Choir")
 
       assert has_element?(
