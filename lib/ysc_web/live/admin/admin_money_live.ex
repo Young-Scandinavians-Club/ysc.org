@@ -693,7 +693,8 @@ defmodule YscWeb.AdminMoneyLive do
           case Tickets.refund_via_stripe(
                  payment,
                  calculated_refund_amount,
-                 refund_params["reason"]
+                 refund_params["reason"],
+                 ticket_ids: ticket_ids
                ) do
             {:ok, {_refund, _transaction, _entries}} ->
               case Tickets.refund_tickets(

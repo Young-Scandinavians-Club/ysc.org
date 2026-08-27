@@ -735,10 +735,20 @@ defmodule Ysc.Tickets do
   confirms the money moved would get a synthetic id that a later webhook for
   the real Stripe refund can't match against -- producing a second Refund, a
   second ledger transaction, and a second "your refund has been processed"
-  email for the same payment. The Stripe call itself is idempotent per
-  `(payment, amount)` so a retry after a post-refund failure (e.g.
-  `Ledgers.process_refund/1` erroring) reuses the same Stripe refund instead
-  of issuing a second one.
+  email for the same payment.
+
+  Stripe idempotency is scoped per refund, not per `(payment, amount)`. Two
+  tickets of the same price on one order are two intentional refunds; a key
+  of only payment+amount would return the first Stripe refund on the second
+  ticket, cancel the ticket, and never move the second share of money.
+  Pass `:ticket_ids` so a retry of the *same* tickets reuses the Stripe
+  refund after a post-refund failure (e.g. `Ledgers.process_refund/1`
+  erroring), while a later refund of different tickets issues a new one.
+  Amount-only refunds (no ticket ids) include the existing refund count so
+  two sequential $50 partials on the same payment also stay distinct.
+
+  ## Options
+  - `:ticket_ids` — ids of the tickets this refund covers (per-ticket flows)
 
   ## Returns
   - `{:ok, {:skipped_zero_amount, nil, nil}}` if `amount` is zero or negative
@@ -746,7 +756,7 @@ defmodule Ysc.Tickets do
   - `{:error, {:stripe_error, reason}}` if Stripe declines the refund
   - `{:error, :no_stripe_payment}` if `payment` has no Stripe payment to refund
   """
-  def refund_via_stripe(payment, amount, reason) do
+  def refund_via_stripe(payment, amount, reason, opts \\ []) do
     amount_cents = MoneyHelper.money_to_cents(amount)
 
     cond do
@@ -757,17 +767,8 @@ defmodule Ysc.Tickets do
         {:ok, {:skipped_zero_amount, nil, nil}}
 
       payment.external_payment_id && payment.external_provider == :stripe ->
-        # Deterministic per (payment, amount) so a retry after a post-refund
-        # failure (e.g. Ledgers.process_refund/1 erroring) reuses the same
-        # Stripe refund instead of issuing a second one. This does mean a
-        # second *intentional* refund of the identical amount on the same
-        # payment within Stripe's 24h idempotency window would be rejected as
-        # a duplicate -- acceptable given how rare that is versus the cost of
-        # a real double refund.
         idempotency_key =
-          Ysc.Stripe.Idempotency.key(
-            "admin_refund_#{payment.id}_#{amount_cents}"
-          )
+          stripe_refund_idempotency_key(payment, amount_cents, opts)
 
         case Bookings.create_stripe_refund_for_admin(
                payment.external_payment_id,
@@ -798,6 +799,39 @@ defmodule Ysc.Tickets do
       true ->
         {:error, :no_stripe_payment}
     end
+  end
+
+  # Stripe idempotency key for an admin refund. Same tickets + amount (or the
+  # same amount-only sequence number) retries the original Stripe refund;
+  # a different ticket set or a later partial of the same amount does not.
+  defp stripe_refund_idempotency_key(payment, amount_cents, opts) do
+    ticket_ids =
+      opts
+      |> Keyword.get(:ticket_ids, [])
+      |> List.wrap()
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&to_string/1)
+      |> Enum.sort()
+
+    scope =
+      case ticket_ids do
+        [] -> "n#{payment_refunds_count(payment.id)}"
+        ids -> "t" <> Enum.join(ids, "-")
+      end
+
+    Ysc.Stripe.Idempotency.key(
+      "admin_refund_#{payment.id}_#{scope}_#{amount_cents}"
+    )
+  end
+
+  defp payment_refunds_count(payment_id) do
+    payment_id
+    |> payment_refunds_count_query()
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp payment_refunds_count_query(payment_id) do
+    from(r in Ysc.Ledgers.Refund, where: r.payment_id == ^payment_id)
   end
 
   @doc """
@@ -2582,6 +2616,11 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_order_tickets_for_refund_query do
     order_tickets_for_refund_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_payment_refunds_count_query do
+    payment_refunds_count_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   defp stripe_client do

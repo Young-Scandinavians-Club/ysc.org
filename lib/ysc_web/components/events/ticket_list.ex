@@ -755,7 +755,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
             {:error, :no_stripe_payment}
 
           true ->
-            Tickets.refund_via_stripe(ticket_order.payment, amount, reason)
+            Tickets.refund_via_stripe(ticket_order.payment, amount, reason,
+              ticket_ids: [ticket.id]
+            )
         end
 
       case stripe_result do

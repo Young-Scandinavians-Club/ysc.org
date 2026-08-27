@@ -1,6 +1,7 @@
 defmodule YscWeb.AdminTicketListLiveTest do
   use YscWeb.ConnCase, async: false
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
@@ -631,6 +632,54 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert Repo.get!(TicketOrder, order.id).status == :cancelled
     end
 
+    test "refunding two same-price tickets issues two Stripe refunds", %{
+      conn: conn
+    } do
+      %{event: event, tickets: tickets, payment: payment} =
+        completed_ticket_order_with_payment!(quantity: 2)
+
+      [first, second] = tickets
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{first.id}-refund")
+      |> render_click()
+
+      view
+      |> form("#refund-ticket-form", %{"reason" => "First unused"})
+      |> render_submit()
+
+      assert Repo.get!(Ticket, first.id).status == :cancelled
+      assert Repo.get!(Ticket, second.id).status == :confirmed
+
+      view
+      |> element("#ticket-actions-#{second.id}-refund")
+      |> render_click()
+
+      view
+      |> form("#refund-ticket-form", %{"reason" => "Second unused"})
+      |> render_submit()
+
+      assert Repo.get!(Ticket, second.id).status == :cancelled
+
+      refunds =
+        Repo.all(
+          from(r in Ysc.Ledgers.Refund, where: r.payment_id == ^payment.id)
+        )
+
+      refund_ids = Enum.map(refunds, & &1.external_refund_id)
+      assert length(refunds) == 2
+      assert length(Enum.uniq(refund_ids)) == 2
+
+      total =
+        Enum.reduce(refunds, Money.new(0, :USD), fn refund, acc ->
+          Money.add!(acc, refund.amount)
+        end)
+
+      assert Money.equal?(total, Money.new(100, :USD))
+    end
+
     test "does not refund an orphaned ticket with no order", %{
       conn: conn,
       admin: admin
@@ -684,6 +733,33 @@ defmodule YscWeb.AdminTicketListLiveTest do
 
       assert has_element?(view, "#refund-ticket-modal")
       assert Repo.get!(Ticket, ticket.id).status == :confirmed
+    end
+
+    test "skips Stripe and cancels when the ticket refund amount is zero", %{
+      conn: conn
+    } do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{event_id: event.id, price: Money.new(0, :USD)})
+
+      %{tickets: [ticket]} =
+        completed_ticket_order_with_payment!(event: event, tier: tier)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-actions-#{ticket.id}-refund")
+      |> render_click()
+
+      assert has_element?(view, "#refund-ticket-modal")
+
+      view
+      |> form("#refund-ticket-form", %{"reason" => "Free ticket"})
+      |> render_submit()
+
+      refute has_element?(view, "#refund-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).status == :cancelled
     end
   end
 end

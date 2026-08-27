@@ -1524,6 +1524,61 @@ defmodule Ysc.TicketsTest do
       assert {:ok, {%Ysc.Ledgers.Refund{}, _transaction, _entries}} =
                Tickets.refund_via_stripe(payment, Money.new(50, :USD), "test")
     end
+
+    test "issues a second same-amount refund for different tickets instead of reusing the first Stripe refund" do
+      payment = LedgersFixtures.payment_fixture()
+      first_ticket_id = Ecto.ULID.generate()
+      second_ticket_id = Ecto.ULID.generate()
+      amount = Money.new(50, :USD)
+
+      assert {:ok, {first_refund, _, _}} =
+               Tickets.refund_via_stripe(payment, amount, "first ticket",
+                 ticket_ids: [first_ticket_id]
+               )
+
+      assert {:ok, {second_refund, _, _}} =
+               Tickets.refund_via_stripe(payment, amount, "second ticket",
+                 ticket_ids: [second_ticket_id]
+               )
+
+      assert first_refund.id != second_refund.id
+      assert first_refund.external_refund_id != second_refund.external_refund_id
+      assert Money.equal?(first_refund.amount, amount)
+      assert Money.equal?(second_refund.amount, amount)
+    end
+
+    test "retries of the same tickets reuse the original Stripe refund" do
+      payment = LedgersFixtures.payment_fixture()
+      ticket_id = Ecto.ULID.generate()
+      amount = Money.new(50, :USD)
+
+      assert {:ok, {first_refund, _, _}} =
+               Tickets.refund_via_stripe(payment, amount, "retry",
+                 ticket_ids: [ticket_id]
+               )
+
+      assert {:ok, {retried, _, _}} =
+               Tickets.refund_via_stripe(payment, amount, "retry",
+                 ticket_ids: [ticket_id]
+               )
+
+      assert retried.id == first_refund.id
+      assert retried.external_refund_id == first_refund.external_refund_id
+    end
+
+    test "sequential amount-only refunds of the same amount each create a Stripe refund" do
+      payment = LedgersFixtures.payment_fixture()
+      amount = Money.new(50, :USD)
+
+      assert {:ok, {first_refund, _, _}} =
+               Tickets.refund_via_stripe(payment, amount, "partial 1")
+
+      assert {:ok, {second_refund, _, _}} =
+               Tickets.refund_via_stripe(payment, amount, "partial 2")
+
+      assert first_refund.id != second_refund.id
+      assert first_refund.external_refund_id != second_refund.external_refund_id
+    end
   end
 
   describe "PubSub subscribe helpers" do
