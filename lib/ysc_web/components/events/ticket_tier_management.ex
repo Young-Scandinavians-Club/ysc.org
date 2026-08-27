@@ -6,7 +6,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="space-y-6">
+    <div id={"ticket-tier-management-#{@event_id}"} class="space-y-6">
       <div
         :if={@event.partiful_link not in [nil, ""]}
         class="border border-blue-100 rounded-lg p-4 bg-blue-50 flex items-center gap-3"
@@ -208,7 +208,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     label={"Actions for #{ticket_tier.name}"}
                   >
                     <.dropdown_menu_item
-                      :if={!is_donation}
+                      :if={!is_donation and @admin_role == :admin}
                       id={"ticket-tier-actions-#{ticket_tier.id}-grant"}
                       icon="hero-gift"
                       tone={:success}
@@ -373,6 +373,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         module={YscWeb.AdminEventsLive.TicketList}
         event_id={@event_id}
         refresh_token={@ticket_list_refresh_token}
+        admin_role={@admin_role}
+      />
+      <button
+        id={"ticket-tier-grant-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="grant-tickets"
+        phx-target={@myself}
       />
       <%!-- Add Ticket Tier Modal --%>
       <.modal
@@ -432,6 +440,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           ticket_tier_id={@granting_tier.id}
           event_id={@event_id}
           current_user={@current_user}
+          admin_role={@admin_role}
         />
       </.modal>
     </div>
@@ -440,7 +449,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @reservation_update_keys [:id, :reservation_epoch, :close_reserve_modal]
   @grant_update_keys [:id, :grant_epoch, :close_grant_modal, :grant_success]
-  @parent_passthrough_keys [:id, :event_id, :event, :current_user]
+  @parent_passthrough_keys [:id, :event_id, :event, :current_user, :admin_role]
 
   @impl true
   def mount(socket) do
@@ -449,6 +458,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def update(incoming_assigns, socket) do
+    socket = assign_new(socket, :admin_role, fn -> nil end)
     close_reserve_modal = Map.get(incoming_assigns, :close_reserve_modal, false)
     close_grant_modal = Map.get(incoming_assigns, :close_grant_modal, false)
     grant_success = Map.get(incoming_assigns, :grant_success)
@@ -480,6 +490,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
               :event_id,
               :event,
               :current_user,
+              :admin_role,
               :show_add_modal,
               :show_edit_modal,
               :show_reserve_modal,
@@ -647,9 +658,15 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         event -> assign(socket, :event, event)
       end
 
-    case Map.get(incoming_assigns, :current_user) do
+    socket =
+      case Map.get(incoming_assigns, :current_user) do
+        nil -> socket
+        current_user -> assign(socket, :current_user, current_user)
+      end
+
+    case Map.get(incoming_assigns, :admin_role) do
       nil -> socket
-      current_user -> assign(socket, :current_user, current_user)
+      admin_role -> assign(socket, :admin_role, admin_role)
     end
   end
 
@@ -814,24 +831,28 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("grant-tickets", params, socket) do
-    case tier_id_from_event_params(params) do
-      nil ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Invalid ticket tier.",
-           title: "Grant Tickets"
-         )}
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Grant Tickets")}
+    else
+      case tier_id_from_event_params(params) do
+        nil ->
+          {:noreply,
+           YscWeb.Flash.put_toast(socket, :error, "Invalid ticket tier.",
+             title: "Grant Tickets"
+           )}
 
-      tier_id ->
-        case Events.get_ticket_tier(tier_id) do
-          nil ->
-            {:noreply,
-             YscWeb.Flash.put_toast(socket, :error, "Ticket tier not found.",
-               title: "Grant Tickets"
-             )}
+        tier_id ->
+          case Events.get_ticket_tier(tier_id) do
+            nil ->
+              {:noreply,
+               YscWeb.Flash.put_toast(socket, :error, "Ticket tier not found.",
+                 title: "Grant Tickets"
+               )}
 
-          ticket_tier ->
-            grant_tickets_for_tier(socket, ticket_tier)
-        end
+            ticket_tier ->
+              grant_tickets_for_tier(socket, ticket_tier)
+          end
+      end
     end
   end
 
@@ -1055,23 +1076,36 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   defp tier_id_from_event_params(_), do: nil
 
   defp grant_tickets_for_tier(socket, ticket_tier) do
-    is_donation =
-      ticket_tier.type == "donation" || ticket_tier.type == :donation
-
-    if is_donation do
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(
-         :error,
-         "Tickets cannot be granted for donation tiers",
-         title: "Grant Tickets"
-       )}
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Grant Tickets")}
     else
-      {:noreply,
-       socket
-       |> assign(:show_grant_modal, true)
-       |> assign(:granting_tier, ticket_tier)}
+      is_donation =
+        ticket_tier.type == "donation" || ticket_tier.type == :donation
+
+      if is_donation do
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Tickets cannot be granted for donation tiers",
+           title: "Grant Tickets"
+         )}
+      else
+        {:noreply,
+         socket
+         |> assign(:show_grant_modal, true)
+         |> assign(:granting_tier, ticket_tier)}
+      end
     end
+  end
+
+  defp deny_full_admin(socket, title) do
+    YscWeb.Flash.put_toast(
+      socket,
+      :error,
+      "You do not have permission to perform this action.",
+      title: title
+    )
   end
 
   defp reserve_tickets_for_tier(socket, ticket_tier) do

@@ -14,6 +14,12 @@ defmodule YscWeb.VolunteerRoleTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
+
+  alias Ysc.Events
+  alias Ysc.Events.Ticket
+  alias Ysc.Repo
+  alias Ysc.Tickets.TicketOrder
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -453,5 +459,89 @@ defmodule YscWeb.VolunteerRoleTest do
       assert {:error, {:redirect, %{to: "/admin"}}} =
                live(conn, ~p"/admin/users/#{other_user.id}/details")
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 46: volunteers cannot refund, reassign, or grant tickets
+  # ---------------------------------------------------------------------------
+
+  describe "volunteer ticket money actions (Finding 46)" do
+    setup [:create_volunteer]
+
+    test "can open the tickets tab but cannot grant, refund, or reassign", %{
+      conn: conn,
+      volunteer: volunteer
+    } do
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Volunteer",
+          quantity: 20
+        })
+
+      buyer = user_fixture(%{first_name: "Ticket", last_name: "Buyer"})
+      ticket = insert_confirmed_ticket_for_volunteer_test(event, tier, buyer)
+      other = user_fixture(%{first_name: "Other", last_name: "Member"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-grant")
+      refute has_element?(view, "#ticket-actions-#{ticket.id}-refund")
+      refute has_element?(view, "#ticket-actions-#{ticket.id}-reassign")
+      assert has_element?(view, "#ticket-actions-#{ticket.id}-edit")
+
+      view
+      |> element("#ticket-tier-grant-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      refute has_element?(view, "#grant-tickets-modal")
+      assert Events.list_tickets_for_user(other.id) == []
+
+      view
+      |> element("#ticket-list-open-refund-#{event.id}")
+      |> render_click(%{"id" => ticket.id})
+
+      refute has_element?(view, "#refund-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).status == :confirmed
+
+      view
+      |> element("#ticket-list-open-reassign-#{event.id}")
+      |> render_click(%{"id" => ticket.id})
+
+      refute has_element?(view, "#reassign-ticket-modal")
+      assert Repo.get!(Ticket, ticket.id).user_id == buyer.id
+    end
+  end
+
+  defp insert_confirmed_ticket_for_volunteer_test(event, tier, buyer) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    order =
+      %TicketOrder{}
+      |> TicketOrder.admin_grant_changeset(
+        %{
+          user_id: buyer.id,
+          event_id: event.id,
+          total_amount: tier.price || Money.new(0, :USD),
+          expires_at: DateTime.add(now, 1, :day),
+          completed_at: now
+        },
+        buyer.id
+      )
+      |> Repo.insert!()
+
+    %Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: event.id,
+      ticket_tier_id: tier.id,
+      ticket_order_id: order.id,
+      user_id: buyer.id,
+      status: :confirmed,
+      inserted_at: now,
+      expires_at: DateTime.add(now, 1, :day)
+    }
+    |> Repo.insert!()
   end
 end
