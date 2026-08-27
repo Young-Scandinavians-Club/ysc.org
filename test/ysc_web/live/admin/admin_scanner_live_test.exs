@@ -140,7 +140,10 @@ defmodule YscWeb.AdminScannerLiveTest do
       })
       |> render_submit()
 
-      assert has_element?(view, "[phx-click='end_session']")
+      # Event sessions surface a "Desk" link back to the check-in desk instead
+      # of the scan-only "Done" button.
+      assert has_element?(view, "#qr-scanner-container")
+      assert has_element?(view, ~s{a[href*="/check-in?scan_session_id="]}, "Desk")
     end
   end
 
@@ -335,10 +338,11 @@ defmodule YscWeb.AdminScannerLiveTest do
                html =~ "/admin/users/"
     end
 
-    test "end_session navigates to event desk without closing session", %{
-      conn: conn,
-      admin: admin
-    } do
+    test "Desk link returns to the event check-in desk without closing session",
+         %{
+           conn: conn,
+           admin: admin
+         } do
       event = event_fixture(%{organizer_id: admin.id})
 
       {:ok, view, _html} = live(conn, ~p"/admin/scanner")
@@ -346,7 +350,11 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       [session] = Scanning.get_open_sessions(admin.id)
 
-      view |> element("button[phx-click='end_session']") |> render_click()
+      refute has_element?(view, "button[phx-click='end_session']")
+
+      view
+      |> element(~s{a[href*="/check-in?scan_session_id="]}, "Desk")
+      |> render_click()
 
       assert_redirect(
         view,
@@ -916,7 +924,7 @@ defmodule YscWeb.AdminScannerLiveTest do
   describe "event_membership scanning" do
     setup [:create_admin]
 
-    test "end_session navigates to membership desk without closing session", %{
+    test "Desk link returns to the membership desk without closing session", %{
       conn: conn,
       admin: admin
     } do
@@ -925,7 +933,11 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
 
-      view |> element("button[phx-click='end_session']") |> render_click()
+      refute has_element?(view, "button[phx-click='end_session']")
+
+      view
+      |> element(~s{a[href="/admin/membership-check-in/#{session.id}"]}, "Desk")
+      |> render_click()
 
       assert_redirect(view, ~p"/admin/membership-check-in/#{session.id}")
       assert is_nil(Scanning.get_session!(session.id).closed_at)

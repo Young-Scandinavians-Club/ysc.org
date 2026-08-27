@@ -812,6 +812,8 @@ defmodule YscWeb.AdminScannerLive do
                 <span class="text-white text-sm">
                   {@scan_count} {if(@scan_count == 1, do: "scan", else: "scans")}
                 </span>
+                <%!-- Sessions with a desk (event ticket / membership check-in)
+                     return there; scan-only sessions close out with "Done". --%>
                 <.link
                   :if={
                     @active_session.type == :event_membership ||
@@ -823,6 +825,10 @@ defmodule YscWeb.AdminScannerLive do
                   Desk
                 </.link>
                 <button
+                  :if={
+                    !(@active_session.type == :event_membership ||
+                        (@active_session.type == :event && @active_session.event))
+                  }
                   phx-click="end_session"
                   class="bg-white/15 hover:bg-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-white/20"
                 >

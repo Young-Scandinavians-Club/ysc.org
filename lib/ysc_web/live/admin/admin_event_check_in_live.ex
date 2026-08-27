@@ -39,14 +39,6 @@ defmodule YscWeb.AdminEventCheckInLive do
         <.admin_check_in_counter count={@checked_in_count} total={@total_count} />
 
         <div class="shrink-0 flex items-center gap-2">
-          <.button
-            phx-click="launch-membership-checkin"
-            variant="outline"
-            color="zinc"
-            class="hidden sm:inline-flex"
-          >
-            <.icon name="hero-identification" class="w-5 h-5" /> Membership Check-in
-          </.button>
           <.admin_check_in_qr_scanner />
         </div>
       </.admin_check_in_sticky_bar>
@@ -63,7 +55,7 @@ defmodule YscWeb.AdminEventCheckInLive do
           clear_event="clear-search"
           phx-hook="EventCheckInKeyboard"
         />
-        <.admin_check_in_keyboard_hints />
+        <.admin_check_in_keyboard_hints show={@search_query != ""} />
       </.admin_check_in_search_section>
 
       <.admin_check_in_content width={:wide}>
@@ -113,7 +105,11 @@ defmodule YscWeb.AdminEventCheckInLive do
               <.admin_event_check_in_table_header />
 
               <div id="pending-groups" phx-update="stream">
-                <div :for={{dom_id, group} <- @streams.pending_groups} id={dom_id}>
+                <div
+                  :for={{dom_id, group} <- @streams.pending_groups}
+                  id={dom_id}
+                  data-checkin-order-group
+                >
                   <.admin_event_check_in_order_group_header
                     order_ref={group.order_ref}
                     ticket_count={length(group.tickets)}
@@ -303,36 +299,6 @@ defmodule YscWeb.AdminEventCheckInLive do
            socket,
            :error,
            "Could not start scan session. Please try again."
-         )}
-    end
-  end
-
-  def handle_event("launch-membership-checkin", _params, socket) do
-    %{event: event, current_user: current_user} = socket.assigns
-
-    session_name =
-      "#{event.title} – Membership – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
-
-    case Scanning.get_or_create_open_session_for_event(
-           event.id,
-           :event_membership,
-           %{
-             name: session_name,
-             type: :event_membership,
-             event_id: event.id,
-             created_by_id: current_user.id
-           }
-         ) do
-      {:ok, session} ->
-        {:noreply,
-         push_navigate(socket, to: ~p"/admin/membership-check-in/#{session.id}")}
-
-      {:error, _changeset} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Could not start membership check-in session. Please try again."
          )}
     end
   end

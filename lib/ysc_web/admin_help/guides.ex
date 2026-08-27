@@ -1376,12 +1376,12 @@ defmodule YscWeb.AdminHelp.Guides do
         %{
           title: "Speed up with keyboard shortcuts",
           body:
-            "With the search box focused: **↑ ↓** move through results, **Enter** checks in the highlighted ticket, and **Alt+1–3** instantly checks in the first, second, or third pending ticket on screen.\n\nThe shortcut legend is shown under the search bar. On a laptop at a busy door, type-three-letters-Enter is dramatically faster than tapping."
+            "Once you've typed a search: **↑ ↓** move through results, **Enter** checks in the highlighted ticket, **Alt+1–8** instantly checks in that numbered result, and **Shift+Cmd/Ctrl+1–8** checks in the whole order that result belongs to.\n\nThe shortcut legend appears under the search bar as soon as you start searching. On a laptop at a busy door, type-three-letters-Enter is dramatically faster than tapping."
         },
         %{
-          title: "Scanner and membership desk",
+          title: "Scan ticket QR codes",
           body:
-            "Two buttons in the header extend the desk:\n\n— **QR Scanner** starts a camera session that scans ticket QR codes from confirmation emails — fastest for big events (see the QR scanner guide).\n— **Membership Check-in** opens a desk for verifying member cards at the door, for member-only events.",
+            "The **QR Scanner** button in the header starts a camera session that scans ticket QR codes from confirmation emails — the fastest option for big events (see the QR scanner guide).",
           cta: %{label: "QR scanner guide", path: "/admin/help/day-of/scanner"}
         }
       ]
