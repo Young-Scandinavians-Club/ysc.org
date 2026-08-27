@@ -1288,5 +1288,49 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert Money.equal?(estimated_total, expected_total)
       assert Money.positive?(estimated_discount)
     end
+
+    test "keeps a 100%-off discount after checkout fulfills the reservation", %{
+      user: user,
+      event: event,
+      tier: tier,
+      organizer: organizer
+    } do
+      %TicketReservation{}
+      |> TicketReservation.changeset(%{
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        quantity: 1,
+        created_by_id: organizer.id,
+        discount_percentage: Decimal.new(100),
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+
+      assert Money.zero?(order.total_amount)
+
+      # The hold is now "fulfilled", so an active-holds-only reprice loses it.
+      assert {:ok, active_only_total, active_only_discount} =
+               BookingLocker.estimate_order_total(user.id, event.id, %{
+                 tier.id => 1
+               })
+
+      assert Money.equal?(active_only_total, tier.price)
+      assert Money.zero?(active_only_discount)
+
+      # Repricing the order must still see the discount it already fulfilled.
+      assert {:ok, reprice_total, reprice_discount} =
+               BookingLocker.estimate_order_total(
+                 user.id,
+                 event.id,
+                 %{tier.id => 1},
+                 include_fulfilled_for_order_id: order.id
+               )
+
+      assert Money.zero?(reprice_total)
+      assert Money.equal?(reprice_discount, tier.price)
+    end
   end
 end
