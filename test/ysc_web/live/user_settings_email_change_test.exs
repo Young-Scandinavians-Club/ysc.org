@@ -53,7 +53,13 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
       refute email_form_html =~ "Current password"
 
       assert email_form_html =~
-               "need to verify your identity before we change your email"
+               "before we change your email"
+
+      assert has_element?(
+               view,
+               "#email_form button",
+               "Continue to change email"
+             )
     end
 
     test "validates email format before showing re-auth modal", %{conn: conn} do

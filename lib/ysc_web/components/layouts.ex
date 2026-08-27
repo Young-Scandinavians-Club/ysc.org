@@ -54,8 +54,7 @@ defmodule YscWeb.Layouts do
     info_msg = flash["info"]
 
     {toasts_sync, flash_out} =
-      if info_msg && is_binary(info_msg) &&
-           String.contains?(info_msg, "Welcome back") do
+      if welcome_back_info?(info_msg) do
         {[welcome_toast(info_msg) | base], flash}
       else
         promoted = promote_flash_to_toasts(flash)
@@ -65,13 +64,20 @@ defmodule YscWeb.Layouts do
     {toasts_sync, flash_out}
   end
 
+  defp welcome_back_info?(info_msg) when is_binary(info_msg) do
+    info_msg == "Good to see you again." or
+      String.contains?(info_msg, "Welcome back")
+  end
+
+  defp welcome_back_info?(_), do: false
+
   defp welcome_toast(info_msg) do
     %LiveToast{
       kind: :info,
       msg: info_msg,
-      title: "Welcome back! 👋",
+      title: "Welcome back!",
       icon: &YscWeb.CoreComponents.flash_toast_icon_success/1,
-      uuid: stable_toast_uuid(:info, info_msg, "Welcome back! 👋"),
+      uuid: stable_toast_uuid(:info, info_msg, "Welcome back!"),
       sync: true,
       duration: 6000
     }

@@ -116,7 +116,7 @@ defmodule Ysc.Tickets.DisplayTest do
     test "matches ticket order vocabulary used on My Tickets" do
       assert Display.order_status_label(:completed) == "Paid"
       assert Display.order_status_label(:pending) == "Payment needed"
-      assert Display.order_status_label(:expired) == "Reservation expired"
+      assert Display.order_status_label(:expired) == "Checkout expired"
       assert Display.order_status_label(:cancelled) == "Cancelled"
     end
   end

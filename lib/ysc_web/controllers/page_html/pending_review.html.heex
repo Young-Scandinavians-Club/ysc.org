@@ -39,13 +39,13 @@
 
       <%= if @has_payment_method do %>
         <div class="my-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-900 text-sm">
-          <strong>Payment method on file.</strong>
-          If your application is approved, your membership will activate automatically — no further action needed.
+          <strong>You've saved a card for payment.</strong>
+          If the board approves you, we'll charge your dues and turn on membership automatically — no extra steps.
         </div>
       <% else %>
         <div class="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-sm space-y-2">
           <p>
-            You haven't added a payment method yet. Add a card or bank account so your dues can be charged automatically if you're approved. You won't be charged unless the board approves your application.
+            You haven't saved a card or bank account yet. Add one so your dues can be charged automatically if you're approved. You won't be charged unless the board approves your application.
           </p>
           <p>
             <.link

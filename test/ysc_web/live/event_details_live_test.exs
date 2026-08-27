@@ -583,8 +583,8 @@ defmodule YscWeb.EventDetailsLiveTest do
       {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
       render_async(view)
 
-      assert html =~ "Your application is under board review"
-      assert html =~ "membership payment may still be required"
+      assert html =~ "Your application is still under board review"
+      assert html =~ "After the board approves you and your dues are paid"
       refute html =~ "membership has expired"
       refute has_element?(view, "button", "Get Tickets")
     end

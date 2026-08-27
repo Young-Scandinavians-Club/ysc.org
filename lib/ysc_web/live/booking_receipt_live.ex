@@ -1067,7 +1067,9 @@ defmodule YscWeb.BookingReceiptLive do
                       </div>
                     <% end %>
                     <div class="flex justify-between border-t-2 border-red-300 pt-4 mt-4">
-                      <span class="font-semibold text-zinc-900">Net Amount</span>
+                      <span class="font-semibold text-zinc-900">
+                        Amount still charged
+                      </span>
                       <span class="font-bold text-red-600 text-xl">
                         {case Money.sub(
                                 receipt_total_paid_amount(assigns),

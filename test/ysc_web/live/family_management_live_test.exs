@@ -89,7 +89,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
 
       assert html =~ "Manage your family members"
       assert html =~ "Add their details first"
-      assert html =~ "People you have added and people with their own login"
+      assert html =~ "People on your family membership"
       assert html =~ "No family members yet. Add someone to get started."
 
       assert has_element?(
@@ -478,7 +478,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
 
       html = render(view)
       assert html =~ sub.email
-      assert html =~ "Linked Account"
+      assert html =~ "Can sign in"
       assert has_element?(view, "#linked-family-member-row-#{sub.id}")
 
       view
