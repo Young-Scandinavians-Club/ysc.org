@@ -428,6 +428,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         <.live_component
           id={"ticket-grant-form-#{@granting_tier.id}"}
           module={YscWeb.AdminEventsLive.TicketGrantForm}
+          dialog_id="grant-tickets-modal"
           ticket_tier={@granting_tier}
           ticket_tier_id={@granting_tier.id}
           event_id={@event_id}

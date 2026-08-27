@@ -136,15 +136,13 @@ defmodule Ysc.Tickets.AdminGrants do
   end
 
   defp fetch_grantable_event(event_id) do
+    # An event can carry a Partiful link alongside real YSC ticket tiers
+    # (see TicketTierManagement); grants are validated against those tiers by
+    # load_and_validate_tiers/2, so the presence of a Partiful link alone does
+    # not disqualify a grant.
     case Repo.get(Event, event_id) do
-      nil ->
-        {:error, :event_not_found}
-
-      %Event{partiful_link: link} when link not in [nil, ""] ->
-        {:error, :partiful_event}
-
-      %Event{} = event ->
-        {:ok, event}
+      nil -> {:error, :event_not_found}
+      %Event{} = event -> {:ok, event}
     end
   end
 
