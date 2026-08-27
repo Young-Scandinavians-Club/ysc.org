@@ -474,8 +474,16 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   end
 
   @impl true
-  def handle_event("toggle-order", %{"id" => order_id}, socket) do
-    order_id = if order_id == "", do: nil, else: order_id
+  def handle_event("toggle-order", params, socket) do
+    # Tickets issued without an order group under `order_id: nil`, so their
+    # toggle button renders no `phx-value-id` and the event arrives with the
+    # key absent (or blank). Normalize both to nil.
+    order_id =
+      case params["id"] do
+        "" -> nil
+        id -> id
+      end
+
     collapsed = socket.assigns.collapsed_order_ids
 
     collapsed =

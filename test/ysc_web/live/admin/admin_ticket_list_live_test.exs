@@ -210,6 +210,31 @@ defmodule YscWeb.AdminTicketListLiveTest do
 
       assert has_element?(view, "#ticket-row-#{ticket.id}")
     end
+
+    test "collapses the orphaned 'No order' group, whose toggle has no id", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      ticket =
+        insert_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      assert has_element?(view, "#ticket-row-#{ticket.id}")
+
+      view |> element("#ticket-order-toggle-") |> render_click()
+      refute has_element?(view, "#ticket-row-#{ticket.id}")
+
+      view |> element("#ticket-order-toggle-") |> render_click()
+      assert has_element?(view, "#ticket-row-#{ticket.id}")
+    end
   end
 
   describe "sorting orders by purchase date" do
