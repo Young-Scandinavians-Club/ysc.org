@@ -156,6 +156,12 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
       refute render(unsearched) =~ "quick check in"
 
+      # A whitespace-only query is treated as no search (matches the JS hook).
+      {:ok, blank, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=%20%20")
+
+      refute render(blank) =~ "quick check in"
+
       {:ok, searched, _html} =
         live(conn, ~p"/admin/events/#{event.id}/check-in?q=smith")
 

@@ -1,4 +1,5 @@
 import {
+    isMac,
     altKeyLabel,
     shiftModKeyLabel,
     applyPlatformKeyLabels,
@@ -92,7 +93,14 @@ const EventCheckInKeyboard = {
         const digitMatch = /^Digit([1-8])$/.exec(e.code);
         if (digitMatch) {
             const idx = parseInt(digitMatch[1], 10) - 1;
-            const shiftMod = e.shiftKey && (e.metaKey || e.ctrlKey);
+            // Whole-order chord: Shift + the platform "command" key (⌘ on Mac,
+            // Ctrl elsewhere), matching the badge label. Alt disqualifies it.
+            const shiftMod =
+                e.shiftKey &&
+                !e.altKey &&
+                (isMac()
+                    ? e.metaKey && !e.ctrlKey
+                    : e.ctrlKey && !e.metaKey);
             const altOnly =
                 e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
 

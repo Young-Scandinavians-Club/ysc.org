@@ -143,7 +143,12 @@ defmodule YscWeb.AdminScannerLiveTest do
       # Event sessions surface a "Desk" link back to the check-in desk instead
       # of the scan-only "Done" button.
       assert has_element?(view, "#qr-scanner-container")
-      assert has_element?(view, ~s{a[href*="/check-in?scan_session_id="]}, "Desk")
+
+      assert has_element?(
+               view,
+               ~s{a[href*="/check-in?scan_session_id="]},
+               "Desk"
+             )
     end
   end
 

@@ -254,7 +254,13 @@ defmodule YscWeb.AdminComponents do
   Keyboard shortcut legend shown below admin check-in search bars.
 
   Used on event and membership check-in LiveViews; keeps shortcut copy and
-  `admin_kbd` layout consistent.
+  `admin_kbd` layout consistent. The quick-check-in range and the order-level
+  shortcut differ per desk, so both are configurable:
+
+  - `quick_range` — digit range advertised for `alt` quick check-in (the event
+    desk enumerates up to 8 rows, the membership desk only 3).
+  - `order_shortcut` — when true, also advertises `⇧⌘/⇧ ctrl` + digit for
+    checking in a whole order (event desk only).
   """
   attr :class, :any,
     default: nil,
@@ -263,6 +269,14 @@ defmodule YscWeb.AdminComponents do
   attr :show, :boolean,
     default: true,
     doc: "When false, the shortcut legend is not rendered"
+
+  attr :quick_range, :string,
+    default: "1–3",
+    doc: "Digit range shown next to the `alt` quick-check-in key"
+
+  attr :order_shortcut, :boolean,
+    default: false,
+    doc: "When true, also show the `⇧⌘` + digit whole-order shortcut"
 
   def admin_check_in_keyboard_hints(assigns) do
     ~H"""
@@ -284,15 +298,15 @@ defmodule YscWeb.AdminComponents do
       <span class="text-zinc-300">·</span>
       <span class="flex items-center gap-0.5">
         <.admin_kbd size={:inline} data-key="alt">alt</.admin_kbd>
-        <.admin_kbd size={:compact}>1–8</.admin_kbd>
+        <.admin_kbd size={:compact}>{@quick_range}</.admin_kbd>
       </span>
       <span>quick check in</span>
-      <span class="text-zinc-300">·</span>
-      <span class="flex items-center gap-0.5">
+      <span :if={@order_shortcut} class="text-zinc-300">·</span>
+      <span :if={@order_shortcut} class="flex items-center gap-0.5">
         <.admin_kbd size={:inline} data-key="shift-mod">⇧ ctrl</.admin_kbd>
-        <.admin_kbd size={:compact}>1–8</.admin_kbd>
+        <.admin_kbd size={:compact}>{@quick_range}</.admin_kbd>
       </span>
-      <span>check in order</span>
+      <span :if={@order_shortcut}>check in order</span>
     </p>
     """
   end

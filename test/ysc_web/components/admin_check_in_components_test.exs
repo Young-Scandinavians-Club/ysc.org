@@ -18,11 +18,35 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ "navigate"
       assert html =~ "check in"
       assert html =~ "quick check in"
-      assert html =~ "check in order"
       assert html =~ ~s(data-key="alt")
-      assert html =~ ~s(data-key="shift-mod")
-      assert html =~ "1–8"
       assert html =~ "↵ enter"
+    end
+
+    test "defaults to the 1–3 range with no order shortcut" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_keyboard_hints />
+        """)
+
+      assert html =~ "1–3"
+      refute html =~ "check in order"
+      refute html =~ ~s(data-key="shift-mod")
+    end
+
+    test "advertises the wider range and order shortcut when opted in" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_keyboard_hints quick_range="1–8" order_shortcut />
+        """)
+
+      assert html =~ "1–8"
+      refute html =~ "1–3"
+      assert html =~ "check in order"
+      assert html =~ ~s(data-key="shift-mod")
     end
 
     test "renders nothing when show is false" do

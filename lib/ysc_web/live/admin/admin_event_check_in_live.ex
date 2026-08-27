@@ -55,7 +55,11 @@ defmodule YscWeb.AdminEventCheckInLive do
           clear_event="clear-search"
           phx-hook="EventCheckInKeyboard"
         />
-        <.admin_check_in_keyboard_hints show={@search_query != ""} />
+        <.admin_check_in_keyboard_hints
+          show={String.trim(@search_query) != ""}
+          quick_range="1–8"
+          order_shortcut
+        />
       </.admin_check_in_search_section>
 
       <.admin_check_in_content width={:wide}>
@@ -145,6 +149,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                 <div
                   :for={{dom_id, group} <- @streams.pending_groups}
                   id={"mobile-#{dom_id}"}
+                  data-checkin-order-group
                   class="bg-white rounded border border-zinc-200 overflow-hidden"
                 >
                   <.admin_event_check_in_order_group_header
