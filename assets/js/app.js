@@ -301,31 +301,37 @@ if (document.fonts?.ready) {
 // connect if there are any LiveViews on the page
 liveSocket.connect();
 
-// Mobile browsers suspend JS timers (including the LiveView heartbeat) while a tab
-// or app is backgrounded, which can leave the socket stuck in a stale state that
-// the default heartbeat/backoff timers never recover from on their own.
+// Mobile browsers suspend JS timers (including the LiveView heartbeat) while a
+// tab or app is backgrounded. After a long suspension the WebSocket is often
+// dead server-side while the client's `readyState` still reports "open" (the
+// close/error event was never delivered), so Phoenix's heartbeat/backoff timers
+// can take up to a minute to notice — or, on iOS Safari, never do.
 //
-// Gating the forced reconnect on `liveSocket.isConnected()` (as this used to do,
-// and as Phoenix's own built-in visibilitychange handler in phoenix.js still
-// does) doesn't work here: isConnected() just reflects the raw WebSocket's
-// readyState, and on iOS Safari and several Android browsers that readyState
-// keeps reporting "open" for a connection that's actually dead, because the
-// close/error event is never delivered while the tab is suspended in the
-// background. That's why the banner could still hang forever after this
-// "fix" shipped in #1104 — the condition guarding the reconnect was exactly
-// the signal that's unreliable in this scenario.
+// Earlier attempts here (#1104, #1114) over-corrected: #1114 dropped the
+// `isConnected()` guard entirely and forced `liveSocket.disconnect(() =>
+// liveSocket.connect())` on every return-to-tab after 3s hidden. On desktop the
+// socket is genuinely still alive on return, so that tears down a healthy
+// connection AND races LiveView's channel machinery: `disconnect()`'s callback
+// fires `connect()` before teardown settles, the main channel never transitions
+// to "errored" so it never rejoins, and the client keeps pushing events to a
+// `lv:` topic the server already dropped → every click fails with
+// "unmatched topic" while the page still looks connected. It also leaks a second
+// live WebSocket per tab switch.
 //
-// Instead, track how long the page was hidden and force a fresh teardown +
-// reconnect unconditionally once we've been hidden long enough for the
-// connection to plausibly have gone stale, regardless of what isConnected()
-// reports. Reconnecting when the socket was actually still healthy just
-// causes a quick, harmless rejoin.
+// Instead: only reconnect when the connection is actually gone. If the raw
+// socket still claims to be open, verify it with a heartbeat round-trip before
+// doing anything — this is the only reliable way to catch the "readyState lies"
+// case without punishing the common healthy-socket case. When we do reconnect,
+// call disconnect() and connect() on separate ticks so the channels move to
+// "errored" and rejoin cleanly, and the old socket finishes closing before the
+// new one opens (no double socket).
 //
 // Chrome 149+ (and installed PWAs) can skip `visibilitychange` after a freeze;
-// the Page Lifecycle `resume` event still fires. Phoenix 1.8.13 listens for
-// that too — keep this more aggressive reconnect on the same path.
-const STALE_AFTER_HIDDEN_MS = 3000;
+// the Page Lifecycle `resume` event still fires, so it's wired to the same path.
+const STALE_AFTER_HIDDEN_MS = 12000;
+const LIVENESS_PROBE_TIMEOUT_MS = 5000;
 let hiddenAt = null;
+let probingLiveness = false;
 
 function markPageHidden() {
     if (hiddenAt === null) {
@@ -333,11 +339,59 @@ function markPageHidden() {
     }
 }
 
-function reconnectIfStaleAfterHidden() {
-    if (hiddenAt !== null && Date.now() - hiddenAt > STALE_AFTER_HIDDEN_MS) {
-        liveSocket.disconnect(() => liveSocket.connect());
-    }
+function forceReconnect() {
+    // Not disconnect(() => connect()): connect() must run on a later tick so the
+    // old socket finishes closing and the LiveView channels settle into
+    // "errored" (from which they rejoin on the next socket open).
+    liveSocket.disconnect();
+    setTimeout(() => liveSocket.connect(), 100);
+}
+
+function verifyConnectionAfterHidden() {
+    const hiddenFor = hiddenAt === null ? 0 : Date.now() - hiddenAt;
     hiddenAt = null;
+
+    if (hiddenFor < STALE_AFTER_HIDDEN_MS || probingLiveness) {
+        return;
+    }
+
+    const socket = liveSocket.getSocket();
+
+    if (!socket.isConnected()) {
+        forceReconnect();
+        return;
+    }
+
+    // Socket claims to be open — confirm with a heartbeat before trusting it.
+    probingLiveness = true;
+    let gotReply = false;
+    let msgRef = null;
+
+    try {
+        msgRef = socket.onMessage(({ topic, event }) => {
+            if (topic === "phoenix" && event === "phx_reply") {
+                gotReply = true;
+            }
+        });
+        socket.push({
+            topic: "phoenix",
+            event: "heartbeat",
+            payload: {},
+            ref: socket.makeRef(),
+        });
+    } catch (_) {
+        // Couldn't even send — treat as dead.
+    }
+
+    setTimeout(() => {
+        try {
+            if (msgRef !== null) socket.off([msgRef]);
+        } catch (_) {}
+        probingLiveness = false;
+        if (!gotReply) {
+            forceReconnect();
+        }
+    }, LIVENESS_PROBE_TIMEOUT_MS);
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -346,11 +400,11 @@ document.addEventListener("visibilitychange", () => {
         return;
     }
 
-    reconnectIfStaleAfterHidden();
+    verifyConnectionAfterHidden();
 });
 
 document.addEventListener("freeze", markPageHidden);
-document.addEventListener("resume", reconnectIfStaleAfterHidden);
+document.addEventListener("resume", verifyConnectionAfterHidden);
 
 // Handle map toggle text updates
 window.addEventListener("phx:toggle-map-text", () => {
