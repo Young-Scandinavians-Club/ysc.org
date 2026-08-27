@@ -2123,10 +2123,15 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   defp normalize_journal_entry_line_item(item) do
+    # QuickBooks rejects a negative Amount on a JournalEntry line (error
+    # 2290) - direction is conveyed entirely by PostingType. Callers are
+    # expected to pass non-negative amounts already; abs/1 here is a
+    # defense-in-depth guard, not how sign is meant to be communicated.
     amount =
       item.amount
       |> deposit_line_amount_to_decimal()
       |> Decimal.round(2)
+      |> Decimal.abs()
       |> Decimal.to_float()
 
     detail =

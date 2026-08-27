@@ -67,7 +67,6 @@ defmodule Ysc.Ledgers.Payout do
       :metadata,
       :payment_id,
       :quickbooks_deposit_id,
-      :quickbooks_transaction_type,
       :quickbooks_sync_status,
       :quickbooks_sync_error,
       :quickbooks_response,

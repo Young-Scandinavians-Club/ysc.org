@@ -3010,8 +3010,15 @@ defmodule Ysc.Quickbooks.Sync do
           {:ok, account_id} ->
             {:ok, %{value: account_id}}
 
-          _ ->
+          {:error, :not_found} ->
             {:error, :stripe_fees_account_not_found}
+
+          # Transient failures (rate limited, a bad response, etc.) are not
+          # "not configured" - preserve the real reason so callers (e.g. the
+          # payout worker's non-retriable error list) don't treat a blip as
+          # a permanent, unretriable config problem.
+          {:error, _other} = error ->
+            error
         end
     end
   end
@@ -3472,7 +3479,13 @@ defmodule Ysc.Quickbooks.Sync do
     end)
   end
 
-  defp payout_fee_amount(%Payout{fee_total: fee_total}) do
+  # Mirrors create_payout_deposit/1's fee resolution: prefer the cached
+  # fee_total (set by the webhook handler), falling back to summing ledger
+  # entries for older payouts that predate fee_total being recorded.
+  defp payout_fee_amount(%Payout{fee_total: fee_total} = payout) do
+    fee_total =
+      fee_total || calculate_payout_stripe_fees(payout, payout.payments)
+
     if fee_total && Money.positive?(fee_total) do
       Money.to_decimal(fee_total) |> Decimal.round(2)
     else
@@ -3851,12 +3864,15 @@ defmodule Ysc.Quickbooks.Sync do
       payout
       |> Payout.changeset(%{
         quickbooks_deposit_id: deposit_id,
-        quickbooks_transaction_type: transaction_type,
         quickbooks_sync_status: "synced",
         quickbooks_synced_at: DateTime.utc_now(),
         quickbooks_response: response,
         quickbooks_last_sync_attempt_at: DateTime.utc_now()
       })
+      # Not cast()-able (see Payout.changeset/2) - it's sync-owned state that
+      # must only ever be set here, after QuickBooks has actually confirmed
+      # which kind of transaction it created, never from arbitrary attrs.
+      |> Ecto.Changeset.change(quickbooks_transaction_type: transaction_type)
       |> Repo.update()
 
     Ysc.Logging.debug(
