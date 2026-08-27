@@ -20,4 +20,21 @@ defmodule YscWeb.TimeZoneTest do
       assert TimeZone.today("UTC") == DateTime.to_date(DateTime.utc_now())
     end
   end
+
+  describe "shift/2" do
+    test "shifts a UTC instant into the given zone" do
+      shifted = TimeZone.shift(~U[2024-12-01 06:00:00Z], "America/New_York")
+
+      assert shifted.time_zone == "America/New_York"
+      assert DateTime.to_date(shifted) == ~D[2024-12-01]
+      assert DateTime.to_time(shifted) == ~T[01:00:00]
+    end
+
+    test "falls back to Pacific time for an invalid zone" do
+      shifted = TimeZone.shift(~U[2024-12-01 06:00:00Z], "Not/AZone")
+
+      assert shifted.time_zone == "America/Los_Angeles"
+      assert DateTime.to_date(shifted) == ~D[2024-11-30]
+    end
+  end
 end

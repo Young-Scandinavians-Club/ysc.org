@@ -354,9 +354,17 @@ defmodule YscWeb.DateDisplay do
     * `:started` — after 3:00 PM Pacific on the check-in day, or any later day
     * `0` — check-in is today and it is still before 3:00 PM Pacific
     * a positive integer — calendar days until check-in
+
+  The optional `now` argument is the instant used for "today" and the 3:00 PM
+  cutoff. It defaults to `TimeZone.now()`.
   """
-  def days_until_cabin_checkin(%{checkin_date: %Date{} = checkin_date}) do
-    now = TimeZone.now()
+  def days_until_cabin_checkin(booking, now \\ nil)
+
+  def days_until_cabin_checkin(
+        %{checkin_date: %Date{} = checkin_date},
+        now
+      ) do
+    now = now || TimeZone.now()
     today = DateTime.to_date(now)
 
     checkin_at =
@@ -378,7 +386,7 @@ defmodule YscWeb.DateDisplay do
     end
   end
 
-  def days_until_cabin_checkin(_), do: nil
+  def days_until_cabin_checkin(_, _), do: nil
 
   @doc """
   Combines an event's stored calendar date with `start_time` as a Pacific
