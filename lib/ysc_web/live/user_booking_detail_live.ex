@@ -288,7 +288,7 @@ defmodule YscWeb.UserBookingDetailLive do
               </div>
 
               <div>
-                <div class="text-sm text-zinc-600">Property</div>
+                <div class="text-sm text-zinc-600">Cabin</div>
                 <div class="font-medium text-zinc-900">
                   {PropertyDisplay.full_name(@booking.property, "Cabin")}
                 </div>

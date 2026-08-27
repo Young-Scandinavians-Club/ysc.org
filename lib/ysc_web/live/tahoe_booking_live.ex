@@ -2438,7 +2438,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </p>
                     </div>
                   </div>
-                  <!-- Rule Compliance Checklist (Smart Summary) -->
+                  <!-- Room requirements checklist -->
                   <div
                     :if={
                       @selected_booking_mode == :room &&
@@ -2449,7 +2449,7 @@ defmodule YscWeb.TahoeBookingLive do
                     class="mt-4"
                   >
                     <p class="text-xs font-bold text-zinc-400 uppercase mb-2">
-                      Rule Compliance
+                      Room requirements
                     </p>
                     <div class="space-y-2">
                       <%= for room_id <- @selected_room_ids do %>

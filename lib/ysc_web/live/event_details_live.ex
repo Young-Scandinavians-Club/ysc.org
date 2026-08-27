@@ -1065,7 +1065,7 @@ defmodule YscWeb.EventDetailsLive do
                           />
                           <%= cond do %>
                             <% @current_user.state == :pending_approval -> %>
-                              Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (membership payment may still be required).
+                              Your application is still under board review. After the board approves you and your dues are paid, you can buy tickets for this event.
                             <% @had_membership? -> %>
                               Member tickets require an active paid membership. Your membership has expired — renew to buy tickets.
                             <% true -> %>
@@ -1181,7 +1181,7 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   <%= cond do %>
                     <% @current_user.state == :pending_approval -> %>
-                      Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (membership payment may still be required).
+                      Your application is still under board review. After the board approves you and your dues are paid, you can buy tickets for this event.
                     <% @had_membership? -> %>
                       Member tickets require an active, paid membership. Renew your membership to buy tickets.
                     <% true -> %>
