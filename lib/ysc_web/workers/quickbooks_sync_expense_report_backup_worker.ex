@@ -11,7 +11,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
   This ensures that any expense reports that failed to sync initially, or were created
   before the sync system was in place, will eventually be synced.
 
-  Scheduled to run every 6 hours via Oban.Plugins.Cron.
+  Scheduled to run every 6 hours via Oban.Cron.
   """
 
   require Ysc.Logging
