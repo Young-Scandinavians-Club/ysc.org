@@ -46,16 +46,8 @@ defmodule Ysc.VerificationCodeCleanupWorkerTest do
 
     test "is registered in the Oban cron plugin every 15 minutes" do
       # Use compile-time config so parallel tests that temporarily override
-      # Application env (e.g. Oban testing mode) cannot clobber :plugins.
-      plugins = Keyword.fetch!(@oban_config, :plugins)
-
-      cron_plugin =
-        Enum.find(plugins, fn
-          {Oban.Plugins.Cron, _} -> true
-          _ -> false
-        end)
-
-      assert {Oban.Plugins.Cron, cron_opts} = cron_plugin
+      # Application env (e.g. Oban testing mode) cannot clobber :cron.
+      cron_opts = Keyword.fetch!(@oban_config, :cron)
       crontab = Keyword.fetch!(cron_opts, :crontab)
 
       assert {"*/15 * * * *", VerificationCodeCleanupWorker} in crontab

@@ -10,7 +10,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
 
   ## Scheduling
 
-  Configured to run daily at 1 AM UTC via Oban.Plugins.Cron.
+  Configured to run daily at 1 AM UTC via Oban.Cron.
 
   ## Manual Triggering
 
