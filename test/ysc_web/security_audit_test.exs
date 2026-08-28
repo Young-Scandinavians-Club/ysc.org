@@ -2555,6 +2555,114 @@ defmodule YscWeb.SecurityAuditTest do
                "attacker takeover password 99"
              )
     end
+
+    test "email and phone changes are refused while impersonating", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture()
+      original_email = target.email
+      original_phone = target.phone_number
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      html =
+        render_submit(view, "request_email_change", %{
+          "user" => %{"email" => "attacker-takeover@example.com"}
+        })
+
+      assert html =~ "Stop impersonating"
+
+      html =
+        render_submit(view, "update_profile", %{
+          "user" => %{
+            "first_name" => target.first_name,
+            "last_name" => target.last_name,
+            "phone_number" => "+14155550199",
+            "most_connected_country" => target.most_connected_country || "SE",
+            "date_of_birth" =>
+              (target.date_of_birth && Date.to_iso8601(target.date_of_birth)) ||
+                "1990-06-15"
+          }
+        })
+
+      assert html =~ "Stop impersonating"
+
+      reloaded = Accounts.get_user!(target.id)
+      assert reloaded.email == original_email
+      assert reloaded.phone_number == original_phone
+    end
+
+    test "reauth_verified is refused while impersonating, including phone purpose",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture()
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      send(view.pid, :reauth_verified)
+      assert render(view) =~ "Stop impersonating"
+
+      :sys.replace_state(view.pid, fn %{socket: socket} = state ->
+        %{
+          state
+          | socket:
+              Phoenix.Component.assign(socket, reauth_purpose: :phone_change)
+        }
+      end)
+
+      send(view.pid, :reauth_verified)
+      assert render(view) =~ "Stop impersonating"
+      assert render(view) =~ "phone"
+    end
+
+    test "passkey deletion is refused while impersonating", %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture()
+
+      {:ok, passkey} =
+        Accounts.create_user_passkey(target, %{
+          external_id: Base.encode64(:crypto.strong_rand_bytes(32)),
+          public_key: Base.encode64(:crypto.strong_rand_bytes(64)),
+          sign_count: 0,
+          nickname: "Target Device"
+        })
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      render_async(view)
+
+      html =
+        render_click(view, "delete_passkey", %{"passkey_id" => passkey.id})
+
+      assert html =~ "Stop impersonating"
+      assert Repo.get(Ysc.Accounts.UserPasskey, passkey.id)
+    end
+
+    test "password reauth_verified is refused while impersonating", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture(%{password: "target password long"})
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      send(view.pid, :reauth_verified)
+      assert render(view) =~ "Stop impersonating"
+
+      assert Accounts.get_user_by_email_and_password(
+               target.email,
+               "target password long"
+             )
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -2703,5 +2811,55 @@ defmodule YscWeb.SecurityAuditTest do
                )
              )
     end
+
+    test "GET /users/log-in/mobile-handoff without a pending handoff redirects home" do
+      admin = user_fixture(%{role: :admin})
+
+      conn =
+        build_conn()
+        |> log_in_user(admin)
+        |> get(~p"/users/log-in/mobile-handoff")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "cancel POST drops the pending handoff without minting a code" do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(admin) |> get(login_path)
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+
+      confirm = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(confirm)
+
+      conn =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "cancel"
+        })
+
+      assert redirected_to(conn) == ~p"/"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
+               )
+             )
+    end
+  end
+
+  defp impersonate_as_admin(conn, admin, target) do
+    conn = log_in_user(conn, admin)
+    {conn, token} = fetch_conn_csrf(conn)
+
+    post(conn, ~p"/admin/impersonate/#{target.id}", %{
+      "_csrf_token" => token
+    })
   end
 end
