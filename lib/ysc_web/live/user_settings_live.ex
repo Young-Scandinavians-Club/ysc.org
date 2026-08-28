@@ -3051,13 +3051,21 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_info(:reauth_verified, socket) do
-    socket =
-      case socket.assigns[:reauth_purpose] do
-        :phone_change -> process_phone_change_after_reauth(socket)
-        _ -> process_email_change_after_reauth(socket)
-      end
+    if socket.assigns[:impersonating?] do
+      {:noreply,
+       deny_credential_change_while_impersonating(
+         socket,
+         impersonation_deny_label(socket.assigns[:reauth_purpose])
+       )}
+    else
+      socket =
+        case socket.assigns[:reauth_purpose] do
+          :phone_change -> process_phone_change_after_reauth(socket)
+          _ -> process_email_change_after_reauth(socket)
+        end
 
-    {:noreply, socket}
+      {:noreply, socket}
+    end
   end
 
   def handle_info(:reauth_cancelled, socket) do
@@ -3087,38 +3095,42 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_event("request_email_change", params, socket) do
-    %{"user" => user_params} = params
-    user = socket.assigns.current_user
-    new_email = user_params["email"]
+    if socket.assigns[:impersonating?] do
+      {:noreply, deny_credential_change_while_impersonating(socket, "email")}
+    else
+      %{"user" => user_params} = params
+      user = socket.assigns.current_user
+      new_email = user_params["email"]
 
-    if new_email != user.email do
-      changeset =
-        user
-        |> Accounts.change_user_email(user_params)
-        |> Map.put(:action, :validate)
+      if new_email != user.email do
+        changeset =
+          user
+          |> Accounts.change_user_email(user_params)
+          |> Map.put(:action, :validate)
 
-      if changeset.valid? do
-        socket =
-          socket
-          |> assign(:pending_email_change, new_email)
-          |> assign(:reauth_purpose, :email_change)
+        if changeset.valid? do
+          socket =
+            socket
+            |> assign(:pending_email_change, new_email)
+            |> assign(:reauth_purpose, :email_change)
 
-        if reauth_still_valid?(socket) do
-          {:noreply, process_email_change_after_reauth(socket)}
+          if reauth_still_valid?(socket) do
+            {:noreply, process_email_change_after_reauth(socket)}
+          else
+            {:noreply, assign(socket, :show_reauth_modal, true)}
+          end
         else
-          {:noreply, assign(socket, :show_reauth_modal, true)}
+          {:noreply, assign(socket, :email_form, to_form(changeset))}
         end
       else
-        {:noreply, assign(socket, :email_form, to_form(changeset))}
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :info,
+           "That is already your email address.",
+           title: "Email"
+         )}
       end
-    else
-      {:noreply,
-       YscWeb.Flash.put_toast(
-         socket,
-         :info,
-         "That is already your email address.",
-         title: "Email"
-       )}
     end
   end
 
@@ -3267,18 +3279,22 @@ defmodule YscWeb.UserSettingsLive do
     new_phone = user_params["phone_number"]
 
     if new_phone != current_phone and new_phone != "" and not is_nil(new_phone) do
-      other_params = Map.delete(user_params, "phone_number")
-
-      socket =
-        socket
-        |> assign(:pending_phone_change, new_phone)
-        |> assign(:pending_profile_params, other_params)
-        |> assign(:reauth_purpose, :phone_change)
-
-      if reauth_still_valid?(socket) do
-        {:noreply, process_phone_change_after_reauth(socket)}
+      if socket.assigns[:impersonating?] do
+        {:noreply, deny_credential_change_while_impersonating(socket, "phone")}
       else
-        {:noreply, assign(socket, :show_reauth_modal, true)}
+        other_params = Map.delete(user_params, "phone_number")
+
+        socket =
+          socket
+          |> assign(:pending_phone_change, new_phone)
+          |> assign(:pending_profile_params, other_params)
+          |> assign(:reauth_purpose, :phone_change)
+
+        if reauth_still_valid?(socket) do
+          {:noreply, process_phone_change_after_reauth(socket)}
+        else
+          {:noreply, assign(socket, :show_reauth_modal, true)}
+        end
       end
     else
       # No phone change or phone is being cleared - normal update
@@ -4836,11 +4852,34 @@ defmodule YscWeb.UserSettingsLive do
   defp restore_pending_from_reauth_intent(socket, _intent), do: socket
 
   defp reauth_still_valid?(socket) do
-    case socket.assigns[:session_reauth_expires_at] do
-      ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
-      _ -> false
+    # Never treat the admin's own login/OAuth reauth as step-up for the
+    # impersonated subject (Finding 47).
+    if socket.assigns[:impersonating?] do
+      false
+    else
+      case socket.assigns[:session_reauth_expires_at] do
+        ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
+        _ -> false
+      end
     end
   end
+
+  defp deny_credential_change_while_impersonating(socket, what) do
+    socket
+    |> assign(:show_reauth_modal, false)
+    |> assign(:pending_email_change, nil)
+    |> assign(:pending_phone_change, nil)
+    |> assign(:pending_profile_params, nil)
+    |> assign(:reauth_purpose, nil)
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "Stop impersonating before changing #{what} for this account.",
+      title: "Impersonation"
+    )
+  end
+
+  defp impersonation_deny_label(:phone_change), do: "phone"
+  defp impersonation_deny_label(_), do: "email"
 
   defp validate_user_active(user) do
     if user.state == :active, do: :ok, else: {:error, :user_not_active}

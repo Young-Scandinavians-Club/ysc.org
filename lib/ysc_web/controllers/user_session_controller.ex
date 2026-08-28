@@ -262,6 +262,32 @@ defmodule YscWeb.UserSessionController do
     |> redirect(to: ~p"/users/log-in")
   end
 
+  @doc """
+  Confirmation page for handing an existing web session off to the mobile app.
+
+  The GET that lands here (via `redirect_if_user_is_authenticated/2`) only
+  stashes the app's PKCE challenge in the session. The code is minted on POST.
+  """
+  def mobile_handoff(conn, _params) do
+    if UserAuth.mobile_handoff_pending?(conn) do
+      render(conn, :mobile_handoff,
+        page_title: "Open the YSC Admin app",
+        meta_description:
+          "Continue to the YSC Admin app with your signed-in account."
+      )
+    else
+      UserAuth.cancel_mobile_handoff(conn)
+    end
+  end
+
+  def create_mobile_handoff(conn, %{"intent" => "cancel"}) do
+    UserAuth.cancel_mobile_handoff(conn)
+  end
+
+  def create_mobile_handoff(conn, _params) do
+    UserAuth.complete_mobile_handoff(conn)
+  end
+
   # sobelow_skip ["XSS.SendResp"]
   def passkey_login(conn, params) do
     require Ysc.Logging

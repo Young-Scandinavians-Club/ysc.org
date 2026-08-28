@@ -112,25 +112,29 @@ defmodule YscWeb.UserSecurityLive do
 
   @impl true
   def handle_event("request_password_change", params, socket) do
-    %{"user" => user_params} = params
-    user = socket.assigns.current_user
-
-    changeset =
-      user
-      |> Accounts.change_user_password(user_params)
-      |> Map.put(:action, :validate)
-
-    if changeset.valid? do
-      socket = assign(socket, :pending_password_change, user_params)
-
-      if reauth_still_valid?(socket) do
-        # Already verified via recent reauth — process immediately
-        {:noreply, process_password_change_after_reauth(socket)}
-      else
-        {:noreply, assign(socket, :show_reauth_modal, true)}
-      end
+    if socket.assigns[:impersonating?] do
+      {:noreply, deny_while_impersonating(socket, "password")}
     else
-      {:noreply, assign(socket, password_form: to_form(changeset))}
+      %{"user" => user_params} = params
+      user = socket.assigns.current_user
+
+      changeset =
+        user
+        |> Accounts.change_user_password(user_params)
+        |> Map.put(:action, :validate)
+
+      if changeset.valid? do
+        socket = assign(socket, :pending_password_change, user_params)
+
+        if reauth_still_valid?(socket) do
+          # Already verified via recent reauth — process immediately
+          {:noreply, process_password_change_after_reauth(socket)}
+        else
+          {:noreply, assign(socket, :show_reauth_modal, true)}
+        end
+      else
+        {:noreply, assign(socket, password_form: to_form(changeset))}
+      end
     end
   end
 
@@ -199,50 +203,56 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   def handle_event("delete_passkey", %{"passkey_id" => id}, socket) do
-    user = socket.assigns.current_user
+    if socket.assigns[:impersonating?] do
+      {:noreply, deny_while_impersonating(socket, "passkeys")}
+    else
+      user = socket.assigns.current_user
 
-    # Get passkey and verify it belongs to current user
-    case Repo.get(Ysc.Accounts.UserPasskey, id) do
-      nil ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Passkey not found.",
-           title: "Passkey"
-         )}
-
-      passkey ->
-        if passkey.user_id == user.id do
-          case Accounts.delete_user_passkey(passkey) do
-            {:ok, _} ->
-              # Remove deleted passkey from assigns
-              updated_passkeys =
-                Enum.reject(socket.assigns.passkeys, &(&1.id == id))
-
-              {:noreply,
-               socket
-               |> assign(:passkeys, updated_passkeys)
-               |> YscWeb.Flash.put_toast(:info, "Passkey deleted successfully.",
-                 title: "Passkey",
-                 icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
-               )}
-
-            {:error, _changeset} ->
-              {:noreply,
-               YscWeb.Flash.put_toast(
-                 socket,
-                 :error,
-                 "Failed to delete passkey. Please try again.",
-                 title: "Passkey"
-               )}
-          end
-        else
+      # Get passkey and verify it belongs to current user
+      case Repo.get(Ysc.Accounts.UserPasskey, id) do
+        nil ->
           {:noreply,
-           YscWeb.Flash.put_toast(
-             socket,
-             :error,
-             "You are not authorized to delete this passkey.",
+           YscWeb.Flash.put_toast(socket, :error, "Passkey not found.",
              title: "Passkey"
            )}
-        end
+
+        passkey ->
+          if passkey.user_id == user.id do
+            case Accounts.delete_user_passkey(passkey) do
+              {:ok, _} ->
+                # Remove deleted passkey from assigns
+                updated_passkeys =
+                  Enum.reject(socket.assigns.passkeys, &(&1.id == id))
+
+                {:noreply,
+                 socket
+                 |> assign(:passkeys, updated_passkeys)
+                 |> YscWeb.Flash.put_toast(
+                   :info,
+                   "Passkey deleted successfully.",
+                   title: "Passkey",
+                   icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
+                 )}
+
+              {:error, _changeset} ->
+                {:noreply,
+                 YscWeb.Flash.put_toast(
+                   socket,
+                   :error,
+                   "Failed to delete passkey. Please try again.",
+                   title: "Passkey"
+                 )}
+            end
+          else
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "You are not authorized to delete this passkey.",
+               title: "Passkey"
+             )}
+          end
+      end
     end
   end
 
@@ -253,7 +263,11 @@ defmodule YscWeb.UserSecurityLive do
 
   @impl true
   def handle_info(:reauth_verified, socket) do
-    {:noreply, process_password_change_after_reauth(socket)}
+    if socket.assigns[:impersonating?] do
+      {:noreply, deny_while_impersonating(socket, "password")}
+    else
+      {:noreply, process_password_change_after_reauth(socket)}
+    end
   end
 
   def handle_info(:reauth_cancelled, socket) do
@@ -293,10 +307,27 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   defp reauth_still_valid?(socket) do
-    case socket.assigns[:session_reauth_expires_at] do
-      ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
-      _ -> false
+    # Never treat the admin's own login/OAuth reauth as step-up for the
+    # impersonated subject (Finding 47).
+    if socket.assigns[:impersonating?] do
+      false
+    else
+      case socket.assigns[:session_reauth_expires_at] do
+        ts when is_integer(ts) -> ts > DateTime.utc_now() |> DateTime.to_unix()
+        _ -> false
+      end
     end
+  end
+
+  defp deny_while_impersonating(socket, what) do
+    socket
+    |> assign(:show_reauth_modal, false)
+    |> assign(:pending_password_change, nil)
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "Stop impersonating before changing #{what} for this account.",
+      title: "Impersonation"
+    )
   end
 
   @dialyzer {:nowarn_function, process_password_change_after_reauth: 1}

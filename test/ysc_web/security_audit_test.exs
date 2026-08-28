@@ -41,6 +41,9 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 44 (MEDIUM)   Contact/volunteer forms cast client-supplied user_id
   Finding 45 (HIGH)     SES webhook auto-confirmed SNS subscriptions from any AWS account
   Finding 46 (HIGH)     Volunteers could refund, reassign, and grant tickets on the event Tickets tab
+  Finding 47 (HIGH)     Impersonation kept post-login reauth grace, allowing password/email takeover of the victim
+  Finding 48 (MEDIUM)   App ticket PaymentIntent treated donation map values as cents while documenting quantity
+  Finding 49 (HIGH)     Already-authenticated mobile handoff minted a PKCE-bound code on GET from attacker-supplied challenge
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2502,5 +2505,361 @@ defmodule YscWeb.SecurityAuditTest do
       assert conn.status == 403
       refute Ysc.Newsletter.hard_bounced?(email)
     end
+  end
+
+  describe "Finding 47: Impersonation clears reauth grace and blocks credential changes" do
+    test "password change is refused while impersonating even if reauth was just set",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture(%{password: "target password long"})
+
+      # Login stamps :reauth_verified_at in production. Seed it here (ConnCase
+      # log_in_user only sets :user_token) then confirm impersonation clears it
+      # and blocks credential changes for the impersonated subject.
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {conn, token} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
+
+      refute get_session(conn, :reauth_verified_at)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      html =
+        render_submit(view, "request_password_change", %{
+          user: %{
+            password: "attacker takeover password 99",
+            password_confirmation: "attacker takeover password 99"
+          }
+        })
+
+      assert html =~ "Stop impersonating"
+
+      assert Accounts.get_user_by_email_and_password(
+               target.email,
+               "target password long"
+             )
+
+      refute Accounts.get_user_by_email_and_password(
+               target.email,
+               "attacker takeover password 99"
+             )
+    end
+
+    test "email and phone changes are refused while impersonating", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture()
+      original_email = target.email
+      original_phone = target.phone_number
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      html =
+        render_submit(view, "request_email_change", %{
+          "user" => %{"email" => "attacker-takeover@example.com"}
+        })
+
+      assert html =~ "Stop impersonating"
+
+      html =
+        render_submit(view, "update_profile", %{
+          "user" => %{
+            "first_name" => target.first_name,
+            "last_name" => target.last_name,
+            "phone_number" => "+14155550199",
+            "most_connected_country" => target.most_connected_country || "SE",
+            "date_of_birth" =>
+              (target.date_of_birth && Date.to_iso8601(target.date_of_birth)) ||
+                "1990-06-15"
+          }
+        })
+
+      assert html =~ "Stop impersonating"
+
+      reloaded = Accounts.get_user!(target.id)
+      assert reloaded.email == original_email
+      assert reloaded.phone_number == original_phone
+    end
+
+    test "reauth_verified is refused while impersonating, including phone purpose",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture()
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      send(view.pid, :reauth_verified)
+      assert render(view) =~ "Stop impersonating"
+
+      :sys.replace_state(view.pid, fn %{socket: socket} = state ->
+        %{
+          state
+          | socket:
+              Phoenix.Component.assign(socket, reauth_purpose: :phone_change)
+        }
+      end)
+
+      send(view.pid, :reauth_verified)
+      assert render(view) =~ "Stop impersonating"
+      assert render(view) =~ "phone"
+    end
+
+    test "passkey deletion is refused while impersonating", %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture()
+
+      {:ok, passkey} =
+        Accounts.create_user_passkey(target, %{
+          external_id: Base.encode64(:crypto.strong_rand_bytes(32)),
+          public_key: Base.encode64(:crypto.strong_rand_bytes(64)),
+          sign_count: 0,
+          nickname: "Target Device"
+        })
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      render_async(view)
+
+      html =
+        render_click(view, "delete_passkey", %{"passkey_id" => passkey.id})
+
+      assert html =~ "Stop impersonating"
+      assert Repo.get(Ysc.Accounts.UserPasskey, passkey.id)
+    end
+
+    test "password reauth_verified is refused while impersonating", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture(%{password: "target password long"})
+
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+      send(view.pid, :reauth_verified)
+      assert render(view) =~ "Stop impersonating"
+
+      assert Accounts.get_user_by_email_and_password(
+               target.email,
+               "target password long"
+             )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 48 (MEDIUM): App tickets donation values are cents, API says quantity
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 48: app tickets reject donation tiers" do
+    import Ysc.EventsFixtures
+
+    test "donation tier selections are refused before order creation" do
+      admin = user_fixture(%{role: :admin})
+      token = Accounts.generate_user_mobile_token(admin)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      donation =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :donation,
+          price: nil
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{donation.id => 50}
+        })
+
+      assert %{
+               "error" =>
+                 "donation ticket tiers cannot be charged via the in-person app; collect donations on the website"
+             } = json_response(conn, 422)
+
+      orders =
+        from(to in Ysc.Tickets.TicketOrder,
+          where: to.user_id == ^member.id and to.event_id == ^event.id
+        )
+        |> Repo.all()
+
+      assert orders == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 49 (HIGH): Already-authenticated mobile handoff must not mint on GET
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 49: already-authenticated mobile handoff requires CSRF POST" do
+    test "GET /users/log-in with attacker PKCE does not mint a redeemable code" do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(admin) |> get(login_path)
+
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
+               )
+             )
+
+      confirm = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      html = html_response(confirm, 200)
+      assert html =~ ~s(id="mobile-handoff-form")
+      assert html =~ ~s(id="mobile-handoff-continue")
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
+               )
+             )
+    end
+
+    test "CSRF POST completes the handoff for the staff session, bound to the stored challenge" do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(admin) |> get(login_path)
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+
+      confirm = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(confirm)
+
+      conn =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "continue"
+        })
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      assert {:ok, %User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(
+                 location
+                 |> URI.parse()
+                 |> Map.fetch!(:query)
+                 |> URI.decode_query()
+                 |> Map.fetch!("code"),
+                 verifier
+               )
+
+      assert id == admin.id
+    end
+
+    test "a regular member cannot start the mobile handoff via the login URL" do
+      member = user_fixture()
+
+      challenge =
+        :crypto.hash(:sha256, String.duplicate("b", 64))
+        |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(member) |> get(login_path)
+
+      assert redirected_to(conn) == ~p"/"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^member.id and t.context == "mobile_redirect"
+               )
+             )
+    end
+
+    test "GET /users/log-in/mobile-handoff without a pending handoff redirects home" do
+      admin = user_fixture(%{role: :admin})
+
+      conn =
+        build_conn()
+        |> log_in_user(admin)
+        |> get(~p"/users/log-in/mobile-handoff")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "cancel POST drops the pending handoff without minting a code" do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(admin) |> get(login_path)
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+
+      confirm = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(confirm)
+
+      conn =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "cancel"
+        })
+
+      assert redirected_to(conn) == ~p"/"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
+               )
+             )
+    end
+  end
+
+  defp impersonate_as_admin(conn, admin, target) do
+    conn = log_in_user(conn, admin)
+    {conn, token} = fetch_conn_csrf(conn)
+
+    post(conn, ~p"/admin/impersonate/#{target.id}", %{
+      "_csrf_token" => token
+    })
   end
 end
