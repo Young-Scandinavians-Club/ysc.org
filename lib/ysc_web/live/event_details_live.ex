@@ -1594,6 +1594,8 @@ defmodule YscWeb.EventDetailsLive do
                                                                  else: "days"}
                           <% is_event_at_capacity -> %>
                             Sold Out (Event at capacity)
+                          <% available == :unlimited && @available_capacity != :unlimited -> %>
+                            {"#{@available_capacity} remaining"}
                           <% available == :unlimited -> %>
                             Unlimited
                           <% available == 0 -> %>
