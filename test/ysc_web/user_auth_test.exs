@@ -1,8 +1,11 @@
 defmodule YscWeb.UserAuthTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   alias Phoenix.LiveView
   alias Ysc.Accounts
+  alias Ysc.Accounts.UserToken
+  alias Ysc.Repo
   alias YscWeb.UserAuth
   import Ysc.AccountsFixtures
 
@@ -411,8 +414,9 @@ defmodule YscWeb.UserAuthTest do
       refute conn.status
     end
 
-    test "hands off to the mobile app instead of the normal redirect when already authenticated with a valid mobile_redirect_uri and code_challenge",
-         %{conn: conn, user: user} do
+    test "sends staff to the mobile-handoff confirmation instead of minting a code on GET",
+         %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
       verifier = String.duplicate("a", 64)
       challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
 
@@ -422,31 +426,31 @@ defmodule YscWeb.UserAuthTest do
           "mobile_redirect_uri" => "ysc-admin://auth-callback",
           "code_challenge" => challenge
         })
-        |> assign(:current_user, user)
+        |> assign(:current_user, admin)
         |> UserAuth.redirect_if_user_is_authenticated([])
 
       assert conn.halted
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
 
-      assert {:ok, %Accounts.User{id: id}} =
-               Accounts.verify_and_consume_mobile_redirect_token(
-                 location
-                 |> URI.parse()
-                 |> Map.fetch!(:query)
-                 |> URI.decode_query()
-                 |> Map.fetch!("code"),
-                 verifier
+      assert get_session(conn, :mobile_handoff_uri) ==
+               "ysc-admin://auth-callback"
+
+      assert get_session(conn, :mobile_handoff_challenge) == challenge
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
                )
-
-      assert id == user.id
+             )
     end
 
-    test "hands off as the real admin, not the impersonated user", %{
-      conn: conn,
-      user: impersonated
-    } do
-      admin = user_fixture()
+    test "stores the real admin, not the impersonated user, for mobile handoff confirmation",
+         %{
+           conn: conn,
+           user: impersonated
+         } do
+      admin = user_fixture(%{role: :admin})
       verifier = String.duplicate("a", 64)
       challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
 
@@ -461,21 +465,29 @@ defmodule YscWeb.UserAuthTest do
         |> UserAuth.redirect_if_user_is_authenticated([])
 
       assert conn.halted
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+      assert get_session(conn, :mobile_handoff_challenge) == challenge
+    end
 
-      assert {:ok, %Accounts.User{id: id}} =
-               Accounts.verify_and_consume_mobile_redirect_token(
-                 location
-                 |> URI.parse()
-                 |> Map.fetch!(:query)
-                 |> URI.decode_query()
-                 |> Map.fetch!("code"),
-                 verifier
-               )
+    test "does not start a mobile handoff for a regular member", %{
+      conn: conn,
+      user: user
+    } do
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
 
-      assert id == admin.id
-      refute id == impersonated.id
+      conn =
+        conn
+        |> Map.put(:params, %{
+          "mobile_redirect_uri" => "ysc-admin://auth-callback",
+          "code_challenge" => challenge
+        })
+        |> assign(:current_user, user)
+        |> UserAuth.redirect_if_user_is_authenticated([])
+
+      assert conn.halted
+      assert redirected_to(conn) == ~p"/"
+      refute get_session(conn, :mobile_handoff_challenge)
     end
 
     test "falls back to the normal redirect when mobile_redirect_uri is valid but code_challenge is missing",
@@ -505,6 +517,87 @@ defmodule YscWeb.UserAuthTest do
 
       assert conn.halted
       assert redirected_to(conn) == ~p"/"
+    end
+  end
+
+  describe "complete_mobile_handoff/1" do
+    test "mints a code bound to the session challenge for staff", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> assign(:current_user, admin)
+        |> put_session(:mobile_handoff_uri, "ysc-admin://auth-callback")
+        |> put_session(:mobile_handoff_challenge, challenge)
+        |> UserAuth.complete_mobile_handoff()
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      refute get_session(conn, :mobile_handoff_challenge)
+
+      assert {:ok, %Accounts.User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(
+                 location
+                 |> URI.parse()
+                 |> Map.fetch!(:query)
+                 |> URI.decode_query()
+                 |> Map.fetch!("code"),
+                 verifier
+               )
+
+      assert id == admin.id
+    end
+
+    test "hands off as the real admin, not the impersonated user", %{
+      conn: conn,
+      user: impersonated
+    } do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> assign(:current_user, impersonated)
+        |> assign(:real_current_user, admin)
+        |> put_session(:mobile_handoff_uri, "ysc-admin://auth-callback")
+        |> put_session(:mobile_handoff_challenge, challenge)
+        |> UserAuth.complete_mobile_handoff()
+
+      location = redirected_to(conn, 302)
+
+      assert {:ok, %Accounts.User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(
+                 location
+                 |> URI.parse()
+                 |> Map.fetch!(:query)
+                 |> URI.decode_query()
+                 |> Map.fetch!("code"),
+                 verifier
+               )
+
+      assert id == admin.id
+      refute id == impersonated.id
+    end
+
+    test "does not mint when the session has no pending handoff", %{
+      conn: conn,
+      user: user
+    } do
+      conn =
+        conn
+        |> assign(:current_user, user)
+        |> UserAuth.complete_mobile_handoff()
+
+      assert redirected_to(conn) == ~p"/"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where: t.user_id == ^user.id and t.context == "mobile_redirect"
+               )
+             )
     end
   end
 

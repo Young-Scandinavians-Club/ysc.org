@@ -43,6 +43,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 46 (HIGH)     Volunteers could refund, reassign, and grant tickets on the event Tickets tab
   Finding 47 (HIGH)     Impersonation kept post-login reauth grace, allowing password/email takeover of the victim
   Finding 48 (MEDIUM)   App ticket PaymentIntent treated donation map values as cents while documenting quantity
+  Finding 49 (HIGH)     Already-authenticated mobile handoff minted a PKCE-bound code on GET from attacker-supplied challenge
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2605,6 +2606,102 @@ defmodule YscWeb.SecurityAuditTest do
         |> Repo.all()
 
       assert orders == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 49 (HIGH): Already-authenticated mobile handoff must not mint on GET
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 49: already-authenticated mobile handoff requires CSRF POST" do
+    test "GET /users/log-in with attacker PKCE does not mint a redeemable code" do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(admin) |> get(login_path)
+
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
+               )
+             )
+
+      confirm = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      html = html_response(confirm, 200)
+      assert html =~ ~s(id="mobile-handoff-form")
+      assert html =~ ~s(id="mobile-handoff-continue")
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
+               )
+             )
+    end
+
+    test "CSRF POST completes the handoff for the staff session, bound to the stored challenge" do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(admin) |> get(login_path)
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+
+      confirm = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(confirm)
+
+      conn =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "continue"
+        })
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      assert {:ok, %User{id: id}} =
+               Accounts.verify_and_consume_mobile_redirect_token(
+                 location
+                 |> URI.parse()
+                 |> Map.fetch!(:query)
+                 |> URI.decode_query()
+                 |> Map.fetch!("code"),
+                 verifier
+               )
+
+      assert id == admin.id
+    end
+
+    test "a regular member cannot start the mobile handoff via the login URL" do
+      member = user_fixture()
+
+      challenge =
+        :crypto.hash(:sha256, String.duplicate("b", 64))
+        |> Base.encode16(case: :lower)
+
+      login_path =
+        ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+
+      conn = build_conn() |> log_in_user(member) |> get(login_path)
+
+      assert redirected_to(conn) == ~p"/"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^member.id and t.context == "mobile_redirect"
+               )
+             )
     end
   end
 end

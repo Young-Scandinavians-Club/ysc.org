@@ -1,6 +1,7 @@
 defmodule YscWeb.UserSessionControllerTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts.UserToken
@@ -26,6 +27,119 @@ defmodule YscWeb.UserSessionControllerTest do
     test "redirects if already logged in", %{conn: conn, user: user} do
       conn = conn |> log_in_user(user) |> get(~p"/users/log-in")
       assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects staff to mobile-handoff confirmation instead of minting on GET",
+         %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+
+      challenge =
+        :crypto.hash(:sha256, String.duplicate("a", 64))
+        |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(
+          ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+        )
+
+      assert redirected_to(conn) == ~p"/users/log-in/mobile-handoff"
+    end
+  end
+
+  describe "GET/POST /users/log-in/mobile-handoff" do
+    test "renders confirmation when a staff handoff is pending", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+
+      challenge =
+        :crypto.hash(:sha256, String.duplicate("a", 64))
+        |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(
+          ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+        )
+
+      conn = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      html = html_response(conn, 200)
+      assert html =~ ~s(id="mobile-handoff-form")
+      assert html =~ "Open the YSC Admin app"
+    end
+
+    test "POST cancel does not mint a code", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(
+          ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+        )
+
+      conn = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+
+      cancel =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "cancel"
+        })
+
+      assert redirected_to(cancel) == ~p"/"
+
+      refute Repo.exists?(
+               from(t in UserToken,
+                 where:
+                   t.user_id == ^admin.id and t.context == "mobile_redirect"
+               )
+             )
+    end
+
+    test "POST continue redirects to the app with a redeemable code", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(
+          ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+        )
+
+      conn = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "continue"
+        })
+
+      location = redirected_to(conn, 302)
+      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+
+      code =
+        location
+        |> URI.parse()
+        |> Map.fetch!(:query)
+        |> URI.decode_query()
+        |> Map.fetch!("code")
+
+      assert {:ok, %Ysc.Accounts.User{id: id}} =
+               Ysc.Accounts.verify_and_consume_mobile_redirect_token(
+                 code,
+                 verifier
+               )
+
+      assert id == admin.id
     end
   end
 

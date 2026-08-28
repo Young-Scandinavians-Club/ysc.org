@@ -364,6 +364,17 @@ defmodule YscWeb.Router do
     post "/users/log-in/passkey", UserSessionController, :create_passkey_login
   end
 
+  # Already-authenticated mobile-app handoff. GET never mints a code (Finding 49).
+  scope "/", YscWeb do
+    pipe_through [:browser, :require_authenticated_user, :auth_rate_limit]
+
+    get "/users/log-in/mobile-handoff", UserSessionController, :mobile_handoff
+
+    post "/users/log-in/mobile-handoff",
+         UserSessionController,
+         :create_mobile_handoff
+  end
+
   ## Password reset (allow unauthenticated access)
   scope "/", YscWeb do
     pipe_through [

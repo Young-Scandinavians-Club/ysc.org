@@ -542,12 +542,17 @@ defmodule YscWeb.UserAuth do
   Used for routes that require the user to not be authenticated.
 
   If the mobile app opened this page (mobile_redirect_uri present and valid)
-  and the browser already had a signed-in session — e.g. a retry after an
-  earlier successful login whose redirect back to the app didn't complete —
-  this still hands off to the app via the one-time-code redirect instead of
-  just rendering the normal signed-in web page. Otherwise the app would be
-  silently stuck: the mobile handoff only otherwise happens inside the login
-  flow itself, which this plug bypasses entirely once already authenticated.
+  and the browser already had a signed-in staff session — e.g. a retry after
+  an earlier successful login whose redirect back to the app didn't complete —
+  we send the user to a CSRF-protected confirmation page instead of minting a
+  handoff code on this GET.
+
+  Minting on GET bound the one-time code to a `code_challenge` taken from the
+  query string. PKCE only helps when the legitimate app created that
+  challenge: `ysc-admin://` is a private-use scheme any installed app can
+  register, so an attacker who opened a Custom Tab (Chrome cookie jar) with
+  *their* challenge could redeem the 302 `code` themselves (Finding 49).
+  Confirmation requires a first-party POST (`SameSite=Lax` session cookie).
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
@@ -558,11 +563,11 @@ defmodule YscWeb.UserAuth do
       is_nil(user) ->
         conn
 
-      mobile_redirect_uri && code_challenge ->
-        code = Accounts.generate_mobile_redirect_token(user, code_challenge)
-
+      mobile_staff_user?(user) && mobile_redirect_uri && code_challenge ->
         conn
-        |> redirect(external: "#{mobile_redirect_uri}?code=#{code}")
+        |> put_session(:mobile_handoff_uri, mobile_redirect_uri)
+        |> put_session(:mobile_handoff_challenge, code_challenge)
+        |> redirect(to: ~p"/users/log-in/mobile-handoff")
         |> halt()
 
       true ->
@@ -571,6 +576,59 @@ defmodule YscWeb.UserAuth do
         |> halt()
     end
   end
+
+  @doc """
+  Completes the already-authenticated mobile-app handoff after a CSRF POST.
+
+  Reads the redirect URI and PKCE challenge from the session (set by
+  `redirect_if_user_is_authenticated/2`), not from the POST body, then mints
+  the one-time code bound to that challenge.
+  """
+  def complete_mobile_handoff(conn) do
+    user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
+    uri = get_session(conn, :mobile_handoff_uri)
+    challenge = get_session(conn, :mobile_handoff_challenge)
+
+    conn =
+      conn
+      |> delete_session(:mobile_handoff_uri)
+      |> delete_session(:mobile_handoff_challenge)
+
+    if mobile_staff_user?(user) && valid_mobile_redirect_uri?(uri) &&
+         valid_code_challenge?(challenge) do
+      code = Accounts.generate_mobile_redirect_token(user, challenge)
+      redirect(conn, external: "#{uri}?code=#{code}")
+    else
+      redirect(conn, to: signed_in_path(conn))
+    end
+  end
+
+  @doc """
+  Drops a pending mobile-app handoff and returns the user to the signed-in path.
+  """
+  def cancel_mobile_handoff(conn) do
+    conn
+    |> delete_session(:mobile_handoff_uri)
+    |> delete_session(:mobile_handoff_challenge)
+    |> redirect(to: signed_in_path(conn))
+  end
+
+  @doc """
+  True when the session has a pending staff mobile-app handoff confirmation.
+  """
+  def mobile_handoff_pending?(conn) do
+    user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
+    uri = get_session(conn, :mobile_handoff_uri)
+    challenge = get_session(conn, :mobile_handoff_challenge)
+
+    mobile_staff_user?(user) && valid_mobile_redirect_uri?(uri) &&
+      valid_code_challenge?(challenge)
+  end
+
+  defp mobile_staff_user?(%{role: role}) when role in [:admin, :volunteer],
+    do: true
+
+  defp mobile_staff_user?(_), do: false
 
   # Pattern-matched directly on a plain map (rather than params["key"], which
   # uses the Access behaviour) so this safely returns nil for a
