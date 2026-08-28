@@ -5,16 +5,23 @@ defmodule Ysc.Events.EventDateTimeTest do
   alias Ysc.Events.EventDateTime
 
   describe "combine/2" do
-    test "combines Date and Time into UTC DateTime" do
+    test "combines Date and Pacific Time into a UTC DateTime" do
+      # 10:00 Pacific on 2024-12-01 is PST (UTC-8) -> 18:00 UTC.
       assert EventDateTime.combine(~D[2024-12-01], ~T[10:00:00]) ==
-               ~U[2024-12-01 10:00:00Z]
+               ~U[2024-12-01 18:00:00Z]
     end
 
     test "combines DateTime and Time using the date portion" do
       date = ~U[2024-12-01 15:30:00Z]
 
       assert EventDateTime.combine(date, ~T[10:00:00]) ==
-               ~U[2024-12-01 10:00:00Z]
+               ~U[2024-12-01 18:00:00Z]
+    end
+
+    test "uses the Pacific offset in effect for the date (PDT vs PST)" do
+      # 10:00 Pacific on 2024-07-01 is PDT (UTC-7) -> 17:00 UTC.
+      assert EventDateTime.combine(~D[2024-07-01], ~T[10:00:00]) ==
+               ~U[2024-07-01 17:00:00Z]
     end
 
     test "returns nil when either argument is nil" do
@@ -30,7 +37,8 @@ defmodule Ysc.Events.EventDateTimeTest do
         start_time: ~T[18:00:00]
       }
 
-      assert EventDateTime.start_datetime(event) == ~U[2024-12-01 18:00:00Z]
+      # 18:00 Pacific (PST, UTC-8) on 2024-12-01 -> 02:00 UTC the next day.
+      assert EventDateTime.start_datetime(event) == ~U[2024-12-02 02:00:00Z]
     end
 
     test "returns nil when start date or time is missing" do

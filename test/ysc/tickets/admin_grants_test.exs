@@ -107,10 +107,13 @@ defmodule Ysc.Tickets.AdminGrantsTest do
 
       [ticket] = order.tickets
 
-      assert DateTime.to_date(ticket.expires_at) ==
-               DateTime.to_date(event.end_date)
+      # Expiry is the event end interpreted as Pacific wall-clock, stored in UTC.
+      assert ticket.expires_at ==
+               Ysc.Events.EventDateTime.combine(event.end_date, event.end_time)
 
-      assert ticket.expires_at.hour == 18
+      assert ticket.expires_at
+             |> DateTime.shift_zone!("America/Los_Angeles")
+             |> Map.fetch!(:hour) == 18
     end
 
     test "falls back to now + 365 days when the event has no end date/time", %{

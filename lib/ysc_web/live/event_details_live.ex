@@ -6586,6 +6586,20 @@ defmodule YscWeb.EventDetailsLive do
          )
          |> assign(:show_ticket_modal, false)}
 
+      {:error, reason}
+      when reason in [:event_in_past, :event_cancelled, :event_not_found] ->
+        # Expected states (event started/cancelled/removed, or a stale tab) —
+        # not an error to page on. Tell the member plainly instead of asking
+        # them to retry a purchase that cannot succeed.
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           checkout_event_unavailable_message(reason),
+           title: "Event"
+         )
+         |> assign(:show_ticket_modal, false)}
+
       {:error, :membership_required} ->
         {:noreply,
          socket
@@ -6641,6 +6655,16 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:show_ticket_modal, false)}
     end
   end
+
+  defp checkout_event_unavailable_message(:event_in_past),
+    do:
+      "This event has already started, so tickets are no longer available online. Email info@ysc.org if you think this is a mistake."
+
+  defp checkout_event_unavailable_message(:event_cancelled),
+    do: "This event has been cancelled, so tickets are no longer available."
+
+  defp checkout_event_unavailable_message(:event_not_found),
+    do: "We couldn't find this event. It may have been removed."
 
   def format_start_date(%DateTime{} = date) do
     date |> DateTime.to_date() |> Calendar.strftime("%A, %B %-d")
