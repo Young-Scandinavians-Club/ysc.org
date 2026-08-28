@@ -532,6 +532,49 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert html =~ "Payout not found"
     end
 
+    test "labels a JournalEntry payout and links to the journal in QuickBooks",
+         %{
+           conn: conn
+         } do
+      payout =
+        LedgersFixtures.payout_fixture()
+        |> Ecto.Changeset.change(%{
+          quickbooks_deposit_id: "qb_je_modal_123",
+          quickbooks_transaction_type: "journal_entry",
+          quickbooks_sync_status: "synced"
+        })
+        |> Repo.update!()
+
+      {:ok, view, html} = live(conn, ~p"/admin/money/payouts/#{payout.id}")
+
+      assert has_element?(view, "#payout-modal")
+      assert html =~ "QuickBooks Journal Entry ID"
+      refute html =~ "QuickBooks Deposit ID"
+      assert html =~ "/app/journal?txnId=qb_je_modal_123"
+      refute html =~ "/app/deposit?txnId=qb_je_modal_123"
+    end
+
+    test "labels a Deposit payout and links to the deposit in QuickBooks", %{
+      conn: conn
+    } do
+      payout =
+        LedgersFixtures.payout_fixture()
+        |> Ecto.Changeset.change(%{
+          quickbooks_deposit_id: "qb_dep_modal_456",
+          quickbooks_transaction_type: "deposit",
+          quickbooks_sync_status: "synced"
+        })
+        |> Repo.update!()
+
+      {:ok, view, html} = live(conn, ~p"/admin/money/payouts/#{payout.id}")
+
+      assert has_element?(view, "#payout-modal")
+      assert html =~ "QuickBooks Deposit ID"
+      refute html =~ "QuickBooks Journal Entry ID"
+      assert html =~ "/app/deposit?txnId=qb_dep_modal_456"
+      refute html =~ "/app/journal?txnId=qb_dep_modal_456"
+    end
+
     # ---------------------------------------------------------------------------
     # Reconciliation row
     # ---------------------------------------------------------------------------
