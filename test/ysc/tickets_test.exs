@@ -388,8 +388,20 @@ defmodule Ysc.TicketsTest do
       {:ok, order} =
         Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
 
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>event body html</p>",
+        rendered_details: "<p>event body html</p>"
+      })
+      |> Repo.update!()
+
       upcoming = Tickets.list_user_upcoming_ticket_orders(user.id)
-      assert Enum.any?(upcoming, &(&1.id == order.id))
+      loaded = Enum.find(upcoming, &(&1.id == order.id))
+      assert loaded
+      assert loaded.event.title == event.title
+      assert loaded.event.description == event.description
+      assert loaded.event.raw_details == nil
+      assert loaded.event.rendered_details == nil
     end
 
     test "respects limit option", %{user: user} do
@@ -471,6 +483,35 @@ defmodule Ysc.TicketsTest do
 
       # If we want to test with confirmed tickets, we'd need to complete the order first
       # For now, just verify the function doesn't crash
+    end
+
+    test "preloads event title and address for the QR page without event body HTML",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      from(t in Ticket, where: t.ticket_order_id == ^order.id)
+      |> Repo.update_all(set: [status: :confirmed])
+
+      event
+      |> Ecto.Changeset.change(%{
+        address: "123 Cabin Rd",
+        raw_details: "<p>event body html</p>",
+        rendered_details: "<p>event body html</p>"
+      })
+      |> Repo.update!()
+
+      [ticket] = Tickets.list_user_tickets_for_event(user.id, event.id)
+
+      assert ticket.event.title == event.title
+      assert ticket.event.address == "123 Cabin Rd"
+      assert ticket.event.start_date == event.start_date
+      assert ticket.event.raw_details == nil
+      assert ticket.event.rendered_details == nil
     end
   end
 
@@ -1438,8 +1479,10 @@ defmodule Ysc.TicketsTest do
       assert loaded.id == ticket.id
       assert loaded.ticket_tier.id == tier1.id
       assert loaded.user.id == user.id
+      assert loaded.user.email == user.email
       assert loaded.ticket_order.id == order.id
       assert loaded.registration.first_name == "Ada"
+      refute Ecto.assoc_loaded?(loaded.ticket_order.payment)
     end
 
     test "excludes tickets from other events", %{
@@ -1494,6 +1537,23 @@ defmodule Ysc.TicketsTest do
       |> Repo.update!()
 
       assert Tickets.list_tickets_for_admin(event.id) == []
+    end
+  end
+
+  describe "get_payment_for_order/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns nil when the order has no payment_id", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert Tickets.get_payment_for_order(order) == nil
     end
   end
 
@@ -2304,6 +2364,11 @@ defmodule Ysc.TicketsTest do
     test "ci_query_explain_order_tickets_for_refund_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Tickets.ci_query_explain_order_tickets_for_refund_query()
+    end
+
+    test "ci_query_explain_list_tickets_for_admin_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_list_tickets_for_admin_query()
     end
   end
 end

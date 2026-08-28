@@ -144,6 +144,32 @@ defmodule Ysc.Events.Event do
     timestamps()
   end
 
+  # Columns needed to render event cards, admin lists, and dashboards.
+  # Omits `raw_details` / `rendered_details` (event body HTML) and other
+  # fields that are only used on the event editor / public event page.
+  @summary_fields [
+    :id,
+    :reference_id,
+    :state,
+    :title,
+    :description,
+    :max_attendees,
+    :start_date,
+    :start_time,
+    :end_date,
+    :end_time,
+    :location_name,
+    :address,
+    :image_id,
+    :publish_at,
+    :tickets_tbd,
+    :inserted_at,
+    :organizer_id
+  ]
+
+  @doc false
+  def summary_fields, do: @summary_fields
+
   @publish_control_fields [:state, :published_at, :publish_at, :organizer_id]
 
   @editor_fields [
