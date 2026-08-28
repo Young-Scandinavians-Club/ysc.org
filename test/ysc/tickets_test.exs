@@ -210,6 +210,135 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "create_ticket_order/3 member-only tiers" do
+    setup do
+      ctx = tickets_setup()
+
+      {:ok, member_tier_a} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Members A",
+          type: :paid,
+          price: Money.new(20, :USD),
+          quantity: 50,
+          member_only: true,
+          event_id: ctx.event.id
+        })
+
+      {:ok, member_tier_b} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Members B",
+          type: :paid,
+          price: Money.new(30, :USD),
+          quantity: 50,
+          member_only: true,
+          event_id: ctx.event.id
+        })
+
+      Map.merge(ctx, %{
+        member_tier_a: member_tier_a,
+        member_tier_b: member_tier_b
+      })
+    end
+
+    defp give_single_membership(user) do
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      single = Enum.find(plans, &(&1.id == :single))
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_single_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: DateTime.truncate(DateTime.utc_now(), :second),
+          current_period_end:
+            DateTime.utc_now()
+            |> DateTime.add(30, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_single_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_single",
+          stripe_price_id: single.stripe_price_id,
+          quantity: 1
+        })
+
+      Ysc.Accounts.MembershipCache.invalidate_user(user.id)
+      user
+    end
+
+    test "lifetime member can buy several member-only tickets across tiers", %{
+      user: user,
+      event: event,
+      member_tier_a: a,
+      member_tier_b: b
+    } do
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 a.id => 2,
+                 b.id => 1
+               })
+    end
+
+    test "single member may buy exactly one member-only ticket", %{
+      event: event,
+      member_tier_a: a
+    } do
+      user = give_single_membership(user_fixture_unique())
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{a.id => 1})
+    end
+
+    test "single member cannot buy two member-only tickets in one order", %{
+      event: event,
+      member_tier_a: a,
+      member_tier_b: b
+    } do
+      user = give_single_membership(user_fixture_unique())
+
+      assert {:error, :member_only_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 a.id => 1,
+                 b.id => 1
+               })
+    end
+
+    test "single member cannot buy a second member-only ticket in a later order",
+         %{event: event, member_tier_a: a, member_tier_b: b} do
+      user = give_single_membership(user_fixture_unique())
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{a.id => 1})
+
+      # Confirm the first ticket so it counts as owned.
+      order
+      |> Ysc.Repo.preload(:tickets)
+      |> Map.fetch!(:tickets)
+      |> Enum.each(fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+
+      assert {:error, :member_only_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{b.id => 1})
+    end
+
+    test "single member can still buy from regular tiers freely", %{
+      event: event,
+      tier1: tier1
+    } do
+      user = give_single_membership(user_fixture_unique())
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+    end
+  end
+
   describe "get_ticket_order/1" do
     setup do
       tickets_setup()

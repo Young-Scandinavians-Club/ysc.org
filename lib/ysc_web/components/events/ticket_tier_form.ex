@@ -131,6 +131,47 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           </.error>
         </div>
 
+        <div
+          :if={!donation_type?(@form[:type].value)}
+          class="rounded-lg border border-violet-200 bg-violet-50 p-3"
+        >
+          <label class="flex items-start gap-3 text-sm leading-6 text-zinc-700">
+            <input
+              type="hidden"
+              name={@form[:member_only].name}
+              value="false"
+            />
+            <input
+              type="checkbox"
+              id={@form[:member_only].id}
+              name={@form[:member_only].name}
+              value="true"
+              checked={
+                Phoenix.HTML.Form.normalize_value(
+                  "checkbox",
+                  @form[:member_only].value
+                )
+              }
+              class="mt-1 rounded border-zinc-300 text-violet-700 focus:ring-0"
+            />
+            <span class="flex flex-col gap-0.5">
+              <span class="flex items-center gap-2 font-medium text-violet-900">
+                <.icon name="hero-lock-closed" class="w-4 h-4" /> Member-only tier
+              </span>
+              <span class="text-xs text-violet-800">
+                Single members can buy just one member-only ticket per event
+                (across all member-only tiers). Family and Lifetime members have
+                no limit. Everyone else must buy from the regular tiers.
+              </span>
+            </span>
+          </label>
+          <.error :for={
+            msg <- Enum.map(@form[:member_only].errors, &translate_error(&1))
+          }>
+            {msg}
+          </.error>
+        </div>
+
         <div class="flex justify-end">
           <.button type="submit" phx-disable-with="Saving...">
             <%= if assigns[:ticket_tier] do %>
@@ -318,6 +359,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         :start_date,
         :end_date,
         :requires_registration,
+        :member_only,
         :event_id
       ])
 

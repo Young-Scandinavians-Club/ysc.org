@@ -96,6 +96,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     >
                       {tier_status_text(ticket_tier)}
                     </.badge>
+                    <.badge
+                      :if={ticket_tier.member_only}
+                      type="violet"
+                      class="inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
+                    >
+                      <.icon name="hero-lock-closed" class="w-3 h-3" /> Member only
+                    </.badge>
                   </div>
                   <p
                     :if={ticket_tier.description}
