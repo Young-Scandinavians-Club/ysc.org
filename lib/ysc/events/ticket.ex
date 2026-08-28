@@ -325,55 +325,26 @@ defmodule Ysc.Events.Ticket do
     end)
   end
 
-  # Validate that the event is not in the past
+  # Validate that the event has not already started.
+  #
+  # Delegates to `Ysc.Events.EventDateTime.in_past?/1` so the event's
+  # `start_date` / `start_time` are interpreted as Pacific wall-clock rather
+  # than naive UTC. Combining them as UTC rejected valid purchases for up to
+  # ~8 hours before the event actually started.
   defp validate_event_not_in_past(changeset) do
     event_id = get_field(changeset, :event_id)
 
-    if event_id do
-      validate_event_not_ended(changeset, event_id)
+    with true <- is_binary(event_id),
+         %Ysc.Events.Event{} = event <-
+           Ysc.Repo.get(Ysc.Events.Event, event_id),
+         true <- Ysc.Events.EventDateTime.in_past?(event) do
+      add_error(
+        changeset,
+        :event_id,
+        "cannot purchase tickets for events that have already ended"
+      )
     else
-      changeset
-    end
-  end
-
-  defp validate_event_not_ended(changeset, event_id) do
-    case Ysc.Repo.get(Ysc.Events.Event, event_id) do
-      nil ->
-        changeset
-
-      event ->
-        now = DateTime.utc_now()
-        event_datetime = build_event_datetime(event)
-
-        if DateTime.compare(now, event_datetime) == :gt do
-          add_error(
-            changeset,
-            :event_id,
-            "cannot purchase tickets for events that have already ended"
-          )
-        else
-          changeset
-        end
-    end
-  end
-
-  defp build_event_datetime(event) do
-    case {event.start_date, event.start_time} do
-      {%DateTime{} = date, %Time{} = time} ->
-        # Convert DateTime to NaiveDateTime, then combine with time
-        naive_date = DateTime.to_naive(date)
-        date_part = NaiveDateTime.to_date(naive_date)
-        naive_datetime = NaiveDateTime.new!(date_part, time)
-        DateTime.from_naive!(naive_datetime, "Etc/UTC")
-
-      {date, time} when not is_nil(date) and not is_nil(time) ->
-        # Handle other date/time combinations
-        NaiveDateTime.new!(date, time)
-        |> DateTime.from_naive!("Etc/UTC")
-
-      _ ->
-        # Fallback to just the date if time is nil
-        event.start_date
+      _ -> changeset
     end
   end
 end
