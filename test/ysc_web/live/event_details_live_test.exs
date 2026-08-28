@@ -1880,6 +1880,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
 
       assert html =~ event.title
+      refute html =~ "This ticket tier is sold out"
     end
 
     test "handles unlimited quantity ticket tier", %{conn: conn} do

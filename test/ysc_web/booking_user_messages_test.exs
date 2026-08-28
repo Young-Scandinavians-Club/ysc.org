@@ -110,6 +110,44 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.property_unavailable_summary() =~
              "Cabin unavailable"
 
+    assert BookingUserMessages.room_inactive() =~ "isn't available to book"
+    refute BookingUserMessages.room_inactive() =~ "not active"
+
+    assert BookingUserMessages.room_already_booked_for_dates() =~
+             "Already booked"
+
+    assert BookingUserMessages.room_not_found() =~ "couldn't find this room"
+
+    assert BookingUserMessages.rooms_no_longer_available() =~
+             "aren't available anymore"
+
+    assert BookingUserMessages.already_have_room_second_booking() =~
+             "already have a room booked"
+
+    refute BookingUserMessages.room_too_small_for_group(1, 3) =~ "capacity"
+
+    assert BookingUserMessages.room_too_small_for_group(1, 3) =~
+             "sleeps 1 person"
+
+    refute BookingUserMessages.room_too_small_for_group(2, 4) =~ "capacity"
+    assert BookingUserMessages.room_too_small_for_group(2, 4) =~ "sleeps 2"
+
+    refute BookingUserMessages.adding_room_still_too_small(2, 6, 2) =~
+             "capacity"
+
+    assert BookingUserMessages.adding_room_still_too_small(2, 6, 2) =~
+             "enough beds"
+
+    refute BookingUserMessages.guests_exceed_selected_rooms(5, 3) =~ "capacity"
+
+    assert BookingUserMessages.guests_exceed_selected_rooms(5, 3) =~
+             "only sleep 3"
+
+    assert BookingUserMessages.cannot_book_second_room_solo() =~
+             "more than one person"
+
+    refute BookingUserMessages.single_membership_one_room() =~ "deselect"
+
     assert BookingUserMessages.membership_required_link_text() ==
              "Manage Membership"
 

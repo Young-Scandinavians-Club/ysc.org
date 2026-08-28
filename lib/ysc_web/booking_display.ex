@@ -89,6 +89,20 @@ defmodule YscWeb.BookingDisplay do
   def people_label(count), do: count_label(count, "guest", "guests")
 
   @doc """
+  Label for a price-breakdown season name.
+
+  Missing names must not show developer fallbacks like "Unnamed season".
+  """
+  def season_rate_label(name) when is_binary(name) do
+    case String.trim(name) do
+      "" -> "Season rate"
+      trimmed -> trimmed
+    end
+  end
+
+  def season_rate_label(_), do: "Season rate"
+
+  @doc """
   Formats adult and child counts for booking UIs and emails.
 
   ## Options

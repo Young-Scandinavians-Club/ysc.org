@@ -1276,9 +1276,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                               class="flex justify-between items-center text-zinc-600 text-xs"
                             >
                               <span>
-                                {segment.season_name || "Unnamed season"} — {BookingDisplay.nights_label(
-                                  segment.nights
-                                )} @ {MoneyHelper.format_money!(
+                                {BookingDisplay.season_rate_label(
+                                  segment.season_name
+                                )} — {BookingDisplay.nights_label(segment.nights)} @ {MoneyHelper.format_money!(
                                   segment.price_per_guest_per_night
                                 )}/guest/night
                               </span>
@@ -1337,9 +1337,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                               class="flex justify-between items-center text-zinc-600 text-xs"
                             >
                               <span>
-                                {segment.season_name || "Unnamed season"} — {BookingDisplay.nights_label(
-                                  segment.nights
-                                )}
+                                {BookingDisplay.season_rate_label(
+                                  segment.season_name
+                                )} — {BookingDisplay.nights_label(segment.nights)}
                                 <%= if segment.price_per_night do %>
                                   @ {MoneyHelper.format_money!(
                                     segment.price_per_night

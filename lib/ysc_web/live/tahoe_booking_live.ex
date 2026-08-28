@@ -2367,7 +2367,7 @@ defmodule YscWeb.TahoeBookingLive do
                     name="hero-exclamation-triangle-solid"
                     class="w-4 h-4 text-amber-600 inline-block me-1"
                   />
-                  Cannot book multiple rooms with only 1 person. Please select more people to book additional rooms.
+                  {YscWeb.BookingUserMessages.cannot_book_second_room_solo()}
                 </p>
               </section>
             </div>
@@ -5175,7 +5175,8 @@ defmodule YscWeb.TahoeBookingLive do
                    "Sorry, some rooms are already booked for your requested dates."
                },
                calculated_price: nil,
-               price_error: "Rooms unavailable"
+               price_error:
+                 YscWeb.BookingUserMessages.rooms_no_longer_available()
              )}
 
           {:error, :room_unavailable} ->
@@ -5192,7 +5193,8 @@ defmodule YscWeb.TahoeBookingLive do
                    "Sorry, some rooms are already booked for your requested dates."
                },
                calculated_price: nil,
-               price_error: "Rooms unavailable"
+               price_error:
+                 YscWeb.BookingUserMessages.rooms_no_longer_available()
              )}
 
           {:error, :stale_inventory} ->
@@ -5451,7 +5453,7 @@ defmodule YscWeb.TahoeBookingLive do
     if room do
       room.availability_status || {:available, nil}
     else
-      {:unavailable, "Room not found"}
+      {:unavailable, YscWeb.BookingUserMessages.room_not_found()}
     end
   end
 
@@ -5797,10 +5799,11 @@ defmodule YscWeb.TahoeBookingLive do
   defp determine_availability_status(context) do
     cond do
       not context.is_active ->
-        {:unavailable, "Room is not active"}
+        {:unavailable, YscWeb.BookingUserMessages.room_inactive()}
 
       not context.is_available ->
-        {:unavailable, "Already booked for selected dates"}
+        {:unavailable,
+         YscWeb.BookingUserMessages.room_already_booked_for_dates()}
 
       context.cannot_select_another_room ->
         build_cannot_select_another_room_error(
@@ -5810,7 +5813,7 @@ defmodule YscWeb.TahoeBookingLive do
 
       context.only_one_person && context.trying_to_add_second_room ->
         {:unavailable,
-         "Cannot book multiple rooms with only 1 person. Please select more guests to book additional rooms."}
+         YscWeb.BookingUserMessages.cannot_book_second_room_solo()}
 
       not context.capacity_ok ->
         build_capacity_error(
@@ -5831,9 +5834,9 @@ defmodule YscWeb.TahoeBookingLive do
        ) do
     error_message =
       if has_existing_booking && membership_type in [:family, :lifetime] do
-        "You already have a room booked. You can only select one room for your second booking. Please deselect the current room to select a different one."
+        YscWeb.BookingUserMessages.already_have_room_second_booking()
       else
-        "Single membership allows only one room per booking. Please deselect the current room to select a different one."
+        YscWeb.BookingUserMessages.single_membership_one_room()
       end
 
     {:unavailable, error_message}
@@ -5847,10 +5850,17 @@ defmodule YscWeb.TahoeBookingLive do
        ) do
     if can_select_multiple do
       {:unavailable,
-       "Adding this room would not provide enough total capacity. Selected rooms: #{total_selected_capacity} guests, need #{total_people} total. This room: #{room.capacity_max} guests."}
+       YscWeb.BookingUserMessages.adding_room_still_too_small(
+         total_selected_capacity,
+         total_people,
+         room.capacity_max
+       )}
     else
       {:unavailable,
-       "Room capacity (#{room.capacity_max}) is less than number of guests (#{total_people})"}
+       YscWeb.BookingUserMessages.room_too_small_for_group(
+         room.capacity_max,
+         total_people
+       )}
     end
   end
 
@@ -7411,7 +7421,10 @@ defmodule YscWeb.TahoeBookingLive do
         if total_guests > total_capacity do
           assign(socket,
             capacity_error:
-              "Total number of guests (#{total_guests}) exceeds the combined capacity of selected rooms (#{total_capacity} guests). Please select more rooms or reduce the number of guests."
+              YscWeb.BookingUserMessages.guests_exceed_selected_rooms(
+                total_guests,
+                total_capacity
+              )
           )
         else
           assign(socket, capacity_error: nil)
@@ -7697,7 +7710,7 @@ defmodule YscWeb.TahoeBookingLive do
         context.today,
         context.seasons
       ) ->
-        "Bookings for this season are not yet open"
+        "Not open for booking yet"
 
       # Blackout occupied night (cannot check in for overnight on this date)
       MapSet.member?(context.blackout_dates, context.date) ->

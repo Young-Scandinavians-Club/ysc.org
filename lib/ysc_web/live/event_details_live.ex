@@ -1765,7 +1765,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div :if={!is_donation && is_sold_out} class="mt-2">
                     <p class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-200">
                       <.icon name="hero-x-circle" class="w-4 h-4 inline me-1" />
-                      This ticket tier is sold out
+                      These tickets are sold out
                     </p>
                   </div>
 
