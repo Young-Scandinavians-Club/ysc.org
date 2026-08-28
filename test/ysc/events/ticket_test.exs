@@ -82,6 +82,37 @@ defmodule Ysc.Events.TicketTest do
       assert cs.valid?
     end
 
+    test "valid when the event start is still in the future in Pacific time", %{
+      user: user,
+      event: event,
+      tier: tier,
+      expires_at: expires_at
+    } do
+      # start_date's calendar day + start_time, read as naive UTC, is ~1h in the
+      # past; read as Pacific wall-clock (the real semantics) it is 6-7h out.
+      target = DateTime.add(DateTime.utc_now(), -1, :hour)
+
+      {:ok, event} =
+        Ysc.Events.update_event(event, %{
+          start_date:
+            DateTime.new!(DateTime.to_date(target), ~T[00:00:00], "Etc/UTC"),
+          start_time: target |> DateTime.to_time() |> Time.truncate(:second),
+          end_date: nil,
+          end_time: nil
+        })
+
+      cs =
+        %Ticket{}
+        |> Ticket.changeset(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          expires_at: expires_at
+        })
+
+      assert cs.valid?, "unexpected errors: #{inspect(cs.errors)}"
+    end
+
     test "adds error when user has no membership", %{
       event: event,
       tier: tier,
