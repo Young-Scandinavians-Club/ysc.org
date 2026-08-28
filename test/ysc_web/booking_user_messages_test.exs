@@ -116,6 +116,19 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.room_already_booked_for_dates() =~
              "Already booked"
 
+    assert BookingUserMessages.room_not_found() =~ "couldn't find this room"
+
+    assert BookingUserMessages.rooms_no_longer_available() =~
+             "aren't available anymore"
+
+    assert BookingUserMessages.already_have_room_second_booking() =~
+             "already have a room booked"
+
+    refute BookingUserMessages.room_too_small_for_group(1, 3) =~ "capacity"
+
+    assert BookingUserMessages.room_too_small_for_group(1, 3) =~
+             "sleeps 1 person"
+
     refute BookingUserMessages.room_too_small_for_group(2, 4) =~ "capacity"
     assert BookingUserMessages.room_too_small_for_group(2, 4) =~ "sleeps 2"
 

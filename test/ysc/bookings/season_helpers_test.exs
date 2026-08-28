@@ -419,6 +419,53 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
       assert errors.advance_booking_limit =~ winter.name
       refute errors.advance_booking_limit =~ summer.name
     end
+
+    test "names the checkout season when only check-out exceeds that season's window" do
+      {:ok, summer} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Named Summer",
+          property: :tahoe,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-10-31],
+          max_nights: 14,
+          advance_booking_days: nil
+        })
+        |> Repo.insert()
+
+      {:ok, winter} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Named Winter",
+          property: :tahoe,
+          start_date: ~D[2024-11-01],
+          end_date: ~D[2025-04-30],
+          max_nights: 14,
+          advance_booking_days: 5
+        })
+        |> Repo.insert()
+
+      Ysc.Bookings.SeasonCache.invalidate()
+
+      # Check-in is still in summer and inside winter's 5-day window; check-out
+      # in winter is past that window so the named checkout-season copy is used.
+      today = ~D[2026-10-28]
+      checkin = ~D[2026-10-30]
+      checkout = ~D[2026-11-05]
+
+      errors =
+        SeasonHelpers.validate_advance_booking_limit(
+          :tahoe,
+          checkin,
+          checkout,
+          today
+        )
+
+      assert Map.has_key?(errors, :advance_booking_limit)
+      assert errors.advance_booking_limit =~ winter.name
+      assert errors.advance_booking_limit =~ "check-out"
+      refute errors.advance_booking_limit =~ summer.name
+    end
   end
 
   describe "date_selectable?/4 with preloaded seasons" do
