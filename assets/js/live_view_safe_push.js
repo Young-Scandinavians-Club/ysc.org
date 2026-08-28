@@ -20,10 +20,14 @@ function liveViewConnected(hook) {
 export function pushEventIfConnected(hook, event, payload = {}, onReply) {
     if (!liveViewConnected(hook)) return false;
     try {
-        if (onReply) {
-            hook.pushEvent(event, payload, onReply);
-        } else {
-            hook.pushEvent(event, payload);
+        const result = onReply
+            ? hook.pushEvent(event, payload, onReply)
+            : hook.pushEvent(event, payload);
+        // pushEvent returns a promise that rejects ("LiveView not connected") if the
+        // socket drops between the check above and delivery. Swallow it so it never
+        // surfaces as an unhandled rejection.
+        if (result && typeof result.catch === "function") {
+            result.catch(() => {});
         }
         return true;
     } catch (err) {
@@ -39,7 +43,10 @@ export function pushEventIfConnected(hook, event, payload = {}, onReply) {
 export function pushEventToIfConnected(hook, target, event, payload = {}) {
     if (!liveViewConnected(hook)) return false;
     try {
-        hook.pushEventTo(target, event, payload);
+        const result = hook.pushEventTo(target, event, payload);
+        if (result && typeof result.catch === "function") {
+            result.catch(() => {});
+        }
         return true;
     } catch (err) {
         console.error("[live_view_safe_push] pushEventTo failed", event, err);

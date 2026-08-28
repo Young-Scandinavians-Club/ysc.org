@@ -933,7 +933,7 @@ defmodule YscWeb.BookingCheckoutLive do
         end
 
       {:error, error_message} when is_binary(error_message) ->
-        Ysc.Logging.error(
+        Ysc.Logging.debug(
           "[validate-guest-info] Error building changesets: #{error_message}"
         )
 
@@ -1419,7 +1419,7 @@ defmodule YscWeb.BookingCheckoutLive do
         end
 
       {:error, error_message} when is_binary(error_message) ->
-        Ysc.Logging.error(
+        Ysc.Logging.warning(
           "[save-guest-info] Error building changesets: #{error_message}"
         )
 
@@ -2983,7 +2983,7 @@ defmodule YscWeb.BookingCheckoutLive do
       error_msg =
         "Expected #{total_expected} guests, got #{length(guests_list)}"
 
-      Ysc.Logging.error("[build_guest_changesets] #{error_msg}")
+      Ysc.Logging.warning("[build_guest_changesets] #{error_msg}")
       {:error, error_msg}
     else
       # Validate that exactly one guest is marked as booking user
@@ -3011,7 +3011,7 @@ defmodule YscWeb.BookingCheckoutLive do
         error_msg =
           "Exactly one guest must be marked as the booking user, got #{booking_user_count}"
 
-        Ysc.Logging.error("[build_guest_changesets] #{error_msg}")
+        Ysc.Logging.warning("[build_guest_changesets] #{error_msg}")
         {:error, error_msg}
       else
         # Validate child count
@@ -3036,7 +3036,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
         if child_count != children_count do
           error_msg = "Expected #{children_count} children, got #{child_count}"
-          Ysc.Logging.error("[build_guest_changesets] #{error_msg}")
+          Ysc.Logging.warning("[build_guest_changesets] #{error_msg}")
           {:error, error_msg}
         else
           # Build changesets
@@ -3064,7 +3064,9 @@ defmodule YscWeb.BookingCheckoutLive do
             Enum.filter(changesets, fn changeset -> not changeset.valid? end)
 
           if invalid_changesets != [] do
-            Ysc.Logging.error(
+            # Expected while the guest is still filling in the form (blank/too-long
+            # names). Surfaced to the UI as field errors; not an application error.
+            Ysc.Logging.debug(
               "[build_guest_changesets] Found #{length(invalid_changesets)} invalid changesets"
             )
 
