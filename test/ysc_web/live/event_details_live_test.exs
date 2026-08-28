@@ -1116,6 +1116,52 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute has_element?(view, "#event-status-label", "Event Ended")
     end
 
+    test "closes ticket sales once a live event has started", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :ongoing, user: user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "p", "Event has started")
+      refute has_element?(view, "button", "Get Tickets")
+    end
+
+    test "rejects opening the ticket modal for a started event", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :ongoing, user: user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      render_click(view, "open-ticket-modal")
+
+      error =
+        :sys.get_state(view.pid).socket.assigns.flash
+        |> Phoenix.Flash.get(:error)
+
+      assert error =~ "already started"
+      refute has_element?(view, "#ticket-modal")
+    end
+
+    test "deep link to /tickets redirects after the event has started", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :ongoing, user: user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#ticket-modal")
+
+      error =
+        :sys.get_state(view.pid).socket.assigns.flash
+        |> Phoenix.Flash.get(:error)
+
+      assert error =~ "already started"
+    end
+
     test "does not show Event has ended after start when end time is later today",
          %{conn: conn} do
       today =

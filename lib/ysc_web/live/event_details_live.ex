@@ -873,12 +873,16 @@ defmodule YscWeb.EventDetailsLive do
               class="hidden lg:block sticky top-28 space-y-8"
             >
               <div class="bg-white rounded-xl border border-zinc-100 overflow-hidden">
-                <%= if event_in_past?(@event) do %>
+                <%= if ticket_sales_closed?(@event) do %>
                   <div class="p-8 text-center bg-zinc-50/50">
                     <div class="text-red-500 mb-4">
                       <.icon name="hero-clock" class="w-10 h-10 mx-auto" />
                     </div>
-                    <p class="text-red-700 font-semibold">Event has ended</p>
+                    <p class="text-red-700 font-semibold">
+                      {if event_in_past?(@event),
+                        do: "Event has ended",
+                        else: "Event has started"}
+                    </p>
                     <p class="text-red-500 text-sm mt-1">
                       Tickets are no longer available
                     </p>
@@ -907,8 +911,8 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 <% end %>
 
-                <%= if event_in_past?(@event) do %>
-                  <!-- No additional content for past events -->
+                <%= if ticket_sales_closed?(@event) do %>
+                  <!-- No additional content once sales close -->
                 <% else %>
                   <%!-- Ticket Perforation Line --%>
                   <div class="relative h-px border-t border-dashed border-zinc-200 mx-4">
@@ -1166,7 +1170,7 @@ defmodule YscWeb.EventDetailsLive do
                 <p
                   :if={
                     @current_user == nil && @has_ticket_tiers &&
-                      !event_in_past?(@event)
+                      !ticket_sales_closed?(@event)
                   }
                   class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
                 >
@@ -1176,7 +1180,7 @@ defmodule YscWeb.EventDetailsLive do
                   :if={
                     @current_user != nil && !@active_membership? &&
                       @has_ticket_tiers &&
-                      !event_in_past?(@event)
+                      !ticket_sales_closed?(@event)
                   }
                   class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
                 >
@@ -1190,10 +1194,12 @@ defmodule YscWeb.EventDetailsLive do
                   <% end %>
                 </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
-                  <%= if event_in_past?(@event) do %>
+                  <%= if ticket_sales_closed?(@event) do %>
                     <div class="flex-1 text-center">
                       <div class="text-red-700 font-black text-base">
-                        Event Ended
+                        {if event_in_past?(@event),
+                          do: "Event Ended",
+                          else: "Event Started"}
                       </div>
                       <div class="text-red-500 text-xs mt-1">
                         Tickets are no longer available
@@ -1255,8 +1261,8 @@ defmodule YscWeb.EventDetailsLive do
                     </div>
                   <% end %>
 
-                  <%= if event_in_past?(@event) do %>
-                    <!-- No action button for past events -->
+                  <%= if ticket_sales_closed?(@event) do %>
+                    <!-- No action button once sales close -->
                   <% else %>
                     <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
                       <.partiful_rsvp_button
@@ -3711,8 +3717,11 @@ defmodule YscWeb.EventDetailsLive do
     has_ticket_tiers = ticket_tiers != []
     has_ticket_info = has_ticket_tiers || event.tickets_tbd
 
-    # Check if we're on the tickets route (live_action == :tickets)
-    show_ticket_modal = socket.assigns.live_action == :tickets
+    # Check if we're on the tickets route (live_action == :tickets). Never open
+    # the modal once sales have closed — handle_params redirects on connect,
+    # this just avoids a flash of the modal in the dead render.
+    show_ticket_modal =
+      socket.assigns.live_action == :tickets and not ticket_sales_closed?(event)
 
     socket
     |> SEO.assign_seo(SEO.assigns_for_event(event_for_seo))
@@ -4477,6 +4486,20 @@ defmodule YscWeb.EventDetailsLive do
           # Legacy: resume_order parameter (for backwards compatibility)
           order_id && socket.assigns.current_user ->
             restore_checkout_state(socket, order_id, socket.assigns.event.id)
+
+          # Deep link to /tickets after the event has started — BookingLocker
+          # would reject any checkout, so send them back with a plain reason
+          # instead of opening a doomed modal.
+          socket.assigns.live_action == :tickets &&
+              ticket_sales_closed?(socket.assigns.event) ->
+            socket
+            |> assign(:show_ticket_modal, false)
+            |> YscWeb.Flash.put_toast(
+              :error,
+              checkout_event_unavailable_message(:event_in_past),
+              title: "Event"
+            )
+            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
 
           # If we're on the tickets route, show ticket modal
           socket.assigns.live_action == :tickets ->
@@ -5766,10 +5789,21 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("open-ticket-modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_ticket_modal, true)
-     |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")}
+    if ticket_sales_closed?(socket.assigns.event) do
+      {:noreply,
+       socket
+       |> assign(:show_ticket_modal, false)
+       |> YscWeb.Flash.put_toast(
+         :error,
+         checkout_event_unavailable_message(:event_in_past),
+         title: "Event"
+       )}
+    else
+      {:noreply,
+       socket
+       |> assign(:show_ticket_modal, true)
+       |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")}
+    end
   end
 
   @impl true
@@ -8756,6 +8790,15 @@ defmodule YscWeb.EventDetailsLive do
         DateTime.compare(DateTime.utc_now(), starts_at) != :lt and
           not event_in_past?(event)
     end
+  end
+
+  # Online ticket sales close the moment an event starts: BookingLocker rejects
+  # any booking whose start time is already in the past (see
+  # Ysc.Events.EventDateTime.in_past?/1). Gate the purchase UI on this so we
+  # never offer a checkout the booking transaction will refuse. Covers both a
+  # live event (started, not ended) and a fully past one.
+  defp ticket_sales_closed?(event) do
+    event_live?(event) or event_in_past?(event)
   end
 
   # Check if an agenda item is currently happening (between start_time and end_time)
