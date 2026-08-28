@@ -159,6 +159,7 @@ defmodule Ysc.Events.Event do
     :end_date,
     :end_time,
     :location_name,
+    :address,
     :image_id,
     :publish_at,
     :tickets_tbd,

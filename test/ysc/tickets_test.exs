@@ -484,6 +484,35 @@ defmodule Ysc.TicketsTest do
       # If we want to test with confirmed tickets, we'd need to complete the order first
       # For now, just verify the function doesn't crash
     end
+
+    test "preloads event title and address for the QR page without event body HTML",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      from(t in Ticket, where: t.ticket_order_id == ^order.id)
+      |> Repo.update_all(set: [status: :confirmed])
+
+      event
+      |> Ecto.Changeset.change(%{
+        address: "123 Cabin Rd",
+        raw_details: "<p>event body html</p>",
+        rendered_details: "<p>event body html</p>"
+      })
+      |> Repo.update!()
+
+      [ticket] = Tickets.list_user_tickets_for_event(user.id, event.id)
+
+      assert ticket.event.title == event.title
+      assert ticket.event.address == "123 Cabin Rd"
+      assert ticket.event.start_date == event.start_date
+      assert ticket.event.raw_details == nil
+      assert ticket.event.rendered_details == nil
+    end
   end
 
   describe "event_at_capacity?/1" do

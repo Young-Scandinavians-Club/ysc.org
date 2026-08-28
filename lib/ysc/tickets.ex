@@ -410,14 +410,20 @@ defmodule Ysc.Tickets do
   Gets all confirmed tickets for a user for a specific event.
   """
   def list_user_tickets_for_event(user_id, event_id) do
-    Ticket
-    |> where(
-      [t],
-      t.user_id == ^user_id and t.event_id == ^event_id and
-        t.status == :confirmed
+    event_query = event_summary_preload_query()
+
+    from(t in Ticket,
+      where:
+        t.user_id == ^user_id and t.event_id == ^event_id and
+          t.status == :confirmed,
+      order_by: [desc: t.inserted_at],
+      preload: [
+        :ticket_tier,
+        :ticket_order,
+        :registration,
+        event: ^event_query
+      ]
     )
-    |> order_by([t], desc: t.inserted_at)
-    |> preload([:ticket_tier, :ticket_order, :registration])
     |> Repo.all()
   end
 
