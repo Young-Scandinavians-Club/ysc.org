@@ -260,6 +260,7 @@ defmodule Ysc.Events do
         |> maybe_filter_start_date_from(date_from)
         |> maybe_filter_start_date_to(date_to)
         |> join(:left, [e], u in assoc(e, :organizer), as: :organizer)
+        |> select_event_summary()
         |> preload([organizer: o], organizer: o)
       else
         fuzzy_search_event(search_term)
@@ -429,8 +430,13 @@ defmodule Ysc.Events do
                    fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
                    ilike(u.first_name, ^search_like) or
                    ilike(u.last_name, ^search_like)))),
+      select: struct(e, ^Event.summary_fields()),
       preload: [organizer: u]
     )
+  end
+
+  defp select_event_summary(query) do
+    select(query, [e], struct(e, ^Event.summary_fields()))
   end
 
   @doc """
@@ -1686,12 +1692,7 @@ defmodule Ysc.Events do
     now = DateTime.utc_now()
 
     events =
-      Repo.all(
-        from e in Event,
-          where: e.start_date > ^now,
-          where: e.state == :published,
-          order_by: [asc: e.start_date]
-      )
+      Repo.all(upcoming_published_events_summary_query(now))
 
     # Batch load all ticket tiers for all events in a single query
     event_ids = Enum.map(events, & &1.id)
@@ -2458,34 +2459,39 @@ defmodule Ysc.Events do
         start_of_today_in_pst_as_utc()
       end
 
+    # Join `events` by id (not `assoc`) so `preload: event` is a separate
+    # SELECT of summary columns — joining `assoc` would force Ecto to use the
+    # join row and load `raw_details` / `rendered_details`.
     base_query =
       Ticket
       |> where([t], t.user_id == ^user_id and t.status == :confirmed)
-      |> join(:inner, [t], e in assoc(t, :event), as: :event)
-      |> where([event: e], not is_nil(e.start_date))
-      |> where([event: e], e.start_date >= ^start_boundary)
+      |> join(:inner, [t], e in Event, on: e.id == t.event_id)
+      |> where([t, e], not is_nil(e.start_date))
+      |> where([t, e], e.start_date >= ^start_boundary)
 
     event_ids =
       if event_limit do
         base_query
-        |> group_by([event: e], [e.id])
-        |> order_by([event: e], asc: min(e.start_date), asc: min(e.start_time))
+        |> group_by([t, e], [e.id])
+        |> order_by([t, e], asc: min(e.start_date), asc: min(e.start_time))
         |> limit(^event_limit)
-        |> select([event: e], e.id)
+        |> select([t, e], e.id)
         |> Repo.all()
       end
+
+    event_card_query = event_summary_preload_query()
 
     query =
       base_query
       |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
       |> join(:left, [t], to in assoc(t, :ticket_order), as: :ticket_order)
       |> maybe_where_event_ids(event_ids)
-      |> preload([event: e, ticket_tier: tt, ticket_order: to],
-        event: e,
+      |> preload([ticket_tier: tt, ticket_order: to],
+        event: ^event_card_query,
         ticket_tier: tt,
         ticket_order: to
       )
-      |> order_by([event: e], asc: e.start_date, asc: e.start_time)
+      |> order_by([t, e], asc: e.start_date, asc: e.start_time)
 
     if event_limit do
       Repo.all(query)
@@ -2501,7 +2507,19 @@ defmodule Ysc.Events do
   defp maybe_where_event_ids(query, []), do: where(query, false)
 
   defp maybe_where_event_ids(query, event_ids) do
-    where(query, [event: e], e.id in ^event_ids)
+    where(query, [t], t.event_id in ^event_ids)
+  end
+
+  defp event_summary_preload_query do
+    from(e in Event, select: struct(e, ^Event.summary_fields()))
+  end
+
+  defp upcoming_published_events_summary_query(now) do
+    from e in Event,
+      where: e.start_date > ^now,
+      where: e.state == :published,
+      order_by: [asc: e.start_date],
+      select: struct(e, ^Event.summary_fields())
   end
 
   defp start_of_today_in_pst_as_utc do
@@ -2549,17 +2567,23 @@ defmodule Ysc.Events do
   List upcoming events that a user has tickets for.
   """
   def list_upcoming_events_for_user(user_id) do
+    event_query =
+      from(e in Event,
+        select: struct(e, ^Event.summary_fields()),
+        preload: [:cover_image]
+      )
+
     Ticket
     |> where([t], t.user_id == ^user_id)
-    |> join(:left, [t], e in assoc(t, :event), as: :event)
+    |> join(:left, [t], e in Event, on: e.id == t.event_id)
     |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
-    |> where([event: e], e.start_date > ^DateTime.utc_now())
-    |> where([event: e], e.state in [:published, :cancelled])
-    |> preload([event: e, ticket_tier: tt],
-      event: {e, :cover_image},
+    |> where([t, e], e.start_date > ^DateTime.utc_now())
+    |> where([t, e], e.state in [:published, :cancelled])
+    |> preload([ticket_tier: tt],
+      event: ^event_query,
       ticket_tier: tt
     )
-    |> order_by([event: e], asc: e.start_date)
+    |> order_by([t, e], asc: e.start_date)
     |> Repo.all()
   end
 
@@ -3717,5 +3741,10 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_upcoming_events_paginated_payable_query do
     upcoming_events_paginated_query(20, 0, true)
+  end
+
+  @doc false
+  def ci_query_explain_upcoming_published_events_summary_query do
+    upcoming_published_events_summary_query(Ysc.Ci.QueryExplain.Fixtures.now())
   end
 end

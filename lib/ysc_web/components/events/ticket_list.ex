@@ -378,28 +378,36 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def update(assigns, socket) do
+    prev_refresh_token = socket.assigns[:refresh_token]
+
     socket =
       socket
       |> assign_new(:admin_role, fn -> nil end)
       |> assign(assigns)
 
-    if socket.assigns[:initialized?] do
-      {:ok, refresh_data(socket)}
-    else
-      {:ok,
-       socket
-       |> assign(:initialized?, true)
-       |> assign(:order_sort_dir, :desc)
-       |> assign(:collapsed_order_ids, MapSet.new())
-       |> refresh_data()
-       |> assign(:editing_ticket, nil)
-       |> assign(:detail_form, nil)
-       |> assign(:reassigning_ticket, nil)
-       |> assign(:user_search, "")
-       |> assign(:user_search_results, [])
-       |> assign(:selected_user, nil)
-       |> assign(:refunding_ticket, nil)
-       |> assign(:refund_amount, nil)}
+    cond do
+      socket.assigns[:initialized?] &&
+          socket.assigns[:refresh_token] == prev_refresh_token ->
+        {:ok, socket}
+
+      socket.assigns[:initialized?] ->
+        {:ok, refresh_data(socket)}
+
+      true ->
+        {:ok,
+         socket
+         |> assign(:initialized?, true)
+         |> assign(:order_sort_dir, :desc)
+         |> assign(:collapsed_order_ids, MapSet.new())
+         |> refresh_data()
+         |> assign(:editing_ticket, nil)
+         |> assign(:detail_form, nil)
+         |> assign(:reassigning_ticket, nil)
+         |> assign(:user_search, "")
+         |> assign(:user_search_results, [])
+         |> assign(:selected_user, nil)
+         |> assign(:refunding_ticket, nil)
+         |> assign(:refund_amount, nil)}
     end
   end
 
@@ -751,13 +759,19 @@ defmodule YscWeb.AdminEventsLive.TicketList do
           Money.zero?(amount) ->
             {:ok, :skipped_zero_amount}
 
-          is_nil(ticket_order.payment) ->
+          is_nil(ticket_order.payment_id) ->
             {:error, :no_stripe_payment}
 
           true ->
-            Tickets.refund_via_stripe(ticket_order.payment, amount, reason,
-              ticket_ids: [ticket.id]
-            )
+            case Tickets.get_payment_for_order(ticket_order) do
+              nil ->
+                {:error, :no_stripe_payment}
+
+              payment ->
+                Tickets.refund_via_stripe(payment, amount, reason,
+                  ticket_ids: [ticket.id]
+                )
+            end
         end
 
       case stripe_result do

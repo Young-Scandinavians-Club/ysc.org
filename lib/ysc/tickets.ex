@@ -346,14 +346,21 @@ defmodule Ysc.Tickets do
     now = Keyword.get(opts, :now, DateTime.utc_now())
     limit = Keyword.get(opts, :limit, 50)
 
+    event_query = event_summary_preload_query()
+
     from(to in TicketOrder,
       where: to.user_id == ^user_id,
       where: to.status != ^:cancelled,
-      join: e in assoc(to, :event),
+      join: e in Event,
+      on: e.id == to.event_id,
       where: e.start_date > ^now,
       order_by: [desc: to.inserted_at],
       limit: ^limit,
-      preload: [:tickets, :event, tickets: :ticket_tier]
+      preload: [
+        :tickets,
+        tickets: :ticket_tier,
+        event: ^event_query
+      ]
     )
     |> Repo.all()
   end
@@ -365,14 +372,17 @@ defmodule Ysc.Tickets do
     now = Keyword.get(opts, :now, DateTime.utc_now())
     limit = Keyword.get(opts, :limit, 12)
 
+    event_query = event_summary_preload_query()
+
     from(to in TicketOrder,
       where: to.user_id == ^user_id,
       where: to.status == ^:completed,
-      join: e in assoc(to, :event),
+      join: e in Event,
+      on: e.id == to.event_id,
       where: e.start_date < ^now,
       order_by: [desc: e.start_date],
       limit: ^limit,
-      preload: [:event]
+      preload: [event: ^event_query]
     )
     |> Repo.all()
   end
@@ -407,7 +417,7 @@ defmodule Ysc.Tickets do
         t.status == :confirmed
     )
     |> order_by([t], desc: t.inserted_at)
-    |> preload([:ticket_tier, :ticket_order, :registration, :event])
+    |> preload([:ticket_tier, :ticket_order, :registration])
     |> Repo.all()
   end
 
@@ -848,21 +858,54 @@ defmodule Ysc.Tickets do
   @doc """
   Lists confirmed tickets for an event for admin display, newest first,
   preloading ticket tier, ticket holder, attendee registration info, and the
-  order (with its payment, for refunds, and purchaser, for grouping tickets
-  by order). Pending/cancelled/expired tickets aren't actionable from this
-  list, so they're excluded.
+  order (with purchaser, for grouping tickets by order). Payment is loaded
+  only when refunding — it is not needed to render the list.
+  Pending/cancelled/expired tickets aren't actionable from this list, so
+  they're excluded.
   """
   def list_tickets_for_admin(event_id) do
-    Ticket
-    |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-    |> order_by([t], desc: t.inserted_at)
-    |> preload([
-      :ticket_tier,
-      :user,
-      :registration,
-      ticket_order: [:payment, :user]
-    ])
+    event_id
+    |> list_tickets_for_admin_query()
     |> Repo.all()
+  end
+
+  # Display fields for purchaser / ticket-holder cards. Omits hashed_password,
+  # board_bio, and other columns the admin ticket list never renders.
+  @admin_ticket_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :most_connected_country,
+    :current_avatar_id
+  ]
+
+  defp list_tickets_for_admin_query(event_id) do
+    user_query =
+      from(u in Ysc.Accounts.User,
+        select: struct(u, ^@admin_ticket_user_fields)
+      )
+
+    from(t in Ticket,
+      where: t.event_id == ^event_id and t.status == :confirmed,
+      order_by: [desc: t.inserted_at],
+      preload: [
+        :ticket_tier,
+        :registration,
+        user: ^user_query,
+        ticket_order: [user: ^user_query]
+      ]
+    )
+  end
+
+  @doc """
+  Loads the Stripe payment row for a ticket order, or `nil` when the order
+  never collected a payment (admin grants, free tickets).
+  """
+  def get_payment_for_order(%TicketOrder{payment_id: nil}), do: nil
+
+  def get_payment_for_order(%TicketOrder{payment_id: payment_id}) do
+    Repo.get(Ysc.Ledgers.Payment, payment_id)
   end
 
   # Read-only: finds the refundable tickets and computes the refund amount,
@@ -2596,6 +2639,10 @@ defmodule Ysc.Tickets do
     )
   end
 
+  defp event_summary_preload_query do
+    from(e in Event, select: struct(e, ^Event.summary_fields()))
+  end
+
   @doc false
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
@@ -2603,14 +2650,26 @@ defmodule Ysc.Tickets do
     user_id = Fixtures.ulid()
     now = Fixtures.now()
 
+    event_query = event_summary_preload_query()
+
     from(to in TicketOrder,
       where: to.user_id == ^user_id,
       where: to.status != ^:cancelled,
-      join: e in assoc(to, :event),
+      join: e in Event,
+      on: e.id == to.event_id,
       where: e.start_date > ^now,
       order_by: [desc: to.inserted_at],
-      preload: [:tickets, :event, tickets: :ticket_tier]
+      preload: [
+        :tickets,
+        tickets: :ticket_tier,
+        event: ^event_query
+      ]
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_tickets_for_admin_query do
+    list_tickets_for_admin_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

@@ -792,8 +792,15 @@ defmodule Ysc.EventsTest do
     end
 
     test "list_events_paginated/1 returns paginated events" do
-      {:ok, _event1} = create_event_fixture()
+      {:ok, event1} = create_event_fixture()
       {:ok, _event2} = create_event_fixture()
+
+      event1
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>admin list should not load this</p>",
+        rendered_details: "<p>admin list should not load this</p>"
+      })
+      |> Repo.update!()
 
       params = %{page: 1, page_size: 10}
 
@@ -802,6 +809,13 @@ defmodule Ysc.EventsTest do
       assert {:ok, {events, meta}} = result
       assert is_list(events)
       assert meta.current_page == 1
+
+      loaded = Enum.find(events, &(&1.id == event1.id))
+      assert loaded
+      assert loaded.title == event1.title
+      assert loaded.description == event1.description
+      assert loaded.raw_details == nil
+      assert loaded.rendered_details == nil
 
       for event <- events do
         assert %{registrations: registrations, capacity: capacity} =
@@ -1324,6 +1338,14 @@ defmodule Ysc.EventsTest do
         |> Ecto.Changeset.change(%{start_date: past_start})
         |> Repo.update()
 
+      {:ok, _} =
+        upcoming_event
+        |> Ecto.Changeset.change(%{
+          raw_details: "<p>home tickets should not load this</p>",
+          rendered_details: "<p>home tickets should not load this</p>"
+        })
+        |> Repo.update()
+
       _pending_ticket =
         create_ticket_fixture(%{
           event_id: upcoming_event.id,
@@ -1338,6 +1360,12 @@ defmodule Ysc.EventsTest do
       assert upcoming_ticket.id in ids
       refute past_ticket.id in ids
       assert Enum.all?(tickets, &(&1.status == :confirmed))
+
+      loaded = Enum.find(tickets, &(&1.id == upcoming_ticket.id))
+      assert loaded.event.title == "Upcoming"
+      assert loaded.event.description == "Soon"
+      assert loaded.event.raw_details == nil
+      assert loaded.event.rendered_details == nil
     end
 
     test "list_upcoming_confirmed_tickets_for_user/2 after_now excludes events that already started today" do
@@ -1928,12 +1956,24 @@ defmodule Ysc.EventsTest do
           event_id: event.id
         })
 
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>dashboard should not load this</p>",
+        rendered_details: "<p>dashboard should not load this</p>"
+      })
+      |> Repo.update!()
+
       events = Events.get_upcoming_events_with_ticket_tier_counts()
       assert is_list(events)
-      # Function returns list of maps with :event and :ticket_tiers keys
-      assert Enum.any?(events, fn event_map ->
-               event_map.event.id == event.id
-             end)
+
+      row =
+        Enum.find(events, fn event_map -> event_map.event.id == event.id end)
+
+      assert row
+      assert row.event.title == "Upcoming Event"
+      assert row.event.description == "Description"
+      assert row.event.raw_details == nil
+      assert row.event.rendered_details == nil
     end
 
     test "aggregates sold_tickets_count per tier for the dashboard query", %{
@@ -4652,6 +4692,13 @@ defmodule Ysc.EventsTest do
       assert updated.organizer.id == organizer.id
       assert %Ysc.Accounts.User{} = updated.updated_by
       assert updated.updated_by.id == editor.id
+    end
+  end
+
+  describe "ci_query_explain_* query builders" do
+    test "ci_query_explain_upcoming_published_events_summary_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Events.ci_query_explain_upcoming_published_events_summary_query()
     end
   end
 end
