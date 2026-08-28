@@ -36,6 +36,7 @@ defmodule YscWeb.DateDisplay do
   timestamps.
   """
 
+  alias Ysc.Bookings
   alias YscWeb.TimeZone
 
   @long_date_format "%B %d, %Y"
@@ -43,7 +44,6 @@ defmodule YscWeb.DateDisplay do
   @datetime_display_format "%b %-d, %Y"
   @long_datetime_format "%B %d, %Y at %I:%M %p"
   @long_datetime_with_zone_format "%B %d, %Y at %I:%M %p %Z"
-  @cabin_checkin_time ~T[15:00:00]
 
   @doc """
   Formats a date as a long label (e.g. `"March 15, 2024"`).
@@ -368,7 +368,7 @@ defmodule YscWeb.DateDisplay do
     today = DateTime.to_date(now)
 
     checkin_at =
-      DateTime.new!(checkin_date, @cabin_checkin_time, TimeZone.default())
+      DateTime.new!(checkin_date, Bookings.checkin_time(), TimeZone.default())
 
     cond do
       Date.compare(today, checkin_date) == :gt ->

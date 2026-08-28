@@ -5,6 +5,7 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
   import Ysc.BookingsFixtures
 
   alias Ysc.Repo
+  alias YscWeb.BookingDisplay
   alias YscWeb.Sms.BookingCheckinReminder
 
   setup do
@@ -26,7 +27,7 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
       assert body =~ "Valued Member"
       assert body =~ "Property"
       assert body =~ "Not Available"
-      assert body =~ "3:00 PM"
+      assert body =~ BookingDisplay.checkin_time_label()
     end
 
     test "interpolates provided variables and normalizes whitespace" do
@@ -79,7 +80,7 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
 
       assert data.first_name == "Bjorn"
       assert data.property_name == "Tahoe"
-      assert data.checkin_time == "3:00 PM"
+      assert data.checkin_time == BookingDisplay.checkin_time_label()
       assert is_binary(data.checkin_date)
 
       assert data.door_code == "Not Available" or is_binary(data.door_code)

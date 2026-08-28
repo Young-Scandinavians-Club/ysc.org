@@ -13,6 +13,7 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
 
   alias Ysc.Repo
   alias Ysc.Bookings.PropertyDisplay
+  alias YscWeb.BookingDisplay
   alias YscWeb.Emails.OutageNotification
 
   def get_template_name() do
@@ -111,7 +112,7 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
       property_name: property_name,
       property_address: property_address,
       checkout_date: checkout_date,
-      checkout_time: "11:00 AM",
+      checkout_time: BookingDisplay.checkout_time_label(),
       booking_reference_id: booking.reference_id,
       cabin_master_name: cabin_master_name,
       cabin_master_email: cabin_master_email,

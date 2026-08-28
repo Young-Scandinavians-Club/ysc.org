@@ -1,6 +1,7 @@
 defmodule YscWeb.BookingDisplayTest do
   use ExUnit.Case, async: true
 
+  alias Ysc.Bookings
   alias YscWeb.BookingDisplay
 
   describe "status_badge_type/1" do
@@ -142,6 +143,21 @@ defmodule YscWeb.BookingDisplayTest do
     test "formats combined headcount as a Total prefix" do
       assert BookingDisplay.guests_total_label(1, 0) == "Total: 1 guest"
       assert BookingDisplay.guests_total_label(2, 1) == "Total: 3 guests"
+    end
+  end
+
+  describe "checkin_time_label/0 and checkout_time_label/0" do
+    test "formats Bookings check-in and check-out times as 12-hour clocks" do
+      assert BookingDisplay.checkin_time_label() == "3:00 PM"
+      assert BookingDisplay.checkout_time_label() == "11:00 AM"
+    end
+
+    test "stays in sync with Bookings.checkin_time/0 and checkout_time/0" do
+      assert BookingDisplay.checkin_time_label() ==
+               Calendar.strftime(Bookings.checkin_time(), "%-I:%M %p")
+
+      assert BookingDisplay.checkout_time_label() ==
+               Calendar.strftime(Bookings.checkout_time(), "%-I:%M %p")
     end
   end
 end

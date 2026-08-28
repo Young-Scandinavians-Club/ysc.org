@@ -51,10 +51,10 @@
     </mj-text>
     <% end %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Check-in:</strong> <%= @booking.checkin_date %> (3:00 PM)
+      <strong>Check-in:</strong> <%= @booking.checkin_date %> (<%= YscWeb.BookingDisplay.checkin_time_label() %>)
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Check-out:</strong> <%= @booking.checkout_date %> (11:00 AM)
+      <strong>Check-out:</strong> <%= @booking.checkout_date %> (<%= YscWeb.BookingDisplay.checkout_time_label() %>)
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Duration:</strong> <%= YscWeb.BookingDisplay.nights_label(@booking.nights) %>

@@ -8,6 +8,7 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
   alias Ysc.Bookings
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.Repo
+  alias YscWeb.BookingDisplay
   alias YscWeb.Sms.Template
 
   @preview_keys [
@@ -41,7 +42,9 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
     property_name = Map.get(variables, :property_name, "Property")
     checkin_date = Map.get(variables, :checkin_date, "")
     door_code = Map.get(variables, :door_code, "Not Available")
-    checkin_time = Map.get(variables, :checkin_time, "3:00 PM")
+
+    checkin_time =
+      Map.get(variables, :checkin_time, BookingDisplay.checkin_time_label())
 
     Template.format(
       "Hej #{first_name}! Your check-in at #{property_name} is on #{checkin_date} at #{checkin_time}. Your door code is: #{door_code}. See you soon!"
@@ -101,7 +104,7 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
       property_name: property_name,
       checkin_date: checkin_date,
       door_code: if(door_code, do: door_code.code, else: "Not Available"),
-      checkin_time: "3:00 PM"
+      checkin_time: BookingDisplay.checkin_time_label()
     }
   end
 
