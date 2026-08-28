@@ -41,6 +41,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 44 (MEDIUM)   Contact/volunteer forms cast client-supplied user_id
   Finding 45 (HIGH)     SES webhook auto-confirmed SNS subscriptions from any AWS account
   Finding 46 (HIGH)     Volunteers could refund, reassign, and grant tickets on the event Tickets tab
+  Finding 47 (HIGH)     Impersonation kept post-login reauth grace, allowing password/email takeover of the victim
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2501,6 +2502,56 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert conn.status == 403
       refute Ysc.Newsletter.hard_bounced?(email)
+    end
+  end
+
+  describe "Finding 47: Impersonation clears reauth grace and blocks credential changes" do
+    test "password change is refused while impersonating even if reauth was just set",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture(%{password: "target password long"})
+
+      # Login stamps :reauth_verified_at in production. Seed it here (ConnCase
+      # log_in_user only sets :user_token) then confirm impersonation clears it
+      # and blocks credential changes for the impersonated subject.
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {conn, token} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
+
+      refute get_session(conn, :reauth_verified_at)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      html =
+        render_submit(view, "request_password_change", %{
+          user: %{
+            password: "attacker takeover password 99",
+            password_confirmation: "attacker takeover password 99"
+          }
+        })
+
+      assert html =~ "Stop impersonating"
+
+      assert Accounts.get_user_by_email_and_password(
+               target.email,
+               "target password long"
+             )
+
+      refute Accounts.get_user_by_email_and_password(
+               target.email,
+               "attacker takeover password 99"
+             )
     end
   end
 end

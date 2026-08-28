@@ -74,6 +74,35 @@ defmodule YscWeb.ImpersonationControllerTest do
       assert get_session(conn, :original_admin_id) == admin.id
     end
 
+    test "clears post-login reauth grace period when starting impersonation (Finding 47)",
+         %{conn: conn} do
+      admin = user_fixture_fast(%{role: "admin"})
+      target = user_fixture_fast()
+
+      # Production log_in_user/6 stamps :reauth_verified_at; the ConnCase helper
+      # only sets :user_token, so seed the grace period explicitly.
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      assert is_integer(get_session(conn, :reauth_verified_at))
+
+      {conn, token} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => token
+        })
+
+      assert redirected_to(conn) == ~p"/"
+      assert get_session(conn, :impersonated_user_id) == target.id
+      refute get_session(conn, :reauth_verified_at)
+    end
+
     test "after impersonating, home page shows impersonation banner", %{
       conn: conn
     } do

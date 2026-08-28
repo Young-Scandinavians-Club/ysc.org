@@ -97,22 +97,35 @@ defmodule YscWeb.PasskeyRegistrationLive do
        )
        |> redirect(to: ~p"/users/log-in")}
     else
-      reauth_verified = socket.assigns[:session_reauth_verified] || false
+      if socket.assigns[:impersonating?] do
+        {:ok,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Stop impersonating before adding a passkey for this account.",
+           title: "Impersonation"
+         )
+         |> push_navigate(to: ~p"/users/settings/security")}
+      else
+        # Never treat the admin's own login reauth as step-up while
+        # impersonating (Finding 47); mount above already redirects.
+        reauth_verified = socket.assigns[:session_reauth_verified] || false
 
-      {:ok,
-       assign(socket,
-         page_title: "Add Passkey",
-         meta_description:
-           "Register a passkey for secure, passwordless sign-in to Young Scandinavians Club.",
-         passkey_supported: false,
-         error: nil,
-         success: false,
-         loading: false,
-         passkey_challenge: nil,
-         user_agent: nil,
-         show_reauth: !reauth_verified,
-         user_has_password: !is_nil(user.hashed_password)
-       )}
+        {:ok,
+         assign(socket,
+           page_title: "Add Passkey",
+           meta_description:
+             "Register a passkey for secure, passwordless sign-in to Young Scandinavians Club.",
+           passkey_supported: false,
+           error: nil,
+           success: false,
+           loading: false,
+           passkey_challenge: nil,
+           user_agent: nil,
+           show_reauth: !reauth_verified,
+           user_has_password: !is_nil(user.hashed_password)
+         )}
+      end
     end
   end
 

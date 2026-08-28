@@ -7,7 +7,10 @@ defmodule YscWeb.ImpersonationController do
   alias Ysc.Accounts
 
   def impersonate(conn, %{"user_id" => user_id}) do
-    current_user = conn.assigns.current_user
+    # Prefer real_current_user so a nested impersonate attempt cannot record the
+    # victim as original_admin_id.
+    current_user =
+      conn.assigns[:real_current_user] || conn.assigns.current_user
 
     case Accounts.get_user(user_id) do
       nil ->
@@ -19,7 +22,12 @@ defmodule YscWeb.ImpersonationController do
         |> halt()
 
       _target_user ->
+        # Drop any post-login / OAuth reauth grace period. Otherwise the
+        # admin's own recent step-up would satisfy reauth_still_valid?/1 while
+        # acting as the victim and allow password/email/phone changes without
+        # the victim's credentials (Finding 47).
         conn
+        |> delete_session(:reauth_verified_at)
         |> put_session(:impersonated_user_id, user_id)
         |> put_session(:original_admin_id, current_user.id)
         |> YscWeb.Flash.put_toast(
