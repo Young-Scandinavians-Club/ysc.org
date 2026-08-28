@@ -2404,6 +2404,195 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert payout.quickbooks_transaction_type == "journal_entry"
     end
 
+    test "credits Undeposited Funds when payments outweigh refunds but fees still make the payout negative",
+         %{user: user} do
+      # $100 payment, $20 refund, $90 fees → Stripe withdrew $10.
+      # Net of already-synced payment/refund lines is +$80, so the UF leg
+      # must Credit (not Debit) to clear that positive contribution.
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(100, :USD),
+          external_payment_id:
+            "pi_je_credit_uf_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(0, :USD),
+          description: "Test payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "synced",
+        quickbooks_sales_receipt_id: "qb_sr_je_credit_uf"
+      })
+      |> Repo.update!()
+
+      {:ok, {refund, _refund_transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(20, :USD),
+          external_refund_id:
+            "re_je_credit_uf_#{System.unique_integer([:positive])}",
+          reason: "Partial refund"
+        })
+
+      refund
+      |> Refund.changeset(%{
+        quickbooks_sync_status: "synced",
+        quickbooks_sales_receipt_id: "qb_rr_je_credit_uf"
+      })
+      |> Repo.update!()
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(Decimal.new("-10.00"), :USD),
+          stripe_payout_id:
+            "po_je_credit_uf_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          fee_total: Money.new(90, :USD),
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+      {:ok, payout} = Ledgers.link_refund_to_payout(payout, refund)
+
+      payout =
+        Repo.get!(Payout, payout.id) |> Repo.preload([:payments, :refunds])
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" -> {:ok, "undeposited_funds_123"}
+        "Administration:Bank Service Charges:Stripe" -> {:ok, "stripe_fees_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      deny(ClientMock, :create_deposit, 2)
+
+      expect(ClientMock, :create_journal_entry, fn params, _opts ->
+        assert length(params.line) == 3
+
+        uf_line =
+          Enum.find(params.line, fn line ->
+            line.account_ref[:value] == "undeposited_funds_123"
+          end)
+
+        assert uf_line.posting_type == "Credit"
+        assert Decimal.equal?(uf_line.amount, Decimal.new("80.00"))
+
+        fees_line =
+          Enum.find(params.line, fn line ->
+            line.account_ref[:value] == "stripe_fees_123"
+          end)
+
+        assert fees_line.posting_type == "Debit"
+        assert Decimal.equal?(fees_line.amount, Decimal.new("90.00"))
+
+        bank_line =
+          Enum.find(params.line, fn line ->
+            line.account_ref[:value] == "bank_account_123"
+          end)
+
+        assert bank_line.posting_type == "Credit"
+        assert Decimal.equal?(bank_line.amount, Decimal.new("10.00"))
+
+        {:ok, %{"Id" => "qb_je_credit_uf"}}
+      end)
+
+      assert {:ok, journal_entry} = Sync.sync_payout(payout)
+      assert journal_entry["Id"] == "qb_je_credit_uf"
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "synced"
+      assert payout.quickbooks_deposit_id == "qb_je_credit_uf"
+      assert payout.quickbooks_transaction_type == "journal_entry"
+    end
+
+    test "does not reconcile an already-synced JournalEntry as a Deposit", %{
+      user: user
+    } do
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(50, :USD),
+          external_payment_id:
+            "pi_je_no_reconcile_#{System.unique_integer([:positive])}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(0, :USD),
+          description: "Later-linked payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment
+      |> Payment.changeset(%{
+        quickbooks_sync_status: "synced",
+        quickbooks_sales_receipt_id: "qb_sr_je_no_reconcile"
+      })
+      |> Repo.update!()
+
+      {:ok, {_payout_payment, _tx, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(Decimal.new("-10.00"), :USD),
+          stripe_payout_id:
+            "po_je_no_reconcile_#{System.unique_integer([:positive])}",
+          description: "Stripe payout",
+          currency: "usd",
+          status: "paid",
+          fee_total: Money.new(10, :USD),
+          arrival_date: DateTime.utc_now(),
+          metadata: %{}
+        })
+
+      {:ok, payout} = Ledgers.link_payment_to_payout(payout, payment)
+
+      payout =
+        payout
+        |> Ecto.Changeset.change(%{
+          quickbooks_sync_status: "synced",
+          quickbooks_deposit_id: "qb_je_existing",
+          quickbooks_transaction_type: "journal_entry",
+          quickbooks_synced_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+        |> Repo.update!()
+        |> Repo.preload([:payments, :refunds])
+
+      deny(ClientMock, :get_deposit_by_id, 1)
+      deny(ClientMock, :update_deposit, 2)
+      deny(ClientMock, :create_deposit, 2)
+      deny(ClientMock, :create_journal_entry, 2)
+
+      assert {:ok, %{"Id" => "qb_je_existing"}} = Sync.sync_payout(payout)
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_deposit_id == "qb_je_existing"
+      assert payout.quickbooks_transaction_type == "journal_entry"
+    end
+
     test "passes idempotency key with length at most 255 to create_deposit", %{
       user: _user
     } do
