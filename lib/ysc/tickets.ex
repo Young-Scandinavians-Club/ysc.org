@@ -22,8 +22,10 @@ defmodule Ysc.Tickets do
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TicketTierHelpers
+  alias Ysc.Events.MemberOnlyTickets
   alias Ysc.Events.Event
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
   alias Ysc.Bookings
   alias Ysc.Ledgers
 
@@ -53,6 +55,8 @@ defmodule Ysc.Tickets do
   - `{:error, :event_capacity_exceeded}` if event's global max_attendees limit would be exceeded
   - `{:error, :event_not_available}` if event is not available for purchase
   - `{:error, :membership_required}` if user doesn't have active membership
+  - `{:error, :member_only_not_eligible}` if the selection includes member-only tiers the buyer's plan can't purchase
+  - `{:error, :member_only_limit_exceeded}` if the selection exceeds the buyer's per-event member-only ticket limit
   - `{:error, :checkout_payment_in_progress}` when another pending checkout has in-flight payment
   """
   def create_ticket_order(user_id, event_id, ticket_selections) do
@@ -65,8 +69,10 @@ defmodule Ysc.Tickets do
     )
 
     case validate_user_membership(user_id) do
-      {:ok, _} ->
-        with :ok <- prepare_new_checkout_session(user_id, event_id),
+      {:ok, user} ->
+        with :ok <-
+               validate_member_only_selection(user, event_id, ticket_selections),
+             :ok <- prepare_new_checkout_session(user_id, event_id),
              {:ok, ticket_order} <-
                BookingLocker.atomic_booking(
                  user_id,
@@ -1988,6 +1994,40 @@ defmodule Ysc.Tickets do
 
   defp has_active_membership?(user) do
     Accounts.has_active_membership?(user)
+  end
+
+  # Enforces the "member only" ticket-tier rules for this event. Only runs a
+  # query when the event actually has a member-only tier. See
+  # `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
+  defp validate_member_only_selection(user, event_id, ticket_selections) do
+    ticket_tiers = Ysc.Events.list_ticket_tiers_for_event(event_id)
+
+    if MemberOnlyTickets.any_member_only?(ticket_tiers) do
+      plan_type = MembershipCache.get_membership_plan_type(user)
+      limit = MemberOnlyTickets.event_limit(plan_type)
+      already_owned = count_owned_member_only_tickets(user.id, event_id)
+
+      MemberOnlyTickets.validate_selection(
+        ticket_selections,
+        ticket_tiers,
+        limit,
+        already_owned
+      )
+    else
+      :ok
+    end
+  end
+
+  defp count_owned_member_only_tickets(user_id, event_id) do
+    from(t in Ticket,
+      join: tt in TicketTier,
+      on: tt.id == t.ticket_tier_id,
+      where:
+        t.user_id == ^user_id and t.event_id == ^event_id and
+          t.status == :confirmed and tt.member_only == true,
+      select: count(t.id)
+    )
+    |> Repo.one()
   end
 
   defp validate_tier_capacity(

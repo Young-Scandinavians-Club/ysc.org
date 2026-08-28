@@ -10,7 +10,8 @@ defmodule YscWeb.EventDetailsLive do
   alias HtmlSanitizeEx.Scrubber
 
   alias Ysc.Events
-  alias Ysc.Events.{EventPricingCache, TicketTierHelpers}
+  alias Ysc.Events.{EventPricingCache, MemberOnlyTickets, TicketTierHelpers}
+  alias Ysc.Accounts.MembershipCache
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Subscriptions
@@ -1465,6 +1466,21 @@ defmodule YscWeb.EventDetailsLive do
                 <% has_discount =
                   reservation_info.discount_percentage != nil &&
                     reservation_info.discount_percentage > 0 %>
+                <% is_member_only = member_only_tier?(ticket_tier) %>
+                <% member_only_selected =
+                  MemberOnlyTickets.selected_count(
+                    @selected_tickets,
+                    @ticket_tiers
+                  ) %>
+                <% member_only_blocked_msg =
+                  if is_member_only,
+                    do:
+                      member_only_block_message(
+                        @member_only_ticket_limit,
+                        member_only_selected,
+                        @member_only_tickets_owned
+                      ),
+                    else: nil %>
                 <div
                   data-tier-card
                   data-tier-id={ticket_tier.id}
@@ -1491,6 +1507,13 @@ defmodule YscWeb.EventDetailsLive do
                             {reserved_quantity} held at member rate
                           </span>
                         <% end %>
+                        <span
+                          :if={is_member_only}
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200"
+                        >
+                          <.icon name="hero-lock-closed" class="w-3 h-3" />
+                          Members only
+                        </span>
                       </div>
                       <p
                         :if={ticket_tier.description}
@@ -1713,7 +1736,14 @@ defmodule YscWeb.EventDetailsLive do
                             @ticket_tiers,
                             @reservations_by_tier,
                             @reserved_counts_by_tier
-                          ) %>
+                          ) &&
+                            member_only_can_add?(
+                              ticket_tier,
+                              @selected_tickets,
+                              @ticket_tiers,
+                              @member_only_ticket_limit,
+                              @member_only_tickets_owned
+                            ) %>
                         <button
                           type="button"
                           data-ticket-action="increase"
@@ -1783,6 +1813,19 @@ defmodule YscWeb.EventDetailsLive do
                         name="hero-exclamation-triangle"
                         class="w-4 h-4 inline me-1"
                       /> Maximum available tickets selected
+                    </p>
+                  </div>
+
+                  <div
+                    :if={!is_donation && is_member_only && member_only_blocked_msg}
+                    class="mt-2"
+                  >
+                    <p class="text-sm text-violet-700 bg-violet-50 px-3 py-2 rounded-md border border-violet-200">
+                      <.icon
+                        name="hero-lock-closed"
+                        class="w-4 h-4 inline me-1"
+                      />
+                      {member_only_blocked_msg}
                     </p>
                   </div>
 
@@ -3673,6 +3716,11 @@ defmodule YscWeb.EventDetailsLive do
     |> SEO.assign_seo(SEO.assigns_for_event(event_for_seo))
     |> assign(:event, event)
     |> assign(:had_membership?, event_had_membership?(socket))
+    |> assign(
+      :member_only_ticket_limit,
+      MemberOnlyTickets.event_limit(viewer_membership_plan_type(socket))
+    )
+    |> assign(:member_only_tickets_owned, 0)
     # Async data - will be populated after connection
     |> assign(:agendas, [])
     |> assign(:active_agenda, nil)
@@ -3739,6 +3787,55 @@ defmodule YscWeb.EventDetailsLive do
       Subscriptions.has_any_subscription?(user)
     else
       false
+    end
+  end
+
+  # Membership plan type (:single | :family | :lifetime | nil) for the viewer.
+  # Only meaningful when the viewer has an active membership; non-members can't
+  # buy any tickets, so nil is fine for them.
+  defp viewer_membership_plan_type(socket) do
+    user = socket.assigns[:current_user]
+
+    if user && socket.assigns[:active_membership?] == true do
+      MembershipCache.get_membership_plan_type(user)
+    else
+      nil
+    end
+  end
+
+  # Count of member-only tickets the viewer already holds (confirmed) for this event.
+  defp member_only_owned_count(user_tickets) when is_list(user_tickets) do
+    Enum.count(user_tickets, &MemberOnlyTickets.member_only?(&1.ticket_tier))
+  end
+
+  defp member_only_owned_count(_), do: 0
+
+  defp member_only_tier?(tier), do: MemberOnlyTickets.member_only?(tier)
+
+  # Whether the viewer may add one more ticket for this member-only tier.
+  defp member_only_can_add?(tier, selected_tickets, ticket_tiers, limit, owned) do
+    MemberOnlyTickets.can_add?(
+      tier,
+      selected_tickets,
+      ticket_tiers,
+      limit,
+      owned
+    )
+  end
+
+  # Explains why a member-only tier is blocked, or nil when it isn't blocked.
+  defp member_only_block_message(limit, member_only_selected, owned) do
+    cond do
+      not MemberOnlyTickets.eligible?(limit) ->
+        "Members-only tickets require a Single, Family, or Lifetime membership. Pick a regular tier instead."
+
+      is_integer(limit) and owned + member_only_selected >= limit ->
+        word = if limit == 1, do: "ticket", else: "tickets"
+
+        "Your membership includes #{limit} members-only #{word} per event — you've reached that limit."
+
+      true ->
+        nil
     end
   end
 
@@ -4262,6 +4359,10 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:active_agenda, default_active_agenda(agendas))
      |> assign(:user_tickets, user_tickets)
      |> assign(:all_tickets_by_order, all_tickets_by_order)
+     |> assign(
+       :member_only_tickets_owned,
+       member_only_owned_count(user_tickets)
+     )
      |> assign(:ticket_tiers, ticket_tiers)
      |> assign(:availability_data, availability_data)
      |> assign(:event_at_capacity, event_at_capacity)
@@ -5721,6 +5822,10 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
          |> assign(:user_tickets, updated_user_tickets)
+         |> assign(
+           :member_only_tickets_owned,
+           member_only_owned_count(updated_user_tickets)
+         )
          |> assign(:payment_intent, nil)
          |> clear_selected_tickets()
          |> assign(:tickets_requiring_registration, [])
@@ -6514,6 +6619,13 @@ defmodule YscWeb.EventDetailsLive do
              socket.assigns.ticket_tiers,
              socket.assigns.reservations_by_tier,
              socket.assigns.reserved_counts_by_tier
+           ) &&
+           member_only_can_add?(
+             ticket_tier,
+             socket.assigns.selected_tickets,
+             socket.assigns.ticket_tiers,
+             socket.assigns.member_only_ticket_limit,
+             socket.assigns.member_only_tickets_owned
            ) do
         new_quantity = current_quantity + 1
 
@@ -6593,6 +6705,26 @@ defmodule YscWeb.EventDetailsLive do
            :error,
            "You need an active, paid YSC membership to buy these tickets. Click your name in the top-right corner and open Membership to renew or activate, then try again.",
            title: "Membership"
+         )
+         |> assign(:show_ticket_modal, false)}
+
+      {:error, :member_only_not_eligible} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "One or more of the tickets you picked are members-only and need a Single, Family, or Lifetime membership. Please choose from the regular tiers.",
+           title: "Members-only tickets"
+         )
+         |> assign(:show_ticket_modal, false)}
+
+      {:error, :member_only_limit_exceeded} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Your membership includes one members-only ticket per event. Please reduce your members-only selection and try again.",
+           title: "Members-only tickets"
          )
          |> assign(:show_ticket_modal, false)}
 
@@ -7631,6 +7763,10 @@ defmodule YscWeb.EventDetailsLive do
              |> assign(:show_order_completion, true)
              |> assign(:ticket_order, updated_order)
              |> assign(:user_tickets, updated_user_tickets)
+             |> assign(
+               :member_only_tickets_owned,
+               member_only_owned_count(updated_user_tickets)
+             )
              |> clear_selected_tickets()
              |> assign(:tickets_requiring_registration, [])
              |> assign(:ticket_details_form, %{})
@@ -7688,6 +7824,10 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
          |> assign(:user_tickets, updated_user_tickets)
+         |> assign(
+           :member_only_tickets_owned,
+           member_only_owned_count(updated_user_tickets)
+         )
          |> assign(:payment_intent, nil)
          |> clear_selected_tickets()
          |> assign(:tickets_requiring_registration, [])

@@ -259,5 +259,29 @@ defmodule Ysc.Events.TicketTierTest do
 
       assert cs.valid?
     end
+
+    test "member_only defaults to false and casts from params", %{
+      event_id: event_id
+    } do
+      default_cs =
+        TicketTier.changeset(%TicketTier{}, %{
+          "name" => "GA",
+          "type" => "free",
+          "event_id" => event_id
+        })
+
+      assert Ecto.Changeset.get_field(default_cs, :member_only) == false
+
+      cs =
+        TicketTier.changeset(%TicketTier{}, %{
+          "name" => "Members GA",
+          "type" => "free",
+          "event_id" => event_id,
+          "member_only" => "true"
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :member_only) == true
+    end
   end
 end

@@ -25,6 +25,10 @@ defmodule Ysc.Events.TicketTier do
     # a registration attached to them
     field :requires_registration, :boolean
 
+    # When true, purchasing is restricted based on the buyer's membership plan.
+    # See `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
+    field :member_only, :boolean, default: false
+
     # Sale window: real UTC instants picked in the admin UI as Pacific days
     field :start_date, Ysc.Ecto.DateKind, kind: :pacific_anchored_datetime
     field :end_date, Ysc.Ecto.DateKind, kind: :pacific_anchored_datetime
@@ -56,6 +60,7 @@ defmodule Ysc.Events.TicketTier do
       :unlimited_quantity,
       :price,
       :requires_registration,
+      :member_only,
       :start_date,
       :end_date,
       :event_id,
