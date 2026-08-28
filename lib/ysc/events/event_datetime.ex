@@ -5,15 +5,23 @@ defmodule Ysc.Events.EventDateTime do
 
   alias Ysc.Events.Event
 
+  # Event `start_date`/`end_date` are Pacific calendar days and
+  # `start_time`/`end_time` are Pacific wall-clock times (see `Ysc.Ecto.DateKind`).
+  @event_timezone "America/Los_Angeles"
+
   @doc """
-  Combines a date and time into a UTC `DateTime`.
+  Combines an event date and Pacific wall-clock time into a UTC `DateTime`.
+
+  The date and time are interpreted in the event timezone
+  (`America/Los_Angeles`) before converting to UTC, so comparisons against
+  `DateTime.utc_now/0` line up with when the event actually happens locally.
 
   Returns `nil` when either argument is `nil`.
 
   ## Examples
 
       iex> combine(~D[2024-12-01], ~T[10:00:00])
-      ~U[2024-12-01 10:00:00Z]
+      ~U[2024-12-01 18:00:00Z]
 
       iex> combine(nil, ~T[10:00:00])
       nil
@@ -23,15 +31,30 @@ defmodule Ysc.Events.EventDateTime do
 
   def combine(%DateTime{} = date, %Time{} = time) do
     date
-    |> DateTime.to_naive()
-    |> NaiveDateTime.to_date()
-    |> NaiveDateTime.new!(time)
-    |> DateTime.from_naive!("Etc/UTC")
+    |> DateTime.to_date()
+    |> pacific_wall_clock_to_utc(time)
   end
 
   def combine(date, time) when not is_nil(date) and not is_nil(time) do
-    NaiveDateTime.new!(date, time)
-    |> DateTime.from_naive!("Etc/UTC")
+    pacific_wall_clock_to_utc(date, time)
+  end
+
+  defp pacific_wall_clock_to_utc(date, time) do
+    case DateTime.new(date, time, @event_timezone) do
+      {:ok, datetime} ->
+        DateTime.shift_zone!(datetime, "Etc/UTC")
+
+      # DST boundaries: pick the earlier instant rather than raising.
+      {:ambiguous, earlier, _later} ->
+        DateTime.shift_zone!(earlier, "Etc/UTC")
+
+      {:gap, just_before, _just_after} ->
+        DateTime.shift_zone!(just_before, "Etc/UTC")
+
+      # No usable timezone database — fall back to a naive UTC combination.
+      {:error, _reason} ->
+        NaiveDateTime.new!(date, time) |> DateTime.from_naive!("Etc/UTC")
+    end
   end
 
   @doc """
