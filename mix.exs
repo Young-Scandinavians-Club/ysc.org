@@ -17,7 +17,7 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe],
         list_unused_filters: true
       ],
-      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-08-28.
+      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-09-04.
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
@@ -194,7 +194,7 @@ defmodule Ysc.MixProject do
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
       # Official Hex cowlib 2.19.0 (cowboy 2.18 needs >= 2.19; fixes EEF-CVE-2026-59248).
-      # EEF-CVE-2026-43969/43966: still unpatched — ignored until 2026-08-28 (see mix.exs hex config).
+      # EEF-CVE-2026-43969/43966: still unpatched — ignored until 2026-09-04 (see mix.exs hex config).
       {:cowboy, "~> 2.18", override: true},
       {:cowlib, "~> 2.19", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
@@ -259,7 +259,10 @@ defmodule Ysc.MixProject do
       {:phoenix_html, "~> 4.3"},
       {:phoenix_live_dashboard, "~> 0.9"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
-      {:phoenix_live_view, "~> 1.2"},
+      # 1.2.11: discard stale diffs if a view rejoins before the first join
+      # succeeds; cancel LiveComponent asyncs on removal; HTMLFormatter
+      # skips EEx→curly migrations that would close interpolation early.
+      {:phoenix_live_view, "~> 1.2.11"},
       {:phoenix_test, "~> 0.12", only: :test, runtime: false},
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+.
