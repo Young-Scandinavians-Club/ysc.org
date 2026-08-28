@@ -1825,6 +1825,35 @@ defmodule Ysc.TicketsTest do
       assert Money.equal?(discount, tier1.price)
     end
 
+    test "pending_order_still_complimentary?/1 is false for a partial reservation discount",
+         %{user: user, event: event, tier1: tier1} do
+      %Ysc.Events.TicketReservation{}
+      |> Ysc.Events.TicketReservation.changeset(%{
+        ticket_tier_id: tier1.id,
+        user_id: user.id,
+        quantity: 1,
+        created_by_id: user.id,
+        discount_percentage: Decimal.new(50),
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      order = Tickets.get_ticket_order(order.id)
+
+      {:ok, expected_total} = Money.sub(tier1.price, Money.new(25, :USD))
+      assert Money.equal?(order.total_amount, expected_total)
+      refute Tickets.pending_order_still_complimentary?(order)
+
+      assert {:ok, total, discount} =
+               Tickets.recalculate_pending_order_pricing(order)
+
+      assert Money.equal?(total, expected_total)
+      assert Money.equal?(discount, Money.new(25, :USD))
+    end
+
     test "recalculate_pending_order_total/1 reflects current tier price after stale zero total",
          %{
            user: user,
