@@ -97,6 +97,18 @@ defmodule YscWeb.BookingDisplayTest do
     end
   end
 
+  describe "season_rate_label/1" do
+    test "keeps a real season name" do
+      assert BookingDisplay.season_rate_label("Summer") == "Summer"
+    end
+
+    test "does not show Unnamed season when the name is missing" do
+      assert BookingDisplay.season_rate_label(nil) == "Season rate"
+      assert BookingDisplay.season_rate_label("") == "Season rate"
+      assert BookingDisplay.season_rate_label("   ") == "Season rate"
+    end
+  end
+
   describe "guests_label/3" do
     test "joins adults and children with a comma by default" do
       assert BookingDisplay.guests_label(2, 1) == "2 adults, 1 child"

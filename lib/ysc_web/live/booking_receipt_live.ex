@@ -726,7 +726,7 @@ defmodule YscWeb.BookingReceiptLive do
                                 else: "text-zinc-400"
                               )
                             }>
-                              {segment.season_name || "Unnamed season"}
+                              {BookingDisplay.season_rate_label(segment.season_name)}
                               <%= if segment.price_per_night do %>
                                 ({MoneyHelper.format_money!(segment.price_per_night)} × {segment.nights} {if segment.nights ==
                                                                                                                1,

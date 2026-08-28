@@ -73,6 +73,46 @@ defmodule YscWeb.BookingUserMessages do
     "Cabin unavailable"
   end
 
+  def room_inactive do
+    "This room isn't available to book right now."
+  end
+
+  def room_already_booked_for_dates do
+    "Already booked for these dates"
+  end
+
+  def room_not_found do
+    "We couldn't find this room. Refresh the page and try again."
+  end
+
+  def rooms_no_longer_available do
+    "Those rooms aren't available anymore"
+  end
+
+  def cannot_book_second_room_solo do
+    "You need more than one person in your group to book a second room."
+  end
+
+  def single_membership_one_room do
+    "A Single membership can include one room per booking. Uncheck the room you already picked if you want a different one."
+  end
+
+  def already_have_room_second_booking do
+    "You already have a room booked. For a second booking you can pick one room — uncheck the current room if you want a different one."
+  end
+
+  def room_too_small_for_group(capacity, people) do
+    "This room sleeps #{capacity} #{person_word(capacity)}, and your group has #{people}. Choose a larger room or reduce your group size."
+  end
+
+  def adding_room_still_too_small(selected_capacity, people, room_capacity) do
+    "Even with this room, there still wouldn't be enough beds. Your selected rooms sleep #{selected_capacity}, this room sleeps #{room_capacity}, and your group has #{people}."
+  end
+
+  def guests_exceed_selected_rooms(total_guests, total_capacity) do
+    "Your group has #{total_guests} #{person_word(total_guests)}, but the rooms you picked only sleep #{total_capacity}. Add another room or reduce your group size."
+  end
+
   def membership_required_link_text do
     "Manage Membership"
   end
@@ -218,6 +258,9 @@ defmodule YscWeb.BookingUserMessages do
   defp modification_after_payment_recovery_body do
     "Open this booking from My Bookings & Payments (click your name in the top-right corner) and check whether the dates updated. If they didn't, email info@ysc.org with #{booking_reference_support_phrase()}."
   end
+
+  defp person_word(1), do: "person"
+  defp person_word(_count), do: "people"
 
   defp trim(string), do: String.trim(string)
 end

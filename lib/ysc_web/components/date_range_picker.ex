@@ -1089,12 +1089,12 @@ defmodule YscWeb.Components.DateRangePicker do
         "Bookings are not open for this date yet"
 
       saturday?(day) && !ctx.allow_saturdays && ctx.state == :set_end ->
-        "Check-outs are not permitted on Saturdays"
+        "You cannot check out on Saturday. Pick Sunday or another day to leave."
 
       ctx.state == :set_end && start_date && saturday?(start_date) &&
         !ctx.allow_saturdays && Date.compare(day, start_date) == :gt &&
           not (Date.diff(day, start_date) == 1 && sunday?(day)) ->
-        "Saturday check-ins must check out on Sunday"
+        Ysc.Bookings.BookingValidator.saturday_checkin_one_night_message()
 
       true ->
         nil

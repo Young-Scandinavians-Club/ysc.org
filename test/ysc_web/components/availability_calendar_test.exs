@@ -565,11 +565,45 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       saturday_cell = extract_day_cell(html, Date.to_iso8601(saturday))
 
-      assert saturday_cell =~ "No check-out"
-      assert saturday_cell =~ "Check-outs are not permitted on Saturdays"
+      assert saturday_cell =~ "No checkout"
+
+      assert saturday_cell =~
+               "You cannot check out on Saturday. Pick Sunday or another day to leave."
 
       refute saturday_cell =~
                "This stay length isn't allowed. Try different dates."
+    end
+
+    test "labels dates beyond the season advance window as not yet open for booking" do
+      today = ~D[2026-07-01]
+      far_date = ~D[2026-07-20]
+
+      seasons = [
+        %Ysc.Bookings.Season{
+          name: "Summer",
+          property: :tahoe,
+          start_date: ~D[2026-05-01],
+          end_date: ~D[2026-10-31],
+          advance_booking_days: 7
+        }
+      ]
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          seasons: seasons
+        )
+
+      far_cell = extract_day_cell(html, Date.to_iso8601(far_date))
+
+      assert far_cell =~ "Not open for booking yet"
+      refute far_cell =~ "Season closed"
+      refute far_cell =~ "Too far in future"
     end
 
     test "valid checkout before blackout shows check-out only, not not available" do
@@ -660,10 +694,10 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       monday_button =
         calendar_day_button(calendar_document(html), Date.to_iso8601(monday))
 
-      assert String.contains?(monday_cell, "Sun only") or
+      assert String.contains?(monday_cell, "Leave Sunday") or
                String.contains?(
                  monday_cell,
-                 "Saturday check-ins must check out on Sunday"
+                 "If you check in on Saturday, you must check out on Sunday"
                )
 
       assert calendar_element_attr(monday_button, "aria-disabled") == "true"
@@ -682,8 +716,12 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       saturday_cell = extract_day_cell(html, Date.to_iso8601(saturday))
 
+      refute saturday_cell =~ "No checkout"
       refute saturday_cell =~ "No check-in"
-      refute saturday_cell =~ "No check-out"
+
+      refute saturday_cell =~
+               "You cannot check out on Saturday. Pick Sunday or another day to leave."
+
       refute saturday_cell =~ "Check-ins are not permitted on Saturdays"
       refute saturday_cell =~ "Check-outs are not permitted on Saturdays"
     end

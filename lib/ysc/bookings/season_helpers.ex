@@ -425,14 +425,22 @@ defmodule Ysc.Bookings.SeasonHelpers do
             Map.put(
               errors,
               :advance_booking_limit,
-              "Bookings can only be made up to #{checkin_season.advance_booking_days} days in advance. Maximum check-in date is #{format_date(max_booking_date)}"
+              advance_booking_limit_message(
+                checkin_season.advance_booking_days,
+                max_booking_date,
+                :checkin
+              )
             )
 
           Date.compare(checkout_date, max_booking_date) == :gt ->
             Map.put(
               errors,
               :advance_booking_limit,
-              "Bookings can only be made up to #{checkin_season.advance_booking_days} days in advance. Maximum check-out date is #{format_date(max_booking_date)}"
+              advance_booking_limit_message(
+                checkin_season.advance_booking_days,
+                max_booking_date,
+                :checkout
+              )
             )
 
           true ->
@@ -455,14 +463,24 @@ defmodule Ysc.Bookings.SeasonHelpers do
             Map.put(
               errors,
               :advance_booking_limit,
-              "Bookings for the #{checkout_season.name} season can only be made up to #{checkout_season.advance_booking_days} days in advance. Maximum check-in date is #{format_date(max_booking_date)}"
+              advance_booking_limit_message(
+                checkout_season.advance_booking_days,
+                max_booking_date,
+                :checkin,
+                checkout_season.name
+              )
             )
 
           Date.compare(checkout_date, max_booking_date) == :gt ->
             Map.put(
               errors,
               :advance_booking_limit,
-              "Bookings for the #{checkout_season.name} season can only be made up to #{checkout_season.advance_booking_days} days in advance. Maximum check-out date is #{format_date(max_booking_date)}"
+              advance_booking_limit_message(
+                checkout_season.advance_booking_days,
+                max_booking_date,
+                :checkout,
+                checkout_season.name
+              )
             )
 
           true ->
@@ -521,6 +539,17 @@ defmodule Ysc.Bookings.SeasonHelpers do
 
   defp format_date(date) do
     Calendar.strftime(date, "%B %d, %Y")
+  end
+
+  defp advance_booking_limit_message(days, max_date, which, season_name \\ nil) do
+    which_word = if which == :checkin, do: "check-in", else: "check-out"
+    latest = format_date(max_date)
+
+    if is_binary(season_name) and String.trim(season_name) != "" do
+      "#{season_name} dates aren't open for booking yet. You can book #{season_name} stays up to #{days} days ahead — the latest #{which_word} you can choose today is #{latest}."
+    else
+      "These dates aren't open for booking yet. You can book up to #{days} days ahead — the latest #{which_word} you can choose today is #{latest}."
+    end
   end
 
   # Gets the next season that comes after the given date

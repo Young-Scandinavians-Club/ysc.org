@@ -341,6 +341,8 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
 
       assert Map.has_key?(errors, :advance_booking_limit)
       assert errors.advance_booking_limit =~ "#{season.advance_booking_days}"
+      assert errors.advance_booking_limit =~ "aren't open for booking yet"
+      refute errors.advance_booking_limit =~ "in advance"
     end
 
     test "returns error when check-out is beyond the advance window (check-in ok)" do

@@ -2622,7 +2622,7 @@ defmodule YscWeb.BookingCheckoutLive do
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <%= for segment <- segments do %>
               <div class="text-zinc-400">
-                {segment.season_name || "Unnamed season"}
+                {BookingDisplay.season_rate_label(segment.season_name)}
               </div>
               <div class="text-right text-zinc-500 text-xs tabular-nums">
                 {MoneyHelper.format_money!(segment.price_per_guest_per_night)}/guest/night
@@ -2676,7 +2676,7 @@ defmodule YscWeb.BookingCheckoutLive do
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <%= for segment <- buyout_segments do %>
               <div class="text-zinc-400">
-                {segment.season_name || "Unnamed season"}
+                {BookingDisplay.season_rate_label(segment.season_name)}
               </div>
               <div class="text-right text-zinc-500 text-xs tabular-nums">
                 <%= if segment.price_per_night do %>

@@ -3433,7 +3433,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       assert has_element?(view, "div", "rate varies by season")
       assert has_element?(view, "span", "Spring")
-      assert has_element?(view, "span", "Unnamed season")
+      assert has_element?(view, "span", "Season rate")
     end
 
     test "switching booking mode with dates already selected recalculates the price immediately",

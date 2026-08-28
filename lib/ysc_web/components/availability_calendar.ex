@@ -764,11 +764,11 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
     cond do
       assigns.state == :set_end && saturday_checkout?(day, property) ->
-        "No check-out"
+        "No checkout"
 
       assigns.state == :set_end &&
           saturday_checkin_requires_sunday_checkout?(day, assigns) ->
-        "Sun only"
+        "Leave Sunday"
 
       true ->
         nil
@@ -1196,7 +1196,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         {:boundary, "Past date"}
 
       assigns.max && Date.compare(day, assigns.max) == :gt ->
-        {:boundary, "Too far in future"}
+        {:boundary, "Too far ahead to book"}
 
       assigns[:property] && assigns[:today] &&
           !date_selectable_cached?(
@@ -1205,7 +1205,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             assigns.today,
             assigns.seasons
           ) ->
-        {:boundary, "Season closed"}
+        {:boundary, "Not open for booking yet"}
 
       true ->
         :ok
@@ -1323,11 +1323,11 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
     cond do
       state == :set_end && saturday_checkout?(day, property) ->
-        "Check-outs are not permitted on Saturdays"
+        "You cannot check out on Saturday. Pick Sunday or another day to leave."
 
       state == :set_end &&
           saturday_checkin_requires_sunday_checkout?(day, assigns) ->
-        "Saturday check-ins must check out on Sunday"
+        Ysc.Bookings.BookingValidator.saturday_checkin_one_night_message()
 
       state == :set_end && checkin_date &&
           Date.compare(day, checkin_date) == :gt ->
