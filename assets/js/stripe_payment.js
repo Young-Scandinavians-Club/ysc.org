@@ -38,6 +38,7 @@ let StripeInput = {
         this._paymentElement = null;
         this._elements = null;
         this._stripe = null;
+        this._ready = false;
 
         this._onPaymentChange = (event) => {
             if (this._destroyed) return;
@@ -61,6 +62,15 @@ let StripeInput = {
             const submitButton = document.getElementById("submit");
             const cardErrors = document.getElementById("card-errors");
             if (!submitButton || !cardErrors || !this._stripe || !this._elements) return;
+
+            // On slow connections (mobile Safari) the Payment Element can be created
+            // but not have emitted `ready` yet. Calling confirmSetup now throws an
+            // IntegrationError, so bail early with a friendly message instead.
+            if (!this._ready) {
+                cardErrors.textContent =
+                    "The payment form is still loading. Please wait a moment and try again.";
+                return;
+            }
 
             let submitted = false;
 
@@ -94,6 +104,15 @@ let StripeInput = {
                     payment_method_id: setupIntent.payment_method,
                 });
                 submitted = true;
+            } catch (err) {
+                // Stripe rejects (rather than returning `{error}`) for setup problems
+                // like an Element that isn't fully mounted. Without this catch the
+                // rejection escapes as an unhandled promise rejection.
+                console.error("confirmSetup failed:", err);
+                if (!this._destroyed && this.el.isConnected) {
+                    cardErrors.textContent =
+                        "We couldn't start payment setup. Please wait a moment and try again.";
+                }
             } finally {
                 if (!submitted && submitButton && !this._destroyed && this.el.isConnected) {
                     submitButton.disabled = false;
@@ -149,11 +168,15 @@ let StripeInput = {
         this._paymentElement = paymentElement;
 
         paymentElement.on("change", this._onPaymentChange);
+        paymentElement.on("ready", () => {
+            this._ready = true;
+        });
         this.el.addEventListener("submit", this._onSubmit);
     },
 
     destroyed() {
         this._destroyed = true;
+        this._ready = false;
         this.el.removeEventListener("submit", this._onSubmit);
 
         if (this._paymentElement) {
