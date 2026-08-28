@@ -66,6 +66,8 @@ defmodule YscWeb.Api.FallbackController do
       "sub-accounts cannot sign up for their own membership",
     invalid_ticket_selection:
       "one or more selected ticket quantities are invalid",
+    donation_tier_not_supported_in_app:
+      "donation ticket tiers cannot be charged via the in-person app; collect donations on the website",
     tier_validation_failed:
       "one or more selected ticket tiers are sold out or unavailable",
     insufficient_capacity:

@@ -175,6 +175,41 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
                json_response(response, 422)
     end
 
+    # Finding 48: donation values are cents in BookingLocker but this API
+    # documents quantity — refuse rather than charge $0.50 for `50`.
+    test "rejects donation tiers instead of treating quantity as cents", %{
+      conn: conn
+    } do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA",
+          price: Money.new(50, :USD)
+        })
+
+      donation =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Donation",
+          type: :donation,
+          price: nil
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{paid.id => 1, donation.id => 50}
+        })
+
+      assert %{
+               "error" =>
+                 "donation ticket tiers cannot be charged via the in-person app; collect donations on the website"
+             } = json_response(response, 422)
+    end
+
     test "returns 404 for an unknown event", %{conn: conn} do
       member = member_with_active_membership()
 

@@ -42,6 +42,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 45 (HIGH)     SES webhook auto-confirmed SNS subscriptions from any AWS account
   Finding 46 (HIGH)     Volunteers could refund, reassign, and grant tickets on the event Tickets tab
   Finding 47 (HIGH)     Impersonation kept post-login reauth grace, allowing password/email takeover of the victim
+  Finding 48 (MEDIUM)   App ticket PaymentIntent treated donation map values as cents while documenting quantity
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2552,6 +2553,58 @@ defmodule YscWeb.SecurityAuditTest do
                target.email,
                "attacker takeover password 99"
              )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 48 (MEDIUM): App tickets donation values are cents, API says quantity
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 48: app tickets reject donation tiers" do
+    import Ysc.EventsFixtures
+
+    test "donation tier selections are refused before order creation" do
+      admin = user_fixture(%{role: :admin})
+      token = Accounts.generate_user_mobile_token(admin)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      donation =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :donation,
+          price: nil
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{donation.id => 50}
+        })
+
+      assert %{
+               "error" =>
+                 "donation ticket tiers cannot be charged via the in-person app; collect donations on the website"
+             } = json_response(conn, 422)
+
+      orders =
+        from(to in Ysc.Tickets.TicketOrder,
+          where: to.user_id == ^member.id and to.event_id == ^event.id
+        )
+        |> Repo.all()
+
+      assert orders == []
     end
   end
 end

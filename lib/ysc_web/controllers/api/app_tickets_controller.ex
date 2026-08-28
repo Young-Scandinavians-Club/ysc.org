@@ -9,13 +9,23 @@ defmodule YscWeb.Api.AppTicketsController do
   Stripe Terminal SDK collects and confirms locally (tap-to-pay or an
   inserted/swiped card reader). The existing webhook handler fulfills the
   order on `payment_intent.succeeded` exactly as it does for web purchases.
+
+  Donation tiers are rejected: this endpoint's `tiers` map is
+  `ticket_tier_id => quantity`, but `BookingLocker` treats donation values as
+  **cents**. Accepting donations here would undercharge (e.g. `50` → $0.50)
+  or overcharge when a client follows the quantity contract.
   """
   use YscWeb, :controller
 
   alias Ysc.Accounts
   alias Ysc.Events
+  alias Ysc.Events.TicketTier
+  alias Ysc.Events.TicketTierHelpers
+  alias Ysc.Repo
   alias Ysc.Tickets
   alias Ysc.Tickets.StripeService
+
+  import Ecto.Query, warn: false
 
   action_fallback YscWeb.Api.FallbackController
 
@@ -28,6 +38,7 @@ defmodule YscWeb.Api.AppTicketsController do
     with {:ok, event} <- fetch_event(event_id),
          {:ok, member} <- fetch_member(member_id),
          {:ok, selections} <- parse_ticket_selections(tiers),
+         :ok <- reject_donation_tiers(event.id, selections),
          {:ok, ticket_order} <-
            Tickets.create_ticket_order(member.id, event.id, selections),
          {:ok, payment_intent} <-
@@ -78,5 +89,24 @@ defmodule YscWeb.Api.AppTicketsController do
         _ -> {:halt, {:error, :invalid_ticket_selection}}
       end
     end)
+  end
+
+  # Finding 48: donation map values are cents in BookingLocker, but this API
+  # documents and validates them as quantity. Refuse rather than mis-price.
+  defp reject_donation_tiers(event_id, selections) do
+    tier_ids = Map.keys(selections)
+
+    donation? =
+      from(tt in TicketTier,
+        where: tt.id in ^tier_ids and tt.event_id == ^event_id
+      )
+      |> Repo.all()
+      |> Enum.any?(&TicketTierHelpers.donation_tier?/1)
+
+    if donation? do
+      {:error, :donation_tier_not_supported_in_app}
+    else
+      :ok
+    end
   end
 end
