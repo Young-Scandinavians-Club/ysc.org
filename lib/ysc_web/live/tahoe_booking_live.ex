@@ -3915,7 +3915,12 @@ defmodule YscWeb.TahoeBookingLive do
                         <tbody class="text-zinc-700">
                           <tr class="border-b border-zinc-100 hover:bg-white">
                             <td class="py-3 px-4 font-semibold">Check-In / Out</td>
-                            <td class="py-3 px-4">3:00 PM / 11:00 AM</td>
+                            <td
+                              id="tahoe-checkin-checkout-hours"
+                              class="py-3 px-4"
+                            >
+                              {BookingDisplay.checkin_time_label()} / {BookingDisplay.checkout_time_label()}
+                            </td>
                           </tr>
                           <tr class="border-b border-zinc-100 hover:bg-white">
                             <td class="py-3 px-4 font-semibold">Maximum Stay</td>
@@ -7127,8 +7132,7 @@ defmodule YscWeb.TahoeBookingLive do
 
   defp past_checkout_time? do
     now = DateTime.now!(cabin_timezone())
-    checkout_time = ~T[11:00:00]
-    Time.compare(DateTime.to_time(now), checkout_time) == :gt
+    Time.compare(DateTime.to_time(now), Bookings.checkout_time()) == :gt
   end
 
   defp get_membership_type(user) do

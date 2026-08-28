@@ -303,17 +303,25 @@ defmodule YscWeb.DateDisplayTest do
              }) == :started
     end
 
-    test "uses the 3:00 PM Pacific cutoff on the check-in day" do
+    test "uses the Bookings check-in time Pacific cutoff on the check-in day" do
       checkin = ~D[2026-08-15]
+      cutoff = Ysc.Bookings.checkin_time()
 
       before_cutoff =
-        DateTime.new!(checkin, ~T[14:59:59], "America/Los_Angeles")
+        DateTime.new!(
+          checkin,
+          Time.add(cutoff, -1, :second),
+          "America/Los_Angeles"
+        )
 
-      at_cutoff =
-        DateTime.new!(checkin, ~T[15:00:00], "America/Los_Angeles")
+      at_cutoff = DateTime.new!(checkin, cutoff, "America/Los_Angeles")
 
       after_cutoff =
-        DateTime.new!(checkin, ~T[15:00:01], "America/Los_Angeles")
+        DateTime.new!(
+          checkin,
+          Time.add(cutoff, 1, :second),
+          "America/Los_Angeles"
+        )
 
       booking = %{checkin_date: checkin}
 

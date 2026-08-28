@@ -74,6 +74,18 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ booking.reference_id
       assert html =~ "Back to home"
       assert has_element?(view, "#booking-receipt")
+
+      assert has_element?(
+               view,
+               "#booking-receipt-checkin-time",
+               "After #{YscWeb.BookingDisplay.checkin_time_label()}"
+             )
+
+      assert has_element?(
+               view,
+               "#booking-receipt-checkout-time",
+               "Before #{YscWeb.BookingDisplay.checkout_time_label()}"
+             )
     end
   end
 

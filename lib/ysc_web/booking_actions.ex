@@ -3,6 +3,7 @@ defmodule YscWeb.BookingActions do
   Shared helpers for member booking actions (cancel, change reservation).
   """
 
+  alias Ysc.Bookings
   alias Ysc.Bookings.Booking
 
   @doc """
@@ -37,10 +38,9 @@ defmodule YscWeb.BookingActions do
   defp before_checkin_time_today? do
     now_pst = DateTime.now!("America/Los_Angeles")
     today_pst = DateTime.to_date(now_pst)
-    checkin_time = ~T[15:00:00]
 
     checkin_datetime_today =
-      DateTime.new!(today_pst, checkin_time, "America/Los_Angeles")
+      DateTime.new!(today_pst, Bookings.checkin_time(), "America/Los_Angeles")
 
     DateTime.compare(now_pst, checkin_datetime_today) == :lt
   end

@@ -231,6 +231,12 @@ defmodule YscWeb.TahoeBookingLiveTest do
                "Any stay that includes Saturday must also include Sunday"
 
       refute html =~ "Saturday bookings must include Sunday"
+
+      assert has_element?(
+               view,
+               "#tahoe-checkin-checkout-hours",
+               "#{YscWeb.BookingDisplay.checkin_time_label()} / #{YscWeb.BookingDisplay.checkout_time_label()}"
+             )
     end
 
     test "sets page title", %{conn: conn} do

@@ -423,14 +423,17 @@ defmodule YscWeb.BookingReceiptLive do
                 ]}>
                   {DateDisplay.format_date_long(@booking.checkin_date, "—")}
                 </p>
-                <p class={[
-                  "text-sm",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-400",
-                    else: "text-zinc-500"
-                  )
-                ]}>
-                  After 3:00 PM
+                <p
+                  id="booking-receipt-checkin-time"
+                  class={[
+                    "text-sm",
+                    if(@booking.status == :canceled,
+                      do: "text-zinc-400",
+                      else: "text-zinc-500"
+                    )
+                  ]}
+                >
+                  After {BookingDisplay.checkin_time_label()}
                 </p>
               </div>
               <div>
@@ -452,14 +455,17 @@ defmodule YscWeb.BookingReceiptLive do
                 ]}>
                   {DateDisplay.format_date_long(@booking.checkout_date, "—")}
                 </p>
-                <p class={[
-                  "text-sm",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-400",
-                    else: "text-zinc-500"
-                  )
-                ]}>
-                  Before 11:00 AM
+                <p
+                  id="booking-receipt-checkout-time"
+                  class={[
+                    "text-sm",
+                    if(@booking.status == :canceled,
+                      do: "text-zinc-400",
+                      else: "text-zinc-500"
+                    )
+                  ]}
+                >
+                  Before {BookingDisplay.checkout_time_label()}
                 </p>
               </div>
               <div>

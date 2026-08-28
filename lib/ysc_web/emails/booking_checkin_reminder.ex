@@ -14,6 +14,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
   alias Ysc.Repo
   alias Ysc.Bookings
   alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay}
+  alias YscWeb.BookingDisplay
   alias YscWeb.Emails.OutageNotification
 
   def get_template_name() do
@@ -140,8 +141,8 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       property_address: property_address,
       checkin_date: checkin_date,
       checkout_date: checkout_date,
-      checkin_time: "3:00 PM",
-      checkout_time: "11:00 AM",
+      checkin_time: BookingDisplay.checkin_time_label(),
+      checkout_time: BookingDisplay.checkout_time_label(),
       days_until_checkin: days_until_checkin,
       booking_reference_id: booking.reference_id,
       booking_mode: booking_mode_description,

@@ -225,6 +225,8 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       data = BookingCheckinReminder.prepare_email_data(booking)
       assert data.first_name == "Valued Member"
       assert data.children_count == 0
+      assert data.checkin_time == YscWeb.BookingDisplay.checkin_time_label()
+      assert data.checkout_time == YscWeb.BookingDisplay.checkout_time_label()
     end
 
     test "reloads when associations are not preloaded", %{booking: booking} do
@@ -314,6 +316,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       data = BookingCheckoutReminder.prepare_email_data(booking)
       assert data.property_name == "Clear Lake"
       assert data.property == "clear_lake"
+      assert data.checkout_time == YscWeb.BookingDisplay.checkout_time_label()
       assert BookingCheckoutReminder.get_subject() =~ "Checkout Reminder"
     end
 

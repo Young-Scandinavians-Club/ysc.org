@@ -15,6 +15,7 @@ defmodule YscWeb.Api.PropertiesControllerTest do
   alias Ysc.Settings
   alias Ysc.SiteSettings.SiteSetting
   alias Ysc.Test.KioskAPIKeyHelper
+  alias YscWeb.BookingDisplay
 
   @test_token "test-kiosk-secret"
   @expected_tab_ids ~w(welcome etiquette bears parking checkout emergency)
@@ -117,16 +118,16 @@ defmodule YscWeb.Api.PropertiesControllerTest do
       response = get(conn, ~p"/api/v1/mobile/properties/tahoe/info")
 
       assert %{"data" => data} = json_response(response, 200)
-      assert data["check_in_time"] == "3:00 PM"
-      assert data["check_out_time"] == "11:00 AM"
+      assert data["check_in_time"] == BookingDisplay.checkin_time_label()
+      assert data["check_out_time"] == BookingDisplay.checkout_time_label()
     end
 
     test "clear_lake uses static check-in and check-out times", %{conn: conn} do
       response = get(conn, ~p"/api/v1/mobile/properties/clear_lake/info")
 
       assert %{"data" => data} = json_response(response, 200)
-      assert data["check_in_time"] == "3:00 PM"
-      assert data["check_out_time"] == "11:00 AM"
+      assert data["check_in_time"] == BookingDisplay.checkin_time_label()
+      assert data["check_out_time"] == BookingDisplay.checkout_time_label()
     end
 
     test "tahoe returns tabs in correct order with all categories", %{

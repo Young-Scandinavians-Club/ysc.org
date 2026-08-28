@@ -8,9 +8,10 @@ defmodule YscWeb.Api.PropertiesController do
   use YscWeb, :controller
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{SeasonCache, SeasonHelpers}
+  alias Ysc.Bookings.{PropertyDisplay, SeasonCache, SeasonHelpers}
   alias Ysc.Extensions.PhoneNumber
   alias Ysc.Settings
+  alias YscWeb.BookingDisplay
   alias YscWeb.Emails.OutageNotification
 
   action_fallback YscWeb.Api.FallbackController
@@ -64,22 +65,25 @@ defmodule YscWeb.Api.PropertiesController do
   end
 
   defp static_property_info(:tahoe, cabin_master) do
-    %{
-      name: "Lake Tahoe Cabin",
-      check_in_time: "3:00 PM",
-      check_out_time: "11:00 AM",
+    Map.merge(property_hours(), %{
+      name: PropertyDisplay.full_name(:tahoe),
       rules_categories: tahoe_rule_categories(),
       rules: tahoe_rules(cabin_master)
-    }
+    })
   end
 
   defp static_property_info(:clear_lake, cabin_master) do
-    %{
-      name: "Clear Lake Cabin",
-      check_in_time: "3:00 PM",
-      check_out_time: "11:00 AM",
+    Map.merge(property_hours(), %{
+      name: PropertyDisplay.full_name(:clear_lake),
       rules_categories: clear_lake_rule_categories(),
       rules: clear_lake_rules(cabin_master)
+    })
+  end
+
+  defp property_hours do
+    %{
+      check_in_time: BookingDisplay.checkin_time_label(),
+      check_out_time: BookingDisplay.checkout_time_label()
     }
   end
 
@@ -153,7 +157,7 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "The Dugnad Cleaning Checklist",
           content:
-            "\"Dugnad\" is our tradition of community work. Please complete these before **11:00 AM**:\n\n- **Rooms:** Strip beds and clean the space.\n- **Laundry:** If you used club bedding, wash, dry, and fold it.\n- **Kitchen:** Wash all dishes and remove all food from the fridge.\n- **Bathrooms:** Wipe down surfaces (supplies are in sink cabinets).\n- **Trash:** Secure all bear bins and turn the bear wire **ON**.\n- **Storage:** Ski boots in laundry room racks; other gear in the outside stairwell."
+            "\"Dugnad\" is our tradition of community work. Please complete these before **#{BookingDisplay.checkout_time_label()}**:\n\n- **Rooms:** Strip beds and clean the space.\n- **Laundry:** If you used club bedding, wash, dry, and fold it.\n- **Kitchen:** Wash all dishes and remove all food from the fridge.\n- **Bathrooms:** Wipe down surfaces (supplies are in sink cabinets).\n- **Trash:** Secure all bear bins and turn the bear wire **ON**.\n- **Storage:** Ski boots in laundry room racks; other gear in the outside stairwell."
         },
         %{
           title: "Cabin Master Note",
