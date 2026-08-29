@@ -309,20 +309,33 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
           action: :edit
         })
 
-      checked_type_radios =
-        Regex.scan(
-          ~r/<input type="radio" name="ticket_tier\[type\]" value="\w+" checked/,
-          html
-        )
+      doc = LazyHTML.from_fragment(html)
 
-      assert length(checked_type_radios) == 1
-      assert html =~ ~s(value="paid" checked)
+      # Exactly one type radio is checked, and it is the paid one.
+      checked =
+        LazyHTML.query(doc, ~s(input[name="ticket_tier[type]"][checked]))
 
-      # Only the selected card carries the blue highlight; the focus ring uses a
-      # neutral color so a programmatically focused card (the modal focuses the
-      # first radio on open) is never mistaken for a second selection.
-      assert length(Regex.scan(~r/\bbg-blue-50\b/, html)) == 1
-      refute html =~ "focus-within:ring-blue"
+      assert LazyHTML.attribute(checked, "value") == ["paid"]
+
+      # Exactly one Type card carries the blue "selected" highlight, and it is
+      # the card wrapping the checked paid radio.
+      selected =
+        LazyHTML.query(doc, "#ticket-tier-type-options label.bg-blue-50")
+
+      assert Enum.count(selected) == 1
+
+      assert selected
+             |> LazyHTML.query(~s(input[value="paid"][checked]))
+             |> Enum.any?()
+
+      # Every card uses the neutral zinc focus ring, not the blue selected color,
+      # so a programmatically focused card is never mistaken for a selection.
+      cards = LazyHTML.query(doc, "#ticket-tier-type-options label")
+      class_attrs = LazyHTML.attribute(cards, "class")
+
+      assert Enum.count(class_attrs) == 3
+      assert Enum.all?(class_attrs, &(&1 =~ "focus-within:ring-zinc-600"))
+      refute Enum.any?(class_attrs, &(&1 =~ "focus-within:ring-blue"))
     end
   end
 
