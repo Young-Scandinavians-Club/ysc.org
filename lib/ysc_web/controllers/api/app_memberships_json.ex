@@ -28,6 +28,8 @@ defmodule YscWeb.Api.AppMembershipsJSON do
 
   defp iso8601(nil), do: nil
   defp iso8601(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+  defp iso8601(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt)
+  defp iso8601(_), do: nil
 
   defp cancel_at_period_end(%{type: :lifetime}), do: false
 
@@ -55,6 +57,21 @@ defmodule YscWeb.Api.AppMembershipsJSON do
     %{
       id: subscription.id,
       status: subscription.status
+    }
+  end
+
+  @doc """
+  Renders the local `%Subscription{}` returned by
+  `Subscriptions.create_subscription_paid_out_of_band/3` (offline membership).
+  Distinct from `subscription/1` above, which renders a `%Stripe.Subscription{}`.
+  """
+  def offline_subscription(%{subscription: subscription, plan: plan}) do
+    %{
+      id: to_string(subscription.id),
+      status: subscription.stripe_status,
+      plan_id: to_string(plan.id),
+      plan_name: plan.name,
+      current_period_end: iso8601(subscription.current_period_end)
     }
   end
 

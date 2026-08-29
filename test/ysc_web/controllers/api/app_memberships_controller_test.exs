@@ -194,6 +194,168 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
     end
   end
 
+  describe "POST /api/v1/app/memberships/subscribe_offline" do
+    setup do
+      on_exit(fn ->
+        Application.delete_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback
+        )
+      end)
+
+      :ok
+    end
+
+    defp stub_out_of_band_stripe(plan_id) do
+      plan =
+        :ysc
+        |> Application.get_env(:membership_plans, [])
+        |> Enum.find(&(&1.id == plan_id))
+
+      now = System.system_time(:second)
+
+      fake =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: "sub_offline_#{System.unique_integer([:positive])}",
+          status: "active",
+          current_period_start: now,
+          current_period_end: now + 365 * 86_400,
+          price_id: plan.stripe_price_id,
+          product_id: "prod_fake",
+          subscription_item_id: "si_#{System.unique_integer([:positive])}"
+        )
+
+      Application.put_env(
+        :ysc,
+        :create_subscription_paid_out_of_band_stripe_callback,
+        fn _user, _plan -> {:ok, fake} end
+      )
+    end
+
+    test "records a cash membership and returns the new subscription", %{
+      conn: conn
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = user_fixture()
+      stub_out_of_band_stripe(:single)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method" => "cash",
+          "note" => "envelope #7"
+        })
+
+      assert %{
+               "status" => "active",
+               "plan_id" => "single",
+               "plan_name" => _
+             } = json_response(response, 200)
+
+      assert Ysc.Accounts.has_active_membership?(
+               Ysc.Accounts.get_user!(member.id)
+             )
+    end
+
+    test "defaults the payment method to cash when omitted", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = user_fixture()
+      stub_out_of_band_stripe(:family)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id,
+          "plan" => "family"
+        })
+
+      assert %{"plan_id" => "family"} = json_response(response, 200)
+    end
+
+    test "rejects an unknown payment method", %{conn: conn} do
+      member = user_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method" => "venmo"
+        })
+
+      assert %{"error" => "payment_method must be one of: cash, check, other"} =
+               json_response(response, 422)
+    end
+
+    test "rejects the non-purchasable lifetime plan", %{conn: conn} do
+      member = user_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id,
+          "plan" => "lifetime"
+        })
+
+      assert %{"error" => "invalid membership plan"} =
+               json_response(response, 422)
+    end
+
+    test "does not create a second membership for a lifetime member", %{
+      conn: conn
+    } do
+      member = lifetime_member()
+
+      Application.put_env(
+        :ysc,
+        :create_subscription_paid_out_of_band_stripe_callback,
+        fn _user, _plan -> flunk("must not create a subscription") end
+      )
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id,
+          "plan" => "single"
+        })
+
+      assert %{"error" => "member already has an active membership"} =
+               json_response(response, 422)
+    end
+
+    test "returns 400 when plan is missing", %{conn: conn} do
+      member = user_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id
+        })
+
+      assert json_response(response, 400)
+    end
+
+    test "returns 404 for an unknown member", %{conn: conn} do
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          "plan" => "single"
+        })
+
+      assert %{"error" => "member not found"} = json_response(response, 404)
+    end
+
+    test "returns 401 without a bearer token", %{conn: conn} do
+      member = user_fixture()
+
+      response =
+        conn
+        |> delete_req_header("authorization")
+        |> post(~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id,
+          "plan" => "single"
+        })
+
+      assert json_response(response, 401)
+    end
+  end
+
   describe "POST /api/v1/app/memberships/setup_intent" do
     test "creates a card-present SetupIntent for the member's Stripe customer",
          %{conn: conn} do

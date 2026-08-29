@@ -291,4 +291,178 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert json_response(response, 401)
     end
   end
+
+  describe "POST /api/v1/app/events/:event_id/tickets/offline_order" do
+    test "grants confirmed tickets, sends the email, and records the cash note",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{event_id: event.id, price: Money.new(45, :USD)})
+
+      response =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          post(
+            conn,
+            ~p"/api/v1/app/events/#{event.id}/tickets/offline_order",
+            %{
+              "member_id" => member.id,
+              "tiers" => %{tier.id => 2},
+              "payment_method" => "cash",
+              "amount_collected_cents" => 9000,
+              "note" => "paid at door"
+            }
+          )
+        end)
+
+      assert %{
+               "status" => "completed",
+               "ticket_count" => 2,
+               "ticket_order_reference" => "ORD" <> _,
+               "notes" => notes
+             } = json_response(response, 200)
+
+      assert notes =~ "Offline sale"
+      assert notes =~ "method=cash"
+      assert notes =~ "amount=90.00"
+      assert notes =~ "recorded_by="
+      assert notes =~ "note=paid at door"
+
+      order = Ysc.Repo.get_by(Ysc.Tickets.TicketOrder, event_id: event.id)
+      assert order.status == :completed
+      assert order.total_amount == Money.new(0, :USD)
+      assert order.granted_by_id
+
+      tickets =
+        Ysc.Events.Ticket
+        |> Ysc.Repo.all()
+        |> Enum.filter(&(&1.ticket_order_id == order.id))
+
+      assert length(tickets) == 2
+      assert Enum.all?(tickets, &(&1.status == :confirmed))
+
+      # The email is sent by default (no skip_email) — that is the whole point
+      # of routing offline sales through Tickets.grant_admin_tickets/5.
+      assert Oban.Job
+             |> Ysc.Repo.all()
+             |> Enum.any?(
+               &(&1.args["idempotency_key"] ==
+                   "ticket_confirmation_#{order.id}")
+             )
+    end
+
+    test "defaults the payment method to cash when omitted", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert %{"notes" => notes} = json_response(response, 200)
+      assert notes =~ "method=cash"
+    end
+
+    test "rejects an unknown payment method", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1},
+          "payment_method" => "zelle"
+        })
+
+      assert %{"error" => "payment_method must be one of: cash, check, other"} =
+               json_response(response, 422)
+    end
+
+    test "rejects a sale to a member without an active membership", %{
+      conn: conn
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = user_fixture()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert %{"error" => "member does not have an active membership"} =
+               json_response(response, 422)
+    end
+
+    test "rejects donation tiers", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+      paid = ticket_tier_fixture(%{event_id: event.id, name: "GA"})
+
+      donation =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Donation",
+          type: :donation,
+          price: nil
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{paid.id => 1, donation.id => 50}
+        })
+
+      assert json_response(response, 422)
+    end
+
+    test "returns 400 when tiers is missing", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id
+        })
+
+      assert json_response(response, 400)
+    end
+
+    test "returns 404 for an unknown member", %{conn: conn} do
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert %{"error" => "member not found"} = json_response(response, 404)
+    end
+
+    test "returns 401 without a bearer token", %{conn: conn} do
+      response =
+        conn
+        |> Plug.Conn.delete_req_header("authorization")
+        |> post(
+          ~p"/api/v1/app/events/01ARZ3NDEKTSV4RRFFQ69G5FAV/tickets/offline_order",
+          %{
+            "member_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "tiers" => %{"01ARZ3NDEKTSV4RRFFQ69G5FAV" => 1}
+          }
+        )
+
+      assert json_response(response, 401)
+    end
+  end
 end
