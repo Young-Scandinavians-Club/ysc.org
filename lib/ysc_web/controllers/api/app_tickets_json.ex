@@ -16,4 +16,24 @@ defmodule YscWeb.Api.AppTicketsJSON do
       currency: payment_intent.currency
     }
   end
+
+  @doc """
+  Renders the completed, already-fulfilled order from an offline (cash/check)
+  ticket sale. No payment intent — the order is a $0 grant with the collected
+  amount recorded in `admin_grant_notes`.
+  """
+  def offline_order(%{ticket_order: ticket_order}) do
+    %{
+      ticket_order_id: to_string(ticket_order.id),
+      ticket_order_reference: ticket_order.reference_id,
+      status: to_string(ticket_order.status),
+      ticket_count: length(ticket_order.tickets || []),
+      payment_channel: ticket_order.payment_channel,
+      amount_collected: money_string(ticket_order.offline_amount_collected),
+      notes: ticket_order.admin_grant_notes
+    }
+  end
+
+  defp money_string(nil), do: nil
+  defp money_string(%Money{} = money), do: Money.to_string!(money)
 end

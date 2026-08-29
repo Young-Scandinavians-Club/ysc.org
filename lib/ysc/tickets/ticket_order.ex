@@ -45,6 +45,14 @@ defmodule Ysc.Tickets.TicketOrder do
     field :cancelled_at, :utc_datetime
     field :cancellation_reason, :string
     field :admin_grant_notes, :string
+    # Set only for in-person cash/check sales recorded via the admin app.
+    # `payment_channel` is "cash" | "check" | "other"; the order `total_amount`
+    # stays $0 (a grant), and `offline_amount_collected` is what the volunteer
+    # physically took, for treasurer reconciliation.
+    field :payment_channel, :string
+
+    field :offline_amount_collected, Money.Ecto.Composite.Type,
+      default_currency: :USD
 
     belongs_to :user, Ysc.Accounts.User, foreign_key: :user_id, references: :id
     belongs_to :event, Ysc.Events.Event, foreign_key: :event_id, references: :id
@@ -105,7 +113,9 @@ defmodule Ysc.Tickets.TicketOrder do
       :discount_amount,
       :expires_at,
       :completed_at,
-      :admin_grant_notes
+      :admin_grant_notes,
+      :payment_channel,
+      :offline_amount_collected
     ])
     |> put_change(:granted_by_id, granted_by_id)
     |> validate_required([
