@@ -13,6 +13,9 @@
 #
 # Secrets: use FLY_SANDBOX_API_TOKEN for the sandbox Fly org (recommended). If unset, FLY_API_TOKEN
 # is used so existing repos keep working — do not point FLY_API_TOKEN at production.
+#
+# flyctl is installed via .github/actions/setup-flyctl (retrying bash), not
+# superfly/flyctl-actions — that Node 24 action can fail in ~1s with no logs.
 
 name: CI and Deploy Sandbox
 on:
@@ -312,7 +315,7 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+      - uses: ./.github/actions/setup-flyctl
       - name: Verify Fly token can access sandbox app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
@@ -403,7 +406,7 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+      - uses: ./.github/actions/setup-flyctl
       - name: Verify Fly token can access query console sandbox
         working-directory: .
         env:
