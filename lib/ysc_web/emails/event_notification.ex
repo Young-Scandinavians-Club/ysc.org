@@ -10,15 +10,14 @@ defmodule YscWeb.Emails.EventNotification do
 
   import YscWeb.Emails.Helpers,
     only: [
-      absolute_url: 1,
+      event_cover_image_url: 1,
+      event_url: 1,
       format_event_start_datetime: 2,
       member_greeting_name: 1,
-      plain_text_from_html: 1
+      notification_settings_url: 0,
+      plain_text_from_html: 1,
+      preload_event_associations: 1
     ]
-
-  alias Ysc.Events.Event
-  alias Ysc.Media.Image
-  alias Ysc.Repo
 
   def get_template_name() do
     "event_notification"
@@ -67,14 +66,6 @@ defmodule YscWeb.Emails.EventNotification do
     "[YSC] " <> subject
   end
 
-  def event_url(event_id) do
-    absolute_url("/events/#{event_id}")
-  end
-
-  def notification_settings_url do
-    absolute_url("/users/notifications")
-  end
-
   @doc """
   Prepares event notification email data.
 
@@ -106,7 +97,7 @@ defmodule YscWeb.Emails.EventNotification do
       raise ArgumentError, "Event cannot be nil"
     end
 
-    event = ensure_event_associations(event)
+    event = preload_event_associations(event)
 
     event_date_time =
       format_event_start_datetime(event.start_date, event.start_time)
@@ -136,32 +127,8 @@ defmodule YscWeb.Emails.EventNotification do
       event: event_map,
       event_date_time: event_date_time,
       event_url: event_url(event.id),
-      event_image_url: get_event_image_url(event),
+      event_image_url: event_cover_image_url(event),
       notification_settings_url: notification_settings_url()
     }
-  end
-
-  defp ensure_event_associations(event) do
-    if Ecto.assoc_loaded?(event.organizer) &&
-         Ecto.assoc_loaded?(event.cover_image) do
-      event
-    else
-      case Repo.get(Event, event.id)
-           |> Repo.preload([:organizer, :cover_image]) do
-        nil ->
-          raise ArgumentError, "Event not found: #{event.id}"
-
-        loaded_event ->
-          loaded_event
-      end
-    end
-  end
-
-  defp get_event_image_url(event) do
-    if Ecto.assoc_loaded?(event.cover_image) && event.cover_image do
-      Image.display_path(event.cover_image)
-    else
-      nil
-    end
   end
 end

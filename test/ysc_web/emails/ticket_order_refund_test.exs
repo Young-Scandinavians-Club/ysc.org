@@ -396,7 +396,7 @@ defmodule YscWeb.Emails.TicketOrderRefundTest do
 
     test "event_url/1 includes events path" do
       id = Ecto.ULID.generate()
-      assert TicketOrderRefund.event_url(id) =~ "/events/#{id}"
+      assert YscWeb.Emails.Helpers.event_url(id) =~ "/events/#{id}"
     end
   end
 

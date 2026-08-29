@@ -25,6 +25,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   alias Ysc.Events.Event
   alias Ysc.Repo
   alias YscWeb.Emails.{EventPhotoUploadReminder, Notifier}
+  alias YscWeb.Emails.Helpers, as: EmailHelpers
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"event_id" => event_id}}) do
@@ -82,7 +83,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
               Map.put(
                 shared,
                 :first_name,
-                recipient[:first_name] || recipient["first_name"] || "there"
+                EmailHelpers.attendee_greeting_name(recipient)
               ),
             text_body: "",
             user_id: nil

@@ -10,7 +10,13 @@ defmodule YscWeb.Emails.NewsletterEdition do
     mjml_template: "templates/newsletter_edition.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers,
+    only: [
+      absolute_url: 1,
+      attendee_greeting_name: 1,
+      event_cover_image_url: 1,
+      event_url: 1
+    ]
 
   @doc """
   Transforms Trix editor HTML into email-safe HTML for use inside MJML mj-text blocks.
@@ -222,7 +228,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
   # unknown tags via Floki; content is admin-authored only.
   # sobelow_skip ["XSS.Raw"]
   def build_assigns(edition, subscriber, posts, events) do
-    first_name = subscriber.first_name || "there"
+    first_name = attendee_greeting_name(subscriber)
 
     unsubscribe_url =
       build_unsubscribe_url(
@@ -344,8 +350,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
       pricing_str: Events.event_pricing_display_string(event),
       tickets_on_sale_str: format_tickets_on_sale(event),
       location_name: event.location_name,
-      url: absolute_url("/events/#{event.id}"),
-      image_url: event_image_url(event)
+      url: event_url(event.id),
+      image_url: event_cover_image_url(event)
     }
   end
 
@@ -370,9 +376,6 @@ defmodule YscWeb.Emails.NewsletterEdition do
       dt -> "Tickets on sale #{Calendar.strftime(dt, "%b %d, %Y")}"
     end
   end
-
-  defp event_image_url(%{cover_image: cover_image}),
-    do: Image.display_path(cover_image)
 
   defp format_event_date(event) do
     case {event.start_date, event.start_time} do

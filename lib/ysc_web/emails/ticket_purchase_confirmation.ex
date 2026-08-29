@@ -11,6 +11,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
   import YscWeb.Emails.Helpers,
     only: [
       absolute_url: 1,
+      event_url: 1,
       format_datetime: 1,
       format_event_start_datetime: 3,
       format_money: 1,
@@ -25,10 +26,6 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
   def get_subject() do
     "Your tickets are confirmed! 🎫"
-  end
-
-  def event_url(event_id) do
-    absolute_url("/events/#{event_id}")
   end
 
   def tickets_qr_url(order_id) do

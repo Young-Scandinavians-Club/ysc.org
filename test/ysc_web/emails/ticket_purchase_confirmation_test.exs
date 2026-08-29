@@ -575,7 +575,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       assert TicketPurchaseConfirmation.get_subject() =~ "confirmed"
 
       id = Ecto.ULID.generate()
-      assert TicketPurchaseConfirmation.event_url(id) =~ "/events/#{id}"
+      assert YscWeb.Emails.Helpers.event_url(id) =~ "/events/#{id}"
 
       assert TicketPurchaseConfirmation.tickets_qr_url(id) =~
                "/tickets/#{id}/qr"

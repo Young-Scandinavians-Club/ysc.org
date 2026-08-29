@@ -13,7 +13,7 @@ defmodule YscWeb.Emails.SaveTheDateAvailableTest do
       assert SaveTheDateAvailable.get_template_name() ==
                "save_the_date_available"
 
-      assert SaveTheDateAvailable.notification_settings_url() =~
+      assert YscWeb.Emails.Helpers.notification_settings_url() =~
                "/users/notifications"
     end
 
@@ -32,7 +32,7 @@ defmodule YscWeb.Emails.SaveTheDateAvailableTest do
 
     test "event_url/1 builds events path" do
       id = Ecto.ULID.generate()
-      assert SaveTheDateAvailable.event_url(id) =~ "/events/#{id}"
+      assert YscWeb.Emails.Helpers.event_url(id) =~ "/events/#{id}"
     end
   end
 

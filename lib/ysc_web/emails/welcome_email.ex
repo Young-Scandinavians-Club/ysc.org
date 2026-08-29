@@ -12,14 +12,16 @@ defmodule YscWeb.Emails.WelcomeEmail do
 
   alias Ysc.Bookings.Season
   alias Ysc.Events
-  alias Ysc.Media.Image
 
   import YscWeb.Emails.Helpers,
     only: [
       member_greeting_name: 1,
+      event_cover_image_url: 1,
+      event_url: 1,
       absolute_url: 1,
       upcoming_events_url: 0,
-      format_event_start_datetime: 2
+      format_event_start_datetime: 2,
+      tahoe_booking_url: 0
     ]
 
   def get_template_name(), do: "welcome_email"
@@ -35,7 +37,7 @@ defmodule YscWeb.Emails.WelcomeEmail do
       first_name: member_greeting_name(user),
       events: upcoming_event_cards(),
       events_url: upcoming_events_url(),
-      tahoe_url: absolute_url("/bookings/tahoe"),
+      tahoe_url: tahoe_booking_url(),
       clear_lake_url: absolute_url("/bookings/clear-lake")
     }
     |> Map.merge(tahoe_season_copy())
@@ -52,8 +54,8 @@ defmodule YscWeb.Emails.WelcomeEmail do
       title: event.title,
       date_str: format_event_start_datetime(event.start_date, event.start_time),
       location_name: event.location_name,
-      url: absolute_url("/events/#{event.id}"),
-      image_url: Image.display_path(event.cover_image)
+      url: event_url(event.id),
+      image_url: event_cover_image_url(event)
     }
   end
 

@@ -65,7 +65,7 @@ defmodule YscWeb.EventTvPosterController do
   defp poster_assigns(event) do
     %{
       event: event,
-      event_url: Helpers.absolute_url("/events/#{event.id}"),
+      event_url: Helpers.event_url(event.id),
       asset_base_url: Helpers.origin() <> "/",
       sold_out: EventHelpers.event_sold_out?(event),
       selling_fast: Map.get(event, :selling_fast, false)
