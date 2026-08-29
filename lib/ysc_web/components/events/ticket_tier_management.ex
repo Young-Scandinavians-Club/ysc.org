@@ -226,7 +226,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       Grant tickets
                     </.dropdown_menu_item>
                     <.dropdown_menu_item
-                      :if={!is_donation}
+                      :if={!is_donation and @admin_role == :admin}
                       id={"ticket-tier-actions-#{ticket_tier.id}-reserve"}
                       icon="hero-ticket"
                       tone={:info}
@@ -389,6 +389,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         phx-click="grant-tickets"
         phx-target={@myself}
       />
+      <button
+        id={"ticket-tier-reserve-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="reserve-tickets"
+        phx-target={@myself}
+      />
       <%!-- Add Ticket Tier Modal --%>
       <.modal
         :if={@show_add_modal}
@@ -433,6 +440,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           ticket_tier_id={@reserving_tier.id}
           event_id={@event_id}
           current_user={@current_user}
+          admin_role={@admin_role}
         />
       </.modal>
       <%!-- Grant Tickets Modal --%>
@@ -868,24 +876,28 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("reserve-tickets", params, socket) do
-    case tier_id_from_event_params(params) do
-      nil ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Invalid ticket tier.",
-           title: "Reservation"
-         )}
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Reservation")}
+    else
+      case tier_id_from_event_params(params) do
+        nil ->
+          {:noreply,
+           YscWeb.Flash.put_toast(socket, :error, "Invalid ticket tier.",
+             title: "Reservation"
+           )}
 
-      tier_id ->
-        case Events.get_ticket_tier(tier_id) do
-          nil ->
-            {:noreply,
-             YscWeb.Flash.put_toast(socket, :error, "Ticket tier not found.",
-               title: "Reservation"
-             )}
+        tier_id ->
+          case Events.get_ticket_tier(tier_id) do
+            nil ->
+              {:noreply,
+               YscWeb.Flash.put_toast(socket, :error, "Ticket tier not found.",
+                 title: "Reservation"
+               )}
 
-          ticket_tier ->
-            reserve_tickets_for_tier(socket, ticket_tier)
-        end
+            ticket_tier ->
+              reserve_tickets_for_tier(socket, ticket_tier)
+          end
+      end
     end
   end
 
@@ -1119,6 +1131,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   defp reserve_tickets_for_tier(socket, ticket_tier) do
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Reservation")}
+    else
+      reserve_tickets_for_tier_as_admin(socket, ticket_tier)
+    end
+  end
+
+  defp reserve_tickets_for_tier_as_admin(socket, ticket_tier) do
     is_donation =
       ticket_tier.type == "donation" || ticket_tier.type == :donation
 

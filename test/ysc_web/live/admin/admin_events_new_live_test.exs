@@ -1378,6 +1378,58 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       refute has_element?(view, "#grant-tickets-modal")
       assert Events.list_tickets_for_user(member.id) == []
     end
+
+    test "volunteer cannot reserve discounted tickets from the tickets tab (Finding 50)",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      conn = log_in_user(conn, volunteer)
+      member = user_fixture()
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Volunteer Reserve",
+          quantity: 50
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-reserve")
+
+      view
+      |> element("#ticket-tier-reserve-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      refute has_element?(view, "#reserve-tickets-modal")
+      assert Events.list_all_ticket_reservations_for_user(member.id) == []
+      assert Events.list_all_ticket_reservations_for_user(volunteer.id) == []
+    end
+
+    test "admin can open the reserve tickets modal", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Admin Reserve",
+          quantity: 50
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      assert has_element?(view, "#ticket-tier-actions-#{tier.id}-reserve")
+
+      view
+      |> element("#ticket-tier-actions-#{tier.id}-reserve")
+      |> render_click()
+
+      assert has_element?(view, "#reserve-tickets-modal")
+      assert has_element?(view, "#ticket-reservation-form")
+    end
   end
 
   describe "tickets tab - ticket tier form" do
