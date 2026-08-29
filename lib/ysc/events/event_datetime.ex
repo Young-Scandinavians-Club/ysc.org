@@ -58,7 +58,10 @@ defmodule Ysc.Events.EventDateTime do
   end
 
   @doc """
-  Returns the start `DateTime` for an event, or `nil`.
+  Returns the start `DateTime` for an event that has both a date and a time.
+
+  Returns `nil` when either is missing. Date-only events should use
+  `starts_at/1` (Pacific midnight of the calendar day).
   """
   def start_datetime(%Event{start_date: start_date, start_time: start_time}) do
     combine(start_date, start_time)
@@ -67,7 +70,40 @@ defmodule Ysc.Events.EventDateTime do
   def start_datetime(_), do: nil
 
   @doc """
+  UTC instant at which the event begins.
+
+  Timed events combine `start_date` + `start_time` as Pacific wall-clock.
+  Date-only events (no `start_time`) start at Pacific midnight of the
+  calendar day stored on `start_date`.
+
+  The admin date picker persists event days as midnight UTC of that calendar
+  day (`~U[2026-08-29 00:00:00Z]` for Saturday Aug 29). That encoding is
+  **not** the start instant — comparing it to `DateTime.utc_now/0` closes
+  checkout at 5pm Pacific the previous evening. Pacific midnight of the same
+  date is the matching cutoff for "the event day has started".
+  """
+  def starts_at(%Event{start_date: start_date, start_time: start_time}) do
+    starts_at(start_date, start_time)
+  end
+
+  def starts_at(start_date, start_time)
+
+  def starts_at(nil, _), do: nil
+
+  def starts_at(start_date, nil) do
+    case calendar_date(start_date) do
+      nil -> nil
+      date -> combine(date, ~T[00:00:00])
+    end
+  end
+
+  def starts_at(start_date, start_time), do: combine(start_date, start_time)
+
+  @doc """
   Returns `true` when the event start is strictly in the future.
+
+  Date-only events return `false` — a missing start time is treated as
+  "cannot determine a future start" (used to skip retroactive notifications).
   """
   def in_future?(%Event{} = event) do
     case start_datetime(event) do
@@ -78,19 +114,22 @@ defmodule Ysc.Events.EventDateTime do
 
   @doc """
   Returns `true` when the event start is in the past.
+
+  Date-only events use Pacific midnight of the stored calendar day, not the
+  raw UTC-midnight encoding. Pass `now` in tests to pin the comparison.
   """
-  def in_past?(%Event{start_date: nil}), do: false
+  def in_past?(event, now \\ DateTime.utc_now())
 
-  def in_past?(%Event{start_date: start_date, start_time: nil}) do
-    DateTime.compare(DateTime.utc_now(), start_date) == :gt
-  end
-
-  def in_past?(%Event{} = event) do
-    case start_datetime(event) do
+  def in_past?(%Event{} = event, %DateTime{} = now) do
+    case starts_at(event) do
       nil -> false
-      datetime -> DateTime.compare(DateTime.utc_now(), datetime) == :gt
+      datetime -> DateTime.compare(now, datetime) == :gt
     end
   end
+
+  defp calendar_date(%DateTime{} = datetime), do: DateTime.to_date(datetime)
+  defp calendar_date(%Date{} = date), do: date
+  defp calendar_date(_), do: nil
 
   @pass_date_format "%a, %b %-d, %Y"
   @pass_time_format "%-I:%M %p"
