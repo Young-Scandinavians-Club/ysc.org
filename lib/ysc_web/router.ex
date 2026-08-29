@@ -174,6 +174,10 @@ defmodule YscWeb.Router do
     get "/memberships/status", AppMembershipsController, :status
     post "/memberships/subscribe", AppMembershipsController, :subscribe
 
+    post "/memberships/subscribe_offline",
+         AppMembershipsController,
+         :subscribe_offline
+
     post "/memberships/setup_intent",
          AppMembershipsController,
          :create_setup_intent
@@ -183,6 +187,10 @@ defmodule YscWeb.Router do
     post "/events/:event_id/tickets/payment_intent",
          AppTicketsController,
          :create_payment_intent
+
+    post "/events/:event_id/tickets/offline_order",
+         AppTicketsController,
+         :grant_offline_order
   end
 
   scope "/", YscWeb do

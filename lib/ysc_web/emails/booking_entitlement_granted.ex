@@ -6,7 +6,8 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
     mjml_template: "templates/booking_entitlement_granted.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, format_money: 1]
+  import YscWeb.Emails.Helpers,
+    only: [absolute_url: 1, format_datetime: 1, format_money: 1]
 
   def get_template_name, do: "booking_entitlement_granted"
 
@@ -44,7 +45,7 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
       tahoe_book_url: tahoe_url,
       clear_lake_book_url: clear_url,
       manage_bookings_hint:
-        "Start a new reservation to use this benefit — it appears on your price summary automatically before you confirm."
+        "Start a new booking to use this benefit — it appears on your price summary automatically before you confirm."
     }
   end
 
@@ -84,7 +85,7 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
 
   defp next_booking_notice do
     "This benefit is for your next eligible cabin booking. When you pick new dates and go through checkout, " <>
-      "the discount is applied automatically to the total. It does not change past trips, completed stays, or bookings you already hold."
+      "the discount is applied automatically to the total. It does not change past trips, completed stays, or bookings you've already made."
   end
 
   defp benefit_description(ent) do
@@ -104,9 +105,9 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
 
   defp property_line(ent) do
     case ent.property do
-      nil -> "Property: any cabin (Tahoe or Clear Lake)."
-      :tahoe -> "Property: Lake Tahoe cabin."
-      :clear_lake -> "Property: Clear Lake cabin."
+      nil -> "Cabin: Tahoe or Clear Lake."
+      :tahoe -> "Cabin: Lake Tahoe."
+      :clear_lake -> "Cabin: Clear Lake."
     end
   end
 
@@ -117,7 +118,7 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
 
       _ ->
         if ent.buyout_max_discount && Money.positive?(ent.buyout_max_discount) do
-          "Full-property buyouts: savings are capped at #{format_money(ent.buyout_max_discount)} for this benefit."
+          "If you book the entire cabin, savings on that stay are capped at #{format_money(ent.buyout_max_discount)}."
         else
           ""
         end
@@ -127,6 +128,6 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
   defp expiry_line(%{expires_at: nil}), do: "This benefit does not expire."
 
   defp expiry_line(%{expires_at: exp}) do
-    "Expires: #{Calendar.strftime(exp, "%b %d, %Y %H:%M UTC")}."
+    "Use by #{format_datetime(exp)}."
   end
 end

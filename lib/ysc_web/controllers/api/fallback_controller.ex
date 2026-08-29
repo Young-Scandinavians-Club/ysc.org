@@ -54,10 +54,23 @@ defmodule YscWeb.Api.FallbackController do
   # (AppTicketsController, AppMembershipsController, AppPaymentsController).
   @app_error_messages %{
     member_not_found: "member not found",
+    user_not_found: "member not found",
     ticket_tier_not_found: "ticket tier not found",
     event_not_found: "event not found",
     membership_required: "member does not have an active membership",
     invalid_plan: "invalid membership plan",
+    invalid_offline_payment_method:
+      "payment_method must be one of: cash, check, other",
+    could_not_create_stripe_customer:
+      "could not set up billing for this member — try again",
+    empty_selection: "select at least one ticket",
+    invalid_ticket_tier: "one or more selected ticket tiers are invalid",
+    invalid_quantity: "one or more selected ticket quantities are invalid",
+    donation_tier_not_grantable:
+      "donation ticket tiers cannot be sold via the in-person app",
+    incomplete_member_profile:
+      "this ticket tier needs the member's name and email on file first",
+    tier_not_on_sale: "one or more selected ticket tiers are not on sale",
     terminal_not_configured:
       "Stripe Terminal is not configured for this environment",
     user_already_has_active_subscription:
@@ -83,6 +96,7 @@ defmodule YscWeb.Api.FallbackController do
 
   @app_not_found_errors [
     :member_not_found,
+    :user_not_found,
     :ticket_tier_not_found,
     :event_not_found
   ]

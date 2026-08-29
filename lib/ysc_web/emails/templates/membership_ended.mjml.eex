@@ -13,7 +13,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your Young Scandinavians Club membership ended on <strong><%= @end_date %></strong> because automatic renewal was turned off.</mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We'd love to have you back. Renewing restores full access to member events, cabin bookings at our Tahoe and Clear Lake properties, and the YSC community.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We'd love to have you back. Renewing restores full access to member events, cabin bookings at our Tahoe and Clear Lake cabins, and the YSC community.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #FEF3C7; padding: 16px; border-radius: 6px; border-left: 4px solid #F59E0B;">
       <strong>Ready to return?</strong> Renew anytime — you can turn automatic renewal back on when you do.
@@ -25,7 +25,7 @@
     <mj-text font-size="18px" align="left" line-height="1.5">
       <ul>
         <li style="padding-bottom: 10px"><strong>Exclusive Events:</strong> Join our community gatherings, cultural celebrations, and social activities. <a href="<%= @upcoming_events_url %>">View Upcoming Events</a></li>
-        <li style="padding-bottom: 10px"><strong>Cabin Bookings:</strong> Reserve our Tahoe and Clear Lake properties for your getaways</li>
+        <li style="padding-bottom: 10px"><strong>Cabin Bookings:</strong> Book a stay at our Tahoe and Clear Lake cabins</li>
         <li><strong>Community Access:</strong> Connect with fellow Scandinavians and build lasting friendships</li>
       </ul>
     </mj-text>

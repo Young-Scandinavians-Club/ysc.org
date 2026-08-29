@@ -21,6 +21,7 @@ defmodule YscWeb.Api.AppMembershipsController do
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Customers
+  alias Ysc.Subscriptions
 
   action_fallback YscWeb.Api.FallbackController
 
@@ -77,6 +78,46 @@ defmodule YscWeb.Api.AppMembershipsController do
     conn
     |> put_status(:bad_request)
     |> json(%{error: "member_id, plan, and payment_method_id are required"})
+  end
+
+  @doc """
+  Records a membership the member paid for in person with cash or a check —
+  no card is collected. Reuses `Subscriptions.create_subscription_paid_out_of_band/3`,
+  the same primitive behind the web admin "Create membership (paid elsewhere)"
+  action: it creates the Stripe subscription, marks the first invoice paid out
+  of band, writes the local subscription + ledger payment, and sends the
+  member the "paid elsewhere" confirmation email. The subscription has no card
+  on file, so it simply lapses at period end rather than auto-renewing.
+
+  The acting volunteer/admin (`conn.assigns.current_user`) is recorded as
+  `recorded_by_id` for the audit log and Stripe metadata; it is never read
+  from the request body.
+  """
+  def subscribe_offline(
+        conn,
+        %{"member_id" => member_id, "plan" => plan_id} = params
+      ) do
+    with {:ok, member} <- fetch_member(member_id),
+         :ok <- reject_duplicate_membership(member),
+         {:ok, plan} <- fetch_plan(plan_id),
+         {:ok, payment_method} <- parse_offline_payment_method(params),
+         {:ok, subscription} <-
+           Subscriptions.create_subscription_paid_out_of_band(member, plan.id,
+             recorded_by_id: conn.assigns.current_user.id,
+             payment_method: payment_method,
+             note: blank_to_nil(params["note"])
+           ) do
+      render(conn, :offline_subscription,
+        subscription: subscription,
+        plan: plan
+      )
+    end
+  end
+
+  def subscribe_offline(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "member_id and plan are required"})
   end
 
   @doc """
@@ -149,7 +190,7 @@ defmodule YscWeb.Api.AppMembershipsController do
 
   defp purchasable_plan?(_), do: false
 
-  defp fetch_plan(plan_id) do
+  defp fetch_plan(plan_id) when is_binary(plan_id) do
     case Enum.find(
            purchasable_membership_plans(),
            &(Atom.to_string(&1.id) == plan_id)
@@ -158,6 +199,30 @@ defmodule YscWeb.Api.AppMembershipsController do
       plan -> {:ok, plan}
     end
   end
+
+  defp fetch_plan(_), do: {:error, :invalid_plan}
+
+  # Defaults to cash — the overwhelmingly common in-person case — when the
+  # client omits the field.
+  defp parse_offline_payment_method(params) do
+    case Map.get(params, "payment_method", "cash") do
+      "cash" -> {:ok, :cash}
+      "check" -> {:ok, :check}
+      "other" -> {:ok, :other}
+      _ -> {:error, :invalid_offline_payment_method}
+    end
+  end
+
+  defp blank_to_nil(nil), do: nil
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(_), do: nil
 
   defp stripe_client do
     Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)

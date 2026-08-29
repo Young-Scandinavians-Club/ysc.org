@@ -107,6 +107,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
 
     {:ok,
      socket
+     |> assign_new(:admin_role, fn -> nil end)
      |> assign(assigns)
      |> assign(:ticket_tier_id, ticket_tier.id)
      |> assign(:form, to_form(changeset))
@@ -131,6 +132,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
 
     {:ok,
      socket
+     |> assign_new(:admin_role, fn -> nil end)
      |> assign(assigns)
      |> assign(:ticket_tier_id, ticket_tier_id)
      |> assign(:form, to_form(changeset))
@@ -180,50 +182,59 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
 
   @impl true
   def handle_event("search-users", %{"value" => query}, socket) do
-    results =
-      if String.length(query) >= 2 do
-        Accounts.search_users(query, limit: 10)
-      else
-        []
-      end
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, socket}
+    else
+      results =
+        if String.length(query) >= 2 do
+          Accounts.search_users(query, limit: 10)
+        else
+          []
+        end
 
-    {:noreply,
-     socket
-     |> assign(:user_search, query)
-     |> assign(:user_search_results, results)}
+      {:noreply,
+       socket
+       |> assign(:user_search, query)
+       |> assign(:user_search_results, results)}
+    end
   end
 
   @impl true
   def handle_event("select-user", %{"id" => id}, socket) do
-    user = Accounts.get_user!(id)
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, socket}
+    else
+      user = Accounts.get_user!(id)
 
-    # Get existing values from the current changeset to preserve them
-    existing_changeset = socket.assigns.form.source
+      # Get existing values from the current changeset to preserve them
+      existing_changeset = socket.assigns.form.source
 
-    params = %{
-      "ticket_tier_id" => socket.assigns.ticket_tier_id,
-      "created_by_id" => socket.assigns.current_user.id,
-      "status" => "active",
-      "user_id" => user.id,
-      "quantity" => Ecto.Changeset.get_field(existing_changeset, :quantity),
-      "discount_percentage" =>
-        Ecto.Changeset.get_field(existing_changeset, :discount_percentage),
-      "expires_at" => Ecto.Changeset.get_field(existing_changeset, :expires_at),
-      "notes" => Ecto.Changeset.get_field(existing_changeset, :notes)
-    }
+      params = %{
+        "ticket_tier_id" => socket.assigns.ticket_tier_id,
+        "created_by_id" => socket.assigns.current_user.id,
+        "status" => "active",
+        "user_id" => user.id,
+        "quantity" => Ecto.Changeset.get_field(existing_changeset, :quantity),
+        "discount_percentage" =>
+          Ecto.Changeset.get_field(existing_changeset, :discount_percentage),
+        "expires_at" =>
+          Ecto.Changeset.get_field(existing_changeset, :expires_at),
+        "notes" => Ecto.Changeset.get_field(existing_changeset, :notes)
+      }
 
-    # Create a changeset with all preserved values plus the new user_id
-    changeset =
-      %Events.TicketReservation{}
-      |> Events.TicketReservation.changeset(params)
-      |> Map.put(:action, :validate)
+      # Create a changeset with all preserved values plus the new user_id
+      changeset =
+        %Events.TicketReservation{}
+        |> Events.TicketReservation.changeset(params)
+        |> Map.put(:action, :validate)
 
-    {:noreply,
-     socket
-     |> assign(:selected_user, user)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])
-     |> assign(:form, to_form(changeset))}
+      {:noreply,
+       socket
+       |> assign(:selected_user, user)
+       |> assign(:user_search, "")
+       |> assign(:user_search_results, [])
+       |> assign(:form, to_form(changeset))}
+    end
   end
 
   @impl true
@@ -262,6 +273,20 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
         %{"ticket_reservation" => reservation_params},
         socket
       ) do
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "You do not have permission to perform this action.",
+         title: "Reservation"
+       )}
+    else
+      save_reservation(reservation_params, socket)
+    end
+  end
+
+  defp save_reservation(reservation_params, socket) do
     ticket_tier_id =
       socket.assigns[:ticket_tier_id] ||
         (socket.assigns[:ticket_tier] && socket.assigns[:ticket_tier].id)

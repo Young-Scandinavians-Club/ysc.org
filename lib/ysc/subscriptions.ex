@@ -1500,7 +1500,13 @@ defmodule Ysc.Subscriptions do
 
   ## Options
 
-  - `:plan_id` - Required. Plan atom, e.g. `:single` or `:family` (not `:lifetime`).
+  Third argument is a keyword list recording how the out-of-band payment was
+  collected. All optional; used for the audit log and Stripe subscription
+  metadata (so finance can see it in the dashboard) — none change billing:
+
+  - `:recorded_by_id` - id of the staff/volunteer user who took the payment
+  - `:payment_method` - `:cash`, `:check`, or `:other`
+  - `:note` - free-text reference (e.g. "check #1234")
 
   ## Examples
 
@@ -1510,10 +1516,20 @@ defmodule Ysc.Subscriptions do
       iex> create_subscription_paid_out_of_band(user, :family)
       {:ok, %Subscription{}}
 
+      iex> create_subscription_paid_out_of_band(user, :single,
+      ...>   recorded_by_id: volunteer.id, payment_method: :cash)
+      {:ok, %Subscription{}}
+
       iex> create_subscription_paid_out_of_band(sub_account_user, :single)
       {:error, :sub_accounts_cannot_create_subscriptions}
   """
-  def create_subscription_paid_out_of_band(%Ysc.Accounts.User{} = user, plan_id)
+  def create_subscription_paid_out_of_band(user, plan_id, opts \\ [])
+
+  def create_subscription_paid_out_of_band(
+        %Ysc.Accounts.User{} = user,
+        plan_id,
+        opts
+      )
       when plan_id in [:single, :family] do
     require Ysc.Logging
 
@@ -1536,13 +1552,13 @@ defmodule Ysc.Subscriptions do
           if is_nil(user.stripe_id) do
             {:error, :could_not_create_stripe_customer}
           else
-            do_create_subscription_paid_out_of_band(user, plan)
+            do_create_subscription_paid_out_of_band(user, plan, opts)
           end
       end
     end
   end
 
-  def create_subscription_paid_out_of_band(_user, _plan_id),
+  def create_subscription_paid_out_of_band(_user, _plan_id, _opts),
     do: {:error, :invalid_plan}
 
   @dialyzer {:nowarn_function, ensure_user_has_stripe_id: 1}
@@ -1555,66 +1571,134 @@ defmodule Ysc.Subscriptions do
 
   defp ensure_user_has_stripe_id(user), do: user
 
-  defp do_create_subscription_paid_out_of_band(user, plan) do
+  defp do_create_subscription_paid_out_of_band(user, plan, opts) do
     require Ysc.Logging
 
     # Optional callback for tests to inject a fake Stripe subscription without calling Stripe API
-    case Application.get_env(
-           :ysc,
-           :create_subscription_paid_out_of_band_stripe_callback
-         ) do
-      nil ->
-        do_create_subscription_paid_out_of_band_stripe(user, plan)
+    result =
+      case Application.get_env(
+             :ysc,
+             :create_subscription_paid_out_of_band_stripe_callback
+           ) do
+        nil ->
+          do_create_subscription_paid_out_of_band_stripe(user, plan, opts)
 
-      callback when is_function(callback, 2) ->
-        case callback.(user, plan) do
-          {:ok, stripe_subscription} ->
-            case create_subscription_from_stripe(user, stripe_subscription) do
-              {:ok, subscription} ->
-                subscription = Repo.preload(subscription, :subscription_items)
+        callback when is_function(callback, 2) ->
+          do_create_subscription_paid_out_of_band_via_callback(
+            callback,
+            user,
+            plan
+          )
+      end
 
-                send_membership_confirmation_email_for_paid_elsewhere(
-                  user,
-                  plan
-                )
+    # Only record the offline payment in the audit log once the subscription
+    # and its paid-out-of-band invoice actually exist — a failed Stripe call
+    # must not leave "payment collected" in the log with no membership.
+    case result do
+      {:ok, _subscription} -> maybe_log_offline_membership(user, plan, opts)
+      _ -> :ok
+    end
 
-                if BoardVolunteerBilling.household_on_board?(user) do
-                  BoardVolunteerBilling.sync_for_user(user)
-                end
+    result
+  end
 
-                {:ok, subscription}
+  defp do_create_subscription_paid_out_of_band_via_callback(
+         callback,
+         user,
+         plan
+       ) do
+    case callback.(user, plan) do
+      {:ok, stripe_subscription} ->
+        case create_subscription_from_stripe(user, stripe_subscription) do
+          {:ok, subscription} ->
+            subscription = Repo.preload(subscription, :subscription_items)
 
-              err ->
-                err
+            send_membership_confirmation_email_for_paid_elsewhere(user, plan)
+
+            if BoardVolunteerBilling.household_on_board?(user) do
+              BoardVolunteerBilling.sync_for_user(user)
             end
 
-          {:error, _} = err ->
+            {:ok, subscription}
+
+          err ->
             err
         end
+
+      {:error, _} = err ->
+        err
     end
   end
 
   @doc false
-  def paid_out_of_band_stripe_create_params(user, plan) do
+  def paid_out_of_band_stripe_create_params(user, plan, opts \\ []) do
     %{
       customer: user.stripe_id,
       items: [%{price: plan.stripe_price_id, quantity: 1}],
       payment_behavior: "default_incomplete",
       expand: ["latest_invoice"],
-      metadata: %{user_id: user.id}
+      metadata: Map.merge(%{user_id: user.id}, offline_payment_metadata(opts))
     }
     |> Map.merge(BoardVolunteerBilling.maybe_pause_collection_params(user))
   end
 
-  @dialyzer {:nowarn_function,
-             do_create_subscription_paid_out_of_band_stripe: 2}
-  defp do_create_subscription_paid_out_of_band_stripe(user, plan) do
+  # Extra Stripe subscription metadata describing an out-of-band payment
+  # collected in person (cash/check at a door). Surfaces in the Stripe
+  # dashboard for finance; does not affect billing. Keys omitted when unset.
+  defp offline_payment_metadata(opts) do
+    %{}
+    |> maybe_put("offline_payment_method", opts[:payment_method])
+    |> maybe_put("offline_recorded_by_id", opts[:recorded_by_id])
+    |> maybe_put("offline_payment_note", truncate_note(opts[:note]))
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, _key, ""), do: map
+
+  defp maybe_put(map, key, value) when is_atom(value),
+    do: Map.put(map, key, Atom.to_string(value))
+
+  defp maybe_put(map, key, value), do: Map.put(map, key, to_string(value))
+
+  defp truncate_note(nil), do: nil
+  defp truncate_note(note) when is_binary(note), do: String.slice(note, 0, 450)
+  defp truncate_note(_), do: nil
+
+  defp maybe_log_offline_membership(user, plan, opts) do
     require Ysc.Logging
 
-    stripe_params = paid_out_of_band_stripe_create_params(user, plan)
+    if opts[:recorded_by_id] || opts[:payment_method] || opts[:note] do
+      Ysc.Logging.info("Offline membership recorded",
+        user_id: user.id,
+        plan_id: plan.id,
+        recorded_by_id: opts[:recorded_by_id],
+        payment_method: opts[:payment_method],
+        note: truncate_note(opts[:note])
+      )
+    end
+
+    :ok
+  end
+
+  @dialyzer {:nowarn_function,
+             do_create_subscription_paid_out_of_band_stripe: 3}
+  defp do_create_subscription_paid_out_of_band_stripe(user, plan, opts) do
+    require Ysc.Logging
+
+    stripe_params = paid_out_of_band_stripe_create_params(user, plan, opts)
+
+    # Stable across retries of the same logical operation so a network retry
+    # (or an accidental double submit from the app) returns the existing
+    # subscription instead of creating a second one with its own paid invoice.
+    idempotency_key =
+      Ysc.Stripe.Idempotency.key(
+        "paid_out_of_band_sub_#{user.id}_#{plan.stripe_price_id}"
+      )
 
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Subscription.create(stripe_params)
+           Stripe.Subscription.create(stripe_params,
+             headers: %{"Idempotency-Key" => idempotency_key}
+           )
          end) do
       {:ok, stripe_subscription} ->
         latest_invoice = stripe_subscription.latest_invoice

@@ -23,7 +23,7 @@
       </span>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Property:</strong> <%= @booking.property %>
+      <strong>Cabin:</strong> <%= @booking.property %>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Check-in:</strong> <%= @booking.checkin_date %>

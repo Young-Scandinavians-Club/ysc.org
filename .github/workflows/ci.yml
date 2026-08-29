@@ -212,6 +212,9 @@ jobs:
           mapfile -t scripts < <(./etc/scripts/list_lintable_shell_scripts.sh)
           if [ "${#scripts[@]}" -gt 0 ]; then shfmt -d -i 2 -ci "${scripts[@]}"; fi
 
+      - name: install_flyctl self-test
+        run: ./etc/scripts/install_flyctl.sh --self-test
+
       - name: dprint (format check)
         run: dprint check
 

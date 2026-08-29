@@ -463,15 +463,17 @@ defmodule YscWeb.VolunteerRoleTest do
 
   # ---------------------------------------------------------------------------
   # Finding 46: volunteers cannot refund, reassign, or grant tickets
+  # Finding 50: volunteers cannot reserve tickets (discounted holds) either
   # ---------------------------------------------------------------------------
 
   describe "volunteer ticket money actions (Finding 46)" do
     setup [:create_volunteer]
 
-    test "can open the tickets tab but cannot grant, refund, or reassign", %{
-      conn: conn,
-      volunteer: volunteer
-    } do
+    test "can open the tickets tab but cannot grant, refund, reassign, or reserve",
+         %{
+           conn: conn,
+           volunteer: volunteer
+         } do
       event = event_fixture(%{organizer_id: volunteer.id, state: :published})
 
       tier =
@@ -488,6 +490,7 @@ defmodule YscWeb.VolunteerRoleTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
 
       refute has_element?(view, "#ticket-tier-actions-#{tier.id}-grant")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-reserve")
       refute has_element?(view, "#ticket-actions-#{ticket.id}-refund")
       refute has_element?(view, "#ticket-actions-#{ticket.id}-reassign")
       assert has_element?(view, "#ticket-actions-#{ticket.id}-edit")
@@ -498,6 +501,14 @@ defmodule YscWeb.VolunteerRoleTest do
 
       refute has_element?(view, "#grant-tickets-modal")
       assert Events.list_tickets_for_user(other.id) == []
+
+      view
+      |> element("#ticket-tier-reserve-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      refute has_element?(view, "#reserve-tickets-modal")
+      assert Events.list_all_ticket_reservations_for_user(other.id) == []
+      assert Events.list_all_ticket_reservations_for_user(volunteer.id) == []
 
       view
       |> element("#ticket-list-open-refund-#{event.id}")

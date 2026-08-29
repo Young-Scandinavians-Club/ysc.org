@@ -724,6 +724,46 @@ defmodule Ysc.SubscriptionsTest do
 
       refute Map.has_key?(params, :pause_collection)
     end
+
+    test "paid_out_of_band_stripe_create_params records offline payment details in metadata" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_offline_#{System.unique_integer()}"
+        })
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      params =
+        Subscriptions.paid_out_of_band_stripe_create_params(user, single_plan,
+          recorded_by_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          payment_method: :cash,
+          note: "check #1234"
+        )
+
+      assert params.metadata.user_id == user.id
+      assert params.metadata["offline_payment_method"] == "cash"
+
+      assert params.metadata["offline_recorded_by_id"] ==
+               "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+
+      assert params.metadata["offline_payment_note"] == "check #1234"
+    end
+
+    test "paid_out_of_band_stripe_create_params omits offline metadata keys when not given" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_plain_#{System.unique_integer()}"
+        })
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      params =
+        Subscriptions.paid_out_of_band_stripe_create_params(user, single_plan)
+
+      assert params.metadata == %{user_id: user.id}
+    end
   end
 
   describe "create_stripe_subscription/2" do
