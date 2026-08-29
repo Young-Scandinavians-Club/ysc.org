@@ -15,6 +15,9 @@ defmodule Ysc.TicketsTest do
   import Ysc.EventsFixtures
   import Ysc.TicketsFixtures
 
+  @sold_count_agg ~r/LEFT OUTER JOIN ["']?tickets["']?.*GROUP BY/is
+  @owned_member_only_count ~r/member_only["']? = TRUE/i
+
   defp user_fixture_unique(attrs \\ %{}) do
     email =
       Map.get_lazy(attrs, :email, fn ->
@@ -336,6 +339,77 @@ defmodule Ysc.TicketsTest do
 
       assert {:ok, _order} =
                Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+    end
+
+    test "regular-tier checkout does not aggregate sold counts for member-only rules",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, sold_agg_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+          end,
+          pattern: @sold_count_agg,
+          caller_pids: [self()]
+        )
+
+      assert sold_agg_count == 0
+    end
+
+    test "regular-tier checkout skips the owned member-only COUNT", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {{:ok, _order}, owned_count_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+          end,
+          pattern: @owned_member_only_count,
+          caller_pids: [self()]
+        )
+
+      assert owned_count_queries == 0
+    end
+
+    test "lifetime member-only checkout skips the owned-ticket COUNT", %{
+      user: user,
+      event: event,
+      member_tier_a: a
+    } do
+      {{:ok, _order}, owned_count_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{a.id => 2})
+          end,
+          pattern: @owned_member_only_count,
+          caller_pids: [self()]
+        )
+
+      assert owned_count_queries == 0
+    end
+
+    test "single member-only checkout counts already-owned member-only tickets",
+         %{
+           event: event,
+           member_tier_a: a
+         } do
+      user = give_single_membership(user_fixture_unique())
+
+      {{:ok, _order}, owned_count_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{a.id => 1})
+          end,
+          pattern: @owned_member_only_count,
+          caller_pids: [self()]
+        )
+
+      assert owned_count_queries == 1
     end
   end
 
@@ -2498,6 +2572,11 @@ defmodule Ysc.TicketsTest do
     test "ci_query_explain_list_tickets_for_admin_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Tickets.ci_query_explain_list_tickets_for_admin_query()
+    end
+
+    test "ci_query_explain_owned_member_only_tickets_count_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_owned_member_only_tickets_count_query()
     end
   end
 end

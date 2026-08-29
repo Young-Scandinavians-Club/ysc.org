@@ -1221,6 +1221,62 @@ defmodule Ysc.EventsTest do
       assert Enum.any?(tiers, &(&1.id == tier.id))
     end
 
+    test "list_ticket_tier_member_only_attrs/1 returns policy fields without sold counts" do
+      {:ok, event} = create_event_fixture()
+
+      {:ok, regular} =
+        create_ticket_tier_fixture(%{event_id: event.id, member_only: false})
+
+      {:ok, member_only} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Members",
+          type: :paid,
+          price: Money.new(20, :USD),
+          quantity: 10,
+          member_only: true,
+          event_id: event.id
+        })
+
+      attrs =
+        Events.list_ticket_tier_member_only_attrs([
+          regular.id,
+          member_only.id,
+          Ecto.ULID.generate()
+        ])
+
+      by_id = Map.new(attrs, &{&1.id, &1})
+      assert by_id[regular.id].member_only == false
+      assert by_id[member_only.id].member_only == true
+      assert Map.has_key?(by_id[regular.id], :type)
+      refute Map.has_key?(by_id[regular.id], :sold_tickets_count)
+      refute Map.has_key?(by_id[regular.id], :name)
+      assert length(attrs) == 2
+    end
+
+    test "list_ticket_tier_member_only_attrs/1 is a PK lookup with no ticket join" do
+      {:ok, tier} = create_ticket_tier_fixture()
+
+      {_attrs, join_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_ticket_tier_member_only_attrs([tier.id]) end,
+          pattern: ~r/JOIN ["']?tickets["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert join_count == 0
+    end
+
+    test "list_ticket_tier_member_only_attrs/1 skips the database for an empty list" do
+      {attrs, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_ticket_tier_member_only_attrs([]) end,
+          caller_pids: [self()]
+        )
+
+      assert attrs == []
+      assert query_count == 0
+    end
+
     test "non_donation_sold_count_from_tiers/1 excludes donation tier sales" do
       tiers = [
         %{type: :paid, sold_tickets_count: 3},
@@ -4699,6 +4755,11 @@ defmodule Ysc.EventsTest do
     test "ci_query_explain_upcoming_published_events_summary_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Events.ci_query_explain_upcoming_published_events_summary_query()
+    end
+
+    test "ci_query_explain_ticket_tier_member_only_attrs_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Events.ci_query_explain_ticket_tier_member_only_attrs_query()
     end
   end
 end

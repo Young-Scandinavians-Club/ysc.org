@@ -1996,16 +1996,29 @@ defmodule Ysc.Tickets do
     Accounts.has_active_membership?(user)
   end
 
-  # Enforces the "member only" ticket-tier rules for this event. Only runs a
-  # query when the event actually has a member-only tier. See
-  # `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
+  # Enforces the "member only" ticket-tier rules for this checkout.
+  #
+  # Loads only `id` / `member_only` / `type` for the selected tiers (PK lookup,
+  # no sold-count aggregation). The owned-ticket COUNT runs only when a
+  # finite per-event limit applies — Single members buying a member-only
+  # tier. Family/lifetime (unlimited) and regular-tier checkouts skip it.
+  # See `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
   defp validate_member_only_selection(user, event_id, ticket_selections) do
-    ticket_tiers = Ysc.Events.list_ticket_tiers_for_event(event_id)
+    ticket_tiers =
+      ticket_selections
+      |> Map.keys()
+      |> Ysc.Events.list_ticket_tier_member_only_attrs()
 
     if MemberOnlyTickets.any_member_only?(ticket_tiers) do
       plan_type = MembershipCache.get_membership_plan_type(user)
       limit = MemberOnlyTickets.event_limit(plan_type)
-      already_owned = count_owned_member_only_tickets(user.id, event_id)
+
+      already_owned =
+        if needs_owned_member_only_count?(limit) do
+          count_owned_member_only_tickets(user.id, event_id)
+        else
+          0
+        end
 
       MemberOnlyTickets.validate_selection(
         ticket_selections,
@@ -2018,16 +2031,30 @@ defmodule Ysc.Tickets do
     end
   end
 
+  # Only Single (limit 1) needs to know how many member-only tickets the buyer
+  # already holds. Unlimited plans and ineligible buyers don't.
+  defp needs_owned_member_only_count?(limit)
+       when is_integer(limit) and limit > 0,
+       do: true
+
+  defp needs_owned_member_only_count?(_), do: false
+
   defp count_owned_member_only_tickets(user_id, event_id) do
+    user_id
+    |> owned_member_only_tickets_count_query(event_id)
+    |> Repo.one()
+  end
+
+  defp owned_member_only_tickets_count_query(user_id, event_id) do
     from(t in Ticket,
       join: tt in TicketTier,
       on: tt.id == t.ticket_tier_id,
       where:
         t.user_id == ^user_id and t.event_id == ^event_id and
-          t.status == :confirmed and tt.member_only == true,
+          t.status == :confirmed and tt.member_only == true and
+          tt.type != :donation,
       select: count(t.id)
     )
-    |> Repo.one()
   end
 
   defp validate_tier_capacity(
@@ -2726,6 +2753,12 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_payment_refunds_count_query do
     payment_refunds_count_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_owned_member_only_tickets_count_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+    owned_member_only_tickets_count_query(ulid, ulid)
   end
 
   defp stripe_client do
