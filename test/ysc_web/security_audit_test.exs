@@ -2775,18 +2775,10 @@ defmodule YscWeb.SecurityAuditTest do
           "intent" => "continue"
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      code = assert_mobile_app_handoff(conn)
 
       assert {:ok, %User{id: id}} =
-               Accounts.verify_and_consume_mobile_redirect_token(
-                 location
-                 |> URI.parse()
-                 |> Map.fetch!(:query)
-                 |> URI.decode_query()
-                 |> Map.fetch!("code"),
-                 verifier
-               )
+               Accounts.verify_and_consume_mobile_redirect_token(code, verifier)
 
       assert id == admin.id
     end

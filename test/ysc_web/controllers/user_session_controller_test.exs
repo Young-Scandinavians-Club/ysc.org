@@ -100,9 +100,10 @@ defmodule YscWeb.UserSessionControllerTest do
              )
     end
 
-    test "POST continue redirects to the app with a redeemable code", %{
-      conn: conn
-    } do
+    test "POST continue hands the browser session off to the app with a redeemable code",
+         %{
+           conn: conn
+         } do
       admin = user_fixture(%{role: :admin})
       verifier = String.duplicate("a", 64)
       challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
@@ -123,15 +124,7 @@ defmodule YscWeb.UserSessionControllerTest do
           "intent" => "continue"
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
-
-      code =
-        location
-        |> URI.parse()
-        |> Map.fetch!(:query)
-        |> URI.decode_query()
-        |> Map.fetch!("code")
+      code = assert_mobile_app_handoff(conn)
 
       assert {:ok, %Ysc.Accounts.User{id: id}} =
                Ysc.Accounts.verify_and_consume_mobile_redirect_token(
@@ -223,8 +216,7 @@ defmodule YscWeb.UserSessionControllerTest do
           "code_challenge" => String.duplicate("a", 64)
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert_mobile_app_handoff(conn)
       assert get_session(conn, :user_token)
     end
 

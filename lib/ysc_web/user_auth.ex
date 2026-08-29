@@ -93,7 +93,7 @@ defmodule YscWeb.UserAuth do
       # (and binding the code to) a code_challenge closes the gap a bare
       # code would leave open — see build_mobile_redirect_token/2.
       code = Accounts.generate_mobile_redirect_token(user, code_challenge)
-      redirect(conn, external: "#{mobile_redirect_uri}?code=#{code}")
+      send_mobile_app_handoff(conn, mobile_redirect_uri, code)
     else
       redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
     end
@@ -111,6 +111,54 @@ defmodule YscWeb.UserAuth do
       true ->
         signed_in_path_for_user(user, conn)
     end
+  end
+
+  # Hands a just-authenticated browser session off to the native admin app.
+  #
+  # This is deliberately an HTML page rather than `redirect(conn, external:
+  # "ysc-admin://…")`: Chrome for Android silently drops an HTTP 3xx whose
+  # `Location` is a private-use scheme (and never fires the intent), so a
+  # header redirect leaves the Custom Tab sitting on a blank page and the app
+  # waiting forever. `window.location.replace` handles the common case, and
+  # the visible link gives the user a real tap — a user-gesture navigation
+  # Chrome *does* hand to the app — when the script doesn't fire.
+  #
+  # The body is fully server-controlled: `mobile_redirect_uri` is one of the
+  # `valid_mobile_redirect_uri?/1` allowlist entries and `code` is unpadded
+  # URL-safe Base64 (`Accounts.generate_mobile_redirect_token/2`), so neither
+  # can break out of the `href` attribute or the JS string literal.
+  # sobelow_skip ["XSS.SendResp"]
+  defp send_mobile_app_handoff(conn, mobile_redirect_uri, code) do
+    app_url = "#{mobile_redirect_uri}?code=#{code}"
+
+    body = """
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex, nofollow" />
+        <title>Opening the YSC Admin app…</title>
+      </head>
+      <body>
+        <p>Opening the YSC Admin app…</p>
+        <p>
+          <a id="open-app" href="#{app_url}">
+            Tap here if the app doesn't open automatically
+          </a>
+        </p>
+        <script>
+          window.location.replace("#{app_url}");
+        </script>
+      </body>
+    </html>
+    """
+
+    conn
+    |> put_resp_content_type("text/html")
+    |> put_resp_header("referrer-policy", "no-referrer")
+    |> send_resp(200, body)
+    |> halt()
   end
 
   # Default signed-in path when no explicit redirect_to / user_return_to is provided.
@@ -551,7 +599,7 @@ defmodule YscWeb.UserAuth do
   query string. PKCE only helps when the legitimate app created that
   challenge: `ysc-admin://` is a private-use scheme any installed app can
   register, so an attacker who opened a Custom Tab (Chrome cookie jar) with
-  *their* challenge could redeem the 302 `code` themselves (Finding 49).
+  *their* challenge could redeem the handoff `code` themselves (Finding 49).
   Confirmation requires a first-party POST (`SameSite=Lax` session cookie).
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
@@ -597,7 +645,7 @@ defmodule YscWeb.UserAuth do
     if mobile_staff_user?(user) && valid_mobile_redirect_uri?(uri) &&
          valid_code_challenge?(challenge) do
       code = Accounts.generate_mobile_redirect_token(user, challenge)
-      redirect(conn, external: "#{uri}?code=#{code}")
+      send_mobile_app_handoff(conn, uri, code)
     else
       redirect(conn, to: signed_in_path(conn))
     end
