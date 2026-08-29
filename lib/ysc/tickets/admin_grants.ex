@@ -48,6 +48,8 @@ defmodule Ysc.Tickets.AdminGrants do
     skip_capacity? = Keyword.get(opts, :skip_capacity, false)
     skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
     admin_grant_notes = Keyword.get(opts, :admin_grant_notes)
+    payment_channel = Keyword.get(opts, :payment_channel)
+    offline_amount_collected = Keyword.get(opts, :offline_amount_collected)
 
     Ysc.Logging.info("Admin ticket grant started",
       granted_by_id: granted_by_id,
@@ -81,7 +83,9 @@ defmodule Ysc.Tickets.AdminGrants do
           ticket_selections,
           admin_grant_notes,
           skip_capacity: skip_capacity?,
-          skip_sale_guards: skip_sale_guards?
+          skip_sale_guards: skip_sale_guards?,
+          payment_channel: payment_channel,
+          offline_amount_collected: offline_amount_collected
         )
       end
 
@@ -320,16 +324,22 @@ defmodule Ysc.Tickets.AdminGrants do
     tiers_by_id = Map.new(tiers, &{&1.id, &1})
 
     Repo.transaction(fn ->
-      order_attrs = %{
-        user_id: user.id,
-        event_id: event.id,
-        total_amount: Money.new(0, :USD),
-        discount_amount: Money.new(0, :USD),
-        expires_at: expires_at,
-        completed_at: now,
-        granted_by_id: granted_by_id,
-        admin_grant_notes: admin_grant_notes
-      }
+      order_attrs =
+        %{
+          user_id: user.id,
+          event_id: event.id,
+          total_amount: Money.new(0, :USD),
+          discount_amount: Money.new(0, :USD),
+          expires_at: expires_at,
+          completed_at: now,
+          granted_by_id: granted_by_id,
+          admin_grant_notes: admin_grant_notes,
+          payment_channel: Keyword.get(grant_opts, :payment_channel),
+          offline_amount_collected:
+            Keyword.get(grant_opts, :offline_amount_collected)
+        }
+        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+        |> Map.new()
 
       with :ok <-
              maybe_validate_fulfillment_in_transaction(

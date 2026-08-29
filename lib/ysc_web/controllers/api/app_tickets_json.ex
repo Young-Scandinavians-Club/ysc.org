@@ -28,7 +28,12 @@ defmodule YscWeb.Api.AppTicketsJSON do
       ticket_order_reference: ticket_order.reference_id,
       status: to_string(ticket_order.status),
       ticket_count: length(ticket_order.tickets || []),
+      payment_channel: ticket_order.payment_channel,
+      amount_collected: money_string(ticket_order.offline_amount_collected),
       notes: ticket_order.admin_grant_notes
     }
   end
+
+  defp money_string(nil), do: nil
+  defp money_string(%Money{} = money), do: Money.to_string!(money)
 end

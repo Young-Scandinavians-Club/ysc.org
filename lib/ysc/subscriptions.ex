@@ -1574,41 +1574,59 @@ defmodule Ysc.Subscriptions do
   defp do_create_subscription_paid_out_of_band(user, plan, opts) do
     require Ysc.Logging
 
-    maybe_log_offline_membership(user, plan, opts)
-
     # Optional callback for tests to inject a fake Stripe subscription without calling Stripe API
-    case Application.get_env(
-           :ysc,
-           :create_subscription_paid_out_of_band_stripe_callback
-         ) do
-      nil ->
-        do_create_subscription_paid_out_of_band_stripe(user, plan, opts)
+    result =
+      case Application.get_env(
+             :ysc,
+             :create_subscription_paid_out_of_band_stripe_callback
+           ) do
+        nil ->
+          do_create_subscription_paid_out_of_band_stripe(user, plan, opts)
 
-      callback when is_function(callback, 2) ->
-        case callback.(user, plan) do
-          {:ok, stripe_subscription} ->
-            case create_subscription_from_stripe(user, stripe_subscription) do
-              {:ok, subscription} ->
-                subscription = Repo.preload(subscription, :subscription_items)
+        callback when is_function(callback, 2) ->
+          do_create_subscription_paid_out_of_band_via_callback(
+            callback,
+            user,
+            plan
+          )
+      end
 
-                send_membership_confirmation_email_for_paid_elsewhere(
-                  user,
-                  plan
-                )
+    # Only record the offline payment in the audit log once the subscription
+    # and its paid-out-of-band invoice actually exist — a failed Stripe call
+    # must not leave "payment collected" in the log with no membership.
+    case result do
+      {:ok, _subscription} -> maybe_log_offline_membership(user, plan, opts)
+      _ -> :ok
+    end
 
-                if BoardVolunteerBilling.household_on_board?(user) do
-                  BoardVolunteerBilling.sync_for_user(user)
-                end
+    result
+  end
 
-                {:ok, subscription}
+  defp do_create_subscription_paid_out_of_band_via_callback(
+         callback,
+         user,
+         plan
+       ) do
+    case callback.(user, plan) do
+      {:ok, stripe_subscription} ->
+        case create_subscription_from_stripe(user, stripe_subscription) do
+          {:ok, subscription} ->
+            subscription = Repo.preload(subscription, :subscription_items)
 
-              err ->
-                err
+            send_membership_confirmation_email_for_paid_elsewhere(user, plan)
+
+            if BoardVolunteerBilling.household_on_board?(user) do
+              BoardVolunteerBilling.sync_for_user(user)
             end
 
-          {:error, _} = err ->
+            {:ok, subscription}
+
+          err ->
             err
         end
+
+      {:error, _} = err ->
+        err
     end
   end
 
@@ -1669,8 +1687,18 @@ defmodule Ysc.Subscriptions do
 
     stripe_params = paid_out_of_band_stripe_create_params(user, plan, opts)
 
+    # Stable across retries of the same logical operation so a network retry
+    # (or an accidental double submit from the app) returns the existing
+    # subscription instead of creating a second one with its own paid invoice.
+    idempotency_key =
+      Ysc.Stripe.Idempotency.key(
+        "paid_out_of_band_sub_#{user.id}_#{plan.stripe_price_id}"
+      )
+
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.Subscription.create(stripe_params)
+           Stripe.Subscription.create(stripe_params,
+             headers: %{"Idempotency-Key" => idempotency_key}
+           )
          end) do
       {:ok, stripe_subscription} ->
         latest_invoice = stripe_subscription.latest_invoice

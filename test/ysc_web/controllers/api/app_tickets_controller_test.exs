@@ -321,18 +321,25 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
                "status" => "completed",
                "ticket_count" => 2,
                "ticket_order_reference" => "ORD" <> _,
+               "payment_channel" => "cash",
+               "amount_collected" => "$90.00",
                "notes" => notes
              } = json_response(response, 200)
 
-      assert notes =~ "Offline sale"
-      assert notes =~ "method=cash"
-      assert notes =~ "amount=90.00"
-      assert notes =~ "recorded_by="
-      assert notes =~ "note=paid at door"
+      assert notes =~ "In-person cash payment recorded via the admin app"
+      assert notes =~ "paid at door"
 
       order = Ysc.Repo.get_by(Ysc.Tickets.TicketOrder, event_id: event.id)
       assert order.status == :completed
       assert order.total_amount == Money.new(0, :USD)
+      assert order.payment_channel == "cash"
+
+      assert Money.equal?(
+               order.offline_amount_collected,
+               Money.new(:USD, "90.00")
+             )
+
+      # For an offline sale the grantor is the acting volunteer/admin.
       assert order.granted_by_id
 
       tickets =
@@ -365,8 +372,30 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
           "tiers" => %{tier.id => 1}
         })
 
-      assert %{"notes" => notes} = json_response(response, 200)
-      assert notes =~ "method=cash"
+      assert %{"payment_channel" => "cash"} = json_response(response, 200)
+    end
+
+    test "records a check sale with no amount collected", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1},
+          "payment_method" => "check"
+        })
+
+      assert %{
+               "payment_channel" => "check",
+               "amount_collected" => nil
+             } = json_response(response, 200)
+
+      order = Ysc.Repo.get_by(Ysc.Tickets.TicketOrder, event_id: event.id)
+      assert order.payment_channel == "check"
+      assert is_nil(order.offline_amount_collected)
     end
 
     test "rejects an unknown payment method", %{conn: conn} do

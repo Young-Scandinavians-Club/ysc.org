@@ -71,11 +71,11 @@ defmodule YscWeb.Api.AppTicketsController do
   confirmed tickets, broadcasts availability, and — because we do not pass
   `skip_email` — sends the member the ticket confirmation email.
 
-  The order total is $0 (a grant, not a charge). The amount actually
-  collected, the payment method, and the acting volunteer are captured in the
-  order's `admin_grant_notes` as a machine-parseable string so the treasurer
-  can reconcile the cash box (event revenue reports are unaffected; a later
-  change can promote these to structured columns).
+  The order total is $0 (a grant, not a charge). How the money was actually
+  collected is persisted as typed columns on the order —
+  `payment_channel` and `offline_amount_collected` (a `Money`) — for treasurer
+  reconciliation; `admin_grant_notes` carries only the human-readable note.
+  Event revenue reports are unaffected.
 
   Capacity and sale-window guards are enforced (no override from the app).
   Donation tiers are rejected, matching `create_payment_intent/2`.
@@ -98,13 +98,12 @@ defmodule YscWeb.Api.AppTicketsController do
              member.id,
              event.id,
              selections,
-             admin_grant_notes:
-               compose_offline_notes(
-                 payment_method,
-                 params["amount_collected_cents"],
-                 blank_to_nil(params["note"]),
-                 conn.assigns.current_user.id
-               )
+             [
+               {:payment_channel, payment_method},
+               {:admin_grant_notes,
+                offline_note(payment_method, blank_to_nil(params["note"]))}
+               | offline_amount_opt(params["amount_collected_cents"])
+             ]
            ) do
       render(conn, :offline_order, ticket_order: ticket_order)
     end
@@ -185,26 +184,20 @@ defmodule YscWeb.Api.AppTicketsController do
     end
   end
 
-  # A machine-parseable audit line stored on the ticket order's
-  # `admin_grant_notes`. Keep the `key=value` shape stable — a later change
-  # that promotes these to real columns will backfill by parsing it.
-  defp compose_offline_notes(payment_method, amount_cents, note, recorded_by_id) do
-    [
-      "Offline sale",
-      "method=#{payment_method}",
-      amount_segment(amount_cents),
-      "recorded_by=#{recorded_by_id}",
-      note && "note=#{note}"
-    ]
-    |> Enum.reject(&is_nil/1)
-    |> Enum.join(" · ")
-  end
+  # Human-readable audit context only — the payment method and collected
+  # amount live in the `payment_channel` / `offline_amount_collected` columns,
+  # and the acting user in `granted_by_id`.
+  defp offline_note(payment_method, nil),
+    do: "In-person #{payment_method} payment recorded via the admin app"
 
-  defp amount_segment(cents) when is_integer(cents) and cents >= 0 do
-    "amount=#{:erlang.float_to_binary(cents / 100, decimals: 2)}"
-  end
+  defp offline_note(payment_method, note),
+    do:
+      "In-person #{payment_method} payment recorded via the admin app — #{note}"
 
-  defp amount_segment(_), do: nil
+  defp offline_amount_opt(cents) when is_integer(cents) and cents >= 0,
+    do: [offline_amount_collected: Ysc.MoneyHelper.cents_to_money(cents, :USD)]
+
+  defp offline_amount_opt(_), do: []
 
   defp blank_to_nil(nil), do: nil
 
