@@ -76,6 +76,24 @@ defmodule Ysc.Events.EventDateTimeTest do
       assert EventDateTime.starts_at(nil, nil) == nil
       assert EventDateTime.starts_at(nil, ~T[10:00:00]) == nil
     end
+
+    test "date-only %Date{} values use Pacific midnight of that calendar day" do
+      assert EventDateTime.starts_at(~D[2026-08-29], nil) ==
+               ~U[2026-08-29 07:00:00Z]
+    end
+
+    test "returns nil when the stored start date is not a date" do
+      assert EventDateTime.starts_at(%{}, nil) == nil
+    end
+
+    test "Event struct delegates to starts_at/2" do
+      event = %Event{
+        start_date: ~U[2026-08-29 00:00:00Z],
+        start_time: nil
+      }
+
+      assert EventDateTime.starts_at(event) == ~U[2026-08-29 07:00:00Z]
+    end
   end
 
   describe "in_future?/1" do
