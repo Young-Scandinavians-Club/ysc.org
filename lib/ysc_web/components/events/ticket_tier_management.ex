@@ -400,6 +400,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           id={"ticket-tier-form-#{@event_id}"}
           module={YscWeb.AdminEventsLive.TicketTierForm}
           event_id={@event_id}
+          dialog_id="add-ticket-tier-modal"
         />
       </.modal>
       <%!-- Edit Ticket Tier Modal --%>
@@ -415,6 +416,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           module={YscWeb.AdminEventsLive.TicketTierForm}
           event_id={@event_id}
           ticket_tier={@editing_ticket_tier}
+          dialog_id="edit-ticket-tier-modal"
         />
       </.modal>
       <%!-- Reserve Tickets Modal --%>

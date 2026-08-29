@@ -1380,6 +1380,116 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "tickets tab - ticket tier form" do
+    setup [:create_admin]
+
+    test "type selector renders as a segmented control with all options", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("[phx-click='open-add-ticket-tier-modal']")
+      |> render_click()
+
+      assert has_element?(view, "#ticket-tier-type-options[role='radiogroup']")
+
+      for value <- ~w(free paid donation) do
+        assert has_element?(
+                 view,
+                 "#ticket-tier-type-options input[type='radio'][name='ticket_tier[type]'][value='#{value}']"
+               )
+      end
+    end
+
+    test "keeps an entered price when switching tier type away and back", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      form_sel = "#ticket-tier-form-#{event.id}"
+      price_sel = "#ticket_tier_price[value='$50.00']"
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("[phx-click='open-add-ticket-tier-modal']")
+      |> render_click()
+
+      # Switch to a paid tier so the price input appears.
+      view
+      |> form(form_sel, %{"ticket_tier" => %{"type" => "paid", "name" => "VIP"}})
+      |> render_change()
+
+      # Enter a price.
+      view
+      |> form(form_sel, %{
+        "ticket_tier" => %{
+          "type" => "paid",
+          "name" => "VIP",
+          "price" => "$50.00"
+        }
+      })
+      |> render_change()
+
+      assert has_element?(view, price_sel)
+
+      # Detour through Free (price input is hidden).
+      view
+      |> form(form_sel, %{"ticket_tier" => %{"type" => "free", "name" => "VIP"}})
+      |> render_change()
+
+      refute has_element?(view, "#ticket_tier_price")
+
+      # Back to Paid: the previously entered price is restored.
+      view
+      |> form(form_sel, %{
+        "ticket_tier" => %{"type" => "paid", "name" => "VIP"}
+      })
+      |> render_change()
+
+      assert has_element?(view, price_sel)
+    end
+
+    test "switching an existing tier to Donation clears quantity and sale dates",
+         %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          price: Money.new(2000, :USD),
+          quantity: 40,
+          start_date: ~U[2026-09-01 00:00:00Z],
+          end_date: ~U[2026-09-10 00:00:00Z]
+        })
+
+      form_sel = "#edit-ticket-tier-form-#{tier.id}"
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#ticket-tier-actions-#{tier.id}-edit")
+      |> render_click()
+
+      view
+      |> form(form_sel, %{
+        "ticket_tier" => %{"type" => "donation", "name" => tier.name}
+      })
+      |> render_submit()
+
+      updated = Events.get_ticket_tier!(tier.id)
+      assert updated.type == :donation
+      assert is_nil(updated.quantity)
+      assert is_nil(updated.start_date)
+      assert is_nil(updated.end_date)
+    end
+  end
+
   describe "statistics tab" do
     setup [:create_admin]
 
