@@ -167,6 +167,30 @@ defmodule YscWeb.AdminPostsLiveTest do
 
       assert_patched(view, ~p"/admin/posts")
     end
+
+    test "renders pagination on the desktop table when results span pages", %{
+      conn: conn,
+      admin: admin
+    } do
+      # default_limit is 50, so 51 posts forces a second page.
+      for i <- 1..51 do
+        post_fixture(admin, %{
+          title: "Paged Post #{i}",
+          url_name: "paged-post-#{System.unique_integer()}"
+        })
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts")
+      render_async(view, 5000)
+
+      # The pagination nav must render inside the desktop-only table
+      # container. The mobile list is `md:hidden`, so a nav that only lives
+      # there is invisible on desktop.
+      assert has_element?(
+               view,
+               "div.hidden.md\\:block nav[aria-label='Pagination'] a[aria-label='Go to page 2']"
+             )
+    end
   end
 
   describe "editing presence" do

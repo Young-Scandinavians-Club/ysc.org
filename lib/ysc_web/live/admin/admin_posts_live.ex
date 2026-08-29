@@ -247,6 +247,13 @@ defmodule YscWeb.AdminPostsLive do
                   />
                 </:action>
               </Flop.Phoenix.table>
+
+              <%!-- Desktop Pagination --%>
+              <.admin_flop_pagination
+                meta={@meta}
+                path={~p"/admin/posts?#{non_flop_params(@params)}"}
+                density={:comfortable}
+              />
             </div>
           </div>
         </div>
