@@ -129,6 +129,8 @@ defmodule Ysc.Tickets do
     * `:skip_sale_guards` - when true, bypass publish state, event date, and tier sale window checks (for legacy migration)
     * `:skip_email` - when true, do not send the ticket confirmation email
     * `:admin_grant_notes` - optional audit note (e.g. legacy order reference)
+    * `:payment_channel` - optional `"cash"` | `"check"` | `"other"` for an in-person sale recorded outside Stripe
+    * `:offline_amount_collected` - optional `Money` the seller physically collected (order total stays $0)
 
   ## Returns
 

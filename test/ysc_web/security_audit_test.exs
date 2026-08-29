@@ -44,6 +44,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 47 (HIGH)     Impersonation kept post-login reauth grace, allowing password/email takeover of the victim
   Finding 48 (MEDIUM)   App ticket PaymentIntent treated donation map values as cents while documenting quantity
   Finding 49 (HIGH)     Already-authenticated mobile handoff minted a PKCE-bound code on GET from attacker-supplied challenge
+  Finding 50 (HIGH)     Volunteers could reserve tickets with up to 100% discount, bypassing Finding 46 grant gates
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2851,6 +2852,45 @@ defmodule YscWeb.SecurityAuditTest do
                    t.user_id == ^admin.id and t.context == "mobile_redirect"
                )
              )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 50 (HIGH): Volunteers cannot reserve tickets with discounts
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 50: volunteers cannot reserve discounted tickets" do
+    import Ysc.EventsFixtures
+
+    test "volunteer tickets tab hides reserve and rejects the LiveView event",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      member = user_fixture()
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 50",
+          quantity: 20
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-reserve")
+
+      view
+      |> element("#ticket-tier-reserve-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      refute has_element?(view, "#reserve-tickets-modal")
+      assert Ysc.Events.list_all_ticket_reservations_for_user(member.id) == []
+
+      assert Ysc.Events.list_all_ticket_reservations_for_user(volunteer.id) ==
+               []
     end
   end
 

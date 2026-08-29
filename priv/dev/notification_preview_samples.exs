@@ -186,7 +186,7 @@
       header_image_alt: "Lake Tahoe cabin",
       benefit_description:
         "2 free nights on your next eligible stay (applied proportionally to the trip subtotal).",
-      property_line: "Property: Lake Tahoe cabin.",
+      property_line: "Cabin: Lake Tahoe.",
       buyout_cap_line: "",
       expiry_line: "This benefit does not expire.",
       next_booking_notice:
@@ -196,7 +196,7 @@
       tahoe_book_url: "http://localhost:4000/bookings/tahoe",
       clear_lake_book_url: nil,
       manage_bookings_hint:
-        "Start a new reservation to use this benefit — it appears on your price summary automatically before you confirm."
+        "Start a new booking to use this benefit — it appears on your price summary automatically before you confirm."
     },
     "booking_modification_confirmation" => %{
       first_name: "Astrid",

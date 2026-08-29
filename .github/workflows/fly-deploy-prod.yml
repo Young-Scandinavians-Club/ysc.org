@@ -9,6 +9,9 @@
 # production does not run. Sandbox deploy uses the shared deploy-sandbox concurrency
 # group with cancel-in-progress: true so release deploys win over CI sandbox deploys.
 #
+# flyctl is installed via .github/actions/setup-flyctl (retrying bash), not
+# superfly/flyctl-actions — that Node 24 action can fail in ~1s with no logs.
+#
 # Requires secrets:
 # - FLY_SANDBOX_API_TOKEN or FLY_API_TOKEN (sandbox gate deploy before prod)
 # - FLY_PROD_API_TOKEN (production Fly org; not sandbox)
@@ -38,7 +41,7 @@ jobs:
           git fetch origin main
           git merge-base --is-ancestor "${{ github.sha }}" origin/main
 
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+      - uses: ./.github/actions/setup-flyctl
 
       - name: Verify Fly token can access sandbox app
         env:
@@ -79,7 +82,7 @@ jobs:
           git fetch origin main
           git merge-base --is-ancestor "${{ github.sha }}" origin/main
 
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+      - uses: ./.github/actions/setup-flyctl
 
       - name: Verify Fly token can access query console sandbox
         working-directory: .
@@ -116,7 +119,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+      - uses: ./.github/actions/setup-flyctl
 
       - name: Verify Fly token can access query console production
         working-directory: .
@@ -150,7 +153,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # Node 24 runtime (post v1.5)
+      - uses: ./.github/actions/setup-flyctl
 
       - name: Verify Fly token can access production app
         env:
