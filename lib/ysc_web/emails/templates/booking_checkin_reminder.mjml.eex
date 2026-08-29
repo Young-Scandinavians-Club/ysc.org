@@ -11,22 +11,22 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your stay at our <%= @property_name %> property is <%= cond do %><% @days_until_checkin == 0 -> %>today<% @days_until_checkin == 1 -> %>tomorrow<% true -> %><%= "#{@days_until_checkin} days away" %><% end %>! We're excited to host you.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your stay at the <%= @property_name %> cabin is <%= cond do %><% @days_until_checkin == 0 -> %>today<% @days_until_checkin == 1 -> %>tomorrow<% true -> %><%= "#{@days_until_checkin} days away" %><% end %>! We're excited to host you.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Door Code Notice - Very Prominent -->
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <div class="door-code-box">
         <strong class="door-code-title">Your Door Code</strong>
         <span class="door-code-value"><%= @door_code %></span>
-        <span class="door-code-note">Please save this code - you'll need it to access the property.</span>
+        <span class="door-code-note">Please save this code — you'll need it to get into the cabin.</span>
       </div>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <!-- Property Location -->
-    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Property Location</mj-text>
+    <!-- Cabin location -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Cabin location</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Property:</strong> <%= @property_name %>
+      <strong>Cabin:</strong> <%= @property_name %>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Address:</strong> <%= @property_address %>
@@ -42,8 +42,8 @@
       <strong>Check-out:</strong> <%= @checkout_date %> at <strong><%= @checkout_time %></strong>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <!-- Reservation Details -->
-    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Reservation Details</mj-text>
+    <!-- Booking Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Booking Details</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Booking Reference:</strong>
@@ -104,8 +104,8 @@
       <div class="red-alert-box">
         <strong class="strong-block">BEARS ARE ACTIVE ALL YEAR.</strong> They will get in your car. Lock your car doors ALWAYS.<br/><br/>
         <strong class="strong-block">No Pets Allowed. No Exceptions.</strong><br/>
-        <strong class="strong-block">Guests &amp; Reservations</strong>
-        Ensure your reservation for the number of adults staying is accurate. Guests must be accompanied by a Member. Members are responsible for ensuring guests know the cabin policies.<br/><br/>
+        <strong class="strong-block">Guests</strong>
+        Make sure the number of adults on your booking is accurate. Guests must be accompanied by a Member. Members are responsible for ensuring guests know the cabin policies.<br/><br/>
         <strong class="strong-block">The Bear Wire</strong>
         <strong>Check Status:</strong> The box to the right of the front door should be clicking. If not, reset it in the fuse box in the laundry room (marked "BW").<br/>
         <strong>To Deactivate:</strong> Remove top wire first, then 2nd, then 3rd.<br/>
@@ -231,7 +231,7 @@
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We look forward to hosting you at our <%= @property_name %> property!</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We look forward to hosting you at the <%= @property_name %> cabin!</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Vi ses snart! (See you soon!) 👋</mj-text>
     <mj-spacer height="24px"></mj-spacer>

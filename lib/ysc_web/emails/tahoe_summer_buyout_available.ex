@@ -16,7 +16,7 @@ defmodule YscWeb.Emails.TahoeSummerBuyoutAvailable do
   def get_template_name, do: "tahoe_summer_buyout_available"
 
   def get_subject(cycle_label) do
-    "[YSC] Book the whole cabin — Summer #{cycle_label} buyouts are open!"
+    "[YSC] Book the whole cabin — Summer #{cycle_label} is open!"
   end
 
   def booking_url, do: absolute_url("/bookings/tahoe")

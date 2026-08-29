@@ -71,7 +71,7 @@
       <%= if @tahoe_buyout_allowed do %>
         That means the whole cabin is available to book, not just individual rooms — great for bringing a bigger group.
       <% else %>
-        In winter, only individual room bookings are available — full-cabin buyouts open back up once summer season starts.
+        In winter, only individual room bookings are available — you can book the entire cabin again once summer season starts.
       <% end %>
     </mj-text>
     <mj-button href="<%= @tahoe_url %>" background-color="#1447e6" color="#ffffff" font-size="14px" padding="0" border-radius="6px" align="left">

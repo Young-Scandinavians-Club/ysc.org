@@ -43,7 +43,7 @@
       </span>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Property:</strong> <%= @booking.property %>
+      <strong>Cabin:</strong> <%= @booking.property %>
     </mj-text>
     <%= if @booking.room_names do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
