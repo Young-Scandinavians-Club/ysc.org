@@ -378,6 +378,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       data = BookingConfirmation.prepare_email_data(booking)
       assert data.booking_date =~ ~r/P(S|D)T$/
       assert data.total_amount =~ "$"
+      assert data.cabin_email == Ysc.EmailConfig.booking_reply_to(booking.property)
 
       assert BookingConfirmation.booking_url(booking.id) =~
                "/bookings/#{booking.id}/receipt"

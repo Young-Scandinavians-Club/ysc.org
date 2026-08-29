@@ -187,15 +187,18 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           },
           total_amount: "$200.00",
           booking_date: "Nov 1, 2026 at 10:00 AM",
-          booking_url: "https://example.com/bookings/preview"
+          booking_url: "https://example.com/bookings/preview",
+          cabin_email: "tahoe@ysc.org"
         })
 
       text = html_text(html)
 
       assert text =~ "host you at the Tahoe cabin"
       assert text =~ "Cabin:"
+      assert text =~ "Tahoe Cabin Master at tahoe@ysc.org"
       refute text =~ "our Tahoe property"
       refute text =~ "Property:"
+      refute text =~ "info@ysc.org"
     end
 
     test "check-in reminder uses booking and cabin language" do

@@ -178,7 +178,8 @@
       },
       total_amount: "$200.00",
       booking_date: "Nov 1, 2026 at 10:00 AM",
-      booking_url: "http://localhost:4000/bookings/preview"
+      booking_url: "http://localhost:4000/bookings/preview",
+      cabin_email: "tahoe@ysc.org"
     },
     "booking_entitlement_granted" => %{
       first_name: "Astrid",
