@@ -23,7 +23,7 @@
     <mj-text font-size="18px" align="left" line-height="1.5">
       <ul>
         <li style="padding-bottom: 10px"><strong>Exclusive Events:</strong> Join our vibrant community gatherings, cultural celebrations, and social activities. <a href="<%= @upcoming_events_url %>">View Upcoming Events</a></li>
-        <li style="padding-bottom: 10px"><strong>Cabin Bookings:</strong> Reserve our beautiful Tahoe and Clear Lake properties for your getaways</li>
+        <li style="padding-bottom: 10px"><strong>Cabin Bookings:</strong> Book a stay at our Tahoe and Clear Lake cabins</li>
         <li><strong>Community Access:</strong> Connect with fellow Scandinavians and build lasting friendships</li>
       </ul>
     </mj-text>

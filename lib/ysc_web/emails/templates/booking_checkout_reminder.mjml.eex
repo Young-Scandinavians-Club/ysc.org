@@ -11,7 +11,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your stay at our <%= @property_name %> property is coming to an end. Please review the checkout instructions below to ensure a smooth departure.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your stay at the <%= @property_name %> cabin is coming to an end. Please review the checkout instructions below to ensure a smooth departure.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Leave by -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Leave By</mj-text>
@@ -141,7 +141,7 @@
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for staying at our <%= @property_name %> property!</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for staying at the <%= @property_name %> cabin!</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Young Scandinavians Club</mj-text>
     <mj-spacer height="12px"></mj-spacer>

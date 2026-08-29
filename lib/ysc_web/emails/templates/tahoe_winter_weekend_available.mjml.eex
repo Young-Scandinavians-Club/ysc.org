@@ -11,7 +11,7 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="20px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      The booking window for the Tahoe cabin's Winter <%= @cycle_label %> season has opened — you can now reserve the first full weekend:
+      The booking window for the Tahoe cabin's Winter <%= @cycle_label %> season has opened — you can now book the first full weekend:
     </mj-text>
     <mj-spacer height="20px"></mj-spacer>
     <mj-text align="left" font-size="22px" line-height="1.4" padding="0px" font-weight="bold" color="#1447e6">
@@ -19,7 +19,7 @@
     </mj-text>
     <mj-spacer height="20px"></mj-spacer>
     <mj-text align="left" font-size="16px" line-height="1.6" padding="0px" color="#444444">
-      Winter is room bookings only — the whole cabin isn't available to rent out during winter nights. Single membership holders can reserve 1 room per stay; family membership holders can reserve 2 rooms for the same dates.
+      Winter is room bookings only — the whole cabin isn't available to book during winter nights. A Single membership can book 1 room per stay; a Family membership can book 2 rooms for the same dates.
     </mj-text>
     <mj-spacer height="32px"></mj-spacer>
     <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="16px 32px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" font-weight="bold" border-radius="6px">
