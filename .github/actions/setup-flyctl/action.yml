@@ -1,0 +1,16 @@
+name: Set up flyctl
+description: Install flyctl with curl retries (avoids Node 24 setup-flyctl flakes)
+inputs:
+  version:
+    description: flyctl version to install, or "latest"
+    required: false
+    default: latest
+runs:
+  using: composite
+  steps:
+    - name: Install flyctl
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        FLYCTL_VERSION: ${{ inputs.version }}
+      run: bash "${{ github.workspace }}/etc/scripts/install_flyctl.sh"
