@@ -240,14 +240,16 @@ defmodule Ysc.TicketsTest do
       })
     end
 
-    defp give_single_membership(user) do
+    defp give_single_membership(user), do: give_plan_membership(user, :single)
+
+    defp give_plan_membership(user, plan_id) do
       plans = Application.fetch_env!(:ysc, :membership_plans)
-      single = Enum.find(plans, &(&1.id == :single))
+      plan = Enum.find(plans, &(&1.id == plan_id))
 
       {:ok, subscription} =
         Ysc.Subscriptions.create_subscription(%{
           user_id: user.id,
-          stripe_id: "sub_single_#{System.unique_integer([:positive])}",
+          stripe_id: "sub_#{plan_id}_#{System.unique_integer([:positive])}",
           stripe_status: "active",
           name: "Membership",
           current_period_start: DateTime.truncate(DateTime.utc_now(), :second),
@@ -260,14 +262,31 @@ defmodule Ysc.TicketsTest do
       {:ok, _} =
         Ysc.Subscriptions.create_subscription_item(%{
           subscription_id: subscription.id,
-          stripe_id: "si_single_#{System.unique_integer([:positive])}",
-          stripe_product_id: "prod_single",
-          stripe_price_id: single.stripe_price_id,
+          stripe_id: "si_#{plan_id}_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_#{plan_id}",
+          stripe_price_id: plan.stripe_price_id,
           quantity: 1
         })
 
       Ysc.Accounts.MembershipCache.invalidate_user(user.id)
       user
+    end
+
+    defp insert_ticket!(%{user: user, event: event, tier: tier, status: status}) do
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.add(1, :day)
+        |> DateTime.truncate(:second)
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: status,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
     end
 
     test "lifetime member can buy several member-only tickets across tiers", %{
@@ -336,6 +355,50 @@ defmodule Ysc.TicketsTest do
 
       assert {:ok, _order} =
                Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+    end
+
+    test "family member can buy several member-only tickets across tiers", %{
+      event: event,
+      member_tier_a: a,
+      member_tier_b: b
+    } do
+      user = give_plan_membership(user_fixture_unique(), :family)
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 a.id => 2,
+                 b.id => 1
+               })
+    end
+
+    test "pending member-only tickets do not consume the single-member limit",
+         %{event: event, member_tier_a: a, member_tier_b: b} do
+      user = give_single_membership(user_fixture_unique())
+
+      insert_ticket!(%{
+        user: user,
+        event: event,
+        tier: a,
+        status: :pending
+      })
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{b.id => 1})
+    end
+
+    test "cancelled member-only tickets do not consume the single-member limit",
+         %{event: event, member_tier_a: a, member_tier_b: b} do
+      user = give_single_membership(user_fixture_unique())
+
+      insert_ticket!(%{
+        user: user,
+        event: event,
+        tier: a,
+        status: :cancelled
+      })
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{b.id => 1})
     end
   end
 
