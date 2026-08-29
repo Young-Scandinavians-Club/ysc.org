@@ -74,22 +74,28 @@ Served at `https://<host>/.well-known/assetlinks.json` (static file:
 `.well-known` `Plug.Static`). Same file is deployed to both `ysc.org` and
 `ysc-sandbox.fly.dev` since they run the same app.
 
-**You must fill in the SHA-256 signing-cert fingerprints** — the committed
-file has `REPLACE_WITH_…` placeholders, so verification will fail until you
-do:
+`sha256_cert_fingerprints` holds the fingerprint of the EAS-managed
+release keystore for `org.ysc.admin`
+(`F8:74:4E:2C:…:E6`). EAS uses one keystore per app, so `preview` and
+`production` builds share it. It was read from a shipped build's APK
+signature:
 
 ```bash
-# From ../ysc-admin-mobile — the EAS-managed upload/signing key:
 cd ../ysc-admin-mobile
-eas credentials --platform android
-#   → select the profile → "Keystore" → note the "SHA256 Fingerprint"
+eas build:list --platform android --limit 1 --json --non-interactive
+#   → download the .apk from applicationArchiveUrl, then:
+#   apksigner verify --print-certs app.apk        # SDK build-tools
+#   (or) keytool -printcert -jarfile app.apk      # only if v1-signed
 ```
 
-If the app is ever distributed through Play Store **Play App Signing**, add
-that cert's fingerprint too (Play Console → *Test and release* → *App
-integrity* → *App signing key certificate* → SHA-256). List all applicable
-fingerprints in `sha256_cert_fingerprints` (uppercase hex, colon-separated,
-e.g. `AB:CD:EF:...`).
+or interactively via `eas credentials --platform android` → *Keystore* →
+"SHA256 Fingerprint".
+
+**Re-check after any keystore change** (a rotated or re-uploaded keystore
+changes the fingerprint). If the app is ever shipped through Play Store
+**Play App Signing**, add that cert's fingerprint too (Play Console → *Test
+and release* → *App integrity* → *App signing key certificate* → SHA-256) —
+`sha256_cert_fingerprints` is a list.
 
 ### 2. Intent filters in the app (`../ysc-admin-mobile/app.json`)
 
