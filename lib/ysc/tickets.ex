@@ -58,8 +58,16 @@ defmodule Ysc.Tickets do
   - `{:error, :member_only_not_eligible}` if the selection includes member-only tiers the buyer's plan can't purchase
   - `{:error, :member_only_limit_exceeded}` if the selection exceeds the buyer's per-event member-only ticket limit
   - `{:error, :checkout_payment_in_progress}` when another pending checkout has in-flight payment
+
+  ## Options
+
+    * `:bypass_guards` - passed straight through to
+      `Ysc.Tickets.BookingLocker.atomic_booking/4` — see its doc for what
+      this relaxes and why (the admin/volunteer mobile app's door sales).
+      Membership and member-only-tier eligibility are unaffected regardless
+      of this option.
   """
-  def create_ticket_order(user_id, event_id, ticket_selections) do
+  def create_ticket_order(user_id, event_id, ticket_selections, opts \\ []) do
     require Ysc.Logging
 
     Ysc.Logging.info("Creating ticket order",
@@ -77,7 +85,8 @@ defmodule Ysc.Tickets do
                BookingLocker.atomic_booking(
                  user_id,
                  event_id,
-                 ticket_selections
+                 ticket_selections,
+                 opts
                ) do
           # Emit telemetry event for ticket order creation
           ticket_count =

@@ -5,7 +5,8 @@ defmodule YscWeb.Api.AppTicketsJSON do
 
   def payment_intent(%{
         payment_intent: payment_intent,
-        ticket_order: ticket_order
+        ticket_order: ticket_order,
+        warnings: warnings
       }) do
     %{
       ticket_order_id: to_string(ticket_order.id),
@@ -13,7 +14,8 @@ defmodule YscWeb.Api.AppTicketsJSON do
       payment_intent_id: payment_intent.id,
       client_secret: payment_intent.client_secret,
       amount: payment_intent.amount,
-      currency: payment_intent.currency
+      currency: payment_intent.currency,
+      warnings: warnings
     }
   end
 
@@ -22,7 +24,7 @@ defmodule YscWeb.Api.AppTicketsJSON do
   ticket sale. No payment intent — the order is a $0 grant with the collected
   amount recorded in `admin_grant_notes`.
   """
-  def offline_order(%{ticket_order: ticket_order}) do
+  def offline_order(%{ticket_order: ticket_order, warnings: warnings}) do
     %{
       ticket_order_id: to_string(ticket_order.id),
       ticket_order_reference: ticket_order.reference_id,
@@ -30,7 +32,8 @@ defmodule YscWeb.Api.AppTicketsJSON do
       ticket_count: length(ticket_order.tickets || []),
       payment_channel: ticket_order.payment_channel,
       amount_collected: money_string(ticket_order.offline_amount_collected),
-      notes: ticket_order.admin_grant_notes
+      notes: ticket_order.admin_grant_notes,
+      warnings: warnings
     }
   end
 

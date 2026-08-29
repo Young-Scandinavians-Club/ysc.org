@@ -78,6 +78,41 @@ defmodule Ysc.Events.Ticket do
   end
 
   @doc """
+  Changeset for the admin/volunteer mobile app's in-person door sales.
+
+  Same as `changeset/2` (still `:pending` until payment succeeds, same
+  fields, still requires membership) except it skips
+  `validate_event_not_in_past/1` — selling at the door is precisely what you
+  do *while* an event is happening, so that guard (written for the
+  self-service web checkout) doesn't apply. See
+  `Ysc.Tickets.BookingLocker.atomic_booking/4`'s `:bypass_guards` option,
+  which is what selects this changeset.
+  """
+  def door_sale_changeset(ticket, attrs) do
+    ticket
+    |> cast(attrs, [
+      :reference_id,
+      :event_id,
+      :ticket_tier_id,
+      :user_id,
+      :ticket_order_id,
+      :status,
+      :payment_id,
+      :expires_at,
+      :discount_amount
+    ])
+    |> validate_required([
+      :event_id,
+      :ticket_tier_id,
+      :user_id,
+      :expires_at
+    ])
+    |> validate_active_membership()
+    |> put_reference_id()
+    |> unique_constraint(:reference_id)
+  end
+
+  @doc """
   Changeset for admin-granted tickets.
 
   Skips purchase-time validations (membership, event-in-past) while still requiring

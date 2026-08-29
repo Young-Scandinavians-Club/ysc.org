@@ -968,6 +968,163 @@ defmodule Ysc.Tickets.BookingLockerTest do
     end
   end
 
+  describe "atomic_booking/4 with bypass_guards: true" do
+    test "succeeds for an event that has already started", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      past = DateTime.add(DateTime.utc_now(), -2, :day)
+      {:ok, _} = Events.update_event(event, %{start_date: past})
+
+      assert {:ok, _order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+                 bypass_guards: true
+               )
+    end
+
+    test "still rejects a cancelled event", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_event(event, %{state: :cancelled})
+
+      assert {:error, :event_cancelled} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+                 bypass_guards: true
+               )
+    end
+
+    test "still rejects a draft event", %{user: user, event: event, tier: tier} do
+      {:ok, _} = Events.update_event(event, %{state: :draft})
+
+      assert {:error, :event_not_available} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+                 bypass_guards: true
+               )
+    end
+
+    test "succeeds for a tier whose sale window hasn't started yet", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      future =
+        DateTime.add(DateTime.utc_now(), 2, :day) |> DateTime.truncate(:second)
+
+      {:ok, _} = Events.update_ticket_tier(tier, %{start_date: future})
+
+      assert {:ok, _order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+                 bypass_guards: true
+               )
+    end
+
+    test "succeeds selling more than the tier's remaining capacity", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 2})
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 5},
+                 bypass_guards: true
+               )
+
+      assert Repo.aggregate(
+               from(t in Ticket, where: t.ticket_order_id == ^order.id),
+               :count
+             ) == 5
+    end
+
+    test "succeeds selling past the event's max_attendees", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_event(event, %{max_attendees: 1})
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 10})
+
+      assert {:ok, _order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 4},
+                 bypass_guards: true
+               )
+    end
+  end
+
+  describe "capacity_warnings/2" do
+    test "empty when the selection is within tier and event capacity", %{
+      event: event,
+      tier: tier
+    } do
+      assert BookingLocker.capacity_warnings(event.id, %{tier.id => 1}) == []
+    end
+
+    test "warns when the selection exceeds the tier's remaining capacity", %{
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 2})
+
+      assert [warning] =
+               BookingLocker.capacity_warnings(event.id, %{tier.id => 5})
+
+      assert warning =~ tier.name
+      assert warning =~ "exceeds the 2 remaining by 3"
+    end
+
+    test "warns when the selection would exceed event max_attendees", %{
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_event(event, %{max_attendees: 1})
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 10})
+
+      assert [warning] =
+               BookingLocker.capacity_warnings(event.id, %{tier.id => 4})
+
+      assert warning =~ "Event capacity"
+      assert warning =~ "exceeding it by 3"
+    end
+
+    test "can return both a tier and an event capacity warning", %{
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_event(event, %{max_attendees: 1})
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 2})
+
+      assert warnings =
+               BookingLocker.capacity_warnings(event.id, %{tier.id => 5})
+
+      assert length(warnings) == 2
+    end
+
+    test "does not warn for donation tiers regardless of quantity", %{
+      event: event
+    } do
+      {:ok, donation_tier} =
+        Events.create_ticket_tier(%{
+          name: "Donate",
+          type: :donation,
+          price: Money.new(0, :USD),
+          quantity: 1,
+          event_id: event.id
+        })
+
+      assert BookingLocker.capacity_warnings(event.id, %{donation_tier.id => 50}) ==
+               []
+    end
+
+    test "returns an empty list for an unknown event", %{tier: tier} do
+      assert BookingLocker.capacity_warnings(Ecto.ULID.generate(), %{
+               tier.id => 1
+             }) == []
+    end
+  end
+
   describe "validate_fulfillment_capacity/3" do
     test "returns :ok when requested tickets fit remaining capacity", %{
       user: user,
