@@ -943,14 +943,35 @@ defmodule YscWeb.UserAuthTest do
   end
 
   describe "valid_mobile_redirect_uri?/1" do
-    test "allows the known admin app deep link" do
+    test "allows the known admin app deep links" do
       assert UserAuth.valid_mobile_redirect_uri?("ysc-admin://auth-callback")
+
+      assert UserAuth.valid_mobile_redirect_uri?(
+               "https://ysc.org/app/auth-callback"
+             )
+
+      assert UserAuth.valid_mobile_redirect_uri?(
+               "https://ysc-sandbox.fly.dev/app/auth-callback"
+             )
     end
 
     test "rejects anything else" do
       refute UserAuth.valid_mobile_redirect_uri?("ysc-admin://something-else")
       refute UserAuth.valid_mobile_redirect_uri?("evil-app://auth-callback")
       refute UserAuth.valid_mobile_redirect_uri?("https://evil.com")
+
+      refute UserAuth.valid_mobile_redirect_uri?(
+               "https://evil.com/app/auth-callback"
+             )
+
+      refute UserAuth.valid_mobile_redirect_uri?(
+               "http://ysc.org/app/auth-callback"
+             )
+
+      refute UserAuth.valid_mobile_redirect_uri?(
+               "https://ysc.org/app/auth-callback/evil"
+             )
+
       refute UserAuth.valid_mobile_redirect_uri?("/events/123")
       refute UserAuth.valid_mobile_redirect_uri?(nil)
       refute UserAuth.valid_mobile_redirect_uri?(123)

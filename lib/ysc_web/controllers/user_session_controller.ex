@@ -288,6 +288,45 @@ defmodule YscWeb.UserSessionController do
     UserAuth.complete_mobile_handoff(conn)
   end
 
+  @doc """
+  Landing page for the `https://…/app/auth-callback` Android App Link.
+
+  Reached only when the OS did *not* intercept the verified App Link — the
+  app isn't installed, the link isn't verified yet, or Chrome kept a
+  same-origin in-browser navigation to itself. Bounces the opaque one-time
+  `code` on to the `ysc-admin://` scheme and shows a button. Mints nothing,
+  consumes nothing.
+  """
+  def app_auth_callback(conn, %{"code" => code})
+      when is_binary(code) and code != "" do
+    # `code` here is straight from the query string (unlike the minted-token
+    # call sites in UserAuth). Only a real one-time code — unpadded URL-safe
+    # Base64, see `UserToken.build_mobile_redirect_token/2` — is ever passed
+    # on; anything else can't be legitimate and must not reach the HTML
+    # builder unescaped.
+    if code =~ ~r/\A[A-Za-z0-9_-]{1,128}\z/ do
+      UserAuth.send_mobile_app_handoff(conn, "ysc-admin://auth-callback", code)
+    else
+      app_auth_callback_placeholder(conn)
+    end
+  end
+
+  def app_auth_callback(conn, _params) do
+    app_auth_callback_placeholder(conn)
+  end
+
+  # sobelow_skip ["XSS.SendResp"]
+  defp app_auth_callback_placeholder(conn) do
+    conn
+    |> put_resp_content_type("text/html")
+    |> send_resp(
+      400,
+      ~s(<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">) <>
+        ~s(<p style="font-family:system-ui,sans-serif;text-align:center;padding:2.5rem 1.5rem">) <>
+        "This link opens the YSC Admin app.</p>"
+    )
+  end
+
   # sobelow_skip ["XSS.SendResp"]
   def passkey_login(conn, params) do
     require Ysc.Logging

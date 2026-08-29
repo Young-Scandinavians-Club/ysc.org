@@ -134,6 +134,61 @@ defmodule YscWeb.UserSessionControllerTest do
 
       assert id == admin.id
     end
+
+    test "the handoff page carries the request's CSP nonce on its inline script",
+         %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(
+          ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+        )
+
+      conn = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "continue"
+        })
+
+      html = html_response(conn, 200)
+      [_, nonce] = Regex.run(~r/<script nonce="([^"]+)">/, html)
+      assert nonce != ""
+
+      assert get_resp_header(conn, "content-security-policy")
+             |> List.first() =~ "'nonce-#{nonce}'"
+    end
+  end
+
+  describe "GET /app/auth-callback" do
+    test "bounces a code to the ysc-admin:// scheme", %{conn: conn} do
+      conn = get(conn, ~p"/app/auth-callback?#{%{code: "abc123_-XYZ"}}")
+
+      html = html_response(conn, 200)
+      assert html =~ "href=\"ysc-admin://auth-callback?code=abc123_-XYZ\""
+      assert html =~ "var url = \"ysc-admin://auth-callback?code=abc123_-XYZ\""
+    end
+
+    test "returns 400 without a code", %{conn: conn} do
+      conn = get(conn, ~p"/app/auth-callback")
+      assert response(conn, 400) =~ "opens the YSC Admin app"
+    end
+
+    test "rejects a code that isn't URL-safe Base64 (no HTML injection)", %{
+      conn: conn
+    } do
+      payload = "a\"><script>x</script>"
+      conn = get(conn, ~p"/app/auth-callback?#{%{code: payload}}")
+
+      assert response(conn, 400) =~ "opens the YSC Admin app"
+      refute response(conn, 400) =~ "<script>x</script>"
+    end
   end
 
   describe "POST /users/log-in" do
