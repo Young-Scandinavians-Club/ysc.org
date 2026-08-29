@@ -47,11 +47,16 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             role="radiogroup"
             aria-label="Ticket tier type"
           >
+            <%!--
+            The focus ring is a neutral zinc, deliberately unlike the blue
+            "selected" style: the modal focuses the first radio on open, and a
+            blue focus ring there read as a second selected option.
+            --%>
             <label
               :for={{value, title, description, icon} <- type_options()}
               class={[
                 "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 transition-colors",
-                "focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1",
+                "focus-within:ring-2 focus-within:ring-zinc-400 focus-within:ring-offset-1",
                 if(@tier_type == value,
                   do: "border-blue-600 bg-blue-50 ring-1 ring-blue-600",
                   else: "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50"

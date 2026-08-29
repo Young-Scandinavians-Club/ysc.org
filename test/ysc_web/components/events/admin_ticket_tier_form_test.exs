@@ -289,6 +289,41 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
       assert html =~ "One fixed ticket price"
       assert html =~ "Attendee picks the amount"
     end
+
+    test "only the current type's radio is checked when editing a paid tier" do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          price: Money.new(8500, :USD)
+        })
+
+      html =
+        render_component(TicketTierForm, %{
+          id: "edit-tier-#{tier.id}",
+          event: event,
+          event_id: event.id,
+          ticket_tier: tier,
+          action: :edit
+        })
+
+      checked_type_radios =
+        Regex.scan(
+          ~r/<input type="radio" name="ticket_tier\[type\]" value="\w+" checked/,
+          html
+        )
+
+      assert length(checked_type_radios) == 1
+      assert html =~ ~s(value="paid" checked)
+
+      # Only the selected card carries the blue highlight; the focus ring uses a
+      # neutral color so a programmatically focused card (the modal focuses the
+      # first radio on open) is never mistaken for a second selection.
+      assert length(Regex.scan(~r/\bbg-blue-50\b/, html)) == 1
+      refute html =~ "focus-within:ring-blue"
+    end
   end
 
   describe "requires registration option" do
