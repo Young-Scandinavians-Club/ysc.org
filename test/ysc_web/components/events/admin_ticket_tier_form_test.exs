@@ -289,6 +289,54 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
       assert html =~ "One fixed ticket price"
       assert html =~ "Attendee picks the amount"
     end
+
+    test "only the current type's radio is checked when editing a paid tier" do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          price: Money.new(8500, :USD)
+        })
+
+      html =
+        render_component(TicketTierForm, %{
+          id: "edit-tier-#{tier.id}",
+          event: event,
+          event_id: event.id,
+          ticket_tier: tier,
+          action: :edit
+        })
+
+      doc = LazyHTML.from_fragment(html)
+
+      # Exactly one type radio is checked, and it is the paid one.
+      checked =
+        LazyHTML.query(doc, ~s(input[name="ticket_tier[type]"][checked]))
+
+      assert LazyHTML.attribute(checked, "value") == ["paid"]
+
+      # Exactly one Type card carries the blue "selected" highlight, and it is
+      # the card wrapping the checked paid radio.
+      selected =
+        LazyHTML.query(doc, "#ticket-tier-type-options label.bg-blue-50")
+
+      assert Enum.count(selected) == 1
+
+      assert selected
+             |> LazyHTML.query(~s(input[value="paid"][checked]))
+             |> Enum.any?()
+
+      # Every card uses the neutral zinc focus ring, not the blue selected color,
+      # so a programmatically focused card is never mistaken for a selection.
+      cards = LazyHTML.query(doc, "#ticket-tier-type-options label")
+      class_attrs = LazyHTML.attribute(cards, "class")
+
+      assert Enum.count(class_attrs) == 3
+      assert Enum.all?(class_attrs, &(&1 =~ "focus-within:ring-zinc-600"))
+      refute Enum.any?(class_attrs, &(&1 =~ "focus-within:ring-blue"))
+    end
   end
 
   describe "requires registration option" do
