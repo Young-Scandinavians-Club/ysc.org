@@ -912,7 +912,7 @@ defmodule YscWeb.EventDetailsLive do
                 <% end %>
 
                 <%= if ticket_sales_closed?(@event) do %>
-                  <!-- No additional content once sales close -->
+                  <%!-- No additional content once sales close --%>
                 <% else %>
                   <%!-- Ticket Perforation Line --%>
                   <div class="relative h-px border-t border-dashed border-zinc-200 mx-4">
@@ -1262,7 +1262,7 @@ defmodule YscWeb.EventDetailsLive do
                   <% end %>
 
                   <%= if ticket_sales_closed?(@event) do %>
-                    <!-- No action button once sales close -->
+                    <%!-- No action button once sales close --%>
                   <% else %>
                     <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
                       <.partiful_rsvp_button
@@ -8792,13 +8792,23 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  # Online ticket sales close the moment an event starts: BookingLocker rejects
-  # any booking whose start time is already in the past (see
-  # Ysc.Events.EventDateTime.in_past?/1). Gate the purchase UI on this so we
-  # never offer a checkout the booking transaction will refuse. Covers both a
-  # live event (started, not ended) and a fully past one.
-  defp ticket_sales_closed?(event) do
-    event_live?(event) or event_in_past?(event)
+  # Online ticket sales close the moment an event starts. This mirrors
+  # Ysc.Events.EventDateTime.in_past?/1 — the exact cutoff
+  # BookingLocker.atomic_booking enforces — so the purchase UI never offers a
+  # checkout the booking transaction will reject. Notably, for an event with no
+  # start_time it compares the stored start_date directly (as BookingLocker
+  # does) rather than assuming Pacific midnight. Kept as a struct-shaped match
+  # rather than a call into EventDateTime so render/1's type checker does not
+  # narrow @event and lose its virtual keys (e.g. pricing_info).
+  defp ticket_sales_closed?(%{start_date: nil}), do: false
+
+  defp ticket_sales_closed?(%{start_date: start_date, start_time: nil}) do
+    DateTime.compare(DateTime.utc_now(), start_date) == :gt
+  end
+
+  defp ticket_sales_closed?(%{start_date: start_date, start_time: start_time}) do
+    starts_at = Ysc.Events.EventDateTime.combine(start_date, start_time)
+    DateTime.compare(DateTime.utc_now(), starts_at) == :gt
   end
 
   # Check if an agenda item is currently happening (between start_time and end_time)
