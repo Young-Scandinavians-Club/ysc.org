@@ -42,6 +42,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             Type
           </span>
           <div
+            id="ticket-tier-type-options"
             class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3"
             role="radiogroup"
             aria-label="Ticket tier type"
@@ -327,6 +328,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       |> maybe_restore_retained_price(ticket_tier_params, retained_price)
       |> maybe_parse_price()
       |> maybe_set_free_price()
+      |> maybe_clear_donation_fields()
       |> maybe_set_unlimited_quantity()
 
     changeset =
@@ -367,6 +369,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       |> maybe_restore_retained_price(ticket_tier_params, retained_price)
       |> maybe_parse_price()
       |> maybe_set_free_price()
+      |> maybe_clear_donation_fields()
       |> maybe_set_unlimited_quantity()
 
     changeset =
@@ -390,6 +393,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       ticket_tier_params
       |> maybe_parse_price()
       |> maybe_set_free_price()
+      |> maybe_clear_donation_fields()
       |> maybe_set_unlimited_quantity()
       |> Map.put("event_id", socket.assigns.event_id)
 
@@ -593,6 +597,20 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       "free" -> Map.put(params, "price", Money.new(0, :USD))
       "donation" -> Map.put(params, "price", nil)
       _ -> params
+    end
+  end
+
+  # Donation tiers have no capacity limit or sale window. Clear those fields so
+  # switching an existing limited/scheduled tier to Donation doesn't silently
+  # keep its old quantity and sale dates after saving.
+  defp maybe_clear_donation_fields(params) do
+    if donation_type?(params["type"]) do
+      params
+      |> Map.put("quantity", nil)
+      |> Map.put("start_date", nil)
+      |> Map.put("end_date", nil)
+    else
+      params
     end
   end
 
