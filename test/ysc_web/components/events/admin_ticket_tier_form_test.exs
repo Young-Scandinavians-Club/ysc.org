@@ -258,4 +258,56 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
       assert html =~ "phx-submit" or html =~ "form"
     end
   end
+
+  describe "type selector" do
+    test "renders type as a radio group with all options visible" do
+      event = event_fixture()
+
+      html =
+        render_component(TicketTierForm, %{
+          id: "new-tier",
+          event: event,
+          event_id: event.id,
+          tier: nil,
+          action: :new
+        })
+
+      # Segmented control, not a <select>
+      assert html =~ ~s(role="radiogroup")
+
+      assert html =~
+               ~s(<input type="radio" name="ticket_tier[type]" value="free")
+
+      assert html =~
+               ~s(<input type="radio" name="ticket_tier[type]" value="paid")
+
+      assert html =~
+               ~s(<input type="radio" name="ticket_tier[type]" value="donation")
+
+      # Each option carries a short helper description
+      assert html =~ "No charge to attend"
+      assert html =~ "One fixed ticket price"
+      assert html =~ "Attendee picks the amount"
+    end
+  end
+
+  describe "requires registration option" do
+    test "shows an inline description instead of only a tooltip" do
+      event = event_fixture()
+
+      html =
+        render_component(TicketTierForm, %{
+          id: "new-tier",
+          event: event,
+          event_id: event.id,
+          tier: nil,
+          action: :new
+        })
+
+      assert html =~ "Requires registration"
+
+      assert html =~
+               "Collect first name, last name, and email for every ticket"
+    end
+  end
 end

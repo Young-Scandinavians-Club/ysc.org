@@ -1380,6 +1380,77 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "tickets tab - ticket tier form" do
+    setup [:create_admin]
+
+    test "type selector renders as a segmented control with descriptions", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("[phx-click='open-add-ticket-tier-modal']")
+      |> render_click()
+
+      html = render(view)
+      assert html =~ ~s(role="radiogroup")
+      assert html =~ "No charge to attend"
+      assert html =~ "One fixed ticket price"
+      assert html =~ "Attendee picks the amount"
+    end
+
+    test "keeps an entered price when switching tier type away and back", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      form_sel = "#ticket-tier-form-#{event.id}"
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("[phx-click='open-add-ticket-tier-modal']")
+      |> render_click()
+
+      # Switch to a paid tier so the price input appears.
+      view
+      |> form(form_sel, %{"ticket_tier" => %{"type" => "paid", "name" => "VIP"}})
+      |> render_change()
+
+      # Enter a price.
+      html =
+        view
+        |> form(form_sel, %{
+          "ticket_tier" => %{
+            "type" => "paid",
+            "name" => "VIP",
+            "price" => "$50.00"
+          }
+        })
+        |> render_change()
+
+      assert html =~ ~s(value="$50.00")
+
+      # Detour through Free (price input is hidden).
+      view
+      |> form(form_sel, %{"ticket_tier" => %{"type" => "free", "name" => "VIP"}})
+      |> render_change()
+
+      # Back to Paid: the previously entered price is restored.
+      html =
+        view
+        |> form(form_sel, %{
+          "ticket_tier" => %{"type" => "paid", "name" => "VIP"}
+        })
+        |> render_change()
+
+      assert html =~ ~s(value="$50.00")
+    end
+  end
+
   describe "statistics tab" do
     setup [:create_admin]
 

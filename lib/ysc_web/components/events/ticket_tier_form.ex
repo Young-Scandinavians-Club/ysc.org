@@ -3,12 +3,27 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
 
   import YscWeb.AdminComponents
 
+  alias Phoenix.LiveView.JS
   alias Ysc.Events.TicketTier
 
   @impl true
   def render(assigns) do
+    assigns =
+      assigns
+      |> assign(:tier_type, to_string(assigns.form[:type].value))
+      |> assign_new(:dialog_id, fn -> nil end)
+
     ~H"""
     <div id={"#{@event_id}-ticket-tier-form"}>
+      <div class="mb-5">
+        <h2 class="text-lg font-semibold text-zinc-900">
+          {if assigns[:ticket_tier], do: "Edit ticket tier", else: "New ticket tier"}
+        </h2>
+        <p class="mt-0.5 text-sm text-zinc-500">
+          Pick a tier type, then fill in what attendees see at checkout.
+        </p>
+      </div>
+
       <.form
         :let={_f}
         for={@form}
@@ -21,23 +36,56 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         class="space-y-4"
       >
         <.input type="hidden" value={@event_id} field={@form[:event_id]} />
-        <.input
-          type="select"
-          label="Type"
-          field={@form[:type]}
-          options={[
-            {"Free", "free"},
-            {"Paid", "paid"},
-            {"Donation", "donation"}
-          ]}
-          required
-        />
+
+        <div>
+          <span class="block text-sm font-semibold leading-6 text-zinc-700">
+            Type
+          </span>
+          <div
+            class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3"
+            role="radiogroup"
+            aria-label="Ticket tier type"
+          >
+            <label
+              :for={{value, title, description, icon} <- type_options()}
+              class={[
+                "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 transition-colors",
+                "focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1",
+                if(@tier_type == value,
+                  do: "border-blue-600 bg-blue-50 ring-1 ring-blue-600",
+                  else: "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50"
+                )
+              ]}
+            >
+              <input
+                type="radio"
+                name={@form[:type].name}
+                value={value}
+                checked={@tier_type == value}
+                class="sr-only"
+                required
+              />
+              <span class="flex items-center gap-1.5 text-sm font-semibold text-zinc-800">
+                <.icon name={icon} class="h-4 w-4 text-zinc-500" /> {title}
+              </span>
+              <span class="text-xs text-zinc-500">{description}</span>
+            </label>
+          </div>
+          <.error :for={msg <- Enum.map(@form[:type].errors, &translate_error(&1))}>
+            {msg}
+          </.error>
+        </div>
+
         <.input type="text" label="Name" field={@form[:name]} required />
 
-        <.input type="textarea" label="Description" field={@form[:description]} />
+        <.input
+          type="textarea"
+          label="Description"
+          field={@form[:description]}
+        />
 
         <.input
-          :if={paid_type?(@form[:type].value)}
+          :if={paid_type?(@tier_type)}
           type="text"
           label="Price"
           field={@form[:price]}
@@ -50,129 +98,155 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             $
           </div>
         </.input>
-        <.input
-          :if={!donation_type?(@form[:type].value)}
-          type="checkbox"
-          label="Unlimited quantity"
-          field={@form[:unlimited_quantity]}
-          phx-change="toggle_quantity_limit"
-          phx-target={@myself}
-        />
 
-        <.input
-          :if={
-            !donation_type?(@form[:type].value) && !@form[:unlimited_quantity].value
-          }
-          type="number"
-          label="Quantity"
-          field={@form[:quantity]}
-        />
-
-        <.date_picker
-          :if={!donation_type?(@form[:type].value)}
-          id="sales_start"
-          label="Sale Starts"
-          form={@form}
-          start_date_field={@form[:start_date]}
-          min={Date.utc_today()}
-          required={false}
-          timezone="America/Los_Angeles"
-        />
-        <.date_picker
-          :if={!donation_type?(@form[:type].value)}
-          id="sale_ends"
-          label="Sale Ends"
-          form={@form}
-          start_date_field={@form[:end_date]}
-          min={sale_end_min_date(@form[:start_date].value)}
-          required={false}
-          timezone="America/Los_Angeles"
-          end_of_day?={true}
-        />
-
-        <div :if={!donation_type?(@form[:type].value)}>
-          <label class="flex items-center gap-4 text-sm leading-6 text-zinc-600">
-            <input
-              type="hidden"
-              name={@form[:requires_registration].name}
-              value="false"
-            />
-            <input
-              type="checkbox"
-              id={@form[:requires_registration].id}
-              name={@form[:requires_registration].name}
-              value="true"
-              checked={
-                Phoenix.HTML.Form.normalize_value(
-                  "checkbox",
-                  @form[:requires_registration].value
-                )
-              }
-              class="rounded border-zinc-300 text-zinc-900 focus:ring-0"
-            />
-            <span class="flex items-center gap-2">
-              Requires Registration
-              <.tooltip
-                max_width="max-w-2xl"
-                tooltip_text="When enabled, customers will be required to provide first name, last name, and email for each ticket during checkout."
-              >
-                <.icon
-                  name="hero-question-mark-circle"
-                  class="w-4 h-4 text-zinc-400 hover:text-zinc-600"
-                />
-              </.tooltip>
-            </span>
-          </label>
-          <.error :for={
-            msg <-
-              Enum.map(@form[:requires_registration].errors, &translate_error(&1))
-          }>
-            {msg}
-          </.error>
+        <div
+          :if={donation_type?(@tier_type)}
+          class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"
+        >
+          Attendees choose how much to give. Donation tiers have no fixed price,
+          capacity limit, or sale window — they stay open until the event starts.
         </div>
 
         <div
-          :if={!donation_type?(@form[:type].value)}
-          class="rounded-lg border border-violet-200 bg-violet-50 p-3"
+          :if={!donation_type?(@tier_type)}
+          class="space-y-4 border-t border-zinc-100 pt-4"
         >
-          <label class="flex items-start gap-3 text-sm leading-6 text-zinc-700">
-            <input
-              type="hidden"
-              name={@form[:member_only].name}
-              value="false"
-            />
-            <input
-              type="checkbox"
-              id={@form[:member_only].id}
-              name={@form[:member_only].name}
-              value="true"
-              checked={
-                Phoenix.HTML.Form.normalize_value(
-                  "checkbox",
-                  @form[:member_only].value
-                )
-              }
-              class="mt-1 rounded border-zinc-300 text-violet-700 focus:ring-0"
-            />
-            <span class="flex flex-col gap-0.5">
-              <span class="flex items-center gap-2 font-medium text-violet-900">
-                <.icon name="hero-lock-closed" class="w-4 h-4" /> Member-only tier
-              </span>
-              <span class="text-xs text-violet-800">
-                Single members can buy just one member-only ticket per event
-                (across all member-only tiers). Family and Lifetime members have
-                no limit. Everyone else must buy from the regular tiers.
-              </span>
-            </span>
-          </label>
-          <.error :for={
-            msg <- Enum.map(@form[:member_only].errors, &translate_error(&1))
-          }>
-            {msg}
-          </.error>
+          <.input
+            type="checkbox"
+            label="Unlimited quantity"
+            field={@form[:unlimited_quantity]}
+            phx-change="toggle_quantity_limit"
+            phx-target={@myself}
+          />
+
+          <.input
+            :if={!@form[:unlimited_quantity].value}
+            type="number"
+            label="Quantity"
+            field={@form[:quantity]}
+          />
+
+          <.date_picker
+            id="sales_start"
+            label="Sale Starts"
+            form={@form}
+            start_date_field={@form[:start_date]}
+            min={Date.utc_today()}
+            required={false}
+            timezone="America/Los_Angeles"
+          />
+          <.date_picker
+            id="sale_ends"
+            label="Sale Ends"
+            form={@form}
+            start_date_field={@form[:end_date]}
+            min={sale_end_min_date(@form[:start_date].value)}
+            required={false}
+            timezone="America/Los_Angeles"
+            end_of_day?={true}
+          />
+          <p class="text-xs text-zinc-500">
+            Leave the sale dates blank to start selling right away. Sales always
+            close once the event begins.
+          </p>
         </div>
 
-        <div class="flex justify-end">
+        <div
+          :if={!donation_type?(@tier_type)}
+          class="space-y-3 border-t border-zinc-100 pt-4"
+        >
+          <div class="rounded-lg border border-sky-200 bg-sky-50 p-3">
+            <label class="flex items-start gap-3 text-sm leading-6 text-zinc-700">
+              <input
+                type="hidden"
+                name={@form[:requires_registration].name}
+                value="false"
+              />
+              <input
+                type="checkbox"
+                id={@form[:requires_registration].id}
+                name={@form[:requires_registration].name}
+                value="true"
+                checked={
+                  Phoenix.HTML.Form.normalize_value(
+                    "checkbox",
+                    @form[:requires_registration].value
+                  )
+                }
+                class="mt-1 rounded border-zinc-300 text-sky-700 focus:ring-0"
+              />
+              <span class="flex flex-col gap-0.5">
+                <span class="flex items-center gap-2 font-medium text-sky-900">
+                  <.icon name="hero-identification" class="w-4 h-4" />
+                  Requires registration
+                </span>
+                <span class="text-xs text-sky-800">
+                  Collect first name, last name, and email for every ticket at
+                  checkout — not just the buyer. Use this when you need a full
+                  attendee list.
+                </span>
+              </span>
+            </label>
+            <.error :for={
+              msg <-
+                Enum.map(
+                  @form[:requires_registration].errors,
+                  &translate_error(&1)
+                )
+            }>
+              {msg}
+            </.error>
+          </div>
+
+          <div class="rounded-lg border border-violet-200 bg-violet-50 p-3">
+            <label class="flex items-start gap-3 text-sm leading-6 text-zinc-700">
+              <input
+                type="hidden"
+                name={@form[:member_only].name}
+                value="false"
+              />
+              <input
+                type="checkbox"
+                id={@form[:member_only].id}
+                name={@form[:member_only].name}
+                value="true"
+                checked={
+                  Phoenix.HTML.Form.normalize_value(
+                    "checkbox",
+                    @form[:member_only].value
+                  )
+                }
+                class="mt-1 rounded border-zinc-300 text-violet-700 focus:ring-0"
+              />
+              <span class="flex flex-col gap-0.5">
+                <span class="flex items-center gap-2 font-medium text-violet-900">
+                  <.icon name="hero-lock-closed" class="w-4 h-4" /> Member-only tier
+                </span>
+                <span class="text-xs text-violet-800">
+                  Single members can buy just one member-only ticket per event
+                  (across all member-only tiers). Family and Lifetime members have
+                  no limit. Everyone else must buy from the regular tiers.
+                </span>
+              </span>
+            </label>
+            <.error :for={
+              msg <- Enum.map(@form[:member_only].errors, &translate_error(&1))
+            }>
+              {msg}
+            </.error>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
+          <.button
+            :if={@dialog_id}
+            type="button"
+            variant="outline"
+            color="zinc"
+            phx-click={JS.exec("data-cancel", to: "##{@dialog_id}")}
+          >
+            Cancel
+          </.button>
           <.button type="submit" phx-disable-with="Saving...">
             <%= if assigns[:ticket_tier] do %>
               <.icon name="hero-pencil" /> Update Ticket Tier
@@ -184,6 +258,15 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       </.form>
     </div>
     """
+  end
+
+  # Segmented "Type" control: {value, title, description, icon}
+  defp type_options do
+    [
+      {"free", "Free", "No charge to attend", "hero-ticket"},
+      {"paid", "Paid", "One fixed ticket price", "hero-banknotes"},
+      {"donation", "Donation", "Attendee picks the amount", "hero-gift"}
+    ]
   end
 
   @impl true
@@ -217,6 +300,16 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
     {:ok,
      socket
      |> assign(assigns)
+     |> assign_new(:dialog_id, fn -> nil end)
+     |> assign_new(:retained_price, fn ->
+       case assigns[:ticket_tier] do
+         %{type: type, price: price} ->
+           if paid_type?(type), do: format_money(price)
+
+         _ ->
+           nil
+       end
+     end)
      |> assign_form(changeset)}
   end
 
@@ -227,10 +320,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
 
     # Merge with existing form values to preserve fields like name, type, etc.
     existing_values = get_existing_form_values(socket.assigns.form)
-    merged_params = Map.merge(existing_values, ticket_tier_params)
+    retained_price = update_retained_price(socket, ticket_tier_params)
 
     merged_params =
-      merged_params
+      Map.merge(existing_values, ticket_tier_params)
+      |> maybe_restore_retained_price(ticket_tier_params, retained_price)
       |> maybe_parse_price()
       |> maybe_set_free_price()
       |> maybe_set_unlimited_quantity()
@@ -243,7 +337,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       end
       |> Map.put(:action, :validate)
 
-    {:noreply, socket |> assign_form(changeset)}
+    {:noreply,
+     socket |> assign(:retained_price, retained_price) |> assign_form(changeset)}
   end
 
   @impl true
@@ -260,11 +355,16 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         %{}
       end
 
+    retained_price = update_retained_price(socket, ticket_tier_params)
+
     merged_params =
       Map.merge(existing_values, ticket_tier_params)
       # Preserve price when params has empty price but form had valid price (e.g. quantity
       # change triggers phx-change; price input may not submit its value in some cases)
       |> preserve_price_if_empty(existing_values)
+      # Bring back a price the user entered earlier when they switch Type away
+      # from and back to a paid tier (the price input is hidden meanwhile).
+      |> maybe_restore_retained_price(ticket_tier_params, retained_price)
       |> maybe_parse_price()
       |> maybe_set_free_price()
       |> maybe_set_unlimited_quantity()
@@ -277,7 +377,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       end
       |> Map.put(:action, :validate)
 
-    {:noreply, socket |> assign_form(changeset)}
+    {:noreply,
+     socket |> assign(:retained_price, retained_price) |> assign_form(changeset)}
   end
 
   @impl true
@@ -437,6 +538,33 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       Map.put(merged_params, "price", existing_price)
     else
       merged_params
+    end
+  end
+
+  # Remember the last non-blank price the user typed, so it survives a detour
+  # through the Free/Donation tier types (where the price input is not rendered).
+  defp update_retained_price(socket, params) do
+    current = socket.assigns[:retained_price]
+
+    case params["price"] do
+      price when is_binary(price) ->
+        if String.trim(price) in ["", "$"], do: current, else: price
+
+      _ ->
+        current
+    end
+  end
+
+  # When the incoming change payload carries no price key (the field was hidden
+  # because Type was Free/Donation) and we're now on a paid tier, restore the
+  # remembered price instead of falling back to the zeroed changeset value.
+  defp maybe_restore_retained_price(params, _raw_params, nil), do: params
+
+  defp maybe_restore_retained_price(params, raw_params, retained) do
+    if paid_type?(params["type"]) and not Map.has_key?(raw_params, "price") do
+      Map.put(params, "price", retained)
+    else
+      params
     end
   end
 
