@@ -316,7 +316,7 @@ defmodule YscWeb.AuthControllerTest do
         |> assign(:ueberauth_auth, auth)
         |> AuthController.callback(%{})
 
-      assert redirected_to(conn, 302) =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert_mobile_app_handoff(conn)
       assert get_session(conn, :user_token) != nil
     end
 

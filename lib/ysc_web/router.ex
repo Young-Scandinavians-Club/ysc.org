@@ -383,6 +383,15 @@ defmodule YscWeb.Router do
          :create_mobile_handoff
   end
 
+  # Android App Link target for the native-app sign-in handoff. Unauthenticated
+  # on purpose: it only bounces an opaque one-time code toward the app, it
+  # never mints or consumes one.
+  scope "/", YscWeb do
+    pipe_through :browser
+
+    get "/app/auth-callback", UserSessionController, :app_auth_callback
+  end
+
   ## Password reset (allow unauthenticated access)
   scope "/", YscWeb do
     pipe_through [

@@ -81,8 +81,7 @@ defmodule YscWeb.PasskeyLoginTest do
           "code_challenge" => String.duplicate("a", 64)
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert_mobile_app_handoff(conn)
       assert get_session(conn, :user_token)
     end
 

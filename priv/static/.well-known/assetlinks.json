@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "org.ysc.admin",
+      "sha256_cert_fingerprints": [
+        "F8:74:4E:2C:32:2C:06:A9:BC:38:75:4F:27:9C:1F:EC:31:ED:7B:F4:3F:C7:02:F9:24:D2:73:D0:1D:C1:B3:E6"
+      ]
+    }
+  }
+]

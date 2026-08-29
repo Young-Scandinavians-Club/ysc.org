@@ -100,9 +100,10 @@ defmodule YscWeb.UserSessionControllerTest do
              )
     end
 
-    test "POST continue redirects to the app with a redeemable code", %{
-      conn: conn
-    } do
+    test "POST continue hands the browser session off to the app with a redeemable code",
+         %{
+           conn: conn
+         } do
       admin = user_fixture(%{role: :admin})
       verifier = String.duplicate("a", 64)
       challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
@@ -123,15 +124,7 @@ defmodule YscWeb.UserSessionControllerTest do
           "intent" => "continue"
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
-
-      code =
-        location
-        |> URI.parse()
-        |> Map.fetch!(:query)
-        |> URI.decode_query()
-        |> Map.fetch!("code")
+      code = assert_mobile_app_handoff(conn)
 
       assert {:ok, %Ysc.Accounts.User{id: id}} =
                Ysc.Accounts.verify_and_consume_mobile_redirect_token(
@@ -140,6 +133,69 @@ defmodule YscWeb.UserSessionControllerTest do
                )
 
       assert id == admin.id
+    end
+
+    test "the handoff page carries the request's CSP nonce on its inline script",
+         %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      verifier = String.duplicate("a", 64)
+      challenge = :crypto.hash(:sha256, verifier) |> Base.encode16(case: :lower)
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> get(
+          ~p"/users/log-in?#{%{mobile_redirect_uri: "ysc-admin://auth-callback", code_challenge: challenge}}"
+        )
+
+      conn = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
+      {conn, csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/mobile-handoff", %{
+          "_csrf_token" => csrf,
+          "intent" => "continue"
+        })
+
+      doc = html_response(conn, 200) |> Floki.parse_document!()
+      nonce = doc |> Floki.attribute("script", "nonce") |> List.first()
+      assert is_binary(nonce) and nonce != ""
+
+      assert get_resp_header(conn, "content-security-policy")
+             |> List.first() =~ "'nonce-#{nonce}'"
+
+      assert get_resp_header(conn, "cache-control") == ["no-store"]
+    end
+  end
+
+  describe "GET /app/auth-callback" do
+    test "bounces a code to the ysc-admin:// scheme", %{conn: conn} do
+      conn = get(conn, ~p"/app/auth-callback?#{%{code: "abc123_-XYZ"}}")
+
+      doc = html_response(conn, 200) |> Floki.parse_document!()
+
+      assert Floki.attribute(doc, "a#open-app", "href") ==
+               ["ysc-admin://auth-callback?code=abc123_-XYZ"]
+
+      assert doc |> Floki.find("script[nonce]") |> Floki.raw_html() =~
+               ~s(window.location.replace)
+    end
+
+    test "returns 400 without a code", %{conn: conn} do
+      conn = get(conn, ~p"/app/auth-callback")
+      assert response(conn, 400) =~ "opens the YSC Admin app"
+    end
+
+    test "rejects a code that isn't URL-safe Base64 (no HTML injection)", %{
+      conn: conn
+    } do
+      payload = "a\"><script>x</script>"
+      conn = get(conn, ~p"/app/auth-callback?#{%{code: payload}}")
+
+      body = response(conn, 400)
+      assert body =~ "opens the YSC Admin app"
+      # The payload must not have broken out into real markup.
+      assert body |> Floki.parse_document!() |> Floki.find("script") == []
     end
   end
 
@@ -223,8 +279,7 @@ defmodule YscWeb.UserSessionControllerTest do
           "code_challenge" => String.duplicate("a", 64)
         })
 
-      location = redirected_to(conn, 302)
-      assert location =~ ~r{^ysc-admin://auth-callback\?code=}
+      assert_mobile_app_handoff(conn)
       assert get_session(conn, :user_token)
     end
 

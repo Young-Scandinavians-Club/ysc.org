@@ -93,7 +93,7 @@ defmodule YscWeb.UserAuth do
       # (and binding the code to) a code_challenge closes the gap a bare
       # code would leave open — see build_mobile_redirect_token/2.
       code = Accounts.generate_mobile_redirect_token(user, code_challenge)
-      redirect(conn, external: "#{mobile_redirect_uri}?code=#{code}")
+      send_mobile_app_handoff(conn, mobile_redirect_uri, code)
     else
       redirect(conn, to: post_login_redirect(user, conn, validated_redirect))
     end
@@ -111,6 +111,106 @@ defmodule YscWeb.UserAuth do
       true ->
         signed_in_path_for_user(user, conn)
     end
+  end
+
+  @doc """
+  Renders the browser→native-app sign-in handoff page.
+
+  Its only job is to deliver the one-time `code` to the app via
+  `mobile_redirect_uri` (`ysc-admin://auth-callback` or an
+  `https://…/app/auth-callback` App Link).
+
+  Deliberately an HTML page, not `redirect(conn, external: …)`:
+
+    * Chrome for Android silently drops an HTTP 3xx whose `Location` is a
+      private-use scheme and never fires the intent.
+    * It only hands *any* navigation (custom scheme or `https://` App Link)
+      to the app when that navigation carries a real user activation — a
+      server redirect has none.
+
+  So the page tries `location.replace` on load (honoured on some browsers /
+  once the App Link is verified) and, failing that, arms the very next tap
+  or keypress anywhere on the page — a genuine user gesture Chrome *does*
+  hand off — as well as offering a visible button.
+
+  The inline `<script>` carries the request's CSP nonce; without it
+  `script-src-elem` (no `'unsafe-inline'`) blocks it.
+
+  `code` is interpolated into an `href` and a JS string literal unescaped,
+  so **callers must pass only a real one-time code** (unpadded URL-safe
+  Base64 — `[A-Za-z0-9_-]`). The minted-token call sites satisfy this
+  inherently; `UserSessionController.app_auth_callback/2`, which forwards a
+  query-string value, validates the charset first. `mobile_redirect_uri` is
+  a `valid_mobile_redirect_uri?/1` allowlist entry and `nonce` is Base64 —
+  neither can break out of the markup.
+  """
+  # sobelow_skip ["XSS.SendResp"]
+  def send_mobile_app_handoff(conn, mobile_redirect_uri, code) do
+    app_url = "#{mobile_redirect_uri}?code=#{code}"
+    nonce = conn.assigns[:csp_nonce] || ""
+
+    body = """
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex, nofollow" />
+        <title>Opening the YSC Admin app…</title>
+        <style>
+          body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            color: #18181b;
+          }
+          p { font-size: 1rem; line-height: 1.5; }
+          a.button {
+            display: inline-block;
+            margin-top: 1.25rem;
+            padding: 0.85rem 1.4rem;
+            min-height: 44px;
+            background: #1d4ed8;
+            color: #fff;
+            font-weight: 600;
+            border-radius: 0.375rem;
+            text-decoration: none;
+          }
+        </style>
+      </head>
+      <body>
+        <p>Opening the YSC Admin app…</p>
+        <p>
+          <a class="button" id="open-app" href="#{app_url}">
+            Open the YSC Admin app
+          </a>
+        </p>
+        <script nonce="#{nonce}">
+          (function () {
+            var url = "#{app_url}";
+            function go() { window.location.replace(url); }
+            // Best effort on load — most mobile browsers gate an external
+            // app launch behind a user gesture and ignore this.
+            go();
+            // The next tap / keypress anywhere is a real gesture the
+            // browser will hand off to the app.
+            document.addEventListener("click", go, { once: true, capture: true });
+            document.addEventListener("keydown", go, { once: true, capture: true });
+          })();
+        </script>
+      </body>
+    </html>
+    """
+
+    conn
+    |> put_resp_content_type("text/html")
+    |> put_resp_header("referrer-policy", "no-referrer")
+    # The body embeds a live one-time code — keep it out of the browser
+    # (and any shared/back-forward) cache.
+    |> put_resp_header("cache-control", "no-store")
+    |> send_resp(200, body)
+    |> halt()
   end
 
   # Default signed-in path when no explicit redirect_to / user_return_to is provided.
@@ -551,7 +651,7 @@ defmodule YscWeb.UserAuth do
   query string. PKCE only helps when the legitimate app created that
   challenge: `ysc-admin://` is a private-use scheme any installed app can
   register, so an attacker who opened a Custom Tab (Chrome cookie jar) with
-  *their* challenge could redeem the 302 `code` themselves (Finding 49).
+  *their* challenge could redeem the handoff `code` themselves (Finding 49).
   Confirmation requires a first-party POST (`SameSite=Lax` session cookie).
   """
   def redirect_if_user_is_authenticated(conn, _opts) do
@@ -597,7 +697,7 @@ defmodule YscWeb.UserAuth do
     if mobile_staff_user?(user) && valid_mobile_redirect_uri?(uri) &&
          valid_code_challenge?(challenge) do
       code = Accounts.generate_mobile_redirect_token(user, challenge)
-      redirect(conn, external: "#{uri}?code=#{code}")
+      send_mobile_app_handoff(conn, uri, code)
     else
       redirect(conn, to: signed_in_path(conn))
     end
@@ -847,17 +947,28 @@ defmodule YscWeb.UserAuth do
 
   def valid_internal_redirect?(_), do: false
 
-  # Custom-scheme deep links the admin/volunteer mobile app may ask the web
-  # login page to hand off to after a successful login (see `log_in_user/5`).
-  # Deliberately a strict allowlist of exact values, not a prefix/scheme
-  # check — `valid_internal_redirect?/1` above is the wrong tool here since it
-  # rejects any URI with a scheme by design (that's what makes it safe for
+  # Deep links the admin/volunteer mobile app may ask the web login page to
+  # hand a successful login off to (see `log_in_user/6`). Deliberately a
+  # strict allowlist of exact values, not a prefix/scheme check —
+  # `valid_internal_redirect?/1` above is the wrong tool here since it rejects
+  # any URI with a scheme by design (that's what makes it safe for
   # same-origin paths); a mobile deep link needs the opposite treatment.
-  @allowed_mobile_redirect_uris ["ysc-admin://auth-callback"]
+  #
+  # The `https://…/app/auth-callback` entries are Android App Links, verified
+  # via `/.well-known/assetlinks.json` on each host — preferred, because a
+  # verified App Link opened by a user tap goes straight to the app and
+  # degrades to a real web page when the app isn't installed. The
+  # `ysc-admin://` custom scheme is the fallback (older installs, iOS, and
+  # local dev where the API host isn't https so an App Link is impossible).
+  @allowed_mobile_redirect_uris [
+    "ysc-admin://auth-callback",
+    "https://ysc.org/app/auth-callback",
+    "https://ysc-sandbox.fly.dev/app/auth-callback"
+  ]
 
   @doc """
-  Validates that a mobile app redirect URI is one of the known, exact
-  custom-scheme deep links this app is allowed to hand a login off to.
+  Validates that a mobile app redirect URI is one of the known, exact deep
+  links this app is allowed to hand a login off to.
   """
   def valid_mobile_redirect_uri?(uri) when is_binary(uri),
     do: uri in @allowed_mobile_redirect_uris

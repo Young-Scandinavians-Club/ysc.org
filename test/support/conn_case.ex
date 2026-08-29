@@ -184,4 +184,29 @@ defmodule YscWeb.ConnCase do
 
     {conn, token}
   end
+
+  @doc """
+  Asserts `conn` rendered the browser→mobile-app handoff page and returns the
+  one-time `code` from its `ysc-admin://auth-callback?code=…` deep link.
+
+  The handoff is an HTML page, not a 302: Chrome for Android silently drops a
+  redirect to a private-use scheme (see `YscWeb.UserAuth.send_mobile_app_handoff/3`).
+  """
+  def assert_mobile_app_handoff(conn) do
+    html = Phoenix.ConnTest.html_response(conn, 200)
+
+    href =
+      html
+      |> Floki.parse_document!()
+      |> Floki.attribute("a#open-app", "href")
+      |> List.first()
+
+    unless href do
+      raise ArgumentError,
+            "expected an `a#open-app` deep link in the handoff HTML:\n#{html}"
+    end
+
+    %{"code" => code} = URI.decode_query(URI.parse(href).query || "")
+    code
+  end
 end
