@@ -8795,20 +8795,22 @@ defmodule YscWeb.EventDetailsLive do
   # Online ticket sales close the moment an event starts. This mirrors
   # Ysc.Events.EventDateTime.in_past?/1 — the exact cutoff
   # BookingLocker.atomic_booking enforces — so the purchase UI never offers a
-  # checkout the booking transaction will reject. Notably, for an event with no
-  # start_time it compares the stored start_date directly (as BookingLocker
-  # does) rather than assuming Pacific midnight. Kept as a struct-shaped match
-  # rather than a call into EventDateTime so render/1's type checker does not
-  # narrow @event and lose its virtual keys (e.g. pricing_info).
-  defp ticket_sales_closed?(%{start_date: nil}), do: false
+  # checkout the booking transaction will reject. Date-only events start at
+  # Pacific midnight of the stored calendar day, not the UTC-midnight encoding
+  # the date picker persists. Reads start_date/start_time via Map.get so
+  # render/1's type checker does not narrow @event and lose virtual keys
+  # (e.g. pricing_info).
+  defp ticket_sales_closed?(event) when is_map(event) do
+    case Ysc.Events.EventDateTime.starts_at(
+           Map.get(event, :start_date),
+           Map.get(event, :start_time)
+         ) do
+      nil ->
+        false
 
-  defp ticket_sales_closed?(%{start_date: start_date, start_time: nil}) do
-    DateTime.compare(DateTime.utc_now(), start_date) == :gt
-  end
-
-  defp ticket_sales_closed?(%{start_date: start_date, start_time: start_time}) do
-    starts_at = Ysc.Events.EventDateTime.combine(start_date, start_time)
-    DateTime.compare(DateTime.utc_now(), starts_at) == :gt
+      instant ->
+        DateTime.compare(DateTime.utc_now(), instant) == :gt
+    end
   end
 
   # Check if an agenda item is currently happening (between start_time and end_time)

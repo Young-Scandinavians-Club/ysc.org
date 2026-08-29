@@ -92,6 +92,33 @@ defmodule Ysc.Tickets.BookingLockerTest do
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
     end
 
+    test "allows booking a date-only event until Pacific midnight of that day",
+         %{
+           user: user,
+           event: event,
+           tier: tier
+         } do
+      # Same encoding the admin date picker uses: midnight UTC of the Pacific
+      # calendar day. Tomorrow Pacific can already be "today" in UTC (evening
+      # in California), so comparing the stored DateTime to utc_now would
+      # spuriously reject checkout.
+      pacific_tomorrow =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+        |> Date.add(1)
+
+      stored_start = DateTime.new!(pacific_tomorrow, ~T[00:00:00], "Etc/UTC")
+
+      {:ok, _} =
+        Events.update_event(event, %{
+          start_date: stored_start,
+          start_time: nil
+        })
+
+      assert {:ok, _order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+    end
+
     test "returns event_not_available for draft events", %{
       user: user,
       event: event,

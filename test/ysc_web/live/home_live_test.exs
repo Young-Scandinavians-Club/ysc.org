@@ -805,16 +805,14 @@ defmodule YscWeb.HomeLiveTest do
       organizer = user_fixture()
       buyer = Ysc.TestDataFactory.user_with_membership(:lifetime)
 
+      # Timed upcoming event: date-only start_date values (UTC-now + a few
+      # hours, no start_time) are Pacific midnight of *today* and already
+      # closed for checkout after EventDateTime.starts_at/1.
       event =
         event_fixture(%{
           title: "Sold Out Home #{System.unique_integer([:positive])}",
           organizer_id: organizer.id,
-          start_date:
-            DateTime.add(DateTime.utc_now(), 2, :hour)
-            |> DateTime.truncate(:second),
-          end_date:
-            DateTime.add(DateTime.utc_now(), 4, :hour)
-            |> DateTime.truncate(:second)
+          start_time: ~T[18:30:00]
         })
 
       tier =

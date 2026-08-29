@@ -55,6 +55,47 @@ defmodule Ysc.Events.EventDateTimeTest do
     end
   end
 
+  describe "starts_at/2" do
+    test "date-only events start at Pacific midnight, not the UTC-midnight encoding" do
+      # Admin date picker stores Saturday Aug 29 as ~U[2026-08-29 00:00:00Z].
+      # Aug 29 2026 is PDT (UTC-7), so Pacific midnight is 07:00 UTC.
+      assert EventDateTime.starts_at(~U[2026-08-29 00:00:00Z], nil) ==
+               ~U[2026-08-29 07:00:00Z]
+
+      # Winter: Dec 1 2024 is PST (UTC-8) -> 08:00 UTC.
+      assert EventDateTime.starts_at(~U[2024-12-01 00:00:00Z], nil) ==
+               ~U[2024-12-01 08:00:00Z]
+    end
+
+    test "timed events still combine as Pacific wall-clock" do
+      assert EventDateTime.starts_at(~U[2024-12-01 00:00:00Z], ~T[10:00:00]) ==
+               ~U[2024-12-01 18:00:00Z]
+    end
+
+    test "returns nil when start date is missing" do
+      assert EventDateTime.starts_at(nil, nil) == nil
+      assert EventDateTime.starts_at(nil, ~T[10:00:00]) == nil
+    end
+
+    test "date-only %Date{} values use Pacific midnight of that calendar day" do
+      assert EventDateTime.starts_at(~D[2026-08-29], nil) ==
+               ~U[2026-08-29 07:00:00Z]
+    end
+
+    test "returns nil when the stored start date is not a date" do
+      assert EventDateTime.starts_at(%{}, nil) == nil
+    end
+
+    test "Event struct delegates to starts_at/2" do
+      event = %Event{
+        start_date: ~U[2026-08-29 00:00:00Z],
+        start_time: nil
+      }
+
+      assert EventDateTime.starts_at(event) == ~U[2026-08-29 07:00:00Z]
+    end
+  end
+
   describe "in_future?/1" do
     test "returns true when event start is in the future" do
       event = %Event{
@@ -105,6 +146,19 @@ defmodule Ysc.Events.EventDateTimeTest do
 
       assert EventDateTime.in_past?(%Event{start_date: nil}) == false
       assert EventDateTime.in_past?(future_event) == false
+    end
+
+    test "date-only events stay bookable after UTC midnight until Pacific midnight" do
+      # Saturday Aug 29 stored as picker UTC midnight. Friday 8pm PDT is
+      # Saturday 03:00 UTC — after the stored DateTime, before the event day.
+      event = %Event{
+        start_date: ~U[2026-08-29 00:00:00Z],
+        start_time: nil
+      }
+
+      refute EventDateTime.in_past?(event, ~U[2026-08-29 03:00:00Z])
+      refute EventDateTime.in_past?(event, ~U[2026-08-29 07:00:00Z])
+      assert EventDateTime.in_past?(event, ~U[2026-08-29 07:00:01Z])
     end
   end
 

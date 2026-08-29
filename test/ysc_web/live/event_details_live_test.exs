@@ -1127,6 +1127,63 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute has_element?(view, "button", "Get Tickets")
     end
 
+    test "keeps ticket sales open for a date-only event until Pacific midnight",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      event =
+        event_with_tickets(
+          tier_count: 1,
+          user: user,
+          event_attrs: %{title: "Time TBD Mixer"}
+        )
+
+      pacific_tomorrow =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+        |> Date.add(1)
+
+      {:ok, event} =
+        event.id
+        |> Ysc.Events.get_event!()
+        |> Ysc.Events.update_event(%{
+          start_date: DateTime.new!(pacific_tomorrow, ~T[00:00:00], "Etc/UTC"),
+          start_time: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "button", "Get Tickets")
+      refute has_element?(view, "p", "Event has started")
+    end
+
+    test "keeps ticket sales open when the event has no start date", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      event =
+        event_with_tickets(
+          tier_count: 1,
+          user: user,
+          event_attrs: %{title: "Date TBD Mixer"}
+        )
+
+      {:ok, event} =
+        event.id
+        |> Ysc.Events.get_event!()
+        |> Ysc.Events.update_event(%{start_date: nil, start_time: nil})
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "button", "Get Tickets")
+      refute has_element?(view, "p", "Event has started")
+    end
+
     test "rejects opening the ticket modal for a started event", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
