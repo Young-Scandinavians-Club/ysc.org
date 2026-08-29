@@ -15,6 +15,7 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
   alias Ysc.Events
   alias Ysc.Events.EventUpdate
   alias YscWeb.Emails.{Notifier, EventUpdateNotification}
+  alias YscWeb.Emails.Helpers, as: EmailHelpers
   alias YscWeb.Sms.EventUpdateNotification, as: EventUpdateSms
   alias YscWeb.Sms.Notifier, as: SmsNotifier
   alias YscWeb.Sms.Segment
@@ -70,7 +71,7 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
               Map.put(
                 shared,
                 :first_name,
-                recipient[:first_name] || recipient["first_name"] || "there"
+                EmailHelpers.attendee_greeting_name(recipient)
               ),
             text_body: "",
             user_id: nil

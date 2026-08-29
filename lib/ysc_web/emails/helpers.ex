@@ -1,12 +1,17 @@
 defmodule YscWeb.Emails.Helpers do
   @moduledoc """
-  Shared helpers for MJML email modules: public URLs, salutation names, and
-  display formatting for money and dates.
+  Shared helpers for MJML email modules: public URLs, salutation names,
+  event cover images / association preloading, and display formatting
+  for money and dates.
   """
 
   alias HtmlSanitizeEx
+  alias Ysc.Events.Event
+  alias Ysc.Media.Image
+  alias Ysc.Repo
 
   @member_default "Valued Member"
+  @attendee_default "there"
   @email_timezone "America/Los_Angeles"
   @money_display_opts [separator: ".", delimiter: ",", fractional_digits: 2]
 
@@ -44,6 +49,22 @@ defmodule YscWeb.Emails.Helpers do
   def member_greeting_name(_), do: @member_default
 
   @doc """
+  Returns a first name for attendee-facing greetings (ticket holders).
+
+  Accepts atom- or string-keyed maps. Uses `#{@attendee_default}` when the name
+  is missing. Does not trim — empty strings are kept, matching historical
+  `prepare_email_data` behavior.
+  """
+  def attendee_greeting_name(recipient, default \\ @attendee_default)
+
+  def attendee_greeting_name(recipient, default) when is_map(recipient) do
+    Map.get(recipient, :first_name) || Map.get(recipient, "first_name") ||
+      default
+  end
+
+  def attendee_greeting_name(_, default), do: default
+
+  @doc """
   Absolute URL for the member membership management page.
   """
   def membership_url, do: absolute_url("/users/membership")
@@ -52,6 +73,21 @@ defmodule YscWeb.Emails.Helpers do
   Absolute URL for the public events listing.
   """
   def upcoming_events_url, do: absolute_url("/events")
+
+  @doc """
+  Absolute URL for a public event page.
+  """
+  def event_url(event_id), do: absolute_url("/events/#{event_id}")
+
+  @doc """
+  Absolute URL for member notification settings.
+  """
+  def notification_settings_url, do: absolute_url("/users/notifications")
+
+  @doc """
+  Absolute URL for Tahoe cabin booking.
+  """
+  def tahoe_booking_url, do: absolute_url("/bookings/tahoe")
 
   @doc """
   Absolute URL for the member payment methods page.
@@ -229,6 +265,43 @@ defmodule YscWeb.Emails.Helpers do
     time_str = Calendar.strftime(time, "%-I:%M %p")
     tz_abbr = pacific_tz_abbreviation(date_only)
     "#{date_str} at #{time_str} #{tz_abbr}"
+  end
+
+  @doc """
+  Display URL for an event's cover image, or `nil`.
+
+  Returns `nil` when `cover_image` is not loaded or is nil. Call
+  `preload_event_associations/2` first when the association may be unloaded.
+  """
+  def event_cover_image_url(%{cover_image: cover_image} = event) do
+    if Ecto.assoc_loaded?(event.cover_image) do
+      Image.display_path(cover_image)
+    else
+      nil
+    end
+  end
+
+  @doc """
+  Reloads the event with `associations` when any of them are not loaded.
+
+  Defaults to `:organizer` and `:cover_image`. Raises if the event row no
+  longer exists.
+  """
+  def preload_event_associations(
+        event,
+        associations \\ [:organizer, :cover_image]
+      )
+
+  def preload_event_associations(%Event{} = event, associations)
+      when is_list(associations) do
+    if Enum.all?(associations, &Ecto.assoc_loaded?(Map.fetch!(event, &1))) do
+      event
+    else
+      case Repo.get(Event, event.id) |> Repo.preload(associations) do
+        nil -> raise ArgumentError, "Event not found: #{event.id}"
+        loaded -> loaded
+      end
+    end
   end
 
   @doc """

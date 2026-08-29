@@ -7,23 +7,29 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, format_datetime: 1, format_money: 1]
+    only: [
+      absolute_url: 1,
+      attendee_greeting_name: 1,
+      format_datetime: 1,
+      format_money: 1,
+      tahoe_booking_url: 0
+    ]
 
   def get_template_name, do: "booking_entitlement_granted"
 
   def get_subject, do: "A cabin benefit for your next booking"
 
   def prepare_email_data(ent, user) do
-    first_name = user.first_name || "there"
+    first_name = attendee_greeting_name(user)
 
     {show_tahoe, show_clear, tahoe_url, clear_url} =
       case ent.property do
         nil ->
-          {true, true, absolute_url("/bookings/tahoe"),
+          {true, true, tahoe_booking_url(),
            absolute_url("/bookings/clear-lake")}
 
         :tahoe ->
-          {true, false, absolute_url("/bookings/tahoe"), nil}
+          {true, false, tahoe_booking_url(), nil}
 
         :clear_lake ->
           {false, true, nil, absolute_url("/bookings/clear-lake")}

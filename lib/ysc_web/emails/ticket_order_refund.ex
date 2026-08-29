@@ -10,7 +10,7 @@ defmodule YscWeb.Emails.TicketOrderRefund do
 
   import YscWeb.Emails.Helpers,
     only: [
-      absolute_url: 1,
+      event_url: 1,
       format_datetime: 1,
       format_event_start_datetime: 3,
       format_money: 1,
@@ -25,10 +25,6 @@ defmodule YscWeb.Emails.TicketOrderRefund do
 
   def get_subject() do
     "Your ticket refund has been processed"
-  end
-
-  def event_url(event_id) do
-    absolute_url("/events/#{event_id}")
   end
 
   @doc """

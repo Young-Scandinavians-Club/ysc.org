@@ -11,17 +11,17 @@ defmodule YscWeb.Emails.TahoeSummerBuyoutAvailable do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, member_greeting_name: 1]
+    only: [
+      member_greeting_name: 1,
+      notification_settings_url: 0,
+      tahoe_booking_url: 0
+    ]
 
   def get_template_name, do: "tahoe_summer_buyout_available"
 
   def get_subject(cycle_label) do
     "[YSC] Book the whole cabin — Summer #{cycle_label} is open!"
   end
-
-  def booking_url, do: absolute_url("/bookings/tahoe")
-
-  def notification_settings_url, do: absolute_url("/users/notifications")
 
   @doc """
   Prepares email data for a recipient.
@@ -34,7 +34,7 @@ defmodule YscWeb.Emails.TahoeSummerBuyoutAvailable do
       first_name: member_greeting_name(user),
       cycle_label: cycle_label,
       weekend_range: format_weekend_range(weekend_checkin, weekend_checkout),
-      booking_url: booking_url(),
+      booking_url: tahoe_booking_url(),
       notification_settings_url: notification_settings_url()
     }
   end

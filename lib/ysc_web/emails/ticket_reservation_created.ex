@@ -8,10 +8,11 @@ defmodule YscWeb.Emails.TicketReservationCreated do
 
   import YscWeb.Emails.Helpers,
     only: [
-      absolute_url: 1,
+      event_url: 1,
       format_datetime: 1,
       format_event_start_datetime: 2,
       member_greeting_name: 1,
+      notification_settings_url: 0,
       plain_text_from_html: 1
     ]
 
@@ -26,10 +27,6 @@ defmodule YscWeb.Emails.TicketReservationCreated do
   end
 
   def get_subject(_), do: "[YSC] Tickets reserved for you"
-
-  def event_url(event_id), do: absolute_url("/events/#{event_id}")
-
-  def notification_settings_url, do: absolute_url("/users/notifications")
 
   @doc """
   Builds assigns for `render/1` from a reservation preloaded with

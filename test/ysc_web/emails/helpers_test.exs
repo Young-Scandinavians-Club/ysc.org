@@ -29,6 +29,30 @@ defmodule YscWeb.Emails.HelpersTest do
     end
   end
 
+  describe "attendee_greeting_name/1" do
+    test "reads atom- or string-keyed first_name" do
+      assert Helpers.attendee_greeting_name(%{first_name: "Alex"}) == "Alex"
+
+      assert Helpers.attendee_greeting_name(%{"first_name" => "Jordan"}) ==
+               "Jordan"
+    end
+
+    test "defaults to there when the name is missing" do
+      assert Helpers.attendee_greeting_name(%{}) == "there"
+      assert Helpers.attendee_greeting_name(%{first_name: nil}) == "there"
+      assert Helpers.attendee_greeting_name(nil) == "there"
+    end
+
+    test "keeps empty strings (does not trim)" do
+      assert Helpers.attendee_greeting_name(%{first_name: ""}) == ""
+      assert Helpers.attendee_greeting_name(%{first_name: "  "}) == "  "
+    end
+
+    test "accepts a custom default" do
+      assert Helpers.attendee_greeting_name(%{}, "friend") == "friend"
+    end
+  end
+
   describe "origin/0 and absolute_url/1" do
     test "absolute_url appends a path to the endpoint origin" do
       origin = YscWeb.Endpoint.url()
@@ -44,6 +68,12 @@ defmodule YscWeb.Emails.HelpersTest do
 
       assert Helpers.membership_url() == origin <> "/users/membership"
       assert Helpers.upcoming_events_url() == origin <> "/events"
+      assert Helpers.event_url("evt-id-123") == origin <> "/events/evt-id-123"
+
+      assert Helpers.notification_settings_url() ==
+               origin <> "/users/notifications"
+
+      assert Helpers.tahoe_booking_url() == origin <> "/bookings/tahoe"
       assert Helpers.payment_methods_url() == origin <> "/users/payment-methods"
 
       assert Helpers.security_settings_url() ==
@@ -191,6 +221,41 @@ defmodule YscWeb.Emails.HelpersTest do
 
       assert Helpers.format_event_start_datetime(nil, ~T[17:00:00], "TBD") ==
                "TBD"
+    end
+  end
+
+  describe "event_cover_image_url/1" do
+    test "returns nil when cover_image is not loaded" do
+      assert Helpers.event_cover_image_url(%Ysc.Events.Event{}) == nil
+    end
+
+    test "returns nil when cover_image is loaded as nil" do
+      assert Helpers.event_cover_image_url(%Ysc.Events.Event{cover_image: nil}) ==
+               nil
+    end
+
+    test "returns optimized path when present" do
+      image = %Ysc.Media.Image{
+        optimized_image_path: "https://example.com/opt.jpg",
+        raw_image_path: "https://example.com/raw.jpg"
+      }
+
+      assert Helpers.event_cover_image_url(%Ysc.Events.Event{
+               cover_image: image
+             }) ==
+               "https://example.com/opt.jpg"
+    end
+
+    test "falls back to raw path when optimized path is nil" do
+      image = %Ysc.Media.Image{
+        optimized_image_path: nil,
+        raw_image_path: "https://example.com/raw.jpg"
+      }
+
+      assert Helpers.event_cover_image_url(%Ysc.Events.Event{
+               cover_image: image
+             }) ==
+               "https://example.com/raw.jpg"
     end
   end
 

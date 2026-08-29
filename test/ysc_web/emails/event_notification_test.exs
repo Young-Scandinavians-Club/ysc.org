@@ -66,7 +66,7 @@ defmodule YscWeb.Emails.EventNotificationTest do
 
   describe "event_url/1" do
     test "generates correct event URL", %{event: event} do
-      url = EventNotification.event_url(event.id)
+      url = YscWeb.Emails.Helpers.event_url(event.id)
       assert url =~ "/events/#{event.id}"
       assert url =~ YscWeb.Endpoint.url()
     end
