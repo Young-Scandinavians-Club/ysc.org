@@ -195,16 +195,18 @@ defmodule YscWeb.ConnCase do
   def assert_mobile_app_handoff(conn) do
     html = Phoenix.ConnTest.html_response(conn, 200)
 
-    case Regex.run(
-           ~r{href="ysc-admin://auth-callback\?code=([A-Za-z0-9_-]+)"},
-           html
-         ) do
-      [_, code] ->
-        code
+    href =
+      html
+      |> Floki.parse_document!()
+      |> Floki.attribute("a#open-app", "href")
+      |> List.first()
 
-      nil ->
-        raise ArgumentError,
-              "expected a ysc-admin:// app-handoff link in HTML response:\n#{html}"
+    unless href do
+      raise ArgumentError,
+            "expected an `a#open-app` deep link in the handoff HTML:\n#{html}"
     end
+
+    %{"code" => code} = URI.decode_query(URI.parse(href).query || "")
+    code
   end
 end

@@ -157,12 +157,14 @@ defmodule YscWeb.UserSessionControllerTest do
           "intent" => "continue"
         })
 
-      html = html_response(conn, 200)
-      [_, nonce] = Regex.run(~r/<script nonce="([^"]+)">/, html)
-      assert nonce != ""
+      doc = html_response(conn, 200) |> Floki.parse_document!()
+      nonce = doc |> Floki.attribute("script", "nonce") |> List.first()
+      assert is_binary(nonce) and nonce != ""
 
       assert get_resp_header(conn, "content-security-policy")
              |> List.first() =~ "'nonce-#{nonce}'"
+
+      assert get_resp_header(conn, "cache-control") == ["no-store"]
     end
   end
 
@@ -170,9 +172,13 @@ defmodule YscWeb.UserSessionControllerTest do
     test "bounces a code to the ysc-admin:// scheme", %{conn: conn} do
       conn = get(conn, ~p"/app/auth-callback?#{%{code: "abc123_-XYZ"}}")
 
-      html = html_response(conn, 200)
-      assert html =~ "href=\"ysc-admin://auth-callback?code=abc123_-XYZ\""
-      assert html =~ "var url = \"ysc-admin://auth-callback?code=abc123_-XYZ\""
+      doc = html_response(conn, 200) |> Floki.parse_document!()
+
+      assert Floki.attribute(doc, "a#open-app", "href") ==
+               ["ysc-admin://auth-callback?code=abc123_-XYZ"]
+
+      assert doc |> Floki.find("script[nonce]") |> Floki.raw_html() =~
+               ~s(window.location.replace)
     end
 
     test "returns 400 without a code", %{conn: conn} do
@@ -186,8 +192,10 @@ defmodule YscWeb.UserSessionControllerTest do
       payload = "a\"><script>x</script>"
       conn = get(conn, ~p"/app/auth-callback?#{%{code: payload}}")
 
-      assert response(conn, 400) =~ "opens the YSC Admin app"
-      refute response(conn, 400) =~ "<script>x</script>"
+      body = response(conn, 400)
+      assert body =~ "opens the YSC Admin app"
+      # The payload must not have broken out into real markup.
+      assert body |> Floki.parse_document!() |> Floki.find("script") == []
     end
   end
 

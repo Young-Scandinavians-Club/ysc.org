@@ -9,7 +9,7 @@ back to the app. The app exchanges that code for a bearer token at
 
 ## Flow
 
-```
+```text
 app: signIn()
   └─ open Custom Tab → https://<host>/users/log-in
                          ?mobile_redirect_uri=<REDIRECT>

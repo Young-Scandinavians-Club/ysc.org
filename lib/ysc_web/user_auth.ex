@@ -206,6 +206,9 @@ defmodule YscWeb.UserAuth do
     conn
     |> put_resp_content_type("text/html")
     |> put_resp_header("referrer-policy", "no-referrer")
+    # The body embeds a live one-time code — keep it out of the browser
+    # (and any shared/back-forward) cache.
+    |> put_resp_header("cache-control", "no-store")
     |> send_resp(200, body)
     |> halt()
   end
