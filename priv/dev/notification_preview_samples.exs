@@ -733,6 +733,7 @@
       payment: %{reference_id: "PMT-PREVIEW-123"},
       payment_date: "Jun 1, 2026 at 10:00 AM",
       payment_method: "Credit Card ending in 4242",
+      paid_in_person: false,
       total_amount: "$100.00",
       gross_total: "$100.00",
       total_discount: "$0.00",

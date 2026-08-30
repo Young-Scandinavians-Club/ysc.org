@@ -259,6 +259,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         },
         payment_date: "Dec 1, 2024 at 10:00 AM",
         payment_method: "Credit Card ending in 1234",
+        paid_in_person: false,
         total_amount: "$100.00",
         gross_total: "$100.00",
         total_discount: "$0.00",

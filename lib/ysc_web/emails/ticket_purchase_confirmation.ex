@@ -82,19 +82,55 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
     purchase_date = format_datetime(ticket_order.completed_at)
 
+    # An in-person cash/check sale recorded via the admin app has no Stripe
+    # `payment` row (it is a $0 admin grant); `payment_channel` /
+    # `offline_amount_collected` on the order carry how the money changed hands.
+    paid_in_person? = not is_nil(ticket_order.payment_channel)
+
     payment_date =
-      if ticket_order.payment,
-        do: format_datetime(ticket_order.payment.payment_date),
-        else: "N/A"
+      cond do
+        ticket_order.payment ->
+          format_datetime(ticket_order.payment.payment_date)
+
+        paid_in_person? ->
+          format_datetime(ticket_order.completed_at)
+
+        true ->
+          "N/A"
+      end
 
     # Get payment method information
     payment_method =
-      if ticket_order.payment,
-        do: get_payment_method_description(ticket_order.payment),
-        else: "Free"
+      cond do
+        ticket_order.payment ->
+          get_payment_method_description(ticket_order.payment)
+
+        paid_in_person? ->
+          offline_payment_method_description(ticket_order.payment_channel)
+
+        true ->
+          "Free"
+      end
+
+    # An in-person sale is booked as a $0 admin grant, so `total_amount` on the
+    # order is $0 even though the buyer handed over cash/a check — which reads
+    # as a contradiction next to the per-tier prices in the table. Show what
+    # was actually collected (or, if no amount was recorded, the tier-price
+    # total) so the receipt is internally consistent.
+    displayed_total =
+      cond do
+        not paid_in_person? ->
+          ticket_order.total_amount
+
+        not is_nil(ticket_order.offline_amount_collected) ->
+          ticket_order.offline_amount_collected
+
+        true ->
+          tier_price_total(ticket_order)
+      end
 
     # Format money amounts
-    total_amount = format_money(ticket_order.total_amount)
+    total_amount = format_money(displayed_total)
 
     # Use stored discount_amount from ticket_order, or calculate from tickets if not stored
     discount_amount =
@@ -105,7 +141,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
     # Calculate gross total (total_amount + discount_amount)
     gross_total_str =
-      case Money.add(ticket_order.total_amount, discount_amount) do
+      case Money.add(displayed_total, discount_amount) do
         {:ok, gross} -> format_money(gross)
         _ -> total_amount
       end
@@ -153,6 +189,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       },
       payment_date: payment_date,
       payment_method: payment_method,
+      paid_in_person: paid_in_person?,
       total_amount: total_amount,
       gross_total: gross_total_str,
       total_discount: total_discount_str,
@@ -336,6 +373,27 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       _ ->
         Money.new(0, :USD)
     end
+  end
+
+  defp offline_payment_method_description("cash"), do: "Cash (paid in person)"
+  defp offline_payment_method_description("check"), do: "Check (paid in person)"
+  defp offline_payment_method_description(_), do: "Paid in person"
+
+  # Sum of tier price × quantity across the order's tickets — the fallback
+  # "what these tickets are worth" figure for an in-person sale that recorded
+  # no explicit collected amount.
+  defp tier_price_total(ticket_order) do
+    ticket_order.tickets
+    |> Enum.group_by(& &1.ticket_tier_id)
+    |> Enum.reduce(Money.new(0, :USD), fn {_tier_id, tier_tickets}, acc ->
+      tier = List.first(tier_tickets).ticket_tier
+      price = (tier && tier.price) || Money.new(0, :USD)
+
+      case Money.add(acc, calculate_tier_total(price, length(tier_tickets))) do
+        {:ok, sum} -> sum
+        _ -> acc
+      end
+    end)
   end
 
   defp get_payment_method_description(payment) do

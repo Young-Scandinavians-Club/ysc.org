@@ -150,10 +150,19 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Method: <strong><%= @payment_method %></strong>
     </mj-text>
+    <%= if @paid_in_person do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Amount Collected: <strong><%= @total_amount %></strong>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Recorded: <strong><%= @payment_date %></strong>
+    </mj-text>
+    <mj-text align="left" font-size="14px" line-height="1.5" padding="0px" color="#6B7280"> This payment was collected in person by YSC event staff.
+    </mj-text>
+    <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Date: <strong><%= @payment_date %></strong>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Transaction ID: <strong><%= @payment.reference_id %></strong>
     </mj-text>
+    <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <% end %>
     <!-- Individual Ticket References -->
