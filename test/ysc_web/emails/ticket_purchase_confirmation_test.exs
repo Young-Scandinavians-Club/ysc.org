@@ -343,6 +343,96 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       assert data.payment_date == "N/A"
     end
 
+    test "in-person cash order describes how the ticket was paid for" do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{event_id: event.id, price: Money.new(50, :USD)})
+
+      completed_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+        |> Ecto.Changeset.change(%{
+          completed_at: completed_at,
+          payment_channel: "cash",
+          offline_amount_collected: Money.new(:USD, "45.00")
+        })
+        |> Repo.update!()
+
+      data =
+        TicketPurchaseConfirmation.prepare_email_data(
+          Tickets.get_ticket_order(ticket_order.id)
+        )
+
+      assert data.paid_in_person == true
+      assert data.payment_method == "Cash (paid in person)"
+      # The order is a $0 grant, but the receipt shows what was collected.
+      assert data.total_amount == "$45.00"
+      assert data.payment_date != "N/A"
+
+      html = TicketPurchaseConfirmation.render(data)
+      assert html =~ "Cash (paid in person)"
+      assert html =~ "Amount Collected:"
+      assert html =~ "$45.00"
+      assert html =~ "collected in person by YSC event staff"
+      refute html =~ "Transaction ID:"
+    end
+
+    test "in-person check order with no recorded amount falls back to the tier price" do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{event_id: event.id, price: Money.new(50, :USD)})
+
+      ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+        |> Ecto.Changeset.change(%{
+          completed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          payment_channel: "check"
+        })
+        |> Repo.update!()
+
+      data =
+        TicketPurchaseConfirmation.prepare_email_data(
+          Tickets.get_ticket_order(ticket_order.id)
+        )
+
+      assert data.payment_method == "Check (paid in person)"
+      # No offline_amount_collected recorded → tier price × qty, not $0.
+      assert data.total_amount == "$50.00"
+
+      html = TicketPurchaseConfirmation.render(data)
+      assert html =~ "Check (paid in person)"
+      refute html =~ "$0.00"
+    end
+
     test "event with no start_date shows TBD for event_date_time" do
       user =
         user_fixture()
