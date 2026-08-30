@@ -216,12 +216,11 @@ defmodule Ysc.Tickets.BookingLocker do
       event = lock_event(event_id)
       tiers = lock_ticket_tiers(event_id)
 
-      event_capacity = get_event_capacity_info(event)
-      tier_availability = Enum.map(tiers, &get_tier_availability/1)
+      counts = load_capacity_counts(Enum.map(tiers, & &1.id))
 
       %{
-        event_capacity: event_capacity,
-        tiers: tier_availability
+        event_capacity: get_event_capacity_info(event),
+        tiers: Enum.map(tiers, &get_tier_availability(&1, counts))
       }
     end)
   end
@@ -247,19 +246,27 @@ defmodule Ysc.Tickets.BookingLocker do
       event ->
         tiers = lock_ticket_tiers(event_id)
 
+        counts =
+          load_capacity_counts(
+            capped_inventory_tier_ids(tiers, Map.keys(ticket_selections))
+          )
+
         tier_warnings =
-          Enum.flat_map(ticket_selections, &tier_capacity_warning(tiers, &1))
+          Enum.flat_map(
+            ticket_selections,
+            &tier_capacity_warning(tiers, counts, &1)
+          )
 
         event_warnings = event_capacity_warning(event, tiers, ticket_selections)
         tier_warnings ++ event_warnings
     end
   end
 
-  defp tier_capacity_warning(tiers, {tier_id, quantity}) do
+  defp tier_capacity_warning(tiers, counts, {tier_id, quantity}) do
     with %TicketTier{} = tier <- Enum.find(tiers, &(&1.id == tier_id)),
          false <- TicketTierHelpers.donation_tier?(tier),
          available when available != :unlimited <-
-           get_available_tier_quantity_locked(tier),
+           available_tier_quantity(tier, counts),
          true <- quantity > available do
       over = quantity - available
 
@@ -363,6 +370,16 @@ defmodule Ysc.Tickets.BookingLocker do
     skip_capacity? = Keyword.get(opts, :skip_capacity, false)
     tiers = lock_ticket_tiers(event_id)
 
+    counts =
+      if skip_capacity? do
+        empty_capacity_counts()
+      else
+        load_capacity_counts(
+          capped_inventory_tier_ids(tiers, Map.keys(ticket_selections)),
+          user_id: user_id
+        )
+      end
+
     validations =
       ticket_selections
       |> Enum.map(fn {tier_id, quantity} ->
@@ -371,7 +388,7 @@ defmodule Ysc.Tickets.BookingLocker do
           tier_id,
           quantity,
           event_id,
-          user_id,
+          counts,
           skip_sale_guards: skip_sale_guards?,
           skip_capacity: skip_capacity?
         )
@@ -389,7 +406,7 @@ defmodule Ysc.Tickets.BookingLocker do
          tier_id,
          quantity,
          event_id,
-         user_id,
+         counts,
          opts
        ) do
     skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
@@ -418,14 +435,14 @@ defmodule Ysc.Tickets.BookingLocker do
             :ok
 
           true ->
-            validate_tier_capacity(tier, quantity, user_id)
+            validate_tier_capacity(tier, quantity, counts)
         end
     end
   end
 
-  defp validate_tier_capacity(tier, requested_quantity, user_id) do
-    available = get_available_tier_quantity_locked(tier)
-    user_reserved = get_user_reserved_quantity_locked(tier.id, user_id)
+  defp validate_tier_capacity(tier, requested_quantity, counts) do
+    available = available_tier_quantity(tier, counts)
+    user_reserved = Map.get(counts.user_reserved, tier.id, 0)
 
     cond do
       available == :unlimited ->
@@ -534,43 +551,91 @@ defmodule Ysc.Tickets.BookingLocker do
     )
   end
 
-  defp get_available_tier_quantity_locked(%TicketTier{quantity: nil}),
+  defp empty_capacity_counts do
+    %{sold: %{}, reserved: %{}, user_reserved: %{}}
+  end
+
+  defp load_capacity_counts(tier_ids, opts \\ []) do
+    user_id = Keyword.get(opts, :user_id)
+
+    %{
+      sold: batch_count_sold_tickets_for_tiers(tier_ids),
+      reserved: Events.batch_count_reserved_tickets_for_tiers(tier_ids),
+      user_reserved:
+        if user_id do
+          batch_user_reserved_quantities(tier_ids, user_id)
+        else
+          %{}
+        end
+    }
+  end
+
+  defp capped_inventory_tier_ids(tiers, selected_ids) do
+    selected = MapSet.new(selected_ids)
+
+    Enum.flat_map(tiers, fn tier ->
+      if MapSet.member?(selected, tier.id) and capped_inventory_tier?(tier) do
+        [tier.id]
+      else
+        []
+      end
+    end)
+  end
+
+  defp capped_inventory_tier?(%TicketTier{} = tier) do
+    not TicketTierHelpers.donation_tier?(tier) and
+      is_integer(tier.quantity) and tier.quantity > 0
+  end
+
+  defp available_tier_quantity(%TicketTier{quantity: nil}, _counts),
     do: :unlimited
 
-  defp get_available_tier_quantity_locked(%TicketTier{quantity: 0}),
+  defp available_tier_quantity(%TicketTier{quantity: 0}, _counts),
     do: :unlimited
 
-  defp get_available_tier_quantity_locked(%TicketTier{
-         id: tier_id,
-         quantity: total_quantity
-       }) do
-    sold_count = count_sold_tickets_for_tier_locked(tier_id)
-    reserved_count = count_reserved_tickets_for_tier_locked(tier_id)
+  defp available_tier_quantity(
+         %TicketTier{id: tier_id, quantity: total_quantity},
+         counts
+       ) do
+    sold_count = Map.get(counts.sold, tier_id, 0)
+    reserved_count = Map.get(counts.reserved, tier_id, 0)
     max(0, total_quantity - sold_count - reserved_count)
   end
 
-  defp get_user_reserved_quantity_locked(tier_id, user_id) do
-    TicketReservation
-    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.user_id == ^user_id)
-    |> Events.where_ticket_reservation_hold_active()
-    |> select([tr], sum(tr.quantity))
-    |> Repo.one()
-    |> case do
-      nil -> 0
-      count -> count
-    end
+  defp batch_count_sold_tickets_for_tiers([]), do: %{}
+
+  defp batch_count_sold_tickets_for_tiers(tier_ids) do
+    tier_ids
+    |> batch_count_sold_tickets_for_tiers_query()
+    |> Repo.all()
+    |> Map.new()
   end
 
-  defp count_reserved_tickets_for_tier_locked(tier_id) do
-    TicketReservation
-    |> where([tr], tr.ticket_tier_id == ^tier_id)
+  defp batch_count_sold_tickets_for_tiers_query(tier_ids) do
+    from(t in Ticket,
+      where:
+        t.ticket_tier_id in ^tier_ids and t.status in [:confirmed, :pending],
+      group_by: t.ticket_tier_id,
+      select: {t.ticket_tier_id, count(t.id)}
+    )
+  end
+
+  defp batch_user_reserved_quantities([], _user_id), do: %{}
+
+  defp batch_user_reserved_quantities(tier_ids, user_id) do
+    tier_ids
+    |> batch_user_reserved_quantities_query(user_id)
+    |> Repo.all()
+    |> Map.new(fn {tier_id, count} -> {tier_id, count || 0} end)
+  end
+
+  defp batch_user_reserved_quantities_query(tier_ids, user_id) do
+    from(tr in TicketReservation,
+      where: tr.ticket_tier_id in ^tier_ids and tr.user_id == ^user_id
+    )
     |> Events.where_ticket_reservation_hold_active()
-    |> select([tr], sum(tr.quantity))
-    |> Repo.one()
-    |> case do
-      nil -> 0
-      count -> count
-    end
+    |> group_by([tr], tr.ticket_tier_id)
+    |> select([tr], {tr.ticket_tier_id, sum(tr.quantity)})
   end
 
   defp user_has_reservations_for_event?(user_id, event_id) do
@@ -722,15 +787,6 @@ defmodule Ysc.Tickets.BookingLocker do
     {fulfilled, still_active}
   end
 
-  defp count_sold_tickets_for_tier_locked(tier_id) do
-    Ticket
-    |> where(
-      [t],
-      t.ticket_tier_id == ^tier_id and t.status in [:confirmed, :pending]
-    )
-    |> Repo.aggregate(:count, :id)
-  end
-
   defp get_event_capacity_info(%Event{max_attendees: nil} = event) do
     %{
       max_attendees: nil,
@@ -768,23 +824,19 @@ defmodule Ysc.Tickets.BookingLocker do
     |> Repo.aggregate(:count, :id)
   end
 
-  defp get_tier_availability(%TicketTier{} = tier) do
-    available = get_available_tier_quantity_locked(tier)
+  defp get_tier_availability(%TicketTier{} = tier, counts) do
+    available = available_tier_quantity(tier, counts)
 
     %{
       tier_id: tier.id,
       name: tier.name,
       total_quantity: tier.quantity,
       available: available,
-      sold: get_sold_tier_quantity_locked(tier),
+      sold: Map.get(counts.sold, tier.id, 0),
       on_sale: TicketTierHelpers.tier_sale_started?(tier),
       start_date: tier.start_date,
       end_date: tier.end_date
     }
-  end
-
-  defp get_sold_tier_quantity_locked(%TicketTier{id: tier_id}) do
-    count_sold_tickets_for_tier_locked(tier_id)
   end
 
   defp calculate_total_amount(
@@ -1195,5 +1247,19 @@ defmodule Ysc.Tickets.BookingLocker do
       Fixtures.ulid(),
       Fixtures.ulid()
     )
+  end
+
+  @doc false
+  def ci_query_explain_sold_counts_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    batch_count_sold_tickets_for_tiers_query([Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_user_reserved_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    batch_user_reserved_quantities_query([Fixtures.ulid()], Fixtures.ulid())
   end
 end
