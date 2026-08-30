@@ -11,7 +11,10 @@ defmodule YscWeb.Emails.OutageNotificationTest do
       assert OutageNotification.get_template_name() == "outage_notification"
 
       assert OutageNotification.get_subject() ==
-               "Property Outage Alert - Young Scandinavians Club"
+               "Outage at one of our cabins — Young Scandinavians Club"
+
+      assert OutageNotification.get_subject(:tahoe) ==
+               "Outage at the Tahoe cabin"
     end
   end
 
@@ -73,16 +76,16 @@ defmodule YscWeb.Emails.OutageNotificationTest do
 
   describe "property_name/1" do
     test "maps known atoms and binaries" do
-      assert OutageNotification.property_name(:tahoe) == "Tahoe Property"
+      assert OutageNotification.property_name(:tahoe) == "Tahoe cabin"
 
       assert OutageNotification.property_name(:clear_lake) ==
-               "Clear Lake Property"
+               "Clear Lake cabin"
 
-      assert OutageNotification.property_name(:other) == "Property"
-      assert OutageNotification.property_name("tahoe") == "Tahoe Property"
+      assert OutageNotification.property_name(:other) == "cabin"
+      assert OutageNotification.property_name("tahoe") == "Tahoe cabin"
 
       assert OutageNotification.property_name("clear_lake") ==
-               "Clear Lake Property"
+               "Clear Lake cabin"
     end
   end
 
@@ -122,7 +125,7 @@ defmodule YscWeb.Emails.OutageNotificationTest do
 
   describe "fallback clauses" do
     test "property_name and incident_type_name for non-atom non-binary values" do
-      assert OutageNotification.property_name(123) == "Property"
+      assert OutageNotification.property_name(123) == "cabin"
       assert OutageNotification.incident_type_name(%{}) == "Outage"
     end
 
@@ -184,14 +187,18 @@ defmodule YscWeb.Emails.OutageNotificationTest do
       body = OutageNotification.text_body(variables)
 
       assert body =~ "Hej Erik"
+      assert body =~ "There's currently a water outage at the Clear Lake cabin"
       assert body =~ "Water Outage"
-      assert body =~ "Clear Lake Property"
+      assert body =~ "Clear Lake cabin"
+      refute body =~ "Property"
       assert body =~ "PG&E"
+      assert body =~ "Utility company: PG&E"
       assert body =~ "November 20, 2024"
       assert body =~ "Planned maintenance in the area."
       assert body =~ "November 22, 2024"
       assert body =~ "November 24, 2024"
       assert body =~ "pgealerts.alerts.pge.com"
+      assert body =~ "Check the outage map"
       assert body =~ "Young Scandinavians Club"
     end
 
@@ -219,7 +226,7 @@ defmodule YscWeb.Emails.OutageNotificationTest do
 
       refute body =~ "Description:"
       refute body =~ "Cabin Master:"
-      refute body =~ "View Outage Map"
+      refute body =~ "Check the outage map"
     end
 
     test "text_body shows cabin block when only email is set" do
@@ -251,7 +258,7 @@ defmodule YscWeb.Emails.OutageNotificationTest do
       body = OutageNotification.text_body(variables)
 
       assert body =~ "only@example.com"
-      assert body =~ "cabin master"
+      assert body =~ "Cabin Master"
       refute body =~ "Cabin Master:"
     end
   end
@@ -279,10 +286,16 @@ defmodule YscWeb.Emails.OutageNotificationTest do
 
       html = OutageNotification.render(assigns)
       assert html =~ "Planned maintenance"
+      assert html =~ "currently a water outage at the Clear Lake cabin"
+      assert html =~ "Cabin outage notice"
+      refute html =~ "Property Outage"
+      refute html =~ "Tahoe Property"
+      assert html =~ "Utility company"
       assert html =~ "Alex Nord"
       assert html =~ "alex@example.com"
       assert html =~ "555-0100"
       assert html =~ "pgealerts.alerts.pge.com"
+      assert html =~ "Check the outage map"
     end
 
     test "omits description and cabin block when not provided", %{user: user} do
@@ -303,7 +316,7 @@ defmodule YscWeb.Emails.OutageNotificationTest do
       html = OutageNotification.render(assigns)
       refute html =~ "Description:"
       refute html =~ "Cabin Master:"
-      refute html =~ "View Outage Map"
+      refute html =~ "Check the outage map"
     end
 
     test "shows cabin block when only email is set", %{user: user} do

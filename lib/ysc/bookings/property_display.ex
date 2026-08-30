@@ -58,14 +58,14 @@ defmodule Ysc.Bookings.PropertyDisplay do
   def full_name(_, default), do: default
 
   @doc """
-  Label for outage notifications (e.g. `"Tahoe Property"`, `"Clear Lake Property"`).
+  Label for outage notifications (e.g. `"Tahoe cabin"`, `"Clear Lake cabin"`).
 
   Accepts atoms and known string keys. Returns `default` for unknown values.
   """
-  def outage_name(property, default \\ "Property")
+  def outage_name(property, default \\ "cabin")
 
-  def outage_name(:tahoe, _default), do: "Tahoe Property"
-  def outage_name(:clear_lake, _default), do: "Clear Lake Property"
+  def outage_name(:tahoe, _default), do: "Tahoe cabin"
+  def outage_name(:clear_lake, _default), do: "Clear Lake cabin"
   def outage_name("tahoe", default), do: outage_name(:tahoe, default)
   def outage_name("clear_lake", default), do: outage_name(:clear_lake, default)
   def outage_name(_, default), do: default
