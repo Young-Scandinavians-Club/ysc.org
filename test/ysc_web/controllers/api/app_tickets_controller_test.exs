@@ -290,6 +290,129 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
 
       assert json_response(response, 401)
     end
+
+    test "sells tickets for an event that has already started, with no warnings",
+         %{conn: conn} do
+      member = member_with_active_membership()
+
+      event =
+        event_fixture(%{
+          start_date: DateTime.add(DateTime.utc_now(), -2, :day)
+        })
+
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_started",
+           client_secret: "pi_started_secret",
+           amount: 5000,
+           currency: "usd"
+         }}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert %{"client_secret" => "pi_started_secret", "warnings" => []} =
+               json_response(response, 200)
+    end
+
+    test "sells past a tier's sale-start window, with no warnings", %{
+      conn: conn
+    } do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          start_date: DateTime.add(DateTime.utc_now(), 2, :day)
+        })
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_not_yet_on_sale",
+           client_secret: "pi_not_yet_on_sale_secret",
+           amount: 5000,
+           currency: "usd"
+         }}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert %{"client_secret" => "pi_not_yet_on_sale_secret", "warnings" => []} =
+               json_response(response, 200)
+    end
+
+    test "sells past tier and event capacity, returning warnings", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture(%{max_attendees: 1})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 2})
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        # 5 x $50 = $250, still charged in full despite exceeding capacity.
+        assert params.amount == 25_000
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_oversell",
+           client_secret: "pi_oversell_secret",
+           amount: 25_000,
+           currency: "usd"
+         }}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 5}
+        })
+
+      assert %{"client_secret" => "pi_oversell_secret", "warnings" => warnings} =
+               json_response(response, 200)
+
+      assert length(warnings) == 2
+      assert Enum.any?(warnings, &(&1 =~ "exceeds the 2 remaining by 3"))
+      assert Enum.any?(warnings, &(&1 =~ "Event capacity"))
+
+      tickets =
+        Ysc.Events.Ticket
+        |> Ysc.Repo.all()
+        |> Enum.filter(&(&1.ticket_tier_id == tier.id))
+
+      assert length(tickets) == 5
+    end
+
+    test "still rejects a cancelled event", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture(%{state: :published})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      {:ok, _} = Ysc.Events.update_event(event, %{state: :cancelled})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert json_response(response, 422)
+    end
   end
 
   describe "POST /api/v1/app/events/:event_id/tickets/offline_order" do
@@ -492,6 +615,52 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
         )
 
       assert json_response(response, 401)
+    end
+
+    test "grants tickets for an event that has already started, with no warnings",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+
+      event =
+        event_fixture(%{
+          start_date: DateTime.add(DateTime.utc_now(), -2, :day)
+        })
+
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1}
+        })
+
+      assert %{"status" => "completed", "warnings" => []} =
+               json_response(response, 200)
+    end
+
+    test "grants past tier and event capacity, returning warnings", %{
+      conn: conn
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+      event = event_fixture(%{max_attendees: 1})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 2})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 5}
+        })
+
+      assert %{
+               "status" => "completed",
+               "ticket_count" => 5,
+               "warnings" => warnings
+             } =
+               json_response(response, 200)
+
+      assert length(warnings) == 2
     end
   end
 end

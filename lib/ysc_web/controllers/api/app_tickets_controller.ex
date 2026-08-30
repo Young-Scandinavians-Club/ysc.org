@@ -14,6 +14,16 @@ defmodule YscWeb.Api.AppTicketsController do
   `ticket_tier_id => quantity`, but `BookingLocker` treats donation values as
   **cents**. Accepting donations here would undercharge (e.g. `50` → $0.50)
   or overcharge when a client follows the quantity contract.
+
+  Both sale paths below bypass the web checkout's "event already started"
+  and tier-sale-window guards, and allow exceeding tier/event capacity
+  instead of rejecting the sale — this app is for selling in person *while*
+  an event is happening, precisely to solve on-the-spot problems (a tier
+  capped too low, a walk-in after the posted start time). Membership and
+  member-only-tier eligibility are unaffected. A capacity overage doesn't
+  fail silently: the response includes `warnings`, computed before the sale
+  via `BookingLocker.capacity_warnings/2`, so the app can show the seller
+  what they're about to exceed.
   """
   use YscWeb, :controller
 
@@ -23,6 +33,7 @@ defmodule YscWeb.Api.AppTicketsController do
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.Repo
   alias Ysc.Tickets
+  alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.StripeService
 
   import Ecto.Query, warn: false
@@ -39,8 +50,11 @@ defmodule YscWeb.Api.AppTicketsController do
          {:ok, member} <- fetch_member(member_id),
          {:ok, selections} <- parse_ticket_selections(tiers),
          :ok <- reject_donation_tiers(event.id, selections),
+         warnings <- BookingLocker.capacity_warnings(event.id, selections),
          {:ok, ticket_order} <-
-           Tickets.create_ticket_order(member.id, event.id, selections),
+           Tickets.create_ticket_order(member.id, event.id, selections,
+             bypass_guards: true
+           ),
          {:ok, payment_intent} <-
            StripeService.create_payment_intent(ticket_order,
              user: member,
@@ -48,7 +62,8 @@ defmodule YscWeb.Api.AppTicketsController do
            ) do
       render(conn, :payment_intent,
         payment_intent: payment_intent,
-        ticket_order: ticket_order
+        ticket_order: ticket_order,
+        warnings: warnings
       )
     end
   end
@@ -77,8 +92,9 @@ defmodule YscWeb.Api.AppTicketsController do
   reconciliation; `admin_grant_notes` carries only the human-readable note.
   Event revenue reports are unaffected.
 
-  Capacity and sale-window guards are enforced (no override from the app).
-  Donation tiers are rejected, matching `create_payment_intent/2`.
+  Capacity and sale-window guards are bypassed here the same way as
+  `create_payment_intent/2` — see this module's moduledoc. Donation tiers
+  are rejected, matching `create_payment_intent/2`.
   """
   def grant_offline_order(
         conn,
@@ -92,6 +108,7 @@ defmodule YscWeb.Api.AppTicketsController do
          {:ok, selections} <- parse_ticket_selections(tiers),
          :ok <- reject_donation_tiers(event.id, selections),
          {:ok, payment_method} <- parse_offline_payment_method(params),
+         warnings <- BookingLocker.capacity_warnings(event.id, selections),
          {:ok, ticket_order} <-
            Tickets.grant_admin_tickets(
              conn.assigns.current_user.id,
@@ -99,13 +116,18 @@ defmodule YscWeb.Api.AppTicketsController do
              event.id,
              selections,
              [
+               {:skip_capacity, true},
+               {:skip_sale_guards, true},
                {:payment_channel, payment_method},
                {:admin_grant_notes,
                 offline_note(payment_method, blank_to_nil(params["note"]))}
                | offline_amount_opt(params["amount_collected_cents"])
              ]
            ) do
-      render(conn, :offline_order, ticket_order: ticket_order)
+      render(conn, :offline_order,
+        ticket_order: ticket_order,
+        warnings: warnings
+      )
     end
   end
 

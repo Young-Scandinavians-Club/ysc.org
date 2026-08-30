@@ -37,17 +37,50 @@ defmodule Ysc.Tickets.BookingLocker do
   - `event_id`: The event to book for
   - `ticket_selections`: Map of tier_id => quantity
 
+  ## Options
+
+    * `:bypass_guards` - when `true`, skips the "event already started" check
+      and each tier's sale-start window, and allows exceeding tier/event
+      capacity instead of rejecting the order. For the admin/volunteer
+      mobile app's in-person door sales: selling at the door is precisely
+      what you do *while* an event is happening and to fix on-the-spot
+      problems (a tier that was capped too low, a walk-in after the posted
+      start time), so these guards — all written for the self-service web
+      checkout — don't apply there. Capacity is intentionally a soft limit
+      here, not skipped silently: pair this with `capacity_warnings/2`
+      (call it *before* placing the order) so the admin app can show what
+      it would exceed and let the seller decide. Membership/member-only-tier
+      eligibility are unaffected — bypassing those is a different,
+      unrequested policy change from "let the door seller override sale
+      timing and capacity".
+
   ## Returns:
   - `{:ok, %TicketOrder{}}` on success
   - `{:error, reason}` on failure
   """
-  def atomic_booking(user_id, event_id, ticket_selections) do
+  def atomic_booking(user_id, event_id, ticket_selections, opts \\ []) do
+    bypass_guards? = Keyword.get(opts, :bypass_guards, false)
+
     Repo.transaction(fn ->
-      with {:ok, event} <- lock_and_validate_event(event_id),
+      with {:ok, event} <- lock_and_validate_event(event_id, bypass_guards?),
            {:ok, tiers} <-
-             lock_and_validate_tiers(event_id, ticket_selections, user_id),
+             lock_and_validate_tiers(
+               event_id,
+               ticket_selections,
+               user_id,
+               bypass_guards?
+             ),
            :ok <-
-             validate_event_capacity(event, tiers, ticket_selections, user_id),
+             (if bypass_guards? do
+                :ok
+              else
+                validate_event_capacity(
+                  event,
+                  tiers,
+                  ticket_selections,
+                  user_id
+                )
+              end),
            {:ok, total_amount, discount_amount} <-
              calculate_total_amount(tiers, ticket_selections, user_id, event_id),
            {:ok, ticket_order} <-
@@ -70,7 +103,8 @@ defmodule Ysc.Tickets.BookingLocker do
                ticket_order,
                tiers,
                ticket_selections,
-               fulfilled_reservations_by_tier
+               fulfilled_reservations_by_tier,
+               bypass_guards?
              ) do
         ticket_order
       else
@@ -192,9 +226,88 @@ defmodule Ysc.Tickets.BookingLocker do
     end)
   end
 
+  @doc """
+  Best-effort, read-only check of whether `ticket_selections` would exceed
+  tier or event capacity — for warning the seller *before* placing an order
+  with `atomic_booking/4`'s `bypass_guards: true`, which allows exceeding
+  capacity rather than rejecting it. Returns a list of human-readable
+  warning strings (empty when nothing would be exceeded).
+
+  Not authoritative and not locked: existing capacity can still change
+  between this call and the actual order (another sale, a reservation
+  expiring), same caveat as the rest of this module's unlocked reads. That's
+  fine for a "heads up, you're about to oversell" prompt — it doesn't need
+  to be race-free the way actually placing the order does.
+  """
+  def capacity_warnings(event_id, ticket_selections) do
+    case lock_event(event_id) do
+      nil ->
+        []
+
+      event ->
+        tiers = lock_ticket_tiers(event_id)
+
+        tier_warnings =
+          Enum.flat_map(ticket_selections, &tier_capacity_warning(tiers, &1))
+
+        event_warnings = event_capacity_warning(event, tiers, ticket_selections)
+        tier_warnings ++ event_warnings
+    end
+  end
+
+  defp tier_capacity_warning(tiers, {tier_id, quantity}) do
+    with %TicketTier{} = tier <- Enum.find(tiers, &(&1.id == tier_id)),
+         false <- TicketTierHelpers.donation_tier?(tier),
+         available when available != :unlimited <-
+           get_available_tier_quantity_locked(tier),
+         true <- quantity > available do
+      over = quantity - available
+
+      [
+        "#{tier.name}: selling #{quantity} exceeds the #{available} remaining by #{over}"
+      ]
+    else
+      _ -> []
+    end
+  end
+
+  defp event_capacity_warning(
+         %Event{max_attendees: nil},
+         _tiers,
+         _ticket_selections
+       ),
+       do: []
+
+  defp event_capacity_warning(
+         %Event{max_attendees: max_attendees} = event,
+         tiers,
+         ticket_selections
+       ) do
+    current_attendees = count_all_tickets_for_event_locked(event.id)
+
+    total_requested =
+      Enum.reduce(ticket_selections, 0, fn {tier_id, quantity}, acc ->
+        tier = Enum.find(tiers, &(&1.id == tier_id))
+
+        if tier && TicketTierHelpers.donation_tier?(tier),
+          do: acc,
+          else: acc + quantity
+      end)
+
+    projected = current_attendees + total_requested
+
+    if projected > max_attendees do
+      [
+        "Event capacity: selling this would bring attendance to #{projected} of #{max_attendees} max, exceeding it by #{projected - max_attendees}"
+      ]
+    else
+      []
+    end
+  end
+
   ## Private Functions
 
-  defp lock_and_validate_event(event_id) do
+  defp lock_and_validate_event(event_id, bypass_guards? \\ false) do
     case lock_event(event_id) do
       nil ->
         {:error, :event_not_found}
@@ -206,7 +319,7 @@ defmodule Ysc.Tickets.BookingLocker do
         {:error, :event_not_available}
 
       %Event{} = event ->
-        if EventDateTime.in_past?(event) do
+        if not bypass_guards? and EventDateTime.in_past?(event) do
           {:error, :event_in_past}
         else
           {:ok, event}
@@ -214,13 +327,18 @@ defmodule Ysc.Tickets.BookingLocker do
     end
   end
 
-  defp lock_and_validate_tiers(event_id, ticket_selections, user_id) do
+  defp lock_and_validate_tiers(
+         event_id,
+         ticket_selections,
+         user_id,
+         bypass_guards?
+       ) do
     validate_tiers_for_fulfillment(
       event_id,
       ticket_selections,
       user_id,
-      skip_sale_guards: false,
-      skip_capacity: false
+      skip_sale_guards: bypass_guards?,
+      skip_capacity: bypass_guards?
     )
   end
 
@@ -914,8 +1032,14 @@ defmodule Ysc.Tickets.BookingLocker do
          ticket_order,
          tiers,
          ticket_selections,
-         fulfilled_reservations_by_tier
+         fulfilled_reservations_by_tier,
+         bypass_guards?
        ) do
+    ticket_changeset_fn =
+      if bypass_guards?,
+        do: &Ticket.door_sale_changeset/2,
+        else: &Ticket.changeset/2
+
     # fulfilled_reservations_by_tier is a map of tier_id => [list of fulfilled reservations]
     # We need to create tickets for both reserved and non-reserved quantities
     tickets =
@@ -977,8 +1101,7 @@ defmodule Ysc.Tickets.BookingLocker do
 
             # Create one ticket per fulfilled quantity (may be less than the original hold)
             Enum.map(1..fulfill_qty, fn _ ->
-              %Ticket{}
-              |> Ticket.changeset(%{
+              ticket_changeset_fn.(%Ticket{}, %{
                 event_id: ticket_order.event_id,
                 ticket_tier_id: tier_id,
                 user_id: ticket_order.user_id,
@@ -998,8 +1121,7 @@ defmodule Ysc.Tickets.BookingLocker do
             []
           else
             Enum.map(1..non_reserved_count, fn _ ->
-              %Ticket{}
-              |> Ticket.changeset(%{
+              ticket_changeset_fn.(%Ticket{}, %{
                 event_id: ticket_order.event_id,
                 ticket_tier_id: tier_id,
                 user_id: ticket_order.user_id,
