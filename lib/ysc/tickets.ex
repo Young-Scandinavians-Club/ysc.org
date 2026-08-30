@@ -24,6 +24,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.Events.MemberOnlyTickets
   alias Ysc.Events.Event
+  alias Ysc.Events.EventDateTime
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Bookings
@@ -2171,12 +2172,36 @@ defmodule Ysc.Tickets do
           BookingLocker.validate_fulfillment_capacity(
             user_id,
             event_id,
-            ticket_selections
+            ticket_selections,
+            expired_fulfillment_capacity_opts(event_id)
           )
         end
 
       _ ->
         :ok
+    end
+  end
+
+  # Door sales (#1186) create pending tickets *after* the event has started
+  # (`bypass_guards: true`). If TimeoutWorker expires that cart and Stripe
+  # later reports a succeeded PaymentIntent, late-payment recovery must not
+  # re-apply the web-checkout "event in past" / capacity guards — those
+  # reject a charge that already went through, and
+  # `maybe_refund_unfulfilled_ticket_payment/3` only auto-refunds
+  # `:amount_mismatch`. Web checkout cannot create pending tickets for an
+  # in-progress event, and the public UI closes sales at start, so skipping
+  # here does not reopen self-service overbooking.
+  defp expired_fulfillment_capacity_opts(event_id) do
+    case Repo.get(Event, event_id) do
+      %Event{} = event ->
+        if EventDateTime.in_past?(event) do
+          [skip_sale_guards: true, skip_capacity: true]
+        else
+          []
+        end
+
+      _ ->
+        []
     end
   end
 
