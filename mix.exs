@@ -241,6 +241,8 @@ defmodule Ysc.MixProject do
       # Pin exact version: jose is pulled by joken (~> 1.11.10) and goth (~> 1.11).
       {:jose, "1.11.12", override: true},
       {:joken, "~> 2.6"},
+      # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
+      # DSL and authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
       {:live_toast, "~> 0.9"},
       {:locus, "~> 2.3"},
