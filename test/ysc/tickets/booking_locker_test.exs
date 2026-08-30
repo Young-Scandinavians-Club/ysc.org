@@ -1123,6 +1123,215 @@ defmodule Ysc.Tickets.BookingLockerTest do
                tier.id => 1
              }) == []
     end
+
+    test "counts another buyer's hold against remaining capacity", %{
+      event: event,
+      tier: tier,
+      organizer: organizer
+    } do
+      other_user = user_fixture() |> with_lifetime_membership()
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 2})
+
+      %TicketReservation{}
+      |> TicketReservation.changeset(%{
+        ticket_tier_id: tier.id,
+        user_id: other_user.id,
+        quantity: 1,
+        created_by_id: organizer.id,
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      assert [warning] =
+               BookingLocker.capacity_warnings(event.id, %{tier.id => 2})
+
+      assert warning =~ "exceeds the 1 remaining by 1"
+    end
+
+    test "warns per selected capped tier in a multi-tier sale", %{
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 1})
+
+      {:ok, vip} =
+        Events.create_ticket_tier(%{
+          name: "VIP",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 1,
+          event_id: event.id
+        })
+
+      warnings =
+        BookingLocker.capacity_warnings(event.id, %{
+          tier.id => 2,
+          vip.id => 3
+        })
+
+      assert length(warnings) == 2
+      assert Enum.any?(warnings, &String.contains?(&1, tier.name))
+      assert Enum.any?(warnings, &String.contains?(&1, "VIP"))
+    end
+  end
+
+  describe "batched inventory counts" do
+    # Ecto 3.14 emits `= ANY($1)` for `in ^list` and `= $1` for a single id.
+    # Event-wide `SELECT count(id)` joins `ON tickets.ticket_tier_id = ticket_tiers.id`
+    # and must not be mistaken for a per-tier COUNT.
+    @per_tier_sold_count ~r/FROM "tickets" AS t0 WHERE \(t0\."ticket_tier_id" = \$/
+    @batched_sold_count ~r/FROM "tickets" AS t0 WHERE \(t0\."ticket_tier_id" = ANY/
+    @per_tier_reserved_sum ~r/FROM "ticket_reservations" AS t0 WHERE \(t0\."ticket_tier_id" = \$/
+    @batched_reserved_sum ~r/FROM "ticket_reservations" AS t0 WHERE \(t0\."ticket_tier_id" = ANY/
+
+    defp extra_capped_tiers(event, count) do
+      Enum.map(1..count, fn n ->
+        {:ok, tier} =
+          Events.create_ticket_tier(%{
+            name: "Tier #{n}",
+            type: :paid,
+            price: Money.new(10, :USD),
+            quantity: 10,
+            event_id: event.id
+          })
+
+        tier
+      end)
+    end
+
+    test "capacity_warnings does not issue a sold COUNT per selected tier", %{
+      event: event,
+      tier: tier
+    } do
+      extra = extra_capped_tiers(event, 3)
+
+      selections =
+        Map.new([tier | extra], fn t -> {t.id, 1} end)
+
+      {{warnings, per_tier_sold}, batched_sold} =
+        with {warnings, per_tier_sold} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn ->
+                   BookingLocker.capacity_warnings(event.id, selections)
+                 end,
+                 pattern: @per_tier_sold_count,
+                 caller_pids: [self()]
+               ),
+             {_, batched_sold} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn ->
+                   BookingLocker.capacity_warnings(event.id, selections)
+                 end,
+                 pattern: @batched_sold_count,
+                 caller_pids: [self()]
+               ) do
+          {{warnings, per_tier_sold}, batched_sold}
+        end
+
+      assert warnings == []
+      assert per_tier_sold == 0
+      assert batched_sold == 1
+    end
+
+    test "capacity_warnings does not issue a reservation SUM per selected tier",
+         %{
+           event: event,
+           tier: tier
+         } do
+      extra = extra_capped_tiers(event, 3)
+
+      selections =
+        Map.new([tier | extra], fn t -> {t.id, 1} end)
+
+      {{_warnings, per_tier_reserved}, batched_reserved} =
+        with {warnings, per_tier_reserved} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn ->
+                   BookingLocker.capacity_warnings(event.id, selections)
+                 end,
+                 pattern: @per_tier_reserved_sum,
+                 caller_pids: [self()]
+               ),
+             {_, batched_reserved} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn ->
+                   BookingLocker.capacity_warnings(event.id, selections)
+                 end,
+                 pattern: @batched_reserved_sum,
+                 caller_pids: [self()]
+               ) do
+          {{warnings, per_tier_reserved}, batched_reserved}
+        end
+
+      assert per_tier_reserved == 0
+      assert batched_reserved == 1
+    end
+
+    test "atomic_booking does not issue a sold COUNT per selected tier", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      extra = extra_capped_tiers(event, 2)
+
+      selections =
+        Map.new([tier | extra], fn t -> {t.id, 1} end)
+
+      {{result, per_tier_sold}, batched_sold} =
+        with {result, per_tier_sold} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn ->
+                   BookingLocker.atomic_booking(user.id, event.id, selections)
+                 end,
+                 pattern: @per_tier_sold_count,
+                 caller_pids: [self()]
+               ),
+             {_, batched_sold} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn ->
+                   BookingLocker.atomic_booking(user.id, event.id, %{
+                     List.first(extra).id => 1
+                   })
+                 end,
+                 pattern: @batched_sold_count,
+                 caller_pids: [self()]
+               ) do
+          {{result, per_tier_sold}, batched_sold}
+        end
+
+      assert {:ok, _order} = result
+      assert per_tier_sold == 0
+      assert batched_sold == 1
+    end
+
+    test "check_availability_with_lock does not issue a sold COUNT per tier", %{
+      event: event,
+      tier: tier
+    } do
+      _extra = extra_capped_tiers(event, 3)
+      _ = tier
+
+      {{result, per_tier_sold}, batched_sold} =
+        with {result, per_tier_sold} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn -> BookingLocker.check_availability_with_lock(event.id) end,
+                 pattern: @per_tier_sold_count,
+                 caller_pids: [self()]
+               ),
+             {_, batched_sold} <-
+               Ysc.QueryCounter.with_query_counter(
+                 fn -> BookingLocker.check_availability_with_lock(event.id) end,
+                 pattern: @batched_sold_count,
+                 caller_pids: [self()]
+               ) do
+          {{result, per_tier_sold}, batched_sold}
+        end
+
+      assert {:ok, %{tiers: tiers}} = result
+      assert length(tiers) >= 4
+      assert per_tier_sold == 0
+      assert batched_sold == 1
+    end
   end
 
   describe "validate_fulfillment_capacity/3" do
@@ -1358,6 +1567,16 @@ defmodule Ysc.Tickets.BookingLockerTest do
 
       assert %Ecto.Query{} = query
       assert Repo.all(query) == []
+    end
+
+    test "sold-count and user-reserved explain queries are runnable" do
+      sold = BookingLocker.ci_query_explain_sold_counts_query()
+      reserved = BookingLocker.ci_query_explain_user_reserved_query()
+
+      assert %Ecto.Query{} = sold
+      assert %Ecto.Query{} = reserved
+      assert Repo.all(sold) == []
+      assert Repo.all(reserved) == []
     end
   end
 
