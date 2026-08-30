@@ -398,7 +398,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         },
         total_amount: "$200.00",
         booking_date: "Dec 1, 2024 at 10:00 AM",
-        booking_url: "https://example.com/bookings/123"
+        booking_url: "https://example.com/bookings/123",
+        cabin_email: "tahoe@ysc.org"
       }
 
       html = BookingConfirmation.render(assigns)
