@@ -17,6 +17,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   alias Ysc.Events.TicketDetail
   alias Ysc.Tickets
   alias Ysc.Tickets.DonationDisplay
+  alias YscWeb.Admin.DateTimeDisplay
 
   @impl true
   def render(assigns) do
@@ -109,7 +110,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
               {format_money_safe(order_total(group))}
             </span>
             <span class="hidden sm:inline text-xs text-zinc-500 whitespace-nowrap shrink-0">
-              {format_datetime(order_purchased_at(group))}
+              {DateTimeDisplay.format_pacific_datetime_at(order_purchased_at(group))}
             </span>
           </button>
 
@@ -876,14 +877,6 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   defp blank_to_default("", default), do: default
   defp blank_to_default(value, _default), do: value
 
-  defp format_datetime(nil), do: "—"
-
-  defp format_datetime(%DateTime{} = datetime) do
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
-  end
-
   defp format_money_safe(%Money{} = money), do: Money.to_string!(money)
   defp format_money_safe(_), do: "—"
 
@@ -915,7 +908,8 @@ defmodule YscWeb.AdminEventsLive.TicketList do
       base_row = %{
         "Ticket Reference" => ticket.reference_id || "",
         "Ticket Tier" => (ticket.ticket_tier && ticket.ticket_tier.name) || "",
-        "Purchase Date" => format_datetime(ticket.inserted_at),
+        "Purchase Date" =>
+          DateTimeDisplay.format_pacific_datetime_at(ticket.inserted_at),
         "Purchaser First Name" => purchaser_first_name,
         "Purchaser Last Name" => purchaser_last_name,
         "Purchaser Email" => purchaser_email,

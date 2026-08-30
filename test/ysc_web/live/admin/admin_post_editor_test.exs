@@ -9,6 +9,7 @@ defmodule YscWeb.AdminPostEditorLiveTest do
   alias Ysc.Posts
   alias Ysc.Posts.Post
   alias Ysc.Repo
+  alias YscWeb.Admin.DateTimeDisplay
   alias YscWeb.Admin.EditingPresence
 
   setup :register_and_log_in_admin
@@ -723,9 +724,7 @@ defmodule YscWeb.AdminPostEditorLiveTest do
   end
 
   defp pacific_last_edited_label(datetime) do
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+    DateTimeDisplay.format_pacific_datetime_at(datetime)
   end
 
   defp utc_last_edited_label(datetime) do
