@@ -939,5 +939,56 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert html =~ "GOING FAST!"
       refute html =~ "Unsubscribe from newsletters"
     end
+
+    test "event and post titles and cover images link to their detail pages" do
+      event = %{
+        title: "Summer Fest",
+        description: "Hi",
+        short_description: "Short",
+        date_str: "Jan 1",
+        save_the_date: false,
+        selling_fast: false,
+        pricing_str: nil,
+        tickets_on_sale_str: nil,
+        location_name: nil,
+        url: "https://example.com/events/summer-fest",
+        image_url: "https://images.example.com/event.jpg"
+      }
+
+      post = %{
+        title: "Dock Repairs",
+        preview_text: "Short preview",
+        url: "https://example.com/posts/dock-repairs",
+        image_url: "https://images.example.com/post.jpg"
+      }
+
+      assigns = %{
+        first_name: "there",
+        edition_title: "Weekly",
+        edition_date: "Newsletter, July 9, 2026",
+        intro_text: Phoenix.HTML.raw("<p>x</p>"),
+        intro_text?: true,
+        cover_image_url: nil,
+        posts: [post],
+        events: [event],
+        unsubscribe_url: "/newsletter/unsubscribe/preview"
+      }
+
+      html = NewsletterEdition.render(assigns)
+
+      # Event title is wrapped in a link to the event, and so is the cover image.
+      assert html =~
+               ~r{<a href="https://example.com/events/summer-fest"[^>]*>\s*Summer Fest\s*</a>}
+
+      assert html =~
+               ~r{<a href="https://example.com/events/summer-fest"[^>]*>\s*<img}
+
+      # Post title is wrapped in a link to the post, and so is the thumbnail.
+      assert html =~
+               ~r{<a href="https://example.com/posts/dock-repairs"[^>]*>\s*Dock Repairs\s*</a>}
+
+      assert html =~
+               ~r{<a href="https://example.com/posts/dock-repairs"[^>]*>\s*<img}
+    end
   end
 end
