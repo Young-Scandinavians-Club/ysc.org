@@ -49,14 +49,14 @@ defmodule Ysc.Bookings.PropertyDisplayTest do
 
   describe "outage_name/1" do
     test "formats known properties" do
-      assert PropertyDisplay.outage_name(:tahoe) == "Tahoe Property"
-      assert PropertyDisplay.outage_name(:clear_lake) == "Clear Lake Property"
-      assert PropertyDisplay.outage_name("tahoe") == "Tahoe Property"
+      assert PropertyDisplay.outage_name(:tahoe) == "Tahoe cabin"
+      assert PropertyDisplay.outage_name(:clear_lake) == "Clear Lake cabin"
+      assert PropertyDisplay.outage_name("tahoe") == "Tahoe cabin"
     end
 
     test "returns default for unknown values" do
-      assert PropertyDisplay.outage_name(:unknown) == "Property"
-      assert PropertyDisplay.outage_name("other") == "Property"
+      assert PropertyDisplay.outage_name(:unknown) == "cabin"
+      assert PropertyDisplay.outage_name("other") == "cabin"
     end
   end
 

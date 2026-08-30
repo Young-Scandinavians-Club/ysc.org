@@ -16,6 +16,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     BookingEntitlementGranted,
     MembershipEnded,
     MembershipPaymentConfirmation,
+    OutageNotification,
     TahoeSummerBuyoutAvailable,
     TahoeWinterWeekendAvailable,
     TicketReservationCreated,
@@ -300,8 +301,43 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Finish checkout before the deadline below"
       assert text =~ "Ticket details"
       assert text =~ "Checkout:"
+      assert text =~ "View event & finish buying tickets"
+      refute text =~ "complete tickets"
       refute text =~ "hold window"
       refute text =~ "your reservation will be applied"
+    end
+  end
+
+  describe "outage notification" do
+    test "uses cabin language, not property, and names the Cabin Master" do
+      html =
+        OutageNotification.render(%{
+          first_name: "Jane",
+          property: :tahoe,
+          incident_type: :power_outage,
+          company_name: "PG&E",
+          incident_date: ~D[2026-12-01],
+          description: "Scheduled maintenance.",
+          checkin_date: ~D[2026-12-01],
+          checkout_date: ~D[2026-12-03],
+          cabin_master_name: "Lars Berg",
+          cabin_master_email: "cabinmaster@ysc.org",
+          cabin_master_phone: "4155550199"
+        })
+
+      text = html_text(html)
+
+      assert OutageNotification.get_subject(:tahoe) ==
+               "Outage at the Tahoe cabin"
+
+      assert text =~ "Cabin outage notice"
+      assert text =~ "There's currently a power outage at the Tahoe cabin"
+      assert text =~ "Utility company"
+      assert text =~ "reach out to the Cabin Master"
+      assert text =~ "Check the outage map"
+      refute text =~ "Property Outage"
+      refute text =~ "Tahoe Property"
+      refute text =~ "the cabin master"
     end
   end
 
