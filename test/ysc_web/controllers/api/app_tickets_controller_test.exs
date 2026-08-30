@@ -662,5 +662,70 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
 
       assert length(warnings) == 2
     end
+
+    test "rejects a volunteer, including a self-grant", %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        conn
+        |> conn_as(volunteer)
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => volunteer.id,
+          "tiers" => %{tier.id => 1},
+          "payment_method" => "cash"
+        })
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(response, 403)
+
+      assert Ysc.Events.list_tickets_for_user(volunteer.id) == []
+    end
+  end
+
+  describe "volunteer card-present door sales remain allowed" do
+    test "volunteer can create a card-present payment intent", %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        assert params.payment_method_types == ["card_present"]
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_volunteer_door",
+           client_secret: "pi_volunteer_door_secret",
+           amount: params.amount,
+           currency: "usd"
+         }}
+      end)
+
+      response =
+        conn
+        |> conn_as(volunteer)
+        |> post(
+          ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent",
+          %{
+            "member_id" => member.id,
+            "tiers" => %{tier.id => 1}
+          }
+        )
+
+      assert %{"client_secret" => "pi_volunteer_door_secret"} =
+               json_response(response, 200)
+    end
+  end
+
+  defp conn_as(conn, user) do
+    token = Accounts.generate_user_mobile_token(user)
+
+    conn
+    |> Plug.Conn.delete_req_header("authorization")
+    |> put_req_header("authorization", "Bearer #{token}")
   end
 end

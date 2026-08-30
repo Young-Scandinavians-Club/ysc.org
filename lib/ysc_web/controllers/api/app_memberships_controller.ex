@@ -22,6 +22,7 @@ defmodule YscWeb.Api.AppMembershipsController do
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Customers
   alias Ysc.Subscriptions
+  alias YscWeb.Plugs.MobileUserAuth
 
   action_fallback YscWeb.Api.FallbackController
 
@@ -89,7 +90,13 @@ defmodule YscWeb.Api.AppMembershipsController do
   member the "paid elsewhere" confirmation email. The subscription has no card
   on file, so it simply lapses at period end rather than auto-renewing.
 
-  The acting volunteer/admin (`conn.assigns.current_user`) is recorded as
+  Full admins only (Finding 51). Volunteers cannot create memberships on
+  the web (`/admin/users/:id/details` redirects them) and must not do so
+  here either — there is no proof cash was collected, and the subscription
+  is marked paid out of band. Card-present sign-up via `subscribe/2` stays
+  available to volunteers.
+
+  The acting admin (`conn.assigns.current_user`) is recorded as
   `recorded_by_id` for the audit log and Stripe metadata; it is never read
   from the request body.
   """
@@ -97,7 +104,8 @@ defmodule YscWeb.Api.AppMembershipsController do
         conn,
         %{"member_id" => member_id, "plan" => plan_id} = params
       ) do
-    with {:ok, member} <- fetch_member(member_id),
+    with :ok <- MobileUserAuth.require_full_admin(conn),
+         {:ok, member} <- fetch_member(member_id),
          :ok <- reject_duplicate_membership(member),
          {:ok, plan} <- fetch_plan(plan_id),
          {:ok, payment_method} <- parse_offline_payment_method(params),
