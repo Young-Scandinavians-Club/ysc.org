@@ -975,20 +975,68 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       }
 
       html = NewsletterEdition.render(assigns)
+      {:ok, doc} = Floki.parse_document(html)
 
-      # Event title is wrapped in a link to the event, and so is the cover image.
-      assert html =~
-               ~r{<a href="https://example.com/events/summer-fest"[^>]*>\s*Summer Fest\s*</a>}
+      event_url = "https://example.com/events/summer-fest"
+      post_url = "https://example.com/posts/dock-repairs"
 
-      assert html =~
-               ~r{<a href="https://example.com/events/summer-fest"[^>]*>\s*<img}
+      # Event: title text and cover image both sit inside a link to the event.
+      assert doc
+             |> Floki.find(~s(a[href="#{event_url}"]))
+             |> Enum.any?(&(Floki.text(&1) |> String.trim() == "Summer Fest"))
 
-      # Post title is wrapped in a link to the post, and so is the thumbnail.
-      assert html =~
-               ~r{<a href="https://example.com/posts/dock-repairs"[^>]*>\s*Dock Repairs\s*</a>}
+      assert doc
+             |> Floki.find(~s(a[href="#{event_url}"] img))
+             |> Enum.any?()
 
-      assert html =~
-               ~r{<a href="https://example.com/posts/dock-repairs"[^>]*>\s*<img}
+      # Post: title text and thumbnail both sit inside a link to the post.
+      assert doc
+             |> Floki.find(~s(a[href="#{post_url}"]))
+             |> Enum.any?(&(Floki.text(&1) |> String.trim() == "Dock Repairs"))
+
+      assert doc
+             |> Floki.find(~s(a[href="#{post_url}"] img))
+             |> Enum.any?()
+    end
+
+    test "badge-overlay event cover (save-the-date / selling-fast) is wrapped in a link" do
+      event = %{
+        title: "Midsummer",
+        description: "Hi",
+        short_description: "Short",
+        date_str: "Jun 21",
+        save_the_date: false,
+        selling_fast: true,
+        pricing_str: nil,
+        tickets_on_sale_str: nil,
+        location_name: nil,
+        url: "https://example.com/events/midsummer",
+        image_url: "https://images.example.com/midsummer.jpg"
+      }
+
+      assigns = %{
+        first_name: "there",
+        edition_title: "Weekly",
+        edition_date: "Newsletter, July 9, 2026",
+        intro_text: Phoenix.HTML.raw("<p>x</p>"),
+        intro_text?: true,
+        cover_image_url: nil,
+        posts: [],
+        events: [event],
+        unsubscribe_url: "/newsletter/unsubscribe/preview"
+      }
+
+      html = NewsletterEdition.render(assigns)
+      {:ok, doc} = Floki.parse_document(html)
+
+      # The badge overlay renders a background-image cover instead of an <img>;
+      # it (badges and all) sits inside a link to the event.
+      link =
+        doc
+        |> Floki.find(~s(a[href="https://example.com/events/midsummer"]))
+        |> Enum.find(&(Floki.find(&1, "span") |> Floki.text() =~ "GOING FAST!"))
+
+      assert link
     end
   end
 end
