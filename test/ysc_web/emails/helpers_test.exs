@@ -74,7 +74,9 @@ defmodule YscWeb.Emails.HelpersTest do
                origin <> "/users/notifications"
 
       assert Helpers.tahoe_booking_url() == origin <> "/bookings/tahoe"
-      assert Helpers.payment_methods_url() == origin <> "/users/payment-methods"
+
+      assert Helpers.payment_methods_url() ==
+               origin <> "/users/membership/payment-method"
 
       assert Helpers.security_settings_url() ==
                origin <> "/users/settings/security"

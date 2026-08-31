@@ -90,9 +90,9 @@ defmodule YscWeb.Emails.Helpers do
   def tahoe_booking_url, do: absolute_url("/bookings/tahoe")
 
   @doc """
-  Absolute URL for the member payment methods page.
+  Absolute URL for the member page where a card or bank account can be saved.
   """
-  def payment_methods_url, do: absolute_url("/users/payment-methods")
+  def payment_methods_url, do: absolute_url("/users/membership/payment-method")
 
   @doc """
   Absolute URL for the member security settings page.

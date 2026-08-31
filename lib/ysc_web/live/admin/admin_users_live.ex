@@ -1133,7 +1133,7 @@ defmodule YscWeb.AdminUsersLive do
 
             We regret to inform you that your application has been rejected.
 
-            #{if has_payment_method, do: "Your payment method on file has not been charged and will not be charged.", else: ""}
+            #{if has_payment_method, do: "The card or bank account you saved has not been charged, and we will not charge it.", else: ""}
 
             If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
 

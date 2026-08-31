@@ -14,8 +14,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     BookingCheckoutReminder,
     BookingConfirmation,
     BookingEntitlementGranted,
+    EventNotification,
     MembershipEnded,
     MembershipPaymentConfirmation,
+    MembershipRenewalPaymentMethodReminder,
     OutageNotification,
     TahoeSummerBuyoutAvailable,
     TahoeWinterWeekendAvailable,
@@ -302,9 +304,63 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Ticket details"
       assert text =~ "Checkout:"
       assert text =~ "View event & finish buying tickets"
+      assert text =~ "Must be 21 or older"
+      refute text =~ "Age Restriction"
       refute text =~ "complete tickets"
       refute text =~ "hold window"
       refute text =~ "your reservation will be applied"
+    end
+  end
+
+  describe "new-event email" do
+    test "asks members to see event details instead of RSVPing" do
+      html =
+        EventNotification.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            description: "Join us.",
+            location_name: "Golden Gate Park",
+            address: "123 Main St",
+            age_restriction: 21
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          event_image_url: nil,
+          notification_settings_url: "https://example.com/users/notifications"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "See event details"
+      assert text =~ "Must be 21 or older"
+      refute text =~ "RSVP"
+      refute text =~ "Age Restriction"
+    end
+  end
+
+  describe "membership renewal payment reminder" do
+    test "asks members to save a card instead of a payment method on file" do
+      html =
+        MembershipRenewalPaymentMethodReminder.render(%{
+          first_name: "Jane",
+          renewal_date: "March 15, 2026",
+          payment_methods_url:
+            "https://example.com/users/membership/payment-method",
+          membership_url: "https://example.com/users/membership"
+        })
+
+      text = html_text(html)
+
+      assert MembershipRenewalPaymentMethodReminder.get_subject() ==
+               "Please add a card so your membership can renew"
+
+      assert text =~ "Please add a card so your membership can renew"
+      assert text =~ "We don't have a card or bank account saved"
+      assert text =~ "Add a card or bank account"
+      assert text =~ "Click the button above"
+      refute text =~ "payment method on file"
+      refute text =~ "Navigate to Payment Methods"
     end
   end
 
