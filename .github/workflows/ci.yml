@@ -215,6 +215,9 @@ jobs:
       - name: install_flyctl self-test
         run: ./etc/scripts/install_flyctl.sh --self-test
 
+      - name: sync_geoip_database self-test
+        run: ./etc/scripts/sync_geoip_database.sh --self-test
+
       - name: dprint (format check)
         run: dprint check
 
