@@ -223,6 +223,120 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
              } = json_response(response, 422)
     end
 
+    test "rejects subscribe when Stripe cannot retrieve the payment method", %{
+      conn: conn
+    } do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_missing" ->
+        {:error, :not_found}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a subscription when the payment method is missing")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_missing"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
+    test "accepts a string-keyed payment method map from Stripe", %{conn: conn} do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_map_keys" ->
+        {:ok,
+         %{
+           "id" => "pm_map_keys",
+           "customer" => member.stripe_id,
+           "created" => System.system_time(:second) - 30
+         }}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn params, _opts ->
+        assert params.default_payment_method == "pm_map_keys"
+
+        {:ok, %Stripe.Subscription{id: "sub_map_keys", status: "active"}}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_map_keys"
+        })
+
+      assert %{"id" => "sub_map_keys", "status" => "active"} =
+               json_response(response, 200)
+    end
+
+    test "rejects a payment method that is not attached to any customer", %{
+      conn: conn
+    } do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_unattached" ->
+        {:ok,
+         %Stripe.PaymentMethod{
+           id: "pm_unattached",
+           customer: nil,
+           created: System.system_time(:second)
+         }}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a subscription with an unattached payment method")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_unattached"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
+    test "rejects a payment method with no created timestamp", %{conn: conn} do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_no_created" ->
+        {:ok, %{"id" => "pm_no_created", "customer" => member.stripe_id}}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a subscription without a created timestamp")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_no_created"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
     test "returns an error for an unknown plan", %{conn: conn} do
       member = user_fixture()
 
