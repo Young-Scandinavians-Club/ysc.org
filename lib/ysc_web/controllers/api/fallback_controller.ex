@@ -75,6 +75,8 @@ defmodule YscWeb.Api.FallbackController do
       "Stripe Terminal is not configured for this environment",
     user_already_has_active_subscription:
       "member already has an active membership",
+    payment_method_not_eligible:
+      "payment method must be collected for this member via Terminal just before subscribe",
     sub_accounts_cannot_create_subscriptions:
       "sub-accounts cannot sign up for their own membership",
     invalid_ticket_selection:

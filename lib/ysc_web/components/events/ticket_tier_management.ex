@@ -306,6 +306,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                             </div>
                           </div>
                           <button
+                            :if={@admin_role == :admin}
+                            id={"cancel-reservation-#{reservation.id}"}
                             phx-click="cancel-reservation"
                             phx-value-id={reservation.id}
                             phx-target={@myself}
@@ -356,6 +358,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                             </div>
                           </div>
                           <button
+                            :if={@admin_role == :admin}
+                            id={"cancel-reservation-#{reservation.id}"}
                             phx-click="cancel-reservation"
                             phx-value-id={reservation.id}
                             phx-target={@myself}
@@ -394,6 +398,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         type="button"
         class="hidden"
         phx-click="reserve-tickets"
+        phx-target={@myself}
+      />
+      <button
+        id={"ticket-tier-cancel-reservation-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="cancel-reservation"
         phx-target={@myself}
       />
       <%!-- Add Ticket Tier Modal --%>
@@ -903,27 +914,59 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("cancel-reservation", %{"id" => id}, socket) do
+    # Finding 53: cancelling a hold is a money action (releases discounted
+    # inventory / forces full price). Gate like grant/reserve after Findings
+    # 46/50, and refuse ids that are not on this event's tiers.
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Cancel Reservation")}
+    else
+      cancel_reservation_as_admin(socket, id)
+    end
+  end
+
+  defp cancel_reservation_as_admin(socket, id) do
     reservation = Events.get_ticket_reservation!(id)
 
-    case Events.cancel_ticket_reservation(reservation) do
-      {:ok, _reservation} ->
-        # Refresh reservation maps using tiers already on the socket
-        {reservations_by_tier, expired_reservations_by_tier} =
-          load_reservations_maps(socket.assigns.ticket_tiers)
+    if reservation_on_current_event?(reservation, socket.assigns.event_id) do
+      case Events.cancel_ticket_reservation(reservation) do
+        {:ok, _reservation} ->
+          {reservations_by_tier, expired_reservations_by_tier} =
+            load_reservations_maps(socket.assigns.ticket_tiers)
 
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:info, "Reservation cancelled successfully",
-           title: "Reservation"
-         )
-         |> assign(:reservations_by_tier, reservations_by_tier)
-         |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)}
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Reservation cancelled successfully",
+             title: "Reservation"
+           )
+           |> assign(:reservations_by_tier, reservations_by_tier)
+           |> assign(
+             :expired_reservations_by_tier,
+             expired_reservations_by_tier
+           )}
 
-      {:error, _} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to cancel reservation",
-           title: "Reservation"
-         )}
+        {:error, _} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to cancel reservation",
+             title: "Reservation"
+           )}
+      end
+    else
+      {:noreply,
+       YscWeb.Flash.put_toast(socket, :error, "Reservation not found",
+         title: "Reservation"
+       )}
+    end
+  end
+
+  defp reservation_on_current_event?(reservation, event_id) do
+    case reservation.ticket_tier do
+      %{event_id: ^event_id} -> true
+      _ -> false
     end
   end
 
