@@ -229,7 +229,10 @@ defmodule Ysc.MixProject do
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
       {:goth, "~> 1.4"},
-      {:hammer, "~> 7.3"},
+      # 7.4.1: TokenBucket ETS refill uses milliseconds instead of whole
+      # seconds. We use default :fix_window (hit/3 scale+limit), not
+      # TokenBucket, so the patch is unused; pin the patched floor.
+      {:hammer, "~> 7.4.1"},
       # 1.5.5: CSS.scrub treats nested tags inside <style> as empty (parser can
       # pass a tree instead of a string); HTML5 also tightens meta http-equiv
       # and object data=. We use BasicHTML / TrixScrubber / strip_tags, not
