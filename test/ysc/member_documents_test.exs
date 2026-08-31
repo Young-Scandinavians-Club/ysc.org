@@ -26,6 +26,17 @@ defmodule Ysc.MemberDocumentsTest do
     end
   end
 
+  describe "annual_meetings_root/0" do
+    test "resolves under the runtime priv directory" do
+      root = MemberDocuments.annual_meetings_root()
+
+      assert root ==
+               Path.join([:code.priv_dir(:ysc), "static", "annual_meetings"])
+
+      assert File.dir?(root)
+    end
+  end
+
   describe "annual_meeting_path/1" do
     test "returns path for an existing file" do
       relative = "2026/YSC_ANNUAL_REPORT_FY_2025.pdf"

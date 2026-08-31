@@ -11,6 +11,11 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
   @sample_pdf "2026/YSC_ANNUAL_REPORT_FY_2025.pdf"
 
   describe "annual meeting documents" do
+    test "annual_meetings is not served by Plug.Static" do
+      refute "annual_meetings" in YscWeb.static_paths()
+      refute "exports" in YscWeb.static_paths()
+    end
+
     test "unauthenticated request is redirected to login", %{conn: conn} do
       conn = get(conn, "/annual_meetings/#{@sample_pdf}")
       assert redirected_to(conn) == ~p"/users/log-in"
