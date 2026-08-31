@@ -6,7 +6,7 @@ defmodule YscWeb.FeedController do
   alias YscWeb.Feeds.AtomFeed
 
   def events(conn, _params) do
-    xml = Events.list_upcoming_events(50) |> AtomFeed.events_feed()
+    xml = Events.list_upcoming_events_for_feed(50) |> AtomFeed.events_feed()
 
     conn
     |> put_resp_content_type("application/atom+xml")

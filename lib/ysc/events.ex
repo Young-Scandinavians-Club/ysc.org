@@ -802,65 +802,23 @@ defmodule Ysc.Events do
   end
 
   def list_upcoming_events_from_db(limit \\ 50) do
-    three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
+    limit
+    |> events_list_query(:upcoming)
+    |> Repo.all()
+    |> add_pricing_info_batch()
+  end
 
-    events =
-      from(e in Event,
-        where: ^event_upcoming_dynamic(),
-        where: e.state in [:published, :cancelled],
-        left_join: t in Ticket,
-        on:
-          t.event_id == e.id and t.status == :confirmed and
-            t.inserted_at >= ^three_days_ago,
-        left_join: tt in TicketTier,
-        on: t.ticket_tier_id == tt.id and tt.type != :donation,
-        group_by: e.id,
-        select: %{
-          id: e.id,
-          reference_id: e.reference_id,
-          state: e.state,
-          published_at: e.published_at,
-          publish_at: e.publish_at,
-          organizer_id: e.organizer_id,
-          title: e.title,
-          description: e.description,
-          max_attendees: e.max_attendees,
-          age_restriction: e.age_restriction,
-          show_participants: e.show_participants,
-          raw_details: e.raw_details,
-          rendered_details: e.rendered_details,
-          image_id: e.image_id,
-          start_date: e.start_date,
-          start_time: e.start_time,
-          end_date: e.end_date,
-          end_time: e.end_time,
-          location_name: e.location_name,
-          address: e.address,
-          latitude: e.latitude,
-          longitude: e.longitude,
-          place_id: e.place_id,
-          partiful_link: e.partiful_link,
-          tickets_tbd: e.tickets_tbd,
-          lock_version: e.lock_version,
-          inserted_at: e.inserted_at,
-          updated_at: e.updated_at,
-          recent_tickets_count: count(t.id),
-          selling_fast: fragment("count(?) >= 5", t.id)
-        },
-        order_by: [
-          # First sort by state: non-cancelled events first, cancelled events last
-          asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
-          # Then sort by start_date for non-cancelled events
-          asc: e.start_date,
-          # Finally sort by start_time for events on the same date
-          asc: e.start_time
-        ],
-        limit: ^limit
-      )
-      |> Repo.all()
+  @doc """
+  Upcoming published/cancelled events for the Atom feed.
 
-    # Batch load all ticket tiers, ticket counts, and images for all events at once
-    add_pricing_info_batch(events)
+  Selects only feed fields, including `rendered_details` for entry HTML.
+  Does not join tickets or load pricing/images — those are unused by the feed
+  and would otherwise share the public list cache's TOAST-heavy payload.
+  """
+  def list_upcoming_events_for_feed(limit \\ 50) do
+    limit
+    |> upcoming_events_feed_query()
+    |> Repo.all()
   end
 
   @doc """
@@ -921,8 +879,8 @@ defmodule Ysc.Events do
   end
 
   # List payload for the kiosk/app APIs — omit unused columns such as
-  # raw_details/rendered_details (event body HTML) that EventListCache still
-  # needs for the Atom feed.
+  # raw_details/rendered_details (event body HTML). The Atom feed uses
+  # `list_upcoming_events_for_feed/1` instead of the public list cache.
   defp upcoming_events_paginated_query(
          page_size,
          offset,
@@ -1046,63 +1004,10 @@ defmodule Ysc.Events do
   end
 
   def list_past_events_from_db(limit \\ 20) do
-    three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
-
-    events =
-      from(e in Event,
-        where: ^event_past_dynamic(),
-        where: e.state in [:published, :cancelled],
-        left_join: t in Ticket,
-        on:
-          t.event_id == e.id and t.status == :confirmed and
-            t.inserted_at >= ^three_days_ago,
-        left_join: tt in TicketTier,
-        on: t.ticket_tier_id == tt.id and tt.type != :donation,
-        group_by: e.id,
-        select: %{
-          id: e.id,
-          reference_id: e.reference_id,
-          state: e.state,
-          published_at: e.published_at,
-          publish_at: e.publish_at,
-          organizer_id: e.organizer_id,
-          title: e.title,
-          description: e.description,
-          max_attendees: e.max_attendees,
-          age_restriction: e.age_restriction,
-          show_participants: e.show_participants,
-          raw_details: e.raw_details,
-          rendered_details: e.rendered_details,
-          image_id: e.image_id,
-          start_date: e.start_date,
-          start_time: e.start_time,
-          end_date: e.end_date,
-          end_time: e.end_time,
-          location_name: e.location_name,
-          address: e.address,
-          latitude: e.latitude,
-          longitude: e.longitude,
-          place_id: e.place_id,
-          partiful_link: e.partiful_link,
-          tickets_tbd: e.tickets_tbd,
-          lock_version: e.lock_version,
-          inserted_at: e.inserted_at,
-          updated_at: e.updated_at,
-          recent_tickets_count: count(t.id),
-          selling_fast: fragment("count(?) >= 5", t.id)
-        },
-        order_by: [
-          # Sort by start_date descending (most recent past events first)
-          desc: e.start_date,
-          # Then sort by start_time for events on the same date
-          desc: e.start_time
-        ],
-        limit: ^limit
-      )
-      |> Repo.all()
-
-    # Batch load all ticket tiers, ticket counts, and images for all events at once
-    add_pricing_info_batch(events)
+    limit
+    |> events_list_query(:past)
+    |> Repo.all()
+    |> add_pricing_info_batch()
   end
 
   @doc """
@@ -1113,17 +1018,8 @@ defmodule Ysc.Events do
   """
   def list_recent_and_upcoming_events do
     now = DateTime.utc_now()
-    three_months_ago = DateTime.add(now, -90, :day)
 
-    events =
-      from(e in Event,
-        where: e.state in [:published, :cancelled],
-        where:
-          (e.start_date >= ^three_months_ago and e.start_date <= ^now) or
-            e.start_date > ^now,
-        limit: 100
-      )
-      |> Repo.all()
+    events = Repo.all(recent_and_upcoming_events_query())
 
     # Sort: upcoming events first (ascending), then past events (descending)
     {upcoming, past} =
@@ -1133,6 +1029,115 @@ defmodule Ysc.Events do
     past_sorted = Enum.sort_by(past, & &1.start_date, {:desc, DateTime})
 
     upcoming_sorted ++ past_sorted
+  end
+
+  # Public event cards (home, /events, EventListCache). Omits `raw_details` /
+  # `rendered_details` so list/cache payloads do not pull event-body HTML.
+  defp events_list_query(limit, timeframe) do
+    three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
+
+    query =
+      Event
+      |> events_list_timeframe_where(timeframe)
+      |> where([e], e.state in [:published, :cancelled])
+      |> join(:left, [e], t in Ticket,
+        on:
+          t.event_id == e.id and t.status == :confirmed and
+            t.inserted_at >= ^three_days_ago
+      )
+      |> join(:left, [e, t], tt in TicketTier,
+        on: t.ticket_tier_id == tt.id and tt.type != :donation
+      )
+      |> group_by([e], e.id)
+      |> select([e, t], %{
+        id: e.id,
+        reference_id: e.reference_id,
+        state: e.state,
+        published_at: e.published_at,
+        publish_at: e.publish_at,
+        organizer_id: e.organizer_id,
+        title: e.title,
+        description: e.description,
+        max_attendees: e.max_attendees,
+        age_restriction: e.age_restriction,
+        show_participants: e.show_participants,
+        image_id: e.image_id,
+        start_date: e.start_date,
+        start_time: e.start_time,
+        end_date: e.end_date,
+        end_time: e.end_time,
+        location_name: e.location_name,
+        address: e.address,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        place_id: e.place_id,
+        partiful_link: e.partiful_link,
+        tickets_tbd: e.tickets_tbd,
+        lock_version: e.lock_version,
+        inserted_at: e.inserted_at,
+        updated_at: e.updated_at,
+        recent_tickets_count: count(t.id),
+        selling_fast: fragment("count(?) >= 5", t.id)
+      })
+      |> limit(^limit)
+
+    events_list_timeframe_order(query, timeframe)
+  end
+
+  defp events_list_timeframe_where(query, :upcoming) do
+    where(query, ^event_upcoming_dynamic())
+  end
+
+  defp events_list_timeframe_where(query, :past) do
+    where(query, ^event_past_dynamic())
+  end
+
+  defp events_list_timeframe_order(query, :upcoming) do
+    order_by(query, [e],
+      asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
+      asc: e.start_date,
+      asc: e.start_time
+    )
+  end
+
+  defp events_list_timeframe_order(query, :past) do
+    order_by(query, [e], desc: e.start_date, desc: e.start_time)
+  end
+
+  defp upcoming_events_feed_query(limit) do
+    from(e in Event,
+      where: ^event_upcoming_dynamic(),
+      where: e.state in [:published, :cancelled],
+      select: %{
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        rendered_details: e.rendered_details,
+        updated_at: e.updated_at,
+        published_at: e.published_at,
+        start_date: e.start_date
+      },
+      order_by: [
+        asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
+        asc: e.start_date,
+        asc: e.start_time
+      ],
+      limit: ^limit
+    )
+  end
+
+  defp recent_and_upcoming_events_query do
+    now = DateTime.utc_now()
+    three_months_ago = DateTime.add(now, -90, :day)
+
+    from(e in Event,
+      where: e.state in [:published, :cancelled],
+      where:
+        (e.start_date >= ^three_months_ago and e.start_date <= ^now) or
+          e.start_date > ^now,
+      select: struct(e, ^Event.summary_fields()),
+      limit: 100
+    )
   end
 
   # Batch load pricing info for all events to avoid N+1 queries
@@ -3780,5 +3785,25 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_ticket_tier_member_only_attrs_query do
     ticket_tier_member_only_attrs_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_upcoming_events_list_query do
+    events_list_query(50, :upcoming)
+  end
+
+  @doc false
+  def ci_query_explain_past_events_list_query do
+    events_list_query(20, :past)
+  end
+
+  @doc false
+  def ci_query_explain_upcoming_events_feed_query do
+    upcoming_events_feed_query(50)
+  end
+
+  @doc false
+  def ci_query_explain_recent_and_upcoming_events_query do
+    recent_and_upcoming_events_query()
   end
 end

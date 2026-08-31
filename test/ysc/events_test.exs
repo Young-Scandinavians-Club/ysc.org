@@ -1076,6 +1076,63 @@ defmodule Ysc.EventsTest do
       assert Enum.any?(events, &(&1.id == event.id))
     end
 
+    test "list_upcoming_events_from_db/1 omits event body HTML" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: DateTime.add(DateTime.utc_now(), 7, :day)
+        })
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>list cache should not load this</p>",
+        rendered_details: "<p>list cache should not load this</p>"
+      })
+      |> Repo.update!()
+
+      loaded =
+        Events.list_upcoming_events_from_db(10)
+        |> Enum.find(&(&1.id == event.id))
+
+      assert loaded
+      assert loaded.title == event.title
+      refute Map.has_key?(loaded, :raw_details)
+      refute Map.has_key?(loaded, :rendered_details)
+    end
+
+    test "list_upcoming_events_for_feed/1 includes rendered_details without pricing joins" do
+      marker = "feed-html-#{System.unique_integer([:positive])}"
+
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: DateTime.add(DateTime.utc_now(), 7, :day)
+        })
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>raw #{marker}</p>",
+        rendered_details: "<p>rendered #{marker}</p>"
+      })
+      |> Repo.update!()
+
+      {loaded, html_query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Events.list_upcoming_events_for_feed(10)
+            |> Enum.find(&(&1.id == event.id))
+          end,
+          pattern: ~r/FROM "events"/
+        )
+
+      assert loaded
+      assert loaded.title == event.title
+      assert loaded.rendered_details == "<p>rendered #{marker}</p>"
+      refute Map.has_key?(loaded, :raw_details)
+      refute Map.has_key?(loaded, :pricing_info)
+      assert html_query_count == 1
+    end
+
     test "list_past_events/1 returns past events" do
       {:ok, event} =
         create_event_fixture(%{
@@ -1087,15 +1144,51 @@ defmodule Ysc.EventsTest do
       assert Enum.any?(events, &(&1.id == event.id))
     end
 
+    test "list_past_events_from_db/1 omits event body HTML" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: DateTime.add(DateTime.utc_now(), -7, :day)
+        })
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>past list should not load this</p>",
+        rendered_details: "<p>past list should not load this</p>"
+      })
+      |> Repo.update!()
+
+      loaded =
+        Events.list_past_events_from_db(10)
+        |> Enum.find(&(&1.id == event.id))
+
+      assert loaded
+      refute Map.has_key?(loaded, :raw_details)
+      refute Map.has_key?(loaded, :rendered_details)
+    end
+
     test "list_recent_and_upcoming_events/0 returns recent and upcoming events" do
-      {:ok, _event1} =
+      {:ok, event} =
         create_event_fixture(%{
           state: :published,
           start_date: DateTime.add(DateTime.utc_now(), 7, :day)
         })
 
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>expense dropdown should not load this</p>",
+        rendered_details: "<p>expense dropdown should not load this</p>"
+      })
+      |> Repo.update!()
+
       events = Events.list_recent_and_upcoming_events()
       assert is_list(events)
+
+      loaded = Enum.find(events, &(&1.id == event.id))
+      assert loaded
+      assert loaded.title == event.title
+      assert loaded.raw_details == nil
+      assert loaded.rendered_details == nil
     end
   end
 
@@ -4760,6 +4853,25 @@ defmodule Ysc.EventsTest do
     test "ci_query_explain_ticket_tier_member_only_attrs_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Events.ci_query_explain_ticket_tier_member_only_attrs_query()
+    end
+
+    test "ci_query_explain_upcoming_events_list_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Events.ci_query_explain_upcoming_events_list_query()
+    end
+
+    test "ci_query_explain_past_events_list_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = Events.ci_query_explain_past_events_list_query()
+    end
+
+    test "ci_query_explain_upcoming_events_feed_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Events.ci_query_explain_upcoming_events_feed_query()
+    end
+
+    test "ci_query_explain_recent_and_upcoming_events_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Events.ci_query_explain_recent_and_upcoming_events_query()
     end
   end
 end
