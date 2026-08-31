@@ -2933,10 +2933,14 @@ defmodule YscWeb.AdminMoneyLive do
 
         payout_fees = @selected_payout.fee_total || Money.new(0, :USD)
 
+        payout_reserve_adjustment =
+          @selected_payout.reserve_adjustment || Money.new(0, :USD)
+
         payout_computed_net =
           with {:ok, after_refunds} <-
                  Money.sub(payout_total_payments, payout_total_refunds),
-               {:ok, net} <- Money.sub(after_refunds, payout_fees) do
+               {:ok, after_fees} <- Money.sub(after_refunds, payout_fees),
+               {:ok, net} <- Money.add(after_fees, payout_reserve_adjustment) do
             net
           else
             _ -> Money.new(0, :USD)
@@ -2965,6 +2969,18 @@ defmodule YscWeb.AdminMoneyLive do
                 {Money.to_string!(payout_fees)}
               </p>
             </div>
+            <div :if={not Money.zero?(payout_reserve_adjustment)}>
+              <p class="text-zinc-600">Minimum-Balance Reserve:</p>
+              <p class={[
+                "font-semibold",
+                if(Money.negative?(payout_reserve_adjustment),
+                  do: "text-red-600",
+                  else: "text-zinc-900"
+                )
+              ]}>
+                {Money.to_string!(payout_reserve_adjustment)}
+              </p>
+            </div>
             <div>
               <p class="text-zinc-600">Bank Transfer (Stripe net):</p>
               <p class="font-semibold text-zinc-900">
@@ -2976,7 +2992,11 @@ defmodule YscWeb.AdminMoneyLive do
           <div class="mt-3 pt-3 border-t border-zinc-200">
             <div class="flex items-center justify-between">
               <span class="text-xs text-zinc-500">
-                Gross − Refunds − Fees =
+                Gross − Refunds − Fees
+                <%= if not Money.zero?(payout_reserve_adjustment) do %>
+                  + Reserve
+                <% end %>
+                =
                 <span class="font-mono">
                   {Money.to_string!(payout_computed_net)}
                 </span>

@@ -228,7 +228,14 @@ defmodule Ysc.Ledgers.Reconciliation do
 
   For each payout, verifies:
 
-      sum(linked payments) - sum(linked refunds) - fee_total == payout.amount
+      sum(linked payments) - sum(linked refunds) - fee_total
+        + reserve_adjustment == payout.amount
+
+  `reserve_adjustment` is the net of Stripe `payout_minimum_balance_hold` /
+  `payout_minimum_balance_release` balance transactions in the payout: negative
+  when Stripe withheld a minimum-balance reserve this cycle, positive when it
+  released one. Without it, any cycle with reserve movement looks like a
+  composition mismatch even though nothing is wrong.
 
   This catches understated `fee_total` (e.g. missing Billing Usage / `stripe_fee`
   balance transactions), incomplete payment/refund linking, and amount drift.
@@ -291,6 +298,7 @@ defmodule Ysc.Ledgers.Reconciliation do
     payments = payout.payments || []
     refunds = payout.refunds || []
     fee_total = payout.fee_total || Money.new(0, :USD)
+    reserve_adjustment = payout.reserve_adjustment || Money.new(0, :USD)
 
     payments_total =
       Enum.reduce(payments, Money.new(0, :USD), fn payment, acc ->
@@ -310,7 +318,8 @@ defmodule Ysc.Ledgers.Reconciliation do
 
     computed_net =
       with {:ok, after_refunds} <- Money.sub(payments_total, refunds_total),
-           {:ok, net} <- Money.sub(after_refunds, fee_total) do
+           {:ok, after_fees} <- Money.sub(after_refunds, fee_total),
+           {:ok, net} <- Money.add(after_fees, reserve_adjustment) do
         net
       else
         _ -> nil
@@ -322,7 +331,7 @@ defmodule Ysc.Ledgers.Reconciliation do
       cond do
         is_nil(computed_net) ->
           [
-            "Unable to compute payout net from payments/refunds/fees"
+            "Unable to compute payout net from payments/refunds/fees/reserve"
             | issues
           ]
 
@@ -340,6 +349,7 @@ defmodule Ysc.Ledgers.Reconciliation do
             "Payout composition mismatch: payments (#{Money.to_string!(payments_total)}) " <>
               "- refunds (#{Money.to_string!(refunds_total)}) " <>
               "- fees (#{Money.to_string!(fee_total)}) " <>
+              "+ reserve adjustment (#{Money.to_string!(reserve_adjustment)}) " <>
               "= #{Money.to_string!(computed_net)}, " <>
               "but payout.amount is #{Money.to_string!(payout.amount)}"
             | issues
