@@ -2179,6 +2179,98 @@ defmodule Ysc.Quickbooks.SyncTest do
       assert payout.quickbooks_deposit_id == "qb_deposit_simple_fees"
     end
 
+    test "simple deposit with no linked transactions includes reserve adjustment",
+         %{user: _user} do
+      # $45 wired = $150 gross - $5 fees - $100 reserve held, no linked txns
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          arrival_date: ~N[2024-01-15 12:00:00],
+          amount: Money.new(45, :USD),
+          stripe_payout_id: "po_simple_with_reserve",
+          currency: "USD",
+          status: "paid",
+          fee_total: Money.new(5, :USD),
+          reserve_adjustment: Money.new(Decimal.new("-100.00"), :USD)
+        })
+
+      payout = Repo.preload(payout, [:payments, :refunds])
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        clear_lake_booking_item_id: "clear_lake_item_123",
+        tahoe_booking_item_id: "tahoe_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      stub(ClientMock, :query_account_by_name, fn
+        "Undeposited Funds" ->
+          {:ok, "undeposited_funds_123"}
+
+        "Administration:Bank Service Charges:Stripe" ->
+          {:ok, "stripe_fees_account_123"}
+
+        _ ->
+          {:error, :not_found}
+      end)
+
+      stub(ClientMock, :query_class_by_name, fn
+        "Administration" -> {:ok, "admin_class_123"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(ClientMock, :get_or_create_item, fn _item_name, _opts ->
+        {:ok, "event_item_123"}
+      end)
+
+      expect(ClientMock, :create_deposit, fn params, _opts ->
+        assert length(params.line) == 3
+        assert Decimal.equal?(params.total_amt, Decimal.new("45.00"))
+
+        gross_line =
+          Enum.find(params.line, fn line ->
+            get_in(line, [:deposit_line_detail, :account_ref, :value]) ==
+              "undeposited_funds_123"
+          end)
+
+        assert gross_line != nil
+        assert Decimal.equal?(gross_line.amount, Decimal.new("150.00"))
+
+        fee_line =
+          Enum.find(params.line, fn line ->
+            get_in(line, [:deposit_line_detail, :account_ref, :value]) ==
+              "stripe_fees_account_123"
+          end)
+
+        assert fee_line != nil
+        assert Decimal.equal?(fee_line.amount, Decimal.new("-5.00"))
+
+        reserve_line =
+          Enum.find(params.line, fn line ->
+            get_in(line, [:deposit_line_detail, :account_ref, :value]) ==
+              "stripe_account_123"
+          end)
+
+        assert reserve_line != nil
+        assert Decimal.equal?(reserve_line.amount, Decimal.new("-100.00"))
+        assert reserve_line.description =~ "minimum-balance reserve held"
+
+        {:ok, %{"Id" => "qb_deposit_simple_reserve", "TotalAmt" => "45.00"}}
+      end)
+
+      assert {:ok, _} = Sync.sync_payout(payout)
+
+      payout = Repo.reload!(payout)
+      assert payout.quickbooks_sync_status == "synced"
+      assert payout.quickbooks_deposit_id == "qb_deposit_simple_reserve"
+    end
+
     test "Deposit subtracts a minimum-balance reserve hold so the total matches the bank feed",
          %{user: user} do
       {:ok, {payment, _tx, _entries}} =

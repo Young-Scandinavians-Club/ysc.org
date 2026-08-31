@@ -2491,13 +2491,18 @@ defmodule Ysc.Quickbooks.Sync do
         )
 
         # Create a simple deposit without linked transactions.
-        # If the payout has Stripe fees, break the deposit into a gross line + negative fee line
-        # so QuickBooks reporting captures both the income and the processing cost.
+        # Break the deposit into a gross source line, optional negative fee
+        # line, and optional reserve line so QuickBooks captures processing
+        # cost and Stripe minimum-balance reserve movement. Bank total is
+        # gross - fees + reserve_adjustment (negative reserve = withheld).
         administration_class_ref = get_administration_class_ref()
 
         net_amount =
           Money.to_decimal(payout.amount)
           |> Decimal.round(2)
+
+        reserve_for_gross =
+          payout_reserve_adjustment_decimal(payout) || Decimal.new(0)
 
         stripe_fees =
           if payout.fee_total && Money.positive?(payout.fee_total) do
@@ -2506,12 +2511,15 @@ defmodule Ysc.Quickbooks.Sync do
             nil
           end
 
-        {line_items, total_amt} =
+        line_items =
           if stripe_fees do
             fee_decimal =
               Money.to_decimal(stripe_fees) |> Decimal.round(2)
 
-            gross_amount = Decimal.add(net_amount, fee_decimal)
+            gross_amount =
+              net_amount
+              |> Decimal.add(fee_decimal)
+              |> Decimal.sub(reserve_for_gross)
 
             gross_line = %{
               amount: gross_amount,
@@ -2536,7 +2544,7 @@ defmodule Ysc.Quickbooks.Sync do
                     "Stripe processing fees for payout #{payout.stripe_payout_id}"
                 }
 
-                {[gross_line, fee_line], net_amount}
+                [gross_line, fee_line]
 
               _error ->
                 Ysc.Logging.warning(
@@ -2544,42 +2552,78 @@ defmodule Ysc.Quickbooks.Sync do
                   payout_id: payout.id
                 )
 
-                {[gross_line], gross_amount}
+                [gross_line]
             end
           else
-            line = %{
-              amount: net_amount,
-              detail_type: "DepositLineDetail",
-              deposit_line_detail: %{
-                account_ref: undeposited_funds_ref,
-                class_ref: administration_class_ref
-              },
-              description: "Stripe Payout: #{payout.stripe_payout_id}"
-            }
+            source_amount = Decimal.sub(net_amount, reserve_for_gross)
 
-            {[line], net_amount}
+            [
+              %{
+                amount: source_amount,
+                detail_type: "DepositLineDetail",
+                deposit_line_detail: %{
+                  account_ref: undeposited_funds_ref,
+                  class_ref: administration_class_ref
+                },
+                description: "Stripe Payout: #{payout.stripe_payout_id}"
+              }
+            ]
           end
 
-        params = %{
-          bank_account_id: bank_account_id,
-          deposit_to_account_ref: %{value: bank_account_id},
-          line: line_items,
-          total_amt: total_amt,
-          txn_date:
-            format_payout_date(payout.arrival_date || payout.inserted_at),
-          private_note:
-            "Stripe Payout: #{payout.stripe_payout_id} — no linked transactions"
-        }
+        case add_payout_reserve_line(
+               line_items,
+               payout,
+               administration_class_ref
+             ) do
+          {:ok, line_items} ->
+            total_amt =
+              Enum.reduce(line_items, Decimal.new(0), fn item, acc ->
+                Decimal.add(acc, item.amount)
+              end)
 
-        Ysc.Logging.debug(
-          "[QB Sync] create_payout_deposit: Simple deposit params",
-          payout_id: payout.id,
-          params: inspect(params, limit: :infinity)
-        )
+            params = %{
+              bank_account_id: bank_account_id,
+              deposit_to_account_ref: %{value: bank_account_id},
+              line: line_items,
+              total_amt: total_amt,
+              txn_date:
+                format_payout_date(payout.arrival_date || payout.inserted_at),
+              private_note:
+                "Stripe Payout: #{payout.stripe_payout_id} — no linked transactions"
+            }
 
-        client_module().create_deposit(params,
-          idempotency_key: qb_idempotency_key("dep_payout", payout)
-        )
+            Ysc.Logging.debug(
+              "[QB Sync] create_payout_deposit: Simple deposit params",
+              payout_id: payout.id,
+              params: inspect(params, limit: :infinity)
+            )
+
+            client_module().create_deposit(params,
+              idempotency_key: qb_idempotency_key("dep_payout", payout)
+            )
+
+          {:error, reason} ->
+            log_qb_sync_failure(
+              "[QB Sync] create_payout_deposit: cannot resolve Stripe reserve account for non-zero reserve adjustment on payout #{payout.stripe_payout_id}",
+              payout_id: payout.id,
+              stripe_payout_id: payout.stripe_payout_id,
+              error_reason: reason,
+              error_type: inspect(reason),
+              extra: %{
+                payout_id: payout.id,
+                reserve_adjustment:
+                  Money.to_string!(
+                    payout.reserve_adjustment || Money.new(0, :USD)
+                  )
+              },
+              tags: %{
+                quickbooks_operation: "sync_payout",
+                error_type: inspect(reason)
+              }
+            )
+
+            {:error, reason}
+        end
       else
         # Build line items for each payment and refund
         Ysc.Logging.debug(
