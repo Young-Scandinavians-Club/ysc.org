@@ -474,6 +474,45 @@ defmodule Ysc.TicketsTest do
       assert {:ok, _order} =
                Tickets.create_ticket_order(user.id, event.id, %{b.id => 1})
     end
+
+    test "bypass_guards does not skip the single-member member-only limit", %{
+      event: event,
+      member_tier_a: a
+    } do
+      user = give_single_membership(user_fixture_unique())
+
+      past =
+        DateTime.utc_now()
+        |> DateTime.add(-2, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} = Events.update_event(event, %{start_date: past})
+
+      assert {:error, :member_only_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{a.id => 2},
+                 bypass_guards: true
+               )
+    end
+
+    test "bypass_guards still requires membership after the event has started",
+         %{
+           event: event,
+           member_tier_a: a
+         } do
+      guest = user_fixture_unique()
+
+      past =
+        DateTime.utc_now()
+        |> DateTime.add(-2, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} = Events.update_event(event, %{start_date: past})
+
+      assert {:error, :membership_required} =
+               Tickets.create_ticket_order(guest.id, event.id, %{a.id => 1},
+                 bypass_guards: true
+               )
+    end
   end
 
   describe "get_ticket_order/1" do
