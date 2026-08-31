@@ -19,6 +19,7 @@ defmodule YscWeb.Admin.DateTimeDisplay do
   @utc_iso_format "%Y-%m-%d %H:%M:%S UTC"
   @utc_iso_minute_format "%Y-%m-%d %H:%M UTC"
   @compact_datetime_format "%b %d, %Y %H:%M"
+  @pacific_datetime_at_format "%b %-d, %Y at %-I:%M%P"
   @nil_label "—"
 
   @doc """
@@ -34,6 +35,23 @@ defmodule YscWeb.Admin.DateTimeDisplay do
   end
 
   def format_utc_date(_), do: @nil_label
+
+  @doc """
+  Formats a UTC datetime as a short Pacific date and 12-hour time
+  (e.g. `"Mar 15, 2024 at 7:30pm"`).
+
+  Matches the Timex `{Mshort} {D}, {YYYY} at {h12}:{m}{am}` labels used on
+  admin editor pages and ticket purchase timestamps.
+
+  Returns `"—"` for nil or other non-datetime values.
+  """
+  def format_pacific_datetime_at(%DateTime{} = dt) do
+    dt
+    |> DateTime.shift_zone!(@admin_timezone)
+    |> Calendar.strftime(@pacific_datetime_at_format)
+  end
+
+  def format_pacific_datetime_at(_), do: @nil_label
 
   @doc """
   Formats a UTC datetime as a long Pacific date (e.g. `"March 15, 2024"`).

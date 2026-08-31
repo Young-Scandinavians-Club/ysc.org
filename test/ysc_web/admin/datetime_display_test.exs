@@ -17,6 +17,39 @@ defmodule YscWeb.Admin.DateTimeDisplayTest do
     end
   end
 
+  describe "format_pacific_datetime_at/1" do
+    test "formats UTC datetime as Pacific 12-hour time" do
+      # 2024-03-16 02:30 UTC is 2024-03-15 7:30pm PDT
+      dt = ~U[2024-03-16 02:30:00Z]
+
+      assert DateTimeDisplay.format_pacific_datetime_at(dt) ==
+               "Mar 15, 2024 at 7:30pm"
+    end
+
+    test "does not zero-pad the hour or day" do
+      dt = ~U[2024-03-05 20:05:00Z]
+
+      assert DateTimeDisplay.format_pacific_datetime_at(dt) ==
+               "Mar 5, 2024 at 12:05pm"
+    end
+
+    test "matches the previous Timex last-edited label" do
+      dt = ~U[2024-03-15 05:00:00Z]
+      pacific = DateTime.shift_zone!(dt, "America/Los_Angeles")
+      timex = Timex.format!(pacific, "{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+
+      assert DateTimeDisplay.format_pacific_datetime_at(dt) == timex
+
+      assert DateTimeDisplay.format_pacific_datetime_at(dt) ==
+               "Mar 14, 2024 at 10:00pm"
+    end
+
+    test "returns em dash for nil and invalid values" do
+      assert DateTimeDisplay.format_pacific_datetime_at(nil) == "—"
+      assert DateTimeDisplay.format_pacific_datetime_at(%{}) == "—"
+    end
+  end
+
   describe "format_utc_date_long/1" do
     test "formats UTC datetime with long month name" do
       dt = ~U[2024-06-15 12:00:00Z]

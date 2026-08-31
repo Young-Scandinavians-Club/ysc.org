@@ -762,4 +762,40 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert Repo.get!(Ticket, ticket.id).status == :cancelled
     end
   end
+
+  describe "CSV export" do
+    setup [:create_admin]
+
+    test "exports purchase dates in Pacific 12-hour format", %{conn: conn} do
+      purchased_at = ~U[2024-03-16 02:30:00Z]
+
+      %{event: event, tickets: [ticket]} =
+        completed_ticket_order_with_payment!()
+
+      ticket
+      |> Ecto.Changeset.change(inserted_at: purchased_at)
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#export-tickets-csv")
+      |> render_click()
+
+      assert_push_event(view, "download-csv", %{
+        content: content,
+        filename: filename
+      })
+
+      assert filename =~ "tickets_export_"
+      csv = Base.decode64!(content)
+
+      assert csv =~ "Purchase Date"
+
+      assert csv =~
+               YscWeb.Admin.DateTimeDisplay.format_pacific_datetime_at(
+                 purchased_at
+               )
+    end
+  end
 end
