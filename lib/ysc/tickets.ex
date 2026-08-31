@@ -524,31 +524,7 @@ defmodule Ysc.Tickets do
         do_cancel_ticket_order(ticket_order, reason, from_statuses)
 
       {:already_succeeded, payment_intent} ->
-        case Ysc.Tickets.StripeService.process_successful_payment(
-               payment_intent
-             ) do
-          {:ok, completed_order} = ok ->
-            Ysc.Logging.info(
-              "Fulfilled ticket order from an abandoned checkout after payment succeeded",
-              ticket_order_id: completed_order.id,
-              payment_intent_id: payment_intent.id
-            )
-
-            ok
-
-          {:error, fulfillment_error} ->
-            Ysc.Logging.error(
-              "Payment succeeded during checkout abandonment but order could not be fulfilled",
-              ticket_order_id: ticket_order.id,
-              payment_intent_id: payment_intent.id,
-              error: inspect(fulfillment_error)
-            )
-
-            # Tagged distinctly from a plain cancel failure: the customer's
-            # card was already charged, so callers must tell them that rather
-            # than silently treating this like an ordinary cancel error.
-            {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
-        end
+        fulfill_succeeded_checkout_payment(ticket_order, payment_intent)
 
       {:in_progress, _payment_intent} ->
         Ysc.Logging.info(
@@ -996,12 +972,20 @@ defmodule Ysc.Tickets do
 
   Skips expiration when checkout payment is in flight (same guard as
   `CheckoutCancel`), so a late capture is not raced against released tickets.
+
+  When a PaymentIntent is present, Stripe cancel runs *before* inventory is
+  released — the same atomic reconcile as `cancel_ticket_order/3`.
+  `StripeService.cancel_payment_intent/1` treats a succeeded PaymentIntent as
+  `:ok`, so the previous expire-then-cancel path could release tickets after a
+  captured charge. Late fulfillment then re-checked capacity against seats
+  that were already given away, and `maybe_refund_unfulfilled_ticket_payment/3`
+  only auto-refunds `:amount_mismatch`.
   """
   def expire_ticket_order(ticket_order) do
     if CheckoutCancel.pending_order_safe_to_cancel?(ticket_order,
          context: "expire_ticket_order"
        ) do
-      do_expire_ticket_order(ticket_order)
+      expire_after_stripe_reconcile(ticket_order)
     else
       require Ysc.Logging
 
@@ -1015,9 +999,72 @@ defmodule Ysc.Tickets do
     end
   end
 
-  defp do_expire_ticket_order(ticket_order) do
+  defp expire_after_stripe_reconcile(ticket_order) do
     require Ysc.Logging
 
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           ticket_order,
+           "expire_ticket_order"
+         ) do
+      {:cancel, _payment_intent} ->
+        do_expire_ticket_order(ticket_order)
+
+      {:already_succeeded, payment_intent} ->
+        fulfill_succeeded_checkout_payment(ticket_order, payment_intent)
+
+      {:in_progress, _payment_intent} ->
+        Ysc.Logging.info(
+          "Skipped ticket order expiration while checkout payment is in flight",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id
+        )
+
+        {:ok, ticket_order}
+
+      {:error, stripe_error} ->
+        Ysc.Logging.warning(
+          "Could not reconcile checkout payment with Stripe, not expiring order",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id,
+          error: inspect(stripe_error)
+        )
+
+        {:ok, ticket_order}
+    end
+  end
+
+  # Shared by checkout-abandonment cancel and payment-timeout expiry: Stripe
+  # already captured the charge, so fulfill while tickets are still pending
+  # rather than releasing inventory first.
+  defp fulfill_succeeded_checkout_payment(ticket_order, payment_intent) do
+    require Ysc.Logging
+
+    case Ysc.Tickets.StripeService.process_successful_payment(payment_intent) do
+      {:ok, completed_order} = ok ->
+        Ysc.Logging.info(
+          "Fulfilled ticket order after payment succeeded during checkout reconcile",
+          ticket_order_id: completed_order.id,
+          payment_intent_id: payment_intent.id
+        )
+
+        ok
+
+      {:error, fulfillment_error} ->
+        Ysc.Logging.error(
+          "Payment succeeded during checkout reconcile but order could not be fulfilled",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(fulfillment_error)
+        )
+
+        # Tagged distinctly from a plain cancel/expire failure: the customer's
+        # card was already charged, so callers must not treat this like an
+        # ordinary timeout.
+        {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
+    end
+  end
+
+  defp do_expire_ticket_order(ticket_order) do
     now = DateTime.utc_now()
 
     result =
@@ -1036,27 +1083,6 @@ defmodule Ysc.Tickets do
           )
 
         if count == 1 do
-          if ticket_order.payment_intent_id do
-            case Ysc.Tickets.StripeService.cancel_payment_intent(
-                   ticket_order.payment_intent_id
-                 ) do
-              :ok ->
-                Ysc.Logging.info(
-                  "Canceled PaymentIntent for expired ticket order",
-                  ticket_order_id: ticket_order.id,
-                  payment_intent_id: ticket_order.payment_intent_id
-                )
-
-              {:error, reason} ->
-                Ysc.Logging.warning(
-                  "Failed to cancel PaymentIntent for expired ticket order (continuing anyway)",
-                  ticket_order_id: ticket_order.id,
-                  payment_intent_id: ticket_order.payment_intent_id,
-                  error: reason
-                )
-            end
-          end
-
           from(t in Ticket,
             where:
               t.ticket_order_id == ^ticket_order.id and t.status == :pending
