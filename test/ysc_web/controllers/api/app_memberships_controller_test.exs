@@ -234,7 +234,9 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
       end)
 
       Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
-        flunk("must not create a subscription when the payment method is missing")
+        flunk(
+          "must not create a subscription when the payment method is missing"
+        )
       end)
 
       response =
@@ -296,7 +298,9 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
       end)
 
       Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
-        flunk("must not create a subscription with an unattached payment method")
+        flunk(
+          "must not create a subscription with an unattached payment method"
+        )
       end)
 
       response =
