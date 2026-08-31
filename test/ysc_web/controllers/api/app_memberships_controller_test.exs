@@ -25,10 +25,8 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
     admin = user_fixture(%{role: :admin})
     token = Accounts.generate_user_mobile_token(admin)
 
-    original_stripe_client = Application.get_env(:ysc, :stripe_client)
-
     on_exit(fn ->
-      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
     end)
 
     conn =

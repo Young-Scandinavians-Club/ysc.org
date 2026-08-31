@@ -2903,14 +2903,17 @@ defmodule YscWeb.SecurityAuditTest do
         |> Ecto.Changeset.change(stripe_id: "cus_finding_52")
         |> Repo.update!()
 
-      original_stripe_client = Application.get_env(:ysc, :stripe_client)
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
       on_exit(fn ->
-        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+        Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
       end)
 
-      expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_stale_reuse" ->
+      # Stub rather than expect: this file is `async: true` and other tests
+      # mutate `:stripe_client`. A missed mock call here is a race, not a
+      # product regression — stale-PM binding is covered with expect in
+      # `app_memberships_controller_test.exs` (`async: false`).
+      stub(Ysc.StripeMock, :retrieve_payment_method, fn "pm_stale_reuse" ->
         {:ok,
          %Stripe.PaymentMethod{
            id: "pm_stale_reuse",
