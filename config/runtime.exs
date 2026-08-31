@@ -712,6 +712,7 @@ end
 # Deployed environments (sandbox/production) load GeoLite2-City from the shared
 # `ysc-app-resources` S3 bucket via Ysc.GeoIP.DatabaseFetcher. The weekly GitHub
 # Actions workflow `.github/workflows/sync-geoip-database.yml` downloads from
-# MaxMind and uploads `geoip/GeoLite2-City.tar.gz`. Keep MAXMIND_LICENSE_KEY in
-# GitHub Actions secrets only — do not set it on Fly app machines.
+# MaxMind and uploads `geoip/GeoLite2-City.tar.gz`. Keep MAXMIND_LICENSE_KEY
+# (and MAXMIND_ACCOUNT_ID) in GitHub Actions secrets only — do not set them
+# on Fly app machines.
 # See Ysc.Application.maybe_start_geo_ip_loader/0.
