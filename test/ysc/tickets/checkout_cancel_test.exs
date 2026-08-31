@@ -459,6 +459,111 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert returned.status == :pending
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
+
+    test "expires locally after Stripe confirms the PaymentIntent is canceled" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_cancellable_expire_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+      end)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok, payment_intent("canceled", payment_intent_id)}
+      end)
+
+      assert {:ok, expired} = Tickets.expire_ticket_order(order)
+      assert expired.status == :expired
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :expired
+    end
+
+    test "does not expire when Stripe cancel fails and the PaymentIntent is still open" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_expire_cancel_timeout_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+      end)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, :timeout}
+      end)
+
+      assert {:ok, returned} = Tickets.expire_ticket_order(order)
+      assert returned.status == :pending
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "fulfills instead of expiring when Stripe cancel reveals the payment already succeeded" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        order = ticket_order_fixture()
+        payment_intent_id = "pi_expire_already_succeeded_#{order.id}"
+
+        assert {:ok, order} =
+                 Tickets.update_payment_intent(order, payment_intent_id)
+
+        amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+        succeeded_payment_intent =
+          struct(Stripe.PaymentIntent, %{
+            id: payment_intent_id,
+            status: "succeeded",
+            amount: amount_cents,
+            metadata: %{
+              "ticket_order_id" => order.id,
+              "user_id" => order.user_id
+            }
+          })
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+        end)
+
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, succeeded_payment_intent}
+        end)
+
+        assert {:ok, fulfilled} = Tickets.expire_ticket_order(order)
+        assert fulfilled.id == order.id
+        assert fulfilled.status == :completed
+        assert fulfilled.payment_id
+
+        assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^order.id
+          )
+
+        assert tickets != []
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end)
+    end
   end
 
   describe "cancel_ticket_order/2 payment guards" do
