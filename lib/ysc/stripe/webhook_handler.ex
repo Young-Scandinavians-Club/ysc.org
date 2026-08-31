@@ -3275,6 +3275,15 @@ defmodule Ysc.Stripe.WebhookHandler do
           # booked when those payments were recorded.
           book_payout_time_stripe_fees(updated_payout, balance_transactions)
 
+          # Persist the net minimum-balance reserve movement so reconciliation
+          # can explain the gap between (payments - refunds - fees) and the
+          # amount actually wired to the bank.
+          updated_payout =
+            maybe_update_payout_reserve_adjustment(
+              updated_payout,
+              balance_transactions
+            )
+
           Ysc.Logging.info(
             "[Payout] Final payout transaction counts after linking",
             payout_id: stripe_payout_id,
@@ -3408,6 +3417,107 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   defp stripe_fee_balance_transaction?(type, reporting_category) do
     type in ["stripe_fee"] or reporting_category in ["stripe_fee", "fee"]
+  end
+
+  @reserve_balance_transaction_types [
+    "payout_minimum_balance_hold",
+    "payout_minimum_balance_release"
+  ]
+
+  defp reserve_balance_transaction?(type, reporting_category) do
+    type in @reserve_balance_transaction_types or
+      reporting_category in @reserve_balance_transaction_types
+  end
+
+  @doc false
+  # Signed sum (in cents) of `payout_minimum_balance_hold` /
+  # `payout_minimum_balance_release` balance transactions in the payout. Holds
+  # carry a negative `:amount` (Stripe withheld funds), releases a positive one
+  # (Stripe returned a previously withheld reserve). The net is what Stripe
+  # added to / subtracted from the wired payout beyond payments, refunds and
+  # fees.
+  def sum_reserve_adjustment_cents_from_balance_transactions(
+        balance_transactions
+      )
+      when is_list(balance_transactions) do
+    Enum.reduce(balance_transactions, 0, fn balance_transaction, acc ->
+      try do
+        type = get_balance_transaction_field(balance_transaction, :type)
+
+        reporting_category =
+          get_balance_transaction_field(
+            balance_transaction,
+            :reporting_category
+          )
+
+        if reserve_balance_transaction?(type, reporting_category) do
+          acc +
+            (get_balance_transaction_field(balance_transaction, :amount, 0) || 0)
+        else
+          acc
+        end
+      rescue
+        error ->
+          require Ysc.Logging
+
+          Ysc.Logging.warning(
+            "Error processing balance transaction for reserve adjustment",
+            error: Exception.message(error),
+            balance_transaction_id:
+              extract_balance_transaction_id(balance_transaction)
+          )
+
+          acc
+      end
+    end)
+  end
+
+  # Persists the payout's net minimum-balance reserve movement. Always writes a
+  # value (including zero) so reconciliation can rely on the field being set once
+  # linking has run.
+  defp maybe_update_payout_reserve_adjustment(payout, balance_transactions) do
+    require Ysc.Logging
+
+    reserve_cents =
+      sum_reserve_adjustment_cents_from_balance_transactions(
+        balance_transactions
+      )
+
+    currency = payout.currency || "usd"
+    currency_atom = normalize_currency(String.downcase(currency))
+
+    reserve_adjustment =
+      Money.new(MoneyHelper.cents_to_dollars(reserve_cents), currency_atom)
+
+    if payout.reserve_adjustment &&
+         Money.equal?(payout.reserve_adjustment, reserve_adjustment) do
+      payout
+    else
+      changeset =
+        Ysc.Ledgers.Payout.changeset(payout, %{
+          reserve_adjustment: reserve_adjustment
+        })
+
+      case Repo.update(changeset) do
+        {:ok, updated} ->
+          Ysc.Logging.info(
+            "Updated payout reserve_adjustment from balance transactions",
+            payout_id: payout.stripe_payout_id,
+            reserve_adjustment: Money.to_string!(reserve_adjustment)
+          )
+
+          # Keep any associations the caller had already preloaded.
+          %{updated | payments: payout.payments, refunds: payout.refunds}
+
+        {:error, changeset} ->
+          Ysc.Logging.error("Failed to update payout reserve_adjustment",
+            payout_id: payout.stripe_payout_id,
+            errors: inspect(changeset.errors)
+          )
+
+          payout
+      end
+    end
   end
 
   defp book_payout_time_stripe_fees(payout, balance_transactions) do

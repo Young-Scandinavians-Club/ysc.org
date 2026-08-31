@@ -98,15 +98,34 @@ updated_payout = WebhookHandler.relink_payout_transactions(payout)
    payout BT fees) to the internal ledger as debit `stripe_fees` / credit
    `stripe_account` on the payout's virtual payment. Idempotent on re-run.
    Per-charge processing fees are not re-booked (they were recorded at payment time).
-8. **Checks QuickBooks Sync**: If all conditions are met, enqueues QuickBooks sync
+8. **Updates Reserve Adjustment**: Sets `reserve_adjustment` to the net of
+   `payout_minimum_balance_hold` / `payout_minimum_balance_release` balance
+   transactions in the payout (negative when Stripe withheld a minimum-balance
+   reserve this cycle, positive when it released one). Reconciliation checks
+   `payments - refunds - fee_total + reserve_adjustment == payout.amount`, so
+   payouts from cycles with reserve movement need a relink to reconcile.
+9. **Checks QuickBooks Sync**: If all conditions are met, enqueues QuickBooks sync
 
 ### QuickBooks deposits already synced
 
-Relinking updates `fee_total` in our database and may enqueue a new QuickBooks
-sync when the payout is eligible. If a Deposit was already created in QuickBooks
-with an understated Stripe Fees line, correct that Deposit in QuickBooks manually
-(or follow your controlled re-sync policy). Do not assume an automatic overwrite
-of an existing QB Deposit.
+Relinking updates `fee_total` and `reserve_adjustment` in our database and may
+enqueue a new QuickBooks sync when the payout is eligible. If a Deposit was
+already created in QuickBooks with an understated Stripe Fees line, or with no
+minimum-balance reserve line (so its total is `gross - fees` rather than the
+amount that actually landed in the bank feed), correct that Deposit in
+QuickBooks manually (or follow your controlled re-sync policy). Do not assume an
+automatic overwrite of an existing QB Deposit — `reconcile_payout_deposit/1`
+only appends newly-linked payment/refund lines, it does not add a reserve line
+or fix the total on an already-synced Deposit.
+
+To correct a reserve mismatch by hand: add one Deposit line for
+`reserve_adjustment` (negative when Stripe withheld a reserve, positive when it
+released one) posted to the Stripe balance account
+(`QUICKBOOKS_STRIPE_RESERVE_ACCOUNT_ID`, or `QUICKBOOKS_STRIPE_ACCOUNT_ID` when
+that is unset), so the Deposit total equals the Stripe transfer in the bank
+feed. When Stripe later releases that reserve, the release lands on a subsequent
+payout's Deposit as a positive line to the same account, netting the balance
+account back to zero.
 
 ## Finding Payouts That Need Reprocessing
 

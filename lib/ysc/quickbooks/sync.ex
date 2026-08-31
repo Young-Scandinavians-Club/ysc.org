@@ -2491,13 +2491,18 @@ defmodule Ysc.Quickbooks.Sync do
         )
 
         # Create a simple deposit without linked transactions.
-        # If the payout has Stripe fees, break the deposit into a gross line + negative fee line
-        # so QuickBooks reporting captures both the income and the processing cost.
+        # Break the deposit into a gross source line, optional negative fee
+        # line, and optional reserve line so QuickBooks captures processing
+        # cost and Stripe minimum-balance reserve movement. Bank total is
+        # gross - fees + reserve_adjustment (negative reserve = withheld).
         administration_class_ref = get_administration_class_ref()
 
         net_amount =
           Money.to_decimal(payout.amount)
           |> Decimal.round(2)
+
+        reserve_for_gross =
+          payout_reserve_adjustment_decimal(payout) || Decimal.new(0)
 
         stripe_fees =
           if payout.fee_total && Money.positive?(payout.fee_total) do
@@ -2506,12 +2511,15 @@ defmodule Ysc.Quickbooks.Sync do
             nil
           end
 
-        {line_items, total_amt} =
+        line_items =
           if stripe_fees do
             fee_decimal =
               Money.to_decimal(stripe_fees) |> Decimal.round(2)
 
-            gross_amount = Decimal.add(net_amount, fee_decimal)
+            gross_amount =
+              net_amount
+              |> Decimal.add(fee_decimal)
+              |> Decimal.sub(reserve_for_gross)
 
             gross_line = %{
               amount: gross_amount,
@@ -2536,7 +2544,7 @@ defmodule Ysc.Quickbooks.Sync do
                     "Stripe processing fees for payout #{payout.stripe_payout_id}"
                 }
 
-                {[gross_line, fee_line], net_amount}
+                [gross_line, fee_line]
 
               _error ->
                 Ysc.Logging.warning(
@@ -2544,42 +2552,78 @@ defmodule Ysc.Quickbooks.Sync do
                   payout_id: payout.id
                 )
 
-                {[gross_line], gross_amount}
+                [gross_line]
             end
           else
-            line = %{
-              amount: net_amount,
-              detail_type: "DepositLineDetail",
-              deposit_line_detail: %{
-                account_ref: undeposited_funds_ref,
-                class_ref: administration_class_ref
-              },
-              description: "Stripe Payout: #{payout.stripe_payout_id}"
-            }
+            source_amount = Decimal.sub(net_amount, reserve_for_gross)
 
-            {[line], net_amount}
+            [
+              %{
+                amount: source_amount,
+                detail_type: "DepositLineDetail",
+                deposit_line_detail: %{
+                  account_ref: undeposited_funds_ref,
+                  class_ref: administration_class_ref
+                },
+                description: "Stripe Payout: #{payout.stripe_payout_id}"
+              }
+            ]
           end
 
-        params = %{
-          bank_account_id: bank_account_id,
-          deposit_to_account_ref: %{value: bank_account_id},
-          line: line_items,
-          total_amt: total_amt,
-          txn_date:
-            format_payout_date(payout.arrival_date || payout.inserted_at),
-          private_note:
-            "Stripe Payout: #{payout.stripe_payout_id} — no linked transactions"
-        }
+        case add_payout_reserve_line(
+               line_items,
+               payout,
+               administration_class_ref
+             ) do
+          {:ok, line_items} ->
+            total_amt =
+              Enum.reduce(line_items, Decimal.new(0), fn item, acc ->
+                Decimal.add(acc, item.amount)
+              end)
 
-        Ysc.Logging.debug(
-          "[QB Sync] create_payout_deposit: Simple deposit params",
-          payout_id: payout.id,
-          params: inspect(params, limit: :infinity)
-        )
+            params = %{
+              bank_account_id: bank_account_id,
+              deposit_to_account_ref: %{value: bank_account_id},
+              line: line_items,
+              total_amt: total_amt,
+              txn_date:
+                format_payout_date(payout.arrival_date || payout.inserted_at),
+              private_note:
+                "Stripe Payout: #{payout.stripe_payout_id} — no linked transactions"
+            }
 
-        client_module().create_deposit(params,
-          idempotency_key: qb_idempotency_key("dep_payout", payout)
-        )
+            Ysc.Logging.debug(
+              "[QB Sync] create_payout_deposit: Simple deposit params",
+              payout_id: payout.id,
+              params: inspect(params, limit: :infinity)
+            )
+
+            client_module().create_deposit(params,
+              idempotency_key: qb_idempotency_key("dep_payout", payout)
+            )
+
+          {:error, reason} ->
+            log_qb_sync_failure(
+              "[QB Sync] create_payout_deposit: cannot resolve Stripe reserve account for non-zero reserve adjustment on payout #{payout.stripe_payout_id}",
+              payout_id: payout.id,
+              stripe_payout_id: payout.stripe_payout_id,
+              error_reason: reason,
+              error_type: inspect(reason),
+              extra: %{
+                payout_id: payout.id,
+                reserve_adjustment:
+                  Money.to_string!(
+                    payout.reserve_adjustment || Money.new(0, :USD)
+                  )
+              },
+              tags: %{
+                quickbooks_operation: "sync_payout",
+                error_type: inspect(reason)
+              }
+            )
+
+            {:error, reason}
+        end
       else
         # Build line items for each payment and refund
         Ysc.Logging.debug(
@@ -2726,25 +2770,58 @@ defmodule Ysc.Quickbooks.Sync do
               line_items
             end
 
-          # Calculate total from line items (including fees)
-          total_amount =
-            Enum.reduce(line_items, Decimal.new(0), fn item, acc ->
-              Decimal.add(acc, item.amount)
-            end)
+          # Add a Stripe minimum-balance reserve line so the Deposit total
+          # equals what actually lands in the bank feed (gross - fees minus a
+          # reserve Stripe withheld this cycle, or plus one it released).
+          case add_payout_reserve_line(
+                 line_items,
+                 payout,
+                 administration_class_ref
+               ) do
+            {:ok, line_items} ->
+              # Calculate total from line items (fees + reserve included)
+              total_amount =
+                Enum.reduce(line_items, Decimal.new(0), fn item, acc ->
+                  Decimal.add(acc, item.amount)
+                end)
 
-          Ysc.Logging.debug("[QB Sync] create_payout_deposit: Total calculated",
-            payout_id: payout.id,
-            total_amount: Decimal.to_string(total_amount),
-            line_items_count: length(line_items)
-          )
+              Ysc.Logging.debug(
+                "[QB Sync] create_payout_deposit: Total calculated",
+                payout_id: payout.id,
+                total_amount: Decimal.to_string(total_amount),
+                line_items_count: length(line_items)
+              )
 
-          # Create deposit with multiple line items
-          create_payout_deposit_with_lines(
-            payout,
-            bank_account_id,
-            line_items,
-            total_amount
-          )
+              # Create deposit with multiple line items
+              create_payout_deposit_with_lines(
+                payout,
+                bank_account_id,
+                line_items,
+                total_amount
+              )
+
+            {:error, reason} ->
+              log_qb_sync_failure(
+                "[QB Sync] create_payout_deposit: cannot resolve Stripe reserve account for non-zero reserve adjustment on payout #{payout.stripe_payout_id}",
+                payout_id: payout.id,
+                stripe_payout_id: payout.stripe_payout_id,
+                error_reason: reason,
+                error_type: inspect(reason),
+                extra: %{
+                  payout_id: payout.id,
+                  reserve_adjustment:
+                    Money.to_string!(
+                      payout.reserve_adjustment || Money.new(0, :USD)
+                    )
+                },
+                tags: %{
+                  quickbooks_operation: "sync_payout",
+                  error_type: inspect(reason)
+                }
+              )
+
+              {:error, reason}
+          end
         end
       end
     else
@@ -3039,6 +3116,80 @@ defmodule Ysc.Quickbooks.Sync do
 
       _ ->
         {:error, :undeposited_funds_account_not_found}
+    end
+  end
+
+  # Balance-sheet account that holds Stripe funds withheld as a minimum-balance
+  # reserve. Resolution order: explicit stripe_reserve_account_id, then
+  # stripe_reserve_account_name, then the general stripe_account_id (the "Stripe"
+  # balance account) since withheld funds are still sitting at Stripe.
+  defp get_stripe_reserve_account_ref do
+    qb = Application.get_env(:ysc, :quickbooks, [])
+
+    cond do
+      id = present_config_string(qb[:stripe_reserve_account_id]) ->
+        {:ok, %{value: id}}
+
+      name = present_config_string(qb[:stripe_reserve_account_name]) ->
+        case client_module().query_account_by_name(name) do
+          {:ok, account_id} -> {:ok, %{value: account_id}}
+          {:error, :not_found} -> {:error, :stripe_reserve_account_not_found}
+          {:error, _other} = error -> error
+        end
+
+      id = present_config_string(qb[:stripe_account_id]) ->
+        {:ok, %{value: id}}
+
+      true ->
+        {:error, :stripe_reserve_account_not_configured}
+    end
+  end
+
+  # `payout.reserve_adjustment` as a signed 2dp Decimal, or nil when it is
+  # unset or zero. Negative = Stripe withheld a reserve this cycle, positive =
+  # Stripe released a previously withheld reserve.
+  defp payout_reserve_adjustment_decimal(%Payout{reserve_adjustment: nil}),
+    do: nil
+
+  defp payout_reserve_adjustment_decimal(%Payout{reserve_adjustment: amount}) do
+    decimal = Money.to_decimal(amount) |> Decimal.round(2)
+
+    if Decimal.equal?(decimal, Decimal.new(0)), do: nil, else: decimal
+  end
+
+  # Prepends a signed reserve DepositLineDetail line to `line_items` when the
+  # payout carries a non-zero reserve adjustment. The line amount matches the
+  # sign of `reserve_adjustment`, so summing the lines yields the true bank
+  # deposit (payments - refunds - fees + reserve_adjustment == payout.amount).
+  defp add_payout_reserve_line(line_items, %Payout{} = payout, class_ref) do
+    case payout_reserve_adjustment_decimal(payout) do
+      nil ->
+        {:ok, line_items}
+
+      reserve_decimal ->
+        case get_stripe_reserve_account_ref() do
+          {:ok, reserve_ref} ->
+            direction =
+              if Decimal.negative?(reserve_decimal),
+                do: "held",
+                else: "released"
+
+            line = %{
+              amount: reserve_decimal,
+              detail_type: "DepositLineDetail",
+              deposit_line_detail: %{
+                account_ref: reserve_ref,
+                class_ref: class_ref
+              },
+              description:
+                "Stripe minimum-balance reserve #{direction} for payout #{payout.stripe_payout_id}"
+            }
+
+            {:ok, [line | line_items]}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 
@@ -3419,6 +3570,7 @@ defmodule Ysc.Quickbooks.Sync do
     line_items = build_payout_line_items(payout)
     net_synced_amount = sum_line_amounts(line_items)
     fee_amount = payout_fee_amount(payout)
+    reserve_amount = payout_reserve_adjustment_decimal(payout) || Decimal.new(0)
 
     bank_amount =
       Money.to_decimal(payout.amount) |> Decimal.round(2) |> Decimal.abs()
@@ -3429,6 +3581,7 @@ defmodule Ysc.Quickbooks.Sync do
       stripe_payout_id: payout.stripe_payout_id,
       net_synced_amount: Decimal.to_string(net_synced_amount),
       fee_amount: Decimal.to_string(fee_amount),
+      reserve_amount: Decimal.to_string(reserve_amount),
       bank_amount: Decimal.to_string(bank_amount),
       linked_lines_count: length(line_items)
     )
@@ -3437,11 +3590,14 @@ defmodule Ysc.Quickbooks.Sync do
            verify_journal_entry_balances(
              net_synced_amount,
              fee_amount,
+             reserve_amount,
              bank_amount
            ),
          {:ok, bank_ref} <- get_bank_account_ref(),
          {:ok, uf_ref} <- get_undeposited_funds_account_ref(),
-         {:ok, fees_ref} <- maybe_get_stripe_fees_account_ref(fee_amount) do
+         {:ok, fees_ref} <- maybe_get_stripe_fees_account_ref(fee_amount),
+         {:ok, reserve_ref} <-
+           maybe_get_stripe_reserve_account_ref(reserve_amount) do
       administration_class_ref = get_administration_class_ref()
 
       lines =
@@ -3449,11 +3605,15 @@ defmodule Ysc.Quickbooks.Sync do
           payout,
           net_synced_amount,
           fee_amount,
+          reserve_amount,
           bank_amount,
-          uf_ref,
-          bank_ref,
-          fees_ref,
-          administration_class_ref
+          %{
+            uf: uf_ref,
+            bank: bank_ref,
+            fees: fees_ref,
+            reserve: reserve_ref,
+            class: administration_class_ref
+          }
         )
 
       params = %{
@@ -3498,9 +3658,23 @@ defmodule Ysc.Quickbooks.Sync do
   # bank - otherwise QuickBooks will reject an unbalanced JournalEntry, or
   # worse, silently accept one that doesn't reconcile. Refuse to guess a
   # plug figure; surface the mismatch for manual entry instead.
-  defp verify_journal_entry_balances(net_synced_amount, fee_amount, bank_amount) do
+  defp verify_journal_entry_balances(
+         net_synced_amount,
+         fee_amount,
+         reserve_amount,
+         bank_amount
+       ) do
     uf_debit = Decimal.negate(net_synced_amount) |> Decimal.round(2)
-    expected_bank_amount = Decimal.add(uf_debit, fee_amount) |> Decimal.round(2)
+
+    # reserve_amount is signed like reserve_adjustment: negative when Stripe
+    # withheld funds (an extra debit to the reserve asset), positive when it
+    # released them (a credit). Subtracting it mirrors the deposit identity
+    # payments - refunds - fees + reserve_adjustment == payout.amount.
+    expected_bank_amount =
+      uf_debit
+      |> Decimal.add(fee_amount)
+      |> Decimal.sub(reserve_amount)
+      |> Decimal.round(2)
 
     if Decimal.equal?(expected_bank_amount, bank_amount) do
       :ok
@@ -3509,6 +3683,7 @@ defmodule Ysc.Quickbooks.Sync do
         "[QB Sync] create_payout_journal_entry: Journal entry would not balance - refusing to sync",
         net_synced_amount: Decimal.to_string(net_synced_amount),
         fee_amount: Decimal.to_string(fee_amount),
+        reserve_amount: Decimal.to_string(reserve_amount),
         bank_amount: Decimal.to_string(bank_amount),
         expected_bank_amount: Decimal.to_string(expected_bank_amount)
       )
@@ -3525,6 +3700,14 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
+  defp maybe_get_stripe_reserve_account_ref(reserve_amount) do
+    if Decimal.equal?(reserve_amount, Decimal.new(0)) do
+      {:ok, nil}
+    else
+      get_stripe_reserve_account_ref()
+    end
+  end
+
   defp get_bank_account_ref do
     raw_bank_id = Application.get_env(:ysc, :quickbooks)[:bank_account_id]
 
@@ -3538,11 +3721,15 @@ defmodule Ysc.Quickbooks.Sync do
          payout,
          net_synced_amount,
          fee_amount,
+         reserve_amount,
          bank_amount,
-         uf_ref,
-         bank_ref,
-         fees_ref,
-         class_ref
+         %{
+           uf: uf_ref,
+           bank: bank_ref,
+           fees: fees_ref,
+           reserve: reserve_ref,
+           class: class_ref
+         }
        ) do
     uf_debit = Decimal.negate(net_synced_amount) |> Decimal.round(2)
 
@@ -3589,7 +3776,39 @@ defmodule Ysc.Quickbooks.Sync do
         []
       end
 
-    [uf_line] ++ fee_line ++ [bank_line]
+    # reserve_amount signed like reserve_adjustment: negative = withheld this
+    # cycle (debit the reserve asset), positive = released (credit it).
+    reserve_debit = Decimal.negate(reserve_amount) |> Decimal.round(2)
+
+    reserve_line =
+      cond do
+        is_nil(reserve_ref) or Decimal.equal?(reserve_debit, Decimal.new(0)) ->
+          []
+
+        Decimal.negative?(reserve_debit) ->
+          [
+            journal_entry_line(
+              Decimal.abs(reserve_debit),
+              "Credit",
+              reserve_ref,
+              class_ref,
+              "Stripe minimum-balance reserve released for payout #{payout.stripe_payout_id}"
+            )
+          ]
+
+        true ->
+          [
+            journal_entry_line(
+              reserve_debit,
+              "Debit",
+              reserve_ref,
+              class_ref,
+              "Stripe minimum-balance reserve held for payout #{payout.stripe_payout_id}"
+            )
+          ]
+      end
+
+    [uf_line] ++ fee_line ++ reserve_line ++ [bank_line]
   end
 
   defp journal_entry_line(

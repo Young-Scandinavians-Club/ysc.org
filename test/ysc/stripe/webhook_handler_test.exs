@@ -2639,6 +2639,69 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
              ) == 50
     end
 
+    test "sum_reserve_adjustment_cents_from_balance_transactions nets holds and releases" do
+      # Mirrors payout po_1UAJU6IZd8GkARoBgjO3k3Tx: 6 holds (-$5,305.31) and
+      # 5 releases (+$4,305.31) => net -$1,000.00 still withheld.
+      holds =
+        for amount <- [
+              -100_000,
+              -100_000,
+              -100_000,
+              -100_000,
+              -100_000,
+              -30_531
+            ] do
+          %{
+            type: "payout_minimum_balance_hold",
+            reporting_category: "payout_minimum_balance_hold",
+            fee: 0,
+            amount: amount
+          }
+        end
+
+      releases =
+        for amount <- [100_000, 100_000, 100_000, 100_000, 30_531] do
+          %{
+            type: "payout_minimum_balance_release",
+            reporting_category: "payout_minimum_balance_release",
+            fee: 0,
+            amount: amount
+          }
+        end
+
+      balance_transactions =
+        [
+          %{
+            type: "charge",
+            reporting_category: "charge",
+            fee: 131,
+            amount: 422_000
+          },
+          %{
+            type: "payout",
+            reporting_category: "payout",
+            fee: 0,
+            amount: -308_418
+          }
+        ] ++ holds ++ releases
+
+      assert WebhookHandler.sum_reserve_adjustment_cents_from_balance_transactions(
+               balance_transactions
+             ) == -100_000
+    end
+
+    test "sum_reserve_adjustment_cents_from_balance_transactions is zero without reserve rows" do
+      balance_transactions = [
+        %{type: "charge", reporting_category: "charge", fee: 100, amount: 2000},
+        %{type: "stripe_fee", reporting_category: "fee", fee: 0, amount: -95},
+        %{type: "payout", reporting_category: "payout", fee: 0, amount: -1805}
+      ]
+
+      assert WebhookHandler.sum_reserve_adjustment_cents_from_balance_transactions(
+               balance_transactions
+             ) == 0
+    end
+
     test "extract_stripe_fee_from_invoice reads cents from metadata" do
       invoice = %{
         "id" => "in_fee_#{System.unique_integer()}",

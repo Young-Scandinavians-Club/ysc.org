@@ -682,6 +682,12 @@ if config_env() == :prod do
       # QuickBooks Account IDs (required - cannot be auto-created)
       bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
       stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+      # Balance-sheet account for Stripe minimum-balance reserve holds/releases
+      # on payout Deposits. Falls back to stripe_account_id when unset.
+      stripe_reserve_account_id:
+        System.get_env("QUICKBOOKS_STRIPE_RESERVE_ACCOUNT_ID"),
+      stripe_reserve_account_name:
+        System.get_env("QUICKBOOKS_STRIPE_RESERVE_ACCOUNT_NAME"),
       stripe_fees_account_id:
         System.get_env("QUICKBOOKS_STRIPE_FEES_ACCOUNT_ID"),
       stripe_fees_account_name:

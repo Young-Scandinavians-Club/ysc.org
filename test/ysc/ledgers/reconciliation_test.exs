@@ -1624,6 +1624,98 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert report.discrepancies_count == 0
     end
 
+    test "passes when a minimum-balance reserve adjustment closes the gap", %{
+      user: user
+    } do
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "1135.00"),
+          external_provider: :stripe,
+          external_payment_id:
+            "pi_payout_recon_reserve_ok_#{System.unique_integer()}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "4.83"),
+          description: "Charge in payout",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      # 1135.00 - 5.78 fees - 1000.00 reserve held = 129.22 wired
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(:USD, "129.22"),
+                 stripe_payout_id:
+                   "po_recon_reserve_ok_#{System.unique_integer()}",
+                 description: "Payout with reserve hold",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(:USD, "5.78"),
+                 reserve_adjustment: Money.new(:USD, "-1000.00")
+               })
+
+      assert {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+
+      assert {:ok, _} =
+               Ledgers.book_payout_stripe_fees(payout, Money.new(:USD, "0.95"))
+
+      report = Reconciliation.reconcile_payouts()
+      assert report.status == :ok
+      assert report.discrepancies_count == 0
+    end
+
+    test "still flags a mismatch the reserve adjustment does not fully explain",
+         %{user: user} do
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "1135.00"),
+          external_provider: :stripe,
+          external_payment_id:
+            "pi_payout_recon_reserve_bad_#{System.unique_integer()}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "4.83"),
+          description: "Charge in payout",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      # reserve_adjustment only -900 but the wired amount reflects -1000
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(:USD, "129.22"),
+                 stripe_payout_id:
+                   "po_recon_reserve_bad_#{System.unique_integer()}",
+                 description: "Payout with understated reserve",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(:USD, "5.78"),
+                 reserve_adjustment: Money.new(:USD, "-900.00")
+               })
+
+      assert {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+
+      assert {:ok, _} =
+               Ledgers.book_payout_stripe_fees(payout, Money.new(:USD, "0.95"))
+
+      report = Reconciliation.reconcile_payouts()
+      assert report.status == :error
+
+      [disc] = report.discrepancies
+
+      assert Enum.any?(disc.issues, fn issue ->
+               String.contains?(issue, "Payout composition mismatch") and
+                 String.contains?(
+                   issue,
+                   "reserve adjustment (#{Money.to_string!(Money.new(:USD, "-900.00"))})"
+                 )
+             end)
+    end
+
     test "detects understated fee_total like missing Billing Usage Fee", %{
       user: user
     } do

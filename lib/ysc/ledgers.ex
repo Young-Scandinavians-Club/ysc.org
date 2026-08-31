@@ -1508,6 +1508,8 @@ defmodule Ysc.Ledgers do
   - `arrival_date`: When the payout arrives (optional)
   - `metadata`: Additional metadata (optional)
   - `fee_total`: Total fees charged by Stripe for this payout (optional)
+  - `reserve_adjustment`: Net Stripe minimum-balance hold/release for this
+    payout (optional; normally set later by balance-transaction linking)
   """
   def process_stripe_payout(attrs) do
     %{
@@ -1521,6 +1523,7 @@ defmodule Ysc.Ledgers do
     arrival_date = Map.get(attrs, :arrival_date)
     metadata = Map.get(attrs, :metadata, %{})
     fee_total = Map.get(attrs, :fee_total)
+    reserve_adjustment = Map.get(attrs, :reserve_adjustment)
 
     ensure_basic_accounts()
 
@@ -1561,6 +1564,7 @@ defmodule Ysc.Ledgers do
           stripe_payout_id: stripe_payout_id,
           amount: payout_amount,
           fee_total: fee_total,
+          reserve_adjustment: reserve_adjustment,
           currency: currency,
           status: status,
           arrival_date: arrival_date,
