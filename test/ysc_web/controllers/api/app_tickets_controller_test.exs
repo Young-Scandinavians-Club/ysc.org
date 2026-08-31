@@ -521,6 +521,33 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert is_nil(order.offline_amount_collected)
     end
 
+    test "records an other in-person payment channel", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1},
+          "payment_method" => "other",
+          "note" => "Venmo at the door"
+        })
+
+      assert %{
+               "payment_channel" => "other",
+               "amount_collected" => nil,
+               "notes" => notes
+             } = json_response(response, 200)
+
+      assert notes =~ "Venmo at the door"
+
+      order = Ysc.Repo.get_by(Ysc.Tickets.TicketOrder, event_id: event.id)
+      assert order.payment_channel == "other"
+      assert order.total_amount == Money.new(0, :USD)
+    end
+
     test "rejects an unknown payment method", %{conn: conn} do
       member = member_with_active_membership()
       event = event_fixture()

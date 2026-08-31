@@ -87,6 +87,52 @@ defmodule Ysc.Tickets.AdminGrantsTest do
       assert order.admin_grant_notes == "Migrated from legacy system"
     end
 
+    test "records cash collected in person without charging the $0 grant", %{
+      admin: admin,
+      member: member,
+      event: event,
+      tier: tier
+    } do
+      collected = Money.new(:USD, "90.00")
+
+      assert {:ok, order} =
+               AdminGrants.grant_admin_tickets(
+                 admin.id,
+                 member.id,
+                 event.id,
+                 %{tier.id => 2},
+                 payment_channel: "cash",
+                 offline_amount_collected: collected
+               )
+
+      assert order.status == :completed
+      assert order.payment_channel == "cash"
+      assert Money.equal?(order.offline_amount_collected, collected)
+      assert order.total_amount == Money.new(0, :USD)
+      assert length(order.tickets) == 2
+      assert Enum.all?(order.tickets, &(&1.status == :confirmed))
+    end
+
+    test "records an other in-person channel without an amount collected", %{
+      admin: admin,
+      member: member,
+      event: event,
+      tier: tier
+    } do
+      assert {:ok, order} =
+               AdminGrants.grant_admin_tickets(
+                 admin.id,
+                 member.id,
+                 event.id,
+                 %{tier.id => 1},
+                 payment_channel: "other"
+               )
+
+      assert order.payment_channel == "other"
+      assert is_nil(order.offline_amount_collected)
+      assert order.total_amount == Money.new(0, :USD)
+    end
+
     test "sets expires_at from the event end date/time when both are present",
          %{
            admin: admin,
