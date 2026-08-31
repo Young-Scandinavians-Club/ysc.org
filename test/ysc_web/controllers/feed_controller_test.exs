@@ -79,6 +79,22 @@ defmodule YscWeb.FeedControllerTest do
       assert body =~ title
       assert body =~ "/events/#{event.id}"
     end
+
+    test "includes rendered event body HTML in the entry content", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      marker = "atom-body-#{System.unique_integer([:positive])}"
+      title = "Feed Body Event #{System.unique_integer([:positive])}"
+      event = event_fixture(%{organizer_id: admin.id, title: title})
+
+      event
+      |> Ecto.Changeset.change(%{rendered_details: "<p>#{marker}</p>"})
+      |> Ysc.Repo.update!()
+
+      body = get(conn, ~p"/feeds/events.atom") |> response(200)
+
+      assert body =~ title
+      assert body =~ marker
+    end
   end
 
   describe "HTML feed discovery" do
