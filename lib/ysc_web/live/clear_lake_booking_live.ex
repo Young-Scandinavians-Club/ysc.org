@@ -14,6 +14,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     PricingHelpers,
     PricingRuleCache,
     BookingLocker,
+    BookingModeDisplay,
     RefundPolicyCache
   }
 
@@ -657,9 +658,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <p class="text-sm text-zinc-500 mt-1">
                     {booking.guests_count} {if booking.guests_count == 1,
                       do: "Guest",
-                      else: "Guests"} • {if booking.booking_mode == :buyout,
-                      do: "Entire cabin",
-                      else: "Shared cabin"}
+                      else: "Guests"} • {BookingModeDisplay.stay_type_label(
+                      booking.booking_mode
+                    )}
                   </p>
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
@@ -750,7 +751,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Shared cabin
+                            {BookingModeDisplay.stay_type_label(:day)}
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -1214,7 +1215,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
-                      Entire cabin
+                      {BookingModeDisplay.stay_type_label(:buyout)}
                     </div>
                   </div>
                   <div
@@ -1228,7 +1229,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
-                      Shared cabin
+                      {BookingModeDisplay.stay_type_label(:day)}
                     </div>
                   </div>
                   <!-- Availability Error Alert -->
@@ -2447,10 +2448,10 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 Days Before Check-In
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                Entire cabin
+                                {BookingModeDisplay.stay_type_label(:buyout)}
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                Shared cabin
+                                {BookingModeDisplay.stay_type_label(:day)}
                               </th>
                             </tr>
                           </thead>
@@ -2554,7 +2555,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                ) != [] do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              Entire cabin:
+                              {BookingModeDisplay.stay_type_label(:buyout)}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
@@ -2573,7 +2574,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                  [] do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              Shared cabin:
+                              {BookingModeDisplay.stay_type_label(:day)}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
