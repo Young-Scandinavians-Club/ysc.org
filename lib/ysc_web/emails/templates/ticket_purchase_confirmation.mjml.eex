@@ -35,7 +35,7 @@
     <mj-spacer height="4px"></mj-spacer>
     <%= if @event.age_restriction && @event.age_restriction > 0 do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Age Restriction:</strong> <%= @event.age_restriction %>+ years old
+      <strong>Must be <%= @event.age_restriction %> or older</strong>
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>

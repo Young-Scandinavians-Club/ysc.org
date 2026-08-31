@@ -536,10 +536,10 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                   <div class="min-w-0">
                     <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-1">
-                      RSVP for real-time updates
+                      RSVP on another website
                     </p>
                     <p class="text-zinc-600 text-sm font-medium leading-relaxed">
-                      This event's guest list and live updates live on Partiful. RSVP there to stay in the loop.
+                      This event also uses Partiful, a separate website, for the guest list and last-minute updates. Click RSVP there so you hear about changes.
                     </p>
                   </div>
                 </div>

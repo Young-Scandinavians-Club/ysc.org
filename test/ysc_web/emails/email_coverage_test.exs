@@ -408,7 +408,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert data.first_name == user.first_name
       assert data.renewal_date =~ ~r/\w+ \d+, \d{4}/
-      assert data.payment_methods_url =~ "/users/payment-methods"
+      assert data.payment_methods_url =~ "/users/membership/payment-method"
       assert data.membership_url =~ "/users/membership"
     end
 

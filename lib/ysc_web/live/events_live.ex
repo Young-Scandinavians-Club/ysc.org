@@ -113,7 +113,7 @@ defmodule YscWeb.EventsLive do
                           d="M12.416 37.896c-1.942 0-2.757-1.322-2.757-3.363c0-6.333 12.145-8.187 12.145-13.892c0-4.899-10.07-2.66-10.07-6.532c0-2.449 2.822-3.067 5.988-3.067c6.63 0 13.78 2.858 13.78 8.683c0 3.265-1.947 7.266-6.647 7.266c-.816 0-1.413-.253-2.44-.253c-8.074 0-3.56 11.169-10.01 11.169h.01z"
                         />
                       </svg>
-                      Informal events on Partiful
+                      Casual get-togethers (opens Partiful)
                     </a>
                     <a
                       :if={@current_user && @site_setting_socials_whatsapp}

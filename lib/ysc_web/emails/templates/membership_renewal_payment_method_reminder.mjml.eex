@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Action Required: Membership Renewal</strong>
+      <strong>Please add a card so your membership can renew</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -13,13 +13,13 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your Young Scandinavians Club membership is set to renew on <strong><%= @renewal_date %></strong> (in 14 days).</mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We noticed that you don't currently have a payment method on file. To ensure your membership continues without interruption, please add a payment method before your renewal date.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We don't have a card or bank account saved for your membership. Please add one before that date so your membership continues automatically.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @payment_methods_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Add Payment Method →</mj-button>
+    <mj-button href="<%= @payment_methods_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Add a card or bank account →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Why is this important?</strong></mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>What happens if you don't?</strong></mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Without a payment method on file, your membership renewal will fail, and you'll lose access to:</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If we can't charge your dues, your membership will end and you'll lose access to:</mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">
       <ul>
         <li style="padding-bottom: 10px">Exclusive member-only events and gatherings</li>
@@ -29,12 +29,12 @@
       </ul>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Adding a payment method is quick and easy:</strong></mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>How to add one:</strong></mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">
       <ol>
-        <li style="padding-bottom: 10px">Click the button above or visit your <a href="<%= @membership_url %>">membership page</a></li>
-        <li style="padding-bottom: 10px">Navigate to Payment Methods</li>
-        <li>Add your credit or debit card information securely</li>
+        <li style="padding-bottom: 10px">Click the button above (you'll need to sign in if you aren't already)</li>
+        <li style="padding-bottom: 10px">Enter your card or bank details</li>
+        <li>Save — we'll use it on your renewal date</li>
       </ol>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>

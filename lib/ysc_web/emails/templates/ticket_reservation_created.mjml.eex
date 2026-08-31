@@ -38,7 +38,7 @@
       <span style="color: #6B7280; font-size: 14px;"><%= @event.address %></span><br />
       <% end %>
       <%= if @event.age_restriction && @event.age_restriction > 0 do %>
-      <strong>Age Restriction:</strong> <%= @event.age_restriction %>+ years old
+      <strong>Must be <%= @event.age_restriction %> or older</strong>
       <% end %>
     </mj-text>
     <mj-spacer height="28px"></mj-spacer>
