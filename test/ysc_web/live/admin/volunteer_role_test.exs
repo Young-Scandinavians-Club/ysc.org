@@ -464,6 +464,7 @@ defmodule YscWeb.VolunteerRoleTest do
   # ---------------------------------------------------------------------------
   # Finding 46: volunteers cannot refund, reassign, or grant tickets
   # Finding 50: volunteers cannot reserve tickets (discounted holds) either
+  # Finding 53: volunteers cannot cancel ticket reservations either
   # ---------------------------------------------------------------------------
 
   describe "volunteer ticket money actions (Finding 46)" do
@@ -523,6 +524,49 @@ defmodule YscWeb.VolunteerRoleTest do
 
       refute has_element?(view, "#reassign-ticket-modal")
       assert Repo.get!(Ticket, ticket.id).user_id == buyer.id
+    end
+
+    test "cannot cancel an active discounted reservation (Finding 53)", %{
+      conn: conn,
+      volunteer: volunteer
+    } do
+      admin = user_fixture(%{role: :admin})
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Cancel Gate",
+          quantity: 20
+        })
+
+      member = user_fixture()
+
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(2, :day)
+
+      assert {:ok, reservation} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 2,
+                 expires_at: expires_at,
+                 discount_percentage: Decimal.new("100")
+               })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#cancel-reservation-#{reservation.id}")
+
+      view
+      |> element("#ticket-tier-cancel-reservation-event-#{event.id}")
+      |> render_click(%{"id" => reservation.id})
+
+      reloaded = Events.get_ticket_reservation!(reservation.id)
+      assert reloaded.status == "active"
     end
   end
 
