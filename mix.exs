@@ -262,7 +262,10 @@ defmodule Ysc.MixProject do
       {:phoenix_ecto, "~> 4.7"},
       {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_html, "~> 4.3"},
-      {:phoenix_live_dashboard, "~> 0.9"},
+      # 0.9.1: skip Ecto repos that cannot resolve an extras module
+      # (dynamic/unnamed names from Ecto.Repo.all_running/0). We only
+      # have named Ysc.Repo + ecto_psql_extras; pin the patched floor.
+      {:phoenix_live_dashboard, "~> 0.9.1"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
       # 1.2.11: discard stale diffs if a view rejoins before the first join
       # succeeds; cancel LiveComponent asyncs on removal; HTMLFormatter
