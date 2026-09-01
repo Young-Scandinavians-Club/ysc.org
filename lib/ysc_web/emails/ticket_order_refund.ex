@@ -24,7 +24,7 @@ defmodule YscWeb.Emails.TicketOrderRefund do
   end
 
   def get_subject() do
-    "Your ticket refund has been processed"
+    "Your ticket refund is on the way"
   end
 
   @doc """
