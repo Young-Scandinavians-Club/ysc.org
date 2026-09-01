@@ -665,4 +665,97 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ "Grace Hopper"
     end
   end
+
+  describe "trix_editor/1" do
+    test "renders hidden TrixHook input, ignore wrapper, and matching trix-editor" do
+      assigns = %{
+        form:
+          Phoenix.Component.to_form(%{"raw_body" => "<p>Hello</p>"}, as: :post)
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.trix_editor
+          id="post[raw_body]"
+          field={@form[:raw_body]}
+          wrapper_id="richtext"
+          editor_class="trix-content custom-editor"
+        />
+        """)
+
+      assert html =~ ~s(id="post[raw_body]")
+      assert html =~ ~s(type="hidden")
+      assert html =~ ~s(phx-hook="TrixHook")
+      assert html =~ ~s(value="&lt;p&gt;Hello&lt;/p&gt;")
+      assert html =~ ~s(id="richtext")
+      assert html =~ ~s(phx-update="ignore")
+      assert html =~ ~s(<trix-editor)
+      assert html =~ ~s(input="post[raw_body]")
+      assert html =~ "trix-content custom-editor"
+      assert html =~ "Write something delightful and nice..."
+
+      assert html =~
+               "prose prose-zinc prose-base prose-a:text-blue-600 max-w-none"
+
+      refute html =~ "trix-image-picker"
+      refute html =~ "cursor-not-allowed"
+    end
+
+    test "forwards debounce, data attributes, placeholder, labelledby, and wrapper class" do
+      assigns = %{
+        form: Phoenix.Component.to_form(%{"raw_body" => ""}, as: :post)
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.trix_editor
+          id="update[raw_body]"
+          field={@form[:raw_body]}
+          wrapper_id="update-richtext"
+          wrapper_class="relative"
+          placeholder="Write the update message..."
+          labelledby="update-message-label"
+          editor_class="trix-content"
+          class="prose custom-prose"
+          phx-debounce="200"
+          data-post-id="evt-1"
+        />
+        """)
+
+      assert html =~ ~s(id="update[raw_body]")
+      assert html =~ ~s(phx-debounce="200")
+      assert html =~ ~s(data-post-id="evt-1")
+      assert html =~ ~s(id="update-richtext")
+      assert html =~ ~s(class="relative")
+      assert html =~ ~s(aria-labelledby="update-message-label")
+      assert html =~ "Write the update message..."
+      assert html =~ "custom-prose"
+    end
+
+    test "renders readonly overlay and inner_block slot" do
+      assigns = %{
+        form:
+          Phoenix.Component.to_form(%{"raw_body" => "<p>Hello</p>"}, as: :post)
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.trix_editor
+          id="edition_intro_text"
+          field={@form[:raw_body]}
+          wrapper_id="newsletter-intro-richtext"
+          wrapper_class="relative"
+          readonly?={true}
+          editor_class="trix-content"
+        >
+          <button type="button" id="open-notice-picker-btn">Insert saved notice</button>
+        </.trix_editor>
+        """)
+
+      assert html =~ ~s(id="open-notice-picker-btn")
+      assert html =~ "Insert saved notice"
+      assert html =~ "cursor-not-allowed"
+      assert html =~ ~s(aria-hidden="true")
+    end
+  end
 end
