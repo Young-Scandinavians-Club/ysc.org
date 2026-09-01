@@ -49,11 +49,18 @@ defmodule YscWeb.Api.AppTicketsController do
     with {:ok, event} <- fetch_event(event_id),
          {:ok, member} <- fetch_member(member_id),
          {:ok, selections} <- parse_ticket_selections(tiers),
-         :ok <- reject_donation_tiers(event.id, selections),
-         warnings <- BookingLocker.capacity_warnings(event.id, selections),
+         {:ok, selected_tiers} <- load_selected_tiers(event.id, selections),
+         :ok <- reject_donation_tiers(selected_tiers),
+         warnings <-
+           BookingLocker.capacity_warnings(event.id, selections,
+             event: event,
+             tiers: selected_tiers
+           ),
          {:ok, ticket_order} <-
            Tickets.create_ticket_order(member.id, event.id, selections,
-             bypass_guards: true
+             bypass_guards: true,
+             user: member,
+             tiers: selected_tiers
            ),
          {:ok, payment_intent} <-
            StripeService.create_payment_intent(ticket_order,
@@ -106,9 +113,14 @@ defmodule YscWeb.Api.AppTicketsController do
          {:ok, member} <- fetch_member(member_id),
          :ok <- require_active_membership(member),
          {:ok, selections} <- parse_ticket_selections(tiers),
-         :ok <- reject_donation_tiers(event.id, selections),
+         {:ok, selected_tiers} <- load_selected_tiers(event.id, selections),
+         :ok <- reject_donation_tiers(selected_tiers),
          {:ok, payment_method} <- parse_offline_payment_method(params),
-         warnings <- BookingLocker.capacity_warnings(event.id, selections),
+         warnings <-
+           BookingLocker.capacity_warnings(event.id, selections,
+             event: event,
+             tiers: selected_tiers
+           ),
          {:ok, ticket_order} <-
            Tickets.grant_admin_tickets(
              conn.assigns.current_user.id,
@@ -119,6 +131,9 @@ defmodule YscWeb.Api.AppTicketsController do
                {:skip_capacity, true},
                {:skip_sale_guards, true},
                {:payment_channel, payment_method},
+               {:user, member},
+               {:event, event},
+               {:tiers, selected_tiers},
                {:admin_grant_notes,
                 offline_note(payment_method, blank_to_nil(params["note"]))}
                | offline_amount_opt(params["amount_collected_cents"])
@@ -169,19 +184,26 @@ defmodule YscWeb.Api.AppTicketsController do
     end)
   end
 
-  # Finding 48: donation map values are cents in BookingLocker, but this API
-  # documents and validates them as quantity. Refuse rather than mis-price.
-  defp reject_donation_tiers(event_id, selections) do
+  defp load_selected_tiers(event_id, selections) do
     tier_ids = Map.keys(selections)
 
-    donation? =
+    tiers =
       from(tt in TicketTier,
         where: tt.id in ^tier_ids and tt.event_id == ^event_id
       )
       |> Repo.all()
-      |> Enum.any?(&TicketTierHelpers.donation_tier?/1)
 
-    if donation? do
+    if length(tiers) == length(tier_ids) do
+      {:ok, tiers}
+    else
+      {:error, :invalid_ticket_tier}
+    end
+  end
+
+  # Finding 48: donation map values are cents in BookingLocker, but this API
+  # documents and validates them as quantity. Refuse rather than mis-price.
+  defp reject_donation_tiers(tiers) when is_list(tiers) do
+    if Enum.any?(tiers, &TicketTierHelpers.donation_tier?/1) do
       {:error, :donation_tier_not_supported_in_app}
     else
       :ok

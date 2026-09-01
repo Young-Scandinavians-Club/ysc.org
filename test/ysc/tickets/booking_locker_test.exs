@@ -402,6 +402,32 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert count == 2
     end
 
+    @user_pk ~r/FROM "users" AS u0 WHERE \(u0\."id" = \$/
+
+    test "looks up the buyer once when inserting several tickets", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {{:ok, order}, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 3})
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      count =
+        Repo.aggregate(
+          from(t in Ticket, where: t.ticket_order_id == ^order.id),
+          :count
+        )
+
+      assert count == 3
+      assert user_lookups == 1
+    end
+
     test "paid tier with unlimited quantity (nil) succeeds", %{
       user: user,
       event: event
@@ -1124,6 +1150,41 @@ defmodule Ysc.Tickets.BookingLockerTest do
              }) == []
     end
 
+    test "skips event and tier SELECTs when they are passed in", %{
+      event: event,
+      tier: tier
+    } do
+      selections = %{tier.id => 1}
+
+      {warnings, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.capacity_warnings(event.id, selections,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.capacity_warnings(event.id, selections,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert warnings == []
+      assert event_lookups == 0
+      assert tier_lookups == 0
+    end
+
     test "counts another buyer's hold against remaining capacity", %{
       event: event,
       tier: tier,
@@ -1496,6 +1557,31 @@ defmodule Ysc.Tickets.BookingLockerTest do
                  %{tier.id => 1},
                  skip_capacity: true
                )
+    end
+
+    test "skip_capacity and skip_sale_guards together skip event and tier SELECTs",
+         %{
+           user: user,
+           event: event,
+           tier: tier
+         } do
+      {result, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.validate_fulfillment_capacity(
+              user.id,
+              event.id,
+              %{tier.id => 1},
+              skip_capacity: true,
+              skip_sale_guards: true
+            )
+          end,
+          pattern: ~r/FROM "(events|ticket_tiers)"/,
+          caller_pids: [self()]
+        )
+
+      assert result == :ok
+      assert lookups == 0
     end
   end
 

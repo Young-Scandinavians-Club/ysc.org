@@ -51,8 +51,13 @@ defmodule Ysc.Events.Ticket do
 
   @doc """
   Changeset for the ticket with validations.
+
+  ## Options
+
+    * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Skips the
+      per-ticket membership SELECT when the struct is the same user.
   """
-  def changeset(ticket, attrs) do
+  def changeset(ticket, attrs, opts \\ []) do
     ticket
     |> cast(attrs, [
       :reference_id,
@@ -71,7 +76,7 @@ defmodule Ysc.Events.Ticket do
       :user_id,
       :expires_at
     ])
-    |> validate_active_membership()
+    |> validate_active_membership(opts)
     |> validate_event_not_in_past()
     |> put_reference_id()
     |> unique_constraint(:reference_id)
@@ -87,8 +92,13 @@ defmodule Ysc.Events.Ticket do
   self-service web checkout) doesn't apply. See
   `Ysc.Tickets.BookingLocker.atomic_booking/4`'s `:bypass_guards` option,
   which is what selects this changeset.
+
+  ## Options
+
+    * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Skips the
+      per-ticket membership SELECT when the struct is the same user.
   """
-  def door_sale_changeset(ticket, attrs) do
+  def door_sale_changeset(ticket, attrs, opts \\ []) do
     ticket
     |> cast(attrs, [
       :reference_id,
@@ -107,7 +117,7 @@ defmodule Ysc.Events.Ticket do
       :user_id,
       :expires_at
     ])
-    |> validate_active_membership()
+    |> validate_active_membership(opts)
     |> put_reference_id()
     |> unique_constraint(:reference_id)
   end
@@ -219,39 +229,52 @@ defmodule Ysc.Events.Ticket do
     end
   end
 
+  @doc false
+  def ensure_membership_preloads(nil), do: nil
+
+  def ensure_membership_preloads(%Accounts.User{} = user) do
+    cond do
+      Accounts.has_lifetime_membership?(user) and
+          not Accounts.sub_account?(user) ->
+        user
+
+      Accounts.sub_account?(user) ->
+        Ysc.Repo.preload(user, [:subscriptions, primary_user: :subscriptions])
+
+      match?(%Ecto.Association.NotLoaded{}, user.subscriptions) ->
+        Ysc.Repo.preload(user, [:subscriptions])
+
+      true ->
+        user
+    end
+  end
+
   # Validate that the user has an active membership
   # For sub-accounts, checks the primary user's membership.
-  defp validate_active_membership(changeset) do
+  defp validate_active_membership(changeset, opts) do
     user_id = get_field(changeset, :user_id)
 
     if user_id do
-      validate_active_membership_for_user(changeset, user_id)
+      validate_active_membership_for_user(changeset, user_id, opts)
     else
       changeset
     end
   end
 
-  defp validate_active_membership_for_user(changeset, user_id) do
-    # Preload primary_user and subscriptions associations to avoid N+1 queries for sub-accounts
-    user = Ysc.Repo.get(Ysc.Accounts.User, user_id)
+  defp validate_active_membership_for_user(changeset, user_id, opts) do
+    user =
+      case Keyword.get(opts, :user) do
+        %Accounts.User{id: id} = loaded when id == user_id -> loaded
+        _ -> Ysc.Repo.get(Accounts.User, user_id)
+      end
 
     case user do
       nil ->
         changeset
 
       user ->
-        user = preload_user_subscriptions(user)
+        user = ensure_membership_preloads(user)
         check_active_membership(changeset, user)
-    end
-  end
-
-  defp preload_user_subscriptions(user) do
-    if Accounts.sub_account?(user) do
-      # For sub-accounts, also preload primary user with their subscriptions
-      Ysc.Repo.preload(user, [:subscriptions, primary_user: :subscriptions])
-    else
-      # For primary users, just preload their subscriptions
-      Ysc.Repo.preload(user, [:subscriptions])
     end
   end
 
