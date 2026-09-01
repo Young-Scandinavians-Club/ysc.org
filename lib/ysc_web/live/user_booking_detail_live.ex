@@ -288,7 +288,7 @@ defmodule YscWeb.UserBookingDetailLive do
                       navigate={~p"/bookings/checkout/#{@booking.id}"}
                       class="font-medium text-teal-600 hover:underline"
                     >
-                      Complete checkout
+                      Finish paying now
                     </.link>
                   </p>
                 <% end %>

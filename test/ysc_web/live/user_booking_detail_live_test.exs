@@ -761,7 +761,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
       assert html =~ "Awaiting payment"
-      assert html =~ "Complete checkout"
+      assert html =~ "Finish paying now"
       assert html =~ "/bookings/checkout/#{booking.id}"
     end
 

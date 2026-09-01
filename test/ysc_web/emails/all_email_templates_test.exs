@@ -311,8 +311,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         quantity: 2,
         discount_display: "10.00% member pricing",
         has_discount: true,
-        hold_expires_display:
-          "Complete checkout before December 2, 2024 at 06:00 PM PST",
+        hold_expires_display: "December 2, 2024 at 06:00 PM PST",
         has_notes: true,
         notes_text: "Please bring ID.",
         reserved_by_display: "Admin Person",

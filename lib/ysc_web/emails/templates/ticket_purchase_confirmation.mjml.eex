@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Ticket Purchase Confirmation</strong>
+      <strong>Your tickets are confirmed</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -39,7 +39,7 @@
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Event Details → </mj-button>
+    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">See event details → </mj-button>
     <mj-spacer height="4px"></mj-spacer>
     <mj-button href="<%= @tickets_qr_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#18181b" color="#ffffff" align="center" font-size="18px" border-radius="4px">🎫 View tickets for check-in</mj-button>
     <mj-spacer height="24px"></mj-spacer>
@@ -186,6 +186,7 @@
       <strong>What's Next?</strong>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • At the event, show the tickets on your phone (use the button above) so staff can check you in </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • You'll receive a reminder email 24 hours before the event </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • If you have any questions, reply to this email or contact us </mj-text>
     <mj-spacer height="36px"></mj-spacer>
