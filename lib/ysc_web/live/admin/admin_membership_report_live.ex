@@ -17,7 +17,14 @@ defmodule YscWeb.AdminMembershipReportLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    today = Date.utc_today()
+    # MembershipReport.generate/2 treats from/to as America/Los_Angeles dates.
+    # UTC calendar dates would skip a still-in-progress Pacific month between
+    # 00:00 UTC and Pacific midnight on the 1st.
+    today =
+      "America/Los_Angeles"
+      |> DateTime.now!()
+      |> DateTime.to_date()
+
     default_from = %Date{today | day: 1}
 
     {:ok,
