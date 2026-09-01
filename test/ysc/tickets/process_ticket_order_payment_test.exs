@@ -255,6 +255,96 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     )
   end
 
+  test "fulfills an expired door-sale order after the event has started", %{
+    user: user,
+    event: event,
+    tier1: tier1
+  } do
+    {:ok, _} =
+      Ysc.Events.update_event(event, %{
+        start_date: DateTime.add(DateTime.utc_now(), -2, :day)
+      })
+
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+          bypass_guards: true
+        )
+      end)
+
+    assert {:ok, expired} = Tickets.expire_ticket_order(order)
+    assert expired.status == :expired
+
+    payment_intent_id = "pi_door_sale_expired_#{order.id}"
+    amount_cents = Ysc.MoneyHelper.money_to_cents(expired.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      amount_cents,
+      payment_intent_metadata(expired),
+      fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(expired, pi_id)
+
+        assert completed.status == :completed
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id
+          )
+
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end
+    )
+  end
+
+  test "fulfills an expired oversold door-sale after the event has started", %{
+    user: user,
+    event: event,
+    tier1: tier1
+  } do
+    {:ok, _} =
+      Ysc.Events.update_event(event, %{
+        start_date: DateTime.add(DateTime.utc_now(), -2, :day),
+        max_attendees: 1
+      })
+
+    {:ok, _} = Ysc.Events.update_ticket_tier(tier1, %{quantity: 1})
+
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3},
+          bypass_guards: true
+        )
+      end)
+
+    assert {:ok, expired} = Tickets.expire_ticket_order(order)
+    assert expired.status == :expired
+
+    payment_intent_id = "pi_door_sale_oversold_#{order.id}"
+    amount_cents = Ysc.MoneyHelper.money_to_cents(expired.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      amount_cents,
+      payment_intent_metadata(expired),
+      fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(expired, pi_id)
+
+        assert completed.status == :completed
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id
+          )
+
+        assert length(tickets) == 3
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end
+    )
+  end
+
   test "does not complete cancelled orders when payment succeeds", %{
     user: user,
     event: event,

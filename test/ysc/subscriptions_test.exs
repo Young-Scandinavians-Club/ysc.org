@@ -764,6 +764,46 @@ defmodule Ysc.SubscriptionsTest do
 
       assert params.metadata == %{user_id: user.id}
     end
+
+    test "paid_out_of_band_stripe_create_params truncates long notes to 450 chars" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_note_#{System.unique_integer()}"
+        })
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      note = String.duplicate("x", 500)
+
+      params =
+        Subscriptions.paid_out_of_band_stripe_create_params(user, single_plan,
+          note: note
+        )
+
+      assert String.length(params.metadata["offline_payment_note"]) == 450
+
+      assert params.metadata["offline_payment_note"] ==
+               String.slice(note, 0, 450)
+    end
+
+    test "paid_out_of_band_stripe_create_params omits empty-string offline keys" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_empty_#{System.unique_integer()}"
+        })
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      params =
+        Subscriptions.paid_out_of_band_stripe_create_params(user, single_plan,
+          payment_method: "",
+          recorded_by_id: "",
+          note: ""
+        )
+
+      assert params.metadata == %{user_id: user.id}
+    end
   end
 
   describe "create_stripe_subscription/2" do

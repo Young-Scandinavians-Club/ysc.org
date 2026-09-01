@@ -19,10 +19,30 @@ defmodule YscWeb.Emails.OutageNotification do
   end
 
   def get_subject() do
-    "Property Outage Alert - Young Scandinavians Club"
+    "Outage at one of our cabins — Young Scandinavians Club"
+  end
+
+  def get_subject(property) do
+    "Outage at the #{property_name(property)}"
   end
 
   def property_name(property), do: PropertyDisplay.outage_name(property)
+
+  @doc """
+  Opening sentence for members, e.g. "There's currently a power outage at the Tahoe cabin."
+  """
+  def opening_sentence(incident_type, property) do
+    name = property_name(property)
+    phrase = incident_type_phrase(incident_type)
+
+    case phrase do
+      "outage" ->
+        "There's currently an outage at the #{name}."
+
+      phrase ->
+        "There's currently a #{phrase} at the #{name}."
+    end
+  end
 
   def incident_type_name(incident_type) when is_atom(incident_type) do
     case incident_type do
@@ -130,11 +150,11 @@ defmodule YscWeb.Emails.OutageNotification do
     """
     Hej #{first_name},
 
-    We wanted to let you know that a #{incident_type_name(incident_type)} has been reported at the #{property_name(property)}.
+    #{opening_sentence(incident_type, property)}
 
-    Outage Details:
+    Outage details:
     - Type: #{incident_type_name(incident_type)}
-    - Provider: #{company_name}
+    - Utility company: #{company_name}
     - Date: #{format_date(incident_date)}
     #{if description, do: "- Description: #{description}", else: ""}
 
@@ -144,13 +164,13 @@ defmodule YscWeb.Emails.OutageNotification do
 
     #{cabin_master_contact_section(cabin_master_name, cabin_master_phone, cabin_master_email)}
 
-    We recommend checking the provider's outage map for the latest status and estimated restoration time.
+    We recommend checking the utility company's outage map for the latest status and estimated restoration time.
 
     #{outage_map_section(company_name)}
 
-    Please note that outages can be unpredictable and restoration times may vary. We recommend checking the provider's website for the most up-to-date information.
+    Please note that outages can be unpredictable and restoration times may vary. We recommend checking the utility company's website for the most up-to-date information.
 
-    If you have any questions or concerns, please don't hesitate to reach out to us.
+    If you have any questions, please don't hesitate to reach out to us.
 
     Young Scandinavians Club
     """
@@ -163,7 +183,7 @@ defmodule YscWeb.Emails.OutageNotification do
        ) do
     if cabin_master_name || cabin_master_email do
       """
-      If you have any issues or need help, please reach out to the cabin master:
+      If you have any issues or need help, please reach out to the Cabin Master.
 
       #{if cabin_master_name, do: "- Cabin Master: #{cabin_master_name}\n", else: ""}#{if cabin_master_phone, do: "- Phone: #{cabin_master_phone}\n", else: ""}#{if cabin_master_email, do: "- Email: #{cabin_master_email}\n", else: ""}
       """
@@ -175,7 +195,7 @@ defmodule YscWeb.Emails.OutageNotification do
   defp outage_map_section(company_name) do
     case provider_outage_map_url(company_name) do
       nil -> ""
-      url -> "View Outage Map: #{url}"
+      url -> "Check the outage map: #{url}"
     end
   end
 
@@ -244,4 +264,10 @@ defmodule YscWeb.Emails.OutageNotification do
   end
 
   def get_cabin_master_email(_), do: nil
+
+  defp incident_type_phrase(incident_type) do
+    incident_type
+    |> incident_type_name()
+    |> String.downcase()
+  end
 end

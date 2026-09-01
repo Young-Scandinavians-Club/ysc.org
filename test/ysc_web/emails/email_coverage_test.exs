@@ -408,7 +408,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert data.first_name == user.first_name
       assert data.renewal_date =~ ~r/\w+ \d+, \d{4}/
-      assert data.payment_methods_url =~ "/users/payment-methods"
+      assert data.payment_methods_url =~ "/users/membership/payment-method"
       assert data.membership_url =~ "/users/membership"
     end
 
@@ -445,25 +445,25 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
   describe "OutageNotification" do
     test "property_name with atoms" do
-      assert OutageNotification.property_name(:tahoe) == "Tahoe Property"
+      assert OutageNotification.property_name(:tahoe) == "Tahoe cabin"
 
       assert OutageNotification.property_name(:clear_lake) ==
-               "Clear Lake Property"
+               "Clear Lake cabin"
 
-      assert OutageNotification.property_name(:other) == "Property"
+      assert OutageNotification.property_name(:other) == "cabin"
     end
 
     test "property_name with binaries" do
-      assert OutageNotification.property_name("tahoe") == "Tahoe Property"
+      assert OutageNotification.property_name("tahoe") == "Tahoe cabin"
 
       assert OutageNotification.property_name("clear_lake") ==
-               "Clear Lake Property"
+               "Clear Lake cabin"
 
-      assert OutageNotification.property_name("unknown") == "Property"
+      assert OutageNotification.property_name("unknown") == "cabin"
     end
 
     test "property_name with other types" do
-      assert OutageNotification.property_name(123) == "Property"
+      assert OutageNotification.property_name(123) == "cabin"
     end
 
     test "incident_type_name with atoms" do
@@ -526,7 +526,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assigns = %{
         first_name: "John",
         property: :tahoe,
-        property_name: "Tahoe Property",
+        property_name: "Tahoe cabin",
         incident_type: :power_outage,
         outage_type: "Power Outage",
         company_name: "PG&E",
@@ -551,7 +551,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assigns = %{
         first_name: "John",
         property: :tahoe,
-        property_name: "Tahoe Property",
+        property_name: "Tahoe cabin",
         incident_type: :power_outage,
         outage_type: "Power Outage",
         company_name: "PG&E",
@@ -566,14 +566,14 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       html = OutageNotification.render(assigns)
       assert is_binary(html)
-      assert html =~ "View Outage Map"
+      assert html =~ "Check the outage map"
     end
 
     test "renders without cabin master section" do
       assigns = %{
         first_name: "John",
         property: :tahoe,
-        property_name: "Tahoe Property",
+        property_name: "Tahoe cabin",
         incident_type: :power_outage,
         outage_type: "Power Outage",
         company_name: "Unknown Co",

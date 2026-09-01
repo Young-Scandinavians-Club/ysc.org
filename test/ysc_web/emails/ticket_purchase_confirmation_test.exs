@@ -728,8 +728,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
         )
 
       html = TicketPurchaseConfirmation.render(data)
-      assert html =~ "Age Restriction"
-      assert html =~ "21"
+      assert html =~ "Must be 21 or older"
+      refute html =~ "Age Restriction"
     end
 
     test "renders multiple agenda sections with section titles when multiple agendas",

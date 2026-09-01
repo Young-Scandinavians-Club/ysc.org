@@ -18,6 +18,14 @@ defmodule Ysc.Ledgers.Payout do
     field :stripe_payout_id, :string
     field :amount, Money.Ecto.Composite.Type, default_currency: :USD
     field :fee_total, Money.Ecto.Composite.Type, default_currency: :USD
+
+    # Net of Stripe `payout_minimum_balance_hold` / `payout_minimum_balance_release`
+    # balance transactions in this payout. Negative when Stripe withholds funds as
+    # a minimum-balance reserve this cycle, positive when it releases a previously
+    # withheld reserve. Reconciliation adds this to (payments - refunds - fees) to
+    # arrive at the amount actually wired to the bank.
+    field :reserve_adjustment, Money.Ecto.Composite.Type, default_currency: :USD
+
     field :currency, :string
     field :status, :string
     field :arrival_date, :utc_datetime
@@ -60,6 +68,7 @@ defmodule Ysc.Ledgers.Payout do
       :stripe_payout_id,
       :amount,
       :fee_total,
+      :reserve_adjustment,
       :currency,
       :status,
       :arrival_date,

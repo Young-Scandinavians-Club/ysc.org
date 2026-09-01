@@ -15,6 +15,12 @@ defmodule YscWeb.Api.AppMembershipsController do
   method again: Stripe's attach call errors if the method is already attached
   to a customer, which is exactly what happens here every time and was
   breaking every in-person membership sign-up with a generic payment error.
+
+  Finding 52: `subscribe/2` must only accept a PaymentMethod that is already
+  attached to this member's Stripe customer and that was created recently
+  (card-present SetupIntent window). Otherwise a volunteer with a stored
+  `pm_*` from an earlier door sale could re-subscribe the member later
+  without the member or Terminal present.
   """
   use YscWeb, :controller
 
@@ -25,6 +31,11 @@ defmodule YscWeb.Api.AppMembershipsController do
   alias YscWeb.Plugs.MobileUserAuth
 
   action_fallback YscWeb.Api.FallbackController
+
+  # Card-present SetupIntent → subscribe should complete in one door-sale
+  # session. Sixty minutes covers slow checkouts without allowing indefinite
+  # reuse of a saved `pm_*` from a prior visit.
+  @max_payment_method_age_seconds 60 * 60
 
   @doc """
   Lists the available membership plans (mirrors `config :ysc, :membership_plans`,
@@ -64,6 +75,8 @@ defmodule YscWeb.Api.AppMembershipsController do
     with {:ok, member} <- fetch_member(member_id),
          :ok <- reject_duplicate_membership(member),
          {:ok, plan} <- fetch_plan(plan_id),
+         :ok <-
+           validate_in_person_payment_method(member, payment_method_id),
          {:ok, subscription} <-
            Customers.create_subscription(member,
              prices: [%{price: plan.stripe_price_id, quantity: 1}],
@@ -231,6 +244,65 @@ defmodule YscWeb.Api.AppMembershipsController do
   end
 
   defp blank_to_nil(_), do: nil
+
+  # Finding 52: bind subscribe to a freshly collected, customer-attached PM.
+  defp validate_in_person_payment_method(
+         %{stripe_id: customer_id},
+         payment_method_id
+       )
+       when is_binary(customer_id) and customer_id != "" and
+              is_binary(payment_method_id) and payment_method_id != "" do
+    case stripe_client().retrieve_payment_method(payment_method_id) do
+      {:ok, payment_method} ->
+        case payment_method_belongs_to_customer?(payment_method, customer_id) do
+          :ok -> payment_method_recently_collected?(payment_method)
+          error -> error
+        end
+
+      {:error, _} ->
+        {:error, :payment_method_not_eligible}
+    end
+  end
+
+  defp validate_in_person_payment_method(_, _),
+    do: {:error, :payment_method_not_eligible}
+
+  defp payment_method_belongs_to_customer?(payment_method, customer_id) do
+    case payment_method_customer(payment_method) do
+      ^customer_id -> :ok
+      _ -> {:error, :payment_method_not_eligible}
+    end
+  end
+
+  defp payment_method_customer(%{customer: customer})
+       when is_binary(customer),
+       do: customer
+
+  defp payment_method_customer(%{"customer" => customer})
+       when is_binary(customer),
+       do: customer
+
+  defp payment_method_customer(_), do: nil
+
+  defp payment_method_recently_collected?(payment_method) do
+    case payment_method_created(payment_method) do
+      created when is_integer(created) and created > 0 ->
+        age_seconds = System.system_time(:second) - created
+
+        if age_seconds >= 0 and age_seconds <= @max_payment_method_age_seconds do
+          :ok
+        else
+          {:error, :payment_method_not_eligible}
+        end
+
+      _ ->
+        {:error, :payment_method_not_eligible}
+    end
+  end
+
+  defp payment_method_created(%{created: created}), do: created
+  defp payment_method_created(%{"created" => created}), do: created
+  defp payment_method_created(_), do: nil
 
   defp stripe_client do
     Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)

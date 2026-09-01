@@ -611,7 +611,7 @@ defmodule YscWeb.EventsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/events")
 
       assert html =~ "partiful.com"
-      assert html =~ "Informal events on Partiful"
+      assert html =~ "Casual get-togethers (opens Partiful)"
       assert html =~ "Read club news"
     end
   end

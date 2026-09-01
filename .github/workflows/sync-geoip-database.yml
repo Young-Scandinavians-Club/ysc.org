@@ -8,6 +8,12 @@
 #   MAXMIND_LICENSE_KEY
 #   TIGRIS_APP_RESOURCES_ACCESS_KEY_ID
 #   TIGRIS_APP_RESOURCES_SECRET_ACCESS_KEY
+#
+# Optional secrets:
+#   MAXMIND_ACCOUNT_ID — MaxMind account ID for Basic Auth against the
+#   current /geoip/databases permalinks. Also accepted as
+#   MAXMIND_LICENSE_KEY="account_id:license_key". The legacy
+#   /app/geoip_download query-param URL is used only when no account ID is set.
 
 name: Sync GeoIP database
 
@@ -39,6 +45,7 @@ jobs:
       - name: Sync GeoIP database
         env:
           MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+          MAXMIND_ACCOUNT_ID: ${{ secrets.MAXMIND_ACCOUNT_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.TIGRIS_APP_RESOURCES_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGRIS_APP_RESOURCES_SECRET_ACCESS_KEY }}
           AWS_ENDPOINT_URL_S3: https://fly.storage.tigris.dev

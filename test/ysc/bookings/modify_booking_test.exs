@@ -156,9 +156,8 @@ defmodule Ysc.Bookings.ModifyBookingTest do
          %{
            user: user
          } do
-      {checkin, checkout} = tahoe_booking_dates(30)
-      new_checkin = Date.add(checkin, 7)
-      new_checkout = Date.add(checkout, 7)
+      {checkin, checkout} = locker_buyout_dates(1)
+      {new_checkin, new_checkout} = locker_buyout_dates_after(checkout, 7)
 
       booking = complete_buyout_booking!(user, checkin, checkout)
       assert is_nil(booking.refund_forfeited_at)
@@ -188,7 +187,8 @@ defmodule Ysc.Bookings.ModifyBookingTest do
     end
 
     test "calculate_refund returns zero after modification", %{user: user} do
-      {checkin, checkout} = tahoe_booking_dates(40)
+      {checkin, checkout} = locker_buyout_dates(2)
+      {new_checkin, new_checkout} = locker_buyout_dates_after(checkout, 7)
       booking = complete_buyout_booking!(user, checkin, checkout)
 
       assert is_nil(booking.refund_forfeited_at)
@@ -203,8 +203,8 @@ defmodule Ysc.Bookings.ModifyBookingTest do
 
       assert {:ok, updated} =
                BookingLocker.modify_complete_booking(booking, %{
-                 checkin_date: Date.add(checkin, 7),
-                 checkout_date: Date.add(checkout, 7),
+                 checkin_date: new_checkin,
+                 checkout_date: new_checkout,
                  guests_count: 5,
                  children_count: 0
                })
@@ -221,13 +221,14 @@ defmodule Ysc.Bookings.ModifyBookingTest do
          %{
            user: user
          } do
-      {checkin, checkout} = tahoe_booking_dates(50)
+      {checkin, checkout} = locker_buyout_dates(3)
+      {new_checkin, new_checkout} = locker_buyout_dates_after(checkout, 7)
       booking = complete_buyout_booking!(user, checkin, checkout)
 
       assert {:ok, modified} =
                BookingLocker.modify_complete_booking(booking, %{
-                 checkin_date: Date.add(checkin, 7),
-                 checkout_date: Date.add(checkout, 7),
+                 checkin_date: new_checkin,
+                 checkout_date: new_checkout,
                  guests_count: 4,
                  children_count: 0
                })

@@ -17,6 +17,9 @@ defmodule YscWeb do
   those modules here.
   """
 
+  # Do not add `annual_meetings` or `exports` — those are member/admin-only and
+  # are served by authenticated controllers (YOU-269 / #358). Listing them here
+  # makes Plug.Static serve the files without a session.
   def static_paths,
     do:
       ~w(assets fonts images video documents favicon.ico site.webmanifest favicon-16x16.png favicon-32x32.png apple-touch-icon.png android-chrome-512x512.png android-chrome-192x192.png)

@@ -1752,6 +1752,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert html =~ "RSVP on"
       assert html =~ "Partiful"
+      assert html =~ "a separate website"
       assert html =~ "https://partiful.com/e/partiful-gala-2026"
     end
 

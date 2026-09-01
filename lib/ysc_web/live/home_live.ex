@@ -15,7 +15,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Events.EventHelpers
 
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
-  alias Ysc.Bookings.{PropertyDisplay, Season}
+  alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay, Season}
   alias Ysc.Posts.Post
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
@@ -1359,7 +1359,7 @@ defmodule YscWeb.HomeLive do
                           </span>
                           <%= if booking.booking_mode == :buyout do %>
                             <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded uppercase tracking-tighter">
-                              Entire cabin
+                              {BookingModeDisplay.stay_type_label(:buyout)}
                             </span>
                           <% end %>
                         </div>

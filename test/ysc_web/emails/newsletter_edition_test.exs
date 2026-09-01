@@ -939,5 +939,104 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert html =~ "GOING FAST!"
       refute html =~ "Unsubscribe from newsletters"
     end
+
+    test "event and post titles and cover images link to their detail pages" do
+      event = %{
+        title: "Summer Fest",
+        description: "Hi",
+        short_description: "Short",
+        date_str: "Jan 1",
+        save_the_date: false,
+        selling_fast: false,
+        pricing_str: nil,
+        tickets_on_sale_str: nil,
+        location_name: nil,
+        url: "https://example.com/events/summer-fest",
+        image_url: "https://images.example.com/event.jpg"
+      }
+
+      post = %{
+        title: "Dock Repairs",
+        preview_text: "Short preview",
+        url: "https://example.com/posts/dock-repairs",
+        image_url: "https://images.example.com/post.jpg"
+      }
+
+      assigns = %{
+        first_name: "there",
+        edition_title: "Weekly",
+        edition_date: "Newsletter, July 9, 2026",
+        intro_text: Phoenix.HTML.raw("<p>x</p>"),
+        intro_text?: true,
+        cover_image_url: nil,
+        posts: [post],
+        events: [event],
+        unsubscribe_url: "/newsletter/unsubscribe/preview"
+      }
+
+      html = NewsletterEdition.render(assigns)
+      {:ok, doc} = Floki.parse_document(html)
+
+      event_url = "https://example.com/events/summer-fest"
+      post_url = "https://example.com/posts/dock-repairs"
+
+      # Event: title text and cover image both sit inside a link to the event.
+      assert doc
+             |> Floki.find(~s(a[href="#{event_url}"]))
+             |> Enum.any?(&(Floki.text(&1) |> String.trim() == "Summer Fest"))
+
+      assert doc
+             |> Floki.find(~s(a[href="#{event_url}"] img))
+             |> Enum.any?()
+
+      # Post: title text and thumbnail both sit inside a link to the post.
+      assert doc
+             |> Floki.find(~s(a[href="#{post_url}"]))
+             |> Enum.any?(&(Floki.text(&1) |> String.trim() == "Dock Repairs"))
+
+      assert doc
+             |> Floki.find(~s(a[href="#{post_url}"] img))
+             |> Enum.any?()
+    end
+
+    test "badge-overlay event cover (save-the-date / selling-fast) is wrapped in a link" do
+      event = %{
+        title: "Midsummer",
+        description: "Hi",
+        short_description: "Short",
+        date_str: "Jun 21",
+        save_the_date: false,
+        selling_fast: true,
+        pricing_str: nil,
+        tickets_on_sale_str: nil,
+        location_name: nil,
+        url: "https://example.com/events/midsummer",
+        image_url: "https://images.example.com/midsummer.jpg"
+      }
+
+      assigns = %{
+        first_name: "there",
+        edition_title: "Weekly",
+        edition_date: "Newsletter, July 9, 2026",
+        intro_text: Phoenix.HTML.raw("<p>x</p>"),
+        intro_text?: true,
+        cover_image_url: nil,
+        posts: [],
+        events: [event],
+        unsubscribe_url: "/newsletter/unsubscribe/preview"
+      }
+
+      html = NewsletterEdition.render(assigns)
+      {:ok, doc} = Floki.parse_document(html)
+
+      # The badge overlay renders a background-image cover instead of an <img>;
+      # it (badges and all) sits inside a link to the event.
+      link =
+        doc
+        |> Floki.find(~s(a[href="https://example.com/events/midsummer"]))
+        |> Enum.find(&(Floki.find(&1, "span") |> Floki.text() =~ "GOING FAST!"))
+
+      assert link
+    end
   end
 end

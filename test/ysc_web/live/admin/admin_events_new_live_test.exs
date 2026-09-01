@@ -13,6 +13,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   alias Ysc.Events.Event
   alias Ysc.MessagePassingEvents
   alias Ysc.Repo
+  alias YscWeb.Admin.DateTimeDisplay
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -1810,9 +1811,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   end
 
   defp pacific_last_edited_label(datetime) do
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> Timex.format!("{Mshort} {D}, {YYYY} at {h12}:{m}{am}")
+    DateTimeDisplay.format_pacific_datetime_at(datetime)
   end
 
   defp utc_last_edited_label(datetime) do

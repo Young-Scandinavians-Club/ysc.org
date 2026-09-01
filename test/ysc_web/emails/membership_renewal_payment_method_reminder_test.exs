@@ -24,14 +24,9 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
   end
 
   describe "get_subject/0" do
-    test "returns action required subject" do
+    test "returns a plain-language subject asking the member to add a card" do
       assert MembershipRenewalPaymentMethodReminder.get_subject() ==
-               "Action Required: Add Payment Method for Membership Renewal"
-    end
-
-    test "subject indicates urgency with 'Action Required'" do
-      subject = MembershipRenewalPaymentMethodReminder.get_subject()
-      assert String.contains?(subject, "Action Required")
+               "Please add a card so your membership can renew"
     end
   end
 
@@ -39,7 +34,7 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
     test "returns payment methods page URL" do
       url = MembershipRenewalPaymentMethodReminder.payment_methods_url()
 
-      assert String.ends_with?(url, "/users/payment-methods")
+      assert String.ends_with?(url, "/users/membership/payment-method")
       assert String.starts_with?(url, "http")
     end
 
@@ -124,7 +119,7 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
 
       assert String.ends_with?(
                data.payment_methods_url,
-               "/users/payment-methods"
+               "/users/membership/payment-method"
              )
     end
 

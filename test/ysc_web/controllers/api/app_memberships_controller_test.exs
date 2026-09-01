@@ -5,9 +5,12 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
   """
   use YscWeb.ConnCase, async: false
 
+  import Mox
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts
+
+  setup :verify_on_exit!
 
   defp lifetime_member do
     user_fixture()
@@ -22,10 +25,8 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
     admin = user_fixture(%{role: :admin})
     token = Accounts.generate_user_mobile_token(admin)
 
-    original_stripe_client = Application.get_env(:ysc, :stripe_client)
-
     on_exit(fn ->
-      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
     end)
 
     conn =
@@ -63,11 +64,35 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
   end
 
   describe "POST /api/v1/app/memberships/subscribe" do
+    defp member_with_stripe_customer do
+      user_fixture()
+      |> Ecto.Changeset.change(stripe_id: "cus_member_door_sale")
+      |> Ysc.Repo.update!()
+    end
+
+    defp stub_recent_payment_method!(
+           customer_id,
+           payment_method_id \\ "pm_test_card"
+         ) do
+      Mox.expect(
+        Ysc.StripeMock,
+        :retrieve_payment_method,
+        fn ^payment_method_id ->
+          {:ok,
+           %Stripe.PaymentMethod{
+             id: payment_method_id,
+             customer: customer_id,
+             created: System.system_time(:second) - 60
+           }}
+        end
+      )
+    end
+
     test "creates a subscription with the already-attached payment method as default",
          %{
            conn: conn
          } do
-      member = user_fixture()
+      member = member_with_stripe_customer()
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
       stripe_price_id =
@@ -80,6 +105,7 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
       # method arrives here already attached (via the prior SetupIntent flow
       # in create_setup_intent/2), and re-attaching an already-attached
       # payment method is a Stripe API error — see the moduledoc.
+      stub_recent_payment_method!(member.stripe_id)
 
       Mox.stub(Stripe.SubscriptionMock, :create, fn params, opts ->
         assert params.default_payment_method == "pm_test_card"
@@ -99,6 +125,218 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
 
       assert %{"id" => "sub_test_123", "status" => "active"} =
                json_response(response, 200)
+    end
+
+    test "rejects a payment method attached to a different Stripe customer", %{
+      conn: conn
+    } do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_foreign" ->
+        {:ok,
+         %Stripe.PaymentMethod{
+           id: "pm_foreign",
+           customer: "cus_someone_else",
+           created: System.system_time(:second)
+         }}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a subscription with a foreign payment method")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_foreign"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
+    test "rejects a stale payment method from a prior door-sale session", %{
+      conn: conn
+    } do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_stale" ->
+        {:ok,
+         %Stripe.PaymentMethod{
+           id: "pm_stale",
+           customer: member.stripe_id,
+           # Older than the in-person SetupIntent window.
+           created: System.system_time(:second) - 60 * 60 - 1
+         }}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a subscription with a stale payment method")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_stale"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
+    test "rejects subscribe when the member has no Stripe customer yet", %{
+      conn: conn
+    } do
+      member = user_fixture()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.stub(Ysc.StripeMock, :retrieve_payment_method, fn _id ->
+        flunk(
+          "must not retrieve a payment method without a member Stripe customer"
+        )
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a subscription without a bound payment method")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_test_card"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
+    test "rejects subscribe when Stripe cannot retrieve the payment method", %{
+      conn: conn
+    } do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_missing" ->
+        {:error, :not_found}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk(
+          "must not create a subscription when the payment method is missing"
+        )
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_missing"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
+    test "accepts a string-keyed payment method map from Stripe", %{conn: conn} do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_map_keys" ->
+        {:ok,
+         %{
+           "id" => "pm_map_keys",
+           "customer" => member.stripe_id,
+           "created" => System.system_time(:second) - 30
+         }}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn params, _opts ->
+        assert params.default_payment_method == "pm_map_keys"
+
+        {:ok, %Stripe.Subscription{id: "sub_map_keys", status: "active"}}
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_map_keys"
+        })
+
+      assert %{"id" => "sub_map_keys", "status" => "active"} =
+               json_response(response, 200)
+    end
+
+    test "rejects a payment method that is not attached to any customer", %{
+      conn: conn
+    } do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_unattached" ->
+        {:ok,
+         %Stripe.PaymentMethod{
+           id: "pm_unattached",
+           customer: nil,
+           created: System.system_time(:second)
+         }}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk(
+          "must not create a subscription with an unattached payment method"
+        )
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_unattached"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+
+    test "rejects a payment method with no created timestamp", %{conn: conn} do
+      member = member_with_stripe_customer()
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :retrieve_payment_method, fn "pm_no_created" ->
+        {:ok, %{"id" => "pm_no_created", "customer" => member.stripe_id}}
+      end)
+
+      Mox.stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        flunk("must not create a subscription without a created timestamp")
+      end)
+
+      response =
+        post(conn, ~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_no_created"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
     end
 
     test "returns an error for an unknown plan", %{conn: conn} do

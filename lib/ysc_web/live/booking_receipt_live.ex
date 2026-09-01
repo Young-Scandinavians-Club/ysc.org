@@ -12,6 +12,7 @@ defmodule YscWeb.BookingReceiptLive do
   alias Ysc.Bookings.{
     Booking,
     BookingLocker,
+    BookingModeDisplay,
     PendingRefund,
     PropertyDisplay,
     RefundPolicyDisplay
@@ -495,14 +496,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
                     {Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)}
                   <% else %>
-                    <%= cond do %>
-                      <% @booking.booking_mode == :buyout -> %>
-                        Entire cabin
-                      <% @booking.booking_mode == :room -> %>
-                        Individual room(s)
-                      <% true -> %>
-                        Shared cabin
-                    <% end %>
+                    {BookingModeDisplay.stay_type_label(@booking.booking_mode)}
                   <% end %>
                 </p>
                 <p
@@ -719,7 +713,7 @@ defmodule YscWeb.BookingReceiptLive do
                     <% :buyout -> %>
                       <%= if @price_breakdown[:segments] && length(@price_breakdown.segments) > 1 do %>
                         <div class="text-xs text-zinc-500 mb-1">
-                          Entire cabin · rate varies by season
+                          {BookingModeDisplay.stay_type_label(:buyout)} · rate varies by season
                         </div>
                         <%= for {segment, index} <- Enum.with_index(@price_breakdown.segments) do %>
                           <div

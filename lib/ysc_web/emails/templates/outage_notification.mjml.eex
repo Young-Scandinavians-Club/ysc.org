@@ -10,7 +10,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Property Outage Alert</strong>
+      <strong>Cabin outage notice</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -30,12 +30,12 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      We wanted to let you know that a <strong><%= incident_type_name(@incident_type) %></strong> has been reported at the <%= property_name(@property) %>.
+      <%= opening_sentence(@incident_type, @property) %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Outage Details -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">
-      Outage Details
+      Outage details
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
@@ -43,7 +43,7 @@
     </mj-text>
     <mj-spacer height="4px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Provider:</strong> <%= @company_name %>
+      <strong>Utility company:</strong> <%= @company_name %>
     </mj-text>
     <mj-spacer height="4px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
@@ -72,7 +72,7 @@
     <!-- Contact Information -->
     <%= if @cabin_master_name || @cabin_master_email do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      If you have any issues or need help, please reach out to the cabin master:
+      If you have any issues or need help, please reach out to the Cabin Master.
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <%= if @cabin_master_name do %>
@@ -95,7 +95,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <% end %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      We recommend checking the provider's outage map for the latest status and estimated restoration time.
+      We recommend checking the utility company's outage map for the latest status and estimated restoration time.
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <%= if provider_outage_map_url(@company_name) do %>
@@ -110,16 +110,16 @@
       font-size="18px"
       border-radius="4px"
     >
-      View Outage Map - <%= @company_name %> →
+      Check the outage map — <%= @company_name %> →
     </mj-button>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      Please note that outages can be unpredictable and restoration times may vary. We recommend checking the provider's website for the most up-to-date information.
+      Please note that outages can be unpredictable and restoration times may vary. We recommend checking the utility company's website for the most up-to-date information.
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      If you have any questions or concerns, please don't hesitate to reach out to us.
+      If you have any questions, please don't hesitate to reach out to us.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">

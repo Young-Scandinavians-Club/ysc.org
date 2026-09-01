@@ -682,6 +682,12 @@ if config_env() == :prod do
       # QuickBooks Account IDs (required - cannot be auto-created)
       bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
       stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+      # Balance-sheet account for Stripe minimum-balance reserve holds/releases
+      # on payout Deposits. Falls back to stripe_account_id when unset.
+      stripe_reserve_account_id:
+        System.get_env("QUICKBOOKS_STRIPE_RESERVE_ACCOUNT_ID"),
+      stripe_reserve_account_name:
+        System.get_env("QUICKBOOKS_STRIPE_RESERVE_ACCOUNT_NAME"),
       stripe_fees_account_id:
         System.get_env("QUICKBOOKS_STRIPE_FEES_ACCOUNT_ID"),
       stripe_fees_account_name:
@@ -706,6 +712,7 @@ end
 # Deployed environments (sandbox/production) load GeoLite2-City from the shared
 # `ysc-app-resources` S3 bucket via Ysc.GeoIP.DatabaseFetcher. The weekly GitHub
 # Actions workflow `.github/workflows/sync-geoip-database.yml` downloads from
-# MaxMind and uploads `geoip/GeoLite2-City.tar.gz`. Keep MAXMIND_LICENSE_KEY in
-# GitHub Actions secrets only — do not set it on Fly app machines.
+# MaxMind and uploads `geoip/GeoLite2-City.tar.gz`. Keep MAXMIND_LICENSE_KEY
+# (and MAXMIND_ACCOUNT_ID) in GitHub Actions secrets only — do not set them
+# on Fly app machines.
 # See Ysc.Application.maybe_start_geo_ip_loader/0.

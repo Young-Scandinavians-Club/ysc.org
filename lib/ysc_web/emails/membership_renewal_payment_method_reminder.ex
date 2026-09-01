@@ -3,7 +3,7 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
   Email template for membership renewal payment method reminder.
 
   Sent to users 14 days before their membership renewal date if they don't have
-  a payment method on file. This is common for users who paid with cash or other
+  a saved card or bank account. This is common for users who paid with cash or other
   offline methods initially.
   """
   use MjmlEEx,
@@ -23,7 +23,7 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
   end
 
   def get_subject() do
-    "Action Required: Add Payment Method for Membership Renewal"
+    "Please add a card so your membership can renew"
   end
 
   def prepare_email_data(user, subscription) do

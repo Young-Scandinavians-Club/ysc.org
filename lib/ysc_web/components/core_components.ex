@@ -22,6 +22,7 @@ defmodule YscWeb.CoreComponents do
 
   alias Phoenix.LiveView.JS
   alias Ysc.Accounts.UserDisplay
+  alias YscWeb.Admin.DateTimeDisplay
   alias YscWeb.{DateDisplay, FormHelpers, UploadErrors}
 
   @doc """
@@ -2773,13 +2774,31 @@ defmodule YscWeb.CoreComponents do
   Small "Last edited by X · DATE" line for admin editor/listing pages.
 
   `user` is the resource's `updated_by` (or a fallback owner for
-  pre-migration records with no `updated_by_id` yet). `formatter` is a
-  `fun(DateTime.t()) :: String.t()` so each page keeps its own date style.
+  pre-migration records with no `updated_by_id` yet).
+
+  By default the timestamp is formatted with
+  `DateTimeDisplay.format_pacific_datetime_at/1`. Pass `formatter` to keep a
+  different date style (e.g. date-only on the newsletter editor).
+
   Renders nothing when `user` or `at` is nil.
+
+  ## Examples
+
+      <.last_edited_by user={@post.updated_by || @post.author} at={@post.updated_at} />
+
+      <.last_edited_by
+        user={@edition.updated_by || @edition.creator}
+        at={@edition.updated_at}
+        formatter={&DateTimeDisplay.format_utc_date/1}
+      />
   """
   attr :user, :any, required: true
   attr :at, :any, required: true
-  attr :formatter, :any, required: true
+
+  attr :formatter, :any,
+    default: &DateTimeDisplay.format_pacific_datetime_at/1,
+    doc: "fun(DateTime.t()) :: String.t()"
+
   attr :class, :string, default: nil
 
   def last_edited_by(assigns) do

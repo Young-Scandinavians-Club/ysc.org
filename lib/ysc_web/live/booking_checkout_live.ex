@@ -6,6 +6,7 @@ defmodule YscWeb.BookingCheckoutLive do
   alias Ysc.Bookings.{
     Booking,
     BookingLocker,
+    BookingModeDisplay,
     Entitlements,
     PropertyDisplay,
     SeasonCache
@@ -2671,7 +2672,7 @@ defmodule YscWeb.BookingCheckoutLive do
         <%= if length(buyout_segments) > 1 do %>
           <!-- Stay spans more than one season: show a line per season -->
           <div class="text-xs text-zinc-500 mb-1">
-            Entire cabin · rate varies by season
+            {BookingModeDisplay.stay_type_label(:buyout)} · rate varies by season
           </div>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <%= for segment <- buyout_segments do %>

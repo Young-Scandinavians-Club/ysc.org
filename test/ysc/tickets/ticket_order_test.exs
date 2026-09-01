@@ -29,6 +29,47 @@ defmodule Ysc.Tickets.TicketOrderTest do
     end
   end
 
+  describe "admin_grant_changeset/3" do
+    test "casts payment_channel and offline_amount_collected onto a $0 grant" do
+      user = user_fixture()
+      granter = user_fixture()
+      event = event_fixture()
+
+      expires =
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+
+      collected = Money.new(:USD, "45.00")
+
+      cs =
+        TicketOrder.admin_grant_changeset(
+          %TicketOrder{},
+          %{
+            user_id: user.id,
+            event_id: event.id,
+            total_amount: Money.new(0, :USD),
+            expires_at: expires,
+            payment_channel: "check",
+            offline_amount_collected: collected
+          },
+          granter.id
+        )
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :status) == :completed
+      assert Ecto.Changeset.get_field(cs, :granted_by_id) == granter.id
+      assert Ecto.Changeset.get_field(cs, :payment_channel) == "check"
+
+      assert Money.equal?(
+               Ecto.Changeset.get_field(cs, :offline_amount_collected),
+               collected
+             )
+
+      assert Ecto.Changeset.get_field(cs, :total_amount) == Money.new(0, :USD)
+    end
+  end
+
   describe "status_changeset/2" do
     test "rejects negative total_amount" do
       cs =

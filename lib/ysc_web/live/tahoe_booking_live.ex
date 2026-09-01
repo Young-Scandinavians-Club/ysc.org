@@ -25,6 +25,7 @@ defmodule YscWeb.TahoeBookingLive do
     Room,
     RoomsListCache,
     BookingLocker,
+    BookingModeDisplay,
     BookingValidator,
     ConfigCacheTelemetry,
     PropertyInventory,
@@ -1274,7 +1275,7 @@ defmodule YscWeb.TahoeBookingLive do
                     {booking.guests_count} {if booking.guests_count == 1,
                       do: "Guest",
                       else: "Guests"} • {if booking.booking_mode == :buyout do
-                      "Entire cabin"
+                      BookingModeDisplay.stay_type_label(:buyout)
                     else
                       if Ecto.assoc_loaded?(booking.rooms) &&
                            length(booking.rooms) > 0 do
@@ -2552,7 +2553,7 @@ defmodule YscWeb.TahoeBookingLive do
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
-                      Entire cabin
+                      {BookingModeDisplay.stay_type_label(:buyout)}
                     </div>
                   </div>
                   <!-- Price Breakdown -->
@@ -2568,7 +2569,7 @@ defmodule YscWeb.TahoeBookingLive do
                         class="flex justify-between text-sm"
                       >
                         <span class="text-zinc-600">
-                          Entire cabin
+                          {BookingModeDisplay.stay_type_label(:buyout)}
                           <%= if @price_breakdown.nights && @price_breakdown.price_per_night do %>
                             ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
@@ -3147,7 +3148,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </h4>
                       <div class="space-y-1 ml-4">
                         <p>
-                          <strong>Entire cabin:</strong>
+                          <strong>{BookingModeDisplay.stay_type_label(:buyout)}:</strong>
                           Cancel fewer than 21 days before check-in for a 50% refund. Cancel fewer than
                           14 days before for no refund.
                         </p>
@@ -4129,10 +4130,10 @@ defmodule YscWeb.TahoeBookingLive do
                                 Days Before Check-In
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                Entire cabin
+                                {BookingModeDisplay.stay_type_label(:buyout)}
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                Individual room(s)
+                                {BookingModeDisplay.stay_type_label(:room)}
                               </th>
                             </tr>
                           </thead>
@@ -4222,7 +4223,7 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @buyout_refund_policy && @buyout_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              Entire cabin:
+                              {BookingModeDisplay.stay_type_label(:buyout)}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@buyout_refund_policy.rules) do %>
@@ -4236,7 +4237,7 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @room_refund_policy && @room_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              Individual room(s):
+                              {BookingModeDisplay.stay_type_label(:room)}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@room_refund_policy.rules) do %>

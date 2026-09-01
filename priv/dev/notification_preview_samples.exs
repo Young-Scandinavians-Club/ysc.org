@@ -514,7 +514,7 @@
       first_name: "Astrid",
       membership_url: "http://localhost:4000/users/membership",
       payment_methods_url:
-        "http://localhost:4000/users/settings/payment-methods",
+        "http://localhost:4000/users/membership/payment-method",
       renewal_date: "January 15, 2027"
     },
     "membership_renewal_reminder" => %{

@@ -168,8 +168,7 @@ defmodule Mix.Tasks.TestOutageEmail do
       variables =
         OutageNotification.build_notification_variables(booking, outage)
 
-      subject =
-        "Property Outage Alert - #{OutageNotification.property_name(outage.property)}"
+      subject = OutageNotification.get_subject(outage.property)
 
       text_body = OutageNotification.text_body(variables)
 

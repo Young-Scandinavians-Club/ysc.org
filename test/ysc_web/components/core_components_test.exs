@@ -809,4 +809,60 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Tahoe"
     end
   end
+
+  describe "last_edited_by/1" do
+    test "formats the timestamp in Pacific time by default" do
+      assigns = %{
+        user: %{first_name: "Morgan", last_name: "Lee"},
+        at: ~U[2024-03-15 05:00:00Z]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.last_edited_by user={@user} at={@at} />
+        """)
+
+      assert html =~ "Last edited by"
+      assert html =~ "Morgan Lee"
+      assert html =~ "Mar 14, 2024 at 10:00pm"
+      refute html =~ "Mar 15, 2024 at 5:00am"
+    end
+
+    test "accepts a custom formatter" do
+      assigns = %{
+        user: %{first_name: "Ada", last_name: "Lovelace"},
+        at: ~U[2024-03-16 02:30:00Z],
+        formatter: &YscWeb.Admin.DateTimeDisplay.format_utc_date/1
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.last_edited_by user={@user} at={@at} formatter={@formatter} />
+        """)
+
+      assert html =~ "Ada Lovelace"
+      assert html =~ "Mar 15, 2024"
+      refute html =~ "7:30pm"
+    end
+
+    test "renders nothing when user or timestamp is missing" do
+      assigns = %{user: %{first_name: "Morgan"}, at: nil}
+
+      html =
+        rendered_to_string(~H"""
+        <.last_edited_by user={@user} at={@at} />
+        """)
+
+      refute html =~ "Last edited by"
+
+      assigns = %{user: nil, at: ~U[2024-03-15 05:00:00Z]}
+
+      html =
+        rendered_to_string(~H"""
+        <.last_edited_by user={@user} at={@at} />
+        """)
+
+      refute html =~ "Last edited by"
+    end
+  end
 end

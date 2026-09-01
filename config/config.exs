@@ -369,6 +369,12 @@ config :ysc, :quickbooks,
   # QuickBooks Account IDs (required - cannot be auto-created)
   bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
   stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+  # Balance-sheet account holding Stripe funds withheld as a minimum-balance
+  # reserve (payout Deposit reserve lines). Falls back to stripe_account_id.
+  stripe_reserve_account_id:
+    System.get_env("QUICKBOOKS_STRIPE_RESERVE_ACCOUNT_ID"),
+  stripe_reserve_account_name:
+    System.get_env("QUICKBOOKS_STRIPE_RESERVE_ACCOUNT_NAME"),
   # Stripe fees expense account for payout Deposit fee lines.
   # Prefer ID when known; otherwise Name or FullyQualifiedName (paths with ":").
   stripe_fees_account_id: System.get_env("QUICKBOOKS_STRIPE_FEES_ACCOUNT_ID"),

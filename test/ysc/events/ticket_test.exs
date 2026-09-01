@@ -448,6 +448,77 @@ defmodule Ysc.Events.TicketTest do
     end
   end
 
+  describe "door_sale_changeset/2" do
+    test "allows a ticket for an event that has already started", %{
+      user: user,
+      event: event,
+      tier: tier,
+      expires_at: expires_at
+    } do
+      {:ok, event} =
+        Ysc.Events.update_event(event, %{
+          start_date:
+            DateTime.utc_now()
+            |> DateTime.add(-2, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      purchase =
+        %Ticket{}
+        |> Ticket.changeset(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          expires_at: expires_at
+        })
+
+      refute purchase.valid?
+      assert {msg, _} = purchase.errors[:event_id]
+      assert msg == "cannot purchase tickets for events that have already ended"
+
+      door_sale =
+        %Ticket{}
+        |> Ticket.door_sale_changeset(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          expires_at: expires_at
+        })
+
+      assert door_sale.valid?, "unexpected errors: #{inspect(door_sale.errors)}"
+    end
+
+    test "still requires an active membership", %{
+      event: event,
+      tier: tier,
+      expires_at: expires_at
+    } do
+      nomember = user_fixture()
+
+      cs =
+        %Ticket{}
+        |> Ticket.door_sale_changeset(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nomember.id,
+          expires_at: expires_at
+        })
+
+      refute cs.valid?
+      assert {msg, _} = cs.errors[:user_id]
+      assert msg == "active membership required to purchase tickets"
+    end
+
+    test "still requires core ticket fields", %{user: user} do
+      cs = Ticket.door_sale_changeset(%Ticket{}, %{user_id: user.id})
+
+      refute cs.valid?
+      assert "can't be blank" in errors_on(cs).event_id
+      assert "can't be blank" in errors_on(cs).ticket_tier_id
+      assert "can't be blank" in errors_on(cs).expires_at
+    end
+  end
+
   describe "status_changeset/2" do
     test "allows status transitions" do
       cs = Ticket.status_changeset(%Ticket{}, %{status: :expired})

@@ -60,7 +60,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <%= if assigns[:has_payment_method] do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Your payment method on file has not been charged and will not be charged.</strong> No action is required on your part.
+      <strong>The card or bank account you saved has not been charged, and we will not charge it.</strong> You don't need to do anything.
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <% end %>

@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.32.4",
+      version: "2.35.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -229,7 +229,10 @@ defmodule Ysc.MixProject do
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
       {:goth, "~> 1.4"},
-      {:hammer, "~> 7.3"},
+      # 7.4.1: TokenBucket ETS refill uses milliseconds instead of whole
+      # seconds. We use default :fix_window (hit/3 scale+limit), not
+      # TokenBucket, so the patch is unused; pin the patched floor.
+      {:hammer, "~> 7.4.1"},
       # 1.5.5: CSS.scrub treats nested tags inside <style> as empty (parser can
       # pass a tree instead of a string); HTML5 also tightens meta http-equiv
       # and object data=. We use BasicHTML / TrixScrubber / strip_tags, not
@@ -241,6 +244,8 @@ defmodule Ysc.MixProject do
       # Pin exact version: jose is pulled by joken (~> 1.11.10) and goth (~> 1.11).
       {:jose, "1.11.12", override: true},
       {:joken, "~> 2.6"},
+      # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
+      # DSL and authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
       {:live_toast, "~> 0.9"},
       {:locus, "~> 2.3"},

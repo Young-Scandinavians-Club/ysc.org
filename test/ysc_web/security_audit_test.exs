@@ -46,6 +46,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 49 (HIGH)     Already-authenticated mobile handoff minted a PKCE-bound code on GET from attacker-supplied challenge
   Finding 50 (HIGH)     Volunteers could reserve tickets with up to 100% discount, bypassing Finding 46 grant gates
   Finding 51 (HIGH)     Volunteers could grant $0 tickets and out-of-band memberships via the mobile app API
+  Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
+  Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2935,6 +2937,110 @@ defmodule YscWeb.SecurityAuditTest do
                json_response(response, 403)
 
       refute Accounts.has_active_membership?(Accounts.get_user!(recipient.id))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 52 (HIGH): App membership subscribe must not reuse stale PMs
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 52: app membership subscribe payment method binding" do
+    test "rejects a payment method that is not freshly collected for the member",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      token = Accounts.generate_user_mobile_token(volunteer)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(stripe_id: "cus_finding_52")
+        |> Repo.update!()
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
+      end)
+
+      # Stub rather than expect: this file is `async: true` and other tests
+      # mutate `:stripe_client`. A missed mock call here is a race, not a
+      # product regression — stale-PM binding is covered with expect in
+      # `app_memberships_controller_test.exs` (`async: false`).
+      stub(Ysc.StripeMock, :retrieve_payment_method, fn "pm_stale_reuse" ->
+        {:ok,
+         %Stripe.PaymentMethod{
+           id: "pm_stale_reuse",
+           customer: member.stripe_id,
+           created: System.system_time(:second) - 60 * 60 - 30
+         }}
+      end)
+
+      response =
+        conn
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/memberships/subscribe", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method_id" => "pm_stale_reuse"
+        })
+
+      assert %{
+               "error" =>
+                 "payment method must be collected for this member via Terminal just before subscribe"
+             } = json_response(response, 422)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 53 (MEDIUM): Volunteers cannot cancel ticket reservations
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 53: volunteers cannot cancel ticket reservations" do
+    import Ysc.EventsFixtures
+
+    test "hides cancel control and rejects the LiveView cancel event", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: "volunteer"})
+      admin = user_fixture(%{role: :admin})
+      member = user_fixture()
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 53",
+          quantity: 20
+        })
+
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(2, :day)
+
+      assert {:ok, reservation} =
+               Ysc.Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 1,
+                 expires_at: expires_at,
+                 discount_percentage: Decimal.new("50")
+               })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#cancel-reservation-#{reservation.id}")
+
+      view
+      |> element("#ticket-tier-cancel-reservation-event-#{event.id}")
+      |> render_click(%{"id" => reservation.id})
+
+      reloaded = Ysc.Events.get_ticket_reservation!(reservation.id)
+      assert reloaded.status == "active"
     end
   end
 
