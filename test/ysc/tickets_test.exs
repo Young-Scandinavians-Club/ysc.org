@@ -395,6 +395,70 @@ defmodule Ysc.TicketsTest do
       assert owned_count_queries == 0
     end
 
+    @user_pk ~r/FROM "users" AS u0 WHERE \(u0\."id" = \$/
+    @member_only_attrs ~r/FROM "ticket_tiers" AS t0 WHERE \(t0\."id" = ANY/
+
+    test "create_ticket_order skips the user lookup for a preloaded lifetime member",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3},
+              user: user,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      assert user_lookups == 0
+    end
+
+    test "create_ticket_order looks up the buyer once when inserting several tickets",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, order}, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      assert length(tickets_for_order(order.id)) == 3
+      assert user_lookups == 1
+    end
+
+    test "create_ticket_order skips the member-only attribute query when tiers are passed",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, attr_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @member_only_attrs,
+          caller_pids: [self()]
+        )
+
+      assert attr_lookups == 0
+    end
+
     test "lifetime member-only checkout skips the owned-ticket COUNT", %{
       user: user,
       event: event,

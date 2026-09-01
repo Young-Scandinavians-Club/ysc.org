@@ -22,6 +22,7 @@ defmodule Ysc.Tickets.BookingLocker do
   }
 
   alias Ysc.Tickets.TicketOrder
+  alias Ysc.Accounts.User
 
   @doc """
   Atomically reserves tickets for a booking.
@@ -47,12 +48,15 @@ defmodule Ysc.Tickets.BookingLocker do
       problems (a tier that was capped too low, a walk-in after the posted
       start time), so these guards — all written for the self-service web
       checkout — don't apply there. Capacity is intentionally a soft limit
-      here, not skipped silently: pair this with `capacity_warnings/2`
+      here, not skipped silently: pair this with `capacity_warnings/2` / `capacity_warnings/3`
       (call it *before* placing the order) so the admin app can show what
       it would exceed and let the seller decide. Membership/member-only-tier
       eligibility are unaffected — bypassing those is a different,
       unrequested policy change from "let the door seller override sale
       timing and capacity".
+    * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Ticket
+      inserts reuse it for the membership check instead of selecting the
+      buyer once per ticket.
 
   ## Returns:
   - `{:ok, %TicketOrder{}}` on success
@@ -60,6 +64,7 @@ defmodule Ysc.Tickets.BookingLocker do
   """
   def atomic_booking(user_id, event_id, ticket_selections, opts \\ []) do
     bypass_guards? = Keyword.get(opts, :bypass_guards, false)
+    buyer = buyer_for_ticket_inserts(user_id, opts)
 
     Repo.transaction(fn ->
       with {:ok, event} <- lock_and_validate_event(event_id, bypass_guards?),
@@ -104,7 +109,8 @@ defmodule Ysc.Tickets.BookingLocker do
                tiers,
                ticket_selections,
                fulfilled_reservations_by_tier,
-               bypass_guards?
+               bypass_guards?,
+               buyer
              ) do
         ticket_order
       else
@@ -168,20 +174,28 @@ defmodule Ysc.Tickets.BookingLocker do
     skip_capacity? = Keyword.get(opts, :skip_capacity, false)
     skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
 
-    with {:ok, event} <-
-           validate_event_for_fulfillment(event_id, skip_sale_guards?),
-         {:ok, tiers} <-
-           validate_tiers_for_fulfillment(
-             event_id,
-             ticket_selections,
-             user_id,
-             skip_sale_guards: skip_sale_guards?,
-             skip_capacity: skip_capacity?
-           ) do
-      if skip_capacity? do
-        :ok
-      else
-        validate_event_capacity(event, tiers, ticket_selections, user_id)
+    # Door sales / admin override already loaded and validated the event and
+    # selected tiers. Reloading every tier on the event (twice — once in a
+    # pre-check transaction and once inside the insert) is wasted work when
+    # both sale-window and capacity checks are skipped.
+    if skip_capacity? and skip_sale_guards? do
+      :ok
+    else
+      with {:ok, event} <-
+             validate_event_for_fulfillment(event_id, skip_sale_guards?),
+           {:ok, tiers} <-
+             validate_tiers_for_fulfillment(
+               event_id,
+               ticket_selections,
+               user_id,
+               skip_sale_guards: skip_sale_guards?,
+               skip_capacity: skip_capacity?
+             ) do
+        if skip_capacity? do
+          :ok
+        else
+          validate_event_capacity(event, tiers, ticket_selections, user_id)
+        end
       end
     end
   end
@@ -237,14 +251,19 @@ defmodule Ysc.Tickets.BookingLocker do
   expiring), same caveat as the rest of this module's unlocked reads. That's
   fine for a "heads up, you're about to oversell" prompt — it doesn't need
   to be race-free the way actually placing the order does.
+
+  ## Options
+
+    * `:event` - `%Event{}` already loaded for `event_id` (skips the event SELECT)
+    * `:tiers` - ticket tier structs already loaded (skips the tier SELECT)
   """
-  def capacity_warnings(event_id, ticket_selections) do
-    case lock_event(event_id) do
+  def capacity_warnings(event_id, ticket_selections, opts \\ []) do
+    case event_for_capacity_warnings(event_id, opts) do
       nil ->
         []
 
       event ->
-        tiers = lock_ticket_tiers(event_id)
+        tiers = tiers_for_capacity_warnings(event_id, opts)
 
         counts =
           load_capacity_counts(
@@ -259,6 +278,20 @@ defmodule Ysc.Tickets.BookingLocker do
 
         event_warnings = event_capacity_warning(event, tiers, ticket_selections)
         tier_warnings ++ event_warnings
+    end
+  end
+
+  defp event_for_capacity_warnings(event_id, opts) do
+    case Keyword.get(opts, :event) do
+      %Event{id: id} = event when id == event_id -> event
+      _ -> lock_event(event_id)
+    end
+  end
+
+  defp tiers_for_capacity_warnings(event_id, opts) do
+    case Keyword.get(opts, :tiers) do
+      tiers when is_list(tiers) -> tiers
+      _ -> lock_ticket_tiers(event_id)
     end
   end
 
@@ -1041,6 +1074,13 @@ defmodule Ysc.Tickets.BookingLocker do
     {new_acc_total, new_acc_discount}
   end
 
+  defp buyer_for_ticket_inserts(user_id, opts) do
+    case Keyword.get(opts, :user) do
+      %User{id: id} = user when id == user_id -> user
+      _ -> Repo.get(User, user_id)
+    end
+  end
+
   defp create_ticket_order_atomic(
          user_id,
          event_id,
@@ -1085,12 +1125,18 @@ defmodule Ysc.Tickets.BookingLocker do
          tiers,
          ticket_selections,
          fulfilled_reservations_by_tier,
-         bypass_guards?
+         bypass_guards?,
+         buyer
        ) do
-    ticket_changeset_fn =
-      if bypass_guards?,
-        do: &Ticket.door_sale_changeset/2,
-        else: &Ticket.changeset/2
+    buyer = Ticket.ensure_membership_preloads(buyer)
+
+    ticket_changeset_fn = fn attrs ->
+      if bypass_guards? do
+        Ticket.door_sale_changeset(%Ticket{}, attrs, user: buyer)
+      else
+        Ticket.changeset(%Ticket{}, attrs, user: buyer)
+      end
+    end
 
     # fulfilled_reservations_by_tier is a map of tier_id => [list of fulfilled reservations]
     # We need to create tickets for both reserved and non-reserved quantities
@@ -1153,7 +1199,7 @@ defmodule Ysc.Tickets.BookingLocker do
 
             # Create one ticket per fulfilled quantity (may be less than the original hold)
             Enum.map(1..fulfill_qty, fn _ ->
-              ticket_changeset_fn.(%Ticket{}, %{
+              ticket_changeset_fn.(%{
                 event_id: ticket_order.event_id,
                 ticket_tier_id: tier_id,
                 user_id: ticket_order.user_id,
@@ -1173,7 +1219,7 @@ defmodule Ysc.Tickets.BookingLocker do
             []
           else
             Enum.map(1..non_reserved_count, fn _ ->
-              ticket_changeset_fn.(%Ticket{}, %{
+              ticket_changeset_fn.(%{
                 event_id: ticket_order.event_id,
                 ticket_tier_id: tier_id,
                 user_id: ticket_order.user_id,
