@@ -497,29 +497,15 @@ defmodule YscWeb.AdminEventsNewLive do
                   </p>
                 </div>
 
-                <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
-                  <.input
-                    type="hidden"
-                    id="post[raw_body]"
-                    field={@form[:raw_details]}
-                    data-post-id={@event.id}
-                    phx-hook="TrixHook"
-                    phx-debounce={200}
-                  />
-                  <.live_component
-                    module={YscWeb.TrixImagePickerComponent}
-                    id={:event_body_image_picker}
-                    target_input_id="post[raw_body]"
-                  />
-                  <div id="richtext" phx-update="ignore">
-                    <trix-editor
-                      input="post[raw_body]"
-                      class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
-                      placeholder="Write something delightful and nice..."
-                    >
-                    </trix-editor>
-                  </div>
-                </div>
+                <.trix_editor
+                  id="post[raw_body]"
+                  field={@form[:raw_details]}
+                  wrapper_id="richtext"
+                  image_picker_id={:event_body_image_picker}
+                  data-post-id={@event.id}
+                  phx-debounce={200}
+                  editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
+                />
               </div>
             </.form>
 
@@ -906,29 +892,16 @@ defmodule YscWeb.AdminEventsNewLive do
                       >
                         Message
                       </span>
-                      <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
-                        <.input
-                          type="hidden"
-                          id="update[raw_body]"
-                          field={@update_form[:raw_body]}
-                          phx-hook="TrixHook"
-                          phx-debounce={200}
-                        />
-                        <.live_component
-                          module={YscWeb.TrixImagePickerComponent}
-                          id={:event_update_body_image_picker}
-                          target_input_id="update[raw_body]"
-                        />
-                        <div id="update-richtext" phx-update="ignore">
-                          <trix-editor
-                            input="update[raw_body]"
-                            aria-labelledby="update-message-label"
-                            class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
-                            placeholder="Write the update message to send to all attendees..."
-                          >
-                          </trix-editor>
-                        </div>
-                      </div>
+                      <.trix_editor
+                        id="update[raw_body]"
+                        field={@update_form[:raw_body]}
+                        wrapper_id="update-richtext"
+                        image_picker_id={:event_update_body_image_picker}
+                        labelledby="update-message-label"
+                        phx-debounce={200}
+                        placeholder="Write the update message to send to all attendees..."
+                        editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
+                      />
                     </div>
 
                     <div class="flex items-center gap-2">

@@ -1770,8 +1770,8 @@ defmodule YscWeb.AdminGhostComponents do
   attr :variant, :atom, default: :event, values: [:event, :post]
 
   @doc """
-  Static Trix editor chrome matching `AdminEventsNewLive` overview — toolbar,
-  library button, and optional sample rich-text body.
+  Static Trix editor chrome matching `<.trix_editor>` (`AdminEventsNewLive`
+  overview) — toolbar, library button, and optional sample rich-text body.
   """
   def admin_ghost_trix_editor(assigns) do
     wrapper_class =
