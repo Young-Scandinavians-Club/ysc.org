@@ -2,7 +2,14 @@ defmodule YscWeb.UserBookingDetailLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, PropertyDisplay, RefundPolicyDisplay}
+
+  alias Ysc.Bookings.{
+    Booking,
+    BookingModeDisplay,
+    PropertyDisplay,
+    RefundPolicyDisplay
+  }
+
   alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Repo
@@ -328,15 +335,7 @@ defmodule YscWeb.UserBookingDetailLive do
               <div>
                 <div class="text-sm text-zinc-600">Booking type</div>
                 <div class="font-medium text-zinc-900">
-                  <%= if @booking.booking_mode == :buyout do %>
-                    Entire cabin
-                  <% else %>
-                    <%= if @booking.booking_mode == :room do %>
-                      Individual room(s)
-                    <% else %>
-                      Shared cabin
-                    <% end %>
-                  <% end %>
+                  {BookingModeDisplay.stay_type_label(@booking.booking_mode)}
                 </div>
               </div>
 

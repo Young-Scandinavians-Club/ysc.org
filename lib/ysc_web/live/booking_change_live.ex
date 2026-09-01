@@ -7,6 +7,7 @@ defmodule YscWeb.BookingChangeLive do
     AvailabilityCache,
     BlackoutListCache,
     Booking,
+    BookingModeDisplay,
     ConfigCacheTelemetry,
     ModificationDateAvailability,
     PricingRuleCache,
@@ -1719,7 +1720,7 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp modification_stay_delta_label(%{booking_mode: :buyout, nights: nights}) do
-    "Entire cabin × #{night_count_label(nights)}"
+    "#{BookingModeDisplay.stay_type_label(:buyout)} × #{night_count_label(nights)}"
   end
 
   defp modification_stay_delta_label(%{
