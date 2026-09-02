@@ -112,6 +112,37 @@ defmodule Ysc.Events.TicketTest do
       assert user_lookups == 0
     end
 
+    @event_pk ~r/FROM "events" AS e0 WHERE \(e0\."id" = \$/
+
+    test "skips the in-past event SELECT when the event is passed in", %{
+      user: user,
+      event: event,
+      tier: tier,
+      expires_at: expires_at
+    } do
+      {cs, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ticket.changeset(
+              %Ticket{},
+              %{
+                event_id: event.id,
+                ticket_tier_id: tier.id,
+                user_id: user.id,
+                expires_at: expires_at
+              },
+              user: user,
+              event: event
+            )
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      assert cs.valid?
+      assert event_lookups == 0
+    end
+
     test "valid when the event start is still in the future in Pacific time", %{
       user: user,
       event: event,

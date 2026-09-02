@@ -1078,6 +1078,93 @@ defmodule Ysc.Tickets.BookingLockerTest do
                  bypass_guards: true
                )
     end
+
+    test "skips event and tier SELECTs when they are passed in", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      selections = %{tier.id => 1}
+
+      {result, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, selections,
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, selections,
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, _order} = result
+      assert event_lookups == 0
+      assert tier_lookups == 0
+    end
+
+    test "still rejects a cancelled event struct without reloading it", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      cancelled = %{event | state: :cancelled}
+
+      {result, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              event: cancelled,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      assert {:error, :event_cancelled} = result
+      assert event_lookups == 0
+    end
+
+    test "reloads selected tiers when the passed list is incomplete", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: []
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, _order} = result
+      assert tier_lookups == 1
+    end
   end
 
   describe "capacity_warnings/2" do
@@ -1663,6 +1750,10 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert %Ecto.Query{} = reserved
       assert Repo.all(sold) == []
       assert Repo.all(reserved) == []
+
+      selected = BookingLocker.ci_query_explain_selected_tiers_query()
+      assert %Ecto.Query{} = selected
+      assert Repo.all(selected) == []
     end
   end
 

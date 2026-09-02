@@ -71,8 +71,12 @@ defmodule Ysc.Tickets do
     * `:user` - `%User{}` already loaded for `user_id`. Skips the membership
       lookup when the struct is the same user; subscriptions are preloaded
       only if membership still needs them.
+    * `:event` - `%Event{}` already loaded for `event_id`. Forwarded to
+      `atomic_booking/4` so checkout does not SELECT the event again.
     * `:tiers` - ticket tier structs already loaded for the selection. Skips
-      the member-only attribute query when every selected id is present.
+      the member-only attribute query when every selected id is present, and
+      is forwarded to `atomic_booking/4` so checkout does not SELECT tiers
+      again. Pass rows loaded in the same request (door sale).
   """
   def create_ticket_order(user_id, event_id, ticket_selections, opts \\ []) do
     require Ysc.Logging
@@ -98,7 +102,10 @@ defmodule Ysc.Tickets do
                  user_id,
                  event_id,
                  ticket_selections,
-                 Keyword.merge(Keyword.take(opts, [:bypass_guards]), user: user)
+                 Keyword.merge(
+                   Keyword.take(opts, [:bypass_guards, :event, :tiers]),
+                   user: user
+                 )
                ) do
           # Emit telemetry event for ticket order creation
           ticket_count =
