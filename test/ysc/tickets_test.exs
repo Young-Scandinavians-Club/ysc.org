@@ -459,6 +459,64 @@ defmodule Ysc.TicketsTest do
       assert attr_lookups == 0
     end
 
+    @event_pk ~r/FROM "events" AS e0 WHERE \(e0\."id" = \$/
+    @booking_tiers ~r/FROM "ticket_tiers" AS t0 WHERE \(t0\."event_id" = \$/
+
+    test "create_ticket_order skips event and booking-tier SELECTs when they are passed",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              event: event,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              event: event,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @booking_tiers,
+          caller_pids: [self()]
+        )
+
+      assert event_lookups == 0
+      assert tier_lookups == 0
+    end
+
+    test "create_ticket_order looks up the event once when inserting several tickets",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, order}, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      assert length(tickets_for_order(order.id)) == 3
+      assert event_lookups == 1
+    end
+
     test "lifetime member-only checkout skips the owned-ticket COUNT", %{
       user: user,
       event: event,

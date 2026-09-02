@@ -60,6 +60,7 @@ defmodule YscWeb.Api.AppTicketsController do
            Tickets.create_ticket_order(member.id, event.id, selections,
              bypass_guards: true,
              user: member,
+             event: event,
              tiers: selected_tiers
            ),
          {:ok, payment_intent} <-

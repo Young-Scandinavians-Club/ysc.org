@@ -56,6 +56,9 @@ defmodule Ysc.Events.Ticket do
 
     * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Skips the
       per-ticket membership SELECT when the struct is the same user.
+    * `:event` - `%Ysc.Events.Event{}` already loaded for `event_id`. Skips the
+      per-ticket event SELECT used by the in-past check when the struct is
+      the same event.
   """
   def changeset(ticket, attrs, opts \\ []) do
     ticket
@@ -77,7 +80,7 @@ defmodule Ysc.Events.Ticket do
       :expires_at
     ])
     |> validate_active_membership(opts)
-    |> validate_event_not_in_past()
+    |> validate_event_not_in_past(opts)
     |> put_reference_id()
     |> unique_constraint(:reference_id)
   end
@@ -87,7 +90,7 @@ defmodule Ysc.Events.Ticket do
 
   Same as `changeset/2` (still `:pending` until payment succeeds, same
   fields, still requires membership) except it skips
-  `validate_event_not_in_past/1` — selling at the door is precisely what you
+  `validate_event_not_in_past/2` — selling at the door is precisely what you
   do *while* an event is happening, so that guard (written for the
   self-service web checkout) doesn't apply. See
   `Ysc.Tickets.BookingLocker.atomic_booking/4`'s `:bypass_guards` option,
@@ -389,12 +392,11 @@ defmodule Ysc.Events.Ticket do
   # `start_date` / `start_time` are interpreted as Pacific wall-clock rather
   # than naive UTC. Combining them as UTC rejected valid purchases for up to
   # ~8 hours before the event actually started.
-  defp validate_event_not_in_past(changeset) do
+  defp validate_event_not_in_past(changeset, opts) do
     event_id = get_field(changeset, :event_id)
 
     with true <- is_binary(event_id),
-         %Ysc.Events.Event{} = event <-
-           Ysc.Repo.get(Ysc.Events.Event, event_id),
+         %Ysc.Events.Event{} = event <- event_for_past_check(event_id, opts),
          true <- Ysc.Events.EventDateTime.in_past?(event) do
       add_error(
         changeset,
@@ -403,6 +405,13 @@ defmodule Ysc.Events.Ticket do
       )
     else
       _ -> changeset
+    end
+  end
+
+  defp event_for_past_check(event_id, opts) do
+    case Keyword.get(opts, :event) do
+      %Ysc.Events.Event{id: id} = event when id == event_id -> event
+      _ -> Ysc.Repo.get(Ysc.Events.Event, event_id)
     end
   end
 end
