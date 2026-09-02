@@ -287,7 +287,8 @@ defmodule Ysc.MixProject do
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing
       # span/parent fixes. We do not enable Sentry.Integrations.Oban or OpenTelemetry.
-      {:sentry, "~> 13.5"},
+      # 13.5.1: rate-limit windows log once; per-event 429 drops at :debug (SDK spec).
+      {:sentry, "~> 13.5.1"},
       {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
