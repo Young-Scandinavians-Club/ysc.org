@@ -3950,10 +3950,12 @@ defmodule Ysc.Accounts do
   defp family_member_removed_email_args(removed_user, primary_user) do
     first_name = removed_user.first_name || "there"
     primary_name = primary_user.first_name || "the primary account holder"
+    membership_url = YscWeb.Emails.FamilyMemberRemoved.membership_url()
 
     email_vars = %{
       first_name: first_name,
-      primary_user_name: primary_name
+      primary_user_name: primary_name,
+      membership_url: membership_url
     }
 
     idempotency_key =
@@ -3974,7 +3976,9 @@ defmodule Ysc.Accounts do
 
       You will no longer have access to membership benefits through this family account, including cabin bookings and member event tickets.
 
-      If you would like to continue enjoying YSC membership benefits, you can purchase your own membership at any time.
+      If you would like to keep booking cabins and buying member event tickets, you can get your own membership anytime:
+
+      #{membership_url}
 
       ==============================
       """,

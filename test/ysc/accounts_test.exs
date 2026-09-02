@@ -2764,14 +2764,18 @@ defmodule Ysc.AccountsTest do
         assert is_nil(left.primary_user_id)
         assert is_nil(left.family_relationship)
 
-        assert Repo.aggregate(
-                 from(j in Oban.Job,
-                   where:
-                     j.args["idempotency_key"] ==
-                       ^"family_member_removed_#{sub.id}_#{primary.id}"
-                 ),
-                 :count
-               ) == 1
+        job =
+          Repo.one!(
+            from(j in Oban.Job,
+              where:
+                j.args["idempotency_key"] ==
+                  ^"family_member_removed_#{sub.id}_#{primary.id}"
+            )
+          )
+
+        assert job.args["params"]["membership_url"] =~ "/users/membership"
+        assert job.args["text_body"] =~ "/users/membership"
+        assert job.args["text_body"] =~ "get your own membership anytime"
       end)
     end
 

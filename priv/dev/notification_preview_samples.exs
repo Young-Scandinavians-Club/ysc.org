@@ -476,7 +476,8 @@
     },
     "family_member_removed" => %{
       first_name: "Freja",
-      primary_user_name: "Astrid Berg"
+      primary_user_name: "Astrid Berg",
+      membership_url: "http://localhost:4000/users/membership"
     },
     "membership_ended" => %{
       first_name: "Astrid",
