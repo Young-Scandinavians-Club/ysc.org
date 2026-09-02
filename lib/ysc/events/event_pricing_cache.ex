@@ -11,6 +11,13 @@ defmodule Ysc.Events.EventPricingCache do
   # pricing enrichment but must not be dropped when serving a cached pricing payload.
   @transient_list_fields [:selling_fast, :recent_tickets_count]
 
+  # Event-body HTML. The public list/card queries omit these columns, so the
+  # cached pricing payload keyed by event id can be seeded body-less by list
+  # traffic. The event page passes a full `%Event{}` here and reads the body
+  # off the result, so always re-merge these from the caller's source event
+  # when it carries them (a slimmed list map simply won't, and stays slim).
+  @source_body_fields [:raw_details, :rendered_details]
+
   def enrich_events(events) when is_list(events) do
     if events == [] do
       []
@@ -23,6 +30,7 @@ defmodule Ysc.Events.EventPricingCache do
       |> Enum.map(fn {source_event, enriched} ->
         enriched
         |> merge_transient_list_fields(source_event)
+        |> merge_source_body_fields(source_event)
         |> ensure_cover_image(source_event)
       end)
     end
@@ -55,6 +63,7 @@ defmodule Ysc.Events.EventPricingCache do
 
     enriched
     |> merge_transient_list_fields(event)
+    |> merge_source_body_fields(event)
     |> ensure_cover_image(event)
   end
 
@@ -134,7 +143,19 @@ defmodule Ysc.Events.EventPricingCache do
   end
 
   defp merge_transient_list_fields(enriched, source) do
-    Enum.reduce(@transient_list_fields, enriched, fn field, acc ->
+    merge_present_fields(enriched, source, @transient_list_fields)
+  end
+
+  # Keep the caller's event-body HTML: a cached pricing payload may have been
+  # written from a body-less list map, but the event page hands us a full
+  # `%Event{}` and expects the body back. A slimmed list map lacks these keys,
+  # so nothing is merged and list payloads stay body-free.
+  defp merge_source_body_fields(enriched, source) do
+    merge_present_fields(enriched, source, @source_body_fields)
+  end
+
+  defp merge_present_fields(enriched, source, fields) do
+    Enum.reduce(fields, enriched, fn field, acc ->
       case Map.fetch(source, field) do
         {:ok, value} -> Map.put(acc, field, value)
         :error -> acc
