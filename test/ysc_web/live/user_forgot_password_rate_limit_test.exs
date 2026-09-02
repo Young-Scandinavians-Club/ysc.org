@@ -5,17 +5,13 @@ defmodule YscWeb.UserForgotPasswordRateLimitTest do
 
   describe "forgot password identifier rate limiting" do
     setup do
-      Application.put_env(:ysc, Ysc.AuthRateLimit,
-        ip_limit: 10_000,
-        identifier_limit: 2
-      )
-
-      on_exit(fn ->
-        Application.put_env(:ysc, Ysc.AuthRateLimit,
+      token =
+        Ysc.Test.AuthRateLimitHelper.capture!(
           ip_limit: 10_000,
-          identifier_limit: 10_000
+          identifier_limit: 2
         )
-      end)
+
+      on_exit(fn -> Ysc.Test.AuthRateLimitHelper.restore!(token) end)
 
       :ok
     end
