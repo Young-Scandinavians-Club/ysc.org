@@ -11,6 +11,8 @@ defmodule YscWeb.ExpenseReportLiveTest do
     {:ok, _index_live, html} = live(conn, ~p"/expensereport")
 
     assert html =~ "Expense Report"
+    assert html =~ "Amount we will reimburse"
+    refute html =~ "Net Total"
   end
 
   test "mileage items use trip-purpose copy instead of business jargon", %{

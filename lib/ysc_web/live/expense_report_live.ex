@@ -1575,7 +1575,7 @@ defmodule YscWeb.ExpenseReportLive do
                   </div>
                 <% end %>
                 <div class="flex justify-between pt-3 border-t border-zinc-200">
-                  <span class="text-lg font-semibold text-zinc-900">Net Total</span>
+                  <span class="text-lg font-semibold text-zinc-900">Amount we will reimburse</span>
                   <span class="text-lg font-semibold text-zinc-900">
                     {display_money(@totals.net_total)}
                   </span>
@@ -1726,7 +1726,7 @@ defmodule YscWeb.ExpenseReportLive do
                           </div>
                         <% end %>
                         <div>
-                          <span class="text-zinc-500">Net Total</span>
+                          <span class="text-zinc-500">Amount we will reimburse</span>
                           <p class="font-semibold text-lg text-zinc-900 mt-1">
                             {display_money(totals.net_total)}
                           </p>
@@ -2992,8 +2992,7 @@ defmodule YscWeb.ExpenseReportLive do
                         <.icon
                           name="hero-paper-airplane"
                           class="w-5 h-5 inline"
-                        />
-                        Submit {Ysc.MoneyHelper.format_money!(@totals.net_total)} Report
+                        /> Submit expense report
                       <% else %>
                         Complete checklist to submit
                       <% end %>
@@ -3010,7 +3009,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="max-w-screen-xl mx-auto">
                     <div class="flex items-center justify-between mb-2">
                       <span class="text-sm font-semibold text-zinc-900">
-                        Net Total
+                        Amount we will reimburse
                       </span>
                       <span class="text-lg font-bold text-blue-700">
                         {Ysc.MoneyHelper.format_money!(@totals.net_total)}
@@ -3037,8 +3036,7 @@ defmodule YscWeb.ExpenseReportLive do
                         <.icon
                           name="hero-paper-airplane"
                           class="w-4 h-4 inline mr-2"
-                        />
-                        Submit {Ysc.MoneyHelper.format_money!(@totals.net_total)} Report
+                        /> Submit expense report
                       <% else %>
                         Complete checklist to submit
                       <% end %>
@@ -3066,7 +3064,7 @@ defmodule YscWeb.ExpenseReportLive do
                     <div class="pt-3 border-t border-zinc-100">
                       <div class="flex justify-between items-center">
                         <span class="text-base font-semibold text-zinc-900">
-                          Net Total
+                          Amount we will reimburse
                         </span>
                         <span class="text-2xl font-bold text-blue-700">
                           {Ysc.MoneyHelper.format_money!(@totals.net_total)}

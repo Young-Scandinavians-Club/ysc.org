@@ -317,7 +317,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       assert data.property_name == "Clear Lake"
       assert data.property == "clear_lake"
       assert data.checkout_time == YscWeb.BookingDisplay.checkout_time_label()
-      assert BookingCheckoutReminder.get_subject() =~ "Checkout Reminder"
+      assert BookingCheckoutReminder.get_subject() =~ "cabin check-out reminder"
     end
 
     test "reloads when user is not preloaded", %{booking: booking} do

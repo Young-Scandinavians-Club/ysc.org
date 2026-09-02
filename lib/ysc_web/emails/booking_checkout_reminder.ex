@@ -21,7 +21,7 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
   end
 
   def get_subject() do
-    "Checkout Reminder - Your YSC Stay Ends Tomorrow 🏡"
+    "Leaving tomorrow — cabin check-out reminder 🏡"
   end
 
   def booking_url(booking_id) do

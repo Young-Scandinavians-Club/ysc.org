@@ -13,4 +13,6 @@ defmodule YscWeb.Emails.FamilyMemberRemoved do
   def get_subject do
     "Removed from Family Membership - YSC"
   end
+
+  def membership_url, do: YscWeb.Emails.Helpers.membership_url()
 end

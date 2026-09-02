@@ -38,8 +38,10 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      If you would like to continue enjoying YSC membership benefits, you can purchase your own membership at any time.
+      If you would like to keep booking cabins and buying member event tickets, you can get your own membership anytime.
     </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Get your own membership →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       Young Scandinavians Club
