@@ -200,4 +200,110 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
   end
+
+  # Oban.Cron runs TimeoutWorker with empty args every 5 minutes. That batch
+  # path also calls expire_ticket_order/1, but unlike expire_specific_order/1
+  # it does not rollback-and-retry on fulfillment failure.
+  describe "perform/1 cron batch payment reconcile" do
+    test "fulfills instead of expiring when Stripe cancel reveals the payment already succeeded" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        order = ticket_order_fixture() |> past_due_order()
+        payment_intent_id = "pi_cron_already_succeeded_#{order.id}"
+
+        assert {:ok, order} =
+                 Tickets.update_payment_intent(order, payment_intent_id)
+
+        amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+        succeeded_payment_intent =
+          struct(Stripe.PaymentIntent, %{
+            id: payment_intent_id,
+            status: "succeeded",
+            amount: amount_cents,
+            metadata: %{
+              "ticket_order_id" => order.id,
+              "user_id" => order.user_id
+            }
+          })
+
+        expect_expire_cancel_reveals_succeeded(
+          payment_intent_id,
+          succeeded_payment_intent
+        )
+
+        assert {:ok, message} = TimeoutWorker.perform(%Oban.Job{args: %{}})
+        assert message =~ "timed out ticket orders"
+
+        reloaded = Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :completed
+        assert reloaded.payment_id
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^order.id
+          )
+
+        assert tickets != []
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end)
+    end
+
+    test "counts a fulfillment failure and leaves the order pending" do
+      order = ticket_order_fixture() |> past_due_order()
+      payment_intent_id = "pi_cron_fulfillment_fail_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      succeeded_payment_intent =
+        struct(Stripe.PaymentIntent, %{
+          id: payment_intent_id,
+          status: "succeeded",
+          amount: 1,
+          metadata: %{
+            "ticket_order_id" => order.id,
+            "user_id" => order.user_id
+          }
+        })
+
+      expect_expire_cancel_reveals_succeeded(
+        payment_intent_id,
+        succeeded_payment_intent
+      )
+
+      assert {:ok, "Expired 0 timed out ticket orders (1 failed)"} =
+               TimeoutWorker.perform(%Oban.Job{args: %{}})
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "leaves the order pending when Stripe cancel is refused because payment is still processing" do
+      order = ticket_order_fixture() |> past_due_order()
+      payment_intent_id = "pi_cron_processing_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+      end)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:ok, message} = TimeoutWorker.perform(%Oban.Job{args: %{}})
+      assert message =~ "timed out ticket orders"
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+  end
 end

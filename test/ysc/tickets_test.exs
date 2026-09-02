@@ -577,6 +577,70 @@ defmodule Ysc.TicketsTest do
                  bypass_guards: true
                )
     end
+
+    # #1207 passes the already-loaded member and selected tiers from the
+    # door-sale API so checkout can skip those SELECTs. Membership and
+    # member-only limits still have to run against those structs — otherwise
+    # a stale or mismatched preload would silently bypass the guards.
+    test "preloaded guest still requires membership on the door-sale path", %{
+      event: event,
+      member_tier_a: a
+    } do
+      guest = user_fixture_unique()
+
+      assert {:error, :membership_required} =
+               Tickets.create_ticket_order(guest.id, event.id, %{a.id => 1},
+                 bypass_guards: true,
+                 user: guest,
+                 tiers: [a]
+               )
+    end
+
+    test "mismatched preloaded user does not borrow another member's membership",
+         %{
+           user: member,
+           event: event,
+           member_tier_a: a
+         } do
+      guest = user_fixture_unique()
+
+      assert {:error, :membership_required} =
+               Tickets.create_ticket_order(guest.id, event.id, %{a.id => 1},
+                 bypass_guards: true,
+                 user: member,
+                 tiers: [a]
+               )
+    end
+
+    test "preloaded member-only tiers still enforce the single-member limit", %{
+      event: event,
+      member_tier_a: a
+    } do
+      user = give_single_membership(user_fixture_unique())
+
+      assert {:error, :member_only_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{a.id => 2},
+                 bypass_guards: true,
+                 user: user,
+                 tiers: [a]
+               )
+    end
+
+    test "incomplete preloaded tiers still load member-only attrs from the database",
+         %{
+           event: event,
+           member_tier_a: a,
+           tier1: regular
+         } do
+      user = give_single_membership(user_fixture_unique())
+
+      assert {:error, :member_only_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{a.id => 2},
+                 bypass_guards: true,
+                 user: user,
+                 tiers: [regular]
+               )
+    end
   end
 
   describe "get_ticket_order/1" do
