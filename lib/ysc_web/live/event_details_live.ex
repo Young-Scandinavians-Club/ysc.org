@@ -6683,16 +6683,12 @@ defmodule YscWeb.EventDetailsLive do
     event_id = socket.assigns.event.id
     ticket_selections = socket.assigns.selected_tickets
 
-    case Ysc.Tickets.create_ticket_order(user_id, event_id, ticket_selections) do
+    case Ysc.Tickets.create_ticket_order(user_id, event_id, ticket_selections,
+           user: socket.assigns.current_user
+         ) do
       {:ok, ticket_order} ->
-        ticket_order_with_tickets =
-          Ysc.Tickets.get_user_ticket_order_for_checkout(
-            user_id,
-            ticket_order.id
-          )
-
-        # Proceed directly to payment/free confirmation with registration integrated
-        proceed_to_payment_or_free(socket, ticket_order_with_tickets)
+        # atomic_booking already puts tickets, tiers, and user on the order.
+        proceed_to_payment_or_free(socket, ticket_order)
 
       {:error, :overbooked} ->
         {:noreply,

@@ -459,6 +459,64 @@ defmodule Ysc.TicketsTest do
       assert attr_lookups == 0
     end
 
+    @event_pk ~r/FROM "events" AS e0 WHERE \(e0\."id" = \$/
+    @booking_tiers ~r/FROM "ticket_tiers" AS t0 WHERE \(t0\."event_id" = \$/
+
+    test "create_ticket_order skips event and booking-tier SELECTs when they are passed",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              event: event,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              event: event,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @booking_tiers,
+          caller_pids: [self()]
+        )
+
+      assert event_lookups == 0
+      assert tier_lookups == 0
+    end
+
+    test "create_ticket_order looks up the event once when inserting several tickets",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, order}, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      assert length(tickets_for_order(order.id)) == 3
+      assert event_lookups == 1
+    end
+
     test "lifetime member-only checkout skips the owned-ticket COUNT", %{
       user: user,
       event: event,
@@ -734,6 +792,58 @@ defmodule Ysc.TicketsTest do
       refute Ecto.assoc_loaded?(synced.event)
       assert Ecto.assoc_loaded?(synced.tickets)
       assert Enum.all?(synced.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+    end
+
+    @ticket_order_pk ~r/FROM "ticket_orders" AS t0 WHERE \(t0\."id" = \$/
+    @estimate_tiers ~r/FROM "ticket_tiers"/
+
+    test "create_ticket_order returns tickets, tiers, and user already loaded",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      assert Ecto.assoc_loaded?(order.user)
+      assert order.user.id == user.id
+      assert Ecto.assoc_loaded?(order.tickets)
+      assert length(order.tickets) == 2
+
+      assert Enum.all?(order.tickets, fn ticket ->
+               Ecto.assoc_loaded?(ticket.ticket_tier) and
+                 ticket.ticket_tier.id == tier1.id
+             end)
+    end
+
+    test "sync after create_ticket_order skips the checkout order reload", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      {{:ok, synced}, order_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.sync_pending_order_pricing(order) end,
+          pattern: @ticket_order_pk,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.sync_pending_order_pricing(order) end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert synced.id == order.id
+      assert order_lookups == 0
+
+      # Always re-read current tier prices so a later admin price change is applied.
+      assert tier_lookups == 1
     end
   end
 

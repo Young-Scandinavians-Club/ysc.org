@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.35.0",
+      version: "2.36.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -287,7 +287,8 @@ defmodule Ysc.MixProject do
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing
       # span/parent fixes. We do not enable Sentry.Integrations.Oban or OpenTelemetry.
-      {:sentry, "~> 13.5"},
+      # 13.5.1: rate-limit windows log once; per-event 429 drops at :debug (SDK spec).
+      {:sentry, "~> 13.5.1"},
       {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
@@ -295,7 +296,11 @@ defmodule Ysc.MixProject do
       # SES error XML is missing Code/Message nodes (we use SES).
       {:swoosh, "~> 1.27.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
-      {:telemetry_metrics, "~> 1.1"},
+      # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
+      # tag_values is still supported and emits no deprecation warning. We keep
+      # tag_values because PromEx/Peep, LiveDashboard, and prometheus_core still
+      # read metric.tags as a list of keys plus metric.tag_values/1.
+      {:telemetry_metrics, "~> 1.2"},
       {:telemetry_poller, "~> 1.3"},
       {:timex, "~> 3.7"},
       {:ueberauth_facebook, "~> 0.10"},

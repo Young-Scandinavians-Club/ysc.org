@@ -58,6 +58,10 @@ defmodule YscWeb.Api.FallbackController do
     ticket_tier_not_found: "ticket tier not found",
     event_not_found: "event not found",
     membership_required: "member does not have an active membership",
+    member_only_not_eligible:
+      "this ticket is members-only and needs a Single, Family, or Lifetime membership",
+    member_only_limit_exceeded:
+      "this membership includes one members-only ticket per event",
     invalid_plan: "invalid membership plan",
     invalid_offline_payment_method:
       "payment_method must be one of: cash, check, other",

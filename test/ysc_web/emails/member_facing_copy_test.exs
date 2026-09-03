@@ -17,10 +17,13 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     BookingRefundProcessed,
     EventNotification,
     EventUpdateNotification,
+    ExpenseReportConfirmation,
+    FamilyMemberRemoved,
     MembershipEnded,
     MembershipPaymentConfirmation,
     MembershipRenewalPaymentMethodReminder,
     OutageNotification,
+    SaveTheDateAvailable,
     TahoeSummerBuyoutAvailable,
     TahoeWinterWeekendAvailable,
     TicketOrderRefund,
@@ -270,7 +273,12 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       text = html_text(html)
 
       assert text =~ "the Tahoe cabin"
+      assert text =~ "Time to leave the cabin"
+      refute text =~ "Checkout Reminder"
       refute text =~ "our Tahoe property"
+
+      assert BookingCheckoutReminder.get_subject() ==
+               "Leaving tomorrow — cabin check-out reminder 🏡"
     end
   end
 
@@ -427,6 +435,36 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     end
   end
 
+  describe "save-the-date tickets-available email" do
+    test "asks members to get tickets instead of viewing the event" do
+      html =
+        SaveTheDateAvailable.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            description: "Join us.",
+            location_name: "Golden Gate Park",
+            address: "123 Main St",
+            age_restriction: 21
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          event_image_url: nil,
+          notification_settings_url: "https://example.com/users/notifications"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Get tickets"
+      refute text =~ "View Event"
+      refute text =~ "registration"
+
+      for template <- SaveTheDateAvailable.subject_templates() do
+        refute template =~ "registration"
+      end
+    end
+  end
+
   describe "ticket purchase confirmation" do
     test "tells members how to check in instead of using receipt jargon" do
       html =
@@ -565,6 +603,55 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Cabin Master"
       refute text =~ "has been processed"
       refute text =~ "will be processed"
+    end
+  end
+
+  describe "family member removed email" do
+    test "tells the member how to get their own membership" do
+      html =
+        FamilyMemberRemoved.render(%{
+          first_name: "Jane",
+          primary_user_name: "John Doe",
+          membership_url: "https://example.com/users/membership"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Get your own membership"
+      assert text =~ "get your own membership anytime"
+      refute text =~ "purchase your own membership at any time"
+    end
+  end
+
+  describe "expense report confirmation" do
+    test "says how much we'll reimburse instead of Net Total" do
+      html =
+        ExpenseReportConfirmation.render(%{
+          first_name: "Jane",
+          expense_report_url: "https://example.com/expensereport/preview",
+          expense_report: %{
+            id: "er-preview",
+            purpose: "Cabin supplies",
+            submitted_date: "September 1, 2026",
+            reimbursement_method: "Bank Transfer",
+            event: nil,
+            bank_account: nil,
+            expense_items: [],
+            income_items: [],
+            expense_total: "$40.00",
+            income_total: "$0.00",
+            net_total: "$40.00"
+          }
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Amount we will reimburse"
+      assert text =~ "See your expense report"
+      assert text =~ "We'll email you when the money is on the way"
+      refute text =~ "Net Total"
+      refute text =~ "View Expense Report"
+      refute text =~ "reimbursement has been processed"
     end
   end
 

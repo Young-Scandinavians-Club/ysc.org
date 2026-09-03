@@ -60,12 +60,14 @@ defmodule YscWeb.Api.AppTicketsController do
            Tickets.create_ticket_order(member.id, event.id, selections,
              bypass_guards: true,
              user: member,
+             event: event,
              tiers: selected_tiers
            ),
          {:ok, payment_intent} <-
            StripeService.create_payment_intent(ticket_order,
              user: member,
-             card_present: true
+             card_present: true,
+             tiers: selected_tiers
            ) do
       render(conn, :payment_intent,
         payment_intent: payment_intent,

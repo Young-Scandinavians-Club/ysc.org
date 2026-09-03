@@ -141,6 +141,8 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
       html = ExpenseReportConfirmation.render(data)
       assert html =~ "Home to YSC Cabin — 20 mi"
       assert html =~ "Mileage — no receipt required"
+      assert html =~ "Amount we will reimburse"
+      refute html =~ "Net Total"
       refute html =~ "No receipt attached"
     end
   end

@@ -24,6 +24,13 @@ defmodule Ysc.Tickets.StripeService do
   - `customer_id`: Stripe customer ID (optional)
   - `payment_method_id`: Stripe payment method ID (optional)
 
+  ## Options
+
+    * `:tiers` - ticket tier structs already loaded for the selection.
+      Forwarded to `sync_pending_order_pricing/2` so door-sale PaymentIntent
+      creation does not SELECT tiers again. Pass rows loaded in the same
+      request; do not pass LiveView-cached tiers that may be stale.
+
   ## Returns:
   - `{:ok, %Stripe.PaymentIntent{}}` on success
   - `{:error, reason}` on failure
@@ -35,7 +42,11 @@ defmodule Ysc.Tickets.StripeService do
     user = Keyword.get(opts, :user)
     card_present = Keyword.get(opts, :card_present, false)
 
-    with {:ok, ticket_order} <- Tickets.sync_pending_order_pricing(ticket_order) do
+    with {:ok, ticket_order} <-
+           Tickets.sync_pending_order_pricing(
+             ticket_order,
+             Keyword.take(opts, [:tiers])
+           ) do
       create_payment_intent_for_order(
         ticket_order,
         customer_id,
