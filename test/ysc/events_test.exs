@@ -503,6 +503,97 @@ defmodule Ysc.EventsTest do
       assert hd(copied.ticket_tiers).type == :free
     end
 
+    test "honors copy_ticket_tiers: false when acting_role is the string admin",
+         %{user: user} do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "String Admin Can Skip Tiers",
+          description: "Desc",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _free} =
+        Events.create_ticket_tier(%{
+          name: "RSVP",
+          type: :free,
+          quantity: 50,
+          event_id: source.id
+        })
+
+      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
+
+      assert {:ok, copied} =
+               Events.copy_event(source, user.id,
+                 acting_role: "admin",
+                 copy_ticket_tiers: false
+               )
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
+      assert copied.ticket_tiers == []
+    end
+
+    test "does not copy ticket tiers when acting_role is the string volunteer",
+         %{user: user} do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "String Volunteer Skips Tiers",
+          description: "Desc",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _free} =
+        Events.create_ticket_tier(%{
+          name: "RSVP",
+          type: :free,
+          quantity: 50,
+          event_id: source.id
+        })
+
+      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
+
+      assert {:ok, copied} =
+               Events.copy_event(source, user.id, acting_role: "volunteer")
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
+      assert copied.ticket_tiers == []
+    end
+
+    test "does not copy ticket tiers for an unrecognized acting_role", %{
+      user: user
+    } do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Unknown Role Skips Tiers",
+          description: "Desc",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _free} =
+        Events.create_ticket_tier(%{
+          name: "RSVP",
+          type: :free,
+          quantity: 50,
+          event_id: source.id
+        })
+
+      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
+
+      assert {:ok, copied} =
+               Events.copy_event(source, user.id, acting_role: :host)
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
+      assert copied.ticket_tiers == []
+    end
+
     test "copies FAQ questions", %{user: user} do
       {:ok, source} =
         Events.create_event(%{
