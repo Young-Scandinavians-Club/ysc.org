@@ -176,4 +176,49 @@ defmodule Ysc.ExpenseReports.ExpenseReportItemTest do
       assert Ecto.Changeset.get_field(cs, :amount) == Money.new(:USD, "42.00")
     end
   end
+
+  describe "draft_changeset/2" do
+    test "is valid with every user field blank" do
+      cs = ExpenseReportItem.draft_changeset(%ExpenseReportItem{}, %{})
+
+      assert cs.valid?
+    end
+
+    test "keeps a partially-filled row valid and casts what is there" do
+      cs =
+        ExpenseReportItem.draft_changeset(%ExpenseReportItem{}, %{
+          "vendor" => "Costco",
+          "amount" => "",
+          "date" => ""
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :vendor) == "Costco"
+      assert Ecto.Changeset.get_field(cs, :amount) == nil
+    end
+
+    test "still rejects a bad expense_type and a non-USD amount" do
+      cs =
+        ExpenseReportItem.draft_changeset(%ExpenseReportItem{}, %{
+          "expense_type" => "bogus",
+          "amount" => Money.new(1000, :EUR)
+        })
+
+      refute cs.valid?
+      assert %{expense_type: [_ | _]} = errors_on(cs)
+      assert %{amount: ["must be in USD"]} = errors_on(cs)
+    end
+
+    test "preserves an uploaded receipt path with no other fields" do
+      cs =
+        ExpenseReportItem.draft_changeset(%ExpenseReportItem{}, %{
+          "receipt_s3_path" => "receipts/u1/abc.pdf"
+        })
+
+      assert cs.valid?
+
+      assert Ecto.Changeset.get_field(cs, :receipt_s3_path) ==
+               "receipts/u1/abc.pdf"
+    end
+  end
 end

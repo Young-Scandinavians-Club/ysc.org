@@ -96,6 +96,29 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
   end
 
   @doc """
+  Changeset for an autosaved `draft` expense report.
+
+  Only `:user_id` is required; `:purpose` and `:reimbursement_method` may be
+  blank while the member is still filling the form in. `:status` is forced to
+  `"draft"` and none of the submission gates (receipts, certification) run.
+  Line items go through the lenient `draft_changeset/2` variants so
+  half-typed rows persist.
+  """
+  def draft_changeset(expense_report, attrs, _opts \\ []) do
+    attrs = normalize_event_id_in_attrs(attrs)
+
+    expense_report
+    |> cast(attrs, @user_submittable_fields)
+    |> put_change(:status, "draft")
+    |> validate_required([:user_id])
+    |> validate_draft_reimbursement_method()
+    |> cast_assoc(:expense_items, with: &ExpenseReportItem.draft_changeset/2)
+    |> cast_assoc(:income_items,
+      with: &ExpenseReportIncomeItem.draft_changeset/2
+    )
+  end
+
+  @doc """
   Changeset for admin/system status updates.
 
   Only casts `:status` and `:quickbooks_sync_error` - it deliberately skips
@@ -127,6 +150,24 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
     |> cast_assoc(:income_items, with: &ExpenseReportIncomeItem.changeset/2)
     |> validate_all_expense_items_have_receipts()
     |> validate_certification_accepted()
+  end
+
+  # A draft may not have picked a reimbursement method yet; only validate the
+  # value once one is actually set.
+  defp validate_draft_reimbursement_method(changeset) do
+    case Ecto.Changeset.get_field(changeset, :reimbursement_method) do
+      nil ->
+        changeset
+
+      "" ->
+        Ecto.Changeset.put_change(changeset, :reimbursement_method, nil)
+
+      _ ->
+        validate_inclusion(changeset, :reimbursement_method, [
+          "check",
+          "bank_transfer"
+        ])
+    end
   end
 
   # Normalize empty string to nil for event_id in attrs before casting

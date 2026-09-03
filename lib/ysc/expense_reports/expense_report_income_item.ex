@@ -45,6 +45,38 @@ defmodule Ysc.ExpenseReports.ExpenseReportIncomeItem do
     |> validate_length(:proof_s3_path, max: 2048)
   end
 
+  @doc """
+  Lenient changeset for income items on a `draft` expense report.
+
+  Same fields as `changeset/2` without `validate_required/2` or the
+  "greater than 0" amount check, so a partially-filled row survives a refresh.
+  """
+  def draft_changeset(expense_report_income_item, attrs) do
+    expense_report_income_item
+    |> cast(attrs, [
+      :expense_report_id,
+      :date,
+      :description,
+      :amount,
+      :proof_s3_path
+    ])
+    |> prepare_changes(&parse_money_fields/1)
+    |> validate_length(:description, max: 1000)
+    |> validate_draft_money(:amount)
+    |> validate_length(:proof_s3_path, max: 2048)
+  end
+
+  defp validate_draft_money(changeset, field) do
+    validate_change(changeset, field, fn _field, value ->
+      case value do
+        %Money{currency: :USD} -> []
+        %Money{} -> [{field, "must be in USD"}]
+        nil -> []
+        _ -> [{field, "invalid money format"}]
+      end
+    end)
+  end
+
   defp parse_money_fields(changeset) do
     changeset
     |> update_change(:amount, fn

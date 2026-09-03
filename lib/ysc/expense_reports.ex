@@ -42,6 +42,133 @@ defmodule Ysc.ExpenseReports do
     |> List.first()
   end
 
+  # Drafts
+  #
+  # A draft is a real `expense_reports` row with `status == "draft"`. The expense
+  # report LiveView autosaves one as soon as a member starts filling in the form
+  # and resumes it on the next visit, so a page refresh never loses their work.
+  # There is at most one active draft per user.
+
+  @draft_preloads [:expense_items, :income_items, :address, :event]
+
+  @doc """
+  Returns the user's most-recently-updated `draft` expense report (with items
+  preloaded, oldest item first), or `nil` if they have none.
+  """
+  def get_active_draft(%User{} = user) do
+    items_query = from(i in ExpenseReportItem, order_by: [asc: i.inserted_at])
+
+    income_query =
+      from(i in ExpenseReportIncomeItem, order_by: [asc: i.inserted_at])
+
+    from(er in ExpenseReport,
+      where: er.user_id == ^user.id and er.status == "draft",
+      order_by: [desc: er.updated_at],
+      limit: 1,
+      preload: [
+        expense_items: ^items_query,
+        income_items: ^income_query,
+        address: [],
+        event: []
+      ]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Inserts or updates the user's draft expense report from `attrs` (string-keyed,
+  same shape the submit path builds, with `"expense_items"` / `"income_items"`
+  as index-keyed maps).
+
+  The incoming item lists are authoritative: existing child rows are deleted and
+  recreated on every save so we never have to reconcile nested-form ids. Drafts
+  are scratch space and item counts are tiny, so this is cheap.
+
+  Returns `{:ok, draft}` (reloaded with `@draft_preloads`) or
+  `{:error, changeset}`.
+  """
+  def save_draft(%User{} = user, attrs, draft_id \\ nil) do
+    attrs =
+      attrs
+      |> Map.put("user_id", user.id)
+      |> Map.put("status", "draft")
+
+    Repo.transaction(fn ->
+      existing =
+        if is_binary(draft_id) do
+          Repo.get_by(ExpenseReport,
+            id: draft_id,
+            user_id: user.id,
+            status: "draft"
+          )
+        end
+
+      base = existing || %ExpenseReport{}
+
+      if base.id do
+        Repo.delete_all(
+          from(i in ExpenseReportItem, where: i.expense_report_id == ^base.id)
+        )
+
+        Repo.delete_all(
+          from(i in ExpenseReportIncomeItem,
+            where: i.expense_report_id == ^base.id
+          )
+        )
+      end
+
+      result =
+        %{base | expense_items: [], income_items: []}
+        |> ExpenseReport.draft_changeset(attrs)
+        |> Repo.insert_or_update()
+
+      case result do
+        {:ok, draft} -> Repo.preload(draft, @draft_preloads, force: true)
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc """
+  Turns a draft into a submitted expense report.
+
+  Delegates to `create_expense_report/2` (so the QuickBooks-sync enqueue and
+  confirmation emails all fire in one place), then deletes the draft row on
+  success. Returns `{:ok, submitted_report}` or `{:error, changeset}`.
+  """
+  def submit_draft(draft_id, attrs, %User{} = user) do
+    with {:ok, report} <- create_expense_report(attrs, user) do
+      case discard_draft(draft_id, user) do
+        {:ok, _} ->
+          :ok
+
+        other ->
+          Ysc.Logging.warning("Could not delete draft after submit",
+            draft_id: draft_id,
+            result: inspect(other)
+          )
+      end
+
+      {:ok, report}
+    end
+  end
+
+  @doc """
+  Permanently deletes the user's draft (child items cascade via the FK).
+  """
+  def discard_draft(draft_id, %User{} = user) when is_binary(draft_id) do
+    case Repo.get_by(ExpenseReport,
+           id: draft_id,
+           user_id: user.id,
+           status: "draft"
+         ) do
+      nil -> {:error, :not_found}
+      draft -> Repo.delete(draft)
+    end
+  end
+
+  def discard_draft(_draft_id, %User{}), do: {:error, :not_found}
+
   @doc """
   List all expense reports for an event, newest first, with items and
   submitter preloaded.

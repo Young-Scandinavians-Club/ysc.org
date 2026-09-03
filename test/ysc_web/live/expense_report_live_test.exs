@@ -5,6 +5,9 @@ defmodule YscWeb.ExpenseReportLiveTest do
   use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+
+  alias Ysc.ExpenseReports
+
   setup :register_and_log_in_user
 
   test "renders expense report form", %{conn: conn} do
@@ -244,6 +247,127 @@ defmodule YscWeb.ExpenseReportLiveTest do
       # No dangling entry to misattach to the remaining row.
       refute has_element?(view, "progress[data-upload-type='receipt']")
       refute has_element?(view, "#receipt-preview-0")
+    end
+  end
+
+  describe "drafts" do
+    # `add_expense_item` schedules an immediate (delay 0) autosave; a follow-up
+    # render syncs the LiveView so the `:autosave_draft` message is processed.
+    defp flush_autosave(view) do
+      render_click(view, "add_expense_item", %{})
+      _ = render(view)
+      Process.sleep(50)
+      _ = render(view)
+    end
+
+    test "typing is autosaved and resumed after a page refresh", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+      view
+      |> form("#expense-report-form", %{
+        "expense_report" => %{"purpose" => "Kayak repair kit"}
+      })
+      |> render_change()
+
+      flush_autosave(view)
+
+      draft = ExpenseReports.get_active_draft(user)
+      assert draft
+      assert draft.purpose == "Kayak repair kit"
+
+      # A brand-new mount (i.e. the member hit refresh) resumes the draft.
+      {:ok, _view2, html2} = live(conn, ~p"/expensereport")
+      assert html2 =~ "Kayak repair kit"
+      assert html2 =~ "expense-report-draft-banner"
+    end
+
+    test "an untouched form never creates a draft row", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+      # Structural change but no real content typed.
+      render_click(view, "add_expense_item", %{})
+      _ = render(view)
+      Process.sleep(50)
+
+      assert ExpenseReports.get_active_draft(user) == nil
+      refute has_element?(view, "#expense-report-draft-banner")
+    end
+
+    test "discarding a draft clears the form and deletes the row", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+      view
+      |> form("#expense-report-form", %{
+        "expense_report" => %{"purpose" => "Throwaway"}
+      })
+      |> render_change()
+
+      flush_autosave(view)
+      assert ExpenseReports.get_active_draft(user)
+
+      html =
+        view
+        |> element(
+          "#expense-report-draft-banner button[phx-click='discard-draft']"
+        )
+        |> render_click()
+
+      assert ExpenseReports.get_active_draft(user) == nil
+      refute html =~ "Throwaway"
+      refute has_element?(view, "#expense-report-draft-banner")
+    end
+
+    test "a resumed draft rehydrates its saved fields and uploaded receipt", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, _draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Regatta catering",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Safeway",
+              "description" => "Sandwiches",
+              "amount" => "48.20",
+              "date" => "2026-02-01",
+              "receipt_s3_path" => "receipts/u/regatta.pdf"
+            }
+          }
+        })
+
+      {:ok, view, html} = live(conn, ~p"/expensereport")
+
+      assert html =~ "Regatta catering"
+      # The item row and its previously-uploaded receipt come back.
+      assert has_element?(
+               view,
+               "input[name='expense_report[expense_items][0][vendor]'][value='Safeway']"
+             )
+
+      assert has_element?(view, "#receipt-preview-0")
+    end
+
+    test "the reports list shows a Drafts section with a Continue link", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, _draft} =
+        ExpenseReports.save_draft(user, %{"purpose" => "Half-done report"})
+
+      {:ok, _view, html} = live(conn, ~p"/expensereports")
+
+      assert html =~ "expense-report-drafts"
+      assert html =~ "Half-done report"
+      assert html =~ "Continue"
     end
   end
 end

@@ -2985,4 +2985,150 @@ defmodule Ysc.ExpenseReportsTest do
       assert Repo.all(query) == []
     end
   end
+
+  describe "drafts" do
+    test "get_active_draft/1 returns nil when the user has none", %{user: user} do
+      assert ExpenseReports.get_active_draft(user) == nil
+    end
+
+    test "save_draft/3 creates a draft, then updates the same row", %{
+      user: user
+    } do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{"purpose" => "Retreat supplies"})
+
+      assert draft.status == "draft"
+      assert draft.purpose == "Retreat supplies"
+      assert ExpenseReports.get_active_draft(user).id == draft.id
+
+      {:ok, updated} =
+        ExpenseReports.save_draft(
+          user,
+          %{"purpose" => "Retreat supplies v2"},
+          draft.id
+        )
+
+      assert updated.id == draft.id
+      assert updated.purpose == "Retreat supplies v2"
+
+      assert Repo.aggregate(
+               from(er in Ysc.ExpenseReports.ExpenseReport,
+                 where: er.user_id == ^user.id
+               ),
+               :count
+             ) == 1
+    end
+
+    test "save_draft/3 persists a half-filled expense item", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Partial",
+          "expense_items" => %{
+            "0" => %{"vendor" => "Costco", "amount" => "", "date" => ""}
+          }
+        })
+
+      assert [item] = draft.expense_items
+      assert item.vendor == "Costco"
+      assert item.amount == nil
+      assert item.date == nil
+    end
+
+    test "save_draft/3 replaces items rather than appending them", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "P",
+          "expense_items" => %{
+            "0" => %{"vendor" => "A"},
+            "1" => %{"vendor" => "B"}
+          }
+        })
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(
+          user,
+          %{
+            "purpose" => "P",
+            "expense_items" => %{"0" => %{"vendor" => "only"}}
+          },
+          draft.id
+        )
+
+      assert [%{vendor: "only"}] = draft.expense_items
+    end
+
+    test "submit_draft/3 creates a submitted report and removes the draft", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Conference travel",
+          "reimbursement_method" => "bank_transfer",
+          "bank_account_id" => bank_account.id
+        })
+
+      attrs = %{
+        "purpose" => "Conference travel",
+        "reimbursement_method" => "bank_transfer",
+        "bank_account_id" => bank_account.id,
+        "certification_accepted" => true,
+        "status" => "submitted",
+        "expense_items" => %{
+          "0" => %{
+            "date" => "2026-01-15",
+            "vendor" => "Delta",
+            "description" => "Flight",
+            "amount" => "250.00",
+            "receipt_s3_path" => "receipts/u/x.pdf"
+          }
+        }
+      }
+
+      {report, _} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          {:ok, report} = ExpenseReports.submit_draft(draft.id, attrs, user)
+          {report, nil}
+        end)
+
+      assert report.status == "submitted"
+      assert ExpenseReports.get_active_draft(user) == nil
+      assert Repo.get(Ysc.ExpenseReports.ExpenseReport, draft.id) == nil
+    end
+
+    test "discard_draft/2 deletes the draft and its items", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Scratch",
+          "expense_items" => %{"0" => %{"vendor" => "X"}}
+        })
+
+      assert {:ok, _} = ExpenseReports.discard_draft(draft.id, user)
+      assert Repo.get(Ysc.ExpenseReports.ExpenseReport, draft.id) == nil
+
+      assert Repo.aggregate(
+               from(i in Ysc.ExpenseReports.ExpenseReportItem,
+                 where: i.expense_report_id == ^draft.id
+               ),
+               :count
+             ) == 0
+    end
+
+    test "discard_draft/2 will not touch another user's draft", %{user: user} do
+      other = user_fixture()
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(other, %{"purpose" => "Not yours"})
+
+      assert ExpenseReports.discard_draft(draft.id, user) ==
+               {:error, :not_found}
+
+      assert Repo.get(Ysc.ExpenseReports.ExpenseReport, draft.id)
+    end
+  end
 end
