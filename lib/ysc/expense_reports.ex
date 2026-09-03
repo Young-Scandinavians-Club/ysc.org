@@ -51,6 +51,11 @@ defmodule Ysc.ExpenseReports do
 
   @draft_preloads [:expense_items, :income_items, :address, :event]
 
+  # Arbitrary constant namespace for the two-arg pg_advisory_xact_lock in
+  # save_draft/3; keeps expense-draft locks from colliding with any other
+  # advisory-lock user elsewhere in the app.
+  @draft_advisory_lock_namespace 8_233_100
+
   @doc """
   Returns the user's `draft` expense report (with items preloaded in their
   saved order), or `nil` if they have none.
@@ -90,21 +95,15 @@ defmodule Ysc.ExpenseReports do
   recreated on every save so we never have to reconcile nested-form ids. Drafts
   are scratch space and item counts are tiny, so this is cheap.
 
-  When `draft_id` is nil the user's existing draft (if any) is reused, so two
-  tabs can't create two draft rows; a partial unique index backs this up and a
-  conflict is retried once against the row the other transaction committed.
+  When `draft_id` is nil the user's existing draft (if any) is reused, so the
+  expense form never spawns a second draft row. A per-user advisory lock held
+  for the transaction serializes concurrent autosaves from two tabs, so the
+  "reuse existing" lookup always sees a committed prior draft.
 
   Returns `{:ok, draft}` (reloaded with `@draft_preloads`) or
   `{:error, changeset}`.
   """
   def save_draft(%User{} = user, attrs, draft_id \\ nil) do
-    case do_save_draft(user, attrs, draft_id) do
-      {:error, :draft_conflict} -> do_save_draft(user, attrs, nil)
-      other -> other
-    end
-  end
-
-  defp do_save_draft(%User{} = user, attrs, draft_id) do
     attrs =
       attrs
       |> Map.put("user_id", user.id)
@@ -112,6 +111,8 @@ defmodule Ysc.ExpenseReports do
       |> stamp_item_positions()
 
     Repo.transaction(fn ->
+      lock_user_drafts(user)
+
       base = draft_row_for_save(user, draft_id) || %ExpenseReport{}
 
       if base.id do
@@ -132,23 +133,23 @@ defmodule Ysc.ExpenseReports do
         |> Repo.insert_or_update()
 
       case result do
-        {:ok, draft} ->
-          Repo.preload(draft, @draft_preloads, force: true)
-
-        {:error, %Ecto.Changeset{} = changeset} ->
-          if is_nil(base.id) and draft_unique_conflict?(changeset) do
-            # A concurrent save just created this user's draft; bail out and
-            # let save_draft/3 retry, which will now find and update it.
-            Repo.rollback(:draft_conflict)
-          else
-            Repo.rollback(changeset)
-          end
+        {:ok, draft} -> Repo.preload(draft, @draft_preloads, force: true)
+        {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
       end
     end)
   end
 
+  # Transaction-scoped advisory lock keyed on the user, so two concurrent
+  # save_draft/3 calls for the same user run one after the other.
+  defp lock_user_drafts(%User{} = user) do
+    Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
+      @draft_advisory_lock_namespace,
+      :erlang.phash2(user.id, 2_147_483_647)
+    ])
+  end
+
   # The row save_draft/3 writes into: the one named by `draft_id`, else the
-  # user's existing draft, locked so concurrent saves serialize.
+  # user's existing draft.
   defp draft_row_for_save(%User{} = user, draft_id) when is_binary(draft_id) do
     Repo.get_by(ExpenseReport,
       id: draft_id,
@@ -161,8 +162,7 @@ defmodule Ysc.ExpenseReports do
     from(er in ExpenseReport,
       where: er.user_id == ^user.id and er.status == "draft",
       order_by: [asc: er.inserted_at],
-      limit: 1,
-      lock: "FOR UPDATE"
+      limit: 1
     )
     |> Repo.one()
   end
@@ -200,16 +200,6 @@ defmodule Ysc.ExpenseReports do
   end
 
   defp to_position(_), do: 0
-
-  defp draft_unique_conflict?(%Ecto.Changeset{errors: errors}) do
-    Enum.any?(errors, fn
-      {:user_id, {_msg, opts}} ->
-        Keyword.get(opts, :constraint) == :unique
-
-      _ ->
-        false
-    end)
-  end
 
   @doc """
   Turns a draft into a submitted expense report.

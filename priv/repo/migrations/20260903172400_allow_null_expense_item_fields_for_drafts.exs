@@ -30,9 +30,11 @@ defmodule Ysc.Repo.Migrations.AllowNullExpenseItemFieldsForDrafts do
       add :position, :integer
     end
 
-    # One active draft per user, enforced at the DB level so two tabs can't each
-    # insert a `draft` row. `save_draft/3` reuses the existing draft on conflict.
-    create unique_index(:expense_reports, [:user_id],
+    # Speeds up the "does this user have a draft?" lookup. Not unique:
+    # `create_expense_report/2` and other callers may legitimately hold more
+    # than one draft row for a user; the single-active-draft guarantee for the
+    # expense form lives in `save_draft/3` (per-user advisory lock + reuse).
+    create index(:expense_reports, [:user_id],
              name: :expense_reports_user_draft_idx,
              where: "status = 'draft'"
            )
