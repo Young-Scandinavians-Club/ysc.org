@@ -152,7 +152,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "You can only be on one family membership at a time. Click your name in the top-right corner, open Membership, and use \"Leave family membership\" to leave your current family first. Then you can accept this invitation.",
+           "You can only be on one family membership at a time. Leave your current family first (go to Settings > Family > Leave family membership), then come back and accept this invitation.",
            title: "Invitation"
          )}
 
