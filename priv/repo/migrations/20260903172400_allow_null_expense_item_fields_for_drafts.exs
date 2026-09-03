@@ -20,14 +20,16 @@ defmodule Ysc.Repo.Migrations.AllowNullExpenseItemFieldsForDrafts do
       # Explicit row order for a draft's line items. `save_draft/3` deletes and
       # recreates all child rows on every autosave, and `:utc_datetime` /
       # non-monotonic ULIDs can't preserve insertion order, so persist it.
-      add :position, :integer
+      # `_if_not_exists` so a DB that saw an earlier form of this migration can
+      # be repaired by re-running it.
+      add_if_not_exists :position, :integer
     end
 
     alter table(:expense_report_income_items) do
       modify :date, :date, null: true
       modify :description, :text, null: true
       modify :amount, :money_with_currency, null: true
-      add :position, :integer
+      add_if_not_exists :position, :integer
     end
 
     # Speeds up the "does this user have a draft?" lookup. Not unique:
@@ -66,7 +68,7 @@ defmodule Ysc.Repo.Migrations.AllowNullExpenseItemFieldsForDrafts do
       modify :date, :date, null: false
       modify :description, :text, null: false
       modify :amount, :money_with_currency, null: false
-      remove :position
+      remove_if_exists :position, :integer
     end
 
     alter table(:expense_report_items) do
@@ -74,7 +76,7 @@ defmodule Ysc.Repo.Migrations.AllowNullExpenseItemFieldsForDrafts do
       modify :vendor, :text, null: false
       modify :description, :text, null: false
       modify :amount, :money_with_currency, null: false
-      remove :position
+      remove_if_exists :position, :integer
     end
 
     alter table(:expense_reports) do
