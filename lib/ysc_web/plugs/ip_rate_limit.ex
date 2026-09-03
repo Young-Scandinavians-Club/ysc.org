@@ -13,7 +13,6 @@ defmodule YscWeb.Plugs.IpRateLimit do
 
   def init(opts), do: opts
 
-  # sobelow_skip ["XSS.SendResp"]
   def call(conn, opts) do
     limiter = Keyword.fetch!(opts, :limiter)
     format = Keyword.get(opts, :format, :json)
@@ -30,6 +29,8 @@ defmodule YscWeb.Plugs.IpRateLimit do
     end
   end
 
+  # retry_after_sec is an integer from Hammer, not request input
+  # sobelow_skip ["XSS.SendResp"]
   defp send_limited(conn, :html, retry_after_sec) do
     conn
     |> put_resp_content_type("text/html")
