@@ -116,6 +116,9 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
     |> cast_assoc(:income_items,
       with: &ExpenseReportIncomeItem.draft_changeset/2
     )
+    # One active draft per user (partial unique index). `save_draft/3` catches
+    # this and retries against the existing draft.
+    |> unique_constraint(:user_id, name: :expense_reports_user_draft_idx)
   end
 
   @doc """

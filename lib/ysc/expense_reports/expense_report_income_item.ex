@@ -20,6 +20,9 @@ defmodule Ysc.ExpenseReports.ExpenseReportIncomeItem do
     field :amount, Money.Ecto.Composite.Type, default_currency: :USD
     field :proof_s3_path, :string
 
+    # Explicit row order, set by `save_draft/3` (see ExpenseReportItem.position).
+    field :position, :integer
+
     timestamps()
   end
 
@@ -58,7 +61,8 @@ defmodule Ysc.ExpenseReports.ExpenseReportIncomeItem do
       :date,
       :description,
       :amount,
-      :proof_s3_path
+      :proof_s3_path,
+      :position
     ])
     |> prepare_changes(&parse_money_fields/1)
     |> validate_length(:description, max: 1000)

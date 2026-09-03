@@ -252,11 +252,11 @@ defmodule YscWeb.ExpenseReportLiveTest do
 
   describe "drafts" do
     # `add_expense_item` schedules an immediate (delay 0) autosave; a follow-up
-    # render syncs the LiveView so the `:autosave_draft` message is processed.
+    # A structural event (add row) schedules an immediate autosave by enqueueing
+    # the message synchronously; the following render/1 is a sync point that lets
+    # the LiveView process that message before we assert.
     defp flush_autosave(view) do
       render_click(view, "add_expense_item", %{})
-      _ = render(view)
-      Process.sleep(50)
       _ = render(view)
     end
 
@@ -279,9 +279,15 @@ defmodule YscWeb.ExpenseReportLiveTest do
       assert draft.purpose == "Kayak repair kit"
 
       # A brand-new mount (i.e. the member hit refresh) resumes the draft.
-      {:ok, _view2, html2} = live(conn, ~p"/expensereport")
-      assert html2 =~ "Kayak repair kit"
-      assert html2 =~ "expense-report-draft-banner"
+      {:ok, view2, _html2} = live(conn, ~p"/expensereport")
+
+      assert has_element?(view2, "#expense-report-draft-banner")
+
+      assert has_element?(
+               view2,
+               "#expense_report_purpose",
+               "Kayak repair kit"
+             )
     end
 
     test "an untouched form never creates a draft row", %{
@@ -293,7 +299,6 @@ defmodule YscWeb.ExpenseReportLiveTest do
       # Structural change but no real content typed.
       render_click(view, "add_expense_item", %{})
       _ = render(view)
-      Process.sleep(50)
 
       assert ExpenseReports.get_active_draft(user) == nil
       refute has_element?(view, "#expense-report-draft-banner")
@@ -314,16 +319,15 @@ defmodule YscWeb.ExpenseReportLiveTest do
       flush_autosave(view)
       assert ExpenseReports.get_active_draft(user)
 
-      html =
-        view
-        |> element(
-          "#expense-report-draft-banner button[phx-click='discard-draft']"
-        )
-        |> render_click()
+      view
+      |> element(
+        "#expense-report-draft-banner button[phx-click='discard-draft']"
+      )
+      |> render_click()
 
       assert ExpenseReports.get_active_draft(user) == nil
-      refute html =~ "Throwaway"
       refute has_element?(view, "#expense-report-draft-banner")
+      refute has_element?(view, "#expense_report_purpose", "Throwaway")
     end
 
     test "a resumed draft rehydrates its saved fields and uploaded receipt", %{
@@ -360,14 +364,18 @@ defmodule YscWeb.ExpenseReportLiveTest do
       conn: conn,
       user: user
     } do
-      {:ok, _draft} =
+      {:ok, draft} =
         ExpenseReports.save_draft(user, %{"purpose" => "Half-done report"})
 
-      {:ok, _view, html} = live(conn, ~p"/expensereports")
+      {:ok, view, _html} = live(conn, ~p"/expensereports")
 
-      assert html =~ "expense-report-drafts"
-      assert html =~ "Half-done report"
-      assert html =~ "Continue"
+      assert has_element?(view, "#expense-report-drafts", "Half-done report")
+
+      assert has_element?(
+               view,
+               "#expense-report-draft-continue-#{draft.id}",
+               "Continue"
+             )
     end
   end
 end

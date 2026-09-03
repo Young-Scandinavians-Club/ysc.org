@@ -46,12 +46,13 @@ defmodule YscWeb.ExpenseReportLive do
         |> assign(:bank_account_form, nil)
         # Autosaved draft: `draft_id` is the persisted `expense_reports` row
         # (nil until the first autosave), `draft_status` drives the "Saving…"
-        # / "All changes saved" indicator, `autosave_ref` is the pending
-        # debounce timer.
+        # / "All changes saved" indicator, `autosave_ref` is the token of the
+        # pending debounce timer and `autosave_timer` its cancel handle.
         |> assign(:draft_id, nil)
         |> assign(:draft_status, :idle)
         |> assign(:draft_updated_at, nil)
         |> assign(:autosave_ref, nil)
+        |> assign(:autosave_timer, nil)
         |> assign_blank_expense_form(user)
         |> allow_upload(:receipt,
           accept: ~w(.pdf .jpg .jpeg .png .webp),
@@ -1013,8 +1014,19 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   @impl true
-  def handle_info(:autosave_draft, socket) do
-    socket = assign(socket, :autosave_ref, nil)
+  # `token` identifies the timer that scheduled this message. `Process.cancel_timer/1`
+  # does not pull an already-delivered message from the mailbox, so a message
+  # from a superseded timer (or one cancelled after submit) can still arrive.
+  # Ignore anything that isn't the token we're currently waiting on.
+  def handle_info({:autosave_draft, token}, socket) do
+    if token == socket.assigns.autosave_ref do
+      run_autosave(assign(socket, :autosave_ref, nil))
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp run_autosave(socket) do
     user = socket.assigns.current_user
     changeset = socket.assigns.form.source
 
@@ -1843,6 +1855,7 @@ defmodule YscWeb.ExpenseReportLive do
             <ul class="divide-y divide-amber-100 rounded-lg border border-amber-200 bg-amber-50/50 overflow-hidden">
               <li
                 :for={report <- @drafts}
+                id={"expense-report-draft-#{report.id}"}
                 class="flex items-center gap-3 p-3 sm:p-4"
               >
                 <.icon
@@ -1865,6 +1878,7 @@ defmodule YscWeb.ExpenseReportLive do
                   </p>
                 </div>
                 <.link
+                  id={"expense-report-draft-continue-#{report.id}"}
                   navigate={~p"/expensereport"}
                   class="flex-shrink-0 inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
                 >
@@ -1872,6 +1886,7 @@ defmodule YscWeb.ExpenseReportLive do
                 </.link>
                 <button
                   type="button"
+                  id={"expense-report-draft-discard-#{report.id}"}
                   phx-click="discard-draft"
                   phx-value-id={report.id}
                   data-confirm="Delete this draft? This can't be undone."
@@ -4344,16 +4359,30 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   # Debounced autosave. `delay == 0` is used for structural changes (add/remove
-  # row, receipt consumed) that must not be lost to a badly-timed refresh;
-  # keystrokes use the default debounce. Only arms when the form has real
-  # content so we never persist an empty draft row.
+  # row, receipt consumed) that must not be lost to a badly-timed refresh - it
+  # enqueues the save message immediately (in-order with the caller's other
+  # work); keystrokes use the default debounce timer. Only arms when the form
+  # has real content so we never persist an empty draft row.
+  #
+  # `:autosave_ref` is a fresh token carried in the message; `handle_info` only
+  # acts on the token it last stored, so a superseded or post-submit timer
+  # firing late is a no-op.
   defp schedule_autosave(socket, delay \\ 1_500) do
     if connected?(socket) and draft_has_content?(socket.assigns.form.source) do
-      if ref = socket.assigns[:autosave_ref], do: Process.cancel_timer(ref)
-      ref = Process.send_after(self(), :autosave_draft, delay)
+      socket = cancel_autosave(socket)
+      token = make_ref()
+
+      timer =
+        if delay <= 0 do
+          send(self(), {:autosave_draft, token})
+          nil
+        else
+          Process.send_after(self(), {:autosave_draft, token}, delay)
+        end
 
       socket
-      |> assign(:autosave_ref, ref)
+      |> assign(:autosave_ref, token)
+      |> assign(:autosave_timer, timer)
       |> assign(:draft_status, :saving)
     else
       socket
@@ -4361,8 +4390,11 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp cancel_autosave(socket) do
-    if ref = socket.assigns[:autosave_ref], do: Process.cancel_timer(ref)
-    assign(socket, :autosave_ref, nil)
+    if timer = socket.assigns[:autosave_timer], do: Process.cancel_timer(timer)
+
+    socket
+    |> assign(:autosave_ref, nil)
+    |> assign(:autosave_timer, nil)
   end
 
   # Scalar (non-item) fields for the draft changeset, pulled from the live

@@ -10,7 +10,7 @@ defmodule Ysc.ExpenseReportsTest do
 
   alias Ysc.Accounts
   alias Ysc.ExpenseReports
-  alias Ysc.ExpenseReports.BankAccount
+  alias Ysc.ExpenseReports.{BankAccount, ExpenseReport, ExpenseReportItem}
   alias Ysc.Repo
   alias YscWeb.Workers.EmailNotifier
 
@@ -41,16 +41,13 @@ defmodule Ysc.ExpenseReportsTest do
         )
 
       for i <- 1..3 do
-        {:ok, _} =
-          ExpenseReports.create_expense_report(
-            %{
-              "status" => "draft",
-              "purpose" => "Batch list #{i}",
-              "reimbursement_method" => "bank_transfer",
-              "bank_account_id" => bank_account.id
-            },
-            user
-          )
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "submitted",
+          purpose: "Batch list #{i}",
+          reimbursement_method: "bank_transfer",
+          bank_account_id: bank_account.id
+        })
       end
 
       reports = ExpenseReports.list_expense_reports(user)
@@ -181,23 +178,15 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      base = %{
-        "status" => "draft",
-        "reimbursement_method" => "bank_transfer",
-        "bank_account_id" => bank_account.id
+      base = %ExpenseReport{
+        user_id: user.id,
+        status: "submitted",
+        reimbursement_method: "bank_transfer",
+        bank_account_id: bank_account.id
       }
 
-      {:ok, older} =
-        ExpenseReports.create_expense_report(
-          Map.put(base, "purpose", "older report"),
-          user
-        )
-
-      {:ok, newer} =
-        ExpenseReports.create_expense_report(
-          Map.put(base, "purpose", "newer report"),
-          user
-        )
+      older = Repo.insert!(%{base | purpose: "older report"})
+      newer = Repo.insert!(%{base | purpose: "newer report"})
 
       old_ts =
         DateTime.utc_now()
@@ -928,7 +917,7 @@ defmodule Ysc.ExpenseReportsTest do
         "bank_account_id" => bank_account.id
       }
 
-      assert {:ok, %Ysc.ExpenseReports.ExpenseReport{} = report} =
+      assert {:ok, %ExpenseReport{} = report} =
                ExpenseReports.create_expense_report(attrs, user)
 
       assert report.user_id == user.id
@@ -2515,58 +2504,37 @@ defmodule Ysc.ExpenseReportsTest do
   end
 
   describe "list_expense_reports_for_event/1" do
-    test "lists reports for the given event, newest first, and excludes other events",
+    test "lists reports for the given event and excludes other events",
          %{user: user} do
-      {:ok, bank_account} =
-        ExpenseReports.create_bank_account(
-          %{
-            "routing_number" => "021000021",
-            "account_number" => "1234567890"
-          },
-          user
-        )
-
       event = event_fixture()
       other_event = event_fixture()
 
-      {:ok, report1} =
-        ExpenseReports.create_expense_report(
-          %{
-            "user_id" => user.id,
-            "event_id" => event.id,
-            "status" => "draft",
-            "purpose" => "First",
-            "reimbursement_method" => "bank_transfer",
-            "bank_account_id" => bank_account.id
-          },
-          user
-        )
+      report1 =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "First",
+          reimbursement_method: "bank_transfer"
+        })
 
-      {:ok, report2} =
-        ExpenseReports.create_expense_report(
-          %{
-            "user_id" => user.id,
-            "event_id" => event.id,
-            "status" => "draft",
-            "purpose" => "Second",
-            "reimbursement_method" => "bank_transfer",
-            "bank_account_id" => bank_account.id
-          },
-          user
-        )
+      report2 =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "approved",
+          purpose: "Second",
+          reimbursement_method: "bank_transfer"
+        })
 
-      {:ok, _other_event_report} =
-        ExpenseReports.create_expense_report(
-          %{
-            "user_id" => user.id,
-            "event_id" => other_event.id,
-            "status" => "draft",
-            "purpose" => "Other event",
-            "reimbursement_method" => "bank_transfer",
-            "bank_account_id" => bank_account.id
-          },
-          user
-        )
+      _other_event_report =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: other_event.id,
+          status: "submitted",
+          purpose: "Other event",
+          reimbursement_method: "bank_transfer"
+        })
 
       results = ExpenseReports.list_expense_reports_for_event(event.id)
 
@@ -2889,7 +2857,7 @@ defmodule Ysc.ExpenseReportsTest do
 
       # Fetch without preloading expense_items/income_items so
       # calculate_totals/1 goes through the DB-aggregate branch.
-      not_preloaded = Repo.get!(Ysc.ExpenseReports.ExpenseReport, report.id)
+      not_preloaded = Repo.get!(ExpenseReport, report.id)
       refute Ecto.assoc_loaded?(not_preloaded.expense_items)
       refute Ecto.assoc_loaded?(not_preloaded.income_items)
 
@@ -2920,7 +2888,7 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      not_preloaded = Repo.get!(Ysc.ExpenseReports.ExpenseReport, report.id)
+      not_preloaded = Repo.get!(ExpenseReport, report.id)
       totals = ExpenseReports.calculate_totals(not_preloaded)
       assert Money.equal?(totals.expense_total, Money.new(0, :USD))
       assert Money.equal?(totals.income_total, Money.new(0, :USD))
@@ -3012,7 +2980,7 @@ defmodule Ysc.ExpenseReportsTest do
       assert updated.purpose == "Retreat supplies v2"
 
       assert Repo.aggregate(
-               from(er in Ysc.ExpenseReports.ExpenseReport,
+               from(er in ExpenseReport,
                  where: er.user_id == ^user.id
                ),
                :count
@@ -3098,7 +3066,7 @@ defmodule Ysc.ExpenseReportsTest do
 
       assert report.status == "submitted"
       assert ExpenseReports.get_active_draft(user) == nil
-      assert Repo.get(Ysc.ExpenseReports.ExpenseReport, draft.id) == nil
+      assert Repo.get(ExpenseReport, draft.id) == nil
     end
 
     test "discard_draft/2 deletes the draft and its items", %{user: user} do
@@ -3108,11 +3076,11 @@ defmodule Ysc.ExpenseReportsTest do
           "expense_items" => %{"0" => %{"vendor" => "X"}}
         })
 
-      assert {:ok, _} = ExpenseReports.discard_draft(draft.id, user)
-      assert Repo.get(Ysc.ExpenseReports.ExpenseReport, draft.id) == nil
+      assert {1, nil} = ExpenseReports.discard_draft(draft.id, user)
+      assert Repo.get(ExpenseReport, draft.id) == nil
 
       assert Repo.aggregate(
-               from(i in Ysc.ExpenseReports.ExpenseReportItem,
+               from(i in ExpenseReportItem,
                  where: i.expense_report_id == ^draft.id
                ),
                :count
@@ -3125,10 +3093,66 @@ defmodule Ysc.ExpenseReportsTest do
       {:ok, draft} =
         ExpenseReports.save_draft(other, %{"purpose" => "Not yours"})
 
-      assert ExpenseReports.discard_draft(draft.id, user) ==
-               {:error, :not_found}
+      assert {0, nil} = ExpenseReports.discard_draft(draft.id, user)
+      assert Repo.get(ExpenseReport, draft.id)
+    end
 
-      assert Repo.get(Ysc.ExpenseReports.ExpenseReport, draft.id)
+    test "save_draft/3 reuses the existing draft when called with nil id", %{
+      user: user
+    } do
+      {:ok, first} = ExpenseReports.save_draft(user, %{"purpose" => "One"})
+
+      {:ok, second} =
+        ExpenseReports.save_draft(user, %{"purpose" => "Two"})
+
+      assert second.id == first.id
+      assert second.purpose == "Two"
+
+      assert Repo.aggregate(
+               from(er in ExpenseReport,
+                 where: er.user_id == ^user.id and er.status == "draft"
+               ),
+               :count
+             ) == 1
+    end
+
+    test "save_draft/3 keeps line items in their form order across saves", %{
+      user: user
+    } do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Ordered",
+          "expense_items" => %{
+            "0" => %{"vendor" => "first"},
+            "1" => %{"vendor" => "second"},
+            "2" => %{"vendor" => "third"}
+          }
+        })
+
+      assert ["first", "second", "third"] ==
+               Enum.map(draft.expense_items, & &1.vendor)
+
+      # Re-save (delete + recreate) and the order still holds.
+      {:ok, resaved} =
+        ExpenseReports.save_draft(
+          user,
+          %{
+            "purpose" => "Ordered",
+            "expense_items" => %{
+              "0" => %{"vendor" => "first"},
+              "1" => %{"vendor" => "second"},
+              "2" => %{"vendor" => "third"}
+            }
+          },
+          draft.id
+        )
+
+      assert ["first", "second", "third"] ==
+               Enum.map(resaved.expense_items, & &1.vendor)
+
+      assert ["first", "second", "third"] ==
+               ExpenseReports.get_active_draft(user).expense_items
+               |> Enum.map(& &1.vendor)
     end
   end
 end

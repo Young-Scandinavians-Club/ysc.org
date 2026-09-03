@@ -52,14 +52,20 @@ defmodule Ysc.ExpenseReports do
   @draft_preloads [:expense_items, :income_items, :address, :event]
 
   @doc """
-  Returns the user's most-recently-updated `draft` expense report (with items
-  preloaded, oldest item first), or `nil` if they have none.
+  Returns the user's `draft` expense report (with items preloaded in their
+  saved order), or `nil` if they have none.
+
+  A partial unique index guarantees at most one, but `limit: 1` keeps this
+  resilient if that ever changes.
   """
   def get_active_draft(%User{} = user) do
-    items_query = from(i in ExpenseReportItem, order_by: [asc: i.inserted_at])
+    items_query =
+      from(i in ExpenseReportItem, order_by: [asc: i.position, asc: i.id])
 
     income_query =
-      from(i in ExpenseReportIncomeItem, order_by: [asc: i.inserted_at])
+      from(i in ExpenseReportIncomeItem,
+        order_by: [asc: i.position, asc: i.id]
+      )
 
     from(er in ExpenseReport,
       where: er.user_id == ^user.id and er.status == "draft",
@@ -84,26 +90,29 @@ defmodule Ysc.ExpenseReports do
   recreated on every save so we never have to reconcile nested-form ids. Drafts
   are scratch space and item counts are tiny, so this is cheap.
 
+  When `draft_id` is nil the user's existing draft (if any) is reused, so two
+  tabs can't create two draft rows; a partial unique index backs this up and a
+  conflict is retried once against the row the other transaction committed.
+
   Returns `{:ok, draft}` (reloaded with `@draft_preloads`) or
   `{:error, changeset}`.
   """
   def save_draft(%User{} = user, attrs, draft_id \\ nil) do
+    case do_save_draft(user, attrs, draft_id) do
+      {:error, :draft_conflict} -> do_save_draft(user, attrs, nil)
+      other -> other
+    end
+  end
+
+  defp do_save_draft(%User{} = user, attrs, draft_id) do
     attrs =
       attrs
       |> Map.put("user_id", user.id)
       |> Map.put("status", "draft")
+      |> stamp_item_positions()
 
     Repo.transaction(fn ->
-      existing =
-        if is_binary(draft_id) do
-          Repo.get_by(ExpenseReport,
-            id: draft_id,
-            user_id: user.id,
-            status: "draft"
-          )
-        end
-
-      base = existing || %ExpenseReport{}
+      base = draft_row_for_save(user, draft_id) || %ExpenseReport{}
 
       if base.id do
         Repo.delete_all(
@@ -123,9 +132,82 @@ defmodule Ysc.ExpenseReports do
         |> Repo.insert_or_update()
 
       case result do
-        {:ok, draft} -> Repo.preload(draft, @draft_preloads, force: true)
-        {:error, changeset} -> Repo.rollback(changeset)
+        {:ok, draft} ->
+          Repo.preload(draft, @draft_preloads, force: true)
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          if is_nil(base.id) and draft_unique_conflict?(changeset) do
+            # A concurrent save just created this user's draft; bail out and
+            # let save_draft/3 retry, which will now find and update it.
+            Repo.rollback(:draft_conflict)
+          else
+            Repo.rollback(changeset)
+          end
       end
+    end)
+  end
+
+  # The row save_draft/3 writes into: the one named by `draft_id`, else the
+  # user's existing draft, locked so concurrent saves serialize.
+  defp draft_row_for_save(%User{} = user, draft_id) when is_binary(draft_id) do
+    Repo.get_by(ExpenseReport,
+      id: draft_id,
+      user_id: user.id,
+      status: "draft"
+    )
+  end
+
+  defp draft_row_for_save(%User{} = user, _draft_id) do
+    from(er in ExpenseReport,
+      where: er.user_id == ^user.id and er.status == "draft",
+      order_by: [asc: er.inserted_at],
+      limit: 1,
+      lock: "FOR UPDATE"
+    )
+    |> Repo.one()
+  end
+
+  # Copy each index-keyed item's key into a "position" field so item order
+  # survives the delete-and-recreate.
+  defp stamp_item_positions(attrs) do
+    attrs
+    |> stamp_positions_for("expense_items")
+    |> stamp_positions_for("income_items")
+  end
+
+  defp stamp_positions_for(attrs, key) do
+    case Map.get(attrs, key) do
+      items when is_map(items) ->
+        stamped =
+          Map.new(items, fn {index, item_params} when is_map(item_params) ->
+            {index, Map.put(item_params, "position", to_position(index))}
+          end)
+
+        Map.put(attrs, key, stamped)
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp to_position(index) when is_integer(index), do: index
+
+  defp to_position(index) when is_binary(index) do
+    case Integer.parse(index) do
+      {int, _} -> int
+      :error -> 0
+    end
+  end
+
+  defp to_position(_), do: 0
+
+  defp draft_unique_conflict?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn
+      {:user_id, {_msg, opts}} ->
+        Keyword.get(opts, :constraint) == :unique
+
+      _ ->
+        false
     end)
   end
 
@@ -133,20 +215,20 @@ defmodule Ysc.ExpenseReports do
   Turns a draft into a submitted expense report.
 
   Delegates to `create_expense_report/2` (so the QuickBooks-sync enqueue and
-  confirmation emails all fire in one place), then deletes the draft row on
-  success. Returns `{:ok, submitted_report}` or `{:error, changeset}`.
+  confirmation emails all fire in one place - side effects we deliberately keep
+  out of a DB transaction), then removes the draft row. `discard_draft/2` is a
+  bulk delete scoped to this user's draft, so it can't leave a duplicate behind.
+  Returns `{:ok, submitted_report}` or `{:error, changeset}`.
   """
   def submit_draft(draft_id, attrs, %User{} = user) do
     with {:ok, report} <- create_expense_report(attrs, user) do
-      case discard_draft(draft_id, user) do
-        {:ok, _} ->
-          :ok
+      {deleted, _} = discard_draft(draft_id, user)
 
-        other ->
-          Ysc.Logging.warning("Could not delete draft after submit",
-            draft_id: draft_id,
-            result: inspect(other)
-          )
+      if deleted == 0 do
+        Ysc.Logging.warning("No draft row removed after submit",
+          draft_id: draft_id,
+          user_id: user.id
+        )
       end
 
       {:ok, report}
@@ -154,20 +236,23 @@ defmodule Ysc.ExpenseReports do
   end
 
   @doc """
-  Permanently deletes the user's draft (child items cascade via the FK).
+  Deletes the user's draft (by id, or their single active draft when `draft_id`
+  is nil). Child items cascade via the FK. Returns `{deleted_count, nil}`.
   """
-  def discard_draft(draft_id, %User{} = user) when is_binary(draft_id) do
-    case Repo.get_by(ExpenseReport,
-           id: draft_id,
-           user_id: user.id,
-           status: "draft"
-         ) do
-      nil -> {:error, :not_found}
-      draft -> Repo.delete(draft)
-    end
-  end
+  def discard_draft(draft_id, %User{} = user) do
+    query =
+      from er in ExpenseReport,
+        where: er.user_id == ^user.id and er.status == "draft"
 
-  def discard_draft(_draft_id, %User{}), do: {:error, :not_found}
+    query =
+      if is_binary(draft_id) do
+        from er in query, where: er.id == ^draft_id
+      else
+        query
+      end
+
+    Repo.delete_all(query)
+  end
 
   @doc """
   List all expense reports for an event, newest first, with items and

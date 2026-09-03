@@ -39,6 +39,10 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
     field :miles_driven, :integer
     field :mileage_from_to, :string
 
+    # Explicit row order, set by `save_draft/3` so a draft's items keep their
+    # order across the delete-and-recreate each autosave does.
+    field :position, :integer
+
     timestamps()
   end
 
@@ -99,7 +103,8 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
       :amount,
       :receipt_s3_path,
       :miles_driven,
-      :mileage_from_to
+      :mileage_from_to,
+      :position
     ])
     |> prepare_changes(&parse_money_fields/1)
     |> validate_inclusion(:expense_type, @expense_types)
