@@ -11,6 +11,8 @@ defmodule Ysc.FlowrouteWebhookRateLimit do
   """
   use Hammer, backend: :ets
 
+  alias Ysc.RateLimit
+
   @default_ip_limit 60
   @ip_scale_ms :timer.minutes(1)
 
@@ -21,22 +23,13 @@ defmodule Ysc.FlowrouteWebhookRateLimit do
   @doc """
   Returns `:ok` or `{:error, :rate_limited, retry_after_seconds}`.
   """
-  def check_ip(ip) when is_tuple(ip) do
-    ip
-    |> :inet.ntoa()
-    |> to_string()
-    |> check_ip()
-  end
-
-  def check_ip(ip) when is_binary(ip) do
-    key = "flowroute_webhook:ip:#{String.trim(ip)}"
-
-    case hit(key, @ip_scale_ms, ip_limit()) do
-      {:allow, _count} ->
-        :ok
-
-      {:deny, retry_after_ms} ->
-        {:error, :rate_limited, max(1, div(retry_after_ms, 1000))}
-    end
+  def check_ip(ip) when is_tuple(ip) or is_binary(ip) do
+    RateLimit.check_ip(
+      &hit/3,
+      "flowroute_webhook:ip:",
+      ip,
+      @ip_scale_ms,
+      ip_limit()
+    )
   end
 end

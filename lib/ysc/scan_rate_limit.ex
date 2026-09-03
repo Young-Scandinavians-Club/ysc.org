@@ -4,6 +4,8 @@ defmodule Ysc.ScanRateLimit do
   """
   use Hammer, backend: :ets
 
+  alias Ysc.RateLimit
+
   @default_limit 20
   @scale_ms :timer.minutes(1)
 
@@ -13,12 +15,7 @@ defmodule Ysc.ScanRateLimit do
   Returns `:ok` if allowed, or `:rate_limited` if over limit.
   """
   def check(user_id) when is_binary(user_id) do
-    key = "scan:#{user_id}"
-
-    case hit(key, @scale_ms, @default_limit) do
-      {:allow, _count} -> :ok
-      {:deny, _retry_after_ms} -> :rate_limited
-    end
+    RateLimit.check_ok(&hit/3, "scan:#{user_id}", @scale_ms, @default_limit)
   end
 
   def check(_), do: :rate_limited

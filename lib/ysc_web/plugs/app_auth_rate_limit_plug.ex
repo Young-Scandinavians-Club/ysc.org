@@ -5,21 +5,13 @@ defmodule YscWeb.Plugs.AppAuthRateLimitPlug do
   login/OAuth/passkey flows (`Ysc.AuthRateLimit`), but responds with JSON
   since these are API clients, not browsers.
   """
-  import Plug.Conn
 
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    case Ysc.AuthRateLimit.check_ip(conn.remote_ip) do
-      :ok ->
-        conn
-
-      {:error, :rate_limited, retry_after_sec} ->
-        conn
-        |> put_resp_header("retry-after", Integer.to_string(retry_after_sec))
-        |> put_resp_content_type("application/json")
-        |> send_resp(429, Jason.encode!(%{error: "Too many requests"}))
-        |> halt()
-    end
+    YscWeb.Plugs.IpRateLimit.call(conn,
+      limiter: Ysc.AuthRateLimit,
+      format: :json
+    )
   end
 end

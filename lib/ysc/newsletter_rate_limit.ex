@@ -10,6 +10,8 @@ defmodule Ysc.NewsletterRateLimit do
 
   require Ysc.Logging
 
+  alias Ysc.RateLimit
+
   # Per IP: 3 subscription attempts per minute
   @ip_limit 3
   @ip_scale_ms :timer.minutes(1)
@@ -23,24 +25,23 @@ defmodule Ysc.NewsletterRateLimit do
 
   Returns `:ok` if allowed, or `{:error, :rate_limited, retry_after_seconds}` if over limit.
   """
-  def check_ip(ip) when is_tuple(ip) do
-    ip_string = ip |> :inet.ntoa() |> to_string()
-    check_ip(ip_string)
-  end
-
-  def check_ip(ip) when is_binary(ip) do
-    key = "newsletter:ip:#{normalize_ip(ip)}"
-
-    case hit(key, @ip_scale_ms, @ip_limit) do
-      {:allow, _count} ->
+  def check_ip(ip) when is_tuple(ip) or is_binary(ip) do
+    case RateLimit.check_ip(
+           &hit/3,
+           "newsletter:ip:",
+           ip,
+           @ip_scale_ms,
+           @ip_limit
+         ) do
+      :ok ->
         :ok
 
-      {:deny, retry_after_ms} ->
+      {:error, :rate_limited, _} = error ->
         Ysc.Logging.warning("Newsletter subscription rate limit exceeded by IP",
           extra: %{ip: ip, limit: @ip_limit}
         )
 
-        {:error, :rate_limited, max(1, div(retry_after_ms, 1000))}
+        error
     end
   end
 
@@ -50,19 +51,22 @@ defmodule Ysc.NewsletterRateLimit do
   Returns `:ok` if allowed, or `{:error, :rate_limited, retry_after_seconds}` if over limit.
   """
   def check_email(email) when is_binary(email) do
-    key = "newsletter:email:#{normalize_email(email)}"
-
-    case hit(key, @email_scale_ms, @email_limit) do
-      {:allow, _count} ->
+    case RateLimit.check(
+           &hit/3,
+           "newsletter:email:#{RateLimit.normalize_identifier(email)}",
+           @email_scale_ms,
+           @email_limit
+         ) do
+      :ok ->
         :ok
 
-      {:deny, retry_after_ms} ->
+      {:error, :rate_limited, _} = error ->
         Ysc.Logging.warning(
           "Newsletter subscription rate limit exceeded by email",
           extra: %{email: email, limit: @email_limit}
         )
 
-        {:error, :rate_limited, max(1, div(retry_after_ms, 1000))}
+        error
     end
   end
 
@@ -77,17 +81,5 @@ defmodule Ysc.NewsletterRateLimit do
     with :ok <- check_ip(ip) do
       check_email(email)
     end
-  end
-
-  defp normalize_ip(ip) do
-    ip
-    |> String.trim()
-    |> String.downcase()
-  end
-
-  defp normalize_email(email) do
-    email
-    |> String.trim()
-    |> String.downcase()
   end
 end
