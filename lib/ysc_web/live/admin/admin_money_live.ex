@@ -1284,6 +1284,10 @@ defmodule YscWeb.AdminMoneyLive do
 
     expense_reports =
       from(er in ExpenseReport,
+        # Drafts are a member's in-progress scratch copy (autosaved from the
+        # expense form) - they have no QuickBooks sync and change constantly,
+        # so they don't belong in the treasurer's reconciliation table.
+        where: er.status != "draft",
         where: er.inserted_at >= ^start_date,
         where: er.inserted_at <= ^end_date,
         preload: [:user],
