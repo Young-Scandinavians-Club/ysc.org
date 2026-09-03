@@ -3069,6 +3069,53 @@ defmodule Ysc.ExpenseReportsTest do
       assert Repo.get(ExpenseReport, draft.id) == nil
     end
 
+    test "submit_draft/3 rolls back when the draft row is already gone", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      attrs = %{
+        "purpose" => "Conference travel",
+        "reimbursement_method" => "bank_transfer",
+        "bank_account_id" => bank_account.id,
+        "certification_accepted" => true,
+        "status" => "submitted",
+        "expense_items" => %{
+          "0" => %{
+            "date" => "2026-01-15",
+            "vendor" => "Delta",
+            "description" => "Flight",
+            "amount" => "250.00",
+            "receipt_s3_path" => "receipts/u/x.pdf"
+          }
+        }
+      }
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:error, %Ecto.Changeset{} = changeset} =
+                 ExpenseReports.submit_draft(
+                   Ecto.ULID.generate(),
+                   attrs,
+                   user
+                 )
+
+        assert changeset.errors[:base]
+      end)
+
+      submitted =
+        Repo.all(
+          from(r in ExpenseReport,
+            where: r.user_id == ^user.id and r.status == "submitted"
+          )
+        )
+
+      assert submitted == []
+    end
+
     test "discard_draft/2 deletes the draft and its items", %{user: user} do
       {:ok, draft} =
         ExpenseReports.save_draft(user, %{

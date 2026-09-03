@@ -204,24 +204,45 @@ defmodule Ysc.ExpenseReports do
   @doc """
   Turns a draft into a submitted expense report.
 
-  Delegates to `create_expense_report/2` (so the QuickBooks-sync enqueue and
-  confirmation emails all fire in one place - side effects we deliberately keep
-  out of a DB transaction), then removes the draft row. `discard_draft/2` is a
-  bulk delete scoped to this user's draft, so it can't leave a duplicate behind.
+  Inserts the submitted report and deletes the draft in one transaction so a
+  failed discard cannot leave both rows (and a retryable duplicate submit)
+  behind. QuickBooks enqueue and confirmation emails run only after commit.
   Returns `{:ok, submitted_report}` or `{:error, changeset}`.
   """
   def submit_draft(draft_id, attrs, %User{} = user) do
-    with {:ok, report} <- create_expense_report(attrs, user) do
-      {deleted, _} = discard_draft(draft_id, user)
+    changeset = expense_report_changeset(attrs, user)
 
-      if deleted == 0 do
-        Ysc.Logging.warning("No draft row removed after submit",
-          draft_id: draft_id,
-          user_id: user.id
-        )
-      end
+    result =
+      Repo.transaction(fn ->
+        case Repo.insert(changeset) do
+          {:ok, report} ->
+            {deleted, _} = discard_draft(draft_id, user)
 
-      {:ok, report}
+            if deleted == 0 do
+              Repo.rollback({:draft_missing, changeset})
+            else
+              report
+            end
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            Repo.rollback(changeset)
+        end
+      end)
+
+    case result do
+      {:ok, report} ->
+        after_expense_report_insert({:ok, report})
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset}
+
+      {:error, {:draft_missing, changeset}} ->
+        {:error,
+         Ecto.Changeset.add_error(
+           changeset,
+           :base,
+           "This draft is no longer available. Please try submitting again."
+         )}
     end
   end
 
@@ -339,17 +360,7 @@ defmodule Ysc.ExpenseReports do
   end
 
   def create_expense_report(attrs, %User{} = user) do
-    require Ysc.Logging
-
-    # Set status to "submitted" if not already set (for submissions)
-    attrs = Map.put_new(attrs, "status", "submitted")
-
-    changeset =
-      %ExpenseReport{}
-      |> ExpenseReport.submission_changeset(Map.put(attrs, "user_id", user.id))
-      |> validate_reimbursement_setup(user)
-      |> validate_reimbursement_ownership(user)
-      |> validate_all_expense_items_have_receipts_for_submission()
+    changeset = expense_report_changeset(attrs, user)
 
     Ysc.Logging.debug(
       "Expense report changeset - valid?: #{changeset.valid?}, errors: #{inspect(changeset.errors, limit: 20)}"
@@ -402,32 +413,41 @@ defmodule Ysc.ExpenseReports do
       end
     end
 
-    result = Repo.insert(changeset)
-
-    # Enqueue QuickBooks sync job and send emails if expense report was created with "submitted" status
-    case result do
-      {:ok, expense_report} ->
-        if expense_report.status == "submitted" do
-          Ysc.Logging.debug(
-            "Expense report created with submitted status, enqueueing QuickBooks sync",
-            expense_report_id: expense_report.id
-          )
-
-          enqueue_quickbooks_sync(expense_report)
-          send_expense_report_emails(expense_report)
-        else
-          Ysc.Logging.debug(
-            "Expense report created with status: #{expense_report.status}, skipping QuickBooks sync and emails",
-            expense_report_id: expense_report.id
-          )
-        end
-
-        result
-
-      error ->
-        error
-    end
+    changeset
+    |> Repo.insert()
+    |> after_expense_report_insert()
   end
+
+  defp expense_report_changeset(attrs, %User{} = user) do
+    attrs = Map.put_new(attrs, "status", "submitted")
+
+    %ExpenseReport{}
+    |> ExpenseReport.submission_changeset(Map.put(attrs, "user_id", user.id))
+    |> validate_reimbursement_setup(user)
+    |> validate_reimbursement_ownership(user)
+    |> validate_all_expense_items_have_receipts_for_submission()
+  end
+
+  defp after_expense_report_insert({:ok, expense_report} = result) do
+    if expense_report.status == "submitted" do
+      Ysc.Logging.debug(
+        "Expense report created with submitted status, enqueueing QuickBooks sync",
+        expense_report_id: expense_report.id
+      )
+
+      enqueue_quickbooks_sync(expense_report)
+      send_expense_report_emails(expense_report)
+    else
+      Ysc.Logging.debug(
+        "Expense report created with status: #{expense_report.status}, skipping QuickBooks sync and emails",
+        expense_report_id: expense_report.id
+      )
+    end
+
+    result
+  end
+
+  defp after_expense_report_insert(error), do: error
 
   defp validate_all_expense_items_have_receipts_for_submission(changeset) do
     # Only validate if status is "submitted"
