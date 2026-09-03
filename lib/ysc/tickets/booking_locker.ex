@@ -124,6 +124,8 @@ defmodule Ysc.Tickets.BookingLocker do
                bypass_guards?,
                buyer
              ) do
+        %User{} = buyer
+
         ticket_order
         |> put_booking_tickets(tickets, tiers)
         |> put_booking_user(buyer)
@@ -1155,10 +1157,7 @@ defmodule Ysc.Tickets.BookingLocker do
 
     loaded_tickets =
       Enum.map(tickets, fn ticket ->
-        case Map.get(tiers_by_id, ticket.ticket_tier_id) do
-          %TicketTier{} = tier -> %{ticket | ticket_tier: tier}
-          _ -> ticket
-        end
+        %{ticket | ticket_tier: Map.fetch!(tiers_by_id, ticket.ticket_tier_id)}
       end)
 
     %{ticket_order | tickets: loaded_tickets}
@@ -1167,8 +1166,6 @@ defmodule Ysc.Tickets.BookingLocker do
   defp put_booking_user(ticket_order, %User{} = buyer) do
     %{ticket_order | user: buyer}
   end
-
-  defp put_booking_user(ticket_order, _), do: ticket_order
 
   defp create_ticket_order_atomic(
          user_id,
