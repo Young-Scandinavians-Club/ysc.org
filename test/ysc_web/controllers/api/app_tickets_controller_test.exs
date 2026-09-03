@@ -162,6 +162,45 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert event_lookups == 1
     end
 
+    test "card-present checkout loads selected tiers once including PaymentIntent repricing",
+         %{
+           conn: conn
+         } do
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      Mox.expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_tier_reuse",
+           client_secret: "pi_tier_reuse_secret",
+           amount: 5000,
+           currency: "usd"
+         }}
+      end)
+
+      {response, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            post(
+              conn,
+              ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent",
+              %{"member_id" => member.id, "tiers" => %{tier.id => 1}}
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert json_response(response, 200)
+      # load_selected_tiers once. atomic_booking, capacity_warnings, and
+      # PaymentIntent repricing reuse those same-request structs.
+      assert tier_lookups == 1
+    end
+
     test "returns an error when the member has no active membership", %{
       conn: conn
     } do

@@ -66,7 +66,8 @@ defmodule YscWeb.Api.AppTicketsController do
          {:ok, payment_intent} <-
            StripeService.create_payment_intent(ticket_order,
              user: member,
-             card_present: true
+             card_present: true,
+             tiers: selected_tiers
            ) do
       render(conn, :payment_intent,
         payment_intent: payment_intent,

@@ -66,7 +66,9 @@ defmodule Ysc.Tickets.BookingLocker do
       LiveView assigns that may have gone stale while the page was open.
 
   ## Returns:
-  - `{:ok, %TicketOrder{}}` on success
+  - `{:ok, %TicketOrder{}}` on success, with `:tickets` (each carrying
+    `:ticket_tier`) and `:user` loaded so checkout repricing can skip those
+    SELECTs
   - `{:error, reason}` on failure
   """
   def atomic_booking(user_id, event_id, ticket_selections, opts \\ []) do
@@ -112,7 +114,7 @@ defmodule Ysc.Tickets.BookingLocker do
                ticket_order.id,
                ticket_selections
              ),
-           {:ok, _tickets} <-
+           {:ok, tickets} <-
              create_tickets_atomic(
                ticket_order,
                event,
@@ -123,6 +125,8 @@ defmodule Ysc.Tickets.BookingLocker do
                buyer
              ) do
         ticket_order
+        |> put_booking_tickets(tickets, tiers)
+        |> put_booking_user(buyer)
       else
         {:error, reason} ->
           require Ysc.Logging
@@ -1142,6 +1146,30 @@ defmodule Ysc.Tickets.BookingLocker do
     end
   end
 
+  # Checkout immediately uses the just-created order. Putting tickets
+  # (with tiers) and the buyer on the returned struct skips the extra
+  # TicketOrder + tickets + user SELECTs in sync_pending_order_pricing.
+  # Current tier prices are still SELECTed unless the caller passes :tiers.
+  defp put_booking_tickets(ticket_order, tickets, tiers) do
+    tiers_by_id = Map.new(tiers, &{&1.id, &1})
+
+    loaded_tickets =
+      Enum.map(tickets, fn ticket ->
+        case Map.get(tiers_by_id, ticket.ticket_tier_id) do
+          %TicketTier{} = tier -> %{ticket | ticket_tier: tier}
+          _ -> ticket
+        end
+      end)
+
+    %{ticket_order | tickets: loaded_tickets}
+  end
+
+  defp put_booking_user(ticket_order, %User{} = buyer) do
+    %{ticket_order | user: buyer}
+  end
+
+  defp put_booking_user(ticket_order, _), do: ticket_order
+
   defp create_ticket_order_atomic(
          user_id,
          event_id,
@@ -1331,6 +1359,10 @@ defmodule Ysc.Tickets.BookingLocker do
       already fulfilled by this order, not just active holds. Pass this when
       repricing an existing order so a fulfilled 100%-off hold keeps its
       discount.
+    * `:tiers` - ticket tier structs already loaded for the selection. Skips
+      the tier SELECT when every selected id is present and belongs to the
+      event. Pass rows loaded in the same request (door sale). Do not pass
+      LiveView-cached tiers that may be stale.
   """
   def estimate_order_total(user_id, event_id, ticket_selections, opts \\ [])
       when is_map(ticket_selections) do
@@ -1339,9 +1371,7 @@ defmodule Ysc.Tickets.BookingLocker do
     if tier_ids == [] do
       {:ok, Money.new(0, :USD), Money.new(0, :USD)}
     else
-      tiers =
-        from(t in TicketTier, where: t.id in ^tier_ids)
-        |> Repo.all()
+      tiers = tiers_for_booking(event_id, ticket_selections, opts)
 
       calculate_total_amount(tiers, ticket_selections, user_id, event_id, opts)
     end

@@ -1998,5 +1998,48 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert Money.zero?(original_total)
       assert Money.equal?(original_discount, tier.price)
     end
+
+    @estimate_tiers ~r/FROM "ticket_tiers"/
+
+    test "skips the tier SELECT when selected tiers are passed", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {_, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              user.id,
+              event.id,
+              %{tier.id => 2},
+              tiers: [tier]
+            )
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert lookups == 0
+    end
+
+    test "loads selected tiers once when they are not passed", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {_, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(user.id, event.id, %{
+              tier.id => 2
+            })
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert lookups == 1
+    end
   end
 end
