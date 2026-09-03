@@ -115,7 +115,9 @@ defmodule YscWeb.VolunteerLive do
                   class="text-green-600 w-8 h-8 flex-shrink-0 mt-0.5"
                 />
                 <div>
-                  <p class="text-green-800 font-bold text-lg mb-2">Välkommen! (Welcome!)</p>
+                  <p class="text-green-800 font-bold text-lg mb-2">
+                    Välkommen! (Welcome!)
+                  </p>
                   <p class="text-green-700">
                     One of our board members will reach out to you within a few days. Thank you for your interest in volunteering with the YSC!
                   </p>
