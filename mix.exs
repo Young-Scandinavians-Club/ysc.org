@@ -296,7 +296,11 @@ defmodule Ysc.MixProject do
       # SES error XML is missing Code/Message nodes (we use SES).
       {:swoosh, "~> 1.27.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
-      {:telemetry_metrics, "~> 1.1"},
+      # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
+      # tag_values is still supported and emits no deprecation warning. We keep
+      # tag_values because PromEx/Peep, LiveDashboard, and prometheus_core still
+      # read metric.tags as a list of keys plus metric.tag_values/1.
+      {:telemetry_metrics, "~> 1.2"},
       {:telemetry_poller, "~> 1.3"},
       {:timex, "~> 3.7"},
       {:ueberauth_facebook, "~> 0.10"},
