@@ -1564,8 +1564,13 @@ defmodule YscWeb.AdminEventsNewLive do
     sales_stats = data.sales_stats
     sales_over_time = data.sales_over_time
     stripe_fees_total = data.stripe_fees_total
-    expense_reports = data.expense_reports
     expense_report_totals = data.expense_report_totals
+
+    # Drop members' in-progress drafts (autosaved from the expense form) - the
+    # per-report table lists filed reports only. `expense_report_totals` already
+    # counts approved/paid only, so the money figures are unaffected.
+    expense_reports =
+      Enum.reject(data.expense_reports, &(&1.status == "draft"))
 
     # Revenue = ticket sales plus any other income logged on expense reports
     # (e.g. cash collected at the door). Costs = Stripe fees plus the gross

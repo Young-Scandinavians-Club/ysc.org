@@ -304,7 +304,7 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~ "Expenses"
-      assert html =~ "File Report"
+      assert html =~ "View reports"
     end
 
     test "shows expense report launcher for admin users", %{conn: conn} do
@@ -317,7 +317,7 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~ "Expenses"
-      assert html =~ "File Report"
+      assert html =~ "View reports"
     end
 
     test "lists upcoming events in the member community section", %{conn: conn} do
@@ -973,7 +973,7 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~ "Browse Events"
-      refute html =~ "File Report"
+      refute html =~ "View reports"
     end
   end
 

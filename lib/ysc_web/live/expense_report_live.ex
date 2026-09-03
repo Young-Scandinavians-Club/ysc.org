@@ -25,25 +25,8 @@ defmodule YscWeb.ExpenseReportLive do
     user = socket.assigns.current_user
 
     if user && user.state == :active do
-      expense_report = %ExpenseReport{
-        user_id: user.id,
-        reimbursement_method: "bank_transfer",
-        expense_items: [%ExpenseReportItem{}],
-        income_items: []
-      }
-
-      changeset = ExpenseReport.changeset(expense_report, %{})
-
       socket =
         socket
-        |> assign(:form, to_form(changeset))
-        |> assign(:expense_report, expense_report)
-        |> assign(:totals, %{
-          expense_total: Money.new(0, :USD),
-          income_total: Money.new(0, :USD),
-          net_total: Money.new(0, :USD)
-        })
-        |> assign(:income_items_empty?, true)
         |> assign(:bank_accounts, [])
         |> assign(:billing_address, nil)
         |> assign(:treasurer, nil)
@@ -61,6 +44,16 @@ defmodule YscWeb.ExpenseReportLive do
         |> assign(:pending_receipt_index, nil)
         |> assign(:pending_proof_index, nil)
         |> assign(:bank_account_form, nil)
+        # Autosaved draft: `draft_id` is the persisted `expense_reports` row
+        # (nil until the first autosave), `draft_status` drives the "Saving…"
+        # / "All changes saved" indicator, `autosave_ref` is the token of the
+        # pending debounce timer and `autosave_timer` its cancel handle.
+        |> assign(:draft_id, nil)
+        |> assign(:draft_status, :idle)
+        |> assign(:draft_updated_at, nil)
+        |> assign(:autosave_ref, nil)
+        |> assign(:autosave_timer, nil)
+        |> assign_blank_expense_form(user)
         |> allow_upload(:receipt,
           accept: ~w(.pdf .jpg .jpeg .png .webp),
           max_entries: 10,
@@ -76,7 +69,9 @@ defmodule YscWeb.ExpenseReportLive do
 
       socket =
         if connected?(socket) do
-          assign_expense_form_data(socket, user)
+          socket
+          |> assign_expense_form_data(user)
+          |> maybe_resume_draft(user)
         else
           socket
         end
@@ -209,7 +204,8 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
-     |> assign_expense_form_state(changeset)}
+     |> assign_expense_form_state(changeset)
+     |> schedule_autosave()}
   end
 
   # Handle file upload triggers (when files are selected, auto_upload starts)
@@ -306,7 +302,8 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign_expense_form_state(new_changeset)}
+     |> assign_expense_form_state(new_changeset)
+     |> schedule_autosave(0)}
   end
 
   def handle_event("clear_event", _params, socket) do
@@ -380,7 +377,8 @@ defmodule YscWeb.ExpenseReportLive do
        :pending_receipt_index,
        index
      )
-     |> assign_expense_form_state(new_changeset)}
+     |> assign_expense_form_state(new_changeset)
+     |> schedule_autosave(0)}
   end
 
   def handle_event("add_income_item", _params, socket) do
@@ -398,7 +396,8 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign_expense_form_state(new_changeset)}
+     |> assign_expense_form_state(new_changeset)
+     |> schedule_autosave(0)}
   end
 
   def handle_event("remove_income_item", %{"index" => index}, socket) do
@@ -421,7 +420,8 @@ defmodule YscWeb.ExpenseReportLive do
        :pending_proof_index,
        index
      )
-     |> assign_expense_form_state(new_changeset)}
+     |> assign_expense_form_state(new_changeset)
+     |> schedule_autosave(0)}
   end
 
   def handle_event("validate-upload", _params, socket) do
@@ -541,6 +541,7 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
+           |> schedule_autosave(0)
            |> YscWeb.Flash.success_with_title(
              "Uploaded",
              "Receipt uploaded successfully"
@@ -585,6 +586,7 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
+           |> schedule_autosave(0)
            |> YscWeb.Flash.success_with_title(
              "Uploaded",
              "Receipt uploaded successfully"
@@ -686,6 +688,7 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
+           |> schedule_autosave(0)
            |> YscWeb.Flash.success_with_title(
              "Uploaded",
              "Proof document uploaded successfully"
@@ -730,6 +733,7 @@ defmodule YscWeb.ExpenseReportLive do
           {:noreply,
            socket
            |> assign(:form, to_form(new_changeset))
+           |> schedule_autosave(0)
            |> YscWeb.Flash.success_with_title(
              "Uploaded",
              "Proof document uploaded successfully"
@@ -775,7 +779,8 @@ defmodule YscWeb.ExpenseReportLive do
      socket
      |> assign(:form, to_form(new_changeset))
      |> assign(:pending_receipt_index, nil)
-     |> assign_expense_form_state(new_changeset)}
+     |> assign_expense_form_state(new_changeset)
+     |> schedule_autosave(0)}
   end
 
   def handle_event("remove-proof", %{"index" => index}, socket) do
@@ -796,7 +801,8 @@ defmodule YscWeb.ExpenseReportLive do
      socket
      |> assign(:form, to_form(new_changeset))
      |> assign(:pending_proof_index, nil)
-     |> assign_expense_form_state(new_changeset)}
+     |> assign_expense_form_state(new_changeset)
+     |> schedule_autosave(0)}
   end
 
   def handle_event("save", params, socket) do
@@ -852,18 +858,29 @@ defmodule YscWeb.ExpenseReportLive do
         "Calling create_expense_report with purpose: #{inspect(expense_report_params["purpose"])}"
       )
 
-      result = ExpenseReports.create_expense_report(expense_report_params, user)
+      # Stop any pending autosave so it can't recreate the draft we're about to
+      # convert to a real submission.
+      socket = cancel_autosave(socket)
+
+      result =
+        case socket.assigns.draft_id do
+          nil ->
+            ExpenseReports.create_expense_report(expense_report_params, user)
+
+          draft_id ->
+            ExpenseReports.submit_draft(draft_id, expense_report_params, user)
+        end
 
       case result do
         {:ok, expense_report} ->
           Ysc.Logging.debug(
-            "create_expense_report SUCCESS - id: #{expense_report.id}, status: #{expense_report.status}"
+            "expense report submitted - id: #{expense_report.id}, status: #{expense_report.status}"
           )
 
-          # Expense report is already created with "submitted" status, no need to call submit_expense_report
           # Add confetti=true parameter to trigger confetti animation on success page
           {:noreply,
            socket
+           |> assign(:draft_id, nil)
            |> redirect(
              to: ~p"/expensereport/#{expense_report.id}/success?confetti=true"
            )}
@@ -966,6 +983,81 @@ defmodule YscWeb.ExpenseReportLive do
     end
   end
 
+  def handle_event("discard-draft", params, socket) do
+    user = socket.assigns.current_user
+    draft_id = params["id"] || socket.assigns.draft_id
+
+    if draft_id, do: ExpenseReports.discard_draft(draft_id, user)
+
+    socket =
+      socket
+      |> cancel_autosave()
+      |> YscWeb.Flash.put_toast(:info, "Draft discarded.",
+        title: "Expense report"
+      )
+
+    socket =
+      if socket.assigns.live_action == :list do
+        assign(
+          socket,
+          :expense_reports,
+          ExpenseReports.list_expense_reports(user)
+        )
+      else
+        socket
+        |> assign(:pending_receipt_index, nil)
+        |> assign(:pending_proof_index, nil)
+        |> assign_blank_expense_form(user)
+      end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  # `token` identifies the timer that scheduled this message. `Process.cancel_timer/1`
+  # does not pull an already-delivered message from the mailbox, so a message
+  # from a superseded timer (or one cancelled after submit) can still arrive.
+  # Ignore anything that isn't the token we're currently waiting on.
+  def handle_info({:autosave_draft, token}, socket) do
+    if token == socket.assigns.autosave_ref do
+      run_autosave(assign(socket, :autosave_ref, nil))
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp run_autosave(socket) do
+    user = socket.assigns.current_user
+    changeset = socket.assigns.form.source
+
+    if draft_has_content?(changeset) do
+      attrs =
+        %{}
+        |> merge_existing_items_into_params(changeset)
+        |> normalize_params_keys()
+        |> Map.merge(draft_scalar_attrs(changeset))
+
+      case ExpenseReports.save_draft(user, attrs, socket.assigns.draft_id) do
+        {:ok, draft} ->
+          {:noreply,
+           socket
+           |> assign(:draft_id, draft.id)
+           |> assign(:draft_updated_at, draft.updated_at)
+           |> assign(:draft_status, :saved)}
+
+        {:error, %Ecto.Changeset{} = error_changeset} ->
+          Ysc.Logging.warning("Expense draft autosave failed",
+            user_id: user.id,
+            errors: inspect(error_changeset.errors, limit: 10)
+          )
+
+          {:noreply, assign(socket, :draft_status, :idle)}
+      end
+    else
+      {:noreply, assign(socket, :draft_status, :idle)}
+    end
+  end
+
   # Merges existing items from current changeset into params if they're missing
   # This ensures items and their receipt/proof paths are preserved when only
   # bank_account_id or reimbursement_method changes
@@ -1022,7 +1114,7 @@ defmodule YscWeb.ExpenseReportLive do
 
           item_params = %{
             "_persistent_id" => to_string(index),
-            "date" => format_date_for_input(item),
+            "date" => format_date_for_input(get_field_from_item(item, :date)),
             "expense_type" =>
               get_field_from_item(item, :expense_type) || "purchase",
             "vendor" => get_field_from_item(item, :vendor),
@@ -1086,7 +1178,7 @@ defmodule YscWeb.ExpenseReportLive do
 
           item_params = %{
             "_persistent_id" => to_string(index),
-            "date" => format_date_for_input(item),
+            "date" => format_date_for_input(get_field_from_item(item, :date)),
             "description" => get_field_from_item(item, :description),
             "amount" =>
               Ysc.MoneyHelper.format_money_for_input(
@@ -1708,33 +1800,47 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp render_list(assigns) do
+    drafts = Enum.filter(assigns.expense_reports, &(&1.status == "draft"))
+    submitted = Enum.reject(assigns.expense_reports, &(&1.status == "draft"))
+
+    totals_by_id =
+      Map.new(
+        assigns.expense_reports,
+        &{&1.id, ExpenseReports.calculate_totals(&1)}
+      )
+
+    assigns =
+      assign(assigns,
+        drafts: drafts,
+        submitted: submitted,
+        totals_by_id: totals_by_id
+      )
+
     ~H"""
     <div class="py-8 lg:py-10">
-      <div class="max-w-screen-xl mx-auto px-4">
+      <div class="max-w-3xl mx-auto px-4">
         <!-- Header -->
-        <div class="mb-8">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h1 class="text-3xl font-bold text-zinc-900">My Expense Reports</h1>
-              <p class="text-zinc-600 mt-2">
-                View and manage all your submitted expense reports.
-              </p>
-            </div>
-            <.button navigate={~p"/expensereport"}>
-              <.icon name="hero-plus" class="w-5 h-5" /> Submit New Report
-            </.button>
+        <div class="flex items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl font-bold text-zinc-900">My Expense Reports</h1>
+            <p class="text-sm text-zinc-500 mt-1">
+              {list_summary_line(@drafts, @submitted)}
+            </p>
           </div>
+          <.button navigate={~p"/expensereport"}>
+            <.icon name="hero-plus" class="w-5 h-5" /> New Report
+          </.button>
         </div>
-        <!-- Expense Reports List -->
+
         <%= if Enum.empty?(@expense_reports) do %>
           <div class="bg-white rounded-lg border border-zinc-200 p-12 text-center">
             <div class="flex flex-col items-center max-w-md mx-auto">
-              <.icon name="hero-document-text" class="w-16 h-16 text-zinc-400 mb-4" />
+              <.icon name="hero-document-text" class="w-14 h-14 text-zinc-300 mb-4" />
               <h3 class="text-lg font-semibold text-zinc-900 mb-2">
                 No expense reports yet
               </h3>
               <p class="text-sm text-zinc-600 mb-6">
-                You haven't submitted any expense reports. Submit your first expense report to get started.
+                Submit your first expense report to get reimbursed.
               </p>
               <.button navigate={~p"/expensereport"}>
                 <.icon name="hero-plus" class="w-5 h-5" /> Submit Your First Report
@@ -1742,105 +1848,133 @@ defmodule YscWeb.ExpenseReportLive do
             </div>
           </div>
         <% else %>
-          <div class="space-y-4">
-            <%= for report <- @expense_reports do %>
-              <% totals = ExpenseReports.calculate_totals(report) %>
-              <div class="bg-white rounded-lg border border-zinc-200 shadow-sm hover:shadow-md transition-shadow">
-                <div class="p-6">
-                  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <!-- Left side: Report details -->
-                    <div class="flex-1">
-                      <div class="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 class="text-lg font-semibold text-zinc-900 mb-1">
-                            {report.purpose}
-                          </h3>
-                          <div class="flex items-center gap-4 text-sm text-zinc-600">
-                            <span class="font-mono text-xs">{report.id}</span>
-                            <span>
-                              Submitted {DateDisplay.format_date_long(
-                                report.inserted_at
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <!-- Report summary -->
-                      <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span class="text-zinc-500">Total Expenses</span>
-                          <p class="font-semibold text-zinc-900 mt-1">
-                            {display_money(totals.expense_total)}
-                          </p>
-                        </div>
-                        <%= if not Money.zero?(totals.income_total) do %>
-                          <div>
-                            <span class="text-zinc-500">Total Income</span>
-                            <p class="font-semibold text-zinc-900 mt-1">
-                              {display_money(totals.income_total)}
-                            </p>
-                          </div>
-                        <% end %>
-                        <div>
-                          <span class="text-zinc-500">Amount we will reimburse</span>
-                          <p class="font-semibold text-lg text-zinc-900 mt-1">
-                            {display_money(totals.net_total)}
-                          </p>
-                        </div>
-                      </div>
-                      <!-- Additional info -->
-                      <div class="mt-4 flex flex-wrap items-center gap-4 text-xs text-zinc-500">
-                        <%= if report.event do %>
-                          <span>
-                            <.icon name="hero-calendar" class="w-4 h-4 inline mr-1" />
-                            {report.event.title}
-                          </span>
-                        <% end %>
-                        <span>
-                          <.icon name="hero-banknotes" class="w-4 h-4 inline mr-1" />
-                          {case report.reimbursement_method do
-                            "bank_transfer" -> "Bank Transfer"
-                            "check" -> "Check"
-                            _ -> "Not specified"
-                          end}
-                        </span>
-                        <span>
-                          <.icon
-                            name="hero-document-text"
-                            class="w-4 h-4 inline mr-1"
-                          />
-                          {length(report.expense_items)} expense item{if length(
-                                                                           report.expense_items
-                                                                         ) !=
-                                                                           1,
-                                                                         do: "s",
-                                                                         else: ""}
-                        </span>
-                      </div>
-                    </div>
-                    <!-- Right side: Actions -->
-                    <div class="flex-shrink-0 flex flex-col gap-2">
-                      <.button
-                        navigate={~p"/expensereport/#{report.id}/success"}
-                        variant="outline"
-                        color="blue"
-                      >
-                        <.icon
-                          name="hero-document-magnifying-glass"
-                          class="w-5 h-5"
-                        /> View Details
-                      </.button>
-                    </div>
-                  </div>
+          <div :if={@drafts != []} id="expense-report-drafts" class="mb-8">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
+              Drafts · not yet submitted
+            </h2>
+            <ul class="divide-y divide-amber-100 rounded-lg border border-amber-200 bg-amber-50/50 overflow-hidden">
+              <li
+                :for={report <- @drafts}
+                id={"expense-report-draft-#{report.id}"}
+                class="flex items-center gap-3 p-3 sm:p-4"
+              >
+                <.icon
+                  name="hero-pencil-square"
+                  class="w-5 h-5 text-amber-500 flex-shrink-0"
+                />
+                <div class="min-w-0 flex-1">
+                  <p class="font-medium text-zinc-900 truncate">
+                    {if present?(report.purpose),
+                      do: report.purpose,
+                      else: "Untitled expense report"}
+                  </p>
+                  <p class="text-xs text-zinc-500">
+                    Edited {DateDisplay.format_date_long(report.updated_at)} · {item_count_label(
+                      report
+                    )}
+                    <%= if not Money.zero?(@totals_by_id[report.id].expense_total) do %>
+                      · {display_money(@totals_by_id[report.id].expense_total)}
+                    <% end %>
+                  </p>
                 </div>
-              </div>
-            <% end %>
+                <.link
+                  id={"expense-report-draft-continue-#{report.id}"}
+                  navigate={~p"/expensereport"}
+                  class="flex-shrink-0 inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
+                >
+                  Continue
+                </.link>
+                <button
+                  type="button"
+                  id={"expense-report-draft-discard-#{report.id}"}
+                  phx-click="discard-draft"
+                  phx-value-id={report.id}
+                  data-confirm="Delete this draft? This can't be undone."
+                  class="flex-shrink-0 p-1.5 text-zinc-400 hover:text-red-600 transition-colors"
+                  title="Delete draft"
+                >
+                  <.icon name="hero-trash" class="w-4 h-4" />
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div :if={@submitted != []}>
+            <h2
+              :if={@drafts != []}
+              class="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2"
+            >
+              Submitted
+            </h2>
+            <ul class="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white overflow-hidden">
+              <li :for={report <- @submitted}>
+                <.link
+                  navigate={~p"/expensereport/#{report.id}/success"}
+                  class="flex items-center gap-3 p-3 sm:p-4 hover:bg-zinc-50 transition-colors"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <.expense_status_badge status={report.status} />
+                      <p class="font-medium text-zinc-900 truncate">
+                        {report.purpose}
+                      </p>
+                    </div>
+                    <p class="text-xs text-zinc-500 truncate">
+                      {DateDisplay.format_date_long(report.inserted_at)} · {reimbursement_label(
+                        report.reimbursement_method
+                      )} · {item_count_label(report)}
+                      <%= if report.event do %>
+                        · {report.event.title}
+                      <% end %>
+                    </p>
+                  </div>
+                  <div class="flex-shrink-0 text-right">
+                    <p class="text-[11px] uppercase tracking-wide text-zinc-400">
+                      Reimburse
+                    </p>
+                    <p class="font-semibold text-zinc-900 tabular-nums">
+                      {display_money(@totals_by_id[report.id].net_total)}
+                    </p>
+                  </div>
+                  <.icon
+                    name="hero-chevron-right"
+                    class="w-4 h-4 text-zinc-300 flex-shrink-0"
+                  />
+                </.link>
+              </li>
+            </ul>
           </div>
         <% end %>
       </div>
     </div>
     """
   end
+
+  defp list_summary_line(drafts, submitted) do
+    parts =
+      [
+        {length(drafts), "draft"},
+        {length(submitted), "submitted"}
+      ]
+      |> Enum.filter(fn {count, _label} -> count > 0 end)
+      |> Enum.map(fn {count, label} -> "#{count} #{label}" end)
+
+    case parts do
+      [] -> "Track your drafts and submitted expense reports."
+      _ -> Enum.join(parts, " · ")
+    end
+  end
+
+  defp reimbursement_label("bank_transfer"), do: "Bank transfer"
+  defp reimbursement_label("check"), do: "Check"
+  defp reimbursement_label(_), do: "No method set"
+
+  defp item_count_label(%{expense_items: items}) when is_list(items) do
+    count = length(items)
+    "#{count} item#{if count == 1, do: "", else: "s"}"
+  end
+
+  defp item_count_label(_), do: "0 items"
 
   defp render_form(assigns) do
     ~H"""
@@ -1917,10 +2051,53 @@ defmodule YscWeb.ExpenseReportLive do
               </div>
             </div>
           </div>
+          <div
+            :if={@draft_id}
+            id="expense-report-draft-banner"
+            class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-5 py-4"
+          >
+            <div class="flex items-start gap-3 text-sm text-amber-900">
+              <.icon
+                name="hero-pencil-square"
+                class="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600"
+              />
+              <p>
+                We saved this as a draft{if @draft_updated_at,
+                  do:
+                    " " <>
+                      DateDisplay.format_datetime_at(@draft_updated_at),
+                  else: ""}. Your changes are kept automatically — you can leave and finish it later.
+              </p>
+            </div>
+            <button
+              type="button"
+              phx-click="discard-draft"
+              data-confirm="Discard this draft and start over? This can't be undone."
+              class="flex-shrink-0 text-sm font-semibold text-amber-800 hover:text-amber-900 underline"
+            >
+              Discard draft
+            </button>
+          </div>
           <!-- 2-Column Layout: Form on left, Sticky Summary on right -->
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Main Form Column -->
             <div class="lg:col-span-2 pb-24 lg:pb-0">
+              <p
+                id="expense-report-autosave-status"
+                class="mb-3 flex items-center gap-1.5 text-xs text-zinc-500 h-4"
+                aria-live="polite"
+              >
+                <%= case @draft_status do %>
+                  <% :saving -> %>
+                    <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
+                    Saving…
+                  <% :saved -> %>
+                    <.icon name="hero-check" class="w-3.5 h-3.5 text-green-600" />
+                    All changes saved
+                  <% _ -> %>
+                    <span class="sr-only">Draft not started</span>
+                <% end %>
+              </p>
               <.simple_form
                 for={@form}
                 id="expense-report-form"
@@ -4086,6 +4263,191 @@ defmodule YscWeb.ExpenseReportLive do
     |> assign(:loading_expense_form_data, false)
   end
 
+  # The pristine "new report" form: one empty expense item, no draft attached.
+  # Used on first mount and after a draft is discarded.
+  defp assign_blank_expense_form(socket, user) do
+    expense_report = %ExpenseReport{
+      user_id: user.id,
+      reimbursement_method: "bank_transfer",
+      expense_items: [%ExpenseReportItem{}],
+      income_items: []
+    }
+
+    changeset = ExpenseReport.changeset(expense_report, %{})
+
+    socket
+    |> assign(:form, to_form(changeset))
+    |> assign(:expense_report, expense_report)
+    |> assign(:totals, %{
+      expense_total: Money.new(0, :USD),
+      income_total: Money.new(0, :USD),
+      net_total: Money.new(0, :USD)
+    })
+    |> assign(:income_items_empty?, true)
+    |> assign(:draft_id, nil)
+    |> assign(:draft_status, :idle)
+    |> assign(:draft_updated_at, nil)
+  end
+
+  # On (re)connect, pull the member's most recent autosaved draft back into the
+  # form so a page refresh never loses their work.
+  defp maybe_resume_draft(socket, user) do
+    case ExpenseReports.get_active_draft(user) do
+      nil -> socket
+      draft -> hydrate_form_from_draft(socket, draft, user)
+    end
+  end
+
+  defp hydrate_form_from_draft(socket, draft, user) do
+    # Rebuild detached item structs (no persisted ids) so the existing
+    # in-memory `validate` / put_assoc form code keeps working unchanged; the
+    # DB row is tracked separately via `:draft_id`.
+    expense_items =
+      case draft.expense_items do
+        [] ->
+          [%ExpenseReportItem{}]
+
+        items ->
+          Enum.map(items, fn i ->
+            %ExpenseReportItem{
+              date: i.date,
+              expense_type: i.expense_type || "purchase",
+              vendor: i.vendor,
+              description: i.description,
+              amount: i.amount,
+              receipt_s3_path: i.receipt_s3_path,
+              miles_driven: i.miles_driven,
+              mileage_from_to: i.mileage_from_to
+            }
+          end)
+      end
+
+    income_items =
+      Enum.map(draft.income_items, fn i ->
+        %ExpenseReportIncomeItem{
+          date: i.date,
+          description: i.description,
+          amount: i.amount,
+          proof_s3_path: i.proof_s3_path
+        }
+      end)
+
+    expense_report = %ExpenseReport{
+      user_id: user.id,
+      purpose: draft.purpose,
+      reimbursement_method: draft.reimbursement_method || "bank_transfer",
+      bank_account_id: draft.bank_account_id,
+      address_id: draft.address_id,
+      event_id: draft.event_id,
+      certification_accepted: draft.certification_accepted,
+      expense_items: expense_items,
+      income_items: income_items
+    }
+
+    changeset =
+      expense_report
+      |> ExpenseReport.changeset(%{})
+      |> validate_reimbursement_setup_in_liveview(user)
+
+    socket
+    |> assign(:form, to_form(changeset))
+    |> assign(:expense_report, expense_report)
+    |> assign(:draft_id, draft.id)
+    |> assign(:draft_status, :saved)
+    |> assign(:draft_updated_at, draft.updated_at)
+    |> assign_expense_form_state(changeset)
+  end
+
+  # Debounced autosave. `delay == 0` is used for structural changes (add/remove
+  # row, receipt consumed) that must not be lost to a badly-timed refresh - it
+  # enqueues the save message immediately (in-order with the caller's other
+  # work); keystrokes use the default debounce timer. Only arms when the form
+  # has real content so we never persist an empty draft row.
+  #
+  # `:autosave_ref` is a fresh token carried in the message; `handle_info` only
+  # acts on the token it last stored, so a superseded or post-submit timer
+  # firing late is a no-op.
+  defp schedule_autosave(socket, delay \\ 1_500) do
+    if connected?(socket) and draft_has_content?(socket.assigns.form.source) do
+      socket = cancel_autosave(socket)
+      token = make_ref()
+
+      timer =
+        if delay <= 0 do
+          send(self(), {:autosave_draft, token})
+          nil
+        else
+          Process.send_after(self(), {:autosave_draft, token}, delay)
+        end
+
+      socket
+      |> assign(:autosave_ref, token)
+      |> assign(:autosave_timer, timer)
+      |> assign(:draft_status, :saving)
+    else
+      socket
+    end
+  end
+
+  defp cancel_autosave(socket) do
+    if timer = socket.assigns[:autosave_timer], do: Process.cancel_timer(timer)
+
+    socket
+    |> assign(:autosave_ref, nil)
+    |> assign(:autosave_timer, nil)
+  end
+
+  # Scalar (non-item) fields for the draft changeset, pulled from the live
+  # changeset so a blank value overwrites a previously-saved one.
+  defp draft_scalar_attrs(changeset) do
+    %{
+      "purpose" => Ecto.Changeset.get_field(changeset, :purpose),
+      "reimbursement_method" =>
+        Ecto.Changeset.get_field(changeset, :reimbursement_method),
+      "bank_account_id" =>
+        Ecto.Changeset.get_field(changeset, :bank_account_id),
+      "address_id" => Ecto.Changeset.get_field(changeset, :address_id),
+      "event_id" => Ecto.Changeset.get_field(changeset, :event_id),
+      "certification_accepted" =>
+        Ecto.Changeset.get_field(changeset, :certification_accepted)
+    }
+  end
+
+  defp draft_has_content?(%Ecto.Changeset{} = changeset) do
+    present?(Ecto.Changeset.get_field(changeset, :purpose)) or
+      present?(Ecto.Changeset.get_field(changeset, :event_id)) or
+      Enum.any?(
+        Ecto.Changeset.get_field(changeset, :expense_items, []),
+        &expense_item_has_content?/1
+      ) or
+      Enum.any?(
+        Ecto.Changeset.get_field(changeset, :income_items, []),
+        &income_item_has_content?/1
+      )
+  end
+
+  defp expense_item_has_content?(item) do
+    present?(get_field_from_item(item, :date)) or
+      present?(get_field_from_item(item, :vendor)) or
+      present?(get_field_from_item(item, :description)) or
+      present?(get_field_from_item(item, :amount)) or
+      present?(get_field_from_item(item, :receipt_s3_path)) or
+      present?(get_field_from_item(item, :miles_driven)) or
+      present?(get_field_from_item(item, :mileage_from_to))
+  end
+
+  defp income_item_has_content?(item) do
+    present?(get_field_from_item(item, :date)) or
+      present?(get_field_from_item(item, :description)) or
+      present?(get_field_from_item(item, :amount)) or
+      present?(get_field_from_item(item, :proof_s3_path))
+  end
+
+  defp present?(nil), do: false
+  defp present?(""), do: false
+  defp present?(%Money{} = money), do: not Money.zero?(money)
+  defp present?(_), do: true
+
   defp get_treasurer do
     from(u in User,
       where: u.board_position == "treasurer" and u.state == :active,
@@ -4096,6 +4458,39 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp expense_upload_error_message(reason) do
     YscWeb.UploadErrors.error_to_string(reason, :expense)
+  end
+
+  attr :status, :string, required: true
+
+  defp expense_status_badge(assigns) do
+    {label, classes} =
+      case assigns.status do
+        "submitted" ->
+          {"Submitted", "bg-blue-100 text-blue-800"}
+
+        "approved" ->
+          {"Approved", "bg-green-100 text-green-800"}
+
+        "paid" ->
+          {"Paid", "bg-green-100 text-green-800"}
+
+        "rejected" ->
+          {"Rejected", "bg-red-100 text-red-800"}
+
+        other ->
+          {String.capitalize(other || "Unknown"), "bg-zinc-100 text-zinc-700"}
+      end
+
+    assigns = assign(assigns, label: label, classes: classes)
+
+    ~H"""
+    <span class={[
+      "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+      @classes
+    ]}>
+      {@label}
+    </span>
+    """
   end
 
   attr :id, :string, required: true
