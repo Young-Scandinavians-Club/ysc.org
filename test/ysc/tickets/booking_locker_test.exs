@@ -1165,6 +1165,137 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert {:ok, _order} = result
       assert tier_lookups == 1
     end
+
+    # #1213 reuses caller-supplied event/tier structs. QueryCounter tests prove
+    # matching ids skip SELECTs; these prove a mismatched id still reloads.
+    test "reloads the booked event when the passed struct is a different event",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Other locker event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, _} = Events.update_event(event, %{state: :cancelled})
+
+      {result, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              event: other,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      assert {:error, :event_cancelled} = result
+      assert event_lookups == 1
+    end
+
+    test "does not reject a published booking when a cancelled other-event struct is passed",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Cancelled other locker event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, other} = Events.update_event(other, %{state: :cancelled})
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+                 bypass_guards: true,
+                 user: user,
+                 event: other,
+                 tiers: [tier]
+               )
+
+      assert order.event_id == event.id
+    end
+
+    test "reloads this event's tiers when the passed list belongs to another event",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Cheap other locker event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, cheap_tier} =
+        Events.create_ticket_tier(%{
+          name: "Cheap",
+          type: :paid,
+          price: Money.new(1, :USD),
+          quantity: 20,
+          event_id: other.id
+        })
+
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: [cheap_tier]
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, order} = result
+      assert Money.equal?(order.total_amount, Money.new(25, :USD))
+      assert tier_lookups == 1
+    end
   end
 
   describe "capacity_warnings/2" do

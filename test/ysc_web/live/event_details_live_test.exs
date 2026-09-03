@@ -460,6 +460,39 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute article_html =~ "onerror="
     end
 
+    # #1198 list queries omit body HTML; those slim rows share EventPricingCache
+    # keys with the detail page. #1218 re-merges body from the source event.
+    @tag process_caches: true
+    test "still renders event body after public list traffic primed a body-less cache entry",
+         %{conn: conn} do
+      marker = "body-cache-#{System.unique_integer([:positive])}"
+
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Body After List Cache #{marker}"}
+        )
+
+      {:ok, event} =
+        Ysc.Events.update_event(event, %{
+          raw_details: "<p>#{marker}</p>",
+          rendered_details: "<p>#{marker}</p>"
+        })
+
+      Ysc.Events.EventPricingCache.invalidate()
+
+      loaded =
+        Ysc.Events.list_upcoming_events_from_db(50)
+        |> Enum.find(&(&1.id == event.id))
+
+      refute Map.has_key?(loaded, :rendered_details)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      article_html = view |> element("#article-body") |> render()
+      assert article_html =~ marker
+    end
+
     test "opens details body links in a new tab", %{conn: conn} do
       event =
         event_with_state(:upcoming,
