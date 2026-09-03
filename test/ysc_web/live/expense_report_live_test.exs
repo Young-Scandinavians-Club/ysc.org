@@ -102,4 +102,81 @@ defmodule YscWeb.ExpenseReportLiveTest do
 
     assert html =~ "Expense Report"
   end
+
+  describe "per-row receipt uploads" do
+    test "an upload started from a later row attaches to that row, not the first",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+      # Two expense items, neither with a receipt yet.
+      render_click(view, "add_expense_item", %{})
+
+      view
+      |> form("#expense-report-form", %{
+        "expense_report" => %{
+          "expense_items" => %{
+            "0" => %{
+              "date" => Date.to_iso8601(Date.utc_today()),
+              "vendor" => "Costco",
+              "description" => "Snacks",
+              "amount" => "10.00"
+            },
+            "1" => %{
+              "date" => Date.to_iso8601(Date.utc_today()),
+              "vendor" => "Target",
+              "description" => "Cups",
+              "amount" => "5.00"
+            }
+          }
+        }
+      })
+      |> render_change()
+
+      # User taps the dropzone on the second item, then picks a file.
+      render_click(view, "select-receipt-target", %{"index" => "1"})
+
+      receipt =
+        file_input(view, "#expense-report-form", :receipt, [
+          %{name: "receipt.png", content: "fake-png-bytes", type: "image/png"}
+        ])
+
+      render_upload(receipt, "receipt.png", 100)
+
+      # The pending upload UI is shown only under item 1.
+      assert has_element?(
+               view,
+               "progress[data-upload-type='receipt'][data-index='1']"
+             )
+
+      refute has_element?(
+               view,
+               "progress[data-upload-type='receipt'][data-index='0']"
+             )
+
+      # Attaching it lands on item 1; item 0 is still awaiting a receipt.
+      view
+      |> element("button[phx-click='consume-receipt'][phx-value-index='1']")
+      |> render_click()
+
+      assert has_element?(view, "#receipt-preview-1")
+      refute has_element?(view, "#receipt-preview-0")
+
+      # The same image can be uploaded again for item 0.
+      render_click(view, "select-receipt-target", %{"index" => "0"})
+
+      receipt2 =
+        file_input(view, "#expense-report-form", :receipt, [
+          %{name: "receipt.png", content: "fake-png-bytes", type: "image/png"}
+        ])
+
+      render_upload(receipt2, "receipt.png", 100)
+
+      view
+      |> element("button[phx-click='consume-receipt'][phx-value-index='0']")
+      |> render_click()
+
+      assert has_element?(view, "#receipt-preview-0")
+      assert has_element?(view, "#receipt-preview-1")
+    end
+  end
 end

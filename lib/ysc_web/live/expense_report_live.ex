@@ -52,6 +52,14 @@ defmodule YscWeb.ExpenseReportLive do
         |> assign(:current_user, user)
         |> assign(:receipt_uploads, %{})
         |> assign(:proof_uploads, %{})
+        # Which expense/income row an in-flight upload belongs to. The receipt
+        # and proof uploads share a single pool across all rows, so we remember
+        # the row the user started the upload from and only surface the pending
+        # entry (and its auto-consume hook) under that row. Without this, an
+        # upload started on row 3 gets consumed into row 1 and the same image
+        # has to be re-uploaded repeatedly.
+        |> assign(:pending_receipt_index, nil)
+        |> assign(:pending_proof_index, nil)
         |> assign(:bank_account_form, nil)
         |> allow_upload(:receipt,
           accept: ~w(.pdf .jpg .jpeg .png .webp),
@@ -296,6 +304,7 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
+     |> assign(:pending_receipt_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -365,6 +374,7 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
+     |> assign(:pending_receipt_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -382,6 +392,7 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
+     |> assign(:pending_proof_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -400,11 +411,23 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
+     |> assign(:pending_proof_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("validate-upload", _params, socket) do
     {:noreply, socket}
+  end
+
+  # Remember which expense row the user is about to attach a receipt to, so the
+  # shared receipt upload pool's pending entry is only shown / auto-consumed
+  # under that row. Fired when the user clicks a row's upload dropzone.
+  def handle_event("select-receipt-target", %{"index" => index}, socket) do
+    {:noreply, assign(socket, :pending_receipt_index, to_int(index))}
+  end
+
+  def handle_event("select-proof-target", %{"index" => index}, socket) do
+    {:noreply, assign(socket, :pending_proof_index, to_int(index))}
   end
 
   def handle_event("copy-report-id", %{"id" => _id}, socket) do
@@ -424,16 +447,25 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :receipt, ref)}
+    {:noreply,
+     socket
+     |> cancel_upload(:receipt, ref)
+     |> assign(:pending_receipt_index, nil)}
   end
 
   def handle_event("cancel-proof-upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :proof, ref)}
+    {:noreply,
+     socket
+     |> cancel_upload(:proof, ref)
+     |> assign(:pending_proof_index, nil)}
   end
 
   def handle_event("consume-receipt", %{"ref" => ref, "index" => index}, socket) do
     index = String.to_integer(index)
     ref_str = to_string(ref)
+    # The pending upload is being resolved now; drop the row pin so any further
+    # uploads fall back to "first row still missing a receipt".
+    socket = assign(socket, :pending_receipt_index, nil)
 
     # Only consider completed entries (avoids race with in-progress uploads)
     {done_entries, _in_progress} = uploaded_entries(socket, :receipt)
@@ -562,6 +594,7 @@ defmodule YscWeb.ExpenseReportLive do
   def handle_event("consume-proof", %{"ref" => ref, "index" => index}, socket) do
     index = String.to_integer(index)
     ref_str = to_string(ref)
+    socket = assign(socket, :pending_proof_index, nil)
 
     # Only consider completed entries (avoids race with in-progress uploads)
     {done_entries, _in_progress} = uploaded_entries(socket, :proof)
@@ -720,6 +753,7 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
+     |> assign(:pending_receipt_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -740,6 +774,7 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
+     |> assign(:pending_proof_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -2315,130 +2350,162 @@ defmodule YscWeb.ExpenseReportLive do
                             :if={!expense_f[:receipt_s3_path].value}
                             class="relative"
                           >
-                            <!-- Upload zone - always rendered but visually hidden when entries exist -->
-                            <label
-                              class={[
-                                "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
-                                not Enum.empty?(@uploads.receipt.entries) &&
-                                  "hidden"
-                              ]}
-                              phx-drop-target={@uploads.receipt.ref}
-                              aria-describedby={"receipt-help-#{expense_f.index}"}
-                            >
-                              <.live_file_input
-                                upload={@uploads.receipt}
-                                class="hidden"
-                              />
-                              <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
-                                <.icon
-                                  name="hero-photo"
-                                  class="w-12 h-12 text-zinc-400 mb-3"
+                            <% receipt_target_index =
+                              @pending_receipt_index ||
+                                first_missing_receipt_index(@form) %>
+                            <!--
+                              The receipt upload pool is shared across every
+                              expense row, and Phoenix requires a single
+                              live_file_input per upload. So the dropzone lives
+                              only on the "target" row (the one the user picked,
+                              or the first row still missing a receipt); other
+                              receiptless rows get a button to become the target.
+                            -->
+                            <%= if expense_f.index == receipt_target_index do %>
+                              <label
+                                class={[
+                                  "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
+                                  not Enum.empty?(@uploads.receipt.entries) &&
+                                    "hidden"
+                                ]}
+                                phx-click="select-receipt-target"
+                                phx-value-index={expense_f.index}
+                                phx-drop-target={@uploads.receipt.ref}
+                                aria-describedby={"receipt-help-#{expense_f.index}"}
+                              >
+                                <.live_file_input
+                                  upload={@uploads.receipt}
+                                  class="hidden"
                                 />
-                                <p class="mb-2 text-sm text-zinc-500">
-                                  <span class="font-semibold">Click to upload</span>
-                                  or drag and drop
+                                <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
+                                  <.icon
+                                    name="hero-photo"
+                                    class="w-12 h-12 text-zinc-400 mb-3"
+                                  />
+                                  <p class="mb-2 text-sm text-zinc-500">
+                                    <span class="font-semibold">Click to upload</span>
+                                    or drag and drop
+                                  </p>
+                                  <p class="text-xs text-zinc-400">
+                                    PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
+                                  </p>
+                                </div>
+                              </label>
+                              <%= for err <- upload_errors(@uploads.receipt) do %>
+                                <p class="mt-2 text-sm text-red-600">
+                                  {YscWeb.UploadErrors.error_to_string(
+                                    err,
+                                    :expense
+                                  )}
                                 </p>
-                                <p class="text-xs text-zinc-400">
-                                  PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
-                                </p>
-                              </div>
-                            </label>
-                            <%= for err <- upload_errors(@uploads.receipt) do %>
-                              <p class="mt-2 text-sm text-red-600">
-                                {YscWeb.UploadErrors.error_to_string(err, :expense)}
-                              </p>
-                            <% end %>
-                            <!-- Upload progress for entries - only show if entry matches this expense item index -->
-                            <%= for entry <- @uploads.receipt.entries do %>
-                              <%= if entry.client_name do %>
-                                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                  <div class="flex items-start gap-4">
-                                    <div class="flex-shrink-0">
-                                      <%= if pdf?(entry.client_name) do %>
-                                        <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
-                                          <.icon
-                                            name="hero-document-text"
-                                            class="w-10 h-10 text-red-600"
-                                          />
-                                        </div>
-                                      <% else %>
-                                        <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
-                                          <.icon
-                                            name="hero-photo"
-                                            class="w-10 h-10 text-blue-600"
-                                          />
-                                        </div>
-                                      <% end %>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                      <div class="flex items-center gap-2 mb-2">
-                                        <.icon
-                                          name="hero-arrow-up-tray"
-                                          class="w-5 h-5 text-blue-600 flex-shrink-0"
-                                        />
-                                        <span class="text-sm font-medium text-blue-800">
-                                          File selected: {entry.client_name}
-                                        </span>
+                              <% end %>
+                              <%= for entry <- @uploads.receipt.entries do %>
+                                <%= if entry.client_name do %>
+                                  <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div class="flex items-start gap-4">
+                                      <div class="flex-shrink-0">
+                                        <%= if pdf?(entry.client_name) do %>
+                                          <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
+                                            <.icon
+                                              name="hero-document-text"
+                                              class="w-10 h-10 text-red-600"
+                                            />
+                                          </div>
+                                        <% else %>
+                                          <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
+                                            <.icon
+                                              name="hero-photo"
+                                              class="w-10 h-10 text-blue-600"
+                                            />
+                                          </div>
+                                        <% end %>
                                       </div>
-                                      <%= for err <- upload_errors(@uploads.receipt, entry) do %>
-                                        <p class="mb-2 text-sm text-red-600">
-                                          {YscWeb.UploadErrors.error_to_string(
-                                            err,
-                                            :expense
-                                          )}
-                                        </p>
-                                      <% end %>
-                                      <progress
-                                        value={entry.progress}
-                                        max="100"
-                                        class="w-full h-2 mb-3"
-                                        id={"receipt-progress-#{entry.ref}"}
-                                        data-ref={entry.ref}
-                                        data-index={expense_f.index}
-                                        data-upload-type="receipt"
-                                        phx-hook="AutoConsumeUpload"
-                                      >
-                                        {entry.progress}%
-                                      </progress>
-                                      <div class="flex gap-2">
-                                        <.button
-                                          type="button"
-                                          phx-click="consume-receipt"
-                                          phx-value-ref={entry.ref}
-                                          phx-value-index={expense_f.index}
-                                          phx-disable-with="Attaching..."
-                                          disabled={
-                                            !entry.done? || entry.progress != 100
-                                          }
-                                          id={"receipt-consume-#{entry.ref}"}
+                                      <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-2">
+                                          <.icon
+                                            name="hero-arrow-up-tray"
+                                            class="w-5 h-5 text-blue-600 flex-shrink-0"
+                                          />
+                                          <span class="text-sm font-medium text-blue-800">
+                                            File selected: {entry.client_name}
+                                          </span>
+                                        </div>
+                                        <%= for err <- upload_errors(@uploads.receipt, entry) do %>
+                                          <p class="mb-2 text-sm text-red-600">
+                                            {YscWeb.UploadErrors.error_to_string(
+                                              err,
+                                              :expense
+                                            )}
+                                          </p>
+                                        <% end %>
+                                        <progress
+                                          value={entry.progress}
+                                          max="100"
+                                          class="w-full h-2 mb-3"
+                                          id={"receipt-progress-#{entry.ref}"}
                                           data-ref={entry.ref}
-                                          data-done={entry.done?}
-                                          data-progress={entry.progress}
+                                          data-index={expense_f.index}
+                                          data-upload-type="receipt"
+                                          phx-hook="AutoConsumeUpload"
                                         >
-                                          <%= cond do %>
-                                            <% entry.done? && entry.progress == 100 -> %>
-                                              Attach Receipt
-                                            <% entry.done? -> %>
-                                              Processing...
-                                            <% true -> %>
-                                              Uploading... ({entry.progress}%)
-                                          <% end %>
-                                        </.button>
-                                        <.button
-                                          type="button"
-                                          phx-click="cancel-upload"
-                                          phx-value-ref={entry.ref}
-                                          phx-disable-with="Cancelling..."
-                                          variant="outline"
-                                          color="red"
-                                        >
-                                          Cancel
-                                        </.button>
+                                          {entry.progress}%
+                                        </progress>
+                                        <div class="flex gap-2">
+                                          <.button
+                                            type="button"
+                                            phx-click="consume-receipt"
+                                            phx-value-ref={entry.ref}
+                                            phx-value-index={expense_f.index}
+                                            phx-disable-with="Attaching..."
+                                            disabled={
+                                              !entry.done? || entry.progress != 100
+                                            }
+                                            id={"receipt-consume-#{entry.ref}"}
+                                            data-ref={entry.ref}
+                                            data-done={entry.done?}
+                                            data-progress={entry.progress}
+                                          >
+                                            <%= cond do %>
+                                              <% entry.done? && entry.progress == 100 -> %>
+                                                Attach Receipt
+                                              <% entry.done? -> %>
+                                                Processing...
+                                              <% true -> %>
+                                                Uploading... ({entry.progress}%)
+                                            <% end %>
+                                          </.button>
+                                          <.button
+                                            type="button"
+                                            phx-click="cancel-upload"
+                                            phx-value-ref={entry.ref}
+                                            phx-disable-with="Cancelling..."
+                                            variant="outline"
+                                            color="red"
+                                          >
+                                            Cancel
+                                          </.button>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
+                                <% end %>
                               <% end %>
+                            <% else %>
+                              <button
+                                type="button"
+                                phx-click="select-receipt-target"
+                                phx-value-index={expense_f.index}
+                                class="flex flex-col items-center justify-center w-full min-h-[140px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors px-4 py-6 text-center"
+                              >
+                                <.icon
+                                  name="hero-paper-clip"
+                                  class="w-8 h-8 text-zinc-400 mb-2"
+                                />
+                                <span class="text-sm text-zinc-500">
+                                  <span class="font-semibold">Add a receipt</span>
+                                  for this item
+                                </span>
+                              </button>
                             <% end %>
                           </div>
                         </fieldset>
@@ -2670,129 +2737,156 @@ defmodule YscWeb.ExpenseReportLive do
                         </div>
                         <!-- Drag-and-drop upload zone with immediate feedback -->
                         <div :if={!income_f[:proof_s3_path].value} class="relative">
-                          <!-- Upload zone - always rendered but visually hidden when entries exist -->
-                          <label
-                            class={[
-                              "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
-                              not Enum.empty?(@uploads.proof.entries) && "hidden"
-                            ]}
-                            phx-drop-target={@uploads.proof.ref}
-                            aria-describedby={"proof-help-#{income_f.index}"}
-                          >
-                            <.live_file_input
-                              upload={@uploads.proof}
-                              class="hidden"
-                            />
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
-                              <.icon
-                                name="hero-photo"
-                                class="w-12 h-12 text-zinc-400 mb-3"
+                          <% proof_target_index =
+                            @pending_proof_index ||
+                              first_missing_proof_index(@form) %>
+                          <!-- One shared proof upload pool: render the dropzone
+                               only on the target row (see receipt block above). -->
+                          <%= if income_f.index == proof_target_index do %>
+                            <label
+                              class={[
+                                "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
+                                not Enum.empty?(@uploads.proof.entries) &&
+                                  "hidden"
+                              ]}
+                              phx-click="select-proof-target"
+                              phx-value-index={income_f.index}
+                              phx-drop-target={@uploads.proof.ref}
+                              aria-describedby={"proof-help-#{income_f.index}"}
+                            >
+                              <.live_file_input
+                                upload={@uploads.proof}
+                                class="hidden"
                               />
-                              <p class="mb-2 text-sm text-zinc-500">
-                                <span class="font-semibold">Click to upload</span>
-                                or drag and drop
+                              <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
+                                <.icon
+                                  name="hero-photo"
+                                  class="w-12 h-12 text-zinc-400 mb-3"
+                                />
+                                <p class="mb-2 text-sm text-zinc-500">
+                                  <span class="font-semibold">Click to upload</span>
+                                  or drag and drop
+                                </p>
+                                <p class="text-xs text-zinc-400">
+                                  PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
+                                </p>
+                              </div>
+                            </label>
+                            <%= for err <- upload_errors(@uploads.proof) do %>
+                              <p class="mt-2 text-sm text-red-600">
+                                {YscWeb.UploadErrors.error_to_string(
+                                  err,
+                                  :expense
+                                )}
                               </p>
-                              <p class="text-xs text-zinc-400">
-                                PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
-                              </p>
-                            </div>
-                          </label>
-                          <%= for err <- upload_errors(@uploads.proof) do %>
-                            <p class="mt-2 text-sm text-red-600">
-                              {YscWeb.UploadErrors.error_to_string(err, :expense)}
-                            </p>
-                          <% end %>
-                          <!-- Upload progress for entries - only show if entry matches this income item index -->
-                          <%= for entry <- @uploads.proof.entries do %>
-                            <%= if entry.client_name do %>
-                              <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <div class="flex items-start gap-4">
-                                  <div class="flex-shrink-0">
-                                    <%= if pdf?(entry.client_name) do %>
-                                      <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
-                                        <.icon
-                                          name="hero-document-text"
-                                          class="w-10 h-10 text-red-600"
-                                        />
-                                      </div>
-                                    <% else %>
-                                      <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
-                                        <.icon
-                                          name="hero-photo"
-                                          class="w-10 h-10 text-blue-600"
-                                        />
-                                      </div>
-                                    <% end %>
-                                  </div>
-                                  <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 mb-2">
-                                      <.icon
-                                        name="hero-arrow-up-tray"
-                                        class="w-5 h-5 text-blue-600 flex-shrink-0"
-                                      />
-                                      <span class="text-sm font-medium text-blue-800">
-                                        File selected: {entry.client_name}
-                                      </span>
+                            <% end %>
+                            <%= for entry <- @uploads.proof.entries do %>
+                              <%= if entry.client_name do %>
+                                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                  <div class="flex items-start gap-4">
+                                    <div class="flex-shrink-0">
+                                      <%= if pdf?(entry.client_name) do %>
+                                        <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
+                                          <.icon
+                                            name="hero-document-text"
+                                            class="w-10 h-10 text-red-600"
+                                          />
+                                        </div>
+                                      <% else %>
+                                        <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
+                                          <.icon
+                                            name="hero-photo"
+                                            class="w-10 h-10 text-blue-600"
+                                          />
+                                        </div>
+                                      <% end %>
                                     </div>
-                                    <%= for err <- upload_errors(@uploads.proof, entry) do %>
-                                      <p class="mb-2 text-sm text-red-600">
-                                        {YscWeb.UploadErrors.error_to_string(
-                                          err,
-                                          :expense
-                                        )}
-                                      </p>
-                                    <% end %>
-                                    <progress
-                                      value={entry.progress}
-                                      max="100"
-                                      class="w-full h-2 mb-3"
-                                      id={"proof-progress-#{entry.ref}"}
-                                      data-ref={entry.ref}
-                                      data-index={income_f.index}
-                                      data-upload-type="proof"
-                                      phx-hook="AutoConsumeUpload"
-                                    >
-                                      {entry.progress}%
-                                    </progress>
-                                    <div class="flex gap-2">
-                                      <.button
-                                        type="button"
-                                        phx-click="consume-proof"
-                                        phx-value-ref={entry.ref}
-                                        phx-value-index={income_f.index}
-                                        phx-disable-with="Attaching..."
-                                        disabled={
-                                          !entry.done? || entry.progress != 100
-                                        }
-                                        id={"proof-consume-#{entry.ref}"}
+                                    <div class="flex-1 min-w-0">
+                                      <div class="flex items-center gap-2 mb-2">
+                                        <.icon
+                                          name="hero-arrow-up-tray"
+                                          class="w-5 h-5 text-blue-600 flex-shrink-0"
+                                        />
+                                        <span class="text-sm font-medium text-blue-800">
+                                          File selected: {entry.client_name}
+                                        </span>
+                                      </div>
+                                      <%= for err <- upload_errors(@uploads.proof, entry) do %>
+                                        <p class="mb-2 text-sm text-red-600">
+                                          {YscWeb.UploadErrors.error_to_string(
+                                            err,
+                                            :expense
+                                          )}
+                                        </p>
+                                      <% end %>
+                                      <progress
+                                        value={entry.progress}
+                                        max="100"
+                                        class="w-full h-2 mb-3"
+                                        id={"proof-progress-#{entry.ref}"}
                                         data-ref={entry.ref}
-                                        data-done={entry.done?}
-                                        data-progress={entry.progress}
+                                        data-index={income_f.index}
+                                        data-upload-type="proof"
+                                        phx-hook="AutoConsumeUpload"
                                       >
-                                        <%= cond do %>
-                                          <% entry.done? && entry.progress == 100 -> %>
-                                            Attach Proof
-                                          <% entry.done? -> %>
-                                            Processing...
-                                          <% true -> %>
-                                            Uploading... ({entry.progress}%)
-                                        <% end %>
-                                      </.button>
-                                      <.button
-                                        type="button"
-                                        phx-click="cancel-proof-upload"
-                                        phx-value-ref={entry.ref}
-                                        phx-disable-with="Cancelling..."
-                                        variant="outline"
-                                        color="red"
-                                      >
-                                        Cancel
-                                      </.button>
+                                        {entry.progress}%
+                                      </progress>
+                                      <div class="flex gap-2">
+                                        <.button
+                                          type="button"
+                                          phx-click="consume-proof"
+                                          phx-value-ref={entry.ref}
+                                          phx-value-index={income_f.index}
+                                          phx-disable-with="Attaching..."
+                                          disabled={
+                                            !entry.done? || entry.progress != 100
+                                          }
+                                          id={"proof-consume-#{entry.ref}"}
+                                          data-ref={entry.ref}
+                                          data-done={entry.done?}
+                                          data-progress={entry.progress}
+                                        >
+                                          <%= cond do %>
+                                            <% entry.done? && entry.progress == 100 -> %>
+                                              Attach Proof
+                                            <% entry.done? -> %>
+                                              Processing...
+                                            <% true -> %>
+                                              Uploading... ({entry.progress}%)
+                                          <% end %>
+                                        </.button>
+                                        <.button
+                                          type="button"
+                                          phx-click="cancel-proof-upload"
+                                          phx-value-ref={entry.ref}
+                                          phx-disable-with="Cancelling..."
+                                          variant="outline"
+                                          color="red"
+                                        >
+                                          Cancel
+                                        </.button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
+                              <% end %>
                             <% end %>
+                          <% else %>
+                            <button
+                              type="button"
+                              phx-click="select-proof-target"
+                              phx-value-index={income_f.index}
+                              class="flex flex-col items-center justify-center w-full min-h-[140px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors px-4 py-6 text-center"
+                            >
+                              <.icon
+                                name="hero-paper-clip"
+                                class="w-8 h-8 text-zinc-400 mb-2"
+                              />
+                              <span class="text-sm text-zinc-500">
+                                <span class="font-semibold">Add proof</span>
+                                for this item
+                              </span>
+                            </button>
                           <% end %>
                         </div>
                       </fieldset>
@@ -3015,6 +3109,13 @@ defmodule YscWeb.ExpenseReportLive do
                         {Ysc.MoneyHelper.format_money!(@totals.net_total)}
                       </span>
                     </div>
+                    <%= if !can_submit?(@form, @bank_accounts, @billing_address, @current_user) do %>
+                      <div class="mb-2 space-y-1">
+                        <%= for error <- get_submission_errors(@form, @bank_accounts, @billing_address, @current_user) do %>
+                          <p class="text-xs text-red-600">{error}</p>
+                        <% end %>
+                      </div>
+                    <% end %>
                     <.button
                       type="submit"
                       form="expense-report-form"
@@ -3505,6 +3606,41 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp get_receipt_path_from_item(_), do: nil
+
+  defp to_int(value) when is_integer(value), do: value
+
+  defp to_int(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> nil
+    end
+  end
+
+  defp to_int(_), do: nil
+
+  defp blank_path?(nil), do: true
+  defp blank_path?(""), do: true
+  defp blank_path?(_), do: false
+
+  # Row index of the first expense item still missing a receipt (mileage items
+  # never need one). Used as the fallback target for the shared receipt upload
+  # pool when the user hasn't clicked a specific row's dropzone (e.g. drag/drop).
+  defp first_missing_receipt_index(form) do
+    form.source
+    |> Ecto.Changeset.get_field(:expense_items, [])
+    |> Enum.find_index(fn item ->
+      get_field_from_item(item, :expense_type) != "mileage" &&
+        blank_path?(get_receipt_path_from_item(item))
+    end)
+  end
+
+  defp first_missing_proof_index(form) do
+    form.source
+    |> Ecto.Changeset.get_field(:income_items, [])
+    |> Enum.find_index(fn item ->
+      blank_path?(get_proof_path_from_item(item))
+    end)
+  end
 
   defp get_readiness_checklist_with_status(
          form,
