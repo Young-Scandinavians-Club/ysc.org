@@ -301,10 +301,11 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:expense_items, expense_items)
 
+    # Appending a row never shifts existing indices, so an active receipt
+    # upload's row pin stays valid - leave it alone.
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:pending_receipt_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -374,7 +375,11 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:pending_receipt_index, nil)
+     |> resolve_upload_pin_after_row_removal(
+       :receipt,
+       :pending_receipt_index,
+       index
+     )
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -389,10 +394,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:income_items, income_items)
 
+    # Appending a row never shifts existing indices - keep any active pin.
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:pending_proof_index, nil)
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -411,7 +416,11 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:pending_proof_index, nil)
+     |> resolve_upload_pin_after_row_removal(
+       :proof,
+       :pending_proof_index,
+       index
+     )
      |> assign_expense_form_state(new_changeset)}
   end
 
@@ -422,12 +431,24 @@ defmodule YscWeb.ExpenseReportLive do
   # Remember which expense row the user is about to attach a receipt to, so the
   # shared receipt upload pool's pending entry is only shown / auto-consumed
   # under that row. Fired when the user clicks a row's upload dropzone.
+  #
+  # Ignored while an upload entry is still in flight: moving the pin then would
+  # re-point the progress hook / consume button at a different row and attach
+  # the file to the wrong item.
   def handle_event("select-receipt-target", %{"index" => index}, socket) do
-    {:noreply, assign(socket, :pending_receipt_index, to_int(index))}
+    if upload_active?(socket, :receipt) do
+      {:noreply, socket}
+    else
+      {:noreply, assign(socket, :pending_receipt_index, to_int(index))}
+    end
   end
 
   def handle_event("select-proof-target", %{"index" => index}, socket) do
-    {:noreply, assign(socket, :pending_proof_index, to_int(index))}
+    if upload_active?(socket, :proof) do
+      {:noreply, socket}
+    else
+      {:noreply, assign(socket, :pending_proof_index, to_int(index))}
+    end
   end
 
   def handle_event("copy-report-id", %{"id" => _id}, socket) do
@@ -2353,14 +2374,14 @@ defmodule YscWeb.ExpenseReportLive do
                             <% receipt_target_index =
                               @pending_receipt_index ||
                                 first_missing_receipt_index(@form) %>
-                            <!--
+                            <%!--
                               The receipt upload pool is shared across every
                               expense row, and Phoenix requires a single
                               live_file_input per upload. So the dropzone lives
                               only on the "target" row (the one the user picked,
                               or the first row still missing a receipt); other
                               receiptless rows get a button to become the target.
-                            -->
+                            --%>
                             <%= if expense_f.index == receipt_target_index do %>
                               <label
                                 class={[
@@ -2493,6 +2514,7 @@ defmodule YscWeb.ExpenseReportLive do
                             <% else %>
                               <button
                                 type="button"
+                                id={"receipt-target-#{expense_f.index}"}
                                 phx-click="select-receipt-target"
                                 phx-value-index={expense_f.index}
                                 class="flex flex-col items-center justify-center w-full min-h-[140px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors px-4 py-6 text-center"
@@ -2740,8 +2762,8 @@ defmodule YscWeb.ExpenseReportLive do
                           <% proof_target_index =
                             @pending_proof_index ||
                               first_missing_proof_index(@form) %>
-                          <!-- One shared proof upload pool: render the dropzone
-                               only on the target row (see receipt block above). -->
+                          <%!-- One shared proof upload pool: render the dropzone
+                               only on the target row (see receipt block above). --%>
                           <%= if income_f.index == proof_target_index do %>
                             <label
                               class={[
@@ -2874,6 +2896,7 @@ defmodule YscWeb.ExpenseReportLive do
                           <% else %>
                             <button
                               type="button"
+                              id={"proof-target-#{income_f.index}"}
                               phx-click="select-proof-target"
                               phx-value-index={income_f.index}
                               class="flex flex-col items-center justify-center w-full min-h-[140px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors px-4 py-6 text-center"
@@ -3640,6 +3663,48 @@ defmodule YscWeb.ExpenseReportLive do
     |> Enum.find_index(fn item ->
       blank_path?(get_proof_path_from_item(item))
     end)
+  end
+
+  defp upload_active?(socket, upload_name) do
+    case socket.assigns.uploads do
+      %{^upload_name => %{entries: entries}} -> entries != []
+      _ -> false
+    end
+  end
+
+  defp cancel_active_uploads(socket, upload_name) do
+    socket.assigns.uploads
+    |> Map.get(upload_name, %{entries: []})
+    |> Map.get(:entries, [])
+    |> Enum.reduce(socket, fn entry, acc ->
+      cancel_upload(acc, upload_name, entry.ref)
+    end)
+  end
+
+  # When a row is deleted the rows after it shift down by one. Keep the upload
+  # pin pointing at the same row: drop it if that row was removed (cancelling
+  # any in-flight upload so it can't attach elsewhere), otherwise shift it.
+  defp resolve_upload_pin_after_row_removal(
+         socket,
+         upload_name,
+         pin_key,
+         removed_index
+       ) do
+    case socket.assigns[pin_key] do
+      nil ->
+        socket
+
+      pinned when pinned == removed_index ->
+        socket
+        |> cancel_active_uploads(upload_name)
+        |> assign(pin_key, nil)
+
+      pinned when pinned > removed_index ->
+        assign(socket, pin_key, pinned - 1)
+
+      _pinned ->
+        socket
+    end
   end
 
   defp get_readiness_checklist_with_status(
