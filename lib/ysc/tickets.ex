@@ -51,7 +51,8 @@ defmodule Ysc.Tickets do
   - `ticket_selections`: Map of ticket_tier_id => quantity
 
   ## Returns:
-  - `{:ok, %TicketOrder{}}` on success
+  - `{:ok, %TicketOrder{}}` on success, with `:tickets` (each carrying
+    `:ticket_tier`) and `:user` loaded from `atomic_booking/4`
   - `{:error, changeset}` on validation failure
   - `{:error, :overbooked}` if event or tier capacity exceeded
   - `{:error, :event_capacity_exceeded}` if event's global max_attendees limit would be exceeded
@@ -1490,8 +1491,11 @@ defmodule Ysc.Tickets do
 
   Returns `{:ok, total, discount}`.
   """
+  def recalculate_pending_order_pricing(ticket_order, opts \\ [])
+
   def recalculate_pending_order_pricing(
-        %TicketOrder{status: :expired} = ticket_order
+        %TicketOrder{status: :expired} = ticket_order,
+        _opts
       ) do
     selections = expired_ticket_selections(ticket_order.id)
 
@@ -1508,14 +1512,17 @@ defmodule Ysc.Tickets do
     end
   end
 
-  def recalculate_pending_order_pricing(%TicketOrder{} = ticket_order) do
+  def recalculate_pending_order_pricing(%TicketOrder{} = ticket_order, opts) do
     selections = ticket_selections_from_order(ticket_order)
 
     BookingLocker.estimate_order_total(
       ticket_order.user_id,
       ticket_order.event_id,
       selections,
-      include_fulfilled_for_order_id: ticket_order.id
+      Keyword.merge(
+        [include_fulfilled_for_order_id: ticket_order.id],
+        Keyword.take(opts, [:tiers])
+      )
     )
   end
 
@@ -1525,8 +1532,19 @@ defmodule Ysc.Tickets do
   Mirrors booking hold checkout pricing sync so Stripe PaymentIntents and
   payment verification use current tier prices instead of the snapshot taken
   when the order was created.
+
+  ## Options
+
+    * `:tiers` - ticket tier structs already loaded for the selection. Skips
+      the estimate-time tier SELECT. Pass rows loaded in the same request
+      (door sale). Do not pass associations cached on a LiveView socket.
   """
-  def sync_pending_order_pricing(%TicketOrder{status: status} = ticket_order)
+  def sync_pending_order_pricing(ticket_order, opts \\ [])
+
+  def sync_pending_order_pricing(
+        %TicketOrder{status: status} = ticket_order,
+        opts
+      )
       when status in [:pending, :expired] do
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
@@ -1535,11 +1553,11 @@ defmodule Ysc.Tickets do
        ) do
       {:ok, ticket_order}
     else
-      do_sync_pending_order_pricing(ticket_order)
+      do_sync_pending_order_pricing(ticket_order, opts)
     end
   end
 
-  def sync_pending_order_pricing(%TicketOrder{} = ticket_order) do
+  def sync_pending_order_pricing(%TicketOrder{} = ticket_order, _opts) do
     {:ok, ensure_ticket_order_for_payment(ticket_order)}
   end
 
@@ -1563,9 +1581,9 @@ defmodule Ysc.Tickets do
     {:ok, ensure_ticket_order_for_payment(ticket_order)}
   end
 
-  defp do_sync_pending_order_pricing(ticket_order) do
+  defp do_sync_pending_order_pricing(ticket_order, opts \\ []) do
     with {:ok, total, discount} <-
-           recalculate_pending_order_pricing(ticket_order) do
+           recalculate_pending_order_pricing(ticket_order, opts) do
       attrs = pending_order_pricing_attrs(total, discount)
 
       if pending_order_pricing_unchanged?(ticket_order, attrs) do
