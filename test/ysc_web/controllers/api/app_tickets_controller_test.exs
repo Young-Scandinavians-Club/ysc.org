@@ -9,6 +9,8 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
   import Ysc.EventsFixtures
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
+  alias Ysc.Subscriptions
 
   defp member_with_active_membership do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -19,6 +21,37 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
         DateTime.truncate(DateTime.utc_now(), :second)
     )
     |> Ysc.Repo.update!()
+  end
+
+  defp give_single_membership(user) do
+    Ysc.Ledgers.ensure_basic_accounts()
+    plans = Application.fetch_env!(:ysc, :membership_plans)
+    single = Enum.find(plans, &(&1.id == :single))
+
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_single_#{System.unique_integer([:positive])}",
+        stripe_status: "active",
+        name: "Membership",
+        current_period_start: DateTime.truncate(DateTime.utc_now(), :second),
+        current_period_end:
+          DateTime.utc_now()
+          |> DateTime.add(30, :day)
+          |> DateTime.truncate(:second)
+      })
+
+    {:ok, _} =
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_id: "si_single_#{System.unique_integer([:positive])}",
+        stripe_product_id: "prod_single",
+        stripe_price_id: single.stripe_price_id,
+        quantity: 1
+      })
+
+    MembershipCache.invalidate_user(user.id)
+    user
   end
 
   setup %{conn: conn} do
@@ -448,6 +481,33 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
         })
 
       assert json_response(response, 422)
+    end
+
+    # Card-present door sale forwards the same-request event/tiers into
+    # create_ticket_order/4. Member-only rules still run; these used to 500
+    # because FallbackController did not map the atoms.
+    test "returns 422 when a Single member exceeds the members-only per-event limit",
+         %{conn: conn} do
+      member = give_single_membership(user_fixture())
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Member",
+          member_only: true
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 2}
+        })
+
+      assert %{
+               "error" =>
+                 "this membership includes one members-only ticket per event"
+             } = json_response(response, 422)
     end
   end
 
