@@ -436,6 +436,73 @@ defmodule Ysc.EventsTest do
       assert tickets == []
     end
 
+    test "does not copy ticket tiers when acting_role is volunteer (Finding 55)",
+         %{user: user} do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Event With Free Tier",
+          description: "Desc",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _free} =
+        Events.create_ticket_tier(%{
+          name: "RSVP",
+          type: :free,
+          quantity: 50,
+          event_id: source.id
+        })
+
+      {:ok, _paid} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: source.id
+        })
+
+      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
+
+      assert {:ok, copied} =
+               Events.copy_event(source, user.id, acting_role: :volunteer)
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
+      assert copied.ticket_tiers == []
+    end
+
+    test "still copies ticket tiers when acting_role is admin", %{user: user} do
+      {:ok, source} =
+        Events.create_event(%{
+          title: "Admin Copy Keeps Tiers",
+          description: "Desc",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _free} =
+        Events.create_ticket_tier(%{
+          name: "RSVP",
+          type: :free,
+          quantity: 50,
+          event_id: source.id
+        })
+
+      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
+
+      assert {:ok, copied} =
+               Events.copy_event(source, user.id, acting_role: :admin)
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
+      assert length(copied.ticket_tiers) == 1
+      assert hd(copied.ticket_tiers).type == :free
+    end
+
     test "copies FAQ questions", %{user: user} do
       {:ok, source} =
         Events.create_event(%{

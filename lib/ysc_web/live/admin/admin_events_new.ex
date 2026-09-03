@@ -216,6 +216,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       <li class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100">
                         <button
                           type="button"
+                          id="copy-event-btn"
                           class="w-full text-left px-1"
                           phx-click="copy-event"
                           data-confirm="Copy this event?"
@@ -1831,7 +1832,9 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("copy-event", _, socket) do
     event = socket.assigns.event
 
-    case Events.copy_event(event, socket.assigns.current_user.id) do
+    case Events.copy_event(event, socket.assigns.current_user.id,
+           acting_role: socket.assigns.admin_role
+         ) do
       {:ok, new_event} ->
         {:noreply,
          push_patch(socket, to: ~p"/admin/events/#{new_event.id}/edit")}
