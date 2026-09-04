@@ -170,8 +170,11 @@ defmodule Ysc.Bookings.BookingValidator do
   end
 
   defp validate_full_weekend_span(changeset, reservation_dates) do
-    has_friday = Enum.any?(reservation_dates, fn date -> day_of_week(date) == 5 end)
-    has_sunday = Enum.any?(reservation_dates, fn date -> day_of_week(date) == 7 end)
+    has_friday =
+      Enum.any?(reservation_dates, fn date -> day_of_week(date) == 5 end)
+
+    has_sunday =
+      Enum.any?(reservation_dates, fn date -> day_of_week(date) == 7 end)
 
     cond do
       has_friday && has_sunday ->

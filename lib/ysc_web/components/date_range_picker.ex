@@ -878,7 +878,9 @@ defmodule YscWeb.Components.DateRangePicker do
   # Friday and Sunday (i.e. it doesn't cover the full weekend).
   defp saturday_span_incomplete?(start_date, day) do
     day_of_weeks =
-      Date.range(start_date, day) |> Enum.to_list() |> Enum.map(&Date.day_of_week/1)
+      Date.range(start_date, day)
+      |> Enum.to_list()
+      |> Enum.map(&Date.day_of_week/1)
 
     6 in day_of_weeks and not (5 in day_of_weeks and 7 in day_of_weeks)
   end

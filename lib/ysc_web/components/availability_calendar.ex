@@ -1425,7 +1425,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       saturday_checkout?(day, property) ->
         true
 
-      property == :tahoe && saturday_without_friday_or_sunday?(checkin_date, day) ->
+      property == :tahoe &&
+          saturday_without_friday_or_sunday?(checkin_date, day) ->
         true
 
       true ->

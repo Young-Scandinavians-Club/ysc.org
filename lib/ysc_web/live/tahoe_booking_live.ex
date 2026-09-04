@@ -1430,7 +1430,9 @@ defmodule YscWeb.TahoeBookingLive do
               <div :if={@booking_step == :details} class="space-y-3 mb-6">
                 <!-- Weekend Rule Alert (Reactive - shows when a stay includes Saturday without spanning Friday-Sunday) -->
                 <div
-                  :if={tahoe_saturday_rule_violation?(@checkin_date, @checkout_date)}
+                  :if={
+                    tahoe_saturday_rule_violation?(@checkin_date, @checkout_date)
+                  }
                   class="p-3 bg-red-50 border border-red-200 rounded-xl"
                 >
                   <div class="flex items-start gap-2">
@@ -6776,10 +6778,18 @@ defmodule YscWeb.TahoeBookingLive do
   # doesn't span the full Friday-through-Sunday weekend.
   defp tahoe_saturday_rule_violation?(checkin_date, checkout_date) do
     cond do
-      is_nil(checkin_date) -> false
-      Date.day_of_week(checkin_date, :monday) == 6 -> true
-      is_nil(checkout_date) -> false
-      Date.compare(checkout_date, checkin_date) == :lt -> false
+      is_nil(checkin_date) ->
+        false
+
+      Date.day_of_week(checkin_date, :monday) == 6 ->
+        true
+
+      is_nil(checkout_date) ->
+        false
+
+      Date.compare(checkout_date, checkin_date) == :lt ->
+        false
+
       true ->
         date_range = Date.range(checkin_date, checkout_date) |> Enum.to_list()
 

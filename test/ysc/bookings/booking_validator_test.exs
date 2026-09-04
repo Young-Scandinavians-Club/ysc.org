@@ -431,10 +431,11 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert Keyword.has_key?(changeset.errors, :checkout_date)
     end
 
-    test "rejects Saturday check-in with Sunday checkout (no Friday in stay)", %{
-      user: user,
-      rooms: rooms
-    } do
+    test "rejects Saturday check-in with Sunday checkout (no Friday in stay)",
+         %{
+           user: user,
+           rooms: rooms
+         } do
       attrs = %{
         user_id: user.id,
         property: :tahoe,
@@ -488,10 +489,11 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert msg =~ "must start Friday"
     end
 
-    test "accepts Friday check-in through Sunday checkout (full weekend span)", %{
-      user: user,
-      rooms: rooms
-    } do
+    test "accepts Friday check-in through Sunday checkout (full weekend span)",
+         %{
+           user: user,
+           rooms: rooms
+         } do
       attrs = %{
         user_id: user.id,
         property: :tahoe,
