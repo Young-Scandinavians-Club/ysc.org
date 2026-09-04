@@ -52,7 +52,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert ApplicationApproved.get_template_name() == "application_approved"
 
-      assert ApplicationApproved.get_subject() =~ "Young Scandinavian"
+      assert ApplicationApproved.get_subject() =~ "membership dues"
 
       assert ApplicationApproved.upcoming_events_url() =~ "/events"
       assert ApplicationApproved.pay_membership_url() =~ "/users/membership"

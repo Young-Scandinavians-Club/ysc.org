@@ -8,7 +8,9 @@ defmodule YscWeb.Emails.ApplicationApprovedTest do
 
   test "get_template_name/0 and get_subject/0" do
     assert ApplicationApproved.get_template_name() == "application_approved"
-    assert ApplicationApproved.get_subject() =~ "Velkommen"
+
+    assert ApplicationApproved.get_subject() ==
+             "Velkommen! (Welcome!) Pay your membership dues to join YSC"
   end
 
   test "upcoming_events_url/0 and pay_membership_url/0 include paths" do
@@ -28,6 +30,10 @@ defmodule YscWeb.Emails.ApplicationApprovedTest do
     html = ApplicationApproved.render(assigns)
     assert is_binary(html)
     assert html =~ user.first_name
+    assert html =~ "Pay your membership dues"
+    assert html =~ "pay your annual membership dues"
+    refute html =~ "Pay Your Membership"
+    refute html =~ "You're officially a Young Scandinavian"
   end
 
   describe "ApplicationApprovedFamilyLinked" do

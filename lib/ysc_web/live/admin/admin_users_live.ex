@@ -13,6 +13,7 @@ defmodule YscWeb.AdminUsersLive do
   alias Ysc.Payments
   alias Ysc.Subscriptions
   alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers, AdminExportFiles}
+  alias YscWeb.Emails.ApplicationApproved
   alias YscWeb.Workers.UserExporter
 
   def render(assigns) do
@@ -1382,7 +1383,7 @@ defmodule YscWeb.AdminUsersLive do
     YscWeb.Emails.Notifier.schedule_email(
       user.email,
       "#{user.id}",
-      "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)",
+      ApplicationApproved.get_subject(),
       "application_approved",
       %{first_name: user.first_name},
       """
@@ -1390,15 +1391,15 @@ defmodule YscWeb.AdminUsersLive do
 
       Hi #{user.email},
 
-      Your application has been approved! 🎉
+      The board approved your application! 🎉
 
-      To complete your membership, please pay your membership dues by visiting the link below:
+      There's one more step before you can book the cabins or buy member event tickets: pay your annual membership dues.
 
       #{YscWeb.Endpoint.url()}/users/membership
 
-      If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
+      If you have any questions, please don't hesitate to contact us at memberships@ysc.org.
 
-      Velkommen!
+      Velkommen! (Welcome!)
 
       Young Scandinavians Club
 
