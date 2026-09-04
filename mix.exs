@@ -254,9 +254,12 @@ defmodule Ysc.MixProject do
       {:nested_filter, "~> 2.1", override: true},
       {:mjml_eex, "~> 0.13"},
       {:mox, "~> 1.2", only: :test},
-      # 2.24: top-level cron/pruner/lifeline/reindexer, Period durations, snooze
-      # no longer consumes attempts. Legacy :plugins names still work.
-      {:oban, "~> 2.24"},
+      # 2.24.1: ack only while the job is still executing (prevents a later
+      # execution from overwriting completed/snoozed); notifier listeners live
+      # in Oban.Notifier.Registry; notify/3 returns {:error, _} instead of
+      # exiting. AdminSettingsLive still uses Oban.Notifier.listen/1 (:ok).
+      # dispatch_cooldown is now a valid start_queue option (unused).
+      {:oban, "~> 2.24.1"},
       {:passbook, "~> 0.1"},
       {:phoenix_bakery, "~> 1.0", runtime: false},
       {:phoenix_ecto, "~> 4.7"},
