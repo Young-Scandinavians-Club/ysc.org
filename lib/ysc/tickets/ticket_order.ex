@@ -93,7 +93,7 @@ defmodule Ysc.Tickets.TicketOrder do
     ])
     |> validate_money(:total_amount)
     |> put_change(:status, :pending)
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
     |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:event_id)
@@ -128,7 +128,7 @@ defmodule Ysc.Tickets.TicketOrder do
     |> validate_money(:total_amount)
     |> put_change(:status, :completed)
     |> put_change(:completed_at, Map.get(attrs, :completed_at, now))
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
     |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:event_id)
@@ -165,25 +165,7 @@ defmodule Ysc.Tickets.TicketOrder do
   Call this when insert fails with a reference_id unique constraint.
   """
   def put_new_reference_id(changeset) do
-    put_change(
-      changeset,
-      :reference_id,
-      ReferenceGenerator.generate_reference_id(@reference_prefix)
-    )
-  end
-
-  defp put_reference_id(changeset) do
-    case get_field(changeset, :reference_id) do
-      nil ->
-        put_change(
-          changeset,
-          :reference_id,
-          ReferenceGenerator.generate_reference_id(@reference_prefix)
-        )
-
-      _ ->
-        changeset
-    end
+    ReferenceGenerator.put_new_reference_id(changeset, @reference_prefix)
   end
 
   defp validate_money(changeset, field) do

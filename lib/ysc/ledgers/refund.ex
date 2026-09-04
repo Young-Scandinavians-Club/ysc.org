@@ -8,6 +8,8 @@ defmodule Ysc.Ledgers.Refund do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Ysc.ReferenceGenerator
+
   @type t :: %__MODULE__{}
 
   @reference_prefix "RFD"
@@ -70,24 +72,10 @@ defmodule Ysc.Ledgers.Refund do
     |> validate_length(:external_refund_id, max: 255)
     |> validate_length(:reference_id, max: 255)
     |> validate_length(:reason, max: 1000)
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
     |> unique_constraint(:external_refund_id)
     |> foreign_key_constraint(:payment_id)
     |> foreign_key_constraint(:user_id)
-  end
-
-  defp put_reference_id(changeset) do
-    case get_field(changeset, :reference_id) do
-      nil ->
-        put_change(
-          changeset,
-          :reference_id,
-          Ysc.ReferenceGenerator.generate_reference_id(@reference_prefix)
-        )
-
-      _ ->
-        changeset
-    end
   end
 end
