@@ -223,6 +223,10 @@ defmodule Ysc.MixProject do
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
+      # EEF-CVE-2026-82728/82729: unbounded HTTP/1 status-line/chunk-extension
+      # buffering and quadratic chunk-size parsing; fixed in mint 1.10.0+.
+      # Finch still lists ~> 1.8, so pin the patched floor.
+      {:mint, "~> 1.10", override: true},
       {:floki, "~> 0.38"},
       {:flop, "~> 0.28.0"},
       {:flop_phoenix, "~> 0.26.3"},
