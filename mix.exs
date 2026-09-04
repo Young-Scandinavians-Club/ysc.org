@@ -17,7 +17,7 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe],
         list_unused_filters: true
       ],
-      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-09-04.
+      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-10-04.
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
@@ -194,7 +194,8 @@ defmodule Ysc.MixProject do
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
       # Official Hex cowlib 2.19.0 (cowboy 2.18 needs >= 2.19; fixes EEF-CVE-2026-59248).
-      # EEF-CVE-2026-43969/43966: still unpatched — ignored until 2026-09-04 (see mix.exs hex config).
+      # EEF-CVE-2026-43969/43966/43971: still unpatched — ignored until 2026-10-04
+      # (see mix.exs hex config).
       {:cowboy, "~> 2.18", override: true},
       {:cowlib, "~> 2.19", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
@@ -223,6 +224,10 @@ defmodule Ysc.MixProject do
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
+      # 1.10.0: EEF-CVE-2026-82728 (unbounded HTTP/1 status-line / chunk-extension
+      # buffering) and EEF-CVE-2026-82729 (quadratic chunk-size parsing). Finch
+      # still lists mint ~> 1.8, so pin the patched floor.
+      {:mint, "~> 1.10", override: true},
       {:floki, "~> 0.38"},
       {:flop, "~> 0.28.0"},
       {:flop_phoenix, "~> 0.26.3"},
