@@ -81,7 +81,7 @@ defmodule Ysc.Events.Ticket do
     ])
     |> validate_active_membership(opts)
     |> validate_event_not_in_past(opts)
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
   end
 
@@ -121,7 +121,7 @@ defmodule Ysc.Events.Ticket do
       :expires_at
     ])
     |> validate_active_membership(opts)
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
   end
 
@@ -150,7 +150,7 @@ defmodule Ysc.Events.Ticket do
       :expires_at
     ])
     |> put_change(:status, Map.get(attrs, :status, :confirmed))
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
   end
 
@@ -211,25 +211,7 @@ defmodule Ysc.Events.Ticket do
   Call this when insert fails with a reference_id unique constraint.
   """
   def put_new_reference_id(changeset) do
-    put_change(
-      changeset,
-      :reference_id,
-      ReferenceGenerator.generate_reference_id(@reference_prefix)
-    )
-  end
-
-  defp put_reference_id(changeset) do
-    case get_field(changeset, :reference_id) do
-      nil ->
-        put_change(
-          changeset,
-          :reference_id,
-          ReferenceGenerator.generate_reference_id(@reference_prefix)
-        )
-
-      _ ->
-        changeset
-    end
+    ReferenceGenerator.put_new_reference_id(changeset, @reference_prefix)
   end
 
   @doc false
