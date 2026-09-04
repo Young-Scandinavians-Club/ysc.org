@@ -213,7 +213,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       refute html =~ "NOT A HOTEL"
     end
 
-    test "booking rules tab explains both Saturday weekend rules", %{
+    test "booking rules tab explains the Saturday weekend rule", %{
       conn: conn
     } do
       user = user_with_membership(:lifetime)
@@ -225,12 +225,9 @@ defmodule YscWeb.TahoeBookingLiveTest do
       html = render_click(view, "switch-info-tab", %{"tab" => "rules"})
 
       assert html =~ "Weekend Policy"
-      assert html =~ "If you arrive Saturday, stay only one night"
+      assert html =~ "Any Saturday stay must run Friday through Sunday"
 
-      assert html =~
-               "Any stay that includes Saturday must also include Sunday"
-
-      refute html =~ "Saturday bookings must include Sunday"
+      refute html =~ "If you arrive Saturday, stay only one night"
 
       assert has_element?(
                view,

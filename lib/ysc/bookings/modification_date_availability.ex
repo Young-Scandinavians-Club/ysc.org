@@ -733,38 +733,36 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     |> Enum.max(fn -> 4 end)
   end
 
-  # Matches BookingValidator: Sat check-in must be one night to Sunday;
-  # any other stay that includes Saturday must also include Sunday.
+  # Matches BookingValidator: any stay that includes Saturday must span the
+  # full weekend (check-in Friday or earlier, checkout Sunday or later).
   defp weekend_unavailability_message(:tahoe, checkin, checkout) do
     if Date.compare(checkout, checkin) == :lt do
       nil
     else
-      cond do
-        Date.day_of_week(checkin, :monday) == 6 ->
-          one_night_to_sunday? =
-            Date.diff(checkout, checkin) == 1 &&
-              Date.day_of_week(checkout, :monday) == 7
+      reservation_dates = Date.range(checkin, checkout) |> Enum.to_list()
 
-          if one_night_to_sunday? do
+      has_saturday? =
+        Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 6))
+
+      if has_saturday? do
+        has_friday? =
+          Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 5))
+
+        has_sunday? =
+          Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 7))
+
+        cond do
+          has_friday? and has_sunday? ->
             nil
-          else
-            BookingValidator.saturday_checkin_one_night_message()
-          end
 
-        true ->
-          reservation_dates = Date.range(checkin, checkout) |> Enum.to_list()
+          not has_friday? ->
+            BookingValidator.saturday_requires_friday_start_message()
 
-          has_saturday? =
-            Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 6))
-
-          has_sunday? =
-            Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 7))
-
-          if has_saturday? and not has_sunday? do
+          true ->
             BookingValidator.saturday_requires_sunday_message()
-          else
-            nil
-          end
+        end
+      else
+        nil
       end
     end
   end

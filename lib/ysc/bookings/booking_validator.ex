@@ -5,8 +5,9 @@ defmodule Ysc.Bookings.BookingValidator do
   ## Tahoe Rules:
   - Winter nights: individual rooms only (buyout cannot occupy any Winter night)
   - Non-winter nights: individual rooms OR full buyout
-  - Saturday check-in must be a one-night stay checking out Sunday; any other stay
-    that includes Saturday must also include Sunday
+  - Any stay that includes Saturday must span the full weekend: check-in on or
+    before Friday and checkout on or after Sunday (Saturday-only check-in is
+    never allowed)
   - Only one active booking per user at a time (all seasons)
   - Exception: Family/Couple members can have up to 2 bookings in the same time period (overlapping dates)
   - Full buyout is mutually exclusive with any other active/future Tahoe reservation
@@ -28,17 +29,18 @@ defmodule Ysc.Bookings.BookingValidator do
   alias Ysc.Subscriptions
 
   @doc """
-  Copy shown when a Saturday check-in is not a one-night stay through Sunday.
+  Copy shown when a stay includes Saturday but check-in is later than Friday
+  (including a Saturday check-in, which is never allowed on its own).
   """
-  def saturday_checkin_one_night_message do
-    "If you check in on Saturday, you must check out on Sunday (one-night stay only). For a longer stay, choose a different arrival day."
+  def saturday_requires_friday_start_message do
+    "Saturday stays must start Friday."
   end
 
   @doc """
   Copy shown when a stay includes Saturday but not Sunday.
   """
   def saturday_requires_sunday_message do
-    "If your stay includes Saturday, it must also include Sunday."
+    "Saturday stays must include Sunday."
   end
 
   @doc """
@@ -139,9 +141,9 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp validate_advance_booking_limit(changeset, _property), do: changeset
 
-  # Tahoe weekend rules:
-  # - Saturday check-in must be a one-night stay checking out Sunday
-  # - Any other stay that includes Saturday must also include Sunday
+  # Tahoe weekend rule: any stay that includes Saturday must span the full
+  # weekend (check-in Friday or earlier, checkout Sunday or later). Saturday
+  # can never be the check-in day.
   defp validate_weekend_requirement(changeset) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
@@ -149,49 +151,41 @@ defmodule Ysc.Bookings.BookingValidator do
 
     if checkin_date && checkout_date && property == :tahoe &&
          Date.compare(checkout_date, checkin_date) != :lt do
-      if day_of_week(checkin_date) == 6 do
-        validate_saturday_checkin_one_night(
-          changeset,
-          checkin_date,
-          checkout_date
-        )
+      reservation_dates =
+        Date.range(checkin_date, checkout_date) |> Enum.to_list()
+
+      has_saturday =
+        Enum.any?(reservation_dates, fn date ->
+          day_of_week(date) == 6
+        end)
+
+      if has_saturday do
+        validate_full_weekend_span(changeset, reservation_dates)
       else
-        reservation_dates =
-          Date.range(checkin_date, checkout_date) |> Enum.to_list()
-
-        has_saturday =
-          Enum.any?(reservation_dates, fn date ->
-            day_of_week(date) == 6
-          end)
-
-        if has_saturday do
-          validate_sunday_included(changeset, reservation_dates)
-        else
-          changeset
-        end
+        changeset
       end
     else
       changeset
     end
   end
 
-  defp validate_saturday_checkin_one_night(
-         changeset,
-         checkin_date,
-         checkout_date
-       ) do
-    one_night_to_sunday? =
-      Date.diff(checkout_date, checkin_date) == 1 &&
-        day_of_week(checkout_date) == 7
+  defp validate_full_weekend_span(changeset, reservation_dates) do
+    has_friday = Enum.any?(reservation_dates, fn date -> day_of_week(date) == 5 end)
+    has_sunday = Enum.any?(reservation_dates, fn date -> day_of_week(date) == 7 end)
 
-    if one_night_to_sunday? do
-      changeset
-    else
-      Ecto.Changeset.add_error(
-        changeset,
-        :checkout_date,
-        saturday_checkin_one_night_message()
-      )
+    cond do
+      has_friday && has_sunday ->
+        changeset
+
+      not has_friday ->
+        Ecto.Changeset.add_error(
+          changeset,
+          :checkin_date,
+          saturday_requires_friday_start_message()
+        )
+
+      true ->
+        validate_sunday_included(changeset, reservation_dates)
     end
   end
 

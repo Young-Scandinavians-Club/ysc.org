@@ -1428,13 +1428,9 @@ defmodule YscWeb.TahoeBookingLive do
               </section>
               <!-- Booking Rules & Policies (Above Stay Details) -->
               <div :if={@booking_step == :details} class="space-y-3 mb-6">
-                <!-- Weekend Rule Alert (Reactive - shows when Saturday selected without Sunday) -->
+                <!-- Weekend Rule Alert (Reactive - shows when a stay includes Saturday without spanning Friday-Sunday) -->
                 <div
-                  :if={
-                    @checkin_date &&
-                      Date.day_of_week(@checkin_date) == 6 &&
-                      (!@checkout_date || Date.day_of_week(@checkout_date) != 7)
-                  }
+                  :if={tahoe_saturday_rule_violation?(@checkin_date, @checkout_date)}
                   class="p-3 bg-red-50 border border-red-200 rounded-xl"
                 >
                   <div class="flex items-start gap-2">
@@ -1447,7 +1443,7 @@ defmodule YscWeb.TahoeBookingLive do
                         Weekend stay rule
                       </p>
                       <p class="text-xs text-red-800">
-                        Check-ins on Saturday must be for one night only, with departure on Sunday. Choose Sunday as your check-out date, or pick different arrival dates if you need a longer stay.
+                        Any Saturday stay must run Friday through Sunday.
                       </p>
                     </div>
                   </div>
@@ -3930,7 +3926,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <tr class="border-b border-zinc-100 hover:bg-white">
                             <td class="py-3 px-4 font-semibold">Weekend Policy</td>
                             <td class="py-3 px-4">
-                              If you arrive Saturday, stay only one night (leave Sunday). Any stay that includes Saturday must also include Sunday.
+                              Any Saturday stay must run Friday through Sunday.
                             </td>
                           </tr>
                           <tr class="border-b border-zinc-100 hover:bg-white">
@@ -4695,15 +4691,9 @@ defmodule YscWeb.TahoeBookingLive do
         socket
       ) do
     checkin_date = parse_date(checkin_date_str)
-
-    # Smart Weekend Rule: Auto-select Sunday if Saturday is selected
-    checkout_date =
-      if checkin_date && Date.day_of_week(checkin_date) == 6 do
-        # Saturday selected - auto-select Sunday
-        Date.add(checkin_date, 1)
-      else
-        socket.assigns.checkout_date
-      end
+    # Saturday can never be a check-in day for Tahoe, so no date is
+    # auto-selected here; the weekend rule validation surfaces the error.
+    checkout_date = socket.assigns.checkout_date
 
     socket =
       socket
@@ -6782,46 +6772,68 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
-  # Matches BookingValidator: Sat check-in must be one night to Sunday;
-  # any other stay that includes Saturday must also include Sunday.
+  # Used by the reactive UI banner to flag a Saturday-inclusive stay that
+  # doesn't span the full Friday-through-Sunday weekend.
+  defp tahoe_saturday_rule_violation?(checkin_date, checkout_date) do
+    cond do
+      is_nil(checkin_date) -> false
+      Date.day_of_week(checkin_date, :monday) == 6 -> true
+      is_nil(checkout_date) -> false
+      Date.compare(checkout_date, checkin_date) == :lt -> false
+      true ->
+        date_range = Date.range(checkin_date, checkout_date) |> Enum.to_list()
+
+        has_saturday =
+          Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 6))
+
+        has_friday =
+          Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 5))
+
+        has_sunday =
+          Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 7))
+
+        has_saturday && !(has_friday && has_sunday)
+    end
+  end
+
+  # Matches BookingValidator: any stay that includes Saturday must span the
+  # full weekend (check-in Friday or earlier, checkout Sunday or later).
   defp validate_weekend_rule(errors, checkin_date, checkout_date) do
     if Date.compare(checkout_date, checkin_date) == :lt do
       errors
     else
-      cond do
-        Date.day_of_week(checkin_date, :monday) == 6 ->
-          one_night_to_sunday? =
-            Date.diff(checkout_date, checkin_date) == 1 &&
-              Date.day_of_week(checkout_date, :monday) == 7
+      date_range = Date.range(checkin_date, checkout_date) |> Enum.to_list()
 
-          if one_night_to_sunday? do
+      has_saturday =
+        Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 6))
+
+      if has_saturday do
+        has_friday =
+          Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 5))
+
+        has_sunday =
+          Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 7))
+
+        cond do
+          has_friday and has_sunday ->
             errors
-          else
+
+          not has_friday ->
             Map.put(
               errors,
               :weekend,
-              BookingValidator.saturday_checkin_one_night_message()
+              BookingValidator.saturday_requires_friday_start_message()
             )
-          end
 
-        true ->
-          date_range = Date.range(checkin_date, checkout_date) |> Enum.to_list()
-
-          has_saturday =
-            Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 6))
-
-          has_sunday =
-            Enum.any?(date_range, &(Date.day_of_week(&1, :monday) == 7))
-
-          if has_saturday and not has_sunday do
+          true ->
             Map.put(
               errors,
               :weekend,
               BookingValidator.saturday_requires_sunday_message()
             )
-          else
-            errors
-          end
+        end
+      else
+        errors
       end
     end
   end

@@ -918,12 +918,15 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
              )
   end
 
-  test "checkout tooltips block Saturday check-in except Sunday one-night", %{
-    user: user
-  } do
+  test "checkout tooltips always block a Saturday check-in (no Friday in stay)",
+       %{
+         user: user
+       } do
     room = create_room!()
     saturday = Date.utc_today() |> Date.add(21) |> first_saturday_on_or_after()
     sunday = Date.add(saturday, 1)
+    # This booking predates the full-weekend-span rule; admin creation skips
+    # validation, so a grandfathered Saturday check-in can still exist here.
     booking = complete_room_booking!(user, room, saturday, sunday)
     calendar = ModificationDateAvailability.calendar_context(booking)
 
@@ -949,8 +952,9 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     monday = Date.add(saturday, 2)
 
     assert tooltips[Date.to_iso8601(monday)] =~
-             BookingValidator.saturday_checkin_one_night_message()
+             BookingValidator.saturday_requires_friday_start_message()
 
-    refute Map.has_key?(tooltips, Date.to_iso8601(sunday))
+    assert tooltips[Date.to_iso8601(sunday)] =~
+             BookingValidator.saturday_requires_friday_start_message()
   end
 end
