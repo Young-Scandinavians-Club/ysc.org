@@ -465,6 +465,7 @@ defmodule YscWeb.VolunteerRoleTest do
   # Finding 46: volunteers cannot refund, reassign, or grant tickets
   # Finding 50: volunteers cannot reserve tickets (discounted holds) either
   # Finding 53: volunteers cannot cancel ticket reservations either
+  # Finding 55: volunteers cannot copy ticket tiers (including Free / $0)
   # ---------------------------------------------------------------------------
 
   describe "volunteer ticket money actions (Finding 46)" do
@@ -524,6 +525,36 @@ defmodule YscWeb.VolunteerRoleTest do
 
       refute has_element?(view, "#reassign-ticket-modal")
       assert Repo.get!(Ticket, ticket.id).user_id == buyer.id
+    end
+
+    test "copy-event does not duplicate ticket tiers (Finding 55)", %{
+      conn: conn,
+      volunteer: volunteer
+    } do
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "Volunteer Copy Free",
+        type: :free,
+        quantity: 15
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#copy-event-btn")
+      |> render_click()
+
+      path = assert_patch(view)
+
+      copied_id =
+        path
+        |> Path.split()
+        |> Enum.at(3)
+
+      copied = Events.get_event!(copied_id) |> Repo.preload(:ticket_tiers)
+      assert copied.ticket_tiers == []
     end
 
     test "cannot cancel an active discounted reservation (Finding 53)", %{

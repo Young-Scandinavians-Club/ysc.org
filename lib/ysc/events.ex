@@ -572,9 +572,20 @@ defmodule Ysc.Events do
   Deep-copy an event as a new draft, including agendas (with items), ticket tiers, and FAQ questions.
   The new event is unpublished (state: :draft), owned by `organizer_id` (the user performing the
   copy). No tickets are copied.
+
+  ## Options
+
+    * `:acting_role` - the staff role performing the copy (`:admin` or `:volunteer`).
+      Volunteers never receive copied ticket tiers (Finding 55): Copy Event would
+      otherwise mint Free / $0 / donation inventory and bypass the ticket-tier
+      create gates.
+    * `:copy_ticket_tiers` - when `false`, skip ticket tiers even for admins.
+      Ignored when `:acting_role` is a non-admin staff role. Defaults to `true`
+      when `:acting_role` is omitted (scripts and tests).
+
   Returns `{:ok, new_event}` or `{:error, reason}`.
   """
-  def copy_event(%Event{} = event, organizer_id) do
+  def copy_event(%Event{} = event, organizer_id, opts \\ []) do
     event =
       Repo.preload(event, [
         :ticket_tiers,
@@ -642,24 +653,27 @@ defmodule Ysc.Events do
               end)
             end)
 
-            Enum.each(event.ticket_tiers || [], fn tier ->
-              tier_attrs = %{
-                event_id: new_event.id,
-                name: tier.name,
-                description: tier.description,
-                type: tier.type,
-                price: tier.price,
-                quantity: tier.quantity,
-                unlimited_quantity: tier.quantity == nil or tier.quantity == 0,
-                requires_registration: tier.requires_registration,
-                start_date: tier.start_date,
-                end_date: tier.end_date
-              }
+            if copy_ticket_tiers?(opts) do
+              Enum.each(event.ticket_tiers || [], fn tier ->
+                tier_attrs = %{
+                  event_id: new_event.id,
+                  name: tier.name,
+                  description: tier.description,
+                  type: tier.type,
+                  price: tier.price,
+                  quantity: tier.quantity,
+                  unlimited_quantity:
+                    tier.quantity == nil or tier.quantity == 0,
+                  requires_registration: tier.requires_registration,
+                  start_date: tier.start_date,
+                  end_date: tier.end_date
+                }
 
-              %TicketTier{}
-              |> TicketTier.changeset(tier_attrs)
-              |> Repo.insert!()
-            end)
+                %TicketTier{}
+                |> TicketTier.changeset(tier_attrs)
+                |> Repo.insert!()
+              end)
+            end
 
             Enum.each(event.faq_questions || [], fn faq ->
               %FaqQuestion{}
@@ -686,6 +700,18 @@ defmodule Ysc.Events do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # Finding 55: volunteers must not mint ticket inventory via Copy Event.
+  defp copy_ticket_tiers?(opts) when is_list(opts) do
+    case Keyword.get(opts, :acting_role) do
+      :admin -> Keyword.get(opts, :copy_ticket_tiers, true)
+      :volunteer -> false
+      "admin" -> Keyword.get(opts, :copy_ticket_tiers, true)
+      "volunteer" -> false
+      nil -> Keyword.get(opts, :copy_ticket_tiers, true)
+      _ -> false
     end
   end
 

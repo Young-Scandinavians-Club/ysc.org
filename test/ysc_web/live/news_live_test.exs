@@ -124,6 +124,8 @@ defmodule YscWeb.NewsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/news")
       render_news_async(view)
 
+      Ysc.PublicContentCache.subscribe()
+
       assert {:ok, post} =
                Posts.create_post(
                  %{
@@ -139,8 +141,23 @@ defmodule YscWeb.NewsLiveTest do
 
       assert Enum.any?(Posts.list_posts(10), &(&1.id == post.id))
 
-      # Process the PubSub invalidation message before asserting on the stream.
-      refresh_news_content(view)
+      # Wait for the create_post broadcast (or force another invalidate if
+      # another async test briefly disabled process caches).
+      receive do
+        {:public_content_cache_invalidated, :posts, _} -> :ok
+      after
+        1_000 ->
+          Application.put_env(:ysc, :process_caches_enabled, true)
+          Ysc.PublicContentCache.invalidate_posts()
+
+          receive do
+            {:public_content_cache_invalidated, :posts, _} -> :ok
+          after
+            1_000 -> :ok
+          end
+      end
+
+      render(view)
       assert has_element?(view, "a[href='/posts/#{url_name}']", title)
     end
 
