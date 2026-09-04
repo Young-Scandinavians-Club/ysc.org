@@ -3262,6 +3262,7 @@ defmodule Ysc.AccountsTest do
     test "get_membership_joins_ytd_comparison ignores lapses outside the YTD window and incomplete checkouts" do
       before = Accounts.get_membership_joins_ytd_comparison()
       now = DateTime.utc_now() |> DateTime.truncate(:second)
+      last_year_at = Timex.shift(now, years: -1)
 
       last_year =
         user_fixture(%{phone_number: unique_user_phone()})
@@ -3275,15 +3276,23 @@ defmodule Ysc.AccountsTest do
       incomplete =
         user_fixture(%{phone_number: unique_user_phone()})
 
+      # First-subscription `inserted_at` counts as a YTD join. Backdate it so
+      # this test only covers losses/incomplete checkouts — otherwise the
+      # exclusive `< now` join window flakes when inserts cross a second.
       insert_lapsed_subscription(last_year, %{
-        current_period_end: Timex.shift(now, years: -1)
+        current_period_end: last_year_at,
+        inserted_at: last_year_at
       })
 
       insert_lapsed_subscription(still_covered, %{
-        current_period_end: DateTime.add(now, 30, :day)
+        current_period_end: DateTime.add(now, 30, :day),
+        inserted_at: last_year_at
       })
 
-      insert_lapsed_subscription(no_period_end, %{current_period_end: nil})
+      insert_lapsed_subscription(no_period_end, %{
+        current_period_end: nil,
+        inserted_at: last_year_at
+      })
 
       {:ok, _subscription} =
         Subscriptions.create_subscription(%{
