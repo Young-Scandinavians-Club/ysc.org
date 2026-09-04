@@ -49,8 +49,6 @@ defmodule Ysc.ExpenseReports do
   # and resumes it on the next visit, so a page refresh never loses their work.
   # There is at most one active draft per user.
 
-  @draft_preloads [:expense_items, :income_items, :address, :event]
-
   # Arbitrary constant namespace for the two-arg pg_advisory_xact_lock in
   # save_draft/3; keeps expense-draft locks from colliding with any other
   # advisory-lock user elsewhere in the app.
@@ -100,7 +98,7 @@ defmodule Ysc.ExpenseReports do
   for the transaction serializes concurrent autosaves from two tabs, so the
   "reuse existing" lookup always sees a committed prior draft.
 
-  Returns `{:ok, draft}` (reloaded with `@draft_preloads`) or
+  Returns `{:ok, draft}` (with nested items from `cast_assoc`) or
   `{:error, changeset}`.
   """
   def save_draft(%User{} = user, attrs, draft_id \\ nil) do
@@ -133,8 +131,14 @@ defmodule Ysc.ExpenseReports do
         |> Repo.insert_or_update()
 
       case result do
-        {:ok, draft} -> Repo.preload(draft, @draft_preloads, force: true)
-        {:error, %Ecto.Changeset{} = changeset} -> Repo.rollback(changeset)
+        {:ok, draft} ->
+          # Nested items are already on the struct from `cast_assoc`. Skip a
+          # force-preload of items/address/event — autosave only needs `id`
+          # and `updated_at`, and resume uses `get_active_draft/1`.
+          draft
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          Repo.rollback(changeset)
       end
     end)
   end
@@ -265,17 +269,37 @@ defmodule Ysc.ExpenseReports do
     Repo.delete_all(query)
   end
 
+  # Display fields for the admin event statistics table. Omits hashed_password,
+  # board_bio, and other columns the submitter-name cell never renders.
+  @event_list_user_fields [:id, :first_name, :last_name]
+
   @doc """
-  List all expense reports for an event, newest first, with items and
+  List filed expense reports for an event, newest first, with items and
   submitter preloaded.
+
+  Drafts are omitted: they are a member's in-progress scratch copy and do not
+  belong in the per-event statistics table. Totals still use
+  `totals_for_event/2`, which counts only approved/paid reports.
   """
   def list_expense_reports_for_event(event_id) do
-    from(er in ExpenseReport,
-      where: er.event_id == ^event_id,
-      order_by: [desc: :inserted_at],
-      preload: [:expense_items, :income_items, :user]
-    )
+    event_id
+    |> list_expense_reports_for_event_query()
     |> Repo.all()
+  end
+
+  defp list_expense_reports_for_event_query(event_id) do
+    user_query =
+      from(u in User, select: struct(u, ^@event_list_user_fields))
+
+    from(er in ExpenseReport,
+      where: er.event_id == ^event_id and er.status != "draft",
+      order_by: [desc: :inserted_at],
+      preload: [
+        :expense_items,
+        :income_items,
+        user: ^user_query
+      ]
+    )
   end
 
   @doc """
@@ -295,33 +319,35 @@ defmodule Ysc.ExpenseReports do
   figure.
 
   Only reports in `statuses` (default `approved` and `paid`) are counted.
+
+  Sums in SQL rather than loading every report, item, and submitter into
+  Elixir — the admin event statistics tab already lists reports separately.
   """
   def totals_for_event(event_id, statuses \\ ["approved", "paid"]) do
-    zero = Money.new(0, :USD)
+    expense_total =
+      event_item_totals_query(ExpenseReportItem, event_id, statuses)
+      |> Repo.one()
+      |> Ysc.MoneyHelper.usd_from_db_sum()
 
-    event_id
-    |> list_expense_reports_for_event()
-    |> Enum.filter(&(&1.status in statuses))
-    |> Enum.reduce(
-      %{expense_total: zero, income_total: zero, net_total: zero},
-      fn report, acc ->
-        report_totals = calculate_totals(report)
+    income_total =
+      event_item_totals_query(ExpenseReportIncomeItem, event_id, statuses)
+      |> Repo.one()
+      |> Ysc.MoneyHelper.usd_from_db_sum()
 
-        %{
-          expense_total:
-            money_sum(acc.expense_total, report_totals.expense_total),
-          income_total: money_sum(acc.income_total, report_totals.income_total),
-          net_total: money_sum(acc.net_total, report_totals.net_total)
-        }
-      end
-    )
+    %{
+      expense_total: expense_total,
+      income_total: income_total,
+      net_total: money_sub_or_zero(expense_total, income_total)
+    }
   end
 
-  defp money_sum(%Money{} = a, %Money{} = b) do
-    case Money.add(a, b) do
-      {:ok, sum} -> sum
-      _ -> a
-    end
+  defp event_item_totals_query(item_schema, event_id, statuses) do
+    from(item in item_schema,
+      join: er in ExpenseReport,
+      on: item.expense_report_id == er.id,
+      where: er.event_id == ^event_id and er.status in ^statuses,
+      select: sum(fragment("(?.amount).amount", item))
+    )
   end
 
   defp expense_reports_query(user_id) do
@@ -1096,12 +1122,21 @@ defmodule Ysc.ExpenseReports do
 
   defp sum_item_amounts(items) do
     Enum.reduce(items, Money.new(0, :USD), fn item, acc ->
-      case Money.add(acc, item.amount) do
-        {:ok, result} -> result
-        _ -> acc
-      end
+      add_item_amount(acc, item.amount)
     end)
   end
+
+  # Draft line items may have a NULL amount while the member is still typing.
+  # `Money.add/2` only accepts `%Money{}` structs, so a nil here would crash
+  # the member reports list (and any other preloaded totals call).
+  defp add_item_amount(acc, %Money{} = amount) do
+    case Money.add(acc, amount) do
+      {:ok, result} -> result
+      _ -> acc
+    end
+  end
+
+  defp add_item_amount(acc, _amount), do: acc
 
   defp money_sub_or_zero(expense_total, income_total) do
     case Money.sub(expense_total, income_total) do
@@ -1365,6 +1400,29 @@ defmodule Ysc.ExpenseReports do
       where: er.user_id == ^user_id,
       order_by: [desc: er.inserted_at],
       preload: [:expense_items, :income_items, :address, :event]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_expense_reports_for_event_query do
+    list_expense_reports_for_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_event_expense_item_totals_query do
+    event_item_totals_query(
+      ExpenseReportItem,
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      ["approved", "paid"]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_event_income_item_totals_query do
+    event_item_totals_query(
+      ExpenseReportIncomeItem,
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      ["approved", "paid"]
     )
   end
 

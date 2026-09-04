@@ -2612,6 +2612,43 @@ defmodule Ysc.EventsTest do
       {:ok, event} = create_event_fixture()
       assert Events.get_event_sales_over_time(event.id) == []
     end
+
+    test "reuses a passed sale window instead of querying ticket-tier dates twice" do
+      {:ok, event} = create_event_fixture()
+
+      start_date =
+        DateTime.add(DateTime.utc_now(), -2, :day)
+        |> DateTime.truncate(:second)
+
+      end_date =
+        DateTime.add(DateTime.utc_now(), 2, :day) |> DateTime.truncate(:second)
+
+      {:ok, _tier} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          start_date: start_date,
+          end_date: end_date
+        })
+
+      window = Events.get_event_ticket_sale_window(event.id)
+
+      {_, with_window} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.get_event_sales_over_time(event.id, window) end,
+          pattern: ~r/["']?ticket_tiers["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_, without_window} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.get_event_sales_over_time(event.id) end,
+          pattern: ~r/["']?ticket_tiers["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert with_window == 1
+      assert without_window == 2
+    end
   end
 
   describe "get_event_ticket_sale_window/1" do
@@ -2771,6 +2808,52 @@ defmodule Ysc.EventsTest do
                Events.get_event_stripe_fees_total(event.id),
                Money.new(320, :USD)
              )
+    end
+
+    test "totals stripe fees in one query without loading payment ids", %{
+      user: user
+    } do
+      {:ok, event} = create_event_fixture()
+      {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+      Ledgers.ensure_basic_accounts()
+      stripe_fees_account = Ledgers.get_account_by_name("stripe_fees")
+
+      payments = Ysc.LedgersFixtures.payment_rows!(user.id, 3)
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      Enum.each(payments, fn payment ->
+        {:ok, _} =
+          Ledgers.create_entry(%{
+            account_id: stripe_fees_account.id,
+            payment_id: payment.id,
+            amount: Money.new(100, :USD),
+            debit_credit: :debit,
+            description: "fee"
+          })
+
+        %Ticket{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          payment_id: payment.id,
+          expires_at: expires_at
+        }
+        |> Repo.insert!()
+      end)
+
+      {total, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.get_event_stripe_fees_total(event.id) end,
+          pattern: ~r/SELECT/i,
+          caller_pids: [self()]
+        )
+
+      assert Money.equal?(total, Money.new(300, :USD))
+      assert query_count == 1
     end
 
     test "returns zero for an event with no confirmed ticket payments" do
@@ -4872,6 +4955,11 @@ defmodule Ysc.EventsTest do
     test "ci_query_explain_recent_and_upcoming_events_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Events.ci_query_explain_recent_and_upcoming_events_query()
+    end
+
+    test "ci_query_explain_event_stripe_fees_total_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Events.ci_query_explain_event_stripe_fees_total_query()
     end
   end
 end

@@ -1,10 +1,14 @@
 defmodule Ysc.ObanUpgradeTest do
   @moduledoc """
-  Guards the Oban 2.23.1 → 2.24.0 upgrade.
+  Guards the Oban 2.24.0 → 2.24.1 upgrade.
 
-  2.24.0 promotes Cron/Pruner/Lifeline/Reindexer to top-level config keys,
-  publicizes `Oban.Period`, keeps `schedule_in` as a synonym for `scheduled_in`,
-  and rolls back `attempt` on snooze. We migrated off `Oban.Plugins.*`.
+  2.24.1 is a patch: ack operations only apply while the job is still
+  `executing` (and `attempted_at` still matches), notifier listeners live
+  in `Oban.Notifier.Registry` so they survive a notifier crash, listen/
+  notify callbacks return `{:error, _}` instead of exiting, and
+  `dispatch_cooldown` is a valid `start_queue` option. We use
+  `Oban.Engines.Basic` and `Oban.Notifiers.PG`. `AdminSettingsLive`
+  still ignores `Oban.Notifier.listen/1`'s return (`:ok`).
   """
   use ExUnit.Case, async: true
 
@@ -12,10 +16,16 @@ defmodule Ysc.ObanUpgradeTest do
 
   @oban_config Application.compile_env!(:ysc, Oban)
   @prod_opts Keyword.delete(@oban_config, :testing)
+  @basic_engine Path.expand(
+                  "../../deps/oban/lib/oban/engines/basic.ex",
+                  __DIR__
+                )
+  @notifier Path.expand("../../deps/oban/lib/oban/notifier.ex", __DIR__)
+  @oban Path.expand("../../deps/oban/lib/oban.ex", __DIR__)
 
-  describe "2.24.0 Hex lock" do
-    test "locks oban to 2.24.0" do
-      assert to_string(Application.spec(:oban, :vsn)) == "2.24.0"
+  describe "2.24.1 Hex lock" do
+    test "locks oban to 2.24.1" do
+      assert to_string(Application.spec(:oban, :vsn)) == "2.24.1"
     end
   end
 
@@ -144,6 +154,73 @@ defmodule Ysc.ObanUpgradeTest do
       # 2.24 rolls back attempt and increments job.meta["snoozed"] instead of
       # consuming max_attempts — desired for SES pacing.
       assert Oban.Period.to_seconds(15) == 15
+    end
+  end
+
+  describe "2.24.1 engine ack guards" do
+    test "Basic engine acks only while executing with a matching attempted_at" do
+      source = File.read!(@basic_engine)
+
+      assert source =~ ~s(@acking_states ["executing"])
+      assert source =~ "defp ack_query(%Job{} = job, states)"
+      assert source =~ "j.attempted_at == ^job.attempted_at"
+      assert source =~ "j.state in ^states"
+    end
+  end
+
+  describe "2.24.1 notifier registry" do
+    test "Oban.Application supervises Oban.Notifier.Registry" do
+      assert {:module, Oban.Notifier.Registry} =
+               Code.ensure_loaded(Oban.Notifier.Registry)
+
+      assert Process.whereis(Oban.Notifier.Registry)
+      assert Process.whereis(Oban.Application)
+    end
+
+    test "listen/1 still returns :ok for AdminSettingsLive channels" do
+      assert :ok = Oban.Notifier.listen([:insert, :gossip])
+
+      conf = Oban.config()
+
+      assert self() in Oban.Notifier.Registry.listeners(conf, :insert)
+      assert self() in Oban.Notifier.Registry.listeners(conf, :gossip)
+
+      assert :ok = Oban.Notifier.unlisten([:insert, :gossip])
+      refute self() in Oban.Notifier.Registry.listeners(conf, :insert)
+      refute self() in Oban.Notifier.Registry.listeners(conf, :gossip)
+    end
+
+    test "notify/3 returns :ok or {:error, exception} without exiting" do
+      result = Oban.Notifier.notify(:insert, %{probe: true})
+
+      assert result == :ok or match?({:error, %_{}}, result)
+    end
+
+    test "listen still registers even when the notifier callback is wrapped" do
+      source = File.read!(@notifier)
+
+      assert source =~ "alias Oban.Notifier.Registry, as: Listeners"
+
+      assert source =~
+               "for channel <- channels, do: Listeners.register(conf, channel)"
+
+      assert source =~ ":exit, reason ->"
+      assert source =~ "notifier exited with"
+    end
+  end
+
+  describe "2.24.1 dispatch_cooldown" do
+    test "start_queue documents and validates dispatch_cooldown" do
+      source = File.read!(@oban)
+
+      assert String.contains?(
+               source,
+               "validate_queue_opts!(opts, ~w(dispatch_cooldown local_only node queue)a)"
+             )
+
+      assert_raise ArgumentError, ~r/dispatch_cooldown/, fn ->
+        Oban.start_queue(queue: :upgrade_probe, limit: 1, dispatch_cooldown: 0)
+      end
     end
   end
 end

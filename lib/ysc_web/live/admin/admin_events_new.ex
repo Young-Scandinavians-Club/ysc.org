@@ -1566,11 +1566,10 @@ defmodule YscWeb.AdminEventsNewLive do
     stripe_fees_total = data.stripe_fees_total
     expense_report_totals = data.expense_report_totals
 
-    # Drop members' in-progress drafts (autosaved from the expense form) - the
-    # per-report table lists filed reports only. `expense_report_totals` already
-    # counts approved/paid only, so the money figures are unaffected.
-    expense_reports =
-      Enum.reject(data.expense_reports, &(&1.status == "draft"))
+    # `list_expense_reports_for_event/1` already omits drafts. Totals count
+    # approved/paid only, so the money figures are unaffected by submitted
+    # or rejected rows in the per-report table.
+    expense_reports = data.expense_reports
 
     # Revenue = ticket sales plus any other income logged on expense reports
     # (e.g. cash collected at the door). Costs = Stripe fees plus the gross
@@ -1606,15 +1605,18 @@ defmodule YscWeb.AdminEventsNewLive do
   defp fetch_statistics_tab_data(event_id) do
     tasks = [
       {:sales_stats, fn -> Events.get_event_sales_stats(event_id) end},
-      {:sales_over_time, fn -> Events.get_event_sales_over_time(event_id) end},
+      {:sales_over_time,
+       fn ->
+         window = Events.get_event_ticket_sale_window(event_id)
+
+         {Events.get_event_sales_over_time(event_id, window), window}
+       end},
       {:stripe_fees_total,
        fn -> Events.get_event_stripe_fees_total(event_id) end},
       {:expense_reports,
        fn -> ExpenseReports.list_expense_reports_for_event(event_id) end},
       {:expense_report_totals,
        fn -> ExpenseReports.totals_for_event(event_id) end},
-      {:ticket_sale_window,
-       fn -> Events.get_event_ticket_sale_window(event_id) end},
       {:event_updates, fn -> Events.list_event_updates(event_id) end},
       {:donations_total, fn -> Events.get_event_donations_total(event_id) end}
     ]
@@ -1631,8 +1633,13 @@ defmodule YscWeb.AdminEventsNewLive do
 
     event_updates = Map.fetch!(results, :event_updates)
 
-    Map.put(
-      results,
+    {sales_over_time, ticket_sale_window} =
+      Map.fetch!(results, :sales_over_time)
+
+    results
+    |> Map.put(:sales_over_time, sales_over_time)
+    |> Map.put(:ticket_sale_window, ticket_sale_window)
+    |> Map.put(
       :event_update_markers,
       event_update_markers_from(event_updates)
     )
