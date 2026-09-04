@@ -1503,6 +1503,9 @@ defmodule YscWeb.BookingChangeLive do
     YscWeb.FormHelpers.format_changeset_errors(changeset, style: :flat)
   end
 
+  defp modification_error_message(:weekend_rule_violation),
+    do: "Any stay that includes Saturday must run Friday through Sunday."
+
   defp modification_error_message(:blackout_conflict),
     do: YscWeb.BookingUserMessages.unavailable_blackout_dates()
 

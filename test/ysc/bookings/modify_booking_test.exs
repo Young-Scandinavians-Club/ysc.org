@@ -641,7 +641,10 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       user: user
     } do
       {checkin, checkout} = tahoe_booking_dates(110)
-      extended_checkout = Date.add(checkout, 2)
+      # Extend by 1 night (Monday check-in + 3 nights -> Friday checkout)
+      # rather than 2, so the extended stay doesn't newly introduce Saturday
+      # and trip the Tahoe weekend rule this test isn't exercising.
+      extended_checkout = Date.add(checkout, 1)
       booking = complete_buyout_booking!(user, checkin, checkout)
 
       attrs = %{

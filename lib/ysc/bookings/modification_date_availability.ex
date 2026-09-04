@@ -447,34 +447,39 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
          checkout
        ) do
     booking = snapshot.booking
-    new_guests = booking.guests_count
-    new_days = modification_date_range(checkin, checkout)
 
-    availability_result =
-      case booking.booking_mode do
-        :buyout ->
-          validate_buyout_modification(snapshot, new_days)
+    if weekend_unavailability_message(booking.property, checkin, checkout) do
+      :weekend_rule_violation
+    else
+      new_guests = booking.guests_count
+      new_days = modification_date_range(checkin, checkout)
 
-        :room ->
-          validate_room_modification(snapshot, checkin, checkout)
+      availability_result =
+        case booking.booking_mode do
+          :buyout ->
+            validate_buyout_modification(snapshot, new_days)
 
-        :day ->
-          validate_day_modification(snapshot, new_days, new_guests)
+          :room ->
+            validate_room_modification(snapshot, checkin, checkout)
 
-        _ ->
-          {:error, :invalid_booking_mode}
-      end
+          :day ->
+            validate_day_modification(snapshot, new_days, new_guests)
 
-    case availability_result do
-      :ok ->
-        if blackout_conflict?(snapshot, checkin, checkout) do
-          :blackout_conflict
-        else
-          nil
+          _ ->
+            {:error, :invalid_booking_mode}
         end
 
-      {:error, reason} ->
-        reason
+      case availability_result do
+        :ok ->
+          if blackout_conflict?(snapshot, checkin, checkout) do
+            :blackout_conflict
+          else
+            nil
+          end
+
+        {:error, reason} ->
+          reason
+      end
     end
   end
 
@@ -777,6 +782,9 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
   defp availability_message(_),
     do: "The cabin is not available starting on this date"
+
+  defp availability_error_message(:weekend_rule_violation),
+    do: "Any stay that includes Saturday must run Friday through Sunday."
 
   defp availability_error_message(:blackout_conflict),
     do:

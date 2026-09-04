@@ -1002,12 +1002,20 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp selection_restricted?(day, assigns) do
-    assigns.state == :set_end &&
-      assigns.checkin_date &&
-      !selected_start?(day, assigns.checkin_date) &&
-      !fully_blocked_for_stay?(day, assigns) &&
-      !partial_availability_day?(day, assigns) &&
-      checkout_selection_blocked?(day, assigns)
+    cond do
+      assigns.state == :set_start ->
+        check_start_date_rules(day, assigns[:property])
+
+      assigns.state == :set_end ->
+        assigns.checkin_date &&
+          !selected_start?(day, assigns.checkin_date) &&
+          !fully_blocked_for_stay?(day, assigns) &&
+          !partial_availability_day?(day, assigns) &&
+          checkout_selection_blocked?(day, assigns)
+
+      true ->
+        false
+    end
   end
 
   defp partial_availability_day?(day, assigns) do
