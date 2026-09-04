@@ -10,6 +10,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
   alias Ysc.Bookings.BookingEntitlement
 
   alias YscWeb.Emails.{
+    ApplicationApproved,
     BookingCheckinReminder,
     BookingCheckoutReminder,
     BookingConfirmation,
@@ -33,6 +34,21 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
   }
 
   describe "membership emails" do
+    test "approval email asks people to pay dues instead of saying they are already members" do
+      html = ApplicationApproved.render(%{first_name: "Jane"})
+      text = html_text(html)
+
+      assert ApplicationApproved.get_subject() ==
+               "Velkommen! (Welcome!) Pay your membership dues to join YSC"
+
+      assert text =~ "There's one more step before you can book the cabins"
+      assert text =~ "pay your annual membership dues"
+      assert text =~ "Pay your membership dues"
+      refute text =~ "You're officially a Young Scandinavian"
+      refute text =~ "Pay Your Membership"
+      refute text =~ "completing your membership payment"
+    end
+
     test "payment confirmation tells members they can book a stay at the cabins" do
       html =
         MembershipPaymentConfirmation.render(%{

@@ -15,7 +15,7 @@ defmodule YscWeb.Emails.ApplicationApproved do
   end
 
   def get_subject() do
-    "Velkommen! You're officially a Young Scandinavian 🎉 (One more step!)"
+    "Velkommen! (Welcome!) Pay your membership dues to join YSC"
   end
 
   def upcoming_events_url(), do: YscWeb.Emails.Helpers.upcoming_events_url()
