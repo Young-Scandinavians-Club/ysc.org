@@ -5,17 +5,10 @@ defmodule Ysc.AuthRateLimitTest do
 
   # Use low limits so we can hit them in tests. Each test uses unique IP/email to avoid cross-test pollution.
   setup do
-    Application.put_env(:ysc, Ysc.AuthRateLimit,
-      ip_limit: 2,
-      identifier_limit: 2
-    )
+    token =
+      Ysc.Test.AuthRateLimitHelper.capture!(ip_limit: 2, identifier_limit: 2)
 
-    on_exit(fn ->
-      Application.put_env(:ysc, Ysc.AuthRateLimit,
-        ip_limit: 10_000,
-        identifier_limit: 10_000
-      )
-    end)
+    on_exit(fn -> Ysc.Test.AuthRateLimitHelper.restore!(token) end)
 
     :ok
   end
