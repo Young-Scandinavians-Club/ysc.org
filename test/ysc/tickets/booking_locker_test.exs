@@ -2172,5 +2172,84 @@ defmodule Ysc.Tickets.BookingLockerTest do
 
       assert lookups == 1
     end
+
+    # #1219 reuses caller-supplied :tiers for door-sale PaymentIntent
+    # repricing. QueryCounter tests prove matching ids skip the SELECT;
+    # these prove a mismatched/incomplete list still charges this event.
+    test "reloads this event's prices when the passed :tiers belong to another event",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Cheap other estimate event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, cheap_tier} =
+        Events.create_ticket_tier(%{
+          name: "Cheap",
+          type: :paid,
+          price: Money.new(1, :USD),
+          quantity: 20,
+          event_id: other.id
+        })
+
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              user.id,
+              event.id,
+              %{tier.id => 1},
+              tiers: [cheap_tier]
+            )
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, estimated_total, estimated_discount} = result
+      assert Money.equal?(estimated_total, Money.new(25, :USD))
+      assert Money.zero?(estimated_discount)
+      assert tier_lookups == 1
+    end
+
+    test "reloads selected tiers when the passed :tiers list is incomplete", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              user.id,
+              event.id,
+              %{tier.id => 2},
+              tiers: []
+            )
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, estimated_total, _discount} = result
+      assert Money.equal?(estimated_total, Money.new(50, :USD))
+      assert tier_lookups == 1
+    end
   end
 end
