@@ -2542,6 +2542,41 @@ defmodule Ysc.ExpenseReportsTest do
                MapSet.new([report1.id, report2.id])
     end
 
+    test "omits draft reports and does not SELECT user password hashes", %{
+      user: user
+    } do
+      event = event_fixture()
+
+      submitted =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Filed",
+          reimbursement_method: "bank_transfer"
+        })
+
+      _draft =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "draft",
+          purpose: "Still writing",
+          reimbursement_method: "bank_transfer"
+        })
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports_for_event(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert Enum.map(results, & &1.id) == [submitted.id]
+      assert password_cols == 0
+      assert hd(results).user.first_name == user.first_name
+    end
+
     test "returns empty list for an event with no expense reports" do
       assert ExpenseReports.list_expense_reports_for_event(Ecto.ULID.generate()) ==
                []
@@ -2699,6 +2734,65 @@ defmodule Ysc.ExpenseReportsTest do
       assert Money.equal?(totals.expense_total, Money.new(0, :USD))
       assert Money.equal?(totals.income_total, Money.new(0, :USD))
       assert Money.equal?(totals.net_total, Money.new(0, :USD))
+    end
+
+    test "sums in SQL without loading submitters or full report rows", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+
+      for i <- 1..3 do
+        {:ok, report} =
+          ExpenseReports.create_expense_report(
+            %{
+              "user_id" => user.id,
+              "event_id" => event.id,
+              "status" => "draft",
+              "purpose" => "Batch #{i}",
+              "reimbursement_method" => "bank_transfer",
+              "bank_account_id" => bank_account.id,
+              "expense_items" => [
+                %{
+                  "date" => "2024-01-15",
+                  "vendor" => "Vendor",
+                  "description" => "Item",
+                  "amount" => "10.00"
+                }
+              ]
+            },
+            user
+          )
+
+        {:ok, _} =
+          ExpenseReports.update_expense_report(report, %{status: "approved"})
+      end
+
+      {totals, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.totals_for_event(event.id) end,
+          pattern: ~r/FROM ["']?users["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_, item_sums} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.totals_for_event(event.id) end,
+          pattern: ~r/FROM ["']?expense_report_items["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert Money.equal?(totals.expense_total, Money.new(30, :USD))
+      assert user_lookups == 0
+      assert item_sums == 1
     end
   end
 
@@ -2952,6 +3046,17 @@ defmodule Ysc.ExpenseReportsTest do
       assert %Ecto.Query{} = query
       assert Repo.all(query) == []
     end
+
+    test "event list and totals builders return Ecto queries" do
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_list_expense_reports_for_event_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_event_expense_item_totals_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_event_income_item_totals_query()
+    end
   end
 
   describe "drafts" do
@@ -2985,6 +3090,31 @@ defmodule Ysc.ExpenseReportsTest do
                ),
                :count
              ) == 1
+    end
+
+    test "save_draft/3 does not reload address or event after insert", %{
+      user: user
+    } do
+      {_, address_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            ExpenseReports.save_draft(user, %{"purpose" => "No extra preloads"})
+          end,
+          pattern: ~r/FROM ["']?addresses["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            ExpenseReports.save_draft(user, %{"purpose" => "Still no extra"})
+          end,
+          pattern: ~r/FROM ["']?events["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert address_lookups == 0
+      assert event_lookups == 0
     end
 
     test "save_draft/3 persists a half-filled expense item", %{user: user} do

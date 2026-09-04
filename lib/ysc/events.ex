@@ -2259,8 +2259,11 @@ defmodule Ysc.Events do
   #{@max_sales_chart_days} days, the result is zero-filled across the whole
   window so gaps in sales are visible rather than skipped. Otherwise only days
   with actual sales are returned.
+
+  Pass `sale_window` when the caller already loaded it (the admin statistics
+  tab) so this does not SELECT ticket-tier dates a second time.
   """
-  def get_event_sales_over_time(event_id) do
+  def get_event_sales_over_time(event_id, sale_window \\ nil) do
     points =
       from(t in Ticket,
         join: tt in assoc(t, :ticket_tier),
@@ -2308,7 +2311,10 @@ defmodule Ysc.Events do
       end)
       |> Enum.sort_by(& &1.date, Date)
 
-    fill_sales_timeline(points, get_event_ticket_sale_window(event_id))
+    fill_sales_timeline(
+      points,
+      sale_window || get_event_ticket_sale_window(event_id)
+    )
   end
 
   @doc """
@@ -2391,6 +2397,13 @@ defmodule Ysc.Events do
   payments.
   """
   def get_event_stripe_fees_total(event_id) do
+    event_id
+    |> event_stripe_fees_total_query()
+    |> Repo.one()
+    |> Ysc.MoneyHelper.usd_from_db_sum()
+  end
+
+  defp event_stripe_fees_total_query(event_id) do
     payment_ids =
       from(t in Ticket,
         where:
@@ -2399,9 +2412,14 @@ defmodule Ysc.Events do
         distinct: true,
         select: t.payment_id
       )
-      |> Repo.all()
 
-    Ysc.Ledgers.sum_stripe_fees_for_payments(payment_ids)
+    from(e in Ysc.Ledgers.LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id in subquery(payment_ids),
+      where: a.name == "stripe_fees",
+      where: e.debit_credit == "debit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
   end
 
   @doc """
@@ -3805,5 +3823,10 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_recent_and_upcoming_events_query do
     recent_and_upcoming_events_query()
+  end
+
+  @doc false
+  def ci_query_explain_event_stripe_fees_total_query do
+    event_stripe_fees_total_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
