@@ -377,5 +377,28 @@ defmodule YscWeb.ExpenseReportLiveTest do
                "Continue"
              )
     end
+
+    test "the reports list renders a draft whose line items have no amount yet",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Kayak repair",
+          "expense_items" => %{
+            "0" => %{"vendor" => "REI", "description" => "Patch kit"}
+          }
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereports")
+
+      assert has_element?(view, "#expense-report-drafts", "Kayak repair")
+
+      assert has_element?(
+               view,
+               "#expense-report-draft-continue-#{draft.id}"
+             )
+    end
   end
 end

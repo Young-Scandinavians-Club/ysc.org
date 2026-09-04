@@ -1766,6 +1766,33 @@ defmodule Ysc.ExpenseReportsTest do
       assert Money.equal?(totals.income_total, Money.new(:USD, "40.00"))
       assert Money.equal?(totals.net_total, Money.new(:USD, "60.00"))
     end
+
+    test "skips draft line items whose amount is still nil", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "WIP",
+          "expense_items" => %{
+            "0" => %{"vendor" => "Costco", "description" => "Paint"},
+            "1" => %{
+              "vendor" => "Home Depot",
+              "description" => "Lumber",
+              "amount" => "40.00"
+            }
+          },
+          "income_items" => %{
+            "0" => %{"description" => "Cash not counted yet"}
+          }
+        })
+
+      [preloaded] = ExpenseReports.list_expense_reports(user)
+      assert preloaded.id == draft.id
+
+      totals = ExpenseReports.calculate_totals(preloaded)
+
+      assert Money.equal?(totals.expense_total, Money.new(:USD, "40.00"))
+      assert Money.equal?(totals.income_total, Money.new(0, :USD))
+      assert Money.equal?(totals.net_total, Money.new(:USD, "40.00"))
+    end
   end
 
   describe "reimbursement validation" do

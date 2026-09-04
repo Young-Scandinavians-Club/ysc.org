@@ -1096,12 +1096,21 @@ defmodule Ysc.ExpenseReports do
 
   defp sum_item_amounts(items) do
     Enum.reduce(items, Money.new(0, :USD), fn item, acc ->
-      case Money.add(acc, item.amount) do
-        {:ok, result} -> result
-        _ -> acc
-      end
+      add_item_amount(acc, item.amount)
     end)
   end
+
+  # Draft line items may have a NULL amount while the member is still typing.
+  # `Money.add/2` only accepts `%Money{}` structs, so a nil here would crash
+  # the member reports list (and any other preloaded totals call).
+  defp add_item_amount(acc, %Money{} = amount) do
+    case Money.add(acc, amount) do
+      {:ok, result} -> result
+      _ -> acc
+    end
+  end
+
+  defp add_item_amount(acc, _amount), do: acc
 
   defp money_sub_or_zero(expense_total, income_total) do
     case Money.sub(expense_total, income_total) do
