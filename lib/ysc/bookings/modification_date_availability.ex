@@ -447,34 +447,39 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
          checkout
        ) do
     booking = snapshot.booking
-    new_guests = booking.guests_count
-    new_days = modification_date_range(checkin, checkout)
 
-    availability_result =
-      case booking.booking_mode do
-        :buyout ->
-          validate_buyout_modification(snapshot, new_days)
+    if weekend_unavailability_message(booking.property, checkin, checkout) do
+      :weekend_rule_violation
+    else
+      new_guests = booking.guests_count
+      new_days = modification_date_range(checkin, checkout)
 
-        :room ->
-          validate_room_modification(snapshot, checkin, checkout)
+      availability_result =
+        case booking.booking_mode do
+          :buyout ->
+            validate_buyout_modification(snapshot, new_days)
 
-        :day ->
-          validate_day_modification(snapshot, new_days, new_guests)
+          :room ->
+            validate_room_modification(snapshot, checkin, checkout)
 
-        _ ->
-          {:error, :invalid_booking_mode}
-      end
+          :day ->
+            validate_day_modification(snapshot, new_days, new_guests)
 
-    case availability_result do
-      :ok ->
-        if blackout_conflict?(snapshot, checkin, checkout) do
-          :blackout_conflict
-        else
-          nil
+          _ ->
+            {:error, :invalid_booking_mode}
         end
 
-      {:error, reason} ->
-        reason
+      case availability_result do
+        :ok ->
+          if blackout_conflict?(snapshot, checkin, checkout) do
+            :blackout_conflict
+          else
+            nil
+          end
+
+        {:error, reason} ->
+          reason
+      end
     end
   end
 
@@ -733,38 +738,36 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     |> Enum.max(fn -> 4 end)
   end
 
-  # Matches BookingValidator: Sat check-in must be one night to Sunday;
-  # any other stay that includes Saturday must also include Sunday.
+  # Matches BookingValidator: any stay that includes Saturday must span the
+  # full weekend (check-in Friday or earlier, checkout Sunday or later).
   defp weekend_unavailability_message(:tahoe, checkin, checkout) do
     if Date.compare(checkout, checkin) == :lt do
       nil
     else
-      cond do
-        Date.day_of_week(checkin, :monday) == 6 ->
-          one_night_to_sunday? =
-            Date.diff(checkout, checkin) == 1 &&
-              Date.day_of_week(checkout, :monday) == 7
+      reservation_dates = Date.range(checkin, checkout) |> Enum.to_list()
 
-          if one_night_to_sunday? do
+      has_saturday? =
+        Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 6))
+
+      if has_saturday? do
+        has_friday? =
+          Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 5))
+
+        has_sunday? =
+          Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 7))
+
+        cond do
+          has_friday? and has_sunday? ->
             nil
-          else
-            BookingValidator.saturday_checkin_one_night_message()
-          end
 
-        true ->
-          reservation_dates = Date.range(checkin, checkout) |> Enum.to_list()
+          not has_friday? ->
+            BookingValidator.saturday_requires_friday_start_message()
 
-          has_saturday? =
-            Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 6))
-
-          has_sunday? =
-            Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 7))
-
-          if has_saturday? and not has_sunday? do
+          true ->
             BookingValidator.saturday_requires_sunday_message()
-          else
-            nil
-          end
+        end
+      else
+        nil
       end
     end
   end
@@ -779,6 +782,9 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
   defp availability_message(_),
     do: "The cabin is not available starting on this date"
+
+  defp availability_error_message(:weekend_rule_violation),
+    do: "Any stay that includes Saturday must run Friday through Sunday."
 
   defp availability_error_message(:blackout_conflict),
     do:

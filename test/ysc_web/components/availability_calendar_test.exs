@@ -648,7 +648,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute calendar_element_attr(checkout_button, "aria-disabled") == "true"
     end
 
-    test "allows Saturday check-in when picking start date on Tahoe" do
+    test "disallows Saturday check-in when picking start date on Tahoe" do
       today = ~D[2026-07-21]
       saturday = ~D[2026-07-25]
 
@@ -667,14 +667,14 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       saturday_button =
         calendar_day_button(calendar_document(html), Date.to_iso8601(saturday))
 
-      refute saturday_cell =~ "No check-in"
-      refute saturday_cell =~ "Check-ins are not permitted on Saturdays"
-      refute calendar_element_attr(saturday_button, "aria-disabled") == "true"
+      assert saturday_cell =~ "No check-in"
+      assert calendar_element_attr(saturday_button, "aria-disabled") == "true"
     end
 
-    test "requires Sunday checkout after Saturday check-in on Tahoe" do
+    test "blocks every checkout date after a Saturday check-in on Tahoe (no Friday in stay)" do
       today = ~D[2026-07-21]
       saturday = ~D[2026-07-25]
+      sunday = ~D[2026-07-26]
       monday = ~D[2026-07-27]
 
       html =
@@ -689,18 +689,17 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           state: :set_end
         )
 
-      monday_cell = extract_day_cell(html, Date.to_iso8601(monday))
+      for day <- [sunday, monday] do
+        cell = extract_day_cell(html, Date.to_iso8601(day))
 
-      monday_button =
-        calendar_day_button(calendar_document(html), Date.to_iso8601(monday))
+        button =
+          calendar_day_button(calendar_document(html), Date.to_iso8601(day))
 
-      assert String.contains?(monday_cell, "Leave Sunday") or
-               String.contains?(
-                 monday_cell,
-                 "If you check in on Saturday, you must check out on Sunday"
-               )
+        assert String.contains?(cell, "Include Fri-Sun") or
+                 String.contains?(cell, "must start Friday")
 
-      assert calendar_element_attr(monday_button, "aria-disabled") == "true"
+        assert calendar_element_attr(button, "aria-disabled") == "true"
+      end
     end
 
     test "does not apply Saturday booking restrictions on Clear Lake" do
