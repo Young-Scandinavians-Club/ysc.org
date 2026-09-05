@@ -335,15 +335,15 @@ defmodule YscWeb.VolunteerLiveTest do
 
   describe "form fields" do
     test "name field is required for unauthenticated users", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/volunteer")
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
 
-      assert html =~ "Name (*)"
+      assert has_element?(view, "#volunteer-form", "Name*")
     end
 
     test "email field is required for unauthenticated users", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/volunteer")
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
 
-      assert html =~ "Email (*)"
+      assert has_element?(view, "#volunteer-form", "Email*")
     end
   end
 

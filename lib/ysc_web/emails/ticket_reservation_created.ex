@@ -98,12 +98,9 @@ defmodule YscWeb.Emails.TicketReservationCreated do
   defp discount_positive?(_), do: false
 
   defp format_hold_expires(nil),
-    do:
-      "No fixed end date — complete checkout on the event page when you are ready."
+    do: "No deadline — buy tickets on the event page when you're ready."
 
-  defp format_hold_expires(%DateTime{} = dt) do
-    "Complete checkout before #{format_datetime(dt)}"
-  end
+  defp format_hold_expires(%DateTime{} = dt), do: format_datetime(dt)
 
   defp notes_present?(notes) when is_binary(notes), do: String.trim(notes) != ""
   defp notes_present?(_), do: false

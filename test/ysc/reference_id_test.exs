@@ -1,6 +1,15 @@
 defmodule Ysc.ReferenceGeneratorTest do
   use ExUnit.Case, async: true
   alias Ysc.ReferenceGenerator
+  import Ecto.Changeset
+
+  defmodule RefSchema do
+    use Ecto.Schema
+
+    schema "ref_schema" do
+      field :reference_id, :string
+    end
+  end
 
   describe "generate_reference_id/1" do
     test "generates valid reference IDs for valid prefixes" do
@@ -126,6 +135,61 @@ defmodule Ysc.ReferenceGeneratorTest do
       checksum1 = ReferenceGenerator.compute_checksum("PMT230415ABC2")
       checksum2 = ReferenceGenerator.compute_checksum("PMT230415ABC3")
       assert checksum1 != checksum2
+    end
+  end
+
+  describe "put_reference_id/2" do
+    test "assigns a valid reference_id when missing" do
+      changeset =
+        %RefSchema{}
+        |> change(%{})
+        |> ReferenceGenerator.put_reference_id("PMT")
+
+      ref = get_change(changeset, :reference_id)
+      assert is_binary(ref)
+      assert String.starts_with?(ref, "PMT-")
+      assert :ok = ReferenceGenerator.validate_reference_id(ref)
+    end
+
+    test "keeps an existing reference_id from attrs" do
+      changeset =
+        %RefSchema{}
+        |> change(%{reference_id: "PMT-CUSTOM-123"})
+        |> ReferenceGenerator.put_reference_id("PMT")
+
+      assert get_change(changeset, :reference_id) == "PMT-CUSTOM-123"
+    end
+
+    test "keeps an existing reference_id on the struct when the change omits it" do
+      changeset =
+        %RefSchema{reference_id: "MIG-WP-123"}
+        |> change(%{})
+        |> ReferenceGenerator.put_reference_id("BKG")
+
+      assert get_change(changeset, :reference_id) == nil
+      assert get_field(changeset, :reference_id) == "MIG-WP-123"
+    end
+  end
+
+  describe "put_new_reference_id/2" do
+    test "always assigns a new reference_id" do
+      changeset =
+        %RefSchema{reference_id: "ORD-260101-OLD1X"}
+        |> change(%{})
+        |> ReferenceGenerator.put_new_reference_id("ORD")
+
+      new_ref = get_change(changeset, :reference_id)
+      assert new_ref != "ORD-260101-OLD1X"
+      assert new_ref =~ ~r/^ORD-\d{6}-[A-Z0-9]{5}$/
+      assert :ok = ReferenceGenerator.validate_reference_id(new_ref)
+    end
+
+    test "raises ArgumentError for an invalid prefix" do
+      changeset = change(%RefSchema{}, %{})
+
+      assert_raise ArgumentError, "Invalid prefix: INV", fn ->
+        ReferenceGenerator.put_new_reference_id(changeset, "INV")
+      end
     end
   end
 end

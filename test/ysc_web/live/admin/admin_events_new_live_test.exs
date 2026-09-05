@@ -1560,6 +1560,41 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       refute has_element?(view, "#event-statistics-loading")
       assert has_element?(view, "#event-stats-kpis")
     end
+
+    test "the linked expense reports table hides members' drafts", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, title: "Stats Event"})
+      member = user_fixture()
+
+      submitted =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Filed",
+          reimbursement_method: "bank_transfer",
+          certification_accepted: true
+        })
+
+      draft =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "draft",
+          purpose: "Half typed",
+          reimbursement_method: "bank_transfer"
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/statistics")
+
+      render_async(view)
+
+      assert has_element?(view, "#expense-report-#{submitted.id}")
+      refute has_element?(view, "#expense-report-#{draft.id}")
+    end
   end
 
   describe "editing presence" do

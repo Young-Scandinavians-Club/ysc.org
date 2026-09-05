@@ -229,7 +229,7 @@ defmodule Ysc.Events.Event do
     |> validate_length(:description, max: 200)
     |> strip_description_html()
     |> handle_unlimited_capacity()
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
     |> validate_partiful_link()
     |> validate_publish_dates()
@@ -320,20 +320,6 @@ defmodule Ysc.Events.Event do
               add_error(changeset, :partiful_link, "must be a valid URL")
           end
         end
-    end
-  end
-
-  defp put_reference_id(changeset) do
-    case get_field(changeset, :reference_id) do
-      nil ->
-        put_change(
-          changeset,
-          :reference_id,
-          ReferenceGenerator.generate_reference_id(@reference_prefix)
-        )
-
-      _ ->
-        changeset
     end
   end
 

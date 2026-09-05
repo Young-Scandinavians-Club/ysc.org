@@ -395,6 +395,128 @@ defmodule Ysc.TicketsTest do
       assert owned_count_queries == 0
     end
 
+    @user_pk ~r/FROM "users" AS u0 WHERE \(u0\."id" = \$/
+    @member_only_attrs ~r/FROM "ticket_tiers" AS t0 WHERE \(t0\."id" = ANY/
+
+    test "create_ticket_order skips the user lookup for a preloaded lifetime member",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3},
+              user: user,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      assert user_lookups == 0
+    end
+
+    test "create_ticket_order looks up the buyer once when inserting several tickets",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, order}, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      assert length(tickets_for_order(order.id)) == 3
+      assert user_lookups == 1
+    end
+
+    test "create_ticket_order skips the member-only attribute query when tiers are passed",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, attr_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @member_only_attrs,
+          caller_pids: [self()]
+        )
+
+      assert attr_lookups == 0
+    end
+
+    @event_pk ~r/FROM "events" AS e0 WHERE \(e0\."id" = \$/
+    @booking_tiers ~r/FROM "ticket_tiers" AS t0 WHERE \(t0\."event_id" = \$/
+
+    test "create_ticket_order skips event and booking-tier SELECTs when they are passed",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, _order}, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              event: event,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1},
+              user: user,
+              event: event,
+              tiers: [tier1]
+            )
+          end,
+          pattern: @booking_tiers,
+          caller_pids: [self()]
+        )
+
+      assert event_lookups == 0
+      assert tier_lookups == 0
+    end
+
+    test "create_ticket_order looks up the event once when inserting several tickets",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {{:ok, order}, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      assert length(tickets_for_order(order.id)) == 3
+      assert event_lookups == 1
+    end
+
     test "lifetime member-only checkout skips the owned-ticket COUNT", %{
       user: user,
       event: event,
@@ -513,6 +635,70 @@ defmodule Ysc.TicketsTest do
                  bypass_guards: true
                )
     end
+
+    # #1207 passes the already-loaded member and selected tiers from the
+    # door-sale API so checkout can skip those SELECTs. Membership and
+    # member-only limits still have to run against those structs — otherwise
+    # a stale or mismatched preload would silently bypass the guards.
+    test "preloaded guest still requires membership on the door-sale path", %{
+      event: event,
+      member_tier_a: a
+    } do
+      guest = user_fixture_unique()
+
+      assert {:error, :membership_required} =
+               Tickets.create_ticket_order(guest.id, event.id, %{a.id => 1},
+                 bypass_guards: true,
+                 user: guest,
+                 tiers: [a]
+               )
+    end
+
+    test "mismatched preloaded user does not borrow another member's membership",
+         %{
+           user: member,
+           event: event,
+           member_tier_a: a
+         } do
+      guest = user_fixture_unique()
+
+      assert {:error, :membership_required} =
+               Tickets.create_ticket_order(guest.id, event.id, %{a.id => 1},
+                 bypass_guards: true,
+                 user: member,
+                 tiers: [a]
+               )
+    end
+
+    test "preloaded member-only tiers still enforce the single-member limit", %{
+      event: event,
+      member_tier_a: a
+    } do
+      user = give_single_membership(user_fixture_unique())
+
+      assert {:error, :member_only_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{a.id => 2},
+                 bypass_guards: true,
+                 user: user,
+                 tiers: [a]
+               )
+    end
+
+    test "incomplete preloaded tiers still load member-only attrs from the database",
+         %{
+           event: event,
+           member_tier_a: a,
+           tier1: regular
+         } do
+      user = give_single_membership(user_fixture_unique())
+
+      assert {:error, :member_only_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{a.id => 2},
+                 bypass_guards: true,
+                 user: user,
+                 tiers: [regular]
+               )
+    end
   end
 
   describe "get_ticket_order/1" do
@@ -606,6 +792,58 @@ defmodule Ysc.TicketsTest do
       refute Ecto.assoc_loaded?(synced.event)
       assert Ecto.assoc_loaded?(synced.tickets)
       assert Enum.all?(synced.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+    end
+
+    @ticket_order_pk ~r/FROM "ticket_orders" AS t0 WHERE \(t0\."id" = \$/
+    @estimate_tiers ~r/FROM "ticket_tiers"/
+
+    test "create_ticket_order returns tickets, tiers, and user already loaded",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      assert Ecto.assoc_loaded?(order.user)
+      assert order.user.id == user.id
+      assert Ecto.assoc_loaded?(order.tickets)
+      assert length(order.tickets) == 2
+
+      assert Enum.all?(order.tickets, fn ticket ->
+               Ecto.assoc_loaded?(ticket.ticket_tier) and
+                 ticket.ticket_tier.id == tier1.id
+             end)
+    end
+
+    test "sync after create_ticket_order skips the checkout order reload", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      {{:ok, synced}, order_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.sync_pending_order_pricing(order) end,
+          pattern: @ticket_order_pk,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.sync_pending_order_pricing(order) end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert synced.id == order.id
+      assert order_lookups == 0
+
+      # Always re-read current tier prices so a later admin price change is applied.
+      assert tier_lookups == 1
     end
   end
 

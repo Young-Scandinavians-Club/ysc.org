@@ -70,6 +70,10 @@ defmodule YscWeb.Api.FallbackControllerTest do
     test "maps mobile-app business-rule reasons to 422 JSON" do
       for {reason, message} <- [
             {:membership_required, "member does not have an active membership"},
+            {:member_only_not_eligible,
+             "this ticket is members-only and needs a Single, Family, or Lifetime membership"},
+            {:member_only_limit_exceeded,
+             "this membership includes one members-only ticket per event"},
             {:invalid_plan, "invalid membership plan"},
             {:terminal_not_configured,
              "Stripe Terminal is not configured for this environment"},

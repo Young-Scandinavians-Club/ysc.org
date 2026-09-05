@@ -25,7 +25,7 @@ defmodule YscWeb.Emails.BookingRefundProcessed do
   end
 
   def get_subject() do
-    "Your booking refund has been processed"
+    "Your booking refund is on the way"
   end
 
   def booking_url(booking_id) do

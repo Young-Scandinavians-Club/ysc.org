@@ -564,6 +564,72 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
         assert Enum.all?(tickets, &(&1.status == :confirmed))
       end)
     end
+
+    test "skips expiration when Stripe cancel is refused because payment is still processing" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_expire_now_processing_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+      end)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:ok, returned} = Tickets.expire_ticket_order(order)
+      assert returned.status == :pending
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "returns fulfillment error when succeeded payment cannot complete the order at expire" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_expire_fulfillment_fail_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      succeeded_payment_intent =
+        struct(Stripe.PaymentIntent, %{
+          id: payment_intent_id,
+          status: "succeeded",
+          amount: 1,
+          metadata: %{
+            "ticket_order_id" => order.id,
+            "user_id" => order.user_id
+          }
+        })
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+      end)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
+
+      assert {:error, {:payment_succeeded_fulfillment_failed, :amount_mismatch}} =
+               Tickets.expire_ticket_order(order)
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
   end
 
   describe "cancel_ticket_order/2 payment guards" do

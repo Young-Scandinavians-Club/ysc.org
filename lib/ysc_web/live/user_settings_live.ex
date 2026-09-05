@@ -2157,7 +2157,7 @@ defmodule YscWeb.UserSettingsLive do
                       Tickets waiting for payment
                     </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
-                      You started buying event tickets but didn't finish payment. Your selections and member price are still saved. Finish checkout before the time shown on each item — or as soon as you can if no time is listed.
+                      You started buying event tickets but didn't finish payment. Your selections and member price are still saved. Finish buying these tickets before the time shown on each item — or as soon as you can if no time is listed.
                     </p>
                   </div>
                   <div class="hidden sm:flex items-center text-zinc-400">
@@ -2222,7 +2222,7 @@ defmodule YscWeb.UserSettingsLive do
                             "%b %-d, %Y %H:%M PT"
                           )}
                         <% else %>
-                          Finish checkout soon — your held tickets may be released if you wait too long
+                          Finish buying soon — these tickets may go back on sale if you wait too long
                         <% end %>
                       </span>
                     </div>

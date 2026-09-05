@@ -52,7 +52,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert ApplicationApproved.get_template_name() == "application_approved"
 
-      assert ApplicationApproved.get_subject() =~ "Young Scandinavian"
+      assert ApplicationApproved.get_subject() =~ "membership dues"
 
       assert ApplicationApproved.upcoming_events_url() =~ "/events"
       assert ApplicationApproved.pay_membership_url() =~ "/users/membership"
@@ -205,18 +205,23 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     test "renders and exposes template metadata" do
       assigns = %{
         first_name: "Jane",
-        primary_user_name: "John Doe"
+        primary_user_name: "John Doe",
+        membership_url: "https://example.com/users/membership"
       }
 
       html = FamilyMemberRemoved.render(assigns)
       assert is_binary(html)
       assert html =~ "Jane"
       assert html =~ "John Doe"
+      assert html =~ "Get your own membership"
+      assert html =~ "https://example.com/users/membership"
 
       assert FamilyMemberRemoved.get_template_name() == "family_member_removed"
 
       assert FamilyMemberRemoved.get_subject() ==
                "Removed from Family Membership - YSC"
+
+      assert FamilyMemberRemoved.membership_url() =~ "/users/membership"
     end
   end
 

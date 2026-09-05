@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Ticket Refund Processed</strong>
+      <strong>Your ticket refund is on the way</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -11,7 +11,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your ticket refund has been processed successfully. The refund amount will be credited back to your original payment method within 5-10 business days.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We've issued your ticket refund. The money should appear on the same card or bank account you used within 5–10 business days.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Refund Details -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund Details</mj-text>
@@ -48,7 +48,7 @@
       <strong>Location:</strong> <%= @event.location_name %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Event Details →</mj-button>
+    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">See event details →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Refunded Tickets -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refunded Tickets</mj-text>
@@ -102,8 +102,8 @@
       <strong>What's Next?</strong>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The refund will be processed to your original payment method</mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• It may take 5-10 business days for the refund to appear in your account</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The money will go back to the same card or bank account you used</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• It may take 5–10 business days to show up in your account</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If you have any questions, contact the Event Coordinator or reach out to us at <a href="mailto:events@ysc.org">events@ysc.org</a>.</mj-text>
     <mj-spacer height="36px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for your understanding.</mj-text>

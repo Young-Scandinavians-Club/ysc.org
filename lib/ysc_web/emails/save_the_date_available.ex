@@ -27,8 +27,10 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
     "{title} — tickets are live!",
     "You asked to be notified — {title} is ready",
     "Good news: tickets for {title} are here",
-    "{title} is now open for registration"
+    "{title} tickets are now available"
   ]
+
+  def subject_templates, do: @subjects
 
   def get_subject(%Event{} = event) do
     "[YSC] " <>

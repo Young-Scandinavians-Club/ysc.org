@@ -25,6 +25,27 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert hd(report.pending).user_id == user.id
     end
 
+    test "treats from/to as America/Los_Angeles dates, not UTC calendar dates" do
+      # 2026-09-01 01:44 UTC is still 2026-08-31 in Pacific. A UTC first-of-month
+      # window would miss this row; the Pacific August window includes it.
+      user = user_fixture(%{state: :pending_approval})
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-09-01 01:44:00Z],
+        review_outcome: nil
+      })
+
+      utc_month_start =
+        MembershipReport.generate(~D[2026-09-01], ~D[2026-09-01])
+
+      pacific_prior_month =
+        MembershipReport.generate(~D[2026-08-01], ~D[2026-08-31])
+
+      assert utc_month_start.counts.applied == 0
+      assert pacific_prior_month.counts.applied == 1
+      assert hd(pacific_prior_month.pending).user_id == user.id
+    end
+
     test "deduplicates purchased users from accepted list" do
       user = user_fixture()
       reviewed_at = ~U[2026-03-10 10:00:00Z]

@@ -22,12 +22,17 @@ defmodule YscWeb.Emails.SaveTheDateAvailableTest do
                "[YSC] An event you saved is now available"
     end
 
-    test "get_subject/1 for event interpolates title" do
+    test "get_subject/1 interpolates title and subject templates avoid registration jargon" do
       event = %Ysc.Events.Event{title: "Midsummer Gala"}
       subject = SaveTheDateAvailable.get_subject(event)
 
       assert subject =~ "[YSC]"
       assert subject =~ "Midsummer Gala"
+
+      for template <- SaveTheDateAvailable.subject_templates() do
+        refute template =~ "registration"
+        assert template =~ "{title}" or template =~ "tickets"
+      end
     end
 
     test "event_url/1 builds events path" do

@@ -378,28 +378,15 @@ defmodule YscWeb.AdminPostEditorLive do
 
       <%!-- Mount Trix only after load; phx-update="ignore" would keep an empty editor. --%>
       <.form :let={_f} :if={!@loading_post?} for={@form} id="trix-editor-form">
-        <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none mx-auto py-8">
-          <.input
-            type="hidden"
-            id="post[raw_body]"
-            field={@form[:raw_body]}
-            data-post-id={@post_id}
-            phx-hook="TrixHook"
-          />
-          <.live_component
-            module={YscWeb.TrixImagePickerComponent}
-            id={:post_body_image_picker}
-            target_input_id="post[raw_body]"
-          />
-          <div id="richtext" phx-update="ignore">
-            <trix-editor
-              input="post[raw_body]"
-              class="trix-content block mt-8 max-w-2xl mx-auto px-8 py-8 bg-white border-0 focus:ring-0 text-wrap"
-              placeholder="Write something delightful and nice..."
-            >
-            </trix-editor>
-          </div>
-        </div>
+        <.trix_editor
+          id="post[raw_body]"
+          field={@form[:raw_body]}
+          wrapper_id="richtext"
+          image_picker_id={:post_body_image_picker}
+          data-post-id={@post_id}
+          class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none mx-auto py-8"
+          editor_class="trix-content block mt-8 max-w-2xl mx-auto px-8 py-8 bg-white border-0 focus:ring-0 text-wrap"
+        />
       </.form>
     </.side_menu>
     """

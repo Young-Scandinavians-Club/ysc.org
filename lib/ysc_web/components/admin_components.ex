@@ -3736,6 +3736,121 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # trix_editor
+  # ---------------------------------------------------------------------------
+
+  @default_trix_prose_class "prose prose-zinc prose-base prose-a:text-blue-600 max-w-none"
+
+  @doc """
+  Trix rich-text editor chrome shared by admin post, event, and newsletter editors.
+
+  Renders the hidden LiveView input (with `TrixHook`), optional image-library
+  picker, and a `phx-update="ignore"` wrapper around `<trix-editor>`. Pass
+  `phx-debounce` and `data-*` attributes through to the hidden input.
+
+  ## Examples
+
+      <.trix_editor
+        id="post[raw_body]"
+        field={@form[:raw_body]}
+        wrapper_id="richtext"
+        image_picker_id={:post_body_image_picker}
+        editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 text-wrap"
+      />
+
+      <.trix_editor
+        id="edition_intro_text"
+        field={@form[:intro_text]}
+        wrapper_id="newsletter-intro-richtext"
+        wrapper_class="relative"
+        image_picker_id={:newsletter_intro_image_picker}
+        readonly?={@readonly?}
+        editor_class="trix-content block px-4 py-2 min-h-[200px]"
+      >
+        <button type="button" phx-click="open-notice-picker">Insert saved notice</button>
+      </.trix_editor>
+  """
+  attr :id, :string,
+    required: true,
+    doc: "DOM id of the hidden input; also the `<trix-editor input>` value"
+
+  attr :field, :any,
+    required: true,
+    doc:
+      "a %Phoenix.HTML.Form{}/field name tuple, for example: @form[:raw_body]"
+
+  attr :wrapper_id, :string,
+    required: true,
+    doc: "id of the `phx-update=\"ignore\"` wrapper around `<trix-editor>`"
+
+  attr :placeholder, :string, default: "Write something delightful and nice..."
+
+  attr :editor_class, :any,
+    required: true,
+    doc: "Tailwind classes for the `<trix-editor>` element"
+
+  attr :wrapper_class, :any,
+    default: nil,
+    doc: "Optional classes on the `phx-update=\"ignore\"` wrapper"
+
+  attr :class, :any,
+    default: @default_trix_prose_class,
+    doc: "Classes on the outer prose wrapper"
+
+  attr :image_picker_id, :any,
+    default: nil,
+    doc:
+      "LiveComponent id for `<.live_component module={TrixImagePickerComponent}>`"
+
+  attr :image_picker_disabled?, :boolean, default: false
+
+  attr :readonly?, :boolean,
+    default: false,
+    doc: "When true, overlays a non-interactive shield on the editor"
+
+  attr :labelledby, :string,
+    default: nil,
+    doc: "Optional `aria-labelledby` for the `<trix-editor>`"
+
+  attr :rest, :global,
+    include: ~w(phx-debounce),
+    doc: "Forwarded to the hidden input (`phx-debounce`, `data-*`, …)"
+
+  slot :inner_block,
+    doc:
+      "Optional controls between the hidden input and the editor (e.g. notice picker)"
+
+  def trix_editor(assigns) do
+    ~H"""
+    <div class={@class}>
+      <.input type="hidden" id={@id} field={@field} phx-hook="TrixHook" {@rest} />
+      {render_slot(@inner_block)}
+      <.live_component
+        :if={@image_picker_id}
+        module={YscWeb.TrixImagePickerComponent}
+        id={@image_picker_id}
+        target_input_id={@id}
+        disabled?={@image_picker_disabled?}
+      />
+      <div id={@wrapper_id} class={@wrapper_class} phx-update="ignore">
+        <trix-editor
+          input={@id}
+          aria-labelledby={@labelledby}
+          class={@editor_class}
+          placeholder={@placeholder}
+        >
+        </trix-editor>
+        <div
+          :if={@readonly?}
+          class="absolute inset-0 z-10 cursor-not-allowed"
+          aria-hidden="true"
+        />
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # phone_mockup
   # ---------------------------------------------------------------------------
 

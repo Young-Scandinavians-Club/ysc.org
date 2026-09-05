@@ -3450,7 +3450,7 @@ defmodule Ysc.LedgersTest do
       assert refund.payment_id == payment.id
       assert length(entries) == 2
 
-      assert_email_sent(subject: "Your booking refund has been processed")
+      assert_email_sent(subject: "Your booking refund is on the way")
     end
 
     test "returns {:ticket_order, ticket_order} when payment is linked to ticket order",
@@ -3595,7 +3595,7 @@ defmodule Ysc.LedgersTest do
                })
 
       # Oban uses testing: :inline — jobs execute immediately and are not persisted to oban_jobs.
-      assert_email_sent(subject: "Your ticket refund has been processed")
+      assert_email_sent(subject: "Your ticket refund is on the way")
     end
 
     test "process_refund/1 for ticket order with no cancelled tickets does not send ticket refund email",
@@ -3649,7 +3649,7 @@ defmodule Ysc.LedgersTest do
                    "re_ticket_no_cancel_#{System.unique_integer([:positive])}"
                })
 
-      refute_email_sent(subject: "Your ticket refund has been processed")
+      refute_email_sent(subject: "Your ticket refund is on the way")
     end
   end
 
@@ -5585,7 +5585,7 @@ defmodule Ysc.LedgersTest do
                    "re_cl_cov_#{System.unique_integer([:positive])}"
                })
 
-      assert_email_sent(subject: "Your booking refund has been processed")
+      assert_email_sent(subject: "Your booking refund is on the way")
     end
   end
 

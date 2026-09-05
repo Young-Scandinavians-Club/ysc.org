@@ -42,17 +42,264 @@ defmodule Ysc.ExpenseReports do
     |> List.first()
   end
 
+  # Drafts
+  #
+  # A draft is a real `expense_reports` row with `status == "draft"`. The expense
+  # report LiveView autosaves one as soon as a member starts filling in the form
+  # and resumes it on the next visit, so a page refresh never loses their work.
+  # There is at most one active draft per user.
+
+  # Arbitrary constant namespace for the two-arg pg_advisory_xact_lock in
+  # save_draft/3; keeps expense-draft locks from colliding with any other
+  # advisory-lock user elsewhere in the app.
+  @draft_advisory_lock_namespace 8_233_100
+
   @doc """
-  List all expense reports for an event, newest first, with items and
+  Returns the user's `draft` expense report (with items preloaded in their
+  saved order), or `nil` if they have none.
+
+  A partial unique index guarantees at most one, but `limit: 1` keeps this
+  resilient if that ever changes.
+  """
+  def get_active_draft(%User{} = user) do
+    items_query =
+      from(i in ExpenseReportItem, order_by: [asc: i.position, asc: i.id])
+
+    income_query =
+      from(i in ExpenseReportIncomeItem,
+        order_by: [asc: i.position, asc: i.id]
+      )
+
+    from(er in ExpenseReport,
+      where: er.user_id == ^user.id and er.status == "draft",
+      order_by: [desc: er.updated_at],
+      limit: 1,
+      preload: [
+        expense_items: ^items_query,
+        income_items: ^income_query,
+        address: [],
+        event: []
+      ]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Inserts or updates the user's draft expense report from `attrs` (string-keyed,
+  same shape the submit path builds, with `"expense_items"` / `"income_items"`
+  as index-keyed maps).
+
+  The incoming item lists are authoritative: existing child rows are deleted and
+  recreated on every save so we never have to reconcile nested-form ids. Drafts
+  are scratch space and item counts are tiny, so this is cheap.
+
+  When `draft_id` is nil the user's existing draft (if any) is reused, so the
+  expense form never spawns a second draft row. A per-user advisory lock held
+  for the transaction serializes concurrent autosaves from two tabs, so the
+  "reuse existing" lookup always sees a committed prior draft.
+
+  Returns `{:ok, draft}` (with nested items from `cast_assoc`) or
+  `{:error, changeset}`.
+  """
+  def save_draft(%User{} = user, attrs, draft_id \\ nil) do
+    attrs =
+      attrs
+      |> Map.put("user_id", user.id)
+      |> Map.put("status", "draft")
+      |> stamp_item_positions()
+
+    Repo.transaction(fn ->
+      lock_user_drafts(user)
+
+      base = draft_row_for_save(user, draft_id) || %ExpenseReport{}
+
+      if base.id do
+        Repo.delete_all(
+          from(i in ExpenseReportItem, where: i.expense_report_id == ^base.id)
+        )
+
+        Repo.delete_all(
+          from(i in ExpenseReportIncomeItem,
+            where: i.expense_report_id == ^base.id
+          )
+        )
+      end
+
+      result =
+        %{base | expense_items: [], income_items: []}
+        |> ExpenseReport.draft_changeset(attrs)
+        |> Repo.insert_or_update()
+
+      case result do
+        {:ok, draft} ->
+          # Nested items are already on the struct from `cast_assoc`. Skip a
+          # force-preload of items/address/event — autosave only needs `id`
+          # and `updated_at`, and resume uses `get_active_draft/1`.
+          draft
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  # Transaction-scoped advisory lock keyed on the user, so two concurrent
+  # save_draft/3 calls for the same user run one after the other.
+  defp lock_user_drafts(%User{} = user) do
+    Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
+      @draft_advisory_lock_namespace,
+      :erlang.phash2(user.id, 2_147_483_647)
+    ])
+  end
+
+  # The row save_draft/3 writes into: the one named by `draft_id`, else the
+  # user's existing draft.
+  defp draft_row_for_save(%User{} = user, draft_id) when is_binary(draft_id) do
+    Repo.get_by(ExpenseReport,
+      id: draft_id,
+      user_id: user.id,
+      status: "draft"
+    )
+  end
+
+  defp draft_row_for_save(%User{} = user, _draft_id) do
+    from(er in ExpenseReport,
+      where: er.user_id == ^user.id and er.status == "draft",
+      order_by: [asc: er.inserted_at],
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  # Copy each index-keyed item's key into a "position" field so item order
+  # survives the delete-and-recreate.
+  defp stamp_item_positions(attrs) do
+    attrs
+    |> stamp_positions_for("expense_items")
+    |> stamp_positions_for("income_items")
+  end
+
+  defp stamp_positions_for(attrs, key) do
+    case Map.get(attrs, key) do
+      items when is_map(items) ->
+        stamped =
+          Map.new(items, fn {index, item_params} when is_map(item_params) ->
+            {index, Map.put(item_params, "position", to_position(index))}
+          end)
+
+        Map.put(attrs, key, stamped)
+
+      _ ->
+        attrs
+    end
+  end
+
+  defp to_position(index) when is_integer(index), do: index
+
+  defp to_position(index) when is_binary(index) do
+    case Integer.parse(index) do
+      {int, _} -> int
+      :error -> 0
+    end
+  end
+
+  defp to_position(_), do: 0
+
+  @doc """
+  Turns a draft into a submitted expense report.
+
+  Inserts the submitted report and deletes the draft in one transaction so a
+  failed discard cannot leave both rows (and a retryable duplicate submit)
+  behind. QuickBooks enqueue and confirmation emails run only after commit.
+  Returns `{:ok, submitted_report}` or `{:error, changeset}`.
+  """
+  def submit_draft(draft_id, attrs, %User{} = user) do
+    changeset = expense_report_changeset(attrs, user)
+
+    result =
+      Repo.transaction(fn ->
+        case Repo.insert(changeset) do
+          {:ok, report} ->
+            {deleted, _} = discard_draft(draft_id, user)
+
+            if deleted == 0 do
+              Repo.rollback({:draft_missing, changeset})
+            else
+              report
+            end
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            Repo.rollback(changeset)
+        end
+      end)
+
+    case result do
+      {:ok, report} ->
+        after_expense_report_insert({:ok, report})
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset}
+
+      {:error, {:draft_missing, changeset}} ->
+        {:error,
+         Ecto.Changeset.add_error(
+           changeset,
+           :base,
+           "This draft is no longer available. Please try submitting again."
+         )}
+    end
+  end
+
+  @doc """
+  Deletes the user's draft (by id, or their single active draft when `draft_id`
+  is nil). Child items cascade via the FK. Returns `{deleted_count, nil}`.
+  """
+  def discard_draft(draft_id, %User{} = user) do
+    query =
+      from er in ExpenseReport,
+        where: er.user_id == ^user.id and er.status == "draft"
+
+    query =
+      if is_binary(draft_id) do
+        from er in query, where: er.id == ^draft_id
+      else
+        query
+      end
+
+    Repo.delete_all(query)
+  end
+
+  # Display fields for the admin event statistics table. Omits hashed_password,
+  # board_bio, and other columns the submitter-name cell never renders.
+  @event_list_user_fields [:id, :first_name, :last_name]
+
+  @doc """
+  List filed expense reports for an event, newest first, with items and
   submitter preloaded.
+
+  Drafts are omitted: they are a member's in-progress scratch copy and do not
+  belong in the per-event statistics table. Totals still use
+  `totals_for_event/2`, which counts only approved/paid reports.
   """
   def list_expense_reports_for_event(event_id) do
-    from(er in ExpenseReport,
-      where: er.event_id == ^event_id,
-      order_by: [desc: :inserted_at],
-      preload: [:expense_items, :income_items, :user]
-    )
+    event_id
+    |> list_expense_reports_for_event_query()
     |> Repo.all()
+  end
+
+  defp list_expense_reports_for_event_query(event_id) do
+    user_query =
+      from(u in User, select: struct(u, ^@event_list_user_fields))
+
+    from(er in ExpenseReport,
+      where: er.event_id == ^event_id and er.status != "draft",
+      order_by: [desc: :inserted_at],
+      preload: [
+        :expense_items,
+        :income_items,
+        user: ^user_query
+      ]
+    )
   end
 
   @doc """
@@ -72,33 +319,35 @@ defmodule Ysc.ExpenseReports do
   figure.
 
   Only reports in `statuses` (default `approved` and `paid`) are counted.
+
+  Sums in SQL rather than loading every report, item, and submitter into
+  Elixir — the admin event statistics tab already lists reports separately.
   """
   def totals_for_event(event_id, statuses \\ ["approved", "paid"]) do
-    zero = Money.new(0, :USD)
+    expense_total =
+      event_item_totals_query(ExpenseReportItem, event_id, statuses)
+      |> Repo.one()
+      |> Ysc.MoneyHelper.usd_from_db_sum()
 
-    event_id
-    |> list_expense_reports_for_event()
-    |> Enum.filter(&(&1.status in statuses))
-    |> Enum.reduce(
-      %{expense_total: zero, income_total: zero, net_total: zero},
-      fn report, acc ->
-        report_totals = calculate_totals(report)
+    income_total =
+      event_item_totals_query(ExpenseReportIncomeItem, event_id, statuses)
+      |> Repo.one()
+      |> Ysc.MoneyHelper.usd_from_db_sum()
 
-        %{
-          expense_total:
-            money_sum(acc.expense_total, report_totals.expense_total),
-          income_total: money_sum(acc.income_total, report_totals.income_total),
-          net_total: money_sum(acc.net_total, report_totals.net_total)
-        }
-      end
-    )
+    %{
+      expense_total: expense_total,
+      income_total: income_total,
+      net_total: money_sub_or_zero(expense_total, income_total)
+    }
   end
 
-  defp money_sum(%Money{} = a, %Money{} = b) do
-    case Money.add(a, b) do
-      {:ok, sum} -> sum
-      _ -> a
-    end
+  defp event_item_totals_query(item_schema, event_id, statuses) do
+    from(item in item_schema,
+      join: er in ExpenseReport,
+      on: item.expense_report_id == er.id,
+      where: er.event_id == ^event_id and er.status in ^statuses,
+      select: sum(fragment("(?.amount).amount", item))
+    )
   end
 
   defp expense_reports_query(user_id) do
@@ -137,17 +386,7 @@ defmodule Ysc.ExpenseReports do
   end
 
   def create_expense_report(attrs, %User{} = user) do
-    require Ysc.Logging
-
-    # Set status to "submitted" if not already set (for submissions)
-    attrs = Map.put_new(attrs, "status", "submitted")
-
-    changeset =
-      %ExpenseReport{}
-      |> ExpenseReport.submission_changeset(Map.put(attrs, "user_id", user.id))
-      |> validate_reimbursement_setup(user)
-      |> validate_reimbursement_ownership(user)
-      |> validate_all_expense_items_have_receipts_for_submission()
+    changeset = expense_report_changeset(attrs, user)
 
     Ysc.Logging.debug(
       "Expense report changeset - valid?: #{changeset.valid?}, errors: #{inspect(changeset.errors, limit: 20)}"
@@ -200,32 +439,41 @@ defmodule Ysc.ExpenseReports do
       end
     end
 
-    result = Repo.insert(changeset)
-
-    # Enqueue QuickBooks sync job and send emails if expense report was created with "submitted" status
-    case result do
-      {:ok, expense_report} ->
-        if expense_report.status == "submitted" do
-          Ysc.Logging.debug(
-            "Expense report created with submitted status, enqueueing QuickBooks sync",
-            expense_report_id: expense_report.id
-          )
-
-          enqueue_quickbooks_sync(expense_report)
-          send_expense_report_emails(expense_report)
-        else
-          Ysc.Logging.debug(
-            "Expense report created with status: #{expense_report.status}, skipping QuickBooks sync and emails",
-            expense_report_id: expense_report.id
-          )
-        end
-
-        result
-
-      error ->
-        error
-    end
+    changeset
+    |> Repo.insert()
+    |> after_expense_report_insert()
   end
+
+  defp expense_report_changeset(attrs, %User{} = user) do
+    attrs = Map.put_new(attrs, "status", "submitted")
+
+    %ExpenseReport{}
+    |> ExpenseReport.submission_changeset(Map.put(attrs, "user_id", user.id))
+    |> validate_reimbursement_setup(user)
+    |> validate_reimbursement_ownership(user)
+    |> validate_all_expense_items_have_receipts_for_submission()
+  end
+
+  defp after_expense_report_insert({:ok, expense_report} = result) do
+    if expense_report.status == "submitted" do
+      Ysc.Logging.debug(
+        "Expense report created with submitted status, enqueueing QuickBooks sync",
+        expense_report_id: expense_report.id
+      )
+
+      enqueue_quickbooks_sync(expense_report)
+      send_expense_report_emails(expense_report)
+    else
+      Ysc.Logging.debug(
+        "Expense report created with status: #{expense_report.status}, skipping QuickBooks sync and emails",
+        expense_report_id: expense_report.id
+      )
+    end
+
+    result
+  end
+
+  defp after_expense_report_insert(error), do: error
 
   defp validate_all_expense_items_have_receipts_for_submission(changeset) do
     # Only validate if status is "submitted"
@@ -874,12 +1122,21 @@ defmodule Ysc.ExpenseReports do
 
   defp sum_item_amounts(items) do
     Enum.reduce(items, Money.new(0, :USD), fn item, acc ->
-      case Money.add(acc, item.amount) do
-        {:ok, result} -> result
-        _ -> acc
-      end
+      add_item_amount(acc, item.amount)
     end)
   end
+
+  # Draft line items may have a NULL amount while the member is still typing.
+  # `Money.add/2` only accepts `%Money{}` structs, so a nil here would crash
+  # the member reports list (and any other preloaded totals call).
+  defp add_item_amount(acc, %Money{} = amount) do
+    case Money.add(acc, amount) do
+      {:ok, result} -> result
+      _ -> acc
+    end
+  end
+
+  defp add_item_amount(acc, _amount), do: acc
 
   defp money_sub_or_zero(expense_total, income_total) do
     case Money.sub(expense_total, income_total) do
@@ -1143,6 +1400,29 @@ defmodule Ysc.ExpenseReports do
       where: er.user_id == ^user_id,
       order_by: [desc: er.inserted_at],
       preload: [:expense_items, :income_items, :address, :event]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_expense_reports_for_event_query do
+    list_expense_reports_for_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_event_expense_item_totals_query do
+    event_item_totals_query(
+      ExpenseReportItem,
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      ["approved", "paid"]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_event_income_item_totals_query do
+    event_item_totals_query(
+      ExpenseReportIncomeItem,
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      ["approved", "paid"]
     )
   end
 

@@ -410,6 +410,38 @@ defmodule Ysc.Tickets.AdminGrantsTest do
 
       assert length(order.tickets) == 2
     end
+
+    @preloaded_grant_lookups ~r/FROM "(events|users)" AS \w0 WHERE \(\w0\."id" = \$|FROM "ticket_tiers" AS t0 WHERE \(t0\."id" = ANY\(\$1\)\) AND \(t0\."event_id"/
+
+    test "reuses preloaded structs and skips event/user/tier lookups when both skip flags are set",
+         %{
+           admin: admin,
+           member: member,
+           event: event,
+           tier: tier
+         } do
+      {{:ok, order}, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            AdminGrants.grant_admin_tickets(
+              admin.id,
+              member.id,
+              event.id,
+              %{tier.id => 1},
+              skip_capacity: true,
+              skip_sale_guards: true,
+              user: member,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: @preloaded_grant_lookups,
+          caller_pids: [self()]
+        )
+
+      assert length(order.tickets) == 1
+      assert lookups == 0
+    end
   end
 
   describe "ci_query_explain_pending_orders_query/0" do

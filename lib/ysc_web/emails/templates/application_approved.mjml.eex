@@ -11,11 +11,11 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We have fantastic news! Your application to join the Young Scandinavians Club has been approved. 🙌</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Great news — the board approved your application to join the Young Scandinavians Club.</mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">To unlock full access to our vibrant community and all the exciting benefits that come with being a member, there's just one more step: <strong>completing your membership payment.</strong></mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">There's one more step before you can book the cabins or buy member event tickets: <strong>pay your annual membership dues.</strong></mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= pay_membership_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Pay Your Membership → </mj-button>
+    <mj-button href="<%= pay_membership_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Pay your membership dues →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Once your payment is processed, you'll be able to:</mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">

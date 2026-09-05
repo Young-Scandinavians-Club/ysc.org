@@ -51,8 +51,16 @@ defmodule Ysc.Events.Ticket do
 
   @doc """
   Changeset for the ticket with validations.
+
+  ## Options
+
+    * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Skips the
+      per-ticket membership SELECT when the struct is the same user.
+    * `:event` - `%Ysc.Events.Event{}` already loaded for `event_id`. Skips the
+      per-ticket event SELECT used by the in-past check when the struct is
+      the same event.
   """
-  def changeset(ticket, attrs) do
+  def changeset(ticket, attrs, opts \\ []) do
     ticket
     |> cast(attrs, [
       :reference_id,
@@ -71,9 +79,9 @@ defmodule Ysc.Events.Ticket do
       :user_id,
       :expires_at
     ])
-    |> validate_active_membership()
-    |> validate_event_not_in_past()
-    |> put_reference_id()
+    |> validate_active_membership(opts)
+    |> validate_event_not_in_past(opts)
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
   end
 
@@ -82,13 +90,18 @@ defmodule Ysc.Events.Ticket do
 
   Same as `changeset/2` (still `:pending` until payment succeeds, same
   fields, still requires membership) except it skips
-  `validate_event_not_in_past/1` — selling at the door is precisely what you
+  `validate_event_not_in_past/2` — selling at the door is precisely what you
   do *while* an event is happening, so that guard (written for the
   self-service web checkout) doesn't apply. See
   `Ysc.Tickets.BookingLocker.atomic_booking/4`'s `:bypass_guards` option,
   which is what selects this changeset.
+
+  ## Options
+
+    * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Skips the
+      per-ticket membership SELECT when the struct is the same user.
   """
-  def door_sale_changeset(ticket, attrs) do
+  def door_sale_changeset(ticket, attrs, opts \\ []) do
     ticket
     |> cast(attrs, [
       :reference_id,
@@ -107,8 +120,8 @@ defmodule Ysc.Events.Ticket do
       :user_id,
       :expires_at
     ])
-    |> validate_active_membership()
-    |> put_reference_id()
+    |> validate_active_membership(opts)
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
   end
 
@@ -137,7 +150,7 @@ defmodule Ysc.Events.Ticket do
       :expires_at
     ])
     |> put_change(:status, Map.get(attrs, :status, :confirmed))
-    |> put_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
   end
 
@@ -198,60 +211,55 @@ defmodule Ysc.Events.Ticket do
   Call this when insert fails with a reference_id unique constraint.
   """
   def put_new_reference_id(changeset) do
-    put_change(
-      changeset,
-      :reference_id,
-      ReferenceGenerator.generate_reference_id(@reference_prefix)
-    )
+    ReferenceGenerator.put_new_reference_id(changeset, @reference_prefix)
   end
 
-  defp put_reference_id(changeset) do
-    case get_field(changeset, :reference_id) do
-      nil ->
-        put_change(
-          changeset,
-          :reference_id,
-          ReferenceGenerator.generate_reference_id(@reference_prefix)
-        )
+  @doc false
+  def ensure_membership_preloads(nil), do: nil
 
-      _ ->
-        changeset
+  def ensure_membership_preloads(%Accounts.User{} = user) do
+    cond do
+      Accounts.has_lifetime_membership?(user) and
+          not Accounts.sub_account?(user) ->
+        user
+
+      Accounts.sub_account?(user) ->
+        Ysc.Repo.preload(user, [:subscriptions, primary_user: :subscriptions])
+
+      match?(%Ecto.Association.NotLoaded{}, user.subscriptions) ->
+        Ysc.Repo.preload(user, [:subscriptions])
+
+      true ->
+        user
     end
   end
 
   # Validate that the user has an active membership
   # For sub-accounts, checks the primary user's membership.
-  defp validate_active_membership(changeset) do
+  defp validate_active_membership(changeset, opts) do
     user_id = get_field(changeset, :user_id)
 
     if user_id do
-      validate_active_membership_for_user(changeset, user_id)
+      validate_active_membership_for_user(changeset, user_id, opts)
     else
       changeset
     end
   end
 
-  defp validate_active_membership_for_user(changeset, user_id) do
-    # Preload primary_user and subscriptions associations to avoid N+1 queries for sub-accounts
-    user = Ysc.Repo.get(Ysc.Accounts.User, user_id)
+  defp validate_active_membership_for_user(changeset, user_id, opts) do
+    user =
+      case Keyword.get(opts, :user) do
+        %Accounts.User{id: id} = loaded when id == user_id -> loaded
+        _ -> Ysc.Repo.get(Accounts.User, user_id)
+      end
 
     case user do
       nil ->
         changeset
 
       user ->
-        user = preload_user_subscriptions(user)
+        user = ensure_membership_preloads(user)
         check_active_membership(changeset, user)
-    end
-  end
-
-  defp preload_user_subscriptions(user) do
-    if Accounts.sub_account?(user) do
-      # For sub-accounts, also preload primary user with their subscriptions
-      Ysc.Repo.preload(user, [:subscriptions, primary_user: :subscriptions])
-    else
-      # For primary users, just preload their subscriptions
-      Ysc.Repo.preload(user, [:subscriptions])
     end
   end
 
@@ -366,12 +374,11 @@ defmodule Ysc.Events.Ticket do
   # `start_date` / `start_time` are interpreted as Pacific wall-clock rather
   # than naive UTC. Combining them as UTC rejected valid purchases for up to
   # ~8 hours before the event actually started.
-  defp validate_event_not_in_past(changeset) do
+  defp validate_event_not_in_past(changeset, opts) do
     event_id = get_field(changeset, :event_id)
 
     with true <- is_binary(event_id),
-         %Ysc.Events.Event{} = event <-
-           Ysc.Repo.get(Ysc.Events.Event, event_id),
+         %Ysc.Events.Event{} = event <- event_for_past_check(event_id, opts),
          true <- Ysc.Events.EventDateTime.in_past?(event) do
       add_error(
         changeset,
@@ -380,6 +387,13 @@ defmodule Ysc.Events.Ticket do
       )
     else
       _ -> changeset
+    end
+  end
+
+  defp event_for_past_check(event_id, opts) do
+    case Keyword.get(opts, :event) do
+      %Ysc.Events.Event{id: id} = event when id == event_id -> event
+      _ -> Ysc.Repo.get(Ysc.Events.Event, event_id)
     end
   end
 end

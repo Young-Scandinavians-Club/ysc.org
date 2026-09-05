@@ -402,6 +402,32 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert count == 2
     end
 
+    @user_pk ~r/FROM "users" AS u0 WHERE \(u0\."id" = \$/
+
+    test "looks up the buyer once when inserting several tickets", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {{:ok, order}, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 3})
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      count =
+        Repo.aggregate(
+          from(t in Ticket, where: t.ticket_order_id == ^order.id),
+          :count
+        )
+
+      assert count == 3
+      assert user_lookups == 1
+    end
+
     test "paid tier with unlimited quantity (nil) succeeds", %{
       user: user,
       event: event
@@ -1052,6 +1078,224 @@ defmodule Ysc.Tickets.BookingLockerTest do
                  bypass_guards: true
                )
     end
+
+    test "skips event and tier SELECTs when they are passed in", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      selections = %{tier.id => 1}
+
+      {result, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, selections,
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, selections,
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, _order} = result
+      assert event_lookups == 0
+      assert tier_lookups == 0
+    end
+
+    test "still rejects a cancelled event struct without reloading it", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      cancelled = %{event | state: :cancelled}
+
+      {result, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              event: cancelled,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      assert {:error, :event_cancelled} = result
+      assert event_lookups == 0
+    end
+
+    test "reloads selected tiers when the passed list is incomplete", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: []
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, _order} = result
+      assert tier_lookups == 1
+    end
+
+    # #1213 reuses caller-supplied event/tier structs. QueryCounter tests prove
+    # matching ids skip SELECTs; these prove a mismatched id still reloads.
+    test "reloads the booked event when the passed struct is a different event",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Other locker event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, _} = Events.update_event(event, %{state: :cancelled})
+
+      {result, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              event: other,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      assert {:error, :event_cancelled} = result
+      assert event_lookups == 1
+    end
+
+    test "does not reject a published booking when a cancelled other-event struct is passed",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Cancelled other locker event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, other} = Events.update_event(other, %{state: :cancelled})
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+                 bypass_guards: true,
+                 user: user,
+                 event: other,
+                 tiers: [tier]
+               )
+
+      assert order.event_id == event.id
+    end
+
+    test "reloads this event's tiers when the passed list belongs to another event",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Cheap other locker event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, cheap_tier} =
+        Events.create_ticket_tier(%{
+          name: "Cheap",
+          type: :paid,
+          price: Money.new(1, :USD),
+          quantity: 20,
+          event_id: other.id
+        })
+
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              bypass_guards: true,
+              user: user,
+              event: event,
+              tiers: [cheap_tier]
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, order} = result
+      assert Money.equal?(order.total_amount, Money.new(25, :USD))
+      assert tier_lookups == 1
+    end
   end
 
   describe "capacity_warnings/2" do
@@ -1122,6 +1366,41 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert BookingLocker.capacity_warnings(Ecto.ULID.generate(), %{
                tier.id => 1
              }) == []
+    end
+
+    test "skips event and tier SELECTs when they are passed in", %{
+      event: event,
+      tier: tier
+    } do
+      selections = %{tier.id => 1}
+
+      {warnings, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.capacity_warnings(event.id, selections,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "events"/,
+          caller_pids: [self()]
+        )
+
+      {_, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.capacity_warnings(event.id, selections,
+              event: event,
+              tiers: [tier]
+            )
+          end,
+          pattern: ~r/FROM "ticket_tiers"/,
+          caller_pids: [self()]
+        )
+
+      assert warnings == []
+      assert event_lookups == 0
+      assert tier_lookups == 0
     end
 
     test "counts another buyer's hold against remaining capacity", %{
@@ -1497,6 +1776,31 @@ defmodule Ysc.Tickets.BookingLockerTest do
                  skip_capacity: true
                )
     end
+
+    test "skip_capacity and skip_sale_guards together skip event and tier SELECTs",
+         %{
+           user: user,
+           event: event,
+           tier: tier
+         } do
+      {result, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.validate_fulfillment_capacity(
+              user.id,
+              event.id,
+              %{tier.id => 1},
+              skip_capacity: true,
+              skip_sale_guards: true
+            )
+          end,
+          pattern: ~r/FROM "(events|ticket_tiers)"/,
+          caller_pids: [self()]
+        )
+
+      assert result == :ok
+      assert lookups == 0
+    end
   end
 
   describe "validate_fulfillment_capacity_in_transaction/4" do
@@ -1577,6 +1881,10 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert %Ecto.Query{} = reserved
       assert Repo.all(sold) == []
       assert Repo.all(reserved) == []
+
+      selected = BookingLocker.ci_query_explain_selected_tiers_query()
+      assert %Ecto.Query{} = selected
+      assert Repo.all(selected) == []
     end
   end
 
@@ -1820,6 +2128,128 @@ defmodule Ysc.Tickets.BookingLockerTest do
 
       assert Money.zero?(original_total)
       assert Money.equal?(original_discount, tier.price)
+    end
+
+    @estimate_tiers ~r/FROM "ticket_tiers"/
+
+    test "skips the tier SELECT when selected tiers are passed", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {_, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              user.id,
+              event.id,
+              %{tier.id => 2},
+              tiers: [tier]
+            )
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert lookups == 0
+    end
+
+    test "loads selected tiers once when they are not passed", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {_, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(user.id, event.id, %{
+              tier.id => 2
+            })
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert lookups == 1
+    end
+
+    # #1219 reuses caller-supplied :tiers for door-sale PaymentIntent
+    # repricing. QueryCounter tests prove matching ids skip the SELECT;
+    # these prove a mismatched/incomplete list still charges this event.
+    test "reloads this event's prices when the passed :tiers belong to another event",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      {:ok, other} =
+        Events.create_event(%{
+          title: "Cheap other estimate event",
+          description: "ID mismatch",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, cheap_tier} =
+        Events.create_ticket_tier(%{
+          name: "Cheap",
+          type: :paid,
+          price: Money.new(1, :USD),
+          quantity: 20,
+          event_id: other.id
+        })
+
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              user.id,
+              event.id,
+              %{tier.id => 1},
+              tiers: [cheap_tier]
+            )
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, estimated_total, estimated_discount} = result
+      assert Money.equal?(estimated_total, Money.new(25, :USD))
+      assert Money.zero?(estimated_discount)
+      assert tier_lookups == 1
+    end
+
+    test "reloads selected tiers when the passed :tiers list is incomplete", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {result, tier_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              user.id,
+              event.id,
+              %{tier.id => 2},
+              tiers: []
+            )
+          end,
+          pattern: @estimate_tiers,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, estimated_total, _discount} = result
+      assert Money.equal?(estimated_total, Money.new(50, :USD))
+      assert tier_lookups == 1
     end
   end
 end

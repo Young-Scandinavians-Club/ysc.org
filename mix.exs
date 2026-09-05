@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.35.0",
+      version: "2.37.2",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -17,7 +17,7 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe],
         list_unused_filters: true
       ],
-      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-09-04.
+      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-10-04.
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
@@ -194,7 +194,8 @@ defmodule Ysc.MixProject do
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
       # Official Hex cowlib 2.19.0 (cowboy 2.18 needs >= 2.19; fixes EEF-CVE-2026-59248).
-      # EEF-CVE-2026-43969/43966: still unpatched — ignored until 2026-09-04 (see mix.exs hex config).
+      # EEF-CVE-2026-43969/43966/43971: still unpatched — ignored until 2026-10-04
+      # (see mix.exs hex config).
       {:cowboy, "~> 2.18", override: true},
       {:cowlib, "~> 2.19", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
@@ -223,6 +224,10 @@ defmodule Ysc.MixProject do
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
+      # 1.10.0: EEF-CVE-2026-82728 (unbounded HTTP/1 status-line / chunk-extension
+      # buffering) and EEF-CVE-2026-82729 (quadratic chunk-size parsing). Finch
+      # still lists mint ~> 1.8, so pin the patched floor.
+      {:mint, "~> 1.10", override: true},
       {:floki, "~> 0.38"},
       {:flop, "~> 0.28.0"},
       {:flop_phoenix, "~> 0.26.3"},
@@ -254,15 +259,21 @@ defmodule Ysc.MixProject do
       {:nested_filter, "~> 2.1", override: true},
       {:mjml_eex, "~> 0.13"},
       {:mox, "~> 1.2", only: :test},
-      # 2.24: top-level cron/pruner/lifeline/reindexer, Period durations, snooze
-      # no longer consumes attempts. Legacy :plugins names still work.
-      {:oban, "~> 2.24"},
+      # 2.24.1: ack only while the job is still executing (prevents a later
+      # execution from overwriting completed/snoozed); notifier listeners live
+      # in Oban.Notifier.Registry; notify/3 returns {:error, _} instead of
+      # exiting. AdminSettingsLive still uses Oban.Notifier.listen/1 (:ok).
+      # dispatch_cooldown is now a valid start_queue option (unused).
+      {:oban, "~> 2.24.1"},
       {:passbook, "~> 0.1"},
       {:phoenix_bakery, "~> 1.0", runtime: false},
       {:phoenix_ecto, "~> 4.7"},
       {:phoenix_html_helpers, "~> 1.0"},
       {:phoenix_html, "~> 4.3"},
-      {:phoenix_live_dashboard, "~> 0.9"},
+      # 0.9.1: skip Ecto repos that cannot resolve an extras module
+      # (dynamic/unnamed names from Ecto.Repo.all_running/0). We only
+      # have named Ysc.Repo + ecto_psql_extras; pin the patched floor.
+      {:phoenix_live_dashboard, "~> 0.9.1"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
       # 1.2.11: discard stale diffs if a view rejoins before the first join
       # succeeds; cancel LiveComponent asyncs on removal; HTMLFormatter
@@ -284,7 +295,8 @@ defmodule Ysc.MixProject do
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing
       # span/parent fixes. We do not enable Sentry.Integrations.Oban or OpenTelemetry.
-      {:sentry, "~> 13.5"},
+      # 13.5.1: rate-limit windows log once; per-event 429 drops at :debug (SDK spec).
+      {:sentry, "~> 13.5.1"},
       {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
@@ -292,7 +304,11 @@ defmodule Ysc.MixProject do
       # SES error XML is missing Code/Message nodes (we use SES).
       {:swoosh, "~> 1.27.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
-      {:telemetry_metrics, "~> 1.1"},
+      # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
+      # tag_values is still supported and emits no deprecation warning. We keep
+      # tag_values because PromEx/Peep, LiveDashboard, and prometheus_core still
+      # read metric.tags as a list of keys plus metric.tag_values/1.
+      {:telemetry_metrics, "~> 1.2"},
       {:telemetry_poller, "~> 1.3"},
       {:timex, "~> 3.7"},
       {:ueberauth_facebook, "~> 0.10"},

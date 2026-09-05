@@ -22,12 +22,14 @@ defmodule Ysc.Tickets.BookingLocker do
   }
 
   alias Ysc.Tickets.TicketOrder
+  alias Ysc.Accounts.User
 
   @doc """
   Atomically reserves tickets for a booking.
 
   This function:
-  1. Loads the event and ticket tiers (no `FOR UPDATE` row locks yet)
+  1. Loads the event and selected ticket tiers (no `FOR UPDATE` row locks yet),
+     or reuses `%Event{}` / tier structs passed in `:event` / `:tiers`
   2. Validates availability
   3. Creates the ticket order and tickets
   4. All within a single transaction
@@ -47,28 +49,42 @@ defmodule Ysc.Tickets.BookingLocker do
       problems (a tier that was capped too low, a walk-in after the posted
       start time), so these guards — all written for the self-service web
       checkout — don't apply there. Capacity is intentionally a soft limit
-      here, not skipped silently: pair this with `capacity_warnings/2`
+      here, not skipped silently: pair this with `capacity_warnings/2` / `capacity_warnings/3`
       (call it *before* placing the order) so the admin app can show what
       it would exceed and let the seller decide. Membership/member-only-tier
       eligibility are unaffected — bypassing those is a different,
       unrequested policy change from "let the door seller override sale
       timing and capacity".
+    * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Ticket
+      inserts reuse it for the membership check instead of selecting the
+      buyer once per ticket.
+    * `:event` - `%Event{}` already loaded for `event_id`. Skips the event
+      SELECT; published/cancelled/in-past checks still run on the struct.
+    * `:tiers` - ticket tier structs already loaded for the selection. Skips
+      the tier SELECT when every selected id is present and belongs to the
+      event. Pass rows loaded in the same request (door sale); do not pass
+      LiveView assigns that may have gone stale while the page was open.
 
   ## Returns:
-  - `{:ok, %TicketOrder{}}` on success
+  - `{:ok, %TicketOrder{}}` on success, with `:tickets` (each carrying
+    `:ticket_tier`) and `:user` loaded so checkout repricing can skip those
+    SELECTs
   - `{:error, reason}` on failure
   """
   def atomic_booking(user_id, event_id, ticket_selections, opts \\ []) do
     bypass_guards? = Keyword.get(opts, :bypass_guards, false)
+    buyer = buyer_for_ticket_inserts(user_id, opts)
 
     Repo.transaction(fn ->
-      with {:ok, event} <- lock_and_validate_event(event_id, bypass_guards?),
+      with {:ok, event} <-
+             lock_and_validate_event(event_id, bypass_guards?, opts),
            {:ok, tiers} <-
              lock_and_validate_tiers(
                event_id,
                ticket_selections,
                user_id,
-               bypass_guards?
+               bypass_guards?,
+               opts
              ),
            :ok <-
              (if bypass_guards? do
@@ -98,15 +114,21 @@ defmodule Ysc.Tickets.BookingLocker do
                ticket_order.id,
                ticket_selections
              ),
-           {:ok, _tickets} <-
+           {:ok, tickets} <-
              create_tickets_atomic(
                ticket_order,
+               event,
                tiers,
                ticket_selections,
                fulfilled_reservations_by_tier,
-               bypass_guards?
+               bypass_guards?,
+               buyer
              ) do
+        %User{} = buyer
+
         ticket_order
+        |> put_booking_tickets(tickets, tiers)
+        |> put_booking_user(buyer)
       else
         {:error, reason} ->
           require Ysc.Logging
@@ -168,20 +190,28 @@ defmodule Ysc.Tickets.BookingLocker do
     skip_capacity? = Keyword.get(opts, :skip_capacity, false)
     skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
 
-    with {:ok, event} <-
-           validate_event_for_fulfillment(event_id, skip_sale_guards?),
-         {:ok, tiers} <-
-           validate_tiers_for_fulfillment(
-             event_id,
-             ticket_selections,
-             user_id,
-             skip_sale_guards: skip_sale_guards?,
-             skip_capacity: skip_capacity?
-           ) do
-      if skip_capacity? do
-        :ok
-      else
-        validate_event_capacity(event, tiers, ticket_selections, user_id)
+    # Door sales / admin override already loaded and validated the event and
+    # selected tiers. Reloading every tier on the event (twice — once in a
+    # pre-check transaction and once inside the insert) is wasted work when
+    # both sale-window and capacity checks are skipped.
+    if skip_capacity? and skip_sale_guards? do
+      :ok
+    else
+      with {:ok, event} <-
+             validate_event_for_fulfillment(event_id, skip_sale_guards?),
+           {:ok, tiers} <-
+             validate_tiers_for_fulfillment(
+               event_id,
+               ticket_selections,
+               user_id,
+               skip_sale_guards: skip_sale_guards?,
+               skip_capacity: skip_capacity?
+             ) do
+        if skip_capacity? do
+          :ok
+        else
+          validate_event_capacity(event, tiers, ticket_selections, user_id)
+        end
       end
     end
   end
@@ -237,14 +267,19 @@ defmodule Ysc.Tickets.BookingLocker do
   expiring), same caveat as the rest of this module's unlocked reads. That's
   fine for a "heads up, you're about to oversell" prompt — it doesn't need
   to be race-free the way actually placing the order does.
+
+  ## Options
+
+    * `:event` - `%Event{}` already loaded for `event_id` (skips the event SELECT)
+    * `:tiers` - ticket tier structs already loaded (skips the tier SELECT)
   """
-  def capacity_warnings(event_id, ticket_selections) do
-    case lock_event(event_id) do
+  def capacity_warnings(event_id, ticket_selections, opts \\ []) do
+    case event_for_capacity_warnings(event_id, opts) do
       nil ->
         []
 
       event ->
-        tiers = lock_ticket_tiers(event_id)
+        tiers = tiers_for_capacity_warnings(event_id, opts)
 
         counts =
           load_capacity_counts(
@@ -259,6 +294,20 @@ defmodule Ysc.Tickets.BookingLocker do
 
         event_warnings = event_capacity_warning(event, tiers, ticket_selections)
         tier_warnings ++ event_warnings
+    end
+  end
+
+  defp event_for_capacity_warnings(event_id, opts) do
+    case Keyword.get(opts, :event) do
+      %Event{id: id} = event when id == event_id -> event
+      _ -> lock_event(event_id)
+    end
+  end
+
+  defp tiers_for_capacity_warnings(event_id, opts) do
+    case Keyword.get(opts, :tiers) do
+      tiers when is_list(tiers) -> tiers
+      _ -> lock_ticket_tiers(event_id)
     end
   end
 
@@ -314,8 +363,8 @@ defmodule Ysc.Tickets.BookingLocker do
 
   ## Private Functions
 
-  defp lock_and_validate_event(event_id, bypass_guards? \\ false) do
-    case lock_event(event_id) do
+  defp lock_and_validate_event(event_id, bypass_guards? \\ false, opts \\ []) do
+    case event_for_booking(event_id, opts) do
       nil ->
         {:error, :event_not_found}
 
@@ -338,14 +387,16 @@ defmodule Ysc.Tickets.BookingLocker do
          event_id,
          ticket_selections,
          user_id,
-         bypass_guards?
+         bypass_guards?,
+         opts
        ) do
     validate_tiers_for_fulfillment(
       event_id,
       ticket_selections,
       user_id,
       skip_sale_guards: bypass_guards?,
-      skip_capacity: bypass_guards?
+      skip_capacity: bypass_guards?,
+      tiers: Keyword.get(opts, :tiers)
     )
   end
 
@@ -368,7 +419,7 @@ defmodule Ysc.Tickets.BookingLocker do
        ) do
     skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
     skip_capacity? = Keyword.get(opts, :skip_capacity, false)
-    tiers = lock_ticket_tiers(event_id)
+    tiers = tiers_for_booking(event_id, ticket_selections, opts)
 
     counts =
       if skip_capacity? do
@@ -538,6 +589,41 @@ defmodule Ysc.Tickets.BookingLocker do
     end
   end
 
+  defp event_for_booking(event_id, opts) do
+    case Keyword.get(opts, :event) do
+      %Event{id: id} = event when id == event_id -> event
+      _ -> lock_event(event_id)
+    end
+  end
+
+  defp tiers_for_booking(event_id, ticket_selections, opts) do
+    selected_ids = Map.keys(ticket_selections)
+
+    case Keyword.get(opts, :tiers) do
+      tiers when is_list(tiers) ->
+        if selected_tiers_complete?(tiers, selected_ids, event_id) do
+          tiers
+        else
+          lock_selected_ticket_tiers(event_id, selected_ids)
+        end
+
+      _ ->
+        lock_selected_ticket_tiers(event_id, selected_ids)
+    end
+  end
+
+  defp selected_tiers_complete?(tiers, selected_ids, event_id) do
+    selected = MapSet.new(selected_ids)
+
+    loaded =
+      Enum.reduce(tiers, MapSet.new(), fn
+        %TicketTier{id: id, event_id: ^event_id}, acc -> MapSet.put(acc, id)
+        _, acc -> acc
+      end)
+
+    MapSet.subset?(selected, loaded)
+  end
+
   defp lock_event(event_id) do
     # Plain read — no FOR UPDATE. Concurrent transactions can observe the same counts.
     Repo.get(Event, event_id)
@@ -545,10 +631,24 @@ defmodule Ysc.Tickets.BookingLocker do
 
   defp lock_ticket_tiers(event_id) do
     # Plain read — no FOR UPDATE. See module doc for concurrency caveats.
-    Repo.all(
-      from tt in TicketTier,
-        where: tt.event_id == ^event_id
-    )
+    Repo.all(ticket_tiers_for_event_query(event_id))
+  end
+
+  defp lock_selected_ticket_tiers(_event_id, []), do: []
+
+  defp lock_selected_ticket_tiers(event_id, selected_ids) do
+    # Plain read — no FOR UPDATE. See module doc for concurrency caveats.
+    Repo.all(selected_ticket_tiers_query(event_id, selected_ids))
+  end
+
+  defp ticket_tiers_for_event_query(event_id) do
+    from tt in TicketTier,
+      where: tt.event_id == ^event_id
+  end
+
+  defp selected_ticket_tiers_query(event_id, selected_ids) do
+    from tt in TicketTier,
+      where: tt.event_id == ^event_id and tt.id in ^selected_ids
   end
 
   defp empty_capacity_counts do
@@ -1041,6 +1141,32 @@ defmodule Ysc.Tickets.BookingLocker do
     {new_acc_total, new_acc_discount}
   end
 
+  defp buyer_for_ticket_inserts(user_id, opts) do
+    case Keyword.get(opts, :user) do
+      %User{id: id} = user when id == user_id -> user
+      _ -> Repo.get(User, user_id)
+    end
+  end
+
+  # Checkout immediately uses the just-created order. Putting tickets
+  # (with tiers) and the buyer on the returned struct skips the extra
+  # TicketOrder + tickets + user SELECTs in sync_pending_order_pricing.
+  # Current tier prices are still SELECTed unless the caller passes :tiers.
+  defp put_booking_tickets(ticket_order, tickets, tiers) do
+    tiers_by_id = Map.new(tiers, &{&1.id, &1})
+
+    loaded_tickets =
+      Enum.map(tickets, fn ticket ->
+        %{ticket | ticket_tier: Map.fetch!(tiers_by_id, ticket.ticket_tier_id)}
+      end)
+
+    %{ticket_order | tickets: loaded_tickets}
+  end
+
+  defp put_booking_user(ticket_order, %User{} = buyer) do
+    %{ticket_order | user: buyer}
+  end
+
   defp create_ticket_order_atomic(
          user_id,
          event_id,
@@ -1082,15 +1208,22 @@ defmodule Ysc.Tickets.BookingLocker do
 
   defp create_tickets_atomic(
          ticket_order,
+         event,
          tiers,
          ticket_selections,
          fulfilled_reservations_by_tier,
-         bypass_guards?
+         bypass_guards?,
+         buyer
        ) do
-    ticket_changeset_fn =
-      if bypass_guards?,
-        do: &Ticket.door_sale_changeset/2,
-        else: &Ticket.changeset/2
+    buyer = Ticket.ensure_membership_preloads(buyer)
+
+    ticket_changeset_fn = fn attrs ->
+      if bypass_guards? do
+        Ticket.door_sale_changeset(%Ticket{}, attrs, user: buyer)
+      else
+        Ticket.changeset(%Ticket{}, attrs, user: buyer, event: event)
+      end
+    end
 
     # fulfilled_reservations_by_tier is a map of tier_id => [list of fulfilled reservations]
     # We need to create tickets for both reserved and non-reserved quantities
@@ -1153,7 +1286,7 @@ defmodule Ysc.Tickets.BookingLocker do
 
             # Create one ticket per fulfilled quantity (may be less than the original hold)
             Enum.map(1..fulfill_qty, fn _ ->
-              ticket_changeset_fn.(%Ticket{}, %{
+              ticket_changeset_fn.(%{
                 event_id: ticket_order.event_id,
                 ticket_tier_id: tier_id,
                 user_id: ticket_order.user_id,
@@ -1173,7 +1306,7 @@ defmodule Ysc.Tickets.BookingLocker do
             []
           else
             Enum.map(1..non_reserved_count, fn _ ->
-              ticket_changeset_fn.(%Ticket{}, %{
+              ticket_changeset_fn.(%{
                 event_id: ticket_order.event_id,
                 ticket_tier_id: tier_id,
                 user_id: ticket_order.user_id,
@@ -1223,6 +1356,10 @@ defmodule Ysc.Tickets.BookingLocker do
       already fulfilled by this order, not just active holds. Pass this when
       repricing an existing order so a fulfilled 100%-off hold keeps its
       discount.
+    * `:tiers` - ticket tier structs already loaded for the selection. Skips
+      the tier SELECT when every selected id is present and belongs to the
+      event. Pass rows loaded in the same request (door sale). Do not pass
+      LiveView-cached tiers that may be stale.
   """
   def estimate_order_total(user_id, event_id, ticket_selections, opts \\ [])
       when is_map(ticket_selections) do
@@ -1231,9 +1368,7 @@ defmodule Ysc.Tickets.BookingLocker do
     if tier_ids == [] do
       {:ok, Money.new(0, :USD), Money.new(0, :USD)}
     else
-      tiers =
-        from(t in TicketTier, where: t.id in ^tier_ids)
-        |> Repo.all()
+      tiers = tiers_for_booking(event_id, ticket_selections, opts)
 
       calculate_total_amount(tiers, ticket_selections, user_id, event_id, opts)
     end
@@ -1254,6 +1389,13 @@ defmodule Ysc.Tickets.BookingLocker do
     alias Ysc.Ci.QueryExplain.Fixtures
 
     batch_count_sold_tickets_for_tiers_query([Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_selected_tiers_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    selected_ticket_tiers_query(Fixtures.ulid(), [Fixtures.ulid()])
   end
 
   @doc false

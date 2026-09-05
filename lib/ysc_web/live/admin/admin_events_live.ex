@@ -445,7 +445,9 @@ defmodule YscWeb.AdminEventsLive do
   def handle_event("copy-event", %{"id" => id}, socket) do
     event = Events.get_event!(id)
 
-    case Events.copy_event(event, socket.assigns.current_user.id) do
+    case Events.copy_event(event, socket.assigns.current_user.id,
+           acting_role: socket.assigns.admin_role
+         ) do
       {:ok, new_event} ->
         {:noreply,
          push_navigate(socket, to: ~p"/admin/events/#{new_event.id}/edit")}

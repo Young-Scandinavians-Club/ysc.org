@@ -7,6 +7,8 @@ defmodule Ysc.EmailVerificationRateLimit do
   """
   use Hammer, backend: :ets
 
+  alias Ysc.RateLimit
+
   @default_limit 12
   @scale_ms :timer.minutes(1)
   @verification_types [:email, :phone]
@@ -25,12 +27,12 @@ defmodule Ysc.EmailVerificationRateLimit do
 
   def check(user_id, type)
       when is_binary(user_id) and type in @verification_types do
-    key = "verify_attempt:#{type}:user:#{user_id}"
-
-    case hit(key, @scale_ms, limit()) do
-      {:allow, _} -> :ok
-      {:deny, _} -> :rate_limited
-    end
+    RateLimit.check_ok(
+      &hit/3,
+      "verify_attempt:#{type}:user:#{user_id}",
+      @scale_ms,
+      limit()
+    )
   end
 
   def check(_, _), do: :rate_limited

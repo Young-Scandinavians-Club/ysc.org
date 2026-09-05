@@ -763,27 +763,30 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     property = assigns[:property]
 
     cond do
+      assigns.state == :set_start && property == :tahoe &&
+          Date.day_of_week(day) == 6 ->
+        "No check-in"
+
       assigns.state == :set_end && saturday_checkout?(day, property) ->
         "No checkout"
 
       assigns.state == :set_end &&
-          saturday_checkin_requires_sunday_checkout?(day, assigns) ->
-        "Leave Sunday"
+          saturday_weekend_span_required?(day, assigns) ->
+        "Include Fri-Sun"
 
       true ->
         nil
     end
   end
 
-  defp saturday_checkin_requires_sunday_checkout?(day, assigns) do
+  defp saturday_weekend_span_required?(day, assigns) do
     checkin = assigns.checkin_date
     property = assigns[:property]
 
     checkin &&
       property == :tahoe &&
-      Date.day_of_week(checkin) == 6 &&
       Date.compare(day, checkin) == :gt &&
-      not (Date.diff(day, checkin) == 1 && Date.day_of_week(day) == 7)
+      saturday_without_friday_or_sunday?(checkin, day)
   end
 
   defp day_detail_label(day, assigns) do
@@ -999,12 +1002,20 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp selection_restricted?(day, assigns) do
-    assigns.state == :set_end &&
-      assigns.checkin_date &&
-      !selected_start?(day, assigns.checkin_date) &&
-      !fully_blocked_for_stay?(day, assigns) &&
-      !partial_availability_day?(day, assigns) &&
-      checkout_selection_blocked?(day, assigns)
+    cond do
+      assigns.state == :set_start ->
+        check_start_date_rules(day, assigns[:property])
+
+      assigns.state == :set_end ->
+        assigns.checkin_date &&
+          !selected_start?(day, assigns.checkin_date) &&
+          !fully_blocked_for_stay?(day, assigns) &&
+          !partial_availability_day?(day, assigns) &&
+          checkout_selection_blocked?(day, assigns)
+
+      true ->
+        false
+    end
   end
 
   defp partial_availability_day?(day, assigns) do
@@ -1322,12 +1333,19 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     seasons = assigns[:seasons]
 
     cond do
+      state == :set_start && property == :tahoe && Date.day_of_week(day) == 6 ->
+        Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
+
       state == :set_end && saturday_checkout?(day, property) ->
         "You cannot check out on Saturday. Pick Sunday or another day to leave."
 
-      state == :set_end &&
-          saturday_checkin_requires_sunday_checkout?(day, assigns) ->
-        Ysc.Bookings.BookingValidator.saturday_checkin_one_night_message()
+      state == :set_end && checkin_date &&
+          saturday_weekend_span_required?(day, assigns) ->
+        if Date.day_of_week(checkin_date) == 5 do
+          Ysc.Bookings.BookingValidator.saturday_requires_sunday_message()
+        else
+          Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
+        end
 
       state == :set_end && checkin_date &&
           Date.compare(day, checkin_date) == :gt ->
@@ -1380,9 +1398,16 @@ defmodule YscWeb.Components.AvailabilityCalendar do
          _mode,
          seasons
        ) do
-    # Saturday check-in is allowed; checkout rules enforce Sat→Sun / weekend span
-    check_end_date_rules(day, checkin_date, state, property, seasons)
+    case state do
+      :set_start -> check_start_date_rules(day, property)
+      _ -> check_end_date_rules(day, checkin_date, state, property, seasons)
+    end
   end
+
+  # Saturday can never be a check-in day for Tahoe: any stay including
+  # Saturday must start Friday or earlier.
+  defp check_start_date_rules(day, :tahoe), do: Date.day_of_week(day) == 6
+  defp check_start_date_rules(_day, _property), do: false
 
   defp check_end_date_rules(day, checkin_date, state, property, seasons) do
     case state do
@@ -1408,11 +1433,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       saturday_checkout?(day, property) ->
         true
 
-      property == :tahoe && Date.day_of_week(checkin_date) == 6 &&
-          not (nights == 1 && Date.day_of_week(day) == 7) ->
-        true
-
-      property == :tahoe && saturday_without_sunday?(checkin_date, day) ->
+      property == :tahoe &&
+          saturday_without_friday_or_sunday?(checkin_date, day) ->
         true
 
       true ->
@@ -1420,11 +1442,13 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     end
   end
 
-  defp saturday_without_sunday?(checkin_date, checkout_date) do
+  # A stay that includes Saturday must also include both Friday and Sunday
+  # (i.e. it must span the full weekend).
+  defp saturday_without_friday_or_sunday?(checkin_date, checkout_date) do
     days =
       Date.range(checkin_date, checkout_date) |> Enum.map(&Date.day_of_week/1)
 
-    6 in days and 7 not in days
+    6 in days and not (5 in days and 7 in days)
   end
 
   defp saturday_checkout?(day, property) do

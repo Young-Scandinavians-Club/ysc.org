@@ -48,6 +48,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 51 (HIGH)     Volunteers could grant $0 tickets and out-of-band memberships via the mobile app API
   Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
+  Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -3041,6 +3042,101 @@ defmodule YscWeb.SecurityAuditTest do
 
       reloaded = Ysc.Events.get_ticket_reservation!(reservation.id)
       assert reloaded.status == "active"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 55 (HIGH): Volunteers cannot copy ticket tiers (incl. Free / $0)
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 55: volunteers cannot copy ticket tiers" do
+    import Ysc.EventsFixtures
+
+    test "copy-event from the editor omits free and paid tiers for volunteers",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "Free RSVP Finding 55",
+        type: :free,
+        quantity: 40
+      })
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "GA Finding 55",
+        type: :paid,
+        price: Money.new(25, :USD),
+        quantity: 40
+      })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#copy-event-btn")
+      |> render_click()
+
+      path = assert_patch(view)
+      assert path =~ ~r|/admin/events/[^/]+/edit|
+
+      copied_id =
+        path
+        |> Path.split()
+        |> Enum.at(3)
+
+      copied =
+        Ysc.Events.get_event!(copied_id) |> Repo.preload(:ticket_tiers)
+
+      assert copied.id != event.id
+      assert copied.ticket_tiers == []
+    end
+
+    test "copy-event from the events list omits ticket tiers for volunteers",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :published,
+          title: "Finding 55 List Copy #{System.unique_integer([:positive])}"
+        })
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "Comp Finding 55",
+        type: :free,
+        quantity: 10
+      })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events")
+
+      view
+      |> element(
+        "#admin_events_list button[phx-click='copy-event'][phx-value-id='#{event.id}']"
+      )
+      |> render_click()
+
+      {path, _flash} = assert_redirect(view)
+      assert path =~ ~r|/admin/events/[^/]+/edit|
+
+      copied_id =
+        path
+        |> Path.split()
+        |> Enum.at(3)
+
+      copied =
+        Ysc.Events.get_event!(copied_id) |> Repo.preload(:ticket_tiers)
+
+      assert copied.ticket_tiers == []
     end
   end
 

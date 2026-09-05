@@ -781,15 +781,19 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     save it as a notice with the document button.
                   </p>
                 </div>
-                <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
-                  <.input
-                    type="hidden"
-                    id="edition_intro_text"
-                    field={@form[:intro_text]}
-                    phx-hook="TrixHook"
-                    phx-debounce="800"
-                    data-newsletter-notices={to_string(!@readonly?)}
-                  />
+                <.trix_editor
+                  id="edition_intro_text"
+                  field={@form[:intro_text]}
+                  wrapper_id="newsletter-intro-richtext"
+                  wrapper_class="relative"
+                  image_picker_id={:newsletter_intro_image_picker}
+                  image_picker_disabled?={@readonly?}
+                  readonly?={@readonly?}
+                  phx-debounce="800"
+                  data-newsletter-notices={to_string(!@readonly?)}
+                  placeholder="Write your opening section..."
+                  editor_class="trix-content block px-4 py-2 bg-white border-0 border-t border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition text-wrap min-h-[200px]"
+                >
                   <button
                     :if={!@readonly?}
                     type="button"
@@ -800,31 +804,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                   >
                     Insert saved notice
                   </button>
-                  <.live_component
-                    module={YscWeb.TrixImagePickerComponent}
-                    id={:newsletter_intro_image_picker}
-                    target_input_id="edition_intro_text"
-                    disabled?={@readonly?}
-                  />
-                  <div
-                    id="newsletter-intro-richtext"
-                    class="relative"
-                    phx-update="ignore"
-                  >
-                    <trix-editor
-                      input="edition_intro_text"
-                      class="trix-content block px-4 py-2 bg-white border-0 border-t border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition text-wrap min-h-[200px]"
-                      placeholder="Write your opening section..."
-                    >
-                    </trix-editor>
-                    <%!-- Transparent overlay prevents all interaction when readonly --%>
-                    <div
-                      :if={@readonly?}
-                      class="absolute inset-0 z-10 cursor-not-allowed"
-                      aria-hidden="true"
-                    />
-                  </div>
-                </div>
+                </.trix_editor>
               </div>
 
               <div class="border border-zinc-200 rounded-lg p-4 bg-white">
