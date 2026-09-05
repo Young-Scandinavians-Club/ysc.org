@@ -49,6 +49,22 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
     has_many :income_items, ExpenseReportIncomeItem,
       foreign_key: :expense_report_id
 
+    # Filled by list queries via SQL SUM/COUNT so index pages do not preload
+    # every item row (receipt S3 paths, descriptions, etc.).
+    field :list_expense_total, Money.Ecto.Composite.Type,
+      virtual: true,
+      default_currency: :USD
+
+    field :list_income_total, Money.Ecto.Composite.Type,
+      virtual: true,
+      default_currency: :USD
+
+    field :list_net_total, Money.Ecto.Composite.Type,
+      virtual: true,
+      default_currency: :USD
+
+    field :expense_item_count, :integer, virtual: true
+
     timestamps()
   end
 
