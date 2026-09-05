@@ -592,6 +592,27 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
 
       assert json_response(response, 401)
     end
+
+    test "rejects a volunteer", %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      member = user_fixture()
+      token = Accounts.generate_user_mobile_token(volunteer)
+
+      response =
+        conn
+        |> delete_req_header("authorization")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => member.id,
+          "plan" => "single",
+          "payment_method" => "cash"
+        })
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(response, 403)
+
+      refute Accounts.has_active_membership?(Accounts.get_user!(member.id))
+    end
   end
 
   describe "POST /api/v1/app/memberships/setup_intent" do

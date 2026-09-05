@@ -464,6 +464,7 @@ defmodule YscWeb.VolunteerRoleTest do
   # ---------------------------------------------------------------------------
   # Finding 46: volunteers cannot refund, reassign, or grant tickets
   # Finding 50: volunteers cannot reserve tickets (discounted holds) either
+  # Finding 51: volunteers cannot grant unpaid tickets/memberships via the app API
   # Finding 53: volunteers cannot cancel ticket reservations either
   # Finding 55: volunteers cannot copy ticket tiers (including Free / $0)
   # ---------------------------------------------------------------------------
@@ -598,6 +599,65 @@ defmodule YscWeb.VolunteerRoleTest do
 
       reloaded = Events.get_ticket_reservation!(reservation.id)
       assert reloaded.status == "active"
+    end
+  end
+
+  describe "volunteer ticket money actions (Finding 51)" do
+    setup [:create_volunteer]
+
+    test "cannot grant complimentary tickets or out-of-band memberships via the app API",
+         %{
+           conn: conn,
+           volunteer: volunteer
+         } do
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Volunteer App",
+          quantity: 20
+        })
+
+      recipient = user_fixture()
+      token = Ysc.Accounts.generate_user_mobile_token(volunteer)
+
+      ticket_response =
+        conn
+        |> recycle()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(
+          ~p"/api/v1/app/events/#{event.id}/tickets/offline_order",
+          %{
+            "member_id" => volunteer.id,
+            "tiers" => %{tier.id => 1},
+            "payment_method" => "cash"
+          }
+        )
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(ticket_response, 403)
+
+      assert Events.list_tickets_for_user(volunteer.id) == []
+
+      membership_response =
+        conn
+        |> recycle()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => recipient.id,
+          "plan" => "single",
+          "payment_method" => "cash"
+        })
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(membership_response, 403)
+
+      refute Ysc.Accounts.has_active_membership?(
+               Ysc.Accounts.get_user!(recipient.id)
+             )
     end
   end
 

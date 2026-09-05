@@ -45,6 +45,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 48 (MEDIUM)   App ticket PaymentIntent treated donation map values as cents while documenting quantity
   Finding 49 (HIGH)     Already-authenticated mobile handoff minted a PKCE-bound code on GET from attacker-supplied challenge
   Finding 50 (HIGH)     Volunteers could reserve tickets with up to 100% discount, bypassing Finding 46 grant gates
+  Finding 51 (HIGH)     Volunteers could grant $0 tickets and out-of-band memberships via the mobile app API
   Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
@@ -2890,6 +2891,57 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Finding 51 (HIGH): Volunteers cannot grant unpaid tickets/memberships via app API
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 51: volunteers cannot grant unpaid tickets or memberships via the app API" do
+    import Ysc.EventsFixtures
+
+    test "volunteer cannot grant complimentary tickets via offline_order, including to themselves",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      member = user_fixture()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        conn
+        |> volunteer_app_conn(volunteer)
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => volunteer.id,
+          "tiers" => %{tier.id => 1},
+          "payment_method" => "cash"
+        })
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(response, 403)
+
+      assert Ysc.Events.list_tickets_for_user(volunteer.id) == []
+      assert Ysc.Events.list_tickets_for_user(member.id) == []
+    end
+
+    test "volunteer cannot create an out-of-band membership via subscribe_offline",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      recipient = user_fixture()
+
+      response =
+        conn
+        |> volunteer_app_conn(volunteer)
+        |> post(~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => recipient.id,
+          "plan" => "single",
+          "payment_method" => "cash"
+        })
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(response, 403)
+
+      refute Accounts.has_active_membership?(Accounts.get_user!(recipient.id))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 52 (HIGH): App membership subscribe must not reuse stale PMs
   # ---------------------------------------------------------------------------
 
@@ -3086,6 +3138,14 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert copied.ticket_tiers == []
     end
+  end
+
+  defp volunteer_app_conn(conn, volunteer) do
+    token = Accounts.generate_user_mobile_token(volunteer)
+
+    conn
+    |> put_req_header("accept", "application/json")
+    |> put_req_header("authorization", "Bearer #{token}")
   end
 
   defp impersonate_as_admin(conn, admin, target) do

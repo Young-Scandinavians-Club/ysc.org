@@ -35,6 +35,7 @@ defmodule YscWeb.Api.AppTicketsController do
   alias Ysc.Tickets
   alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.StripeService
+  alias YscWeb.Plugs.MobileUserAuth
 
   import Ecto.Query, warn: false
 
@@ -101,6 +102,10 @@ defmodule YscWeb.Api.AppTicketsController do
   reconciliation; `admin_grant_notes` carries only the human-readable note.
   Event revenue reports are unaffected.
 
+  Full admins only (Finding 51). Volunteers may still collect card-present
+  payment via `create_payment_intent/2`. This path is the same complimentary
+  grant primitive the web Tickets tab already hides from volunteers.
+
   Capacity and sale-window guards are bypassed here the same way as
   `create_payment_intent/2` — see this module's moduledoc. Donation tiers
   are rejected, matching `create_payment_intent/2`.
@@ -111,7 +116,8 @@ defmodule YscWeb.Api.AppTicketsController do
           params
       )
       when is_map(tiers) and map_size(tiers) > 0 do
-    with {:ok, event} <- fetch_event(event_id),
+    with :ok <- MobileUserAuth.require_full_admin(conn),
+         {:ok, event} <- fetch_event(event_id),
          {:ok, member} <- fetch_member(member_id),
          :ok <- require_active_membership(member),
          {:ok, selections} <- parse_ticket_selections(tiers),
