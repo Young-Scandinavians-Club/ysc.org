@@ -7,6 +7,8 @@ defmodule Ysc.PublicContentCache do
 
   require Ysc.Logging
 
+  alias Ysc.VersionedCache
+
   @cache_name :ysc_cache
   @posts_version_key "public_content:version:posts"
   @events_version_key "public_content:version:events"
@@ -100,112 +102,17 @@ defmodule Ysc.PublicContentCache do
 
   defp fetch_cached(domain, cache_key, fetch_fun)
        when is_function(fetch_fun, 0) do
-    if Ysc.ProcessCache.enabled?() do
-      do_fetch_cached(domain, cache_key, fetch_fun)
-    else
-      fetch_fun.()
-    end
+    VersionedCache.fetch(
+      version_key(domain),
+      cache_key,
+      fetch_fun,
+      cache_name: @cache_name,
+      ttl: ttl_ms()
+    )
   end
 
-  defp do_fetch_cached(domain, cache_key, fetch_fun)
-       when is_function(fetch_fun, 0) do
-    version_key = version_key(domain)
-
-    case Cachex.get(@cache_name, cache_key) do
-      {:ok, nil} ->
-        fetch_and_cache(domain, cache_key, fetch_fun)
-
-      {:ok, {:version, version, ttl_expires_at, value}} ->
-        now = System.system_time(:millisecond)
-
-        if now < ttl_expires_at do
-          validate_cached_version(
-            domain,
-            version_key,
-            cache_key,
-            version,
-            value,
-            fetch_fun
-          )
-        else
-          refetch_and_cache(domain, cache_key, fetch_fun)
-        end
-
-      {:ok, value} ->
-        fetch_and_cache(domain, cache_key, fn -> value end)
-
-      {:error, _reason} ->
-        fetch_fun.()
-    end
-  end
-
-  defp validate_cached_version(
-         domain,
-         version_key,
-         cache_key,
-         version,
-         value,
-         fetch_fun
-       ) do
-    case Cachex.get(@cache_name, version_key) do
-      {:ok, current_version} when current_version == version ->
-        value
-
-      _ ->
-        refetch_and_cache(domain, cache_key, fetch_fun)
-    end
-  end
-
-  defp fetch_and_cache(domain, cache_key, fetch_fun) do
-    version_before = current_version(domain)
-    value = fetch_fun.()
-
-    if current_version(domain) == version_before do
-      cache_with_version_and_ttl(domain, cache_key, value, version_before)
-      value
-    else
-      refetch_and_cache(domain, cache_key, fetch_fun)
-    end
-  end
-
-  defp refetch_and_cache(domain, cache_key, fetch_fun) do
-    Cachex.del(@cache_name, cache_key)
-    fetch_and_cache(domain, cache_key, fetch_fun)
-  end
-
-  defp cache_with_version_and_ttl(domain, key, value, version) do
-    version_key = version_key(domain)
-
-    ttl_ms =
-      Application.get_env(:ysc, :public_content_cache_ttl_ms, @default_ttl)
-
-    now = System.system_time(:millisecond)
-    ttl_expires_at = now + ttl_ms
-
-    case version do
-      version when is_integer(version) ->
-        Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},
-          expire: ttl_ms
-        )
-
-      _ ->
-        new_version = System.unique_integer([:monotonic, :positive])
-        Cachex.put(@cache_name, version_key, new_version)
-
-        Cachex.put(
-          @cache_name,
-          key,
-          {:version, new_version, ttl_expires_at, value},
-          expire: ttl_ms
-        )
-    end
-  end
-
-  defp current_version(domain) do
-    case Cachex.get(@cache_name, version_key(domain)) do
-      {:ok, version} when is_integer(version) -> version
-      _ -> nil
-    end
+  defp ttl_ms do
+    Application.get_env(:ysc, :public_content_cache_ttl_ms, @default_ttl)
   end
 
   defp bump_version(domain) do

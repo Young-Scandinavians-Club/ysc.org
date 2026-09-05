@@ -9,6 +9,7 @@ defmodule Ysc.Bookings.SeasonCache do
 
   require Ysc.Logging
   alias Ysc.Bookings.{ConfigCacheTelemetry, Season}
+  alias Ysc.VersionedCache
 
   @cache_name :ysc_cache
   @cache_prefix "season:"
@@ -30,9 +31,13 @@ defmodule Ysc.Bookings.SeasonCache do
   Returns the season or nil if not found.
   """
   def get(property, date) when is_atom(property) do
-    property
-    |> build_cache_key(date)
-    |> fetch_cached(fn -> Season.for_date_db(property, date) end)
+    VersionedCache.fetch(
+      @cache_version_key,
+      build_cache_key(property, date),
+      fn -> Season.for_date_db(property, date) end,
+      cache_name: @cache_name,
+      ttl: ttl_ms()
+    )
   end
 
   @doc """
@@ -79,84 +84,21 @@ defmodule Ysc.Bookings.SeasonCache do
   This is useful when you need all seasons for a property (e.g., for UI display).
   """
   def get_all_for_property(property) when is_atom(property) do
-    cache_key = "#{@cache_prefix}all:#{property}"
-
-    fetch_cached(cache_key, fn -> Season.list_all_for_property_db(property) end)
+    VersionedCache.fetch(
+      @cache_version_key,
+      "#{@cache_prefix}all:#{property}",
+      fn -> Season.list_all_for_property_db(property) end,
+      cache_name: @cache_name,
+      ttl: ttl_ms()
+    )
   end
-
-  # Private functions
 
   defp build_cache_key(property, date) do
     date_str = Date.to_iso8601(date)
     "#{@cache_prefix}#{property}:#{date_str}"
   end
 
-  defp fetch_cached(cache_key, fetch_fun) when is_function(fetch_fun, 0) do
-    case Cachex.get(@cache_name, cache_key) do
-      {:ok, nil} ->
-        value = fetch_fun.()
-        cache_with_version_and_ttl(cache_key, value)
-        value
-
-      {:ok, {:version, version, ttl_expires_at, value}} ->
-        now = System.system_time(:millisecond)
-
-        if now < ttl_expires_at do
-          validate_cached_version(cache_key, version, value, fetch_fun)
-        else
-          refetch_and_cache(cache_key, fetch_fun)
-        end
-
-      {:ok, value} ->
-        cache_with_version_and_ttl(cache_key, value)
-        value
-
-      {:error, _reason} ->
-        fetch_fun.()
-    end
-  end
-
-  defp validate_cached_version(cache_key, version, value, fetch_fun) do
-    case Cachex.get(@cache_name, @cache_version_key) do
-      {:ok, current_version} when current_version == version ->
-        value
-
-      _ ->
-        refetch_and_cache(cache_key, fetch_fun)
-    end
-  end
-
-  defp refetch_and_cache(cache_key, fetch_fun) do
-    Cachex.del(@cache_name, cache_key)
-    value = fetch_fun.()
-    cache_with_version_and_ttl(cache_key, value)
-    value
-  end
-
-  defp cache_with_version_and_ttl(key, value) do
-    ttl_ms = get_ttl()
-    now = System.system_time(:millisecond)
-    ttl_expires_at = now + ttl_ms
-
-    case Cachex.get(@cache_name, @cache_version_key) do
-      {:ok, version} when is_integer(version) ->
-        Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},
-          expire: ttl_ms
-        )
-
-      _ ->
-        # No version set yet - initialize it
-        version = System.unique_integer([:monotonic, :positive])
-        Cachex.put(@cache_name, @cache_version_key, version)
-
-        Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},
-          expire: ttl_ms
-        )
-    end
-  end
-
-  defp get_ttl do
-    # Use 10 minutes as default, but can be configured
+  defp ttl_ms do
     Application.get_env(:ysc, :season_cache_ttl_ms, @default_ttl)
   end
 end
