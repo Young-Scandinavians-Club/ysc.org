@@ -2,7 +2,11 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
   @moduledoc """
   Public page for unsubscribing from the newsletter via a link in an email.
 
-  Route: /newsletter/unsubscribe/:token
+  Route: `/newsletter/unsubscribe/:token`
+
+  The `:token` path param is a `subscription_token` only. Email addresses are
+  not valid tokens; `handle_event/3` unsubscribes the subscriber resolved at
+  mount, never the raw URL value (Finding 56).
   """
   use YscWeb, :live_view
 
@@ -124,12 +128,17 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
 
   @impl true
   def handle_event("unsubscribe", _params, socket) do
-    token = socket.assigns.token
+    # Finding 56: this page is public. Mount resolves the subscriber by
+    # subscription_token only. Newsletter.unsubscribe/2 treats any string
+    # containing "@" as an email, so the URL param must never be passed
+    # through — hiding the button is not authorization.
+    subscriber = socket.assigns.subscriber
     edition_id = socket.assigns.edition_id
+    token = subscriber && subscriber.subscription_token
 
-    # Guard: only call context if we have a valid token string (never crash)
     result =
-      if is_binary(token) && String.trim(token) != "" do
+      if is_binary(token) && String.trim(token) != "" &&
+           not String.contains?(token, "@") do
         opts = if edition_id, do: [edition_id: edition_id], else: []
         Newsletter.unsubscribe(token, opts)
       else

@@ -280,6 +280,26 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
     end
   end
 
+  describe "Finding 56: email in URL is not a valid unsubscribe token" do
+    test "unsubscribe event with an email path param does not remove the subscriber",
+         %{conn: conn} do
+      email = "email-as-token@example.com"
+
+      {:ok, _sub} = Newsletter.subscribe(email, source: "public_signup")
+
+      {:ok, view, html} = live(conn, ~p"/newsletter/unsubscribe/#{email}")
+
+      assert html =~ "Invalid or expired link"
+      refute has_element?(view, "button", "Unsubscribe")
+
+      render_click(view, "unsubscribe")
+
+      subscriber = Newsletter.get_subscriber_by_email(email)
+      assert subscriber.subscribed
+      assert subscriber.unsubscribed_at == nil
+    end
+  end
+
   describe "access without authentication" do
     test "unsubscribe page is public and does not require login", %{conn: conn} do
       {:ok, sub} =
