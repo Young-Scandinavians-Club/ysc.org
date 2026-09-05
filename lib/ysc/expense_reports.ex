@@ -7,6 +7,7 @@ defmodule Ysc.ExpenseReports do
 
   alias Ysc.Repo
   alias Ysc.Accounts.{Address, User}
+  alias Ysc.Events.Event
 
   alias Ysc.ExpenseReports.{
     ExpenseReport,
@@ -27,14 +28,14 @@ defmodule Ysc.ExpenseReports do
 
   def list_expense_reports(%User{} = user) do
     user.id
-    |> expense_reports_query()
+    |> expense_reports_list_query()
     |> Repo.all()
-    |> attach_bank_accounts()
+    |> attach_list_aggregates()
   end
 
   def get_expense_report!(id, %User{} = user) do
     user.id
-    |> expense_reports_query()
+    |> expense_report_detail_query()
     |> where([er], er.id == ^id)
     |> Repo.one!()
     |> List.wrap()
@@ -274,17 +275,19 @@ defmodule Ysc.ExpenseReports do
   @event_list_user_fields [:id, :first_name, :last_name]
 
   @doc """
-  List filed expense reports for an event, newest first, with items and
-  submitter preloaded.
+  List filed expense reports for an event, newest first, with submitter
+  preloaded and per-report net totals attached from SQL.
 
-  Drafts are omitted: they are a member's in-progress scratch copy and do not
-  belong in the per-event statistics table. Totals still use
-  `totals_for_event/2`, which counts only approved/paid reports.
+  Item rows are not preloaded: the statistics table only shows submitter,
+  purpose, status, and net total. Drafts are omitted — they are a member's
+  in-progress scratch copy. Headline totals still use `totals_for_event/2`,
+  which counts only approved/paid reports.
   """
   def list_expense_reports_for_event(event_id) do
     event_id
     |> list_expense_reports_for_event_query()
     |> Repo.all()
+    |> attach_list_aggregates()
   end
 
   defp list_expense_reports_for_event_query(event_id) do
@@ -294,11 +297,7 @@ defmodule Ysc.ExpenseReports do
     from(er in ExpenseReport,
       where: er.event_id == ^event_id and er.status != "draft",
       order_by: [desc: :inserted_at],
-      preload: [
-        :expense_items,
-        :income_items,
-        user: ^user_query
-      ]
+      preload: [user: ^user_query]
     )
   end
 
@@ -350,15 +349,37 @@ defmodule Ysc.ExpenseReports do
     )
   end
 
-  defp expense_reports_query(user_id) do
+  # Member "My Reports" index: event title only, no item rows, address, or
+  # encrypted bank accounts. Totals and item counts come from
+  # `attach_list_aggregates/1`.
+  defp expense_reports_list_query(user_id) do
+    event_query = event_summary_preload_query()
+
     from er in ExpenseReport,
       where: er.user_id == ^user_id,
       order_by: [desc: :inserted_at],
-      preload: [:expense_items, :income_items, :address, :event]
+      preload: [event: ^event_query]
+  end
+
+  # Success / detail page still needs line items, the mailing address, and the
+  # bank account. Event body HTML is omitted — the page only shows title and
+  # start date.
+  defp expense_report_detail_query(user_id) do
+    event_query = event_summary_preload_query()
+
+    from er in ExpenseReport,
+      where: er.user_id == ^user_id,
+      order_by: [desc: :inserted_at],
+      preload: [:expense_items, :income_items, :address, event: ^event_query]
+  end
+
+  defp event_summary_preload_query do
+    from(e in Event, select: struct(e, ^Event.summary_fields()))
   end
 
   # Bank accounts are loaded in a second query so encrypted fields are not
-  # pulled via join/preload; batch by id to avoid N+1 on list endpoints.
+  # pulled via join/preload; batch by id on the detail path. The member list
+  # does not need bank accounts.
   defp attach_bank_accounts(reports) when is_list(reports) do
     bank_account_ids =
       reports
@@ -1068,12 +1089,26 @@ defmodule Ysc.ExpenseReports do
   # Calculations
 
   def calculate_totals(%ExpenseReport{} = expense_report) do
-    if preloaded_items?(expense_report) do
-      calculate_totals_from_preloaded(expense_report)
-    else
-      calculate_totals_from_db(expense_report)
+    cond do
+      list_aggregates_attached?(expense_report) ->
+        %{
+          expense_total: expense_report.list_expense_total,
+          income_total: expense_report.list_income_total,
+          net_total: expense_report.list_net_total
+        }
+
+      preloaded_items?(expense_report) ->
+        calculate_totals_from_preloaded(expense_report)
+
+      true ->
+        calculate_totals_from_db(expense_report)
     end
   end
+
+  defp list_aggregates_attached?(%ExpenseReport{list_net_total: %Money{}}),
+    do: true
+
+  defp list_aggregates_attached?(_), do: false
 
   defp preloaded_items?(%ExpenseReport{
          expense_items: expense_items,
@@ -1143,6 +1178,53 @@ defmodule Ysc.ExpenseReports do
       {:ok, result} -> result
       _ -> Money.new(0, :USD)
     end
+  end
+
+  # Per-report SUM/COUNT so list pages never SELECT item rows. Two grouped
+  # queries regardless of how many reports are on the page — not N item
+  # preloads with receipt S3 paths.
+  defp attach_list_aggregates([]), do: []
+
+  defp attach_list_aggregates(reports) do
+    ids = Enum.map(reports, & &1.id)
+
+    expense_by_id =
+      ids
+      |> item_aggregates_query(ExpenseReportItem)
+      |> Repo.all()
+      |> Map.new(fn {id, total, count} -> {id, {total, count}} end)
+
+    income_by_id =
+      ids
+      |> item_aggregates_query(ExpenseReportIncomeItem)
+      |> Repo.all()
+      |> Map.new(fn {id, total, _count} -> {id, total} end)
+
+    Enum.map(reports, fn report ->
+      {expense_sum, item_count} =
+        Map.get(expense_by_id, report.id, {nil, 0})
+
+      expense_total = Ysc.MoneyHelper.usd_from_db_sum(expense_sum)
+      income_total = Ysc.MoneyHelper.usd_from_db_sum(income_by_id[report.id])
+
+      %{
+        report
+        | list_expense_total: expense_total,
+          list_income_total: income_total,
+          list_net_total: money_sub_or_zero(expense_total, income_total),
+          expense_item_count: item_count
+      }
+    end)
+  end
+
+  defp item_aggregates_query(report_ids, item_schema) do
+    from(item in item_schema,
+      where: item.expense_report_id in ^report_ids,
+      group_by: item.expense_report_id,
+      select:
+        {item.expense_report_id, sum(fragment("(?.amount).amount", item)),
+         count(item.id)}
+    )
   end
 
   # S3 Upload for Expense Reports
@@ -1392,20 +1474,25 @@ defmodule Ysc.ExpenseReports do
 
   @doc false
   def ci_query_explain_query do
-    alias Ysc.Ci.QueryExplain.Fixtures
+    expense_reports_list_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
 
-    user_id = Fixtures.ulid()
-
-    from(er in ExpenseReport,
-      where: er.user_id == ^user_id,
-      order_by: [desc: er.inserted_at],
-      preload: [:expense_items, :income_items, :address, :event]
-    )
+  @doc false
+  def ci_query_explain_detail_query do
+    expense_report_detail_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false
   def ci_query_explain_list_expense_reports_for_event_query do
     list_expense_reports_for_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_item_aggregates_query do
+    item_aggregates_query(
+      [Ysc.Ci.QueryExplain.Fixtures.ulid()],
+      ExpenseReportItem
+    )
   end
 
   @doc false
