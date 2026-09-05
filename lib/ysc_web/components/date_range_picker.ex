@@ -1103,7 +1103,7 @@ defmodule YscWeb.Components.DateRangePicker do
         Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
 
       saturday?(day) && !ctx.allow_saturdays && ctx.state == :set_end ->
-        "You cannot check out on Saturday. Pick Sunday or another day to leave."
+        Ysc.Bookings.BookingValidator.saturday_requires_sunday_message()
 
       ctx.state == :set_end && start_date && !ctx.allow_saturdays &&
         Date.compare(day, start_date) == :gt &&

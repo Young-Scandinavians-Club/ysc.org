@@ -8,6 +8,7 @@ defmodule YscWeb.BookingChangeLive do
     BlackoutListCache,
     Booking,
     BookingModeDisplay,
+    BookingValidator,
     ConfigCacheTelemetry,
     ModificationDateAvailability,
     PricingRuleCache,
@@ -1504,7 +1505,7 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp modification_error_message(:weekend_rule_violation),
-    do: "Any stay that includes Saturday must run Friday through Sunday."
+    do: BookingValidator.saturday_weekend_policy_message()
 
   defp modification_error_message(:blackout_conflict),
     do: YscWeb.BookingUserMessages.unavailable_blackout_dates()
