@@ -336,6 +336,74 @@ defmodule Ysc.Bookings.ModifyBookingTest do
                })
     end
 
+    test "lets a grandfathered Saturday-Sunday stay change guest count", %{
+      user: user
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+
+      saturday =
+        Date.utc_today() |> Date.add(21) |> first_saturday_on_or_after()
+
+      sunday = Date.add(saturday, 1)
+      booking = complete_room_booking!(user, room, saturday, sunday)
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => Date.to_string(saturday),
+                 "checkout_date" => Date.to_string(sunday),
+                 "guests_count" => "3",
+                 "children_count" => "0"
+               })
+
+      assert preview.attrs.guests_count == 3
+      assert preview.attrs.checkin_date == saturday
+      assert preview.attrs.checkout_date == sunday
+    end
+
+    test "still rejects moving a grandfathered Saturday-Sunday stay to a new Saturday check-in",
+         %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+
+      saturday =
+        Date.utc_today() |> Date.add(21) |> first_saturday_on_or_after()
+
+      sunday = Date.add(saturday, 1)
+      booking = complete_room_booking!(user, room, saturday, sunday)
+
+      next_saturday = Date.add(saturday, 7)
+      next_sunday = Date.add(sunday, 7)
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => Date.to_string(next_saturday),
+                 "checkout_date" => Date.to_string(next_sunday),
+                 "guests_count" => "2",
+                 "children_count" => "0"
+               })
+
+      refute changeset.valid?
+      assert [message] = errors_on(changeset).checkin_date
+      assert message =~ "must start Friday"
+    end
+
     test "returns error when modification would checkout on Saturday without Sunday",
          %{user: user} do
       {checkin, checkout} = tahoe_booking_dates(80)
@@ -1397,5 +1465,10 @@ defmodule Ysc.Bookings.ModifyBookingTest do
   defp first_friday_on_or_after(date) do
     days_until_friday = rem(5 - Date.day_of_week(date, :monday) + 7, 7)
     Date.add(date, days_until_friday)
+  end
+
+  defp first_saturday_on_or_after(date) do
+    days_until_saturday = rem(6 - Date.day_of_week(date, :monday) + 7, 7)
+    Date.add(date, days_until_saturday)
   end
 end

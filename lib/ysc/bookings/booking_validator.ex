@@ -144,29 +144,44 @@ defmodule Ysc.Bookings.BookingValidator do
   # Tahoe weekend rule: any stay that includes Saturday must span the full
   # weekend (check-in Friday or earlier, checkout Sunday or later). Saturday
   # can never be the check-in day.
+  #
+  # Existing rows may predate this rule (Saturday check-in to Sunday checkout
+  # was previously allowed). Re-checking those dates on a guest-count or
+  # status-only update would block members from changing a stay they already
+  # paid for. Only new bookings and date changes must satisfy the current rule.
   defp validate_weekend_requirement(changeset) do
-    checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
-    checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
-    property = Ecto.Changeset.get_field(changeset, :property)
+    if weekend_rule_applies?(changeset) do
+      checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
+      checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
+      property = Ecto.Changeset.get_field(changeset, :property)
 
-    if checkin_date && checkout_date && property == :tahoe &&
-         Date.compare(checkout_date, checkin_date) != :lt do
-      reservation_dates =
-        Date.range(checkin_date, checkout_date) |> Enum.to_list()
+      if checkin_date && checkout_date && property == :tahoe &&
+           Date.compare(checkout_date, checkin_date) != :lt do
+        reservation_dates =
+          Date.range(checkin_date, checkout_date) |> Enum.to_list()
 
-      has_saturday =
-        Enum.any?(reservation_dates, fn date ->
-          day_of_week(date) == 6
-        end)
+        has_saturday =
+          Enum.any?(reservation_dates, fn date ->
+            day_of_week(date) == 6
+          end)
 
-      if has_saturday do
-        validate_full_weekend_span(changeset, reservation_dates)
+        if has_saturday do
+          validate_full_weekend_span(changeset, reservation_dates)
+        else
+          changeset
+        end
       else
         changeset
       end
     else
       changeset
     end
+  end
+
+  defp weekend_rule_applies?(%Ecto.Changeset{} = changeset) do
+    is_nil(changeset.data.id) or
+      Map.has_key?(changeset.changes, :checkin_date) or
+      Map.has_key?(changeset.changes, :checkout_date)
   end
 
   defp validate_full_weekend_span(changeset, reservation_dates) do
