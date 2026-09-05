@@ -224,10 +224,20 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       html = render_click(view, "switch-info-tab", %{"tab" => "rules"})
 
-      assert html =~ "Weekend Policy"
-      assert html =~ "Any Saturday stay must run Friday through Sunday"
+      assert html =~ "Saturday nights"
 
+      assert html =~
+               Ysc.Bookings.BookingValidator.saturday_weekend_policy_message()
+
+      refute html =~ "Weekend Policy"
+      refute html =~ "Any Saturday stay must run Friday through Sunday"
       refute html =~ "If you arrive Saturday, stay only one night"
+
+      assert has_element?(
+               view,
+               "#tahoe-weekend-policy",
+               Ysc.Bookings.BookingValidator.saturday_weekend_policy_message()
+             )
 
       assert has_element?(
                view,
@@ -1604,6 +1614,33 @@ defmodule YscWeb.TahoeBookingLiveTest do
       render_async(view, 2_000)
       html = render(view)
       assert html =~ "Tahoe"
+    end
+
+    test "shows a plain-language Saturday night notice for Saturday-Sunday dates",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      base_date = tahoe_test_date(60)
+      saturday = find_next_weekday(base_date, 6)
+      sunday = Date.add(saturday, 1)
+
+      params = %{
+        "checkin_date" => Date.to_string(saturday),
+        "checkout_date" => Date.to_string(sunday),
+        "booking_mode" => "room"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+
+      policy = Ysc.Bookings.BookingValidator.saturday_weekend_policy_message()
+
+      assert has_element?(view, "#tahoe-weekend-stay-rule", policy)
+      refute render(view) =~ "Weekend stay rule"
+      refute render(view) =~ "Any Saturday stay must run Friday through Sunday"
     end
 
     test "books week starting on Saturday", %{conn: conn} do

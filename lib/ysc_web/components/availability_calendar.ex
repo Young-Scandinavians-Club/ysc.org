@@ -1337,7 +1337,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
 
       state == :set_end && saturday_checkout?(day, property) ->
-        "You cannot check out on Saturday. Pick Sunday or another day to leave."
+        Ysc.Bookings.BookingValidator.saturday_requires_sunday_message()
 
       state == :set_end && checkin_date &&
           saturday_weekend_span_required?(day, assigns) ->

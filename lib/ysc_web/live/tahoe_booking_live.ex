@@ -1433,6 +1433,7 @@ defmodule YscWeb.TahoeBookingLive do
                   :if={
                     tahoe_saturday_rule_violation?(@checkin_date, @checkout_date)
                   }
+                  id="tahoe-weekend-stay-rule"
                   class="p-3 bg-red-50 border border-red-200 rounded-xl"
                 >
                   <div class="flex items-start gap-2">
@@ -1442,10 +1443,10 @@ defmodule YscWeb.TahoeBookingLive do
                     />
                     <div class="flex-1">
                       <p class="text-sm font-semibold text-red-900">
-                        Weekend stay rule
+                        Saturday night stays
                       </p>
                       <p class="text-xs text-red-800">
-                        Any Saturday stay must run Friday through Sunday.
+                        {BookingValidator.saturday_weekend_policy_message()}
                       </p>
                     </div>
                   </div>
@@ -3926,9 +3927,14 @@ defmodule YscWeb.TahoeBookingLive do
                             <td class="py-3 px-4">4 nights per booking</td>
                           </tr>
                           <tr class="border-b border-zinc-100 hover:bg-white">
-                            <td class="py-3 px-4 font-semibold">Weekend Policy</td>
-                            <td class="py-3 px-4">
-                              Any Saturday stay must run Friday through Sunday.
+                            <td class="py-3 px-4 font-semibold">
+                              Saturday nights
+                            </td>
+                            <td
+                              id="tahoe-weekend-policy"
+                              class="py-3 px-4"
+                            >
+                              {BookingValidator.saturday_weekend_policy_message()}
                             </td>
                           </tr>
                           <tr class="border-b border-zinc-100 hover:bg-white">

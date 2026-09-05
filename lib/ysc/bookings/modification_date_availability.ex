@@ -784,7 +784,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     do: "The cabin is not available starting on this date"
 
   defp availability_error_message(:weekend_rule_violation),
-    do: "Any stay that includes Saturday must run Friday through Sunday."
+    do: BookingValidator.saturday_weekend_policy_message()
 
   defp availability_error_message(:blackout_conflict),
     do:
