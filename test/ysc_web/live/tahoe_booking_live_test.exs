@@ -1533,6 +1533,54 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert html =~ "Tahoe"
     end
 
+    test "Saturday-Sunday URL stay shows the weekend rule banner", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      base_date = tahoe_test_date(60)
+      saturday = find_next_weekday(base_date, 6)
+      sunday = Date.add(saturday, 1)
+
+      params = %{
+        "checkin_date" => Date.to_string(saturday),
+        "checkout_date" => Date.to_string(sunday),
+        "booking_mode" => "room"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+
+      assert has_element?(view, "#tahoe-weekend-stay-rule")
+    end
+
+    test "Friday-Sunday URL stay does not show the weekend rule banner", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      base_date = tahoe_test_date(60)
+      friday = find_next_weekday(base_date, 5)
+      sunday = Date.add(friday, 2)
+
+      params = %{
+        "checkin_date" => Date.to_string(friday),
+        "checkout_date" => Date.to_string(sunday),
+        "booking_mode" => "room"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+
+      refute has_element?(view, "#tahoe-weekend-stay-rule")
+    end
+
     test "handles dates far in the future", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
