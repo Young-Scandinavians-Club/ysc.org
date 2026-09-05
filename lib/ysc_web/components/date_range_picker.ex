@@ -874,8 +874,15 @@ defmodule YscWeb.Components.DateRangePicker do
     Date.day_of_week(day) == 6
   end
 
-  defp sunday?(day) do
-    Date.day_of_week(day) == 7
+  # True when the [start_date, day] span includes Saturday but not both
+  # Friday and Sunday (i.e. it doesn't cover the full weekend).
+  defp saturday_span_incomplete?(start_date, day) do
+    day_of_weeks =
+      Date.range(start_date, day)
+      |> Enum.to_list()
+      |> Enum.map(&Date.day_of_week/1)
+
+    6 in day_of_weeks and not (5 in day_of_weeks and 7 in day_of_weeks)
   end
 
   defp check_end_date_rules(
@@ -895,6 +902,9 @@ defmodule YscWeb.Components.DateRangePicker do
           max_nights,
           min_nights
         )
+
+      :set_start ->
+        saturday?(day) && !allow_saturdays
 
       _ ->
         false
@@ -929,20 +939,18 @@ defmodule YscWeb.Components.DateRangePicker do
       saturday?(day) && !allow_saturdays ->
         false
 
-      # Saturday check-in: only Sunday checkout (one night)
-      saturday?(start_date) && !allow_saturdays &&
-          not (nights == 1 && sunday?(day)) ->
-        false
-
       allow_saturdays ->
         true
 
       true ->
+        # A stay that includes Saturday must span the full weekend: it must
+        # also include both Friday and Sunday.
         date_range = Date.range(start_date, day) |> Enum.to_list()
         day_of_weeks = Enum.map(date_range, &Date.day_of_week/1)
         has_saturday = 6 in day_of_weeks
+        has_friday = 5 in day_of_weeks
         has_sunday = 7 in day_of_weeks
-        not (has_saturday and not has_sunday)
+        not (has_saturday and not (has_friday and has_sunday))
     end
   end
 
@@ -1000,6 +1008,9 @@ defmodule YscWeb.Components.DateRangePicker do
           max_nights,
           min_nights
         )
+
+      :set_start ->
+        not (saturday?(date_day) && !allow_saturdays)
 
       _ ->
         true
@@ -1088,13 +1099,16 @@ defmodule YscWeb.Components.DateRangePicker do
       after_max_date?(day, ctx.max) ->
         "Bookings are not open for this date yet"
 
+      saturday?(day) && !ctx.allow_saturdays && ctx.state == :set_start ->
+        Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
+
       saturday?(day) && !ctx.allow_saturdays && ctx.state == :set_end ->
         "You cannot check out on Saturday. Pick Sunday or another day to leave."
 
-      ctx.state == :set_end && start_date && saturday?(start_date) &&
-        !ctx.allow_saturdays && Date.compare(day, start_date) == :gt &&
-          not (Date.diff(day, start_date) == 1 && sunday?(day)) ->
-        Ysc.Bookings.BookingValidator.saturday_checkin_one_night_message()
+      ctx.state == :set_end && start_date && !ctx.allow_saturdays &&
+        Date.compare(day, start_date) == :gt &&
+          saturday_span_incomplete?(start_date, day) ->
+        Ysc.Bookings.BookingValidator.saturday_requires_sunday_message()
 
       true ->
         nil

@@ -10,22 +10,45 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
   alias Ysc.Bookings.BookingEntitlement
 
   alias YscWeb.Emails.{
+    ApplicationApproved,
     BookingCheckinReminder,
     BookingCheckoutReminder,
     BookingConfirmation,
     BookingEntitlementGranted,
+    BookingRefundProcessed,
     EventNotification,
+    EventUpdateNotification,
+    ExpenseReportConfirmation,
+    FamilyMemberRemoved,
     MembershipEnded,
     MembershipPaymentConfirmation,
     MembershipRenewalPaymentMethodReminder,
     OutageNotification,
+    SaveTheDateAvailable,
     TahoeSummerBuyoutAvailable,
     TahoeWinterWeekendAvailable,
+    TicketOrderRefund,
+    TicketPurchaseConfirmation,
     TicketReservationCreated,
     WelcomeEmail
   }
 
   describe "membership emails" do
+    test "approval email asks people to pay dues instead of saying they are already members" do
+      html = ApplicationApproved.render(%{first_name: "Jane"})
+      text = html_text(html)
+
+      assert ApplicationApproved.get_subject() ==
+               "Velkommen! (Welcome!) Pay your membership dues to join YSC"
+
+      assert text =~ "There's one more step before you can book the cabins"
+      assert text =~ "pay your annual membership dues"
+      assert text =~ "Pay your membership dues"
+      refute text =~ "You're officially a Young Scandinavian"
+      refute text =~ "Pay Your Membership"
+      refute text =~ "completing your membership payment"
+    end
+
     test "payment confirmation tells members they can book a stay at the cabins" do
       html =
         MembershipPaymentConfirmation.render(%{
@@ -266,7 +289,12 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       text = html_text(html)
 
       assert text =~ "the Tahoe cabin"
+      assert text =~ "Time to leave the cabin"
+      refute text =~ "Checkout Reminder"
       refute text =~ "our Tahoe property"
+
+      assert BookingCheckoutReminder.get_subject() ==
+               "Leaving tomorrow — cabin check-out reminder 🏡"
     end
   end
 
@@ -289,8 +317,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           quantity: 2,
           discount_display: "10% member pricing",
           has_discount: true,
-          hold_expires_display:
-            "Complete checkout before December 2, 2026 at 06:00 PM PST",
+          hold_expires_display: "December 2, 2026 at 06:00 PM PST",
           has_notes: false,
           notes_text: nil,
           reserved_by_display: "YSC staff",
@@ -300,13 +327,15 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       text = html_text(html)
 
       assert text =~ "TICKETS SET ASIDE"
-      assert text =~ "Finish checkout before the deadline below"
+      assert text =~ "set aside tickets for you"
       assert text =~ "Ticket details"
-      assert text =~ "Checkout:"
+      assert text =~ "Finish buying by:"
       assert text =~ "View event & finish buying tickets"
       assert text =~ "Must be 21 or older"
       refute text =~ "Age Restriction"
       refute text =~ "complete tickets"
+      refute text =~ "Finish checkout"
+      refute text =~ "Complete checkout"
       refute text =~ "hold window"
       refute text =~ "your reservation will be applied"
     end
@@ -394,6 +423,251 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "Property Outage"
       refute text =~ "Tahoe Property"
       refute text =~ "the cabin master"
+    end
+  end
+
+  describe "event update email" do
+    test "asks members to see event details, not View Event" do
+      html =
+        EventUpdateNotification.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            location_name: "Golden Gate Park",
+            address: "123 Main St"
+          },
+          update_title: "Doors open later",
+          update_body: "<p>Arrive at 8pm.</p>",
+          event_date_time: "Dec 1, 2026 at 8:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          event_image_url: nil,
+          notification_settings_url: "https://example.com/users/notifications"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "See event details"
+      refute text =~ "View Event"
+    end
+  end
+
+  describe "save-the-date tickets-available email" do
+    test "asks members to get tickets instead of viewing the event" do
+      html =
+        SaveTheDateAvailable.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            description: "Join us.",
+            location_name: "Golden Gate Park",
+            address: "123 Main St",
+            age_restriction: 21
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          event_image_url: nil,
+          notification_settings_url: "https://example.com/users/notifications"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Get tickets"
+      refute text =~ "View Event"
+      refute text =~ "registration"
+
+      for template <- SaveTheDateAvailable.subject_templates() do
+        refute template =~ "registration"
+      end
+    end
+  end
+
+  describe "ticket purchase confirmation" do
+    test "tells members how to check in instead of using receipt jargon" do
+      html =
+        TicketPurchaseConfirmation.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            description: "Join us.",
+            location_name: "Golden Gate Park",
+            address: "123 Main St",
+            age_restriction: 21
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          agenda: [],
+          ticket_order: %{reference_id: "TKT-123"},
+          purchase_date: "Nov 1, 2026",
+          payment: %{reference_id: "PMT-123"},
+          payment_date: "Nov 1, 2026",
+          payment_method: "Visa ending in 4242",
+          paid_in_person: false,
+          total_amount: "$20.00",
+          gross_total: "$20.00",
+          total_discount: "$0.00",
+          has_discounts: false,
+          ticket_summaries: [
+            %{
+              ticket_tier_name: "Member GA",
+              quantity: 1,
+              price_per_ticket: "$20.00",
+              total_price: "$20.00",
+              original_price: nil,
+              discount_amount: nil,
+              discount_percentage: nil
+            }
+          ],
+          tickets: [
+            %{
+              reference_id: "TKT-001",
+              ticket_tier_name: "Member GA"
+            }
+          ],
+          tickets_qr_url: "https://example.com/tickets/order-123/qr"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Your tickets are confirmed"
+      assert text =~ "See event details"
+      assert text =~ "show the tickets on your phone"
+      refute text =~ "Ticket Purchase Confirmation"
+      refute text =~ "View Event Details"
+    end
+  end
+
+  describe "refund emails" do
+    test "ticket refund says the money is on the way, not that it was processed twice" do
+      html =
+        TicketOrderRefund.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            description: "Join us.",
+            location_name: "Golden Gate Park",
+            address: "123 Main St"
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          ticket_order: %{reference_id: "TKT-123"},
+          refund: %{
+            reference_id: "RFD-123",
+            reason: "Event cancelled"
+          },
+          refund_date: "Nov 2, 2026",
+          refund_amount: "$20.00",
+          ticket_summaries: [
+            %{
+              ticket_tier_name: "Member GA",
+              quantity: 1,
+              price_per_ticket: "$20.00",
+              total_price: "$20.00"
+            }
+          ],
+          refunded_tickets: [
+            %{
+              reference_id: "TKT-001",
+              ticket_tier_name: "Member GA"
+            }
+          ]
+        })
+
+      text = html_text(html)
+
+      assert TicketOrderRefund.get_subject() ==
+               "Your ticket refund is on the way"
+
+      assert text =~ "Your ticket refund is on the way"
+      assert text =~ "We've issued your ticket refund"
+      assert text =~ "same card or bank account"
+      refute text =~ "has been processed"
+      refute text =~ "will be processed"
+    end
+
+    test "booking refund says the money is on the way, not that it was processed twice" do
+      html =
+        BookingRefundProcessed.render(%{
+          first_name: "Jane",
+          booking: %{
+            reference_id: "BK-123",
+            property: "Tahoe",
+            checkin_date: "December 1, 2026",
+            checkout_date: "December 3, 2026",
+            guests_count: 2,
+            children_count: 0
+          },
+          refund: %{
+            reference_id: "RFD-123",
+            reason: "Cancelled stay"
+          },
+          payment: %{
+            reference_id: "PMT-123",
+            amount: "$200.00"
+          },
+          refund_date: "Nov 2, 2026",
+          refund_amount: "$200.00",
+          booking_url: "https://example.com/bookings/preview"
+        })
+
+      text = html_text(html)
+
+      assert BookingRefundProcessed.get_subject() ==
+               "Your booking refund is on the way"
+
+      assert text =~ "Your booking refund is on the way"
+      assert text =~ "We've issued your cabin booking refund"
+      assert text =~ "Cabin Master"
+      refute text =~ "has been processed"
+      refute text =~ "will be processed"
+    end
+  end
+
+  describe "family member removed email" do
+    test "tells the member how to get their own membership" do
+      html =
+        FamilyMemberRemoved.render(%{
+          first_name: "Jane",
+          primary_user_name: "John Doe",
+          membership_url: "https://example.com/users/membership"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Get your own membership"
+      assert text =~ "get your own membership anytime"
+      refute text =~ "purchase your own membership at any time"
+    end
+  end
+
+  describe "expense report confirmation" do
+    test "says how much we'll reimburse instead of Net Total" do
+      html =
+        ExpenseReportConfirmation.render(%{
+          first_name: "Jane",
+          expense_report_url: "https://example.com/expensereport/preview",
+          expense_report: %{
+            id: "er-preview",
+            purpose: "Cabin supplies",
+            submitted_date: "September 1, 2026",
+            reimbursement_method: "Bank Transfer",
+            event: nil,
+            bank_account: nil,
+            expense_items: [],
+            income_items: [],
+            expense_total: "$40.00",
+            income_total: "$0.00",
+            net_total: "$40.00"
+          }
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Amount we will reimburse"
+      assert text =~ "See your expense report"
+      assert text =~ "We'll email you when the money is on the way"
+      refute text =~ "Net Total"
+      refute text =~ "View Expense Report"
+      refute text =~ "reimbursement has been processed"
     end
   end
 

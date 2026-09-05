@@ -903,27 +903,16 @@ defmodule YscWeb.AdminNewslettersLive do
                 <p class="text-sm text-zinc-500 mb-2">
                   Rich text inserted into the newsletter intro at the cursor.
                 </p>
-                <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none border border-zinc-200 rounded-lg overflow-hidden">
-                  <.input
-                    type="hidden"
-                    id={"notice_body_#{@notice_editor_key}"}
-                    field={@notice_form[:body]}
-                    phx-hook="TrixHook"
-                    phx-debounce="400"
-                  />
-                  <div
-                    id={"notice-richtext-#{@notice_editor_key}"}
-                    class="relative"
-                    phx-update="ignore"
-                  >
-                    <trix-editor
-                      input={"notice_body_#{@notice_editor_key}"}
-                      class="trix-content block px-4 py-2 bg-white border-0 focus:ring-1 focus:ring-blue-400 transition text-wrap min-h-[160px]"
-                      placeholder="Write the notice…"
-                    >
-                    </trix-editor>
-                  </div>
-                </div>
+                <.trix_editor
+                  id={"notice_body_#{@notice_editor_key}"}
+                  field={@notice_form[:body]}
+                  wrapper_id={"notice-richtext-#{@notice_editor_key}"}
+                  wrapper_class="relative"
+                  phx-debounce="400"
+                  class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none border border-zinc-200 rounded-lg overflow-hidden"
+                  placeholder="Write the notice…"
+                  editor_class="trix-content block px-4 py-2 bg-white border-0 focus:ring-1 focus:ring-blue-400 transition text-wrap min-h-[160px]"
+                />
               </div>
               <div class="flex justify-end gap-2 mt-6">
                 <button

@@ -69,6 +69,41 @@ defmodule Ysc.Events.EventPricingCacheTest do
     assert Map.has_key?(enriched, :pricing_info)
   end
 
+  test "enrich_event restores event body HTML when cache was primed from a body-less list row" do
+    event = event_fixture(%{title: "Body HTML #{System.unique_integer()}"})
+    _tier = ticket_tier_fixture(%{event_id: event.id})
+
+    event
+    |> Ecto.Changeset.change(%{
+      raw_details: "<p>raw body</p>",
+      rendered_details: "<p>rendered body</p>"
+    })
+    |> Ysc.Repo.update!()
+
+    # Public list/card queries select slimmed rows without the body columns.
+    # Priming the shared per-event cache from one must not blank the body for
+    # the event page, which enriches a full %Event{} through the same key.
+    list_row =
+      event
+      |> Map.from_struct()
+      |> Map.drop([:raw_details, :rendered_details])
+      |> Map.merge(%{selling_fast: false, recent_tickets_count: 0})
+
+    EventPricingCache.enrich_event(list_row)
+
+    refute Map.has_key?(
+             EventPricingCache.enrich_event(list_row),
+             :rendered_details
+           )
+
+    full_event = Ysc.Repo.get!(Ysc.Events.Event, event.id)
+    enriched = EventPricingCache.enrich_event(full_event)
+
+    assert enriched.raw_details == "<p>raw body</p>"
+    assert enriched.rendered_details == "<p>rendered body</p>"
+    assert Map.has_key?(enriched, :pricing_info)
+  end
+
   test "create_ticket_reservation invalidates pricing cache" do
     admin = user_fixture(%{role: "admin"})
     event = event_fixture(%{organizer_id: admin.id})

@@ -1178,7 +1178,7 @@ defmodule YscWeb.HomeLive do
             </.link>
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
               <.link
-                navigate={~p"/expensereport"}
+                navigate={~p"/expensereports"}
                 class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
               >
                 <div class="w-8 h-8 lg:w-10 lg:h-10 bg-orange-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
@@ -1188,7 +1188,7 @@ defmodule YscWeb.HomeLive do
                   />
                 </div>
                 <p class="font-bold text-sm lg:text-base text-zinc-900">Expenses</p>
-                <p class="text-xs lg:text-sm text-zinc-500">File Report</p>
+                <p class="text-xs lg:text-sm text-zinc-500">View reports</p>
               </.link>
             <% else %>
               <.link

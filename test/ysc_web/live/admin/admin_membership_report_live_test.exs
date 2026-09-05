@@ -15,39 +15,54 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
     {view, html}
   end
 
+  # Pin completed/from/to to a fixed Pacific window. Date.utc_today() with
+  # first-of-UTC-month misses utc_now() fixtures overnight on the 1st, when
+  # it is still the previous month in America/Los_Angeles (the report TZ).
+  defp live_pending_report(conn) do
+    user = user_fixture(%{state: :pending_approval})
+
+    signup_application_fixture(user, %{
+      completed: ~U[2026-03-15 12:00:00Z],
+      review_outcome: nil
+    })
+
+    {view, html} =
+      live_report(
+        conn,
+        ~p"/admin/memberships/report?from=2026-03-01&to=2026-03-31"
+      )
+
+    {view, html, user}
+  end
+
   describe "index" do
     setup [:create_admin]
 
     test "renders report form and summary placeholders", %{conn: conn} do
       {view, _html} = live_report(conn)
 
+      today =
+        "America/Los_Angeles"
+        |> DateTime.now!()
+        |> DateTime.to_date()
+
+      default_from = Date.to_iso8601(%Date{today | day: 1})
+      default_to = Date.to_iso8601(today)
+
       assert has_element?(view, "h1", "Membership Report")
       assert has_element?(view, "#membership-report-form")
-      assert has_element?(view, "#date_from")
-      assert has_element?(view, "#date_to")
+      assert has_element?(view, ~s(#date_from[value="#{default_from}"]))
+      assert has_element?(view, ~s(#date_to[value="#{default_to}"]))
       assert has_element?(view, "#generate-report-button", "Generate report")
     end
 
     test "generates report for date range with pending applications", %{
       conn: conn
     } do
-      user = user_fixture()
-
-      signup_application_fixture(user, %{
-        completed: DateTime.utc_now(),
-        review_outcome: nil
-      })
-
-      today = Date.utc_today()
-      from = Date.to_iso8601(%Date{today | day: 1})
-      to = Date.to_iso8601(today)
-
-      {view, html} =
-        live_report(conn, ~p"/admin/memberships/report?from=#{from}&to=#{to}")
+      {view, html, user} = live_pending_report(conn)
 
       assert html =~ ~s(id="report-stat-applied")
-      assert has_element?(view, "#report-pending")
-      assert html =~ user.email
+      assert has_element?(view, "#report-pending", user.email)
     end
 
     test "shows accepted applications in report output", %{conn: conn} do
@@ -81,19 +96,7 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
     test "download_csv pushes download event when report is loaded", %{
       conn: conn
     } do
-      user = user_fixture()
-
-      signup_application_fixture(user, %{
-        completed: DateTime.utc_now(),
-        review_outcome: nil
-      })
-
-      today = Date.utc_today()
-      from = Date.to_iso8601(%Date{today | day: 1})
-      to = Date.to_iso8601(today)
-
-      {view, _html} =
-        live_report(conn, ~p"/admin/memberships/report?from=#{from}&to=#{to}")
+      {view, _html, _user} = live_pending_report(conn)
 
       render_click(view, "download_csv")
 
@@ -106,19 +109,7 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
     end
 
     test "email_report shows success flash when report is loaded", %{conn: conn} do
-      user = user_fixture()
-
-      signup_application_fixture(user, %{
-        completed: DateTime.utc_now(),
-        review_outcome: nil
-      })
-
-      today = Date.utc_today()
-      from = Date.to_iso8601(%Date{today | day: 1})
-      to = Date.to_iso8601(today)
-
-      {view, _html} =
-        live_report(conn, ~p"/admin/memberships/report?from=#{from}&to=#{to}")
+      {view, _html, _user} = live_pending_report(conn)
 
       render_click(view, "email_report")
 

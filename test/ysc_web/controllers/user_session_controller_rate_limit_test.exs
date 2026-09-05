@@ -5,17 +5,13 @@ defmodule YscWeb.UserSessionControllerRateLimitTest do
 
   describe "POST /users/log-in identifier rate limiting" do
     setup do
-      Application.put_env(:ysc, Ysc.AuthRateLimit,
-        ip_limit: 10_000,
-        identifier_limit: 2
-      )
-
-      on_exit(fn ->
-        Application.put_env(:ysc, Ysc.AuthRateLimit,
+      token =
+        Ysc.Test.AuthRateLimitHelper.capture!(
           ip_limit: 10_000,
-          identifier_limit: 10_000
+          identifier_limit: 2
         )
-      end)
+
+      on_exit(fn -> Ysc.Test.AuthRateLimitHelper.restore!(token) end)
 
       :ok
     end
@@ -37,17 +33,13 @@ defmodule YscWeb.UserSessionControllerRateLimitTest do
 
   describe "GET /users/log-in/passkey identifier rate limiting" do
     setup do
-      Application.put_env(:ysc, Ysc.AuthRateLimit,
-        ip_limit: 10_000,
-        identifier_limit: 2
-      )
-
-      on_exit(fn ->
-        Application.put_env(:ysc, Ysc.AuthRateLimit,
+      token =
+        Ysc.Test.AuthRateLimitHelper.capture!(
           ip_limit: 10_000,
-          identifier_limit: 10_000
+          identifier_limit: 2
         )
-      end)
+
+      on_exit(fn -> Ysc.Test.AuthRateLimitHelper.restore!(token) end)
 
       user = user_fixture()
       encoded_user_id = Base.url_encode64(user.id, padding: false)

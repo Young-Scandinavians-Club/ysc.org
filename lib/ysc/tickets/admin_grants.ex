@@ -10,6 +10,7 @@ defmodule Ysc.Tickets.AdminGrants do
   require Ysc.Logging
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.User
   alias Ysc.Events
   alias Ysc.Events.Event
   alias Ysc.Events.EventDateTime
@@ -30,7 +31,8 @@ defmodule Ysc.Tickets.AdminGrants do
     * `user_id` - member receiving tickets
     * `event_id` - event id
     * `ticket_selections` - map of `ticket_tier_id => quantity`
-    * `opts` - `:skip_capacity`, `:skip_sale_guards`, `:skip_email`, `:admin_grant_notes`
+    * `opts` - `:skip_capacity`, `:skip_sale_guards`, `:skip_email`, `:admin_grant_notes`,
+      `:user`, `:event`, `:tiers` (preloaded structs skip matching Repo lookups)
 
   ## Returns
 
@@ -61,20 +63,13 @@ defmodule Ysc.Tickets.AdminGrants do
     )
 
     result =
-      with {:ok, user} <- fetch_user(user_id),
-           {:ok, event} <- fetch_grantable_event(event_id),
-           {:ok, tiers} <- load_and_validate_tiers(event_id, ticket_selections),
+      with {:ok, user} <- fetch_user(user_id, opts),
+           {:ok, event} <- fetch_grantable_event(event_id, opts),
+           {:ok, tiers} <-
+             load_and_validate_tiers(event_id, ticket_selections, opts),
            :ok <- validate_recipient_for_registration_tiers(user, tiers),
            :ok <- ensure_no_blocking_pending_checkout(user_id, event_id),
-           :ok <- reconcile_pending_checkouts_for_grant(user_id, event_id),
-           :ok <-
-             maybe_validate_fulfillment(
-               user_id,
-               event_id,
-               ticket_selections,
-               skip_capacity: skip_capacity?,
-               skip_sale_guards: skip_sale_guards?
-             ) do
+           :ok <- reconcile_pending_checkouts_for_grant(user_id, event_id) do
         insert_grant_transaction(
           granted_by_id,
           user,
@@ -132,49 +127,79 @@ defmodule Ysc.Tickets.AdminGrants do
     pending_orders_query(Fixtures.ulid(), Fixtures.ulid())
   end
 
-  defp fetch_user(user_id) do
-    case Accounts.get_user(user_id) do
-      nil -> {:error, :user_not_found}
-      user -> {:ok, user}
+  defp fetch_user(user_id, opts) do
+    case Keyword.get(opts, :user) do
+      %User{id: id} = user when id == user_id ->
+        {:ok, user}
+
+      _ ->
+        case Accounts.get_user(user_id) do
+          nil -> {:error, :user_not_found}
+          user -> {:ok, user}
+        end
     end
   end
 
-  defp fetch_grantable_event(event_id) do
+  defp fetch_grantable_event(event_id, opts) do
     # An event can carry a Partiful link alongside real YSC ticket tiers
     # (see TicketTierManagement); grants are validated against those tiers by
-    # load_and_validate_tiers/2, so the presence of a Partiful link alone does
+    # load_and_validate_tiers/3, so the presence of a Partiful link alone does
     # not disqualify a grant.
-    case Repo.get(Event, event_id) do
-      nil -> {:error, :event_not_found}
-      %Event{} = event -> {:ok, event}
+    case Keyword.get(opts, :event) do
+      %Event{id: id} = event when id == event_id ->
+        {:ok, event}
+
+      _ ->
+        case Repo.get(Event, event_id) do
+          nil -> {:error, :event_not_found}
+          %Event{} = event -> {:ok, event}
+        end
     end
   end
 
-  defp load_and_validate_tiers(event_id, ticket_selections) do
+  defp load_and_validate_tiers(event_id, ticket_selections, opts) do
     if ticket_selections == %{} do
       {:error, :empty_selection}
     else
       tier_ids = Map.keys(ticket_selections)
 
-      tiers =
-        TicketTier
-        |> where([tt], tt.id in ^tier_ids and tt.event_id == ^event_id)
-        |> Repo.all()
+      case fetch_selected_tiers(event_id, tier_ids, opts) do
+        {:ok, tiers} ->
+          if length(tiers) != length(tier_ids) do
+            {:error, :invalid_ticket_tier}
+          else
+            case Enum.find(tiers, &TicketTierHelpers.donation_tier?/1) do
+              nil ->
+                case invalid_quantity?(ticket_selections) do
+                  true -> {:error, :invalid_quantity}
+                  false -> {:ok, tiers}
+                end
 
-      if length(tiers) != length(tier_ids) do
-        {:error, :invalid_ticket_tier}
-      else
-        case Enum.find(tiers, &TicketTierHelpers.donation_tier?/1) do
-          nil ->
-            case invalid_quantity?(ticket_selections) do
-              true -> {:error, :invalid_quantity}
-              false -> {:ok, tiers}
+              _ ->
+                {:error, :donation_tier_not_grantable}
             end
-
-          _ ->
-            {:error, :donation_tier_not_grantable}
-        end
+          end
       end
+    end
+  end
+
+  defp fetch_selected_tiers(event_id, tier_ids, opts) do
+    selected_ids = MapSet.new(tier_ids)
+
+    case Keyword.get(opts, :tiers) do
+      tiers when is_list(tiers) ->
+        matching =
+          Enum.filter(tiers, fn tier ->
+            MapSet.member?(selected_ids, tier.id) and tier.event_id == event_id
+          end)
+
+        {:ok, matching}
+
+      _ ->
+        {:ok,
+         TicketTier
+         |> where([tt], tt.id in ^tier_ids and tt.event_id == ^event_id)
+         |> Repo.all()}
     end
   end
 
@@ -259,18 +284,6 @@ defmodule Ysc.Tickets.AdminGrants do
 
       {:error, _reason} ->
         {:halt, {:error, :checkout_payment_in_progress}}
-    end
-  end
-
-  defp maybe_validate_fulfillment(user_id, event_id, ticket_selections, opts) do
-    case BookingLocker.validate_fulfillment_capacity(
-           user_id,
-           event_id,
-           ticket_selections,
-           opts
-         ) do
-      :ok -> :ok
-      {:error, reason} -> {:error, reason}
     end
   end
 

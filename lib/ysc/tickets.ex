@@ -26,6 +26,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Events.Event
   alias Ysc.Events.EventDateTime
   alias Ysc.Accounts
+  alias Ysc.Accounts.User
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Bookings
   alias Ysc.Ledgers
@@ -50,7 +51,8 @@ defmodule Ysc.Tickets do
   - `ticket_selections`: Map of ticket_tier_id => quantity
 
   ## Returns:
-  - `{:ok, %TicketOrder{}}` on success
+  - `{:ok, %TicketOrder{}}` on success, with `:tickets` (each carrying
+    `:ticket_tier`) and `:user` loaded from `atomic_booking/4`
   - `{:error, changeset}` on validation failure
   - `{:error, :overbooked}` if event or tier capacity exceeded
   - `{:error, :event_capacity_exceeded}` if event's global max_attendees limit would be exceeded
@@ -67,6 +69,15 @@ defmodule Ysc.Tickets do
       this relaxes and why (the admin/volunteer mobile app's door sales).
       Membership and member-only-tier eligibility are unaffected regardless
       of this option.
+    * `:user` - `%User{}` already loaded for `user_id`. Skips the membership
+      lookup when the struct is the same user; subscriptions are preloaded
+      only if membership still needs them.
+    * `:event` - `%Event{}` already loaded for `event_id`. Forwarded to
+      `atomic_booking/4` so checkout does not SELECT the event again.
+    * `:tiers` - ticket tier structs already loaded for the selection. Skips
+      the member-only attribute query when every selected id is present, and
+      is forwarded to `atomic_booking/4` so checkout does not SELECT tiers
+      again. Pass rows loaded in the same request (door sale).
   """
   def create_ticket_order(user_id, event_id, ticket_selections, opts \\ []) do
     require Ysc.Logging
@@ -77,17 +88,25 @@ defmodule Ysc.Tickets do
       ticket_selections: ticket_selections
     )
 
-    case validate_user_membership(user_id) do
+    case membership_user(user_id, opts) do
       {:ok, user} ->
         with :ok <-
-               validate_member_only_selection(user, event_id, ticket_selections),
+               validate_member_only_selection(
+                 user,
+                 event_id,
+                 ticket_selections,
+                 opts
+               ),
              :ok <- prepare_new_checkout_session(user_id, event_id),
              {:ok, ticket_order} <-
                BookingLocker.atomic_booking(
                  user_id,
                  event_id,
                  ticket_selections,
-                 opts
+                 Keyword.merge(
+                   Keyword.take(opts, [:bypass_guards, :event, :tiers]),
+                   user: user
+                 )
                ) do
           # Emit telemetry event for ticket order creation
           ticket_count =
@@ -141,6 +160,8 @@ defmodule Ysc.Tickets do
     * `:admin_grant_notes` - optional audit note (e.g. legacy order reference)
     * `:payment_channel` - optional `"cash"` | `"check"` | `"other"` for an in-person sale recorded outside Stripe
     * `:offline_amount_collected` - optional `Money` the seller physically collected (order total stays $0)
+    * `:user` / `:event` / `:tiers` - preloaded structs matching the ids; skips
+      the corresponding Repo lookups in `AdminGrants`
 
   ## Returns
 
@@ -1470,8 +1491,11 @@ defmodule Ysc.Tickets do
 
   Returns `{:ok, total, discount}`.
   """
+  def recalculate_pending_order_pricing(ticket_order, opts \\ [])
+
   def recalculate_pending_order_pricing(
-        %TicketOrder{status: :expired} = ticket_order
+        %TicketOrder{status: :expired} = ticket_order,
+        _opts
       ) do
     selections = expired_ticket_selections(ticket_order.id)
 
@@ -1488,14 +1512,17 @@ defmodule Ysc.Tickets do
     end
   end
 
-  def recalculate_pending_order_pricing(%TicketOrder{} = ticket_order) do
+  def recalculate_pending_order_pricing(%TicketOrder{} = ticket_order, opts) do
     selections = ticket_selections_from_order(ticket_order)
 
     BookingLocker.estimate_order_total(
       ticket_order.user_id,
       ticket_order.event_id,
       selections,
-      include_fulfilled_for_order_id: ticket_order.id
+      Keyword.merge(
+        [include_fulfilled_for_order_id: ticket_order.id],
+        Keyword.take(opts, [:tiers])
+      )
     )
   end
 
@@ -1505,8 +1532,19 @@ defmodule Ysc.Tickets do
   Mirrors booking hold checkout pricing sync so Stripe PaymentIntents and
   payment verification use current tier prices instead of the snapshot taken
   when the order was created.
+
+  ## Options
+
+    * `:tiers` - ticket tier structs already loaded for the selection. Skips
+      the estimate-time tier SELECT. Pass rows loaded in the same request
+      (door sale). Do not pass associations cached on a LiveView socket.
   """
-  def sync_pending_order_pricing(%TicketOrder{status: status} = ticket_order)
+  def sync_pending_order_pricing(ticket_order, opts \\ [])
+
+  def sync_pending_order_pricing(
+        %TicketOrder{status: status} = ticket_order,
+        opts
+      )
       when status in [:pending, :expired] do
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
@@ -1515,11 +1553,11 @@ defmodule Ysc.Tickets do
        ) do
       {:ok, ticket_order}
     else
-      do_sync_pending_order_pricing(ticket_order)
+      do_sync_pending_order_pricing(ticket_order, opts)
     end
   end
 
-  def sync_pending_order_pricing(%TicketOrder{} = ticket_order) do
+  def sync_pending_order_pricing(%TicketOrder{} = ticket_order, _opts) do
     {:ok, ensure_ticket_order_for_payment(ticket_order)}
   end
 
@@ -1543,9 +1581,9 @@ defmodule Ysc.Tickets do
     {:ok, ensure_ticket_order_for_payment(ticket_order)}
   end
 
-  defp do_sync_pending_order_pricing(ticket_order) do
+  defp do_sync_pending_order_pricing(ticket_order, opts \\ []) do
     with {:ok, total, discount} <-
-           recalculate_pending_order_pricing(ticket_order) do
+           recalculate_pending_order_pricing(ticket_order, opts) do
       attrs = pending_order_pricing_attrs(total, discount)
 
       if pending_order_pricing_unchanged?(ticket_order, attrs) do
@@ -2016,6 +2054,39 @@ defmodule Ysc.Tickets do
     end
   end
 
+  defp membership_user(user_id, opts) do
+    case Keyword.get(opts, :user) do
+      %User{id: id} = user when id == user_id ->
+        check_loaded_membership(user)
+
+      _ ->
+        validate_user_membership(user_id)
+    end
+  end
+
+  defp check_loaded_membership(user) do
+    user = preload_subscriptions_for_membership(user)
+
+    if has_active_membership?(user) do
+      {:ok, user}
+    else
+      {:error, :membership_required}
+    end
+  end
+
+  defp preload_subscriptions_for_membership(user) do
+    cond do
+      Accounts.has_lifetime_membership?(user) ->
+        user
+
+      match?(%Ecto.Association.NotLoaded{}, user.subscriptions) ->
+        Repo.preload(user, [:subscriptions])
+
+      true ->
+        user
+    end
+  end
+
   defp validate_user_membership(user_id) do
     case Accounts.get_user!(user_id, [:subscriptions]) do
       nil ->
@@ -2041,11 +2112,8 @@ defmodule Ysc.Tickets do
   # finite per-event limit applies — Single members buying a member-only
   # tier. Family/lifetime (unlimited) and regular-tier checkouts skip it.
   # See `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
-  defp validate_member_only_selection(user, event_id, ticket_selections) do
-    ticket_tiers =
-      ticket_selections
-      |> Map.keys()
-      |> Ysc.Events.list_ticket_tier_member_only_attrs()
+  defp validate_member_only_selection(user, event_id, ticket_selections, opts) do
+    ticket_tiers = member_only_tier_attrs(ticket_selections, opts)
 
     if MemberOnlyTickets.any_member_only?(ticket_tiers) do
       plan_type = MembershipCache.get_membership_plan_type(user)
@@ -2066,6 +2134,43 @@ defmodule Ysc.Tickets do
       )
     else
       :ok
+    end
+  end
+
+  defp member_only_tier_attrs(ticket_selections, opts) do
+    selected_ids = Map.keys(ticket_selections)
+
+    case member_only_attrs_from_preloaded_tiers(opts, selected_ids) do
+      {:ok, attrs} ->
+        attrs
+
+      :miss ->
+        Ysc.Events.list_ticket_tier_member_only_attrs(selected_ids)
+    end
+  end
+
+  defp member_only_attrs_from_preloaded_tiers(opts, selected_ids) do
+    selected = MapSet.new(selected_ids)
+
+    case Keyword.get(opts, :tiers) do
+      tiers when is_list(tiers) ->
+        attrs =
+          Enum.flat_map(tiers, fn tier ->
+            if MapSet.member?(selected, tier.id) do
+              [%{id: tier.id, member_only: tier.member_only, type: tier.type}]
+            else
+              []
+            end
+          end)
+
+        if length(attrs) == MapSet.size(selected) do
+          {:ok, attrs}
+        else
+          :miss
+        end
+
+      _ ->
+        :miss
     end
   end
 

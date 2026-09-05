@@ -96,10 +96,10 @@
     </mj-text>
     <% end %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" css-class="net-total-green">
-      <strong>Net Total:</strong> <%= @expense_report.net_total %>
+      <strong>Amount we will reimburse:</strong> <%= @expense_report.net_total %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @expense_report_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Expense Report →</mj-button>
+    <mj-button href="<%= @expense_report_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">See your expense report →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Next Steps -->
     <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
@@ -107,7 +107,7 @@
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Your expense report has been submitted and is now being reviewed by our Treasurer</mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• You will be notified once your reimbursement has been processed</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• We'll email you when the money is on the way</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If you have any questions, please contact the Treasurer</mj-text>
     <mj-spacer height="36px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for your submission!</mj-text>

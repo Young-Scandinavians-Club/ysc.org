@@ -405,7 +405,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
     end
   end
 
-  describe "Weekend requirement validation (Saturday must include Sunday)" do
+  describe "Weekend requirement validation (Saturday requires full Friday-Sunday span)" do
     test "rejects checkout on Saturday without Sunday in reservation", %{
       user: user,
       rooms: rooms
@@ -431,14 +431,17 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert Keyword.has_key?(changeset.errors, :checkout_date)
     end
 
-    test "accepts Saturday check-in with Sunday checkout", %{
-      user: user,
-      rooms: rooms
-    } do
+    test "rejects Saturday check-in with Sunday checkout (no Friday in stay)",
+         %{
+           user: user,
+           rooms: rooms
+         } do
       attrs = %{
         user_id: user.id,
         property: :tahoe,
+        # Saturday
         checkin_date: ~D[2024-07-13],
+        # Sunday
         checkout_date: ~D[2024-07-14],
         booking_mode: :room,
         guests_count: 2,
@@ -451,10 +454,13 @@ defmodule Ysc.Bookings.BookingValidatorTest do
           user: user
         )
 
-      assert changeset.valid?
+      refute changeset.valid?
+
+      assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
+      assert msg =~ "must start Friday"
     end
 
-    test "rejects Saturday check-in with Monday checkout (must be one night to Sunday)",
+    test "rejects Saturday check-in with Monday checkout (no Friday in stay)",
          %{
            user: user,
            rooms: rooms
@@ -465,7 +471,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         checkin_date: ~D[2024-07-13],
         # Saturday
         checkout_date: ~D[2024-07-15],
-        # Monday — not allowed for Saturday arrivals
+        # Monday
         booking_mode: :room,
         guests_count: 2,
         total_price: Money.new(400, :USD)
@@ -479,10 +485,60 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       refute changeset.valid?
 
-      assert {msg, _} = Keyword.get(changeset.errors, :checkout_date)
+      assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
+      assert msg =~ "must start Friday"
+    end
 
-      assert msg =~
-               "If you check in on Saturday, you must check out on Sunday"
+    test "accepts Friday check-in through Sunday checkout (full weekend span)",
+         %{
+           user: user,
+           rooms: rooms
+         } do
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        # Friday
+        checkin_date: ~D[2024-07-12],
+        # Sunday
+        checkout_date: ~D[2024-07-14],
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(400, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      assert changeset.valid?
+    end
+
+    test "accepts a longer stay that starts before Friday and ends after Sunday",
+         %{
+           user: user,
+           rooms: rooms
+         } do
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        # Thursday
+        checkin_date: ~D[2024-07-11],
+        # Monday
+        checkout_date: ~D[2024-07-15],
+        booking_mode: :room,
+        guests_count: 2,
+        total_price: Money.new(400, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      assert changeset.valid?
     end
 
     test "accepts weekday bookings without Saturday", %{

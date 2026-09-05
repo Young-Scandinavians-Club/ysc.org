@@ -4,6 +4,9 @@ defmodule Ysc.ReferenceGenerator do
 
   Generates reference IDs in the format:
   `[Prefix]-[Date]-[Random String][Checksum]`
+
+  Changeset helpers `put_reference_id/2` and `put_new_reference_id/2` assign
+  those IDs on create and unique-constraint retry.
   """
 
   @prefixes ~w(PMT TKT BKG DON EVT ORD RFD)
@@ -73,6 +76,47 @@ defmodule Ysc.ReferenceGenerator do
     String.upcase(string)
     |> String.to_charlist()
     |> Enum.all?(&(&1 in @charset))
+  end
+
+  @doc """
+  Puts `reference_id` when the changeset (and underlying data) have none.
+
+  Uses `Ecto.Changeset.get_field/2`, not `get_change/2`, so updates keep an
+  existing id (e.g. migrated `MIG-WP-*` bookings). `get_change/2` is nil when
+  a form omits `reference_id`, which previously regenerated a new prefix id
+  on every admin edit.
+
+      changeset
+      |> ReferenceGenerator.put_reference_id("BKG")
+      |> unique_constraint(:reference_id)
+  """
+  @spec put_reference_id(Ecto.Changeset.t(), String.t()) :: Ecto.Changeset.t()
+  def put_reference_id(%Ecto.Changeset{} = changeset, prefix)
+      when is_binary(prefix) do
+    case Ecto.Changeset.get_field(changeset, :reference_id) do
+      nil -> put_new_reference_id(changeset, prefix)
+      _ -> changeset
+    end
+  end
+
+  @doc """
+  Always assigns a new `reference_id`. Used after a unique-constraint collision.
+
+  Schemas that use `Ysc.Repo.insert_with_reference_retry/3` should wrap this:
+
+      def put_new_reference_id(changeset) do
+        ReferenceGenerator.put_new_reference_id(changeset, @reference_prefix)
+      end
+  """
+  @spec put_new_reference_id(Ecto.Changeset.t(), String.t()) ::
+          Ecto.Changeset.t()
+  def put_new_reference_id(%Ecto.Changeset{} = changeset, prefix)
+      when is_binary(prefix) do
+    Ecto.Changeset.put_change(
+      changeset,
+      :reference_id,
+      generate_reference_id(prefix)
+    )
   end
 
   @doc """

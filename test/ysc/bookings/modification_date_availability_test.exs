@@ -918,12 +918,15 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
              )
   end
 
-  test "checkout tooltips block Saturday check-in except Sunday one-night", %{
-    user: user
-  } do
+  test "checkout tooltips always block a Saturday check-in (no Friday in stay)",
+       %{
+         user: user
+       } do
     room = create_room!()
     saturday = Date.utc_today() |> Date.add(21) |> first_saturday_on_or_after()
     sunday = Date.add(saturday, 1)
+    # This booking predates the full-weekend-span rule; admin creation skips
+    # validation, so a grandfathered Saturday check-in can still exist here.
     booking = complete_room_booking!(user, room, saturday, sunday)
     calendar = ModificationDateAvailability.calendar_context(booking)
 
@@ -949,8 +952,46 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     monday = Date.add(saturday, 2)
 
     assert tooltips[Date.to_iso8601(monday)] =~
-             BookingValidator.saturday_checkin_one_night_message()
+             BookingValidator.saturday_requires_friday_start_message()
 
-    refute Map.has_key?(tooltips, Date.to_iso8601(sunday))
+    assert tooltips[Date.to_iso8601(sunday)] =~
+             BookingValidator.saturday_requires_friday_start_message()
+  end
+
+  test "validate_modification_dates rejects a Saturday check-in to Sunday checkout on its own, even when rooms and inventory are otherwise available",
+       %{
+         user: user
+       } do
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    saturday = Date.add(checkin, 7) |> first_saturday_on_or_after()
+    sunday = Date.add(saturday, 1)
+
+    parsed = %{
+      checkin_date: saturday,
+      checkout_date: sunday,
+      guests_count: 2,
+      children_count: 0
+    }
+
+    assert {:error, :weekend_rule_violation} =
+             Bookings.validate_modification_availability(booking, parsed)
+
+    snapshot =
+      ModificationDateAvailability.build_snapshot_for_modification(
+        booking,
+        parsed.checkin_date,
+        parsed.checkout_date
+      )
+
+    assert {:error, :weekend_rule_violation} =
+             ModificationDateAvailability.validate_modification_dates(
+               snapshot,
+               parsed.checkin_date,
+               parsed.checkout_date
+             )
   end
 end

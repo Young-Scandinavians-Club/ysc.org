@@ -8,6 +8,8 @@ defmodule Ysc.AuthRateLimit do
   """
   use Hammer, backend: :ets
 
+  alias Ysc.RateLimit
+
   # Per IP: 20 auth attempts per minute (login, OAuth, passkey, forgot password)
   @default_ip_limit 20
   @ip_scale_ms :timer.minutes(1)
@@ -30,21 +32,8 @@ defmodule Ysc.AuthRateLimit do
 
   Returns `:ok` if allowed, or `{:error, :rate_limited, retry_after_seconds}` if over limit.
   """
-  def check_ip(ip) when is_tuple(ip) do
-    ip_string = ip |> :inet.ntoa() |> to_string()
-    check_ip(ip_string)
-  end
-
-  def check_ip(ip) when is_binary(ip) do
-    key = "auth:ip:#{normalize_ip(ip)}"
-
-    case hit(key, @ip_scale_ms, ip_limit()) do
-      {:allow, _count} ->
-        :ok
-
-      {:deny, retry_after_ms} ->
-        {:error, :rate_limited, max(1, div(retry_after_ms, 1000))}
-    end
+  def check_ip(ip) when is_tuple(ip) or is_binary(ip) do
+    RateLimit.check_ip(&hit/3, "auth:ip:", ip, @ip_scale_ms, ip_limit())
   end
 
   @doc """
@@ -54,28 +43,13 @@ defmodule Ysc.AuthRateLimit do
   Returns `:ok` if allowed, or `{:error, :rate_limited, retry_after_seconds}` if over limit.
   """
   def check_identifier(identifier) when is_binary(identifier) do
-    key = "auth:id:#{normalize_identifier(identifier)}"
-
-    case hit(key, @identifier_scale_ms, identifier_limit()) do
-      {:allow, _count} ->
-        :ok
-
-      {:deny, retry_after_ms} ->
-        {:error, :rate_limited, max(1, div(retry_after_ms, 1000))}
-    end
+    RateLimit.check(
+      &hit/3,
+      "auth:id:#{RateLimit.normalize_identifier(identifier)}",
+      @identifier_scale_ms,
+      identifier_limit()
+    )
   end
 
   def check_identifier(_), do: :ok
-
-  defp normalize_ip(ip) do
-    ip
-    |> String.trim()
-    |> String.downcase()
-  end
-
-  defp normalize_identifier(identifier) do
-    identifier
-    |> String.trim()
-    |> String.downcase()
-  end
 end

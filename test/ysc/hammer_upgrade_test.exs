@@ -63,12 +63,13 @@ defmodule Ysc.HammerUpgradeTest do
 
       prev = Application.get_env(:ysc, AuthRateLimit, [])
 
-      Application.put_env(:ysc, AuthRateLimit,
-        ip_limit: 1,
-        identifier_limit: Keyword.get(prev, :identifier_limit, 10_000)
-      )
+      token =
+        Ysc.Test.AuthRateLimitHelper.capture!(
+          ip_limit: 1,
+          identifier_limit: Keyword.get(prev, :identifier_limit, 10_000)
+        )
 
-      on_exit(fn -> Application.put_env(:ysc, AuthRateLimit, prev) end)
+      on_exit(fn -> Ysc.Test.AuthRateLimitHelper.restore!(token) end)
 
       assert :ok = AuthRateLimit.check_ip(ip)
 

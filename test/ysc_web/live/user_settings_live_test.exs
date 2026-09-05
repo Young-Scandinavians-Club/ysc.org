@@ -1064,6 +1064,9 @@ defmodule YscWeb.UserSettingsLiveTest do
                "Tickets waiting for payment"
              )
 
+      assert html =~ "Finish buying these tickets before the time shown"
+      refute html =~ "Finish checkout"
+
       assert has_element?(
                view,
                "#member-ticket-reservation-#{reservation.id}",

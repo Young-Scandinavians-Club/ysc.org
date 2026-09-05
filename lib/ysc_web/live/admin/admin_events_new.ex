@@ -216,6 +216,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       <li class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100">
                         <button
                           type="button"
+                          id="copy-event-btn"
                           class="w-full text-left px-1"
                           phx-click="copy-event"
                           data-confirm="Copy this event?"
@@ -497,29 +498,15 @@ defmodule YscWeb.AdminEventsNewLive do
                   </p>
                 </div>
 
-                <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
-                  <.input
-                    type="hidden"
-                    id="post[raw_body]"
-                    field={@form[:raw_details]}
-                    data-post-id={@event.id}
-                    phx-hook="TrixHook"
-                    phx-debounce={200}
-                  />
-                  <.live_component
-                    module={YscWeb.TrixImagePickerComponent}
-                    id={:event_body_image_picker}
-                    target_input_id="post[raw_body]"
-                  />
-                  <div id="richtext" phx-update="ignore">
-                    <trix-editor
-                      input="post[raw_body]"
-                      class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
-                      placeholder="Write something delightful and nice..."
-                    >
-                    </trix-editor>
-                  </div>
-                </div>
+                <.trix_editor
+                  id="post[raw_body]"
+                  field={@form[:raw_details]}
+                  wrapper_id="richtext"
+                  image_picker_id={:event_body_image_picker}
+                  data-post-id={@event.id}
+                  phx-debounce={200}
+                  editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
+                />
               </div>
             </.form>
 
@@ -906,29 +893,16 @@ defmodule YscWeb.AdminEventsNewLive do
                       >
                         Message
                       </span>
-                      <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
-                        <.input
-                          type="hidden"
-                          id="update[raw_body]"
-                          field={@update_form[:raw_body]}
-                          phx-hook="TrixHook"
-                          phx-debounce={200}
-                        />
-                        <.live_component
-                          module={YscWeb.TrixImagePickerComponent}
-                          id={:event_update_body_image_picker}
-                          target_input_id="update[raw_body]"
-                        />
-                        <div id="update-richtext" phx-update="ignore">
-                          <trix-editor
-                            input="update[raw_body]"
-                            aria-labelledby="update-message-label"
-                            class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
-                            placeholder="Write the update message to send to all attendees..."
-                          >
-                          </trix-editor>
-                        </div>
-                      </div>
+                      <.trix_editor
+                        id="update[raw_body]"
+                        field={@update_form[:raw_body]}
+                        wrapper_id="update-richtext"
+                        image_picker_id={:event_update_body_image_picker}
+                        labelledby="update-message-label"
+                        phx-debounce={200}
+                        placeholder="Write the update message to send to all attendees..."
+                        editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
+                      />
                     </div>
 
                     <div class="flex items-center gap-2">
@@ -1591,8 +1565,12 @@ defmodule YscWeb.AdminEventsNewLive do
     sales_stats = data.sales_stats
     sales_over_time = data.sales_over_time
     stripe_fees_total = data.stripe_fees_total
-    expense_reports = data.expense_reports
     expense_report_totals = data.expense_report_totals
+
+    # `list_expense_reports_for_event/1` already omits drafts. Totals count
+    # approved/paid only, so the money figures are unaffected by submitted
+    # or rejected rows in the per-report table.
+    expense_reports = data.expense_reports
 
     # Revenue = ticket sales plus any other income logged on expense reports
     # (e.g. cash collected at the door). Costs = Stripe fees plus the gross
@@ -1628,15 +1606,18 @@ defmodule YscWeb.AdminEventsNewLive do
   defp fetch_statistics_tab_data(event_id) do
     tasks = [
       {:sales_stats, fn -> Events.get_event_sales_stats(event_id) end},
-      {:sales_over_time, fn -> Events.get_event_sales_over_time(event_id) end},
+      {:sales_over_time,
+       fn ->
+         window = Events.get_event_ticket_sale_window(event_id)
+
+         {Events.get_event_sales_over_time(event_id, window), window}
+       end},
       {:stripe_fees_total,
        fn -> Events.get_event_stripe_fees_total(event_id) end},
       {:expense_reports,
        fn -> ExpenseReports.list_expense_reports_for_event(event_id) end},
       {:expense_report_totals,
        fn -> ExpenseReports.totals_for_event(event_id) end},
-      {:ticket_sale_window,
-       fn -> Events.get_event_ticket_sale_window(event_id) end},
       {:event_updates, fn -> Events.list_event_updates(event_id) end},
       {:donations_total, fn -> Events.get_event_donations_total(event_id) end}
     ]
@@ -1653,8 +1634,13 @@ defmodule YscWeb.AdminEventsNewLive do
 
     event_updates = Map.fetch!(results, :event_updates)
 
-    Map.put(
-      results,
+    {sales_over_time, ticket_sale_window} =
+      Map.fetch!(results, :sales_over_time)
+
+    results
+    |> Map.put(:sales_over_time, sales_over_time)
+    |> Map.put(:ticket_sale_window, ticket_sale_window)
+    |> Map.put(
       :event_update_markers,
       event_update_markers_from(event_updates)
     )
@@ -1858,7 +1844,9 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("copy-event", _, socket) do
     event = socket.assigns.event
 
-    case Events.copy_event(event, socket.assigns.current_user.id) do
+    case Events.copy_event(event, socket.assigns.current_user.id,
+           acting_role: socket.assigns.admin_role
+         ) do
       {:ok, new_event} ->
         {:noreply,
          push_patch(socket, to: ~p"/admin/events/#{new_event.id}/edit")}

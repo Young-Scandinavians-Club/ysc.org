@@ -14,7 +14,7 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="20px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      The YSC team has set aside tickets for you for the event below. When you buy tickets for this event, your member price will be applied automatically. Finish checkout before the deadline below so we can keep these tickets for you.
+      The YSC team has set aside tickets for you for the event below. When you buy tickets for this event, your member price will be applied automatically.
     </mj-text>
     <mj-spacer height="28px"></mj-spacer>
     <mj-text align="left" font-size="22px" line-height="1.4" padding="0px" font-weight="bold" color="#1447e6">
@@ -52,7 +52,7 @@
       <%= if @has_discount do %>
       <strong>Member pricing:</strong> <%= @discount_display %><br />
       <% end %>
-      <strong>Checkout:</strong> <%= @hold_expires_display %><br />
+      <strong>Finish buying by:</strong> <%= @hold_expires_display %><br />
       <strong>Arranged by:</strong> <%= @reserved_by_display %>
     </mj-text>
     <%= if @has_notes do %>

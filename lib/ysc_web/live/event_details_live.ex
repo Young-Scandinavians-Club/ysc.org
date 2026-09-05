@@ -1510,7 +1510,7 @@ defmodule YscWeb.EventDetailsLive do
                         <%= if has_reservation do %>
                           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
                             <.icon name="hero-ticket" class="w-3 h-3" />
-                            {reserved_quantity} held at member rate
+                            {reserved_quantity} at member price
                           </span>
                         <% end %>
                         <span
@@ -6683,16 +6683,12 @@ defmodule YscWeb.EventDetailsLive do
     event_id = socket.assigns.event.id
     ticket_selections = socket.assigns.selected_tickets
 
-    case Ysc.Tickets.create_ticket_order(user_id, event_id, ticket_selections) do
+    case Ysc.Tickets.create_ticket_order(user_id, event_id, ticket_selections,
+           user: socket.assigns.current_user
+         ) do
       {:ok, ticket_order} ->
-        ticket_order_with_tickets =
-          Ysc.Tickets.get_user_ticket_order_for_checkout(
-            user_id,
-            ticket_order.id
-          )
-
-        # Proceed directly to payment/free confirmation with registration integrated
-        proceed_to_payment_or_free(socket, ticket_order_with_tickets)
+        # atomic_booking already puts tickets, tiers, and user on the order.
+        proceed_to_payment_or_free(socket, ticket_order)
 
       {:error, :overbooked} ->
         {:noreply,
@@ -7308,11 +7304,11 @@ defmodule YscWeb.EventDetailsLive do
 
   defp member_hold_message(1),
     do:
-      "We're holding 1 ticket at the discounted member rate for a limited time. Complete checkout to keep it."
+      "We've set aside 1 ticket at the member price. Finish buying it soon so we can keep it for you."
 
   defp member_hold_message(n),
     do:
-      "We're holding #{n} tickets at the discounted member rate for a limited time. Complete checkout to keep them."
+      "We've set aside #{n} tickets at the member price. Finish buying them soon so we can keep them for you."
 
   # Format price for display
   defp format_price(%Money{} = money) do

@@ -82,6 +82,100 @@ defmodule Ysc.Events.TicketTest do
       assert cs.valid?
     end
 
+    @user_pk ~r/FROM "users" AS u0 WHERE \(u0\."id" = \$/
+
+    test "skips the membership user SELECT when the buyer is passed in", %{
+      user: user,
+      event: event,
+      tier: tier,
+      expires_at: expires_at
+    } do
+      {cs, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ticket.changeset(
+              %Ticket{},
+              %{
+                event_id: event.id,
+                ticket_tier_id: tier.id,
+                user_id: user.id,
+                expires_at: expires_at
+              },
+              user: user
+            )
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      assert cs.valid?
+      assert user_lookups == 0
+    end
+
+    test "does not skip membership lookup when the passed user is a different id",
+         %{
+           user: member,
+           event: event,
+           tier: tier,
+           expires_at: expires_at
+         } do
+      guest = user_fixture()
+
+      {cs, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ticket.changeset(
+              %Ticket{},
+              %{
+                event_id: event.id,
+                ticket_tier_id: tier.id,
+                user_id: guest.id,
+                expires_at: expires_at
+              },
+              user: member
+            )
+          end,
+          pattern: @user_pk,
+          caller_pids: [self()]
+        )
+
+      refute cs.valid?
+      assert {msg, _} = cs.errors[:user_id]
+      assert msg == "active membership required to purchase tickets"
+      assert user_lookups == 1
+    end
+
+    @event_pk ~r/FROM "events" AS e0 WHERE \(e0\."id" = \$/
+
+    test "skips the in-past event SELECT when the event is passed in", %{
+      user: user,
+      event: event,
+      tier: tier,
+      expires_at: expires_at
+    } do
+      {cs, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ticket.changeset(
+              %Ticket{},
+              %{
+                event_id: event.id,
+                ticket_tier_id: tier.id,
+                user_id: user.id,
+                expires_at: expires_at
+              },
+              user: user,
+              event: event
+            )
+          end,
+          pattern: @event_pk,
+          caller_pids: [self()]
+        )
+
+      assert cs.valid?
+      assert event_lookups == 0
+    end
+
     test "valid when the event start is still in the future in Pacific time", %{
       user: user,
       event: event,
@@ -486,6 +580,30 @@ defmodule Ysc.Events.TicketTest do
         })
 
       assert door_sale.valid?, "unexpected errors: #{inspect(door_sale.errors)}"
+    end
+
+    test "still requires membership when the guest is passed in", %{
+      event: event,
+      tier: tier,
+      expires_at: expires_at
+    } do
+      guest = user_fixture()
+
+      cs =
+        Ticket.door_sale_changeset(
+          %Ticket{},
+          %{
+            event_id: event.id,
+            ticket_tier_id: tier.id,
+            user_id: guest.id,
+            expires_at: expires_at
+          },
+          user: guest
+        )
+
+      refute cs.valid?
+      assert {msg, _} = cs.errors[:user_id]
+      assert msg == "active membership required to purchase tickets"
     end
 
     test "still requires an active membership", %{

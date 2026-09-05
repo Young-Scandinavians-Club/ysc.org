@@ -195,4 +195,58 @@ defmodule Ysc.ExpenseReports.ExpenseReportIncomeItemTest do
       assert changeset.valid?
     end
   end
+
+  describe "draft_changeset/2" do
+    test "is valid with every user field blank" do
+      cs =
+        ExpenseReportIncomeItem.draft_changeset(%ExpenseReportIncomeItem{}, %{})
+
+      assert cs.valid?
+    end
+
+    test "keeps a partially-filled row valid and casts what is there" do
+      cs =
+        ExpenseReportIncomeItem.draft_changeset(%ExpenseReportIncomeItem{}, %{
+          "description" => "Door sales",
+          "amount" => "",
+          "date" => ""
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :description) == "Door sales"
+      assert Ecto.Changeset.get_field(cs, :amount) == nil
+    end
+
+    test "allows a zero amount that submission still rejects" do
+      cs =
+        ExpenseReportIncomeItem.draft_changeset(%ExpenseReportIncomeItem{}, %{
+          "description" => "Placeholder",
+          "amount" => Money.new(:USD, 0)
+        })
+
+      assert cs.valid?
+    end
+
+    test "still rejects a non-USD amount" do
+      cs =
+        ExpenseReportIncomeItem.draft_changeset(%ExpenseReportIncomeItem{}, %{
+          "amount" => Money.new(1000, :EUR)
+        })
+
+      refute cs.valid?
+      assert %{amount: ["must be in USD"]} = errors_on(cs)
+    end
+
+    test "still rejects a description over the max length" do
+      cs =
+        ExpenseReportIncomeItem.draft_changeset(%ExpenseReportIncomeItem{}, %{
+          "description" => String.duplicate("a", 1001)
+        })
+
+      refute cs.valid?
+
+      assert %{description: ["should be at most 1000 character(s)"]} =
+               errors_on(cs)
+    end
+  end
 end

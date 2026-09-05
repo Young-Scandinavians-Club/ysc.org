@@ -10,7 +10,7 @@ defmodule Ysc.ExpenseReportsTest do
 
   alias Ysc.Accounts
   alias Ysc.ExpenseReports
-  alias Ysc.ExpenseReports.BankAccount
+  alias Ysc.ExpenseReports.{BankAccount, ExpenseReport, ExpenseReportItem}
   alias Ysc.Repo
   alias YscWeb.Workers.EmailNotifier
 
@@ -41,16 +41,13 @@ defmodule Ysc.ExpenseReportsTest do
         )
 
       for i <- 1..3 do
-        {:ok, _} =
-          ExpenseReports.create_expense_report(
-            %{
-              "status" => "draft",
-              "purpose" => "Batch list #{i}",
-              "reimbursement_method" => "bank_transfer",
-              "bank_account_id" => bank_account.id
-            },
-            user
-          )
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "submitted",
+          purpose: "Batch list #{i}",
+          reimbursement_method: "bank_transfer",
+          bank_account_id: bank_account.id
+        })
       end
 
       reports = ExpenseReports.list_expense_reports(user)
@@ -181,23 +178,15 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      base = %{
-        "status" => "draft",
-        "reimbursement_method" => "bank_transfer",
-        "bank_account_id" => bank_account.id
+      base = %ExpenseReport{
+        user_id: user.id,
+        status: "submitted",
+        reimbursement_method: "bank_transfer",
+        bank_account_id: bank_account.id
       }
 
-      {:ok, older} =
-        ExpenseReports.create_expense_report(
-          Map.put(base, "purpose", "older report"),
-          user
-        )
-
-      {:ok, newer} =
-        ExpenseReports.create_expense_report(
-          Map.put(base, "purpose", "newer report"),
-          user
-        )
+      older = Repo.insert!(%{base | purpose: "older report"})
+      newer = Repo.insert!(%{base | purpose: "newer report"})
 
       old_ts =
         DateTime.utc_now()
@@ -928,7 +917,7 @@ defmodule Ysc.ExpenseReportsTest do
         "bank_account_id" => bank_account.id
       }
 
-      assert {:ok, %Ysc.ExpenseReports.ExpenseReport{} = report} =
+      assert {:ok, %ExpenseReport{} = report} =
                ExpenseReports.create_expense_report(attrs, user)
 
       assert report.user_id == user.id
@@ -1777,6 +1766,33 @@ defmodule Ysc.ExpenseReportsTest do
       assert Money.equal?(totals.income_total, Money.new(:USD, "40.00"))
       assert Money.equal?(totals.net_total, Money.new(:USD, "60.00"))
     end
+
+    test "skips draft line items whose amount is still nil", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "WIP",
+          "expense_items" => %{
+            "0" => %{"vendor" => "Costco", "description" => "Paint"},
+            "1" => %{
+              "vendor" => "Home Depot",
+              "description" => "Lumber",
+              "amount" => "40.00"
+            }
+          },
+          "income_items" => %{
+            "0" => %{"description" => "Cash not counted yet"}
+          }
+        })
+
+      [preloaded] = ExpenseReports.list_expense_reports(user)
+      assert preloaded.id == draft.id
+
+      totals = ExpenseReports.calculate_totals(preloaded)
+
+      assert Money.equal?(totals.expense_total, Money.new(:USD, "40.00"))
+      assert Money.equal?(totals.income_total, Money.new(0, :USD))
+      assert Money.equal?(totals.net_total, Money.new(:USD, "40.00"))
+    end
   end
 
   describe "reimbursement validation" do
@@ -2515,63 +2531,77 @@ defmodule Ysc.ExpenseReportsTest do
   end
 
   describe "list_expense_reports_for_event/1" do
-    test "lists reports for the given event, newest first, and excludes other events",
+    test "lists reports for the given event and excludes other events",
          %{user: user} do
-      {:ok, bank_account} =
-        ExpenseReports.create_bank_account(
-          %{
-            "routing_number" => "021000021",
-            "account_number" => "1234567890"
-          },
-          user
-        )
-
       event = event_fixture()
       other_event = event_fixture()
 
-      {:ok, report1} =
-        ExpenseReports.create_expense_report(
-          %{
-            "user_id" => user.id,
-            "event_id" => event.id,
-            "status" => "draft",
-            "purpose" => "First",
-            "reimbursement_method" => "bank_transfer",
-            "bank_account_id" => bank_account.id
-          },
-          user
-        )
+      report1 =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "First",
+          reimbursement_method: "bank_transfer"
+        })
 
-      {:ok, report2} =
-        ExpenseReports.create_expense_report(
-          %{
-            "user_id" => user.id,
-            "event_id" => event.id,
-            "status" => "draft",
-            "purpose" => "Second",
-            "reimbursement_method" => "bank_transfer",
-            "bank_account_id" => bank_account.id
-          },
-          user
-        )
+      report2 =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "approved",
+          purpose: "Second",
+          reimbursement_method: "bank_transfer"
+        })
 
-      {:ok, _other_event_report} =
-        ExpenseReports.create_expense_report(
-          %{
-            "user_id" => user.id,
-            "event_id" => other_event.id,
-            "status" => "draft",
-            "purpose" => "Other event",
-            "reimbursement_method" => "bank_transfer",
-            "bank_account_id" => bank_account.id
-          },
-          user
-        )
+      _other_event_report =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: other_event.id,
+          status: "submitted",
+          purpose: "Other event",
+          reimbursement_method: "bank_transfer"
+        })
 
       results = ExpenseReports.list_expense_reports_for_event(event.id)
 
       assert MapSet.new(Enum.map(results, & &1.id)) ==
                MapSet.new([report1.id, report2.id])
+    end
+
+    test "omits draft reports and does not SELECT user password hashes", %{
+      user: user
+    } do
+      event = event_fixture()
+
+      submitted =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Filed",
+          reimbursement_method: "bank_transfer"
+        })
+
+      _draft =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          event_id: event.id,
+          status: "draft",
+          purpose: "Still writing",
+          reimbursement_method: "bank_transfer"
+        })
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports_for_event(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert Enum.map(results, & &1.id) == [submitted.id]
+      assert password_cols == 0
+      assert hd(results).user.first_name == user.first_name
     end
 
     test "returns empty list for an event with no expense reports" do
@@ -2732,6 +2762,65 @@ defmodule Ysc.ExpenseReportsTest do
       assert Money.equal?(totals.income_total, Money.new(0, :USD))
       assert Money.equal?(totals.net_total, Money.new(0, :USD))
     end
+
+    test "sums in SQL without loading submitters or full report rows", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+
+      for i <- 1..3 do
+        {:ok, report} =
+          ExpenseReports.create_expense_report(
+            %{
+              "user_id" => user.id,
+              "event_id" => event.id,
+              "status" => "draft",
+              "purpose" => "Batch #{i}",
+              "reimbursement_method" => "bank_transfer",
+              "bank_account_id" => bank_account.id,
+              "expense_items" => [
+                %{
+                  "date" => "2024-01-15",
+                  "vendor" => "Vendor",
+                  "description" => "Item",
+                  "amount" => "10.00"
+                }
+              ]
+            },
+            user
+          )
+
+        {:ok, _} =
+          ExpenseReports.update_expense_report(report, %{status: "approved"})
+      end
+
+      {totals, user_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.totals_for_event(event.id) end,
+          pattern: ~r/FROM ["']?users["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_, item_sums} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.totals_for_event(event.id) end,
+          pattern: ~r/FROM ["']?expense_report_items["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert Money.equal?(totals.expense_total, Money.new(30, :USD))
+      assert user_lookups == 0
+      assert item_sums == 1
+    end
   end
 
   describe "get_expense_report_by_quickbooks_bill_id/2" do
@@ -2889,7 +2978,7 @@ defmodule Ysc.ExpenseReportsTest do
 
       # Fetch without preloading expense_items/income_items so
       # calculate_totals/1 goes through the DB-aggregate branch.
-      not_preloaded = Repo.get!(Ysc.ExpenseReports.ExpenseReport, report.id)
+      not_preloaded = Repo.get!(ExpenseReport, report.id)
       refute Ecto.assoc_loaded?(not_preloaded.expense_items)
       refute Ecto.assoc_loaded?(not_preloaded.income_items)
 
@@ -2920,7 +3009,7 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      not_preloaded = Repo.get!(Ysc.ExpenseReports.ExpenseReport, report.id)
+      not_preloaded = Repo.get!(ExpenseReport, report.id)
       totals = ExpenseReports.calculate_totals(not_preloaded)
       assert Money.equal?(totals.expense_total, Money.new(0, :USD))
       assert Money.equal?(totals.income_total, Money.new(0, :USD))
@@ -2983,6 +3072,291 @@ defmodule Ysc.ExpenseReportsTest do
 
       assert %Ecto.Query{} = query
       assert Repo.all(query) == []
+    end
+
+    test "event list and totals builders return Ecto queries" do
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_list_expense_reports_for_event_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_event_expense_item_totals_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_event_income_item_totals_query()
+    end
+  end
+
+  describe "drafts" do
+    test "get_active_draft/1 returns nil when the user has none", %{user: user} do
+      assert ExpenseReports.get_active_draft(user) == nil
+    end
+
+    test "save_draft/3 creates a draft, then updates the same row", %{
+      user: user
+    } do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{"purpose" => "Retreat supplies"})
+
+      assert draft.status == "draft"
+      assert draft.purpose == "Retreat supplies"
+      assert ExpenseReports.get_active_draft(user).id == draft.id
+
+      {:ok, updated} =
+        ExpenseReports.save_draft(
+          user,
+          %{"purpose" => "Retreat supplies v2"},
+          draft.id
+        )
+
+      assert updated.id == draft.id
+      assert updated.purpose == "Retreat supplies v2"
+
+      assert Repo.aggregate(
+               from(er in ExpenseReport,
+                 where: er.user_id == ^user.id
+               ),
+               :count
+             ) == 1
+    end
+
+    test "save_draft/3 does not reload address or event after insert", %{
+      user: user
+    } do
+      {_, address_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            ExpenseReports.save_draft(user, %{"purpose" => "No extra preloads"})
+          end,
+          pattern: ~r/FROM ["']?addresses["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            ExpenseReports.save_draft(user, %{"purpose" => "Still no extra"})
+          end,
+          pattern: ~r/FROM ["']?events["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert address_lookups == 0
+      assert event_lookups == 0
+    end
+
+    test "save_draft/3 persists a half-filled expense item", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Partial",
+          "expense_items" => %{
+            "0" => %{"vendor" => "Costco", "amount" => "", "date" => ""}
+          }
+        })
+
+      assert [item] = draft.expense_items
+      assert item.vendor == "Costco"
+      assert item.amount == nil
+      assert item.date == nil
+    end
+
+    test "save_draft/3 replaces items rather than appending them", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "P",
+          "expense_items" => %{
+            "0" => %{"vendor" => "A"},
+            "1" => %{"vendor" => "B"}
+          }
+        })
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(
+          user,
+          %{
+            "purpose" => "P",
+            "expense_items" => %{"0" => %{"vendor" => "only"}}
+          },
+          draft.id
+        )
+
+      assert [%{vendor: "only"}] = draft.expense_items
+    end
+
+    test "submit_draft/3 creates a submitted report and removes the draft", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Conference travel",
+          "reimbursement_method" => "bank_transfer",
+          "bank_account_id" => bank_account.id
+        })
+
+      attrs = %{
+        "purpose" => "Conference travel",
+        "reimbursement_method" => "bank_transfer",
+        "bank_account_id" => bank_account.id,
+        "certification_accepted" => true,
+        "status" => "submitted",
+        "expense_items" => %{
+          "0" => %{
+            "date" => "2026-01-15",
+            "vendor" => "Delta",
+            "description" => "Flight",
+            "amount" => "250.00",
+            "receipt_s3_path" => "receipts/u/x.pdf"
+          }
+        }
+      }
+
+      {report, _} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          {:ok, report} = ExpenseReports.submit_draft(draft.id, attrs, user)
+          {report, nil}
+        end)
+
+      assert report.status == "submitted"
+      assert ExpenseReports.get_active_draft(user) == nil
+      assert Repo.get(ExpenseReport, draft.id) == nil
+    end
+
+    test "submit_draft/3 rolls back when the draft row is already gone", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      attrs = %{
+        "purpose" => "Conference travel",
+        "reimbursement_method" => "bank_transfer",
+        "bank_account_id" => bank_account.id,
+        "certification_accepted" => true,
+        "status" => "submitted",
+        "expense_items" => %{
+          "0" => %{
+            "date" => "2026-01-15",
+            "vendor" => "Delta",
+            "description" => "Flight",
+            "amount" => "250.00",
+            "receipt_s3_path" => "receipts/u/x.pdf"
+          }
+        }
+      }
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:error, %Ecto.Changeset{} = changeset} =
+                 ExpenseReports.submit_draft(
+                   Ecto.ULID.generate(),
+                   attrs,
+                   user
+                 )
+
+        assert changeset.errors[:base]
+      end)
+
+      submitted =
+        Repo.all(
+          from(r in ExpenseReport,
+            where: r.user_id == ^user.id and r.status == "submitted"
+          )
+        )
+
+      assert submitted == []
+    end
+
+    test "discard_draft/2 deletes the draft and its items", %{user: user} do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Scratch",
+          "expense_items" => %{"0" => %{"vendor" => "X"}}
+        })
+
+      assert {1, nil} = ExpenseReports.discard_draft(draft.id, user)
+      assert Repo.get(ExpenseReport, draft.id) == nil
+
+      assert Repo.aggregate(
+               from(i in ExpenseReportItem,
+                 where: i.expense_report_id == ^draft.id
+               ),
+               :count
+             ) == 0
+    end
+
+    test "discard_draft/2 will not touch another user's draft", %{user: user} do
+      other = user_fixture()
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(other, %{"purpose" => "Not yours"})
+
+      assert {0, nil} = ExpenseReports.discard_draft(draft.id, user)
+      assert Repo.get(ExpenseReport, draft.id)
+    end
+
+    test "save_draft/3 reuses the existing draft when called with nil id", %{
+      user: user
+    } do
+      {:ok, first} = ExpenseReports.save_draft(user, %{"purpose" => "One"})
+
+      {:ok, second} =
+        ExpenseReports.save_draft(user, %{"purpose" => "Two"})
+
+      assert second.id == first.id
+      assert second.purpose == "Two"
+
+      assert Repo.aggregate(
+               from(er in ExpenseReport,
+                 where: er.user_id == ^user.id and er.status == "draft"
+               ),
+               :count
+             ) == 1
+    end
+
+    test "save_draft/3 keeps line items in their form order across saves", %{
+      user: user
+    } do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Ordered",
+          "expense_items" => %{
+            "0" => %{"vendor" => "first"},
+            "1" => %{"vendor" => "second"},
+            "2" => %{"vendor" => "third"}
+          }
+        })
+
+      assert ["first", "second", "third"] ==
+               Enum.map(draft.expense_items, & &1.vendor)
+
+      # Re-save (delete + recreate) and the order still holds.
+      {:ok, resaved} =
+        ExpenseReports.save_draft(
+          user,
+          %{
+            "purpose" => "Ordered",
+            "expense_items" => %{
+              "0" => %{"vendor" => "first"},
+              "1" => %{"vendor" => "second"},
+              "2" => %{"vendor" => "third"}
+            }
+          },
+          draft.id
+        )
+
+      assert ["first", "second", "third"] ==
+               Enum.map(resaved.expense_items, & &1.vendor)
+
+      assert ["first", "second", "third"] ==
+               ExpenseReports.get_active_draft(user).expense_items
+               |> Enum.map(& &1.vendor)
     end
   end
 end

@@ -161,7 +161,7 @@ defmodule Ysc.Bookings.Booking do
       :booking_mode,
       :user_id
     ])
-    |> generate_reference_id()
+    |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> infer_booking_mode()
     |> validate_date_range()
     |> validate_booking_rules(opts)
@@ -191,28 +191,7 @@ defmodule Ysc.Bookings.Booking do
   Call this when insert fails with a reference_id unique constraint.
   """
   def put_new_reference_id(changeset) do
-    put_change(
-      changeset,
-      :reference_id,
-      ReferenceGenerator.generate_reference_id(@reference_prefix)
-    )
-  end
-
-  defp generate_reference_id(changeset) do
-    # Use get_field/2 so updates keep an existing reference_id (e.g. MIG-WP-*).
-    # get_change/2 is nil when the form omits reference_id, which previously
-    # regenerated a new BKG-* id on every admin edit/cancel status update.
-    case get_field(changeset, :reference_id) do
-      nil ->
-        put_change(
-          changeset,
-          :reference_id,
-          ReferenceGenerator.generate_reference_id(@reference_prefix)
-        )
-
-      _ ->
-        changeset
-    end
+    ReferenceGenerator.put_new_reference_id(changeset, @reference_prefix)
   end
 
   # Infer booking_mode from rooms if not provided

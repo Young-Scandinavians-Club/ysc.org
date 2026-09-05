@@ -354,6 +354,36 @@ defmodule YscWeb.AdminMoneyLiveTest do
              )
     end
 
+    test "expenses tab hides members' in-progress drafts", %{conn: conn} do
+      member = user_fixture()
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(member, %{
+          "purpose" => "Half-typed draft report"
+        })
+
+      submitted =
+        %Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          purpose: "Filed report for the treasurer",
+          reimbursement_method: "bank_transfer",
+          status: "submitted",
+          certification_accepted: true
+        }
+        |> Repo.insert!()
+
+      year = DateTime.now!("America/Los_Angeles").year
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          "/admin/money?tab=expenses&start_date=#{year}-01-01&end_date=#{year}-12-31"
+        )
+
+      assert has_element?(view, "#expense-report-row-#{submitted.id}")
+      refute has_element?(view, "#expense-report-row-#{draft.id}")
+    end
+
     test "switching tabs does not drift the date range", %{conn: conn} do
       {:ok, view, _html} =
         live(

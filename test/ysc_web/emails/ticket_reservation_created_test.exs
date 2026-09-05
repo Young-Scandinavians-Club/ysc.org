@@ -75,6 +75,7 @@ defmodule YscWeb.Emails.TicketReservationCreatedTest do
       assert data.event_url =~ "/events/#{event.id}"
       assert data.notification_settings_url =~ "/users/notifications"
       assert is_binary(data.event_date_time)
+      refute data.hold_expires_display =~ "checkout"
     end
 
     test "treats zero discount as no discount" do
@@ -136,7 +137,7 @@ defmodule YscWeb.Emails.TicketReservationCreatedTest do
       refute data.has_notes
       assert data.notes_text == nil
       assert data.event_date_time == nil
-      assert data.hold_expires_display =~ "No fixed end date"
+      assert data.hold_expires_display =~ "No deadline"
     end
   end
 end

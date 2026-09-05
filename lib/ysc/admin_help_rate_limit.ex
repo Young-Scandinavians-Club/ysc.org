@@ -4,6 +4,8 @@ defmodule Ysc.AdminHelpRateLimit do
   """
   use Hammer, backend: :ets
 
+  alias Ysc.RateLimit
+
   @limit 10
   @scale_ms :timer.minutes(10)
 
@@ -13,12 +15,7 @@ defmodule Ysc.AdminHelpRateLimit do
   Returns `:ok` or `:rate_limited`.
   """
   def check(user_id) when is_binary(user_id) do
-    key = "admin_help:user:#{user_id}"
-
-    case hit(key, @scale_ms, @limit) do
-      {:allow, _} -> :ok
-      {:deny, _} -> :rate_limited
-    end
+    RateLimit.check_ok(&hit/3, "admin_help:user:#{user_id}", @scale_ms, @limit)
   end
 
   def check(_), do: :rate_limited

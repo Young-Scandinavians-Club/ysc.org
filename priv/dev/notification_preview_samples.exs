@@ -476,7 +476,8 @@
     },
     "family_member_removed" => %{
       first_name: "Freja",
-      primary_user_name: "Astrid Berg"
+      primary_user_name: "Astrid Berg",
+      membership_url: "http://localhost:4000/users/membership"
     },
     "membership_ended" => %{
       first_name: "Astrid",
@@ -774,8 +775,7 @@
       quantity: 2,
       discount_display: "10% member pricing",
       has_discount: true,
-      hold_expires_display:
-        "Complete checkout before December 2, 2026 at 06:00 PM PST",
+      hold_expires_display: "December 2, 2026 at 06:00 PM PST",
       has_notes: true,
       notes_text: "Please bring ID.",
       reserved_by_display: "Admin Person"
