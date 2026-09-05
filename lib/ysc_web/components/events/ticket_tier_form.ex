@@ -308,6 +308,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
      socket
      |> assign(assigns)
      |> assign_new(:dialog_id, fn -> nil end)
+     |> assign_new(:admin_role, fn -> nil end)
      |> assign_new(:retained_price, fn ->
        case assigns[:ticket_tier] do
          %{type: type, price: price} ->
@@ -392,6 +393,20 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
 
   @impl true
   def handle_event("save", params, socket) do
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "You do not have permission to perform this action.",
+         title: "Ticket tier"
+       )}
+    else
+      save_ticket_tier(params, socket)
+    end
+  end
+
+  defp save_ticket_tier(params, socket) do
     # Handle both expected and unexpected parameter formats
     ticket_tier_params = params["ticket_tier"] || params
 

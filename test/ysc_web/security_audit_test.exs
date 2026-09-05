@@ -47,6 +47,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 50 (HIGH)     Volunteers could reserve tickets with up to 100% discount, bypassing Finding 46 grant gates
   Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
+  Finding 54 (HIGH)     Volunteers could add/edit ticket tiers (including Free / $0), then check out complimentary tickets
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -2990,6 +2991,60 @@ defmodule YscWeb.SecurityAuditTest do
 
       reloaded = Ysc.Events.get_ticket_reservation!(reservation.id)
       assert reloaded.status == "active"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 54 (HIGH): Volunteers cannot add/edit/delete ticket tiers
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 54: volunteers cannot add or edit ticket tiers" do
+    import Ysc.EventsFixtures
+
+    test "volunteer tickets tab hides add/edit/delete and rejects the LiveView events",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 54",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 20
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#add-ticket-tier-btn-#{event.id}")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-edit")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-delete")
+
+      view
+      |> element("#ticket-tier-add-event-#{event.id}")
+      |> render_click()
+
+      refute has_element?(view, "#add-ticket-tier-modal")
+      refute has_element?(view, "#ticket-tier-form-#{event.id}")
+
+      view
+      |> element("#ticket-tier-edit-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      refute has_element?(view, "#edit-ticket-tier-modal")
+
+      view
+      |> element("#ticket-tier-delete-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      reloaded = Ysc.Events.get_ticket_tier!(tier.id)
+      assert reloaded.type == :paid
+      assert Money.equal?(reloaded.price, Money.new(50, :USD))
+      assert length(Ysc.Events.list_ticket_tiers_for_event(event.id)) == 1
     end
   end
 

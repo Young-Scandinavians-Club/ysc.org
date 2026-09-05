@@ -465,6 +465,7 @@ defmodule YscWeb.VolunteerRoleTest do
   # Finding 46: volunteers cannot refund, reassign, or grant tickets
   # Finding 50: volunteers cannot reserve tickets (discounted holds) either
   # Finding 53: volunteers cannot cancel ticket reservations either
+  # Finding 54: volunteers cannot add, edit, or delete ticket tiers
   # Finding 55: volunteers cannot copy ticket tiers (including Free / $0)
   # ---------------------------------------------------------------------------
 
@@ -493,6 +494,9 @@ defmodule YscWeb.VolunteerRoleTest do
 
       refute has_element?(view, "#ticket-tier-actions-#{tier.id}-grant")
       refute has_element?(view, "#ticket-tier-actions-#{tier.id}-reserve")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-edit")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-delete")
+      refute has_element?(view, "#add-ticket-tier-btn-#{event.id}")
       refute has_element?(view, "#ticket-actions-#{ticket.id}-refund")
       refute has_element?(view, "#ticket-actions-#{ticket.id}-reassign")
       assert has_element?(view, "#ticket-actions-#{ticket.id}-edit")
@@ -598,6 +602,49 @@ defmodule YscWeb.VolunteerRoleTest do
 
       reloaded = Events.get_ticket_reservation!(reservation.id)
       assert reloaded.status == "active"
+    end
+
+    test "cannot add, edit, or delete ticket tiers (Finding 54)", %{
+      conn: conn,
+      volunteer: volunteer
+    } do
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Volunteer Price Gate",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 20
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#add-ticket-tier-btn-#{event.id}")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-edit")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-delete")
+
+      view
+      |> element("#ticket-tier-add-event-#{event.id}")
+      |> render_click()
+
+      refute has_element?(view, "#add-ticket-tier-modal")
+      assert length(Events.list_ticket_tiers_for_event(event.id)) == 1
+
+      view
+      |> element("#ticket-tier-edit-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      refute has_element?(view, "#edit-ticket-tier-modal")
+
+      view
+      |> element("#ticket-tier-delete-event-#{event.id}")
+      |> render_click(%{"id" => tier.id})
+
+      reloaded = Events.get_ticket_tier!(tier.id)
+      assert reloaded.type == :paid
+      assert Money.equal?(reloaded.price, Money.new(50, :USD))
     end
   end
 
