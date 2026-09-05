@@ -258,7 +258,10 @@ defmodule Ysc.MixProject do
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.
       {:nested_filter, "~> 2.1", override: true},
       {:mjml_eex, "~> 0.13"},
-      {:mox, "~> 1.2", only: :test},
+      # 1.3.0: Elixir 1.15 floor; Process.info parent for allowances when
+      # `$callers` is missing. 1.3.1: shared-mode verify after an unexpected
+      # call no longer crashes (empty expectation map instead of nil).
+      {:mox, "~> 1.3", only: :test},
       # 2.24.1: ack only while the job is still executing (prevents a later
       # execution from overwriting completed/snoozed); notifier listeners live
       # in Oban.Notifier.Registry; notify/3 returns {:error, _} instead of
