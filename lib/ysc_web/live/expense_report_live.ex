@@ -69,9 +69,7 @@ defmodule YscWeb.ExpenseReportLive do
 
       socket =
         if connected?(socket) do
-          socket
-          |> assign_expense_form_data(user)
-          |> maybe_resume_draft(user)
+          maybe_load_expense_form_data(socket, user)
         else
           socket
         end
@@ -4261,6 +4259,22 @@ defmodule YscWeb.ExpenseReportLive do
     |> assign(:treasurer, get_treasurer())
     |> assign(:events, Events.list_recent_and_upcoming_events())
     |> assign(:loading_expense_form_data, false)
+  end
+
+  # Bank accounts, billing address, treasurer, the event picker, and draft
+  # resume are only rendered on the new-report form (`:index` / `:new`).
+  # `/expensereports` and the success page used to pay that cost on every
+  # connect — including a full events list and a draft row with line items.
+  defp maybe_load_expense_form_data(socket, user) do
+    case socket.assigns.live_action do
+      action when action in [:index, :new] ->
+        socket
+        |> assign_expense_form_data(user)
+        |> maybe_resume_draft(user)
+
+      _ ->
+        assign(socket, :loading_expense_form_data, false)
+    end
   end
 
   # The pristine "new report" form: one empty expense item, no draft attached.
