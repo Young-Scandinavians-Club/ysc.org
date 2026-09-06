@@ -48,6 +48,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
+  Finding 57 (MEDIUM)   Leftover event editor save created events via Event.changeset, allowing organizer/state mass assignment
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -3085,6 +3086,71 @@ defmodule YscWeb.SecurityAuditTest do
         Ysc.Events.get_event!(copied_id) |> Repo.preload(:ticket_tiers)
 
       assert copied.ticket_tiers == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 57 (MEDIUM): Leftover event editor save must not create events
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 57: leftover event editor save cannot mint or reattribute events" do
+    import Ysc.EventsFixtures
+
+    alias Ysc.Events
+    alias Ysc.Events.Event
+
+    test "volunteer save with foreign organizer_id and published state is ignored",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      victim = user_fixture(%{role: "admin"})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :draft,
+          title: "Finding 57 Source #{System.unique_integer([:positive])}"
+        })
+
+      ids_before =
+        Event
+        |> select([e], e.id)
+        |> Repo.all()
+        |> MapSet.new()
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/edit")
+
+      _ = render(view)
+      refute has_element?(view, "#new_event_form[phx-submit=save]")
+
+      render_submit(view, "save", %{
+        "event" => %{
+          "title" => "Emergency Dues Collection",
+          "description" => "Pay the club now",
+          "state" => "published",
+          "organizer_id" => victim.id,
+          "rendered_details" =>
+            "<p>Injected</p><script>document.cookie</script>"
+        }
+      })
+
+      ids_after =
+        Event
+        |> select([e], e.id)
+        |> Repo.all()
+        |> MapSet.new()
+
+      assert MapSet.equal?(ids_before, ids_after)
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.id == event.id
+      assert reloaded.organizer_id == volunteer.id
+      assert reloaded.state == :draft
+      assert reloaded.rendered_details == event.rendered_details
+
+      refute Enum.any?(Events.list_event_hosts(reloaded), &(&1.id == victim.id))
     end
   end
 

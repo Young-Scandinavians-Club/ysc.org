@@ -322,10 +322,7 @@ defmodule YscWeb.AdminEventsNewLive do
             <.form
               for={@form}
               id="new_event_form"
-              phx-submit="save"
               phx-change="validate"
-              phx-trigger-action={@trigger_submit}
-              method="post"
               class="space-y-6 max-w-3xl"
             >
               <.input
@@ -1415,7 +1412,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:end_time, event.end_time)
     |> assign(:can_publish, can_publish?(event.start_date, event.title))
     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
-    |> assign(trigger_submit: false, check_errors: false)
+    |> assign(check_errors: false)
     |> assign(:hosts, [])
     |> assign(:host_ids, MapSet.new())
     |> assign(:host_search_query, "")
@@ -1476,7 +1473,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:end_time, nil)
     |> assign(:can_publish, false)
     |> assign(:partiful_link_present, false)
-    |> assign(trigger_submit: false, check_errors: false)
+    |> assign(check_errors: false)
     |> assign(:hosts, [])
     |> assign(:host_ids, MapSet.new())
     |> assign(:host_search_query, "")
@@ -1988,15 +1985,12 @@ defmodule YscWeb.AdminEventsNewLive do
     {:noreply, socket}
   end
 
-  def handle_event("save", %{"event" => event_params}, socket) do
-    case Events.create_event(event_params) do
-      {:ok, event} ->
-        {:noreply, push_patch(socket, to: "/admin/events/#{event.id}/edit")}
-
-      {:error, changeset} ->
-        {:noreply, assign_form(socket, changeset)}
-    end
-  end
+  # Autosave is `phx-change="validate"` via `Event.editor_changeset/2`. A leftover
+  # `phx-submit="save"` used to call `Events.create_event/1` with the full
+  # `Event.changeset/2`, which casts `state`, `organizer_id`, and `published_at`.
+  # Ignore any stale submit so volunteers cannot mint a published event attributed
+  # to another member (Finding 57).
+  def handle_event("save", _params, socket), do: {:noreply, socket}
 
   def handle_event("validate", %{"event" => event_params}, socket) do
     # rendered_details is computed server-side on editor-update; never trust client params.
