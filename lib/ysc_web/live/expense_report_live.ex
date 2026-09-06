@@ -2082,22 +2082,14 @@ defmodule YscWeb.ExpenseReportLive do
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Main Form Column -->
             <div class="lg:col-span-2 pb-24 lg:pb-0">
-              <p
+              <.autosave_status
                 id="expense-report-autosave-status"
-                class="mb-3 flex items-center gap-1.5 text-xs text-zinc-500 h-4"
-                aria-live="polite"
-              >
-                <%= case @draft_status do %>
-                  <% :saving -> %>
-                    <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
-                    Saving…
-                  <% :saved -> %>
-                    <.icon name="hero-check" class="w-3.5 h-3.5 text-green-600" />
-                    All changes saved
-                  <% _ -> %>
-                    <span class="sr-only">Draft not started</span>
-                <% end %>
-              </p>
+                saving?={@draft_status == :saving}
+                saved?={@draft_status == :saved}
+                saved_label="All changes saved"
+                idle_label="Draft not started"
+                class="mb-3"
+              />
               <.simple_form
                 for={@form}
                 id="expense-report-form"

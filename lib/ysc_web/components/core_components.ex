@@ -3296,6 +3296,114 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Inline autosave status for draft editors (posts, newsletters, expense reports).
+
+  Shows a spinning "Saving…" while a write is in flight. After a successful save,
+  shows `saved_label` when `saved?` is true, or "Saved {time}" from `saved_at`.
+  Hidden entirely when `readonly?` is true.
+
+  ## Examples
+
+      <.autosave_status id="post-editor-autosave-status" saving?={@saving?} />
+
+      <.autosave_status
+        id="newsletter-editor-autosave-status"
+        saving?={@saving?}
+        saved_at={@last_saved_at}
+        readonly?={@readonly?}
+      />
+
+      <.autosave_status
+        id="expense-report-autosave-status"
+        saving?={@draft_status == :saving}
+        saved?={@draft_status == :saved}
+        saved_label="All changes saved"
+        idle_label="Draft not started"
+        class="mb-3"
+      />
+  """
+  attr :id, :string, default: nil
+  attr :saving?, :boolean, required: true
+  attr :saved?, :boolean, default: false
+
+  attr :saved_at, :any,
+    default: nil,
+    doc: "UTC DateTime of the last successful save"
+
+  attr :saved_label, :string,
+    default: nil,
+    doc: "Confirmation copy when `saved?` is true (e.g. \"All changes saved\")"
+
+  attr :idle_label, :string,
+    default: nil,
+    doc: "Screen-reader-only copy while nothing has been saved yet"
+
+  attr :readonly?, :boolean, default: false
+
+  attr :size, :atom,
+    default: :xs,
+    values: [:xs, :sm],
+    doc:
+      "Type size. `:sm` matches the post editor header; `:xs` is the default toolbar size"
+
+  attr :class, :any, default: nil
+
+  def autosave_status(assigns) do
+    assigns =
+      assigns
+      |> assign(:saved_text, autosave_saved_text(assigns))
+      |> assign(:size_class, autosave_size_class(assigns.size))
+
+    ~H"""
+    <p
+      :if={!@readonly?}
+      id={@id}
+      class={[
+        "inline-flex shrink-0 items-center gap-1.5 h-4",
+        @size_class,
+        @class
+      ]}
+      role="status"
+      aria-live="polite"
+    >
+      <%= cond do %>
+        <% @saving? -> %>
+          <.icon
+            name="hero-arrow-path"
+            class="w-3.5 h-3.5 shrink-0 animate-spin"
+          /> Saving…
+        <% @saved_text -> %>
+          <%= if @saved_label || @saved? do %>
+            <.icon name="hero-check" class="w-3.5 h-3.5 shrink-0 text-green-600" />
+          <% else %>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+          <% end %>
+          {@saved_text}
+        <% true -> %>
+          <span :if={@idle_label} class="sr-only">{@idle_label}</span>
+      <% end %>
+    </p>
+    """
+  end
+
+  defp autosave_size_class(:sm), do: "text-sm text-zinc-600"
+  defp autosave_size_class(:xs), do: "text-xs text-zinc-500"
+
+  defp autosave_saved_text(%{saving?: true}), do: nil
+
+  defp autosave_saved_text(%{saved?: true, saved_label: label})
+       when is_binary(label) and label != "",
+       do: label
+
+  defp autosave_saved_text(%{saved?: true}), do: "Saved"
+
+  defp autosave_saved_text(%{saved_at: %DateTime{} = saved_at}) do
+    "Saved #{Calendar.strftime(saved_at, "%I:%M %p")}"
+  end
+
+  defp autosave_saved_text(_), do: nil
+
+  @doc """
   Generic shimmer placeholder block for skeleton loading layouts.
 
   Combine with Tailwind sizing/spacing/color classes via `class` to match the shape

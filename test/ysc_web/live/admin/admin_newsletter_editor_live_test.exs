@@ -70,6 +70,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
 
       assert html =~ "Newsletter"
       assert has_element?(view, "#newsletter-editor-form")
+      assert has_element?(view, "#newsletter-editor-autosave-status")
     end
 
     test "shows title and subject fields", %{conn: conn} do
@@ -104,6 +105,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       |> render_submit()
 
       assert Newsletter.list_editions() |> Enum.any?(&(&1.title == "New Title"))
+      assert render(view) =~ "Saved"
     end
   end
 

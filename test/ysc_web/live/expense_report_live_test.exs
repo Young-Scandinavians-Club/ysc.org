@@ -11,11 +11,18 @@ defmodule YscWeb.ExpenseReportLiveTest do
   setup :register_and_log_in_user
 
   test "renders expense report form", %{conn: conn} do
-    {:ok, _index_live, html} = live(conn, ~p"/expensereport")
+    {:ok, view, html} = live(conn, ~p"/expensereport")
 
     assert html =~ "Expense Report"
     assert html =~ "Amount we will reimburse"
     refute html =~ "Net Total"
+    assert has_element?(view, "#expense-report-autosave-status")
+
+    assert has_element?(
+             view,
+             "#expense-report-autosave-status",
+             "Draft not started"
+           )
   end
 
   test "mileage items use trip-purpose copy instead of business jargon", %{
