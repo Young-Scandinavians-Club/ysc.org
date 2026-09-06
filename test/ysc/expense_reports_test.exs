@@ -3083,12 +3083,65 @@ defmodule Ysc.ExpenseReportsTest do
 
       assert %Ecto.Query{} =
                ExpenseReports.ci_query_explain_event_income_item_totals_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_active_draft_query()
     end
   end
 
   describe "drafts" do
     test "get_active_draft/1 returns nil when the user has none", %{user: user} do
       assert ExpenseReports.get_active_draft(user) == nil
+    end
+
+    test "get_active_draft/1 does not SELECT event or address rows", %{
+      user: user
+    } do
+      event =
+        event_fixture(%{raw_details: "<p>toast body that must not load</p>"})
+
+      {:ok, _} =
+        Accounts.update_billing_address(user, %{
+          "address" => "123 Main St",
+          "city" => "Oakland",
+          "region" => "CA",
+          "postal_code" => "94601",
+          "country" => "US"
+        })
+
+      user = Repo.preload(user, :billing_address, force: true)
+
+      {:ok, _draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "With event and address",
+          "event_id" => event.id,
+          "address_id" => user.billing_address.id,
+          "expense_items" => %{
+            "0" => %{"vendor" => "REI", "description" => "Patch kit"}
+          }
+        })
+
+      {draft, event_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.get_active_draft(user) end,
+          pattern: ~r/FROM ["']?events["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_, address_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.get_active_draft(user) end,
+          pattern: ~r/FROM ["']?addresses["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert draft.event_id == event.id
+      assert draft.address_id == user.billing_address.id
+      assert [%{vendor: "REI"}] = draft.expense_items
+      refute Ecto.assoc_loaded?(draft.event)
+      refute Ecto.assoc_loaded?(draft.address)
+      assert event_lookups == 0
+      assert address_lookups == 0
     end
 
     test "save_draft/3 creates a draft, then updates the same row", %{

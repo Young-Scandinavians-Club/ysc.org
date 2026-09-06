@@ -60,8 +60,19 @@ defmodule Ysc.ExpenseReports do
 
   A partial unique index guarantees at most one, but `limit: 1` keeps this
   resilient if that ever changes.
+
+  Does not preload `:event` or `:address` — resume only needs `event_id` /
+  `address_id` (the form picker already loaded events and billing separately).
+  Skipping those associations avoids pulling event-body TOAST HTML and an
+  unused address row on every form reconnect.
   """
   def get_active_draft(%User{} = user) do
+    user.id
+    |> active_draft_query()
+    |> Repo.one()
+  end
+
+  defp active_draft_query(user_id) do
     items_query =
       from(i in ExpenseReportItem, order_by: [asc: i.position, asc: i.id])
 
@@ -71,17 +82,14 @@ defmodule Ysc.ExpenseReports do
       )
 
     from(er in ExpenseReport,
-      where: er.user_id == ^user.id and er.status == "draft",
+      where: er.user_id == ^user_id and er.status == "draft",
       order_by: [desc: er.updated_at],
       limit: 1,
       preload: [
         expense_items: ^items_query,
-        income_items: ^income_query,
-        address: [],
-        event: []
+        income_items: ^income_query
       ]
     )
-    |> Repo.one()
   end
 
   @doc """
@@ -1424,6 +1432,11 @@ defmodule Ysc.ExpenseReports do
       Ysc.Ci.QueryExplain.Fixtures.ulid(),
       ["approved", "paid"]
     )
+  end
+
+  @doc false
+  def ci_query_explain_active_draft_query do
+    active_draft_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   defp validate_and_send_expense_report_emails(loaded_report) do
