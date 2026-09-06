@@ -202,7 +202,9 @@ defmodule Ysc.MixProject do
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:dns_cluster, "~> 0.2"},
+      # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
+      # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
+      {:dns_cluster, "~> 0.3"},
       {:ecto_enum, "~> 1.4"},
       {:ecto_psql_extras, "~> 0.8"},
       {:ecto_sql, "~> 3.13"},
