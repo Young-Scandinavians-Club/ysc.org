@@ -13,6 +13,8 @@ defmodule YscWeb.Emails.FamilyInviteCancelled do
   end
 
   def get_subject do
-    "Family Membership Invitation Cancelled - YSC"
+    "Your family membership invitation was cancelled - YSC"
   end
+
+  def membership_email, do: Ysc.EmailConfig.membership_email()
 end

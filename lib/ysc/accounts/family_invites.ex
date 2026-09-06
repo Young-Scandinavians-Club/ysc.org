@@ -16,6 +16,16 @@ defmodule Ysc.Accounts.FamilyInvites do
   @max_spouses 1
 
   @doc """
+  Toast shown when an invitation token does not match a current invite.
+
+  Cancelled invites are deleted, so clicking the original email button lands
+  here rather than on an "expired" message.
+  """
+  def missing_invite_message do
+    "This invitation is no longer valid."
+  end
+
+  @doc """
   Creates a family invite for the given primary user.
 
   Validates that:
@@ -589,10 +599,12 @@ defmodule Ysc.Accounts.FamilyInvites do
 
     idempotency_key = "family_invite_cancelled_#{invite.id}"
 
+    membership_email = Ysc.EmailConfig.membership_email()
+
     %{
       recipient: invite.email,
       idempotency_key: idempotency_key,
-      subject: "Family Membership Invitation Cancelled - YSC",
+      subject: YscWeb.Emails.FamilyInviteCancelled.get_subject(),
       template: "family_invite_cancelled",
       variables: email_vars,
       text_body: """
@@ -602,9 +614,9 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       Your family membership invitation from #{primary_user.first_name} has been cancelled.
 
-      You will no longer be able to use the invitation link that was previously sent to #{invite.email}.
+      The invitation we sent to #{invite.email} no longer works. You cannot use that link to join this family membership.
 
-      If you have questions about this cancellation, please contact the person who invited you or reach out to YSC.
+      If you have questions, contact the person who invited you or email us at #{membership_email}.
 
       ==============================
       """,

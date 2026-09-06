@@ -845,6 +845,15 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
     end
   end
 
+  describe "missing_invite_message/0" do
+    test "tells people the invitation is no longer valid" do
+      assert FamilyInvites.missing_invite_message() ==
+               "This invitation is no longer valid."
+
+      refute FamilyInvites.missing_invite_message() =~ "Invalid invitation link"
+    end
+  end
+
   describe "revoke_invite/2" do
     test "revokes a pending invite" do
       primary_user = create_user_with_lifetime_membership()
@@ -861,14 +870,23 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         # Verify invite is deleted
         assert is_nil(Repo.get(FamilyInvite, invite.id))
 
-        assert %Oban.Job{} =
-                 Repo.one(
-                   from(j in Oban.Job,
-                     where:
-                       j.args["idempotency_key"] ==
-                         ^"family_invite_cancelled_#{invite.id}"
-                   )
-                 )
+        job =
+          Repo.one(
+            from(j in Oban.Job,
+              where:
+                j.args["idempotency_key"] ==
+                  ^"family_invite_cancelled_#{invite.id}"
+            )
+          )
+
+        assert %Oban.Job{} = job
+
+        assert job.args["subject"] ==
+                 YscWeb.Emails.FamilyInviteCancelled.get_subject()
+
+        assert job.args["text_body"] =~ "no longer works"
+        assert job.args["text_body"] =~ Ysc.EmailConfig.membership_email()
+        refute job.args["text_body"] =~ "reach out to YSC"
       end)
     end
 
