@@ -20,6 +20,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts.FamilyInvite
+  alias Ysc.Accounts.FamilyInvites
   alias Ysc.Repo
 
   # Helper to create a valid family invite
@@ -50,7 +51,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                live(conn, ~p"/family-invite/invalid_token_123/accept")
 
-      assert flash["error"] == "Invalid invitation link."
+      assert flash["error"] == FamilyInvites.missing_invite_message()
     end
 
     test "redirects to home with error when token is nil", %{conn: conn} do
@@ -58,7 +59,17 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                live(conn, ~p"/family-invite/nonexistent_token/accept")
 
-      assert flash["error"] == "Invalid invitation link."
+      assert flash["error"] == FamilyInvites.missing_invite_message()
+    end
+
+    test "redirects after the invitation is cancelled", %{conn: conn} do
+      {invite, _primary_user} = create_family_invite()
+      Repo.delete!(invite)
+
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
+               live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert flash["error"] == FamilyInvites.missing_invite_message()
     end
   end
 

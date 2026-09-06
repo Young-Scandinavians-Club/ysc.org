@@ -5,6 +5,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts.FamilyInvite
+  alias Ysc.Accounts.FamilyInvites
   alias Ysc.Repo
 
   defp create_family_invite(attrs \\ %{}) do
@@ -47,7 +48,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
       assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                live(conn, ~p"/family-invite/bad_token_xyz/logout-required")
 
-      assert flash["error"] == "Invalid invitation link."
+      assert flash["error"] == FamilyInvites.missing_invite_message()
     end
 
     test "redirects home when invite is expired", %{conn: conn} do
