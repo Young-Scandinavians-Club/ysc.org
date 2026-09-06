@@ -3022,6 +3022,193 @@ defmodule Ysc.EventsTest do
                Money.new(0, :USD)
              )
     end
+
+    test "counts a shared payment's fee once across two confirmed tickets", %{
+      user: user
+    } do
+      {:ok, event} = create_event_fixture()
+      {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+      Ledgers.ensure_basic_accounts()
+      stripe_fees_account = Ledgers.get_account_by_name("stripe_fees")
+
+      [payment] = Ysc.LedgersFixtures.payment_rows!(user.id, 1)
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment.id,
+          amount: Money.new(320, :USD),
+          debit_credit: :debit,
+          description: "fee"
+        })
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      for _i <- 1..2 do
+        %Ticket{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          payment_id: payment.id,
+          expires_at: expires_at
+        }
+        |> Repo.insert!()
+      end
+
+      assert Money.equal?(
+               Events.get_event_stripe_fees_total(event.id),
+               Money.new(320, :USD)
+             )
+    end
+
+    test "ignores pending and cancelled tickets even when they have fees", %{
+      user: user
+    } do
+      {:ok, event} = create_event_fixture()
+      {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+      Ledgers.ensure_basic_accounts()
+      stripe_fees_account = Ledgers.get_account_by_name("stripe_fees")
+
+      [pending_payment, cancelled_payment] =
+        Ysc.LedgersFixtures.payment_rows!(user.id, 2)
+
+      for payment <- [pending_payment, cancelled_payment] do
+        {:ok, _} =
+          Ledgers.create_entry(%{
+            account_id: stripe_fees_account.id,
+            payment_id: payment.id,
+            amount: Money.new(250, :USD),
+            debit_credit: :debit,
+            description: "fee"
+          })
+      end
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :pending,
+        payment_id: pending_payment.id,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :cancelled,
+        payment_id: cancelled_payment.id,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      assert Money.equal?(
+               Events.get_event_stripe_fees_total(event.id),
+               Money.new(0, :USD)
+             )
+    end
+
+    test "sums debit fee lines on one payment and ignores credits, other accounts, and other events",
+         %{user: user} do
+      {:ok, event} = create_event_fixture()
+      {:ok, other_event} = create_event_fixture()
+      {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+      {:ok, other_tier} =
+        create_ticket_tier_fixture(%{event_id: other_event.id})
+
+      Ledgers.ensure_basic_accounts()
+      stripe_fees_account = Ledgers.get_account_by_name("stripe_fees")
+      cash_account = Ledgers.get_account_by_name("cash")
+
+      [payment, other_payment] = Ysc.LedgersFixtures.payment_rows!(user.id, 2)
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment.id,
+          amount: Money.new(100, :USD),
+          debit_credit: :debit,
+          description: "fee"
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment.id,
+          amount: Money.new(40, :USD),
+          debit_credit: :debit,
+          description: "additional fee"
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment.id,
+          amount: Money.new(25, :USD),
+          debit_credit: :credit,
+          description: "fee reversal"
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: cash_account.id,
+          payment_id: payment.id,
+          amount: Money.new(999, :USD),
+          debit_credit: :debit,
+          description: "cash"
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: other_payment.id,
+          amount: Money.new(500, :USD),
+          debit_credit: :debit,
+          description: "other event fee"
+        })
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        payment_id: payment.id,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      %Ticket{
+        event_id: other_event.id,
+        user_id: user.id,
+        ticket_tier_id: other_tier.id,
+        status: :confirmed,
+        payment_id: other_payment.id,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      assert Money.equal?(
+               Events.get_event_stripe_fees_total(event.id),
+               Money.new(140, :USD)
+             )
+
+      assert Money.equal?(
+               Events.get_event_stripe_fees_total(other_event.id),
+               Money.new(500, :USD)
+             )
+    end
   end
 
   describe "get_event_donations_total/1" do
