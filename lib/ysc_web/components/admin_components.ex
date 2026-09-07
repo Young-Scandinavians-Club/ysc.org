@@ -2427,6 +2427,155 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_property_occupancy_card
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Occupancy snapshot card for a cabin property on the admin dashboard.
+
+  Used for Tahoe and Clear Lake: guests staying now, today's check-ins/outs,
+  and the next 14 days of bookings.
+
+  ## Examples
+
+      <.admin_property_occupancy_card
+        id="dashboard-property-tahoe"
+        navigate={~p"/admin/bookings?property=tahoe"}
+        label="Tahoe"
+        accent={:sky}
+        stats={@property_stats.tahoe}
+      />
+  """
+  attr :id, :string, default: nil
+  attr :navigate, :any, required: true
+  attr :label, :string, required: true
+
+  attr :accent, :atom,
+    required: true,
+    values: [:sky, :teal],
+    doc: "Header/hover color: `:sky` for Tahoe, `:teal` for Clear Lake"
+
+  attr :stats, :map,
+    required: true,
+    doc:
+      "Map with `:staying`, `:checkins_today`, `:checkouts_today`, `:upcoming_bookings`, `:upcoming_guests`"
+
+  attr :view_label, :string,
+    default: nil,
+    doc: "Footer CTA. Defaults to `View {label} bookings →`"
+
+  def admin_property_occupancy_card(assigns) do
+    {label_class, value_hover_class} = occupancy_accent_classes(assigns.accent)
+
+    assigns =
+      assigns
+      |> assign(:occupied?, assigns.stats.staying > 0)
+      |> assign(:label_class, label_class)
+      |> assign(:value_hover_class, value_hover_class)
+      |> assign(
+        :view_label,
+        assigns.view_label || "View #{assigns.label} bookings →"
+      )
+
+    ~H"""
+    <.link
+      id={@id}
+      navigate={@navigate}
+      class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+    >
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <p class={[
+            "flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em]",
+            @label_class
+          ]}>
+            <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> {@label}
+          </p>
+          <span class="flex items-center gap-1.5">
+            <span class={[
+              "w-1.5 h-1.5 rounded-full",
+              if(@occupied?, do: "bg-emerald-500", else: "bg-zinc-300")
+            ]}></span>
+            <span class="text-[10px] font-bold text-zinc-400 uppercase">
+              {if(@occupied?, do: "Active", else: "Empty")}
+            </span>
+          </span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <p class={[
+            "text-3xl font-black font-mono text-zinc-900 transition-colors",
+            @value_hover_class
+          ]}>
+            {@stats.staying}
+          </p>
+          <span class="text-xs font-bold text-zinc-400">staying now</span>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <div class="rounded-lg bg-emerald-50 p-2 flex items-center gap-2">
+            <.icon
+              name="hero-arrow-right-circle"
+              class="w-6 h-6 text-emerald-500 shrink-0"
+            />
+            <div>
+              <p class="font-bold text-emerald-700 uppercase text-[10px] leading-none">
+                Checking in
+              </p>
+              <p class="font-black font-mono text-emerald-800 text-lg leading-tight">
+                {@stats.checkins_today}
+              </p>
+            </div>
+          </div>
+          <div class="rounded-lg bg-amber-50 p-2 flex items-center gap-2">
+            <.icon
+              name="hero-arrow-left-circle"
+              class="w-6 h-6 text-amber-500 shrink-0"
+            />
+            <div>
+              <p class="font-bold text-amber-700 uppercase text-[10px] leading-none">
+                Checking out
+              </p>
+              <p class="font-black font-mono text-amber-800 text-lg leading-tight">
+                {@stats.checkouts_today}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <p class="font-bold text-zinc-400 uppercase text-[10px]">
+            Next 14 days
+          </p>
+          <p class="font-black font-mono text-zinc-800 mt-0.5">
+            {upcoming_bookings_label(@stats.upcoming_bookings)}
+          </p>
+        </div>
+        <div>
+          <p class="font-bold text-zinc-400 uppercase text-[10px]">
+            Expected guests
+          </p>
+          <p class="font-black font-mono text-zinc-800 mt-0.5">
+            {@stats.upcoming_guests}
+          </p>
+        </div>
+      </div>
+      <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+        {@view_label}
+      </p>
+    </.link>
+    """
+  end
+
+  defp occupancy_accent_classes(:sky),
+    do: {"text-sky-600", "group-hover:text-sky-600"}
+
+  defp occupancy_accent_classes(:teal),
+    do: {"text-teal-600", "group-hover:text-teal-600"}
+
+  defp upcoming_bookings_label(1), do: "1 booking"
+  defp upcoming_bookings_label(count), do: "#{count} bookings"
+
+  # ---------------------------------------------------------------------------
   # admin_toggle_pill
   # ---------------------------------------------------------------------------
 
