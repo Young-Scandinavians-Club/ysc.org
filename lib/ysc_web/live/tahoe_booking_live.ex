@@ -1433,6 +1433,7 @@ defmodule YscWeb.TahoeBookingLive do
                   :if={
                     tahoe_saturday_rule_violation?(@checkin_date, @checkout_date)
                   }
+                  id="tahoe-weekend-stay-rule"
                   class="p-3 bg-red-50 border border-red-200 rounded-xl"
                 >
                   <div class="flex items-start gap-2">
