@@ -258,6 +258,130 @@ defmodule YscWeb.Components.DateRangePickerTest do
     end
   end
 
+  describe "Tahoe weekend rule (allow_saturdays: false)" do
+    @friday ~D[2026-08-07]
+    @saturday ~D[2026-08-08]
+    @sunday ~D[2026-08-09]
+    @monday ~D[2026-08-10]
+    @thursday ~D[2026-08-13]
+    @next_saturday ~D[2026-08-15]
+    @next_sunday ~D[2026-08-16]
+
+    defp cabin_assigns(overrides \\ %{}) do
+      base_assigns(%{
+        id: "tahoe_dates",
+        min: @friday,
+        today: @friday,
+        max: ~D[2026-08-31],
+        min_nights: 1,
+        max_nights: 4,
+        allow_saturdays: false
+      })
+      |> Map.merge(overrides)
+    end
+
+    defp pick(socket, %Date{} = date) do
+      {:noreply, socket} =
+        DateRangePicker.handle_event(
+          "pick-date",
+          %{"date" => iso_date(date)},
+          socket
+        )
+
+      socket
+    end
+
+    defp hover(socket, %Date{} = date) do
+      {:noreply, socket} =
+        DateRangePicker.handle_event("cursor-move", iso_date(date), socket)
+
+      socket
+    end
+
+    defp range_dates(socket) do
+      start_date =
+        case socket.assigns.range_start do
+          nil -> nil
+          dt -> DateTime.to_date(dt)
+        end
+
+      end_date =
+        case socket.assigns.range_end do
+          nil -> nil
+          dt -> DateTime.to_date(dt)
+        end
+
+      {start_date, end_date}
+    end
+
+    test "ignores Saturday as a check-in (the old one-night exception is gone)" do
+      socket = init_socket(cabin_assigns()) |> pick(@saturday)
+
+      assert range_dates(socket) == {nil, nil}
+      assert socket.assigns.state == :set_start
+    end
+
+    test "accepts Friday check-in and Sunday checkout as a full weekend span" do
+      socket = init_socket(cabin_assigns()) |> pick(@friday)
+
+      assert range_dates(socket) == {@friday, nil}
+      assert socket.assigns.state == :set_end
+
+      socket = pick(socket, @sunday)
+
+      assert range_dates(socket) == {@friday, @sunday}
+    end
+
+    test "ignores Saturday checkout after a Friday check-in" do
+      socket = init_socket(cabin_assigns()) |> pick(@friday) |> pick(@saturday)
+
+      assert range_dates(socket) == {@friday, nil}
+      assert socket.assigns.state == :set_end
+    end
+
+    test "accepts Monday checkout after Friday check-in (Friday-Sunday still in span)" do
+      socket = init_socket(cabin_assigns()) |> pick(@friday) |> pick(@monday)
+
+      assert range_dates(socket) == {@friday, @monday}
+    end
+
+    test "ignores Saturday checkout after Thursday check-in (Sunday missing)" do
+      socket =
+        init_socket(cabin_assigns()) |> pick(@thursday) |> pick(@next_saturday)
+
+      assert range_dates(socket) == {@thursday, nil}
+    end
+
+    test "accepts Sunday checkout after Thursday check-in (full weekend in span)" do
+      socket =
+        init_socket(cabin_assigns()) |> pick(@thursday) |> pick(@next_sunday)
+
+      assert range_dates(socket) == {@thursday, @next_sunday}
+    end
+
+    test "does not hover an incomplete Saturday span as a checkout preview" do
+      socket = init_socket(cabin_assigns()) |> pick(@friday) |> hover(@saturday)
+
+      assert socket.assigns.hover_range_end == nil
+
+      socket = hover(socket, @sunday)
+
+      assert DateTime.to_date(socket.assigns.hover_range_end) == @sunday
+    end
+
+    test "still allows Saturday check-in when allow_saturdays is true" do
+      socket =
+        init_socket(cabin_assigns(%{allow_saturdays: true}))
+        |> pick(@saturday)
+
+      assert range_dates(socket) == {@saturday, nil}
+
+      socket = pick(socket, @sunday)
+
+      assert range_dates(socket) == {@saturday, @sunday}
+    end
+  end
+
   describe "close-calendar" do
     test "normalizes reversed ranges and notifies the parent process" do
       socket =

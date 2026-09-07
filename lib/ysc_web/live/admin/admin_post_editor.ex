@@ -184,16 +184,12 @@ defmodule YscWeb.AdminPostEditorLive do
                 class="self-center"
               />
 
-              <p class={[
-                "inline-flex shrink-0 items-center text-sm text-zinc-600 transition duration-200 ease-in-out",
-                @saving? && "opacity-100",
-                !@saving? && "opacity-0"
-              ]}>
-                <.icon
-                  name="hero-arrow-path"
-                  class="mr-1 h-4 w-4 shrink-0 animate-spin"
-                /> Saving...
-              </p>
+              <.autosave_status
+                id="post-editor-autosave-status"
+                saving?={@saving?}
+                size={:sm}
+                class="self-center"
+              />
             </div>
           </div>
 

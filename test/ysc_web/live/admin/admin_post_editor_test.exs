@@ -514,7 +514,10 @@ defmodule YscWeb.AdminPostEditorLiveTest do
       assert deleted_post.state == :deleted
     end
 
-    test "shows saving indicator", %{conn: conn, user: user} do
+    test "shows saving indicator while a draft write is in flight", %{
+      conn: conn,
+      user: user
+    } do
       {:ok, post} =
         Posts.create_post(
           %{
@@ -526,7 +529,15 @@ defmodule YscWeb.AdminPostEditorLiveTest do
           user
         )
 
-      {:ok, _view, html} = live(conn, ~p"/admin/posts/#{post.id}")
+      {:ok, view, html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      assert has_element?(view, "#post-editor-autosave-status")
+      refute html =~ "Saving"
+
+      html =
+        view
+        |> form("#edit_post_form", %{"post" => %{"title" => "Updated title"}})
+        |> render_change()
 
       assert html =~ "Saving"
       assert html =~ "hero-arrow-path"
