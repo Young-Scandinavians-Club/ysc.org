@@ -248,9 +248,13 @@ defmodule Ysc.MixProject do
       {:image, "~> 0.72"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
-      # Pin exact version: jose is pulled by joken (~> 1.11.10) and goth (~> 1.11).
+      # Pin exact version: jose is pulled by joken (~> 1.11.12) and goth (~> 1.11).
       {:jose, "1.11.12", override: true},
-      {:joken, "~> 2.6"},
+      # 2.7.0: Elixir 1.16 / OTP 26 floor (we are 1.20 / OTP 27). Signer.create
+      # accepts a JOSE.JWK; peek returns {:error, :token_malformed} for invalid
+      # tokens. We sign Google Wallet JWTs with Signer.create("RS256", %{"pem"
+      # => ...}) and generate_and_sign/3; we do not use peek or JWK signers.
+      {:joken, "~> 2.7"},
       # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
       # DSL and authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
