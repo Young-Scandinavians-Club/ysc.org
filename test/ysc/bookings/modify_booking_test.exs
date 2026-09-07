@@ -401,7 +401,9 @@ defmodule Ysc.Bookings.ModifyBookingTest do
 
       refute changeset.valid?
       assert [message] = errors_on(changeset).checkin_date
-      assert message =~ "must start Friday"
+
+      assert message ==
+               Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
     end
 
     test "returns error when modification would checkout on Saturday without Sunday",
