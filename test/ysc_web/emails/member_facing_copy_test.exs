@@ -175,6 +175,15 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       data = BookingEntitlementGranted.prepare_email_data(ent, user)
 
+      assert data.benefit_description =~ "2 free nights on your next cabin stay"
+
+      assert data.benefit_description =~
+               "4-night stay is half off the cabin price"
+
+      refute data.benefit_description =~ "proportionally"
+      refute data.benefit_description =~ "subtotal"
+      refute data.benefit_description =~ "eligible stay"
+
       assert data.property_line == "Cabin: Lake Tahoe."
 
       assert data.buyout_cap_line =~

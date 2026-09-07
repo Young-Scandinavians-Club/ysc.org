@@ -2154,10 +2154,11 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
                     <h2 class="text-lg font-bold text-zinc-900">
-                      Tickets waiting for payment
+                      Tickets reserved for you
                     </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
-                      You started buying event tickets but didn't finish payment. Your selections and member price are still saved. Finish buying these tickets before the time shown on each item — or as soon as you can if no time is listed.
+                      The YSC team has set aside event tickets for you at the member price.
+                      Finish buying them before the time shown — or as soon as you can if no time is listed.
                     </p>
                   </div>
                   <div class="hidden sm:flex items-center text-zinc-400">
@@ -2177,7 +2178,7 @@ defmodule YscWeb.UserSettingsLive do
                     <div class="flex items-start justify-between gap-3 mb-3">
                       <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-sm">
                         <.icon name="hero-bolt" class="w-3.5 h-3.5 text-blue-600" />
-                        Payment not finished
+                        Reserved for you
                       </span>
                       <span class="text-xs font-medium text-zinc-500 mt-1 tabular-nums">
                         {if res.quantity == 1,
@@ -2190,7 +2191,7 @@ defmodule YscWeb.UserSettingsLive do
                         <%= if res.ticket_tier && res.ticket_tier.event do %>
                           {res.ticket_tier.event.title}
                         <% else %>
-                          Tickets in progress
+                          Tickets reserved for you
                         <% end %>
                       </p>
                       <p :if={res.ticket_tier} class="mt-1 text-sm text-zinc-600">
