@@ -448,7 +448,10 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
        ) do
     booking = snapshot.booking
 
-    if weekend_unavailability_message(booking.property, checkin, checkout) do
+    # Keep a paid Saturday-Sunday stay selectable for guest-count (and other
+    # non-date) changes. Date changes still go through the current weekend rule.
+    if weekend_dates_changed?(booking, checkin, checkout) &&
+         weekend_unavailability_message(booking.property, checkin, checkout) do
       :weekend_rule_violation
     else
       new_guests = booking.guests_count
@@ -737,6 +740,15 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     |> Enum.map(&Season.get_max_nights(&1, property))
     |> Enum.max(fn -> 4 end)
   end
+
+  defp weekend_dates_changed?(
+         %{checkin_date: checkin, checkout_date: checkout},
+         checkin,
+         checkout
+       ),
+       do: false
+
+  defp weekend_dates_changed?(_booking, _checkin, _checkout), do: true
 
   # Matches BookingValidator: any stay that includes Saturday must span the
   # full weekend (check-in Friday or earlier, checkout Sunday or later).

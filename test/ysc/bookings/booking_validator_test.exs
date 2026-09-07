@@ -566,6 +566,51 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       assert changeset.valid?
     end
+
+    test "grandfathered Saturday-Sunday stay can change guest count without retouching dates",
+         %{
+           user: user,
+           rooms: rooms
+         } do
+      booking =
+        insert_family_booking!(user, rooms, %{
+          checkin_date: ~D[2024-07-13],
+          checkout_date: ~D[2024-07-14],
+          guests_count: 2
+        })
+
+      changeset =
+        Booking.changeset(booking, %{guests_count: 3},
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      assert changeset.valid?
+    end
+
+    test "grandfathered Saturday-Sunday stay still cannot extend dates without Friday",
+         %{
+           user: user,
+           rooms: rooms
+         } do
+      booking =
+        insert_family_booking!(user, rooms, %{
+          checkin_date: ~D[2024-07-13],
+          checkout_date: ~D[2024-07-14],
+          guests_count: 2
+        })
+
+      changeset =
+        Booking.changeset(booking, %{checkout_date: ~D[2024-07-15]},
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      refute changeset.valid?
+
+      assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
+      assert msg =~ "must start Friday"
+    end
   end
 
   describe "Max nights validation" do
