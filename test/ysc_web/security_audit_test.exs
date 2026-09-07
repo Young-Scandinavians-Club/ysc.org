@@ -49,6 +49,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
   Finding 58 (HIGH)     App ticket PaymentIntent accepted free / $0 tiers, leaving pending comps completable via web confirm-free
+  Finding 59 (HIGH)     Volunteers could soft-delete any published event (including others') via the event editor
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1332,7 +1333,7 @@ defmodule YscWeb.SecurityAuditTest do
     end
 
     test "update_event_editor cannot resurrect a deleted event via forged publish params" do
-      event = event_fixture(%{state: :published})
+      event = event_fixture(%{state: :draft})
       {:ok, deleted} = Events.delete_event(event)
 
       assert deleted.state == :deleted
@@ -3187,6 +3188,58 @@ defmodule YscWeb.SecurityAuditTest do
         Ysc.Events.get_event!(copied_id) |> Repo.preload(:ticket_tiers)
 
       assert copied.ticket_tiers == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 59 (HIGH): Volunteers must not soft-delete published events
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 59: volunteers cannot delete published events" do
+    import Ysc.EventsFixtures
+
+    test "volunteer delete-event on another organizer's published event is refused" do
+      organizer = user_fixture(%{role: :member})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 59 Victim Event #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      refute has_element?(view, "#delete-event-btn")
+
+      render_click(view, "delete-event", %{})
+
+      reloaded = Ysc.Events.get_event!(event.id)
+      assert reloaded.state == :published
+      assert reloaded.organizer_id == organizer.id
+    end
+
+    test "volunteer can still delete their own draft from the editor" do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :draft,
+          title: "Finding 59 Draft #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#delete-event-btn")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               render_click(view, "delete-event", %{})
+
+      assert Ysc.Events.get_event!(event.id).state == :deleted
     end
   end
 

@@ -260,11 +260,16 @@ defmodule YscWeb.AdminEventsNewLive do
                         </button>
                       </li>
 
-                      <li class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100">
+                      <li
+                        :if={@event.state in [:draft, :scheduled]}
+                        class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100"
+                      >
                         <button
                           type="button"
+                          id="delete-event-btn"
                           class="w-full text-left px-1"
                           phx-click="delete-event"
+                          data-confirm="Delete this event? This cannot be undone."
                         >
                           <.icon name="hero-trash" class="w-5 h-5" /> Delete Event
                         </button>
@@ -1860,12 +1865,31 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("delete-event", _, socket) do
-    Events.delete_event(socket.assigns.event)
+    case Events.delete_event(socket.assigns.event) do
+      {:ok, _event} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "Event deleted.", title: "Event")
+         |> push_navigate(to: "/admin/events")}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Event deleted.", title: "Event")
-     |> push_navigate(to: "/admin/events")}
+      {:error, :invalid_state} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Published and cancelled events cannot be deleted. Cancel the event instead.",
+           title: "Event"
+         )}
+
+      {:error, _reason} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to delete event. Please try again.",
+           title: "Event"
+         )}
+    end
   end
 
   @impl true
