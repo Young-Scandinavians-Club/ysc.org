@@ -11,11 +11,18 @@ defmodule YscWeb.ExpenseReportLiveTest do
   setup :register_and_log_in_user
 
   test "renders expense report form", %{conn: conn} do
-    {:ok, _index_live, html} = live(conn, ~p"/expensereport")
+    {:ok, view, html} = live(conn, ~p"/expensereport")
 
     assert html =~ "Expense Report"
     assert html =~ "Amount we will reimburse"
     refute html =~ "Net Total"
+    assert has_element?(view, "#expense-report-autosave-status")
+
+    assert has_element?(
+             view,
+             "#expense-report-autosave-status",
+             "Draft not started"
+           )
   end
 
   test "mileage items use trip-purpose copy instead of business jargon", %{
@@ -378,6 +385,25 @@ defmodule YscWeb.ExpenseReportLiveTest do
              )
     end
 
+    test "the reports list shows item counts and totals from SQL aggregates", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Paint",
+          "expense_items" => %{
+            "0" => %{"vendor" => "A", "amount" => "12.00"},
+            "1" => %{"vendor" => "B", "amount" => "8.00"}
+          }
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereports")
+
+      assert has_element?(view, "#expense-report-draft-#{draft.id}", "2 items")
+      assert has_element?(view, "#expense-report-draft-#{draft.id}", "$20.00")
+    end
+
     test "the reports list renders a draft whose line items have no amount yet",
          %{
            conn: conn,
@@ -394,6 +420,12 @@ defmodule YscWeb.ExpenseReportLiveTest do
       {:ok, view, _html} = live(conn, ~p"/expensereports")
 
       assert has_element?(view, "#expense-report-drafts", "Kayak repair")
+
+      assert has_element?(
+               view,
+               "#expense-report-draft-#{draft.id}",
+               "1 item"
+             )
 
       assert has_element?(
                view,

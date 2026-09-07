@@ -19,6 +19,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     EventNotification,
     EventUpdateNotification,
     ExpenseReportConfirmation,
+    FamilyInviteCancelled,
     FamilyMemberRemoved,
     MembershipEnded,
     MembershipPaymentConfirmation,
@@ -636,6 +637,29 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Get your own membership"
       assert text =~ "get your own membership anytime"
       refute text =~ "purchase your own membership at any time"
+    end
+  end
+
+  describe "family invite cancelled email" do
+    test "explains the old link no longer works and how to contact YSC" do
+      html =
+        FamilyInviteCancelled.render(%{
+          primary_user_name: "John",
+          invite_email: "jane@example.com"
+        })
+
+      text = html_text(html)
+      membership_email = FamilyInviteCancelled.membership_email()
+
+      assert FamilyInviteCancelled.get_subject() ==
+               "Your family membership invitation was cancelled - YSC"
+
+      assert text =~ "Family invitation cancelled"
+      assert text =~ "no longer works"
+      assert text =~ "cannot use that link to join this family membership"
+      assert text =~ membership_email
+      refute text =~ "reach out to YSC"
+      refute text =~ "invitation link that was previously sent"
     end
   end
 

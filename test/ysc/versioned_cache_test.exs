@@ -28,8 +28,8 @@ defmodule Ysc.VersionedCacheTest do
     Application.put_env(:ysc, :process_caches_enabled, false)
   end
 
-  defp fetch_count(context, fun) do
-    VersionedCache.fetch(context.version_key, context.cache_key, fun)
+  defp fetch_count(context, fun, opts \\ []) do
+    VersionedCache.fetch(context.version_key, context.cache_key, fun, opts)
   end
 
   describe "fetch/3 when process caches are disabled" do
@@ -159,6 +159,77 @@ defmodule Ysc.VersionedCacheTest do
       assert :counters.get(counter, 1) == 2
 
       assert {:ok, {:version, _version, :stable}} =
+               Cachex.get(@cache_name, context.cache_key)
+    end
+
+    test "ttl option stamps a 3-tuple and sets Cachex expire", context do
+      enable_process_cache()
+      ttl = :timer.minutes(10)
+
+      assert :cached =
+               fetch_count(context, fn -> :cached end, ttl: ttl)
+
+      assert {:ok, {:version, version, :cached}} =
+               Cachex.get(@cache_name, context.cache_key)
+
+      assert is_integer(version)
+      assert {:ok, remaining} = Cachex.ttl(@cache_name, context.cache_key)
+      assert remaining > 0
+      assert remaining <= ttl
+    end
+
+    test "serves a legacy 4-tuple stamp until its embedded TTL expires",
+         context do
+      enable_process_cache()
+      version = System.unique_integer([:monotonic, :positive])
+      Cachex.put(@cache_name, context.version_key, version)
+
+      future_ttl = System.system_time(:millisecond) + 60_000
+
+      Cachex.put(
+        @cache_name,
+        context.cache_key,
+        {:version, version, future_ttl, :legacy_ttl}
+      )
+
+      counter = :counters.new(1, [])
+
+      result =
+        fetch_count(context, fn ->
+          :counters.add(counter, 1, 1)
+          :should_not_run
+        end)
+
+      assert result == :legacy_ttl
+      assert :counters.get(counter, 1) == 0
+    end
+
+    test "refetches a legacy 4-tuple stamp after embedded TTL expires",
+         context do
+      enable_process_cache()
+      version = System.unique_integer([:monotonic, :positive])
+      Cachex.put(@cache_name, context.version_key, version)
+
+      past_ttl = System.system_time(:millisecond) - 60_000
+
+      Cachex.put(
+        @cache_name,
+        context.cache_key,
+        {:version, version, past_ttl, :stale}
+      )
+
+      counter = :counters.new(1, [])
+
+      result =
+        fetch_count(context, fn ->
+          :counters.add(counter, 1, 1)
+          :refetched
+        end)
+
+      assert result == :refetched
+      assert :counters.get(counter, 1) == 1
+
+      assert {:ok, {:version, ^version, :refetched}} =
                Cachex.get(@cache_name, context.cache_key)
     end
   end

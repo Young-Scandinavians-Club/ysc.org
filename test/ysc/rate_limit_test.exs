@@ -80,5 +80,27 @@ defmodule Ysc.RateLimitTest do
                  2
                )
     end
+
+    test "buckets mixed-case IPv6 strings together" do
+      prefix = "rate_limit_test:ipv6:#{System.unique_integer([:positive])}:"
+
+      assert :ok =
+               RateLimit.check_ip(
+                 &AuthRateLimit.hit/3,
+                 prefix,
+                 "  ::FFFF:192.0.2.1 ",
+                 60_000,
+                 1
+               )
+
+      assert {:error, :rate_limited, _} =
+               RateLimit.check_ip(
+                 &AuthRateLimit.hit/3,
+                 prefix,
+                 "::ffff:192.0.2.1",
+                 60_000,
+                 1
+               )
+    end
   end
 end

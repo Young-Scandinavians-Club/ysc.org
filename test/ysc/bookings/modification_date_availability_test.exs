@@ -956,6 +956,13 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
     assert tooltips[Date.to_iso8601(sunday)] =~
              BookingValidator.saturday_requires_friday_start_message()
+
+    assert :ok =
+             ModificationDateAvailability.validate_modification_dates(
+               snapshot,
+               saturday,
+               sunday
+             )
   end
 
   test "validate_modification_dates rejects a Saturday check-in to Sunday checkout on its own, even when rooms and inventory are otherwise available",

@@ -202,7 +202,9 @@ defmodule Ysc.MixProject do
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:dns_cluster, "~> 0.2"},
+      # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
+      # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
+      {:dns_cluster, "~> 0.3"},
       {:ecto_enum, "~> 1.4"},
       {:ecto_psql_extras, "~> 0.8"},
       {:ecto_sql, "~> 3.13"},
@@ -246,9 +248,13 @@ defmodule Ysc.MixProject do
       {:image, "~> 0.72"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
-      # Pin exact version: jose is pulled by joken (~> 1.11.10) and goth (~> 1.11).
+      # Pin exact version: jose is pulled by joken (~> 1.11.12) and goth (~> 1.11).
       {:jose, "1.11.12", override: true},
-      {:joken, "~> 2.6"},
+      # 2.7.0: Elixir 1.16 / OTP 26 floor (we are 1.20 / OTP 27). Signer.create
+      # accepts a JOSE.JWK; peek returns {:error, :token_malformed} for invalid
+      # tokens. We sign Google Wallet JWTs with Signer.create("RS256", %{"pem"
+      # => ...}) and generate_and_sign/3; we do not use peek or JWK signers.
+      {:joken, "~> 2.7"},
       # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
       # DSL and authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
@@ -258,7 +264,10 @@ defmodule Ysc.MixProject do
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.
       {:nested_filter, "~> 2.1", override: true},
       {:mjml_eex, "~> 0.13"},
-      {:mox, "~> 1.2", only: :test},
+      # 1.3.0: Elixir 1.15 floor; Process.info parent for allowances when
+      # `$callers` is missing. 1.3.1: shared-mode verify after an unexpected
+      # call no longer crashes (empty expectation map instead of nil).
+      {:mox, "~> 1.3", only: :test},
       # 2.24.1: ack only while the job is still executing (prevents a later
       # execution from overwriting completed/snoozed); notifier listeners live
       # in Oban.Notifier.Registry; notify/3 returns {:error, _} instead of
