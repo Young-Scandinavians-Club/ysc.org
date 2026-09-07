@@ -459,6 +459,11 @@ defmodule Ysc.Newsletter do
   @doc """
   Unsubscribes by email or by subscription token.
 
+  Email lookup is for authenticated/internal callers (admin list, account
+  settings, email-change). The public unsubscribe LiveView must pass a
+  `subscription_token` resolved at mount — never the raw URL param — because
+  any string containing `"@"` is treated as an email (Finding 56).
+
   Options:
   - `:edition_id` — when present and valid, records a confirmed
     `UnsubscribeEvent` attributed to that edition (idempotent per

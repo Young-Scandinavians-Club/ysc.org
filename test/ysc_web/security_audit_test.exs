@@ -48,6 +48,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
+  Finding 56 (MEDIUM)   Public newsletter unsubscribe LiveView treated an email URL param as a token, then unsubscribed by email
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -63,6 +64,7 @@ defmodule YscWeb.SecurityAuditTest do
   import Mox
 
   alias Ysc.Accounts
+  alias Ysc.Newsletter
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Payments
   alias Ysc.Tickets
@@ -3085,6 +3087,52 @@ defmodule YscWeb.SecurityAuditTest do
         Ysc.Events.get_event!(copied_id) |> Repo.preload(:ticket_tiers)
 
       assert copied.ticket_tiers == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 56 (MEDIUM): Public unsubscribe must not accept an email as token
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 56: public unsubscribe is token-only" do
+    test "LiveView unsubscribe event does not unsubscribe by email from the URL",
+         %{conn: conn} do
+      victim_email = "finding56-victim@example.com"
+
+      {:ok, _sub} =
+        Newsletter.subscribe(victim_email, source: "public_signup")
+
+      {:ok, view, html} =
+        live(conn, ~p"/newsletter/unsubscribe/#{victim_email}")
+
+      assert html =~ "Invalid or expired link"
+      refute has_element?(view, "button", "Unsubscribe")
+
+      # UI hide is not auth: the event is still reachable over the socket.
+      render_click(view, "unsubscribe")
+
+      subscriber = Newsletter.get_subscriber_by_email(victim_email)
+      assert subscriber.subscribed
+      assert subscriber.unsubscribed_at == nil
+    end
+
+    test "Gmail-canonical twin of a known address cannot be used as a token",
+         %{conn: conn} do
+      {:ok, _sub} =
+        Newsletter.subscribe("finding56.victim@gmail.com",
+          source: "public_signup",
+          skip_email_validation: true
+        )
+
+      {:ok, view, _html} =
+        live(conn, ~p"/newsletter/unsubscribe/finding56victim@gmail.com")
+
+      render_click(view, "unsubscribe")
+
+      subscriber =
+        Newsletter.get_subscriber_by_email("finding56.victim@gmail.com")
+
+      assert subscriber.subscribed
     end
   end
 
