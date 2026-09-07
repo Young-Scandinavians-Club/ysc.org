@@ -415,7 +415,7 @@ defmodule YscWeb.AdminEventCheckInLive do
         socket
 
       _ ->
-        event = Events.get_event!(event_id)
+        event = Events.get_event_for_check_in!(event_id)
 
         socket
         |> assign(:event, event)
@@ -584,18 +584,7 @@ defmodule YscWeb.AdminEventCheckInLive do
   end
 
   defp fetch_ticket_from_db(ticket_id) do
-    case Ysc.Repo.get(Ysc.Events.Ticket, ticket_id) do
-      nil ->
-        nil
-
-      ticket ->
-        Ysc.Repo.preload(ticket, [
-          :registration,
-          :user,
-          :ticket_tier,
-          :ticket_order
-        ])
-    end
+    Scanning.get_checkin_ticket(ticket_id)
   end
 
   defp apply_ticket_checked_in(socket, ticket) do

@@ -13,11 +13,38 @@ defmodule Ysc.Scanning do
   alias Ysc.Repo
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
+  alias Ysc.Accounts.User
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketDetail
+  alias Ysc.Events.TicketTier
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord, SessionCheckIn}
   alias Ysc.MessagePassingEvents
+
+  # Display fields for the admin event check-in list. Omits hashed_password,
+  # board_bio, order notes, tier descriptions, and other columns the page
+  # never renders.
+  @checkin_ticket_fields [
+    :id,
+    :event_id,
+    :user_id,
+    :ticket_order_id,
+    :ticket_tier_id,
+    :reference_id,
+    :status,
+    :checked_in,
+    :checked_in_at
+  ]
+  @checkin_user_fields [:id, :email, :first_name, :last_name]
+  @checkin_registration_fields [
+    :id,
+    :ticket_id,
+    :first_name,
+    :last_name,
+    :email
+  ]
+  @checkin_ticket_tier_fields [:id, :name]
+  @checkin_ticket_order_fields [:id, :reference_id]
 
   # --- Session Management ---
 
@@ -537,14 +564,7 @@ defmodule Ysc.Scanning do
         {:error, :invalid, "This order is for a different event."}
 
       order ->
-        order = Repo.preload(order, tickets: [:registration])
-
-        unchecked =
-          Enum.filter(order.tickets, fn t ->
-            t.status == :confirmed && !t.checked_in
-          end)
-
-        case unchecked do
+        case unchecked_order_tickets(order.id) do
           [] ->
             {:ok, :group_checked_in, 0}
 
@@ -554,31 +574,51 @@ defmodule Ysc.Scanning do
     end
   end
 
+  defp unchecked_order_tickets(order_id) do
+    from(t in Ticket,
+      where:
+        t.ticket_order_id == ^order_id and t.status == :confirmed and
+          t.checked_in == false
+    )
+    |> Repo.all()
+  end
+
   defp check_in_order_tickets(session, tickets) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    ids = Enum.map(tickets, & &1.id)
+
     result =
       Repo.transaction(fn ->
-        updated_tickets =
-          Enum.map(tickets, fn ticket ->
-            case Repo.update(Ticket.check_in_changeset(ticket)) do
-              {:ok, updated} -> updated
-              {:error, changeset} -> Repo.rollback(changeset)
+        {_count, updated_tickets} =
+          Repo.update_all(
+            from(t in Ticket,
+              where:
+                t.id in ^ids and t.checked_in == false and
+                  t.status == :confirmed,
+              select: t
+            ),
+            set: [checked_in: true, checked_in_at: now, updated_at: now]
+          )
+
+        case updated_tickets do
+          [] ->
+            []
+
+          updated_tickets ->
+            rows =
+              Enum.map(updated_tickets, fn ticket ->
+                scan_record_insert_attrs(session, ticket, now)
+              end)
+
+            try do
+              Repo.insert_all(ScanRecord, rows)
+            rescue
+              error in [Ecto.ConstraintError, Postgrex.Error] ->
+                Repo.rollback(error)
             end
-          end)
 
-        Enum.each(updated_tickets, fn ticket ->
-          case record_scan(session, %{
-                 user_id: ticket.user_id,
-                 ticket_id: ticket.id,
-                 ticket_order_id: ticket.ticket_order_id,
-                 checkin_type: :individual,
-                 result: :success
-               }) do
-            {:ok, _record} -> :ok
-            {:error, reason} -> Repo.rollback(reason)
-          end
-        end)
-
-        updated_tickets
+            updated_tickets
+        end
       end)
 
     case result do
@@ -586,7 +626,7 @@ defmodule Ysc.Scanning do
         event_id = session.event_id
 
         updated_tickets
-        |> Repo.preload([:registration, :user, :ticket_tier, :ticket_order])
+        |> Repo.preload(checkin_ticket_preloads())
         |> Enum.each(fn loaded_ticket ->
           broadcast_checkin(
             event_id,
@@ -603,6 +643,21 @@ defmodule Ysc.Scanning do
         {:error, :check_in_failed,
          "Failed to check in tickets. Please try again."}
     end
+  end
+
+  defp scan_record_insert_attrs(session, ticket, now) do
+    %{
+      id: Ecto.ULID.generate(),
+      scan_session_id: session.id,
+      user_id: ticket.user_id,
+      ticket_id: ticket.id,
+      ticket_order_id: ticket.ticket_order_id,
+      checkin_type: :individual,
+      result: :success,
+      metadata: %{},
+      inserted_at: now,
+      updated_at: now
+    }
   end
 
   defp validate_manual_check_in(session, ticket) do
@@ -667,12 +722,7 @@ defmodule Ysc.Scanning do
     case result do
       {:ok, {updated_ticket, _record}} ->
         loaded_ticket =
-          Repo.preload(updated_ticket, [
-            :registration,
-            :user,
-            :ticket_tier,
-            :ticket_order
-          ])
+          Repo.preload(updated_ticket, checkin_ticket_preloads())
 
         broadcast_checkin(
           ticket.event_id,
@@ -912,58 +962,117 @@ defmodule Ysc.Scanning do
   Sorted: pending (not checked in) alphabetically by attendee/purchaser name, then checked-in.
   """
   def list_event_checkin_tickets(event_id, search \\ nil) do
-    base_query =
-      Ticket
-      |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-      |> join(:left, [t], td in TicketDetail,
-        on: td.ticket_id == t.id,
-        as: :registration
-      )
-      |> join(:left, [t], u in assoc(t, :user), as: :user)
-      |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
-      |> join(:left, [t], o in assoc(t, :ticket_order), as: :ticket_order)
-      |> preload([registration: td, user: u, ticket_tier: tt, ticket_order: o],
-        registration: td,
-        user: u,
-        ticket_tier: tt,
-        ticket_order: o
-      )
+    event_id
+    |> list_event_checkin_tickets_query(search)
+    |> Repo.all()
+    |> Enum.sort_by(&checkin_sort_key/1)
+  end
 
-    query =
-      if search && search != "" do
-        search_term = "%#{search}%"
+  defp checkin_sort_key(ticket) do
+    {ticket.checked_in, String.downcase(checkin_sort_name(ticket))}
+  end
 
-        base_query
-        |> where(
-          [t, registration: td, user: u, ticket_order: o],
-          ilike(
-            fragment("concat(?, ' ', ?)", td.first_name, td.last_name),
-            ^search_term
-          ) or
-            ilike(
-              fragment("concat(?, ' ', ?)", u.first_name, u.last_name),
-              ^search_term
-            ) or
-            ilike(u.email, ^search_term) or
-            ilike(o.reference_id, ^search_term) or
-            ilike(t.reference_id, ^search_term)
-        )
-      else
-        base_query
-      end
+  defp checkin_sort_name(%{
+         registration: %{first_name: first, last_name: last}
+       })
+       when is_binary(first) or is_binary(last) do
+    String.trim("#{first} #{last}")
+  end
 
-    query
-    |> order_by([t, registration: td, user: u],
-      asc: t.checked_in,
-      asc:
-        fragment(
-          "coalesce(?, concat(?, ' ', ?))",
-          fragment("concat(?, ' ', ?)", td.first_name, td.last_name),
-          u.first_name,
-          u.last_name
+  defp checkin_sort_name(%{user: %{first_name: first, last_name: last}})
+       when is_binary(first) or is_binary(last) do
+    String.trim("#{first} #{last}")
+  end
+
+  defp checkin_sort_name(_), do: ""
+
+  defp list_event_checkin_tickets_query(event_id, search) do
+    preloads = checkin_ticket_preloads()
+
+    from(t in Ticket,
+      as: :ticket,
+      where: t.event_id == ^event_id and t.status == :confirmed,
+      select: struct(t, ^@checkin_ticket_fields)
+    )
+    |> filter_checkin_search(search)
+    |> order_by([ticket: t], asc: t.checked_in)
+    |> preload(^preloads)
+  end
+
+  defp filter_checkin_search(query, search) when search in [nil, ""], do: query
+
+  defp filter_checkin_search(query, search) do
+    search_term = "%#{search}%"
+
+    where(
+      query,
+      [ticket: t],
+      ilike(t.reference_id, ^search_term) or
+        exists(
+          from(td in TicketDetail,
+            where: td.ticket_id == parent_as(:ticket).id,
+            where:
+              ilike(
+                fragment("concat(?, ' ', ?)", td.first_name, td.last_name),
+                ^search_term
+              )
+          )
+        ) or
+        exists(
+          from(u in User,
+            where: u.id == parent_as(:ticket).user_id,
+            where:
+              ilike(
+                fragment("concat(?, ' ', ?)", u.first_name, u.last_name),
+                ^search_term
+              ) or ilike(u.email, ^search_term)
+          )
+        ) or
+        exists(
+          from(o in TicketOrder,
+            where: o.id == parent_as(:ticket).ticket_order_id,
+            where: ilike(o.reference_id, ^search_term)
+          )
         )
     )
-    |> Repo.all()
+  end
+
+  defp checkin_ticket_preloads do
+    [
+      registration: checkin_registration_query(),
+      user: checkin_user_query(),
+      ticket_tier: checkin_ticket_tier_query(),
+      ticket_order: checkin_ticket_order_query()
+    ]
+  end
+
+  defp checkin_user_query do
+    from(u in User, select: struct(u, ^@checkin_user_fields))
+  end
+
+  defp checkin_registration_query do
+    from(td in TicketDetail, select: struct(td, ^@checkin_registration_fields))
+  end
+
+  defp checkin_ticket_tier_query do
+    from(tt in TicketTier, select: struct(tt, ^@checkin_ticket_tier_fields))
+  end
+
+  defp checkin_ticket_order_query do
+    from(o in TicketOrder, select: struct(o, ^@checkin_ticket_order_fields))
+  end
+
+  @doc """
+  Loads a ticket by ID with the same slim associations as the check-in list.
+  """
+  def get_checkin_ticket(ticket_id) do
+    preloads = checkin_ticket_preloads()
+
+    Ticket
+    |> where([t], t.id == ^ticket_id)
+    |> select([t], struct(t, ^@checkin_ticket_fields))
+    |> preload(^preloads)
+    |> Repo.one()
   end
 
   @doc """
@@ -1328,7 +1437,6 @@ defmodule Ysc.Scanning do
 
   @doc false
   def ci_query_explain_query do
-    alias Ysc.Accounts.User
     alias Ysc.Ci.QueryExplain.Fixtures
 
     session_id = Fixtures.ulid()
@@ -1339,6 +1447,22 @@ defmodule Ysc.Scanning do
       on: u.id == sc.user_id,
       preload: [:user, :checked_in_by],
       order_by: [desc: sc.inserted_at]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_event_checkin_tickets_query do
+    list_event_checkin_tickets_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      nil
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_event_checkin_tickets_search_query do
+    list_event_checkin_tickets_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      "Ada"
     )
   end
 end

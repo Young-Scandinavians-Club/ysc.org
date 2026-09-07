@@ -1019,6 +1019,38 @@ defmodule Ysc.ScanningTest do
       assert tier_preload_count == 1
     end
 
+    test "checks in an order with one ticket UPDATE", %{
+      session: session,
+      order: order
+    } do
+      assert length(order.tickets) == 2
+
+      {_result, update_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.check_in_order(session, order.id) end,
+          pattern: ~r/UPDATE "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      assert update_count == 1
+    end
+
+    test "records group check-in scan rows in one INSERT", %{
+      session: session,
+      order: order
+    } do
+      assert length(order.tickets) == 2
+
+      {_result, insert_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.check_in_order(session, order.id) end,
+          pattern: ~r/INSERT INTO "scan_records"/i,
+          caller_pids: [self()]
+        )
+
+      assert insert_count == 1
+    end
+
     test "returns zero when every ticket in the order is already checked in", %{
       session: session,
       order: order
@@ -1382,6 +1414,44 @@ defmodule Ysc.ScanningTest do
       first = List.first(results)
       assert first.id == pending_ticket.id
       assert first.checked_in == false
+    end
+
+    test "does not SELECT user password hashes or unused order/tier columns", %{
+      event: event,
+      buyer: buyer,
+      order: order
+    } do
+      {tickets, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_event_checkin_tickets(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      ticket = List.first(tickets)
+      assert password_cols == 0
+      assert ticket.user.first_name == buyer.first_name
+      assert ticket.user.email == buyer.email
+      assert ticket.ticket_order.reference_id == order.reference_id
+      assert is_binary(ticket.ticket_tier.name)
+
+      {_tickets, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_event_checkin_tickets(event.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+
+      {_tickets, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_event_checkin_tickets(event.id) end,
+          pattern: ~r/admin_grant_notes/i,
+          caller_pids: [self()]
+        )
+
+      assert notes_cols == 0
     end
   end
 
