@@ -114,6 +114,27 @@ defmodule Ysc.Events do
     Repo.get!(Event, id)
   end
 
+  @check_in_event_fields [:id, :title]
+
+  @doc """
+  Fetch an event by ID with only the fields the admin check-in header needs.
+
+  Omits `raw_details` / `rendered_details` (event body HTML) and every other
+  column the check-in page never renders.
+  """
+  def get_event_for_check_in!(id) do
+    id
+    |> event_for_check_in_query()
+    |> Repo.one!()
+  end
+
+  defp event_for_check_in_query(id) do
+    from(e in Event,
+      where: e.id == ^id,
+      select: struct(e, ^@check_in_event_fields)
+    )
+  end
+
   @doc """
   Fetch an event by its ID, returns nil if not found.
   """
@@ -3854,5 +3875,10 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_event_stripe_fees_total_query do
     event_stripe_fees_total_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_event_for_check_in_query do
+    event_for_check_in_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
