@@ -1065,26 +1065,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             {Calendar.strftime(@edition.scheduled_at, "%b %-d at %-I:%M %p")} UTC
           </span>
 
-          <%!-- Saving spinner (hidden when readonly) --%>
-          <span
-            :if={!@readonly?}
-            class={[
-              "flex items-center gap-1.5 text-xs text-zinc-400 transition-opacity duration-150 shrink-0",
-              if(@saving?, do: "opacity-100", else: "opacity-0 pointer-events-none")
-            ]}
-          >
-            <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
-            Saving…
-          </span>
-
-          <%!-- Last saved confirmation (hidden when readonly) --%>
-          <span
-            :if={@last_saved_at && !@saving? && !@readonly?}
-            class="flex items-center gap-1.5 text-xs text-zinc-400 shrink-0"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
-            Saved {Calendar.strftime(@last_saved_at, "%I:%M %p")}
-          </span>
+          <.autosave_status
+            id="newsletter-editor-autosave-status"
+            saving?={@saving?}
+            saved_at={@last_saved_at}
+            readonly?={@readonly?}
+          />
 
           <%!-- Read-only lock indicator --%>
           <span

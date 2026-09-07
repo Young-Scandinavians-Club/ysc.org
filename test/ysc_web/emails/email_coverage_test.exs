@@ -193,11 +193,19 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assert html =~ "John Doe"
       assert html =~ "jane@example.com"
 
+      assert html =~ "Family invitation cancelled"
+      assert html =~ "no longer works"
+      assert html =~ FamilyInviteCancelled.membership_email()
+      refute html =~ "reach out to YSC"
+      refute html =~ "invitation link that was previously sent"
+
       assert FamilyInviteCancelled.get_template_name() ==
                "family_invite_cancelled"
 
       assert FamilyInviteCancelled.get_subject() ==
-               "Family Membership Invitation Cancelled - YSC"
+               "Your family membership invitation was cancelled - YSC"
+
+      assert FamilyInviteCancelled.membership_email() =~ "@ysc.org"
     end
   end
 

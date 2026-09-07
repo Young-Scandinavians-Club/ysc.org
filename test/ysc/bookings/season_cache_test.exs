@@ -15,6 +15,8 @@ defmodule Ysc.Bookings.SeasonCacheTest do
   """
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   import Ysc.BookingsFixtures
 
   alias Ysc.Bookings.{SeasonCache, Season}
@@ -475,7 +477,7 @@ defmodule Ysc.Bookings.SeasonCacheTest do
 
       SeasonCache.get(:tahoe, date)
 
-      {:ok, {:version, version, _ttl, cached_snapshot}} =
+      {:ok, {:version, version, cached_snapshot}} =
         Cachex.get(:ysc_cache, cache_key)
 
       past_ttl = System.system_time(:millisecond) - 60_000
@@ -516,7 +518,7 @@ defmodule Ysc.Bookings.SeasonCacheTest do
       assert cached.id == season.id
 
       {:ok, stored} = Cachex.get(:ysc_cache, cache_key)
-      assert match?({:version, _, _, _}, stored)
+      assert match?({:version, _, _}, stored)
     end
 
     test "upgrades legacy get_all_for_property cache entry" do
@@ -537,7 +539,7 @@ defmodule Ysc.Bookings.SeasonCacheTest do
       assert hd(seasons).id == season.id
 
       {:ok, stored} = Cachex.get(:ysc_cache, cache_key)
-      assert match?({:version, _, _, _}, stored)
+      assert match?({:version, _, _}, stored)
     end
 
     test "initializes season version when missing before caching get/2" do
@@ -572,7 +574,7 @@ defmodule Ysc.Bookings.SeasonCacheTest do
 
       SeasonCache.get_all_for_property(:tahoe)
 
-      {:ok, {:version, version, _ttl, cached_snapshot}} =
+      {:ok, {:version, version, cached_snapshot}} =
         Cachex.get(:ysc_cache, cache_key)
 
       past_ttl = System.system_time(:millisecond) - 60_000

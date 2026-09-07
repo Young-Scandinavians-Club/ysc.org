@@ -429,6 +429,11 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       refute changeset.valid?
       assert Keyword.has_key?(changeset.errors, :checkout_date)
+
+      assert {msg, _} = Keyword.get(changeset.errors, :checkout_date)
+
+      assert msg ==
+               BookingValidator.saturday_requires_sunday_message()
     end
 
     test "rejects Saturday check-in with Sunday checkout (no Friday in stay)",
@@ -457,7 +462,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
-      assert msg =~ "must start Friday"
+
+      assert msg ==
+               BookingValidator.saturday_requires_friday_start_message()
     end
 
     test "rejects Saturday check-in with Monday checkout (no Friday in stay)",
@@ -486,7 +493,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
-      assert msg =~ "must start Friday"
+
+      assert msg ==
+               BookingValidator.saturday_requires_friday_start_message()
     end
 
     test "accepts Friday check-in through Sunday checkout (full weekend span)",
@@ -541,6 +550,26 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert changeset.valid?
     end
 
+    test "weekend copy tells members they cannot check in or out on Saturday" do
+      friday_start = BookingValidator.saturday_requires_friday_start_message()
+      sunday_leave = BookingValidator.saturday_requires_sunday_message()
+      policy = BookingValidator.saturday_weekend_policy_message()
+
+      assert friday_start =~ "cannot check in on Saturday"
+      assert friday_start =~ "Friday or an earlier day"
+      refute friday_start =~ "must start Friday"
+
+      assert sunday_leave =~ "cannot check out on Saturday"
+      assert sunday_leave =~ "Sunday or another day"
+      refute sunday_leave =~ "must include Sunday"
+
+      assert policy =~ "arrive Friday or earlier"
+      assert policy =~ "leave Sunday or later"
+      assert policy =~ "Saturday check-in is not allowed"
+      refute policy =~ "must run Friday through Sunday"
+      refute policy =~ "Any Saturday stay"
+    end
+
     test "accepts weekday bookings without Saturday", %{
       user: user,
       rooms: rooms
@@ -565,6 +594,51 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         )
 
       assert changeset.valid?
+    end
+
+    test "grandfathered Saturday-Sunday stay can change guest count without retouching dates",
+         %{
+           user: user,
+           rooms: rooms
+         } do
+      booking =
+        insert_family_booking!(user, rooms, %{
+          checkin_date: ~D[2024-07-13],
+          checkout_date: ~D[2024-07-14],
+          guests_count: 2
+        })
+
+      changeset =
+        Booking.changeset(booking, %{guests_count: 3},
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      assert changeset.valid?
+    end
+
+    test "grandfathered Saturday-Sunday stay still cannot extend dates without Friday",
+         %{
+           user: user,
+           rooms: rooms
+         } do
+      booking =
+        insert_family_booking!(user, rooms, %{
+          checkin_date: ~D[2024-07-13],
+          checkout_date: ~D[2024-07-14],
+          guests_count: 2
+        })
+
+      changeset =
+        Booking.changeset(booking, %{checkout_date: ~D[2024-07-15]},
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      refute changeset.valid?
+
+      assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
+      assert msg =~ "must start Friday"
     end
   end
 

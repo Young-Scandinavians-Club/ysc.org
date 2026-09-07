@@ -69,9 +69,7 @@ defmodule YscWeb.ExpenseReportLive do
 
       socket =
         if connected?(socket) do
-          socket
-          |> assign_expense_form_data(user)
-          |> maybe_resume_draft(user)
+          maybe_load_expense_form_data(socket, user)
         else
           socket
         end
@@ -1969,6 +1967,10 @@ defmodule YscWeb.ExpenseReportLive do
   defp reimbursement_label("check"), do: "Check"
   defp reimbursement_label(_), do: "No method set"
 
+  defp item_count_label(%{expense_item_count: count}) when is_integer(count) do
+    "#{count} item#{if count == 1, do: "", else: "s"}"
+  end
+
   defp item_count_label(%{expense_items: items}) when is_list(items) do
     count = length(items)
     "#{count} item#{if count == 1, do: "", else: "s"}"
@@ -2082,22 +2084,14 @@ defmodule YscWeb.ExpenseReportLive do
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Main Form Column -->
             <div class="lg:col-span-2 pb-24 lg:pb-0">
-              <p
+              <.autosave_status
                 id="expense-report-autosave-status"
-                class="mb-3 flex items-center gap-1.5 text-xs text-zinc-500 h-4"
-                aria-live="polite"
-              >
-                <%= case @draft_status do %>
-                  <% :saving -> %>
-                    <.icon name="hero-arrow-path" class="w-3.5 h-3.5 animate-spin" />
-                    Saving…
-                  <% :saved -> %>
-                    <.icon name="hero-check" class="w-3.5 h-3.5 text-green-600" />
-                    All changes saved
-                  <% _ -> %>
-                    <span class="sr-only">Draft not started</span>
-                <% end %>
-              </p>
+                saving?={@draft_status == :saving}
+                saved?={@draft_status == :saved}
+                saved_label="All changes saved"
+                idle_label="Draft not started"
+                class="mb-3"
+              />
               <.simple_form
                 for={@form}
                 id="expense-report-form"
@@ -4261,6 +4255,22 @@ defmodule YscWeb.ExpenseReportLive do
     |> assign(:treasurer, get_treasurer())
     |> assign(:events, Events.list_recent_and_upcoming_events())
     |> assign(:loading_expense_form_data, false)
+  end
+
+  # Bank accounts, billing address, treasurer, the event picker, and draft
+  # resume are only rendered on the new-report form (`:index` / `:new`).
+  # `/expensereports` and the success page used to pay that cost on every
+  # connect — including a full events list and a draft row with line items.
+  defp maybe_load_expense_form_data(socket, user) do
+    case socket.assigns.live_action do
+      action when action in [:index, :new] ->
+        socket
+        |> assign_expense_form_data(user)
+        |> maybe_resume_draft(user)
+
+      _ ->
+        assign(socket, :loading_expense_form_data, false)
+    end
   end
 
   # The pristine "new report" form: one empty expense item, no draft attached.

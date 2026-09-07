@@ -10,7 +10,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Invitation Cancelled</strong>
+      <strong>Family invitation cancelled</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -34,11 +34,11 @@
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      You will no longer be able to use the invitation link that was previously sent to <strong><%= @invite_email %></strong>.
+      The invitation we sent to <strong><%= @invite_email %></strong> no longer works. You cannot use that link to join this family membership.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      If you have questions about this cancellation, please contact the person who invited you or reach out to YSC.
+      If you have questions, contact the person who invited you or email us at <a href="mailto:<%= membership_email() %>"><%= membership_email() %></a>.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">

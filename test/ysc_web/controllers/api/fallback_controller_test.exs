@@ -58,6 +58,7 @@ defmodule YscWeb.Api.FallbackControllerTest do
     test "maps mobile-app not-found reasons to 404 JSON" do
       for {reason, message} <- [
             {:member_not_found, "member not found"},
+            {:user_not_found, "member not found"},
             {:ticket_tier_not_found, "ticket tier not found"},
             {:event_not_found, "event not found"}
           ] do
@@ -75,14 +76,33 @@ defmodule YscWeb.Api.FallbackControllerTest do
             {:member_only_limit_exceeded,
              "this membership includes one members-only ticket per event"},
             {:invalid_plan, "invalid membership plan"},
+            {:invalid_offline_payment_method,
+             "payment_method must be one of: cash, check, other"},
+            {:could_not_create_stripe_customer,
+             "could not set up billing for this member — try again"},
+            {:empty_selection, "select at least one ticket"},
+            {:invalid_ticket_tier,
+             "one or more selected ticket tiers are invalid"},
+            {:invalid_quantity,
+             "one or more selected ticket quantities are invalid"},
+            {:donation_tier_not_grantable,
+             "donation ticket tiers cannot be sold via the in-person app"},
+            {:incomplete_member_profile,
+             "this ticket tier needs the member's name and email on file first"},
+            {:tier_not_on_sale,
+             "one or more selected ticket tiers are not on sale"},
             {:terminal_not_configured,
              "Stripe Terminal is not configured for this environment"},
             {:user_already_has_active_subscription,
              "member already has an active membership"},
+            {:payment_method_not_eligible,
+             "payment method must be collected for this member via Terminal just before subscribe"},
             {:sub_accounts_cannot_create_subscriptions,
              "sub-accounts cannot sign up for their own membership"},
             {:invalid_ticket_selection,
              "one or more selected ticket quantities are invalid"},
+            {:donation_tier_not_supported_in_app,
+             "donation ticket tiers cannot be charged via the in-person app; collect donations on the website"},
             {:tier_validation_failed,
              "one or more selected ticket tiers are sold out or unavailable"},
             {:insufficient_capacity,
@@ -101,6 +121,23 @@ defmodule YscWeb.Api.FallbackControllerTest do
         assert result.status == 422, "#{reason} should be 422"
         assert Jason.decode!(result.resp_body) == %{"error" => message}
       end
+    end
+
+    test "maps Stripe.Error to 422 without leaking Stripe internals", %{
+      conn: conn
+    } do
+      error = %Stripe.Error{
+        code: "api_error",
+        message: "No such payment_intent: 'pi_123abc'",
+        source: :api
+      }
+
+      conn = FallbackController.call(conn, {:error, error})
+      assert conn.status == 422
+      body = Jason.decode!(conn.resp_body)
+      assert body["error"] =~ "couldn't process"
+      refute body["error"] =~ "pi_123abc"
+      refute body["error"] =~ "No such payment_intent"
     end
   end
 end
