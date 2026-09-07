@@ -25,7 +25,9 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
       is_nil(invite) ->
         {:ok,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Invalid invitation link.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           FamilyInvites.missing_invite_message(),
            title: "Invitation"
          )
          |> redirect(to: ~p"/")}
