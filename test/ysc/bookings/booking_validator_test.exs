@@ -638,7 +638,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
-      assert msg =~ "must start Friday"
+
+      assert msg ==
+               BookingValidator.saturday_requires_friday_start_message()
     end
   end
 
