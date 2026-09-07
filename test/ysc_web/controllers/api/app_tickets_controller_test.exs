@@ -318,6 +318,56 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
              } = json_response(response, 422)
     end
 
+    # Finding 58: free / $0 tiers must not leave pending complimentary orders.
+    test "rejects free tiers before creating a pending order", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      free =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Free RSVP",
+          type: :free,
+          price: Money.new(0, :USD)
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{free.id => 1}
+        })
+
+      assert %{
+               "error" =>
+                 "free or $0 ticket tiers cannot be charged via the in-person app; use the website free checkout or an admin offline sale"
+             } = json_response(response, 422)
+
+      assert Ysc.Tickets.list_user_ticket_orders(member.id) == []
+    end
+
+    test "rejects $0 paid tiers before creating a pending order", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      zero =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Zero GA",
+          type: :paid,
+          price: Money.new(0, :USD)
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{zero.id => 1}
+        })
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "free or $0 ticket tiers"
+      assert Ysc.Tickets.list_user_ticket_orders(member.id) == []
+    end
+
     test "returns 404 for an unknown event", %{conn: conn} do
       member = member_with_active_membership()
 

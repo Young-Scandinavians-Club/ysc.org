@@ -87,6 +87,8 @@ defmodule YscWeb.Api.FallbackController do
       "one or more selected ticket quantities are invalid",
     donation_tier_not_supported_in_app:
       "donation ticket tiers cannot be charged via the in-person app; collect donations on the website",
+    complimentary_tier_not_supported_in_app:
+      "free or $0 ticket tiers cannot be charged via the in-person app; use the website free checkout or an admin offline sale",
     tier_validation_failed:
       "one or more selected ticket tiers are sold out or unavailable",
     insufficient_capacity:

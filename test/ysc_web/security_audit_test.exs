@@ -48,6 +48,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
+  Finding 58 (HIGH)     App ticket PaymentIntent accepted free / $0 tiers, leaving pending comps completable via web confirm-free
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2718,6 +2719,107 @@ defmodule YscWeb.SecurityAuditTest do
         |> Repo.all()
 
       assert orders == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 58 (HIGH): App PaymentIntent must reject free / $0 tiers
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 58: app tickets reject free and $0 tiers" do
+    import Ysc.EventsFixtures
+
+    test "volunteer cannot create a pending free-tier order via payment_intent" do
+      volunteer = user_fixture(%{role: :volunteer})
+      token = Accounts.generate_user_mobile_token(volunteer)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      _paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 58",
+          type: :paid,
+          price: Money.new(40, :USD)
+        })
+
+      free =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Free RSVP Finding 58",
+          type: :free,
+          price: Money.new(0, :USD)
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{free.id => 2}
+        })
+
+      assert %{
+               "error" =>
+                 "free or $0 ticket tiers cannot be charged via the in-person app; use the website free checkout or an admin offline sale"
+             } = json_response(conn, 422)
+
+      orders =
+        from(to in Ysc.Tickets.TicketOrder,
+          where: to.user_id == ^member.id and to.event_id == ^event.id
+        )
+        |> Repo.all()
+
+      assert orders == []
+    end
+
+    test "$0 paid tiers are refused the same way as free tiers" do
+      admin = user_fixture(%{role: :admin})
+      token = Accounts.generate_user_mobile_token(admin)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      zero_paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Zero GA Finding 58",
+          type: :paid,
+          price: Money.new(0, :USD)
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{zero_paid.id => 1}
+        })
+
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "free or $0 ticket tiers"
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
     end
   end
 
