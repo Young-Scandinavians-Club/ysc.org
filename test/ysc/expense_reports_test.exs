@@ -28,9 +28,10 @@ defmodule Ysc.ExpenseReportsTest do
       assert result == []
     end
 
-    test "batch-loads bank_account for multiple reports in one query", %{
-      user: user
-    } do
+    test "does not load bank accounts, addresses, or item rows on the member list",
+         %{
+           user: user
+         } do
       {:ok, bank_account} =
         ExpenseReports.create_bank_account(
           %{
@@ -41,29 +42,73 @@ defmodule Ysc.ExpenseReportsTest do
         )
 
       for i <- 1..3 do
-        Repo.insert!(%ExpenseReport{
-          user_id: user.id,
-          status: "submitted",
-          purpose: "Batch list #{i}",
-          reimbursement_method: "bank_transfer",
-          bank_account_id: bank_account.id
-        })
+        {:ok, _} =
+          ExpenseReports.create_expense_report(
+            %{
+              "status" => "draft",
+              "purpose" => "Batch list #{i}",
+              "reimbursement_method" => "bank_transfer",
+              "bank_account_id" => bank_account.id,
+              "expense_items" => [
+                %{
+                  "date" => "2024-01-15",
+                  "vendor" => "Vendor",
+                  "description" => "Item",
+                  "amount" => "10.00",
+                  "receipt_s3_path" => "receipts/#{i}.pdf"
+                }
+              ]
+            },
+            user
+          )
       end
 
-      reports = ExpenseReports.list_expense_reports(user)
+      {reports, bank_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports(user) end,
+          pattern: ~r/FROM ["']?bank_accounts["']?/i,
+          caller_pids: [self()]
+        )
 
-      assert length(reports) >= 3
+      {_, address_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports(user) end,
+          pattern: ~r/FROM ["']?addresses["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_, receipt_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports(user) end,
+          pattern: ~r/receipt_s3_path/i,
+          caller_pids: [self()]
+        )
+
+      {_, item_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports(user) end,
+          pattern: ~r/FROM ["']?expense_report_items["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert length(reports) == 3
+      assert bank_lookups == 0
+      assert address_lookups == 0
+      assert receipt_cols == 0
+      assert item_queries == 1
 
       assert Enum.all?(reports, fn report ->
-               if report.bank_account_id do
-                 report.bank_account.id == report.bank_account_id
-               else
-                 report.bank_account == nil
-               end
+               report.bank_account_id == bank_account.id and
+                 not Ecto.assoc_loaded?(report.bank_account) and
+                 not Ecto.assoc_loaded?(report.expense_items) and
+                 report.expense_item_count == 1
              end)
+
+      totals = ExpenseReports.calculate_totals(hd(reports))
+      assert Money.equal?(totals.expense_total, Money.new(:USD, "10.00"))
     end
 
-    test "loads bank_account for each report when bank_account_id is set", %{
+    test "keeps bank_account_id on list rows without loading the account", %{
       user: user
     } do
       {:ok, bank_account} =
@@ -91,11 +136,14 @@ defmodule Ysc.ExpenseReportsTest do
         |> Enum.filter(&(&1.id == report.id))
 
       assert listed.bank_account_id == bank_account.id
-      assert %BankAccount{} = listed.bank_account
-      assert listed.bank_account.id == bank_account.id
+      refute Ecto.assoc_loaded?(listed.bank_account)
+
+      fetched = ExpenseReports.get_expense_report!(report.id, user)
+      assert %BankAccount{} = fetched.bank_account
+      assert fetched.bank_account.id == bank_account.id
     end
 
-    test "list_expense_reports/1 and get_expense_report!/2 set bank_account nil when bank_account_id is nil",
+    test "get_expense_report!/2 sets bank_account nil when bank_account_id is nil",
          %{user: user} do
       {:ok, _} =
         Accounts.update_billing_address(user, %{
@@ -123,7 +171,7 @@ defmodule Ysc.ExpenseReportsTest do
         |> Enum.filter(&(&1.id == report.id))
 
       assert listed.bank_account_id == nil
-      assert listed.bank_account == nil
+      refute Ecto.assoc_loaded?(listed.bank_account)
 
       fetched = ExpenseReports.get_expense_report!(report.id, user)
       assert fetched.bank_account_id == nil
@@ -161,11 +209,22 @@ defmodule Ysc.ExpenseReportsTest do
       assert listed.event_id == event.id
       assert Ecto.assoc_loaded?(listed.event)
       assert listed.event.id == event.id
+      assert listed.event.title == event.title
+
+      {_, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports(user) end,
+          pattern: ~r/raw_details/i,
+          caller_pids: [self()]
+        )
+
+      assert html_cols == 0
 
       fetched = ExpenseReports.get_expense_report!(report.id, user)
       assert fetched.event_id == event.id
       assert Ecto.assoc_loaded?(fetched.event)
       assert fetched.event.id == event.id
+      assert fetched.event.title == event.title
     end
 
     test "orders by inserted_at descending (newest first)", %{user: user} do
@@ -1670,7 +1729,7 @@ defmodule Ysc.ExpenseReportsTest do
       assert Money.equal?(totals.net_total, Money.new(:USD, "-62.25"))
     end
 
-    test "uses preloaded items without extra SUM queries when associations are loaded",
+    test "uses attached list aggregates without extra SUM queries",
          %{
            user: user
          } do
@@ -1680,7 +1739,7 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      {:ok, _report} =
+      {:ok, report} =
         ExpenseReports.create_expense_report(
           %{
             "user_id" => user.id,
@@ -1707,24 +1766,34 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      [preloaded_report] = ExpenseReports.list_expense_reports(user)
+      [listed] = ExpenseReports.list_expense_reports(user)
+      refute Ecto.assoc_loaded?(listed.expense_items)
+      refute Ecto.assoc_loaded?(listed.income_items)
 
-      totals_from_preloaded = ExpenseReports.calculate_totals(preloaded_report)
+      {totals, item_sums} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.calculate_totals(listed) end,
+          pattern: ~r/FROM ["']?expense_report_items["']?/i,
+          caller_pids: [self()]
+        )
 
-      assert Money.equal?(
-               totals_from_preloaded.expense_total,
-               Money.new(:USD, "30.00")
-             )
+      assert item_sums == 0
+      assert Money.equal?(totals.expense_total, Money.new(:USD, "30.00"))
+      assert Money.equal?(totals.income_total, Money.new(:USD, "10.00"))
+      assert Money.equal?(totals.net_total, Money.new(:USD, "20.00"))
 
-      assert Money.equal?(
-               totals_from_preloaded.income_total,
-               Money.new(:USD, "10.00")
-             )
+      fetched = ExpenseReports.get_expense_report!(report.id, user)
+      assert Ecto.assoc_loaded?(fetched.expense_items)
 
-      assert Money.equal?(
-               totals_from_preloaded.net_total,
-               Money.new(:USD, "20.00")
-             )
+      {fetched_totals, fetched_sums} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.calculate_totals(fetched) end,
+          pattern: ~r/FROM ["']?expense_report_items["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert fetched_sums == 0
+      assert Money.equal?(fetched_totals.net_total, Money.new(:USD, "20.00"))
     end
 
     test "computes net_total as expense_total minus income_total", %{user: user} do
@@ -2602,6 +2671,85 @@ defmodule Ysc.ExpenseReportsTest do
       assert Enum.map(results, & &1.id) == [submitted.id]
       assert password_cols == 0
       assert hd(results).user.first_name == user.first_name
+      refute Ecto.assoc_loaded?(hd(results).expense_items)
+    end
+
+    test "attaches SQL net totals without selecting item receipt paths", %{
+      user: user
+    } do
+      event = event_fixture()
+
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      for i <- 1..3 do
+        {:ok, report} =
+          ExpenseReports.create_expense_report(
+            %{
+              "user_id" => user.id,
+              "event_id" => event.id,
+              "status" => "draft",
+              "purpose" => "Batch #{i}",
+              "reimbursement_method" => "bank_transfer",
+              "bank_account_id" => bank_account.id,
+              "expense_items" => [
+                %{
+                  "date" => "2024-01-15",
+                  "vendor" => "Vendor",
+                  "description" => "Item",
+                  "amount" => "25.00",
+                  "receipt_s3_path" => "receipts/batch-#{i}.pdf"
+                }
+              ],
+              "income_items" => [
+                %{
+                  "date" => "2024-01-15",
+                  "description" => "Cash",
+                  "amount" => "5.00"
+                }
+              ]
+            },
+            user
+          )
+
+        {:ok, _} =
+          ExpenseReports.update_expense_report(report, %{status: "approved"})
+      end
+
+      {results, receipt_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports_for_event(event.id) end,
+          pattern: ~r/receipt_s3_path/i,
+          caller_pids: [self()]
+        )
+
+      {_, item_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_expense_reports_for_event(event.id) end,
+          pattern: ~r/FROM ["']?expense_report_items["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert length(results) == 3
+      assert receipt_cols == 0
+      assert item_queries == 1
+
+      Enum.each(results, fn report ->
+        refute Ecto.assoc_loaded?(report.expense_items)
+        refute Ecto.assoc_loaded?(report.income_items)
+        assert report.expense_item_count == 1
+
+        totals = ExpenseReports.calculate_totals(report)
+        assert Money.equal?(totals.expense_total, Money.new(:USD, "25.00"))
+        assert Money.equal?(totals.income_total, Money.new(:USD, "5.00"))
+        assert Money.equal?(totals.net_total, Money.new(:USD, "20.00"))
+      end)
     end
 
     test "returns empty list for an event with no expense reports" do
@@ -3074,9 +3222,15 @@ defmodule Ysc.ExpenseReportsTest do
       assert Repo.all(query) == []
     end
 
-    test "event list and totals builders return Ecto queries" do
+    test "event list, detail, aggregates, and totals builders return Ecto queries" do
       assert %Ecto.Query{} =
                ExpenseReports.ci_query_explain_list_expense_reports_for_event_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_detail_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_list_item_aggregates_query()
 
       assert %Ecto.Query{} =
                ExpenseReports.ci_query_explain_event_expense_item_totals_query()

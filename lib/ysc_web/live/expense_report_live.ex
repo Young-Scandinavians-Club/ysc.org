@@ -1969,6 +1969,10 @@ defmodule YscWeb.ExpenseReportLive do
   defp reimbursement_label("check"), do: "Check"
   defp reimbursement_label(_), do: "No method set"
 
+  defp item_count_label(%{expense_item_count: count}) when is_integer(count) do
+    "#{count} item#{if count == 1, do: "", else: "s"}"
+  end
+
   defp item_count_label(%{expense_items: items}) when is_list(items) do
     count = length(items)
     "#{count} item#{if count == 1, do: "", else: "s"}"
