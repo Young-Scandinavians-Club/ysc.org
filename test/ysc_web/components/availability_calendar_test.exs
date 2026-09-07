@@ -696,7 +696,10 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           calendar_day_button(calendar_document(html), Date.to_iso8601(day))
 
         assert String.contains?(cell, "Include Fri-Sun") or
-                 String.contains?(cell, "must start Friday")
+                 String.contains?(
+                   cell,
+                   Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
+                 )
 
         assert calendar_element_attr(button, "aria-disabled") == "true"
       end

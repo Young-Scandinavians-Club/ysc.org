@@ -429,6 +429,11 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       refute changeset.valid?
       assert Keyword.has_key?(changeset.errors, :checkout_date)
+
+      assert {msg, _} = Keyword.get(changeset.errors, :checkout_date)
+
+      assert msg ==
+               BookingValidator.saturday_requires_sunday_message()
     end
 
     test "rejects Saturday check-in with Sunday checkout (no Friday in stay)",
@@ -457,7 +462,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
-      assert msg =~ "must start Friday"
+
+      assert msg ==
+               BookingValidator.saturday_requires_friday_start_message()
     end
 
     test "rejects Saturday check-in with Monday checkout (no Friday in stay)",
@@ -486,7 +493,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
 
       assert {msg, _} = Keyword.get(changeset.errors, :checkin_date)
-      assert msg =~ "must start Friday"
+
+      assert msg ==
+               BookingValidator.saturday_requires_friday_start_message()
     end
 
     test "accepts Friday check-in through Sunday checkout (full weekend span)",
@@ -539,6 +548,26 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         )
 
       assert changeset.valid?
+    end
+
+    test "weekend copy tells members they cannot check in or out on Saturday" do
+      friday_start = BookingValidator.saturday_requires_friday_start_message()
+      sunday_leave = BookingValidator.saturday_requires_sunday_message()
+      policy = BookingValidator.saturday_weekend_policy_message()
+
+      assert friday_start =~ "cannot check in on Saturday"
+      assert friday_start =~ "Friday or an earlier day"
+      refute friday_start =~ "must start Friday"
+
+      assert sunday_leave =~ "cannot check out on Saturday"
+      assert sunday_leave =~ "Sunday or another day"
+      refute sunday_leave =~ "must include Sunday"
+
+      assert policy =~ "arrive Friday or earlier"
+      assert policy =~ "leave Sunday or later"
+      assert policy =~ "Saturday check-in is not allowed"
+      refute policy =~ "must run Friday through Sunday"
+      refute policy =~ "Any Saturday stay"
     end
 
     test "accepts weekday bookings without Saturday", %{

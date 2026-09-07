@@ -33,14 +33,22 @@ defmodule Ysc.Bookings.BookingValidator do
   (including a Saturday check-in, which is never allowed on its own).
   """
   def saturday_requires_friday_start_message do
-    "Saturday stays must start Friday."
+    "You cannot check in on Saturday. To stay Saturday night, please arrive on Friday or an earlier day."
   end
 
   @doc """
-  Copy shown when a stay includes Saturday but not Sunday.
+  Copy shown when a stay includes Saturday but not Sunday (Saturday check-out).
   """
   def saturday_requires_sunday_message do
-    "Saturday stays must include Sunday."
+    "You cannot check out on Saturday. Pick Sunday or another day to leave."
+  end
+
+  @doc """
+  Plain-language weekend policy for Tahoe booking pages, rules, and errors
+  that do not distinguish check-in vs check-out.
+  """
+  def saturday_weekend_policy_message do
+    "If your stay includes Saturday, you must arrive Friday or earlier and leave Sunday or later. Saturday check-in is not allowed."
   end
 
   @doc """
