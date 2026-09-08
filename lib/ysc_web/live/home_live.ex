@@ -379,7 +379,7 @@ defmodule YscWeb.HomeLive do
               id="home-community-eyebrow"
               class="text-blue-700 font-semibold text-sm uppercase tracking-widest"
             >
-              Velkommen
+              Velkommen (Welcome)
             </span>
             <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight leading-[1.05] break-words">
               A home for Nordic spirits in the Bay.

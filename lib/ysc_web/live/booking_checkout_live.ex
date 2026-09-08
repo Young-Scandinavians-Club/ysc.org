@@ -1500,7 +1500,7 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your booking has been canceled and the availability has been released.",
+           BookingUserMessages.leave_unpaid_checkout_toast(),
            title: "Checkout"
          )
          |> redirect(to: redirect_path)}
@@ -3131,6 +3131,6 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp leave_checkout_confirm do
-    "Leave checkout and release these dates? Your booking is not confirmed until payment is complete."
+    BookingUserMessages.leave_unpaid_checkout_confirm()
   end
 end

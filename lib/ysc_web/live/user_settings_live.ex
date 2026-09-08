@@ -1650,7 +1650,7 @@ defmodule YscWeb.UserSettingsLive do
                         ]}>
                           <%= if @membership_change_info.direction == :upgrade do %>
                             <p>
-                              To upgrade today, you'll pay the prorated difference for the rest of your
+                              To upgrade today, you'll pay the price difference for the rest of your
                               membership year when you switch from {String.capitalize(
                                 "#{@membership_change_info.current_plan.id}"
                               )} to {String.capitalize(
@@ -4728,7 +4728,7 @@ defmodule YscWeb.UserSettingsLive do
     |> push_patch(to: path)
     |> YscWeb.Flash.put_toast(
       :info,
-      "Phone number update initiated. Please verify the code sent to your new number.",
+      "We sent a code to your new phone number. Enter it below to finish updating.",
       title: "Phone",
       icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
     )
@@ -6031,8 +6031,8 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to retry invoice payments.",
-         title: "Invoice"
+         "You must have an approved account to retry this payment.",
+         title: "Payment"
        )}
     else
       Ysc.Logging.info("Retrying invoice payment",
@@ -6062,8 +6062,8 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :info,
-             "Payment retry successful! Your invoice has been paid and your membership will be updated shortly.",
-             title: "Invoice",
+             "Payment successful! Your membership dues are paid and your membership will update shortly.",
+             title: "Payment",
              icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
            )
            |> push_patch(to: ~p"/users/membership")}
@@ -6074,7 +6074,7 @@ defmodule YscWeb.UserSettingsLive do
              socket,
              :error,
              retry_invoice_link_help_message(),
-             title: "Invoice"
+             title: "Payment"
            )}
 
         {:error, :unauthorized} ->
@@ -6082,8 +6082,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This invoice does not belong to your account.",
-             title: "Invoice"
+             "This payment does not belong to your account.",
+             title: "Payment"
            )}
 
         {:error, :already_paid} ->
@@ -6091,8 +6091,8 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :info,
-             "This invoice has already been paid. Your membership is up to date.",
-             title: "Invoice"
+             "This payment has already gone through. Your membership is up to date.",
+             title: "Payment"
            )}
 
         {:error, :invalid_invoice_status} ->
@@ -6101,7 +6101,7 @@ defmodule YscWeb.UserSettingsLive do
              socket,
              :error,
              retry_invoice_link_help_message(),
-             title: "Invoice"
+             title: "Payment"
            )}
 
         {:error, error_message} when is_binary(error_message) ->
@@ -6110,7 +6110,7 @@ defmodule YscWeb.UserSettingsLive do
              socket,
              :error,
              Ysc.PaymentUserMessages.invoice_retry_error(error_message),
-             title: "Invoice"
+             title: "Payment"
            )}
 
         {:error, _reason} ->
@@ -6119,7 +6119,7 @@ defmodule YscWeb.UserSettingsLive do
              socket,
              :error,
              "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, email info@ysc.org.",
-             title: "Invoice"
+             title: "Payment"
            )}
       end
     end
@@ -6131,7 +6131,7 @@ defmodule YscWeb.UserSettingsLive do
        socket,
        :error,
        retry_invoice_link_help_message(),
-       title: "Invoice"
+       title: "Payment"
      )}
   end
 

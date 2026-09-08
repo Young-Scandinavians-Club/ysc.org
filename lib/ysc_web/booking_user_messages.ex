@@ -31,6 +31,30 @@ defmodule YscWeb.BookingUserMessages do
     "I understand and accept that this change makes my booking non-refundable."
   end
 
+  def modification_forfeiture_after_change do
+    trim("""
+    Because you changed this booking, you cannot get a refund if you cancel later — even if our usual cancellation rules would have allowed one.
+    """)
+  end
+
+  def clear_lake_no_booking_options do
+    trim("""
+    Neither booking option is available for these dates. Try different dates, or email info@ysc.org if you think this is a mistake.
+    """)
+  end
+
+  def leave_unpaid_checkout_confirm do
+    trim("""
+    Cancel this unfinished booking? These dates will go back on the calendar. Your stay is not booked until you finish payment.
+    """)
+  end
+
+  def leave_unpaid_checkout_toast do
+    trim("""
+    We cancelled this unfinished booking. Those dates are open again if you want to start over.
+    """)
+  end
+
   def clear_lake_blackout_date(date_str) do
     "The cabin isn't open for bookings on #{date_str}. This date may be reserved for maintenance or a club event. Please choose different dates, or contact info@ysc.org if you have questions."
   end

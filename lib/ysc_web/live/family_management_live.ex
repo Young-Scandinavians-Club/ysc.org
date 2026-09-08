@@ -271,7 +271,7 @@ defmodule YscWeb.FamilyManagementLive do
         {:noreply,
          socket
          |> assign(:invites, invites)
-         |> YscWeb.Flash.put_toast(:info, "Invitation revoked.",
+         |> YscWeb.Flash.put_toast(:info, "Invitation cancelled.",
            title: "Family"
          )}
 
@@ -286,7 +286,7 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You are not authorized to revoke this invitation.",
+           "You can't cancel this invitation.",
            title: "Family"
          )}
 
