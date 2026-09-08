@@ -69,6 +69,7 @@ import InteractScrollbar from "./interact_scrollbar";
 import OtpInput from "./otp_input";
 import StopClick from "./stop_click";
 import DisableOnSubmit from "./disable_on_submit";
+import ExpenseReceiptKeys from "./expense_receipt_keys";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
 const TOAST_DURATION_MS = 6000;
@@ -114,6 +115,7 @@ let Hooks = {
     OtpInput,
     StopClick,
     DisableOnSubmit,
+    ExpenseReceiptKeys,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
     ToastFlashBridge,
 };

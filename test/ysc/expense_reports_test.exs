@@ -447,6 +447,60 @@ defmodule Ysc.ExpenseReportsTest do
     end
   end
 
+  describe "receipt_preview_url/1" do
+    test "returns nil for nil and non-binary input" do
+      assert ExpenseReports.receipt_preview_url(nil) == nil
+      assert ExpenseReports.receipt_preview_url(:not_binary) == nil
+    end
+
+    test "appends /preview to the receipt URL" do
+      s3_path = "receipts/test.pdf"
+      url = ExpenseReports.receipt_preview_url(s3_path)
+      assert url == ExpenseReports.receipt_url(s3_path) <> "/preview"
+    end
+  end
+
+  describe "media_type_for_path/1" do
+    test "classifies known receipt extensions" do
+      assert ExpenseReports.media_type_for_path("receipts/a.pdf") == :pdf
+      assert ExpenseReports.media_type_for_path("receipts/a.PDF") == :pdf
+      assert ExpenseReports.media_type_for_path("receipts/a.jpg") == :image
+      assert ExpenseReports.media_type_for_path("receipts/a.jpeg") == :image
+      assert ExpenseReports.media_type_for_path("receipts/a.png") == :image
+      assert ExpenseReports.media_type_for_path("receipts/a.webp") == :image
+      assert ExpenseReports.media_type_for_path("receipts/a.doc") == :other
+      assert ExpenseReports.media_type_for_path("receipts/noext") == :other
+      assert ExpenseReports.media_type_for_path("") == :none
+      assert ExpenseReports.media_type_for_path(nil) == :none
+    end
+  end
+
+  describe "fetch_file/1" do
+    test "returns error for non-binary path" do
+      assert ExpenseReports.fetch_file(nil) == {:error, :invalid_path}
+      assert ExpenseReports.fetch_file(:nope) == {:error, :invalid_path}
+    end
+
+    test "uses the configured expense_reports_file_fetcher" do
+      prev = Application.get_env(:ysc, :expense_reports_file_fetcher)
+
+      on_exit(fn ->
+        if prev do
+          Application.put_env(:ysc, :expense_reports_file_fetcher, prev)
+        else
+          Application.delete_env(:ysc, :expense_reports_file_fetcher)
+        end
+      end)
+
+      Application.put_env(:ysc, :expense_reports_file_fetcher, fn path ->
+        {:ok, "bytes:#{path}"}
+      end)
+
+      assert ExpenseReports.fetch_file("receipts/x.pdf") ==
+               {:ok, "bytes:receipts/x.pdf"}
+    end
+  end
+
   describe "upload_receipt_to_s3/2" do
     test "uses unique_key when upload result has no body key (fallback path)" do
       prev = Application.get_env(:ysc, :expense_reports_s3_upload)

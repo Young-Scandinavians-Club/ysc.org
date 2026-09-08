@@ -1328,6 +1328,79 @@ defmodule Ysc.ExpenseReports do
   def receipt_url(_), do: nil
 
   @doc """
+  Same-origin URL that streams the file inline (correct Content-Type) so PDFs
+  can render in an `<iframe>` without CSP `frame-src` changes.
+  """
+  def receipt_preview_url(s3_path) when is_binary(s3_path) do
+    "#{receipt_url(s3_path)}/preview"
+  end
+
+  def receipt_preview_url(_), do: nil
+
+  @doc """
+  Classifies a stored receipt/proof key by extension for admin preview UI.
+
+  Returns `:image`, `:pdf`, `:other`, or `:none`.
+  """
+  def media_type_for_path(s3_path) when is_binary(s3_path) and s3_path != "" do
+    case s3_path |> Path.extname() |> String.downcase() do
+      ".pdf" -> :pdf
+      ext when ext in [".jpg", ".jpeg", ".png", ".webp"] -> :image
+      "" -> :other
+      _ -> :other
+    end
+  end
+
+  def media_type_for_path(_), do: :none
+
+  @doc """
+  Fetches the bytes of an expense-report receipt/proof from S3.
+
+  Uses a presigned URL + `Req.get` (the same technique as QuickBooks receipt
+  upload) because signed ExAws GET requests are rewritten to POST in this
+  environment.
+
+  Override with `Application.put_env(:ysc, :expense_reports_file_fetcher, fun)`
+  in tests (`fun` is `s3_path -> {:ok, binary} | {:error, reason}`).
+  """
+  def fetch_file(s3_path) when is_binary(s3_path) do
+    fetcher = Application.get_env(:ysc, :expense_reports_file_fetcher)
+
+    if is_function(fetcher, 1) do
+      fetcher.(s3_path)
+    else
+      fetch_file_via_presigned_url(s3_path)
+    end
+  end
+
+  def fetch_file(_), do: {:error, :invalid_path}
+
+  defp fetch_file_via_presigned_url(s3_path) do
+    normalized_path = normalize_s3_path(s3_path)
+
+    {config, method, bucket_or_host, object_key, presign_opts} =
+      S3Config.expense_report_file_presigned_url_args(normalized_path, 300)
+
+    with {:ok, url} <-
+           ExAws.S3.presigned_url(
+             config,
+             method,
+             bucket_or_host,
+             object_key,
+             presign_opts
+           ),
+         {:ok, %{status: 200, body: body}} <-
+           Req.get(url, decode_body: false) do
+      {:ok, body}
+    else
+      {:ok, %{status: status}} -> {:error, {:http_status, status}}
+      {:error, reason} -> {:error, reason}
+    end
+  rescue
+    e -> {:error, e}
+  end
+
+  @doc """
   Checks if a user can access a file by verifying they own the expense report
   that contains the file, or if they are an admin. Also allows access to recently
   uploaded files (within 24 hours) that haven't been submitted yet, so users can
