@@ -15,9 +15,9 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">No action is needed if you'd like to continue your membership — the renewal will happen automatically.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Want to cancel before the renewal?</strong></mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Prefer not to renew?</strong></mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you'd prefer not to renew, you can cancel your membership before <strong><%= @renewal_date %></strong> from your membership page.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you'd rather not continue, turn off automatic renewal before <strong><%= @renewal_date %></strong> from your membership page. You'll keep your benefits until that date.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= @membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Manage My Membership →</mj-button>
     <mj-spacer height="24px"></mj-spacer>

@@ -836,7 +836,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert String.length(html) > 0
       assert html =~ "Membership Upgrade Successful"
       assert html =~ "upgraded from Single to Family"
-      assert html =~ "prorated payment"
+      assert html =~ "We charged"
       assert html =~ "$15.08"
     end
 
@@ -860,7 +860,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert String.length(html) > 0
       assert html =~ "Membership Updated"
       assert html =~ "changed from Family to Single"
-      assert html =~ "prorated payment"
+      assert html =~ "We processed a payment"
       assert html =~ "$10.00"
     end
 

@@ -52,9 +52,9 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <%= if @has_proration do %>
         <%= if @is_upgrade do %>
-          Your prorated payment of <strong><%= @amount %></strong> has been processed for the upgrade to <%= @membership_type %>. This reflects the remaining time on your current membership period at the new rate.
+          We charged <strong><%= @amount %></strong> for the upgrade to <%= @membership_type %>. That amount covers the rest of your current membership year at the new price.
         <% else %>
-          Your prorated payment of <strong><%= @amount %></strong> has been processed for your membership change. This reflects the credit for unused time and the charge for the remaining period at the new rate.
+          We processed a payment of <strong><%= @amount %></strong> for your membership change. It accounts for unused time on your old plan and the remaining time at the new price.
         <% end %>
       <% else %>
         <%= if @is_single_to_family_upgrade do %>
