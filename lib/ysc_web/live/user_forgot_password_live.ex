@@ -96,7 +96,7 @@ defmodule YscWeb.UserForgotPasswordLive do
         end
 
         info =
-          "If your email is in our system, you'll receive a password reset link shortly."
+          "If we have an account for that email, you'll get a password reset link shortly."
 
         {:noreply,
          socket

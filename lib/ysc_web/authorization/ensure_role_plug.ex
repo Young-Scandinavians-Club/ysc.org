@@ -36,7 +36,11 @@ defmodule YscWeb.Authorization.EnsureRolePlug do
 
   defp maybe_halt(_any, conn) do
     conn
-    |> YscWeb.Flash.put_toast(:error, "Unauthorized", title: "Access")
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "You don't have permission to open that page.",
+      title: "Access"
+    )
     |> Controller.redirect(to: signed_in_path(conn))
     |> halt()
   end

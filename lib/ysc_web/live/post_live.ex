@@ -65,7 +65,7 @@ defmodule YscWeb.PostLive do
             />
             <div class="text-left">
               <p class="text-xs font-black text-zinc-900 uppercase tracking-widest">
-                Post By
+                Posted by
               </p>
               <p class="text-sm font-medium text-zinc-500">
                 {UserDisplay.full_name(@post.author)}

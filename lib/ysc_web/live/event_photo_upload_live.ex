@@ -389,9 +389,9 @@ defmodule YscWeb.EventPhotoUploadLive do
          socket
          |> assign(:upload_complete?, true)
          |> assign(:upload_errors, [
-           "Some files could not be queued for upload. Please try again."
+           "Some files couldn't be uploaded. Please try again."
          ])
-         |> put_flash(:error, "Some files could not be queued for upload.")}
+         |> put_flash(:error, "Some files couldn't be uploaded. Please try again.")}
 
       true ->
         {:noreply,
@@ -487,7 +487,7 @@ defmodule YscWeb.EventPhotoUploadLive do
 
       <h1 class="mt-3 text-2xl font-semibold text-zinc-900 leading-tight">
         <%= if @variant == :success do %>
-          Tusen tack!
+          Tusen tack! (Thank you so much!)
         <% else %>
           <%= if @greeting_name != "" do %>
             Hej {@greeting_name},

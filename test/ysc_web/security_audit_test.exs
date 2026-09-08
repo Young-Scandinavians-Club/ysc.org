@@ -3106,7 +3106,7 @@ defmodule YscWeb.SecurityAuditTest do
       {:ok, view, html} =
         live(conn, ~p"/newsletter/unsubscribe/#{victim_email}")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
       refute has_element?(view, "button", "Unsubscribe")
 
       # UI hide is not auth: the event is still reachable over the socket.
