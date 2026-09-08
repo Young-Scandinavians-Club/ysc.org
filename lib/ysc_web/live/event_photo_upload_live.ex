@@ -391,7 +391,10 @@ defmodule YscWeb.EventPhotoUploadLive do
          |> assign(:upload_errors, [
            "Some files couldn't be uploaded. Please try again."
          ])
-         |> put_flash(:error, "Some files couldn't be uploaded. Please try again.")}
+         |> put_flash(
+           :error,
+           "Some files couldn't be uploaded. Please try again."
+         )}
 
       true ->
         {:noreply,
