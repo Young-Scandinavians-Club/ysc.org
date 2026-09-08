@@ -538,18 +538,14 @@ defmodule YscWeb.UserRegistrationLive do
 
   @spec handle_event(<<_::32, _::_*32>>, map(), any()) :: {:noreply, any()}
   def handle_event("save", %{"user" => user_params} = values, socket) do
-    case turnstile_mod().verify(values, socket.assigns.remote_ip) do
-      {:error, _} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "We couldn't verify you're a real person. Please try submitting again. If this keeps happening, refresh the page or try a different browser.",
-           title: "Registration"
-         )
-         |> turnstile_mod().refresh()}
+    case YscWeb.GuestTurnstile.verify(socket, values,
+           title: "Registration",
+           required: true
+         ) do
+      {:error, socket} ->
+        {:noreply, socket}
 
-      {:ok, _} ->
+      :ok ->
         reg_form_updated =
           user_params["registration_form"]
           |> Map.put("started", socket.assigns[:started])
@@ -1053,7 +1049,4 @@ defmodule YscWeb.UserRegistrationLive do
         nil
     end
   end
-
-  defp turnstile_mod,
-    do: Application.get_env(:phoenix_turnstile, :turnstile_module, Turnstile)
 end

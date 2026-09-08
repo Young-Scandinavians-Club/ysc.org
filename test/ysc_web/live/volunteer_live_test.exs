@@ -437,5 +437,31 @@ defmodule YscWeb.VolunteerLiveTest do
       assert html =~ "volunteer-form"
       assert html =~ "Marketing"
     end
+
+    test "blocks guest submit when Turnstile verification fails", %{conn: conn} do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+
+      html =
+        view
+        |> form("#volunteer-form",
+          volunteer: %{
+            "name" => "Guest Volunteer",
+            "email" => "guest.vol#{System.unique_integer()}@example.com",
+            "interest_events" => "true"
+          }
+        )
+        |> render_submit()
+
+      assert html =~ "verify you"
+      assert html =~ "real person"
+      refute html =~ "Välkommen"
+      assert has_element?(view, "#volunteer-form")
+    end
   end
 end
