@@ -192,6 +192,60 @@ defmodule YscWeb.ContactLiveTest do
     end
   end
 
+  describe "save (guest Turnstile)" do
+    test "submits contact form when Turnstile verification succeeds", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      view
+      |> form("#contact-form",
+        contact_form: %{
+          name: "Guest Sender",
+          email: "guest.sender#{System.unique_integer()}@example.com",
+          subject: "General Inquiry",
+          message: "Hello from LiveView test message body."
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "Thank you! Your message has been sent"
+    end
+
+    test "blocks submission and shows error when Turnstile verification fails",
+         %{conn: conn} do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      view
+      |> form("#contact-form",
+        contact_form: %{
+          name: "Guest Sender",
+          email: "guest.blocked#{System.unique_integer()}@example.com",
+          subject: "General Inquiry",
+          message: "Hello from LiveView test message body."
+        }
+      )
+      |> render_submit()
+
+      html = render(view)
+      assert html =~ "verify you"
+      assert html =~ "real person"
+      assert has_element?(view, "#contact-form")
+
+      refute has_element?(
+               view,
+               "span",
+               "Thank you! Your message has been sent"
+             )
+    end
+  end
+
   describe "save (authenticated)" do
     test "submits contact form without Turnstile when logged in", %{conn: conn} do
       user =
