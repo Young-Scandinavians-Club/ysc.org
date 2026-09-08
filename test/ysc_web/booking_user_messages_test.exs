@@ -36,6 +36,32 @@ defmodule YscWeb.BookingUserMessagesTest do
              "non-refundable"
   end
 
+  test "plain-language booking flow copy" do
+    assert BookingUserMessages.modification_forfeiture_after_change() =~
+             "cannot get a refund if you cancel later"
+
+    refute BookingUserMessages.modification_forfeiture_after_change() =~
+             "no longer apply"
+
+    assert BookingUserMessages.clear_lake_no_booking_options() =~
+             "Neither booking option is available for these dates"
+
+    refute BookingUserMessages.clear_lake_no_booking_options() =~
+             "select dates to see available"
+
+    assert BookingUserMessages.leave_unpaid_checkout_confirm() =~
+             "unfinished booking"
+
+    refute BookingUserMessages.leave_unpaid_checkout_confirm() =~
+             "release these dates"
+
+    assert BookingUserMessages.leave_unpaid_checkout_toast() =~
+             "dates are open again"
+
+    refute BookingUserMessages.leave_unpaid_checkout_toast() =~
+             "availability has been released"
+  end
+
   test "clear lake blackout message" do
     assert BookingUserMessages.clear_lake_blackout_date("2026-06-01") =~
              "isn't open for bookings on 2026-06-01"

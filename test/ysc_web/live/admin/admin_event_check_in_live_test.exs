@@ -68,6 +68,24 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     )
   end
 
+  defp insert_confirmed_checkin_ticket(attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    unique = System.unique_integer([:positive])
+
+    %Ysc.Events.Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: attrs.event_id,
+      ticket_tier_id: attrs.ticket_tier_id,
+      ticket_order_id: Map.get(attrs, :ticket_order_id),
+      user_id: Map.get(attrs, :user_id),
+      status: :confirmed,
+      reference_id: Map.get(attrs, :reference_id, "TKT-CHKIN-#{unique}"),
+      inserted_at: now,
+      expires_at: DateTime.add(now, 1, :day)
+    }
+    |> Repo.insert!()
+  end
+
   # ---------------------------------------------------------------------------
   # Access control
   # ---------------------------------------------------------------------------
@@ -298,6 +316,40 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
       refute html =~ "UnconfirmedBuyer"
       assert html =~ "No confirmed tickets for this event"
+    end
+
+    test "renders a nil-purchaser ticket using its registration name", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      unique = System.unique_integer([:positive])
+      guest_first = "WalkupGuest#{unique}"
+      reference_id = "TKT-WALKUI-#{unique}"
+
+      ticket =
+        insert_confirmed_checkin_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nil,
+          reference_id: reference_id
+        })
+
+      {:ok, _} =
+        Ysc.Events.create_registration(%{
+          "ticket_id" => ticket.id,
+          "first_name" => guest_first,
+          "last_name" => "Door",
+          "email" => "walkup-ui-#{unique}@example.com"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
+
+      assert html =~ guest_first
+      assert html =~ reference_id
+      assert html =~ "walkup-ui-#{unique}@example.com"
     end
 
     test "accumulates counter across multiple orders from different buyers", %{
@@ -889,6 +941,45 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
       assert html =~ "TicketSearchAlice"
       refute html =~ "TicketSearchBob"
+    end
+
+    test "filters tickets by registration attendee name including nil purchaser",
+         %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      unique = System.unique_integer([:positive])
+      guest_first = "RegSearchGuest#{unique}"
+
+      buyer =
+        make_member(%{first_name: "RegSearchBuyer#{unique}", last_name: "Test"})
+
+      confirm_order(
+        ticket_order_fixture(%{user: buyer, event: event, tier: tier})
+      )
+
+      walkup =
+        insert_confirmed_checkin_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nil,
+          reference_id: "TKT-REGSRCH-#{unique}"
+        })
+
+      {:ok, _} =
+        Ysc.Events.create_registration(%{
+          "ticket_id" => walkup.id,
+          "first_name" => guest_first,
+          "last_name" => "Door",
+          "email" => "reg-search-#{unique}@example.com"
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=#{guest_first}")
+
+      html = render(view)
+
+      assert html =~ guest_first
+      refute html =~ "RegSearchBuyer#{unique}"
     end
 
     test "search is case-insensitive", %{conn: conn, admin: admin} do

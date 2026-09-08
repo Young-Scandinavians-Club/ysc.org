@@ -1140,7 +1140,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       render(view)
       html = render(view)
-      assert html =~ "Invoice"
+      assert html =~ "Payment"
       assert html =~ "expired"
       assert html =~ Ysc.EmailConfig.membership_email()
     end
@@ -1889,7 +1889,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         "invoice_id" => "in_bad_retry"
       })
 
-      assert render(view) =~ "invoice" or render(view) =~ "Invoice"
+      assert render(view) =~ "payment" or render(view) =~ "Payment"
     end
 
     test "confirm_cancel_email_verification patches to settings when no pending email",

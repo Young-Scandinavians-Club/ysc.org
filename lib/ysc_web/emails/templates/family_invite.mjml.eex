@@ -45,7 +45,7 @@
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Important:</strong> Family members share the primary account's membership. You cannot purchase your own membership, but you'll have full access to all membership benefits.
+      <strong>Important:</strong> Family members share the membership of the person who invited them. You won't buy your own separate membership, but you'll have full access to membership benefits.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= @invite_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px"><%= @invite_button_text %> →</mj-button>

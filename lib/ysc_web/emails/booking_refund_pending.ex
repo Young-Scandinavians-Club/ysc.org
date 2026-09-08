@@ -2,7 +2,8 @@ defmodule YscWeb.Emails.BookingRefundPending do
   @moduledoc """
   Email template for booking refunds that are pending approval.
 
-  Sends a notification email to users when their booking refund request is pending admin review.
+  Sends a notification email to users when their cancelled booking's refund
+  is waiting for Cabin Master review.
   """
   use MjmlEEx,
     mjml_template: "templates/booking_refund_pending.mjml.eex",
@@ -24,7 +25,7 @@ defmodule YscWeb.Emails.BookingRefundPending do
   end
 
   def get_subject() do
-    "Your booking refund request is under review"
+    "We're reviewing your cabin booking refund"
   end
 
   def booking_url(booking_id) do

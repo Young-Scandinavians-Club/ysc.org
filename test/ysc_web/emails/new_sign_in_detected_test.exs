@@ -99,7 +99,7 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
 
       assert body =~ "Hi Ada,"
       assert body =~ "new location"
-      assert body =~ "Platform: Chrome on macOS"
+      assert body =~ "Device: Chrome on macOS"
       assert body =~ "Location: Stockholm, Sweden"
       assert body =~ "Time: Jan 1, 2026 at 9:00 AM PST"
       assert body =~ "https://example.com/users/settings/security"

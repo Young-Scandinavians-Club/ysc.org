@@ -454,7 +454,7 @@ defmodule YscWeb.ExpenseReportLive do
      socket
      |> YscWeb.Flash.success_with_title(
        "Copied",
-       "Report ID copied to clipboard"
+       "Reference number copied"
      )}
   end
 
@@ -599,14 +599,16 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload receipt: Unexpected result",
+             "We couldn't finish uploading that receipt. Please try again, or choose a different file.",
              title: "Expense report"
            )}
       end
     else
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "Upload entry not found",
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "We couldn't find that upload. Please choose the file again and try once more.",
          title: "Expense report"
        )}
     end
@@ -746,14 +748,16 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload proof: Unexpected result",
+             "We couldn't finish uploading that document. Please try again, or choose a different file.",
              title: "Expense report"
            )}
       end
     else
       {:noreply,
        socket
-       |> YscWeb.Flash.put_toast(:error, "Upload entry not found",
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "We couldn't find that upload. Please choose the file again and try once more.",
          title: "Expense report"
        )}
     end
@@ -1524,7 +1528,9 @@ defmodule YscWeb.ExpenseReportLive do
                 </div>
               <% end %>
               <div>
-                <dt class="text-sm font-medium text-zinc-500">Report ID</dt>
+                <dt class="text-sm font-medium text-zinc-500">
+                  Reference number
+                </dt>
                 <dd class="mt-1 flex items-center gap-2">
                   <span class="text-xs sm:text-sm text-zinc-900 font-mono break-all">
                     {@expense_report.id}
@@ -1534,7 +1540,7 @@ defmodule YscWeb.ExpenseReportLive do
                     phx-click="copy-report-id"
                     phx-value-id={@expense_report.id}
                     class="px-1.5 py-0.5 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded transition-colors flex-shrink-0"
-                    title="Copy Report ID"
+                    title="Copy reference number"
                   >
                     <.icon name="hero-clipboard" class="w-4 h-4 -mt-1.5" />
                   </button>
@@ -2035,7 +2041,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <p>
                     Submit your expenses for reimbursement. Expenses must be submitted
                     <strong class="font-semibold text-zinc-900">within 30 days</strong>
-                    of the date of purchase. Once submitted, you will receive an email confirmation and your reimbursement will be processed by the treasurer.
+                    of the date of purchase. Once submitted, you will receive an email confirmation and the treasurer will review your report and send your reimbursement.
                   </p>
                   <p :if={@treasurer}>
                     If you have questions, please contact:
@@ -4065,7 +4071,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp display_money(money) do
     case Ysc.MoneyHelper.format_money(money) do
       {:ok, amount} -> amount
-      _ -> "N/A"
+      _ -> "—"
     end
   end
 
@@ -4139,8 +4145,8 @@ defmodule YscWeb.ExpenseReportLive do
               timeline_step_status(@expense_report.status, "approved", ["paid"])
             }
             icon="hero-arrow-path"
-            title="Processing Payment"
-            description="Reimbursement is being processed"
+            title="Sending Reimbursement"
+            description="Your reimbursement is on the way"
           />
           <.timeline_connector completed={@expense_report.status == "paid"} />
           <.timeline_step
@@ -4244,7 +4250,7 @@ defmodule YscWeb.ExpenseReportLive do
         end
 
       _ ->
-        "Reimbursement will be processed"
+        "Your reimbursement is on the way"
     end
   end
 

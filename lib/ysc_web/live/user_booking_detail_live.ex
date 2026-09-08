@@ -90,9 +90,9 @@ defmodule YscWeb.UserBookingDetailLive do
             refund_message =
               if Money.positive?(refund_amount) do
                 if is_pending_refund do
-                  "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} needs a quick club review before it's sent (this is normal for some cancellation amounts). We'll email you when it's processed - you don't need to do anything else."
+                  "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} needs a quick club review before it's sent (this is normal for some cancellation amounts). We'll email you when the money is on the way — you don't need to do anything else."
                 else
-                  "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
+                  "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} is on the way."
                 end
               else
                 "Booking cancelled. No refund is available based on the cancellation policy."
@@ -745,7 +745,8 @@ defmodule YscWeb.UserBookingDetailLive do
           <% else %>
             <div class="flex justify-between text-sm">
               <span class="text-zinc-600">
-                Room Booking ({@breakdown["nights"] || 0} nights)
+                {BookingModeDisplay.stay_type_label(:room)} ({@breakdown["nights"] ||
+                  0} nights)
               </span>
               <span class="text-zinc-900">
                 {format_money_from_map(@breakdown["total"])}

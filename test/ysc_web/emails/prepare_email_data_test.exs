@@ -285,7 +285,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
       data = BookingCheckinReminder.prepare_email_data(booking)
       assert data.room_names =~ "Sunrise Loft"
-      assert data.booking_mode == "Room Booking"
+      assert data.booking_mode == "Individual room(s)"
       assert data.is_buyout == false
     end
 
@@ -423,7 +423,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
       data = BookingConfirmation.prepare_email_data(booking)
       assert data.booking.room_names =~ "Pine"
-      assert data.booking.booking_mode == "Day Booking"
+      assert data.booking.booking_mode == "Shared cabin"
       assert data.booking.is_buyout == false
     end
   end

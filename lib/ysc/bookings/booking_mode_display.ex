@@ -2,19 +2,19 @@ defmodule Ysc.Bookings.BookingModeDisplay do
   @moduledoc """
   Human-readable labels for booking modes (`:room`, `:day`, `:buyout`).
 
-  Use `label/1` for emails (`"Room Booking"`, `"Day Booking"`). Use
-  `stay_type_label/1` for member booking UIs (`"Individual room(s)"`,
-  `"Shared cabin"`). Buyout is `"Entire cabin"` in both.
+  `label/1` and `stay_type_label/1` use the same copy for known modes so emails
+  match the booking website (`"Individual room(s)"`, `"Shared cabin"`,
+  `"Entire cabin"`).
   """
 
   @doc """
-  Human-readable label (e.g. `"Room Booking"`, `"Day Booking"`, `"Entire cabin"`).
+  Human-readable label for known booking modes, matching the booking website.
 
   Accepts atoms and known string keys. Unknown atoms are title-cased.
   """
-  def label(:room), do: "Room Booking"
-  def label(:day), do: "Day Booking"
-  def label(:buyout), do: "Entire cabin"
+  def label(:room), do: stay_type_label(:room)
+  def label(:day), do: stay_type_label(:day)
+  def label(:buyout), do: stay_type_label(:buyout)
   def label("room"), do: label(:room)
   def label("day"), do: label(:day)
   def label("buyout"), do: label(:buyout)
@@ -23,10 +23,7 @@ defmodule Ysc.Bookings.BookingModeDisplay do
   def label(mode) when is_binary(mode), do: mode
 
   @doc """
-  Member-facing stay type used on receipts, booking details, and policy tables.
-
-  Matches the booking UI (unlike `label/1`, which uses `"Room Booking"` /
-  `"Day Booking"` in emails):
+  Member-facing stay type used on receipts, booking details, emails, and policy tables.
 
     * `:buyout` — `"Entire cabin"`
     * `:room` — `"Individual room(s)"`

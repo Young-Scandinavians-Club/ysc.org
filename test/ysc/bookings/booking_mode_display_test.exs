@@ -5,11 +5,11 @@ defmodule Ysc.Bookings.BookingModeDisplayTest do
 
   describe "label/1" do
     test "formats known booking modes" do
-      assert BookingModeDisplay.label(:room) == "Room Booking"
-      assert BookingModeDisplay.label(:day) == "Day Booking"
+      assert BookingModeDisplay.label(:room) == "Individual room(s)"
+      assert BookingModeDisplay.label(:day) == "Shared cabin"
       assert BookingModeDisplay.label(:buyout) == "Entire cabin"
-      assert BookingModeDisplay.label("room") == "Room Booking"
-      assert BookingModeDisplay.label("day") == "Day Booking"
+      assert BookingModeDisplay.label("room") == "Individual room(s)"
+      assert BookingModeDisplay.label("day") == "Shared cabin"
       assert BookingModeDisplay.label("buyout") == "Entire cabin"
     end
 
@@ -38,11 +38,12 @@ defmodule Ysc.Bookings.BookingModeDisplayTest do
       assert BookingModeDisplay.stay_type_label("other") == "Shared cabin"
     end
 
-    test "uses different copy from email label/1 for room and day" do
-      assert BookingModeDisplay.label(:room) == "Room Booking"
-      assert BookingModeDisplay.stay_type_label(:room) == "Individual room(s)"
-      assert BookingModeDisplay.label(:day) == "Day Booking"
-      assert BookingModeDisplay.stay_type_label(:day) == "Shared cabin"
+    test "uses the same copy as stay_type_label for room and day" do
+      assert BookingModeDisplay.label(:room) ==
+               BookingModeDisplay.stay_type_label(:room)
+
+      assert BookingModeDisplay.label(:day) ==
+               BookingModeDisplay.stay_type_label(:day)
 
       assert BookingModeDisplay.label(:buyout) ==
                BookingModeDisplay.stay_type_label(:buyout)

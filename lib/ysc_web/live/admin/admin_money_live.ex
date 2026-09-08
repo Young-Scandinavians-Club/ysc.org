@@ -12,6 +12,7 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.Tickets
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReport
+  alias Ysc.ExpenseReports.ExpenseReportItem
   alias Ysc.Repo
   alias YscWeb.AdminBadgeHelpers
   alias YscWeb.DateDisplay
@@ -75,6 +76,10 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:per_page, 20)
       |> assign(:show_expense_report_modal, false)
       |> assign(:selected_expense_report, nil)
+      |> assign(:expense_attachments, [])
+      |> assign(:selected_attachment_index, 0)
+      |> assign(:expense_item_flags, %{})
+      |> assign(:expense_report_totals, nil)
       |> assign(
         :expense_report_status_form,
         to_form(%{}, as: :expense_report_status)
@@ -1081,16 +1086,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> Repo.one()
 
     if expense_report do
-      status_form =
-        %{status: expense_report.status}
-        |> expense_report_status_changeset()
-        |> to_form(as: :expense_report_status)
-
-      {:noreply,
-       socket
-       |> assign(:show_expense_report_modal, true)
-       |> assign(:selected_expense_report, expense_report)
-       |> assign(:expense_report_status_form, status_form)}
+      {:noreply, assign_expense_report_modal(socket, expense_report)}
     else
       {:noreply,
        socket
@@ -1102,14 +1098,7 @@ defmodule YscWeb.AdminMoneyLive do
 
   @impl true
   def handle_event("close_expense_report_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_expense_report_modal, false)
-     |> assign(:selected_expense_report, nil)
-     |> assign(
-       :expense_report_status_form,
-       to_form(%{}, as: :expense_report_status)
-     )}
+    {:noreply, clear_expense_report_modal(socket)}
   end
 
   @impl true
@@ -1118,68 +1107,56 @@ defmodule YscWeb.AdminMoneyLive do
         %{"expense_report_status" => status_params},
         socket
       ) do
-    %{selected_expense_report: expense_report} = socket.assigns
+    apply_expense_report_status(socket, status_params)
+  end
 
-    # Reload expense report with all required associations before updating
-    expense_report =
-      from(er in ExpenseReport,
-        where: er.id == ^expense_report.id,
-        preload: [
-          :user,
-          :expense_items,
-          :income_items,
-          :address,
-          :bank_account,
-          :event
-        ]
+  @impl true
+  def handle_event(
+        "update_expense_report_status",
+        %{"status" => status},
+        socket
+      ) do
+    apply_expense_report_status(socket, %{"status" => status})
+  end
+
+  @impl true
+  def handle_event("select_expense_attachment", %{"index" => raw}, socket) do
+    {:noreply, assign_selected_attachment(socket, parse_attachment_index(raw))}
+  end
+
+  @impl true
+  def handle_event("expense_attachment_prev", _params, socket) do
+    {:noreply, shift_attachment_index(socket, -1)}
+  end
+
+  @impl true
+  def handle_event("expense_attachment_next", _params, socket) do
+    {:noreply, shift_attachment_index(socket, 1)}
+  end
+
+  @impl true
+  def handle_event(
+        "expense_attachment_keydown",
+        %{"key" => key},
+        socket
       )
-      |> Repo.one()
+      when key in ["ArrowLeft", "ArrowUp"] do
+    {:noreply, shift_attachment_index(socket, -1)}
+  end
 
-    if expense_report do
-      case ExpenseReports.update_expense_report(expense_report, status_params) do
-        {:ok, _updated_report} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :info,
-             "Expense report status updated successfully",
-             title: "Expense report"
-           )
-           |> assign(:show_expense_report_modal, false)
-           |> assign(:selected_expense_report, nil)
-           |> load_expense_reports_inbox()
-           |> maybe_refresh_expense_reports_list()
-           |> assign(
-             :expense_report_status_form,
-             to_form(%{}, as: :expense_report_status)
-           )}
+  @impl true
+  def handle_event(
+        "expense_attachment_keydown",
+        %{"key" => key},
+        socket
+      )
+      when key in ["ArrowRight", "ArrowDown"] do
+    {:noreply, shift_attachment_index(socket, 1)}
+  end
 
-        {:error, changeset} ->
-          error_message =
-            case changeset.errors do
-              [] -> "Failed to update expense report status"
-              errors -> "Validation errors: #{inspect(errors)}"
-            end
-
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(:error, error_message,
-             title: "Expense report"
-           )
-           |> assign(
-             :expense_report_status_form,
-             to_form(changeset, as: :expense_report_status)
-           )}
-      end
-    else
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(:error, "Expense report not found",
-         title: "Expense report"
-       )
-       |> assign(:show_expense_report_modal, false)
-       |> assign(:selected_expense_report, nil)}
-    end
+  @impl true
+  def handle_event("expense_attachment_keydown", _params, socket) do
+    {:noreply, socket}
   end
 
   @impl true
@@ -3435,428 +3412,1076 @@ defmodule YscWeb.AdminMoneyLive do
         :if={@show_expense_report_modal && @selected_expense_report}
         id="expense-report-modal"
         show
+        fullscreen
+        fill_viewport
         on_cancel={JS.push("close_expense_report_modal")}
       >
-        <h3 class="text-lg font-medium text-zinc-900 mb-4">
-          Expense Report Details
-        </h3>
-
-        <% totals = ExpenseReports.calculate_totals(@selected_expense_report) %>
-        <!-- Basic Information -->
-        <div class="mb-6 space-y-3">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Basic Information
-          </h4>
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="font-medium text-zinc-700">Expense Report ID</p>
-              <p class="text-zinc-900 font-mono text-xs">
-                {String.slice(to_string(@selected_expense_report.id), 0..20)}...
-              </p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">User</p>
-              <p class="text-zinc-900">
-                <%= if Ecto.assoc_loaded?(@selected_expense_report.user) && @selected_expense_report.user do %>
-                  <.link
-                    navigate={
-                      ~p"/admin/users/#{@selected_expense_report.user.id}/details"
-                    }
-                    class="text-blue-600 hover:underline"
-                  >
-                    {get_user_display_name(@selected_expense_report.user)} ({@selected_expense_report.user.email})
-                  </.link>
-                <% else %>
-                  <span class="text-zinc-400">Unknown</span>
-                <% end %>
-              </p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">Purpose</p>
-              <p class="text-zinc-900">{@selected_expense_report.purpose}</p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">Reimbursement Method</p>
-              <p class="text-zinc-900">
-                {String.capitalize(
-                  @selected_expense_report.reimbursement_method || "unknown"
-                )}
-              </p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">Status</p>
-              <p class="text-zinc-900">
-                <.badge type={
-                  AdminBadgeHelpers.expense_report_status_badge_type(
-                    @selected_expense_report.status
-                  )
-                }>
-                  {String.capitalize(@selected_expense_report.status || "unknown")}
-                </.badge>
-              </p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">Certification Accepted</p>
-              <p class="text-zinc-900">
-                {if @selected_expense_report.certification_accepted,
-                  do: "Yes",
-                  else: "No"}
-              </p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">Created At</p>
-              <p class="text-zinc-900">
-                {format_datetime(
-                  @selected_expense_report.inserted_at,
-                  @timezone,
-                  "%Y-%m-%d %H:%M:%S"
-                )}
-              </p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">Updated At</p>
-              <p class="text-zinc-900">
-                {format_datetime(
-                  @selected_expense_report.updated_at,
-                  @timezone,
-                  "%Y-%m-%d %H:%M:%S"
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-        <!-- Reimbursement Details -->
-        <div class="mb-6 space-y-3">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Reimbursement Details
-          </h4>
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <%= if @selected_expense_report.reimbursement_method == "check" do %>
-              <div>
-                <p class="font-medium text-zinc-700">Address</p>
-                <p class="text-zinc-900">
-                  <%= if Ecto.assoc_loaded?(@selected_expense_report.address) && @selected_expense_report.address do %>
-                    {@selected_expense_report.address.address}<br />
-                    {@selected_expense_report.address.city}, {@selected_expense_report.address.region} {@selected_expense_report.address.postal_code}
-                  <% else %>
-                    <span class="text-zinc-400">Not set</span>
-                  <% end %>
-                </p>
-              </div>
-            <% end %>
-            <%= if @selected_expense_report.reimbursement_method == "bank_transfer" do %>
-              <div>
-                <p class="font-medium text-zinc-700">Bank Account</p>
-                <p class="text-zinc-900">
-                  <%= if Ecto.assoc_loaded?(@selected_expense_report.bank_account) && @selected_expense_report.bank_account do %>
-                    Account ending in: {@selected_expense_report.bank_account.account_number_last_4}
-                  <% else %>
-                    <span class="text-zinc-400">Not set</span>
-                  <% end %>
-                </p>
-              </div>
-            <% end %>
-            <%= if Ecto.assoc_loaded?(@selected_expense_report.event) && @selected_expense_report.event do %>
-              <div>
-                <p class="font-medium text-zinc-700">Related Event</p>
-                <p class="text-zinc-900">
-                  {@selected_expense_report.event.title}
-                </p>
-              </div>
-            <% end %>
-          </div>
-        </div>
-        <!-- QuickBooks Information -->
-        <div class="mb-6 space-y-3">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            QuickBooks Information
-          </h4>
-          <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="font-medium text-zinc-700">Sync Status</p>
-              <p class="text-zinc-900">
-                <.admin_quickbooks_sync_status
-                  status={@selected_expense_report.quickbooks_sync_status}
-                  layout={:inline}
-                  default_label="unknown"
-                />
-              </p>
-            </div>
-            <%= if @selected_expense_report.quickbooks_bill_id do %>
-              <div>
-                <p class="font-medium text-zinc-700">QuickBooks Bill ID</p>
-                <a
-                  href={
-                    quickbooks_entity_url(
-                      "bill",
-                      @selected_expense_report.quickbooks_bill_id
+        <% report = @selected_expense_report %>
+        <% totals =
+          @expense_report_totals || ExpenseReports.calculate_totals(report) %>
+        <% {submitted_phrase, submitted_absolute} =
+          submitted_label(report.inserted_at, @timezone) %>
+        <% expense_rows = expense_attachment_rows(@expense_attachments) %>
+        <% income_rows = income_attachment_rows(@expense_attachments) %>
+        <% selected = Enum.at(@expense_attachments, @selected_attachment_index) %>
+        <% attention_count = flagged_item_count(@expense_item_flags) %>
+        <div
+          id="expense-report-review"
+          phx-hook="ExpenseReceiptKeys"
+          class="flex h-full min-h-0 flex-1 flex-row overflow-hidden"
+        >
+          <span
+            id="expense-receipt-key-left"
+            class="hidden"
+            phx-window-keydown="expense_attachment_prev"
+            phx-key="ArrowLeft"
+          ></span>
+          <span
+            id="expense-receipt-key-right"
+            class="hidden"
+            phx-window-keydown="expense_attachment_next"
+            phx-key="ArrowRight"
+          ></span>
+          <span
+            id="expense-receipt-key-up"
+            class="hidden"
+            phx-window-keydown="expense_attachment_prev"
+            phx-key="ArrowUp"
+          ></span>
+          <span
+            id="expense-receipt-key-down"
+            class="hidden"
+            phx-window-keydown="expense_attachment_next"
+            phx-key="ArrowDown"
+          ></span>
+          <div class="flex h-full min-h-0 w-[min(34%,30rem)] min-w-[22rem] shrink-0 flex-col border-r border-zinc-200">
+            <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-lg font-semibold text-zinc-900">
+                    {report.purpose}
+                  </h3>
+                  <p class="mt-1 text-sm text-zinc-600">
+                    <%= if Ecto.assoc_loaded?(report.user) && report.user do %>
+                      <.link
+                        navigate={~p"/admin/users/#{report.user.id}/details"}
+                        class="font-medium text-blue-600 hover:underline"
+                      >
+                        {get_user_display_name(report.user)}
+                      </.link>
+                      <span class="text-zinc-400">·</span>
+                      <span>{report.user.email}</span>
+                    <% else %>
+                      <span class="text-zinc-400">Unknown member</span>
+                    <% end %>
+                    <span class="text-zinc-400">·</span>
+                    <span title={submitted_absolute}>{submitted_phrase}</span>
+                    <%= if Ecto.assoc_loaded?(report.event) && report.event do %>
+                      <span class="text-zinc-400">·</span>
+                      <span>Event: {report.event.title}</span>
+                    <% end %>
+                  </p>
+                  <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <span
+                      class="font-mono text-xs text-zinc-500"
+                      title={to_string(report.id)}
+                    >
+                      {truncate_id(to_string(report.id))}
+                    </span>
+                    <.admin_clipboard_button
+                      id={"copy-expense-report-id-#{report.id}"}
+                      variant={:icon}
+                      copy={to_string(report.id)}
+                      title="Copy expense report ID"
+                      aria_label="Copy expense report ID"
+                    />
+                  </div>
+                </div>
+                <div class="flex flex-col items-end gap-1">
+                  <.badge type={
+                    AdminBadgeHelpers.expense_report_status_badge_type(
+                      report.status
                     )
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-zinc-900 hover:text-blue-600 font-mono text-xs transition-colors underline decoration-dotted"
-                  title="View in QuickBooks"
+                  }>
+                    {String.capitalize(report.status || "unknown")}
+                  </.badge>
+                  <p class="text-xl font-semibold tabular-nums text-zinc-900">
+                    {Money.to_string!(totals.net_total)}
+                  </p>
+                  <p class="text-xs text-zinc-500">Net total</p>
+                  <%= if report.quickbooks_bill_id do %>
+                    <a
+                      id="expense-report-quickbooks-bill"
+                      href={
+                        quickbooks_entity_url(
+                          "bill",
+                          report.quickbooks_bill_id
+                        )
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="mt-1 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      title={report.quickbooks_bill_id}
+                    >
+                      View in QuickBooks
+                      <.icon
+                        name="hero-arrow-top-right-on-square"
+                        class="h-4 w-4"
+                      />
+                    </a>
+                  <% end %>
+                </div>
+              </div>
+
+              <%= if attention_count > 0 do %>
+                <p
+                  id="expense-report-attention"
+                  class="text-sm text-amber-800"
                 >
-                  {@selected_expense_report.quickbooks_bill_id}
-                </a>
-              </div>
-            <% end %>
-            <%= if @selected_expense_report.quickbooks_vendor_id do %>
-              <div>
-                <p class="font-medium text-zinc-700">QuickBooks Vendor ID</p>
-                <p class="text-zinc-900 font-mono text-xs">
-                  {@selected_expense_report.quickbooks_vendor_id}
+                  {attention_count} item{if attention_count == 1,
+                    do: "",
+                    else: "s"} need attention
                 </p>
-              </div>
-            <% end %>
-            <%= if @selected_expense_report.quickbooks_synced_at do %>
-              <div>
-                <p class="font-medium text-zinc-700">Synced At</p>
-                <p class="text-zinc-900">
-                  {format_datetime(
-                    @selected_expense_report.quickbooks_synced_at,
-                    @timezone,
-                    "%Y-%m-%d %H:%M:%S"
-                  )}
-                </p>
-              </div>
-            <% end %>
-            <%= if @selected_expense_report.quickbooks_last_sync_attempt_at do %>
-              <div>
-                <p class="font-medium text-zinc-700">Last Sync Attempt</p>
-                <p class="text-zinc-900">
-                  {format_datetime(
-                    @selected_expense_report.quickbooks_last_sync_attempt_at,
-                    @timezone,
-                    "%Y-%m-%d %H:%M:%S"
-                  )}
-                </p>
-              </div>
-            <% end %>
-            <%= if @selected_expense_report.quickbooks_sync_error do %>
-              <div class="col-span-2">
-                <p class="font-medium text-zinc-700">Sync Error</p>
-                <p class="text-red-600 text-xs">
-                  {format_quickbooks_sync_error(
-                    @selected_expense_report.quickbooks_sync_error
-                  )}
-                </p>
-              </div>
-            <% end %>
-          </div>
-        </div>
-        <!-- Expense Items -->
-        <div class="mb-6">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Expense Items ({length(@selected_expense_report.expense_items || [])})
-          </h4>
-          <%= if Ecto.assoc_loaded?(@selected_expense_report.expense_items) && length(@selected_expense_report.expense_items) > 0 do %>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-zinc-200 text-sm">
-                <thead class="bg-zinc-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Date
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Vendor
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Description
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Amount
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Receipt
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-zinc-200">
-                  <tr
-                    :for={item <- @selected_expense_report.expense_items}
-                    id={"expense-report-item-#{item.id}"}
-                  >
-                    <td class="px-4 py-2 whitespace-nowrap">
-                      {Calendar.strftime(item.date, "%Y-%m-%d")}
-                    </td>
-                    <td class="px-4 py-2">{item.vendor}</td>
-                    <td class="px-4 py-2 max-w-xs">
-                      <div class="truncate" title={item.description}>
-                        {item.description}
-                      </div>
-                      <%= if item.expense_type == "mileage" do %>
-                        <div
-                          id={"expense-report-item-#{item.id}-mileage"}
-                          class="text-xs text-zinc-500 mt-0.5"
-                        >
-                          <%= if item.mileage_from_to do %>
-                            {item.mileage_from_to} •
-                          <% end %>
-                          <%= if item.miles_driven do %>
-                            {item.miles_driven} mi
-                          <% end %>
-                        </div>
-                      <% end %>
-                    </td>
-                    <td
-                      id={"expense-report-item-#{item.id}-amount"}
-                      class="px-4 py-2 whitespace-nowrap font-medium"
+              <% end %>
+
+              <.line_items_table
+                id="expense-report-expense-items"
+                title={"Expense items (#{length(expense_rows)})"}
+                rows={expense_rows}
+                selected_index={@selected_attachment_index}
+                flags={@expense_item_flags}
+                id_prefix="expense-report-item"
+                empty_copy="No expense items"
+                subtotal={sum_attachment_amounts(expense_rows)}
+              />
+
+              <.line_items_table
+                :if={income_rows != []}
+                id="expense-report-income-items"
+                title={"Income items (#{length(income_rows)})"}
+                rows={income_rows}
+                selected_index={@selected_attachment_index}
+                flags={@expense_item_flags}
+                id_prefix="income-report-item"
+                empty_copy="No income items"
+                subtotal={sum_attachment_amounts(income_rows)}
+              />
+
+              <details
+                id="expense-report-more-details"
+                class="rounded border border-zinc-200 bg-zinc-50 p-3 text-sm"
+                open={not is_nil(report.quickbooks_sync_error)}
+              >
+                <summary class="cursor-pointer font-medium text-zinc-800">
+                  More details
+                </summary>
+                <div class="mt-3 space-y-3">
+                  <%= if report.quickbooks_sync_error do %>
+                    <div
+                      id="expense-report-qb-error"
+                      class="rounded border border-red-200 bg-red-50 p-3 text-red-700"
                     >
-                      {Money.to_string!(item.amount)}
-                    </td>
-                    <td
-                      id={"expense-report-item-#{item.id}-receipt"}
-                      class="px-4 py-2"
-                    >
-                      <%= cond do %>
-                        <% item.receipt_s3_path -> %>
+                      {format_quickbooks_sync_error(report.quickbooks_sync_error)}
+                    </div>
+                  <% end %>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <p class="font-medium text-zinc-700">Certification</p>
+                      <p class="text-zinc-900">
+                        <%= if report.certification_accepted do %>
+                          Accepted
+                        <% else %>
+                          <.badge type="yellow">Not accepted</.badge>
+                        <% end %>
+                      </p>
+                    </div>
+                    <div>
+                      <p class="font-medium text-zinc-700">Created</p>
+                      <p class="text-zinc-900">
+                        {format_datetime_human(
+                          report.inserted_at,
+                          @timezone
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="font-medium text-zinc-700">Updated</p>
+                      <p class="text-zinc-900">
+                        {format_datetime_human(report.updated_at, @timezone)}
+                      </p>
+                    </div>
+                    <div>
+                      <p class="font-medium text-zinc-700">
+                        QuickBooks sync
+                      </p>
+                      <.admin_quickbooks_sync_status
+                        status={report.quickbooks_sync_status}
+                        layout={:inline}
+                        default_label="unknown"
+                      />
+                    </div>
+                    <%= if report.quickbooks_bill_id do %>
+                      <div>
+                        <p class="font-medium text-zinc-700">
+                          QuickBooks Bill ID
+                        </p>
+                        <div class="flex items-center gap-1">
                           <a
-                            href={ExpenseReports.receipt_url(item.receipt_s3_path)}
+                            href={
+                              quickbooks_entity_url(
+                                "bill",
+                                report.quickbooks_bill_id
+                              )
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="text-blue-600 hover:text-blue-800 text-xs"
+                            class="font-mono text-xs text-zinc-900 underline decoration-dotted hover:text-blue-600"
+                            title={report.quickbooks_bill_id}
                           >
-                            View Receipt
+                            {truncate_id(report.quickbooks_bill_id)}
                           </a>
-                        <% item.expense_type == "mileage" -> %>
-                          <span class="text-zinc-400 text-xs">Mileage — no receipt required</span>
-                        <% true -> %>
-                          <span class="text-zinc-400 text-xs">No receipt</span>
-                      <% end %>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          <% else %>
-            <p class="text-sm text-zinc-500 italic">No expense items</p>
-          <% end %>
-        </div>
-        <!-- Income Items -->
-        <div class="mb-6">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
-            Income Items ({length(@selected_expense_report.income_items || [])})
-          </h4>
-          <%= if Ecto.assoc_loaded?(@selected_expense_report.income_items) && length(@selected_expense_report.income_items) > 0 do %>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-zinc-200 text-sm">
-                <thead class="bg-zinc-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Date
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Description
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Amount
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
-                      Proof
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-zinc-200">
-                  <tr :for={item <- @selected_expense_report.income_items}>
-                    <td class="px-4 py-2 whitespace-nowrap">
-                      {Calendar.strftime(item.date, "%Y-%m-%d")}
-                    </td>
-                    <td class="px-4 py-2 max-w-xs">
-                      <div class="truncate" title={item.description}>
-                        {item.description}
+                          <.admin_clipboard_button
+                            id={"copy-qb-bill-#{report.id}"}
+                            variant={:icon}
+                            copy={report.quickbooks_bill_id}
+                            title="Copy QuickBooks Bill ID"
+                            aria_label="Copy QuickBooks Bill ID"
+                          />
+                        </div>
                       </div>
-                    </td>
-                    <td class="px-4 py-2 whitespace-nowrap font-medium">
-                      {Money.to_string!(item.amount)}
-                    </td>
-                    <td class="px-4 py-2">
-                      <%= if item.proof_s3_path do %>
-                        <a
-                          href={ExpenseReports.receipt_url(item.proof_s3_path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-blue-600 hover:text-blue-800 text-xs"
-                        >
-                          View Proof
-                        </a>
-                      <% else %>
-                        <span class="text-zinc-400 text-xs">No proof</span>
-                      <% end %>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    <% end %>
+                    <%= if report.quickbooks_vendor_id do %>
+                      <div>
+                        <p class="font-medium text-zinc-700">
+                          QuickBooks Vendor ID
+                        </p>
+                        <div class="flex items-center gap-1">
+                          <span
+                            class="font-mono text-xs text-zinc-900"
+                            title={report.quickbooks_vendor_id}
+                          >
+                            {truncate_id(report.quickbooks_vendor_id)}
+                          </span>
+                          <.admin_clipboard_button
+                            id={"copy-qb-vendor-#{report.id}"}
+                            variant={:icon}
+                            copy={report.quickbooks_vendor_id}
+                            title="Copy QuickBooks Vendor ID"
+                            aria_label="Copy QuickBooks Vendor ID"
+                          />
+                        </div>
+                      </div>
+                    <% end %>
+                    <%= if report.quickbooks_synced_at do %>
+                      <div>
+                        <p class="font-medium text-zinc-700">Synced at</p>
+                        <p class="text-zinc-900">
+                          {format_datetime_human(
+                            report.quickbooks_synced_at,
+                            @timezone
+                          )}
+                        </p>
+                      </div>
+                    <% end %>
+                    <%= if report.quickbooks_last_sync_attempt_at do %>
+                      <div>
+                        <p class="font-medium text-zinc-700">
+                          Last sync attempt
+                        </p>
+                        <p class="text-zinc-900">
+                          {format_datetime_human(
+                            report.quickbooks_last_sync_attempt_at,
+                            @timezone
+                          )}
+                        </p>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              </details>
             </div>
-          <% else %>
-            <p class="text-sm text-zinc-500 italic">No income items</p>
-          <% end %>
-        </div>
-        <!-- Totals -->
-        <div class="mb-6 p-4 bg-zinc-50 rounded border">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">Totals</h4>
-          <div class="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p class="font-medium text-zinc-700">Expense Total</p>
-              <p class="text-lg font-semibold text-zinc-900">
-                {Money.to_string!(totals.expense_total)}
+
+            <div
+              id="expense-report-decision"
+              class="shrink-0 border-t border-zinc-200 bg-white px-6 py-6 sm:px-8"
+            >
+              <p class="mb-3 text-sm text-zinc-700">
+                {reimbursement_destination_summary(report, totals)}
               </p>
+              <%= if report.quickbooks_bill_id do %>
+                <a
+                  id="expense-report-quickbooks-bill-footer"
+                  href={quickbooks_entity_url("bill", report.quickbooks_bill_id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="mb-3 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                  title={report.quickbooks_bill_id}
+                >
+                  View bill in QuickBooks
+                  <.icon
+                    name="hero-arrow-top-right-on-square"
+                    class="h-4 w-4"
+                  />
+                </a>
+              <% end %>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <.button
+                  type="button"
+                  color="zinc"
+                  variant="outline"
+                  phx-click="close_expense_report_modal"
+                >
+                  Close
+                </.button>
+                <%= case report.status do %>
+                  <% "submitted" -> %>
+                    <.button
+                      id="expense-report-reject"
+                      type="button"
+                      color="red"
+                      phx-click="update_expense_report_status"
+                      phx-value-status="rejected"
+                      data-confirm="Reject this expense report?"
+                    >
+                      Reject
+                    </.button>
+                    <.button
+                      id="expense-report-approve"
+                      type="button"
+                      color="green"
+                      phx-click="update_expense_report_status"
+                      phx-value-status="approved"
+                    >
+                      Approve
+                    </.button>
+                  <% "approved" -> %>
+                    <.button
+                      id="expense-report-revert"
+                      type="button"
+                      color="zinc"
+                      variant="outline"
+                      phx-click="update_expense_report_status"
+                      phx-value-status="submitted"
+                    >
+                      Revert to submitted
+                    </.button>
+                    <.button
+                      id="expense-report-mark-paid"
+                      type="button"
+                      color="blue"
+                      phx-click="update_expense_report_status"
+                      phx-value-status="paid"
+                    >
+                      Mark paid
+                    </.button>
+                  <% "rejected" -> %>
+                    <.button
+                      id="expense-report-reopen"
+                      type="button"
+                      color="blue"
+                      phx-click="update_expense_report_status"
+                      phx-value-status="submitted"
+                    >
+                      Reopen
+                    </.button>
+                  <% _ -> %>
+                <% end %>
+              </div>
+              <details id="expense-report-status-form" class="mt-3">
+                <summary class="cursor-pointer text-xs text-zinc-500">
+                  Change status manually
+                </summary>
+                <.form
+                  for={@expense_report_status_form}
+                  phx-submit="update_expense_report_status"
+                  class="mt-3"
+                >
+                  <.input
+                    field={@expense_report_status_form[:status]}
+                    type="select"
+                    label="Update Status"
+                    options={[
+                      {"Draft", "draft"},
+                      {"Submitted", "submitted"},
+                      {"Approved", "approved"},
+                      {"Rejected", "rejected"},
+                      {"Paid", "paid"}
+                    ]}
+                    required
+                  />
+                  <div class="mt-2 flex justify-end">
+                    <.button type="submit" phx-disable-with="Updating...">
+                      Update Status
+                    </.button>
+                  </div>
+                </.form>
+              </details>
             </div>
-            <div>
-              <p class="font-medium text-zinc-700">Income Total</p>
-              <p class="text-lg font-semibold text-zinc-900">
-                {Money.to_string!(totals.income_total)}
-              </p>
-            </div>
-            <div>
-              <p class="font-medium text-zinc-700">Net Total</p>
-              <p class="text-lg font-semibold text-zinc-900">
-                {Money.to_string!(totals.net_total)}
-              </p>
-            </div>
-          </div>
-        </div>
-        <!-- Status Update Form -->
-        <.form
-          for={@expense_report_status_form}
-          phx-submit="update_expense_report_status"
-        >
-          <div class="mb-4">
-            <.input
-              field={@expense_report_status_form[:status]}
-              type="select"
-              label="Update Status"
-              options={[
-                {"Draft", "draft"},
-                {"Submitted", "submitted"},
-                {"Approved", "approved"},
-                {"Rejected", "rejected"},
-                {"Paid", "paid"}
-              ]}
-              required
-            />
           </div>
 
-          <div class="flex justify-end gap-2">
-            <.button
-              type="button"
-              phx-click="close_expense_report_modal"
-              class="bg-zinc-500 hover:bg-zinc-600"
-            >
-              Close
-            </.button>
-            <.button
-              type="submit"
-              phx-disable-with="Updating..."
-              class="bg-blue-600 hover:bg-blue-700"
-            >
-              Update Status
-            </.button>
+          <div
+            id="expense-receipt-viewer"
+            class="flex h-full min-h-0 min-w-0 flex-1 flex-col px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8"
+          >
+            <%= if selected do %>
+              <div class="mb-3 flex flex-wrap items-start justify-between gap-3 pr-12">
+                <div class="min-w-0">
+                  <p
+                    id="expense-receipt-caption"
+                    class="font-medium text-zinc-900"
+                  >
+                    {selected.label}
+                  </p>
+                  <p class="text-sm text-zinc-600">
+                    {format_item_date(selected.date)}
+                    <span class="text-zinc-400">·</span>
+                    <span class="tabular-nums">
+                      {Money.to_string!(selected.amount)}
+                    </span>
+                    <%= if selected.filename do %>
+                      <span class="text-zinc-400">·</span>
+                      <span class="font-mono text-xs">{selected.filename}</span>
+                    <% end %>
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs tabular-nums text-zinc-500">
+                    {selected.index + 1} of {length(@expense_attachments)}
+                  </span>
+                  <.button
+                    id="expense-receipt-prev"
+                    type="button"
+                    color="zinc"
+                    variant="outline"
+                    phx-click="expense_attachment_prev"
+                    class="!min-h-0 px-2 py-1"
+                  >
+                    <.icon name="hero-chevron-left" class="h-4 w-4" />
+                    <span class="sr-only">Previous item</span>
+                  </.button>
+                  <.button
+                    id="expense-receipt-next"
+                    type="button"
+                    color="zinc"
+                    variant="outline"
+                    phx-click="expense_attachment_next"
+                    class="!min-h-0 px-2 py-1"
+                  >
+                    <.icon name="hero-chevron-right" class="h-4 w-4" />
+                    <span class="sr-only">Next item</span>
+                  </.button>
+                  <%= if attachment_open_url(selected) do %>
+                    <a
+                      id="expense-receipt-open"
+                      href={attachment_open_url(selected)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-xs font-medium text-blue-600 hover:underline"
+                    >
+                      Open in new tab
+                    </a>
+                  <% end %>
+                </div>
+              </div>
+              <div class="relative min-h-0 flex-1 overflow-hidden rounded bg-zinc-100">
+                <%= cond do %>
+                  <% selected.media == :image && selected.url -> %>
+                    <div
+                      id={"expense-receipt-lightbox-#{selected.index}"}
+                      phx-hook="ReceiptLightbox"
+                      class="absolute inset-0 flex items-center justify-center p-3"
+                    >
+                      <a
+                        href={selected.url}
+                        data-lightbox="receipt"
+                        class="flex h-full max-h-full w-full cursor-zoom-in items-center justify-center"
+                      >
+                        <img
+                          src={selected.url}
+                          alt={"Receipt for #{selected.label}"}
+                          class="max-h-full max-w-full object-contain"
+                        />
+                      </a>
+                    </div>
+                  <% selected.media == :pdf && selected.preview_url -> %>
+                    <iframe
+                      id={"expense-receipt-pdf-#{selected.index}"}
+                      src={selected.preview_url}
+                      title={"Receipt for #{selected.label}"}
+                      tabindex="-1"
+                      class="absolute inset-0 h-full w-full border-0"
+                    ></iframe>
+                  <% selected.expense_type == "mileage" -> %>
+                    <p class="flex h-full items-center justify-center p-6 text-center text-sm text-zinc-500">
+                      Mileage — no receipt required
+                    </p>
+                  <% selected.kind == :income -> %>
+                    <p class="flex h-full items-center justify-center p-6 text-center text-sm text-zinc-500">
+                      No proof attached
+                    </p>
+                  <% true -> %>
+                    <p class="flex h-full items-center justify-center p-6 text-center text-sm text-zinc-500">
+                      No receipt attached
+                    </p>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="p-6 text-center text-sm text-zinc-500">
+                No expense items
+              </p>
+            <% end %>
           </div>
-        </.form>
+        </div>
       </.modal>
     </.side_menu>
     """
+  end
+
+  attr :id, :string, required: true
+  attr :title, :string, required: true
+  attr :rows, :list, required: true
+  attr :selected_index, :integer, required: true
+  attr :flags, :map, required: true
+  attr :id_prefix, :string, required: true
+  attr :empty_copy, :string, required: true
+  attr :subtotal, :any, required: true
+
+  defp line_items_table(assigns) do
+    ~H"""
+    <div id={@id}>
+      <h4 class="mb-2 text-sm font-semibold text-zinc-800">{@title}</h4>
+      <%= if @rows == [] do %>
+        <p class="text-sm italic text-zinc-500">{@empty_copy}</p>
+      <% else %>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-zinc-200 text-sm">
+            <thead class="bg-zinc-50">
+              <tr>
+                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                  #
+                </th>
+                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                  Date
+                </th>
+                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                  Vendor
+                </th>
+                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                  Description
+                </th>
+                <th class="px-2 py-2 text-right text-xs font-medium uppercase text-zinc-500">
+                  Amount
+                </th>
+                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                  Receipt
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-200 bg-white">
+              <tr
+                :for={row <- @rows}
+                id={"#{@id_prefix}-#{row.item_id}"}
+                phx-click="select_expense_attachment"
+                phx-value-index={row.index}
+                aria-selected={@selected_index == row.index}
+                class={[
+                  "cursor-pointer hover:bg-zinc-50",
+                  @selected_index == row.index &&
+                    "bg-blue-50 ring-1 ring-inset ring-blue-200"
+                ]}
+              >
+                <td class="px-2 py-2 tabular-nums text-zinc-500">
+                  {row.index + 1}
+                </td>
+                <td class="whitespace-nowrap px-2 py-2">
+                  {format_item_date(row.date)}
+                </td>
+                <td class="px-2 py-2">{row.vendor || "—"}</td>
+                <td class="max-w-xs px-2 py-2">
+                  <div>{row.description}</div>
+                  <%= if row.expense_type == "mileage" do %>
+                    <div
+                      id={"#{@id_prefix}-#{row.item_id}-mileage"}
+                      class="mt-0.5 text-xs text-zinc-500"
+                    >
+                      <%= if row.mileage_from_to do %>
+                        {row.mileage_from_to} •
+                      <% end %>
+                      <%= if row.miles_driven do %>
+                        {row.miles_driven} mi × {Money.to_string!(
+                          ExpenseReportItem.mileage_rate()
+                        )}
+                      <% end %>
+                    </div>
+                  <% end %>
+                  <%= if Map.get(@flags, row.item_id, []) != [] do %>
+                    <div
+                      id={"#{@id_prefix}-#{row.item_id}-flags"}
+                      class="mt-1 flex flex-wrap gap-1"
+                    >
+                      <.badge
+                        :for={flag <- Map.get(@flags, row.item_id, [])}
+                        type="yellow"
+                      >
+                        {flag_label(flag)}
+                      </.badge>
+                    </div>
+                  <% end %>
+                </td>
+                <td
+                  id={"#{@id_prefix}-#{row.item_id}-amount"}
+                  class="whitespace-nowrap px-2 py-2 text-right font-medium tabular-nums"
+                >
+                  {Money.to_string!(row.amount)}
+                </td>
+                <td
+                  id={"#{@id_prefix}-#{row.item_id}-receipt"}
+                  class="px-2 py-2"
+                >
+                  <span class="sr-only">{receipt_cell_label(row)}</span>
+                  <%= cond do %>
+                    <% row.media == :image && row.url -> %>
+                      <img
+                        src={row.url}
+                        alt={receipt_cell_label(row)}
+                        title={receipt_cell_label(row)}
+                        class="h-10 w-10 rounded object-cover"
+                      />
+                    <% row.media == :pdf -> %>
+                      <.icon
+                        name="hero-document-text"
+                        class="h-8 w-8 text-red-600"
+                      />
+                    <% true -> %>
+                      <span
+                        title={receipt_cell_label(row)}
+                        class="inline-block h-8 w-8 rounded border border-dashed border-zinc-300"
+                      ></span>
+                  <% end %>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="bg-zinc-50">
+                <td
+                  colspan="4"
+                  class="px-2 py-2 text-right text-xs font-medium uppercase text-zinc-500"
+                >
+                  Subtotal
+                </td>
+                <td class="px-2 py-2 text-right font-semibold tabular-nums">
+                  {Money.to_string!(@subtotal)}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp apply_expense_report_status(socket, status_params) do
+    expense_report = socket.assigns.selected_expense_report
+
+    expense_report =
+      if expense_report do
+        from(er in ExpenseReport,
+          where: er.id == ^expense_report.id,
+          preload: [
+            :user,
+            :expense_items,
+            :income_items,
+            :address,
+            :bank_account,
+            :event
+          ]
+        )
+        |> Repo.one()
+      end
+
+    if expense_report do
+      case ExpenseReports.update_expense_report(expense_report, status_params) do
+        {:ok, _updated_report} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :info,
+             "Expense report status updated successfully",
+             title: "Expense report"
+           )
+           |> clear_expense_report_modal()
+           |> load_expense_reports_inbox()
+           |> maybe_refresh_expense_reports_list()}
+
+        {:error, changeset} ->
+          error_message =
+            case changeset.errors do
+              [] -> "Failed to update expense report status"
+              errors -> "Validation errors: #{inspect(errors)}"
+            end
+
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, error_message,
+             title: "Expense report"
+           )
+           |> assign(
+             :expense_report_status_form,
+             to_form(changeset, as: :expense_report_status)
+           )}
+      end
+    else
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:error, "Expense report not found",
+         title: "Expense report"
+       )
+       |> clear_expense_report_modal()}
+    end
+  end
+
+  defp assign_expense_report_modal(socket, expense_report) do
+    attachments = build_expense_attachments(expense_report)
+    flags = compute_item_flags(expense_report)
+
+    status_form =
+      %{status: expense_report.status}
+      |> expense_report_status_changeset()
+      |> to_form(as: :expense_report_status)
+
+    socket
+    |> assign(:show_expense_report_modal, true)
+    |> assign(:selected_expense_report, expense_report)
+    |> assign(:expense_attachments, attachments)
+    |> assign(:selected_attachment_index, default_attachment_index(attachments))
+    |> assign(:expense_item_flags, flags)
+    |> assign(
+      :expense_report_totals,
+      ExpenseReports.calculate_totals(expense_report)
+    )
+    |> assign(:expense_report_status_form, status_form)
+  end
+
+  defp clear_expense_report_modal(socket) do
+    socket
+    |> assign(:show_expense_report_modal, false)
+    |> assign(:selected_expense_report, nil)
+    |> assign(:expense_attachments, [])
+    |> assign(:selected_attachment_index, 0)
+    |> assign(:expense_item_flags, %{})
+    |> assign(:expense_report_totals, nil)
+    |> assign(
+      :expense_report_status_form,
+      to_form(%{}, as: :expense_report_status)
+    )
+  end
+
+  defp parse_attachment_index(raw) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {index, ""} -> index
+      _ -> nil
+    end
+  end
+
+  defp parse_attachment_index(raw) when is_integer(raw), do: raw
+  defp parse_attachment_index(_), do: nil
+
+  defp assign_selected_attachment(socket, nil), do: socket
+
+  defp assign_selected_attachment(socket, index) when is_integer(index) do
+    max_index = length(socket.assigns.expense_attachments) - 1
+
+    if max_index < 0 do
+      socket
+    else
+      assign(socket, :selected_attachment_index, min(max(index, 0), max_index))
+    end
+  end
+
+  defp shift_attachment_index(socket, delta) do
+    attachments = socket.assigns.expense_attachments
+    count = length(attachments)
+
+    if count == 0 do
+      socket
+    else
+      current = socket.assigns.selected_attachment_index || 0
+
+      assign(
+        socket,
+        :selected_attachment_index,
+        Integer.mod(current + delta, count)
+      )
+    end
+  end
+
+  defp default_attachment_index(attachments) do
+    case Enum.find_index(attachments, &(&1.media != :none)) do
+      nil -> 0
+      index -> index
+    end
+  end
+
+  defp ordered_report_items(items) when is_list(items) do
+    Enum.sort_by(items, &{&1.position || 999_999, &1.id})
+  end
+
+  defp ordered_report_items(_), do: []
+
+  defp build_expense_attachments(expense_report) do
+    expense_rows =
+      expense_report.expense_items
+      |> ordered_report_items()
+      |> Enum.map(&expense_item_to_attachment/1)
+
+    income_rows =
+      expense_report.income_items
+      |> ordered_report_items()
+      |> Enum.map(&income_item_to_attachment/1)
+
+    (expense_rows ++ income_rows)
+    |> Enum.with_index()
+    |> Enum.map(fn {row, index} -> Map.put(row, :index, index) end)
+  end
+
+  defp expense_item_to_attachment(item) do
+    s3_path = blank_to_nil(item.receipt_s3_path)
+    media = ExpenseReports.media_type_for_path(s3_path)
+
+    %{
+      kind: :expense,
+      item_id: item.id,
+      label: item.vendor || item.description || "Expense item",
+      vendor: item.vendor,
+      description: item.description,
+      date: item.date,
+      amount: item.amount,
+      s3_path: s3_path,
+      filename: s3_path && Path.basename(s3_path),
+      media: media,
+      url: s3_path && ExpenseReports.receipt_url(s3_path),
+      preview_url: s3_path && ExpenseReports.receipt_preview_url(s3_path),
+      expense_type: item.expense_type,
+      mileage_from_to: item.mileage_from_to,
+      miles_driven: item.miles_driven
+    }
+  end
+
+  defp income_item_to_attachment(item) do
+    s3_path = blank_to_nil(item.proof_s3_path)
+    media = ExpenseReports.media_type_for_path(s3_path)
+
+    %{
+      kind: :income,
+      item_id: item.id,
+      label: item.description || "Income item",
+      vendor: nil,
+      description: item.description,
+      date: item.date,
+      amount: item.amount,
+      s3_path: s3_path,
+      filename: s3_path && Path.basename(s3_path),
+      media: media,
+      url: s3_path && ExpenseReports.receipt_url(s3_path),
+      preview_url: s3_path && ExpenseReports.receipt_preview_url(s3_path),
+      expense_type: nil,
+      mileage_from_to: nil,
+      miles_driven: nil
+    }
+  end
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(_), do: nil
+
+  defp compute_item_flags(expense_report) do
+    today = Date.utc_today()
+    inserted_date = DateTime.to_date(expense_report.inserted_at)
+    stale_cutoff = Date.add(inserted_date, -90)
+    items = ordered_report_items(expense_report.expense_items)
+
+    duplicate_keys =
+      items
+      |> Enum.frequencies_by(&duplicate_item_key/1)
+      |> Enum.filter(fn {_key, count} -> count > 1 end)
+      |> MapSet.new(fn {key, _count} -> key end)
+
+    Map.new(items, fn item ->
+      flags =
+        []
+        |> maybe_flag(
+          item.expense_type != "mileage" and
+            is_nil(blank_to_nil(item.receipt_s3_path)),
+          :missing_receipt
+        )
+        |> maybe_flag(
+          item.date && Date.compare(item.date, today) == :gt,
+          :future_date
+        )
+        |> maybe_flag(
+          item.date && Date.compare(item.date, stale_cutoff) == :lt,
+          :stale_date
+        )
+        |> maybe_flag(
+          MapSet.member?(duplicate_keys, duplicate_item_key(item)),
+          :possible_duplicate
+        )
+
+      {item.id, flags}
+    end)
+  end
+
+  defp maybe_flag(flags, true, flag), do: flags ++ [flag]
+  defp maybe_flag(flags, _false, _flag), do: flags
+
+  defp duplicate_item_key(item) do
+    {item.vendor, money_flag_key(item.amount), item.date}
+  end
+
+  defp money_flag_key(%Money{} = money), do: {money.currency, money.amount}
+  defp money_flag_key(other), do: other
+
+  defp flag_label(:missing_receipt), do: "Missing receipt"
+  defp flag_label(:future_date), do: "Future date"
+  defp flag_label(:stale_date), do: "Older than 90 days"
+  defp flag_label(:possible_duplicate), do: "Possible duplicate"
+
+  defp flag_label(other),
+    do: other |> to_string() |> String.replace("_", " ")
+
+  defp flagged_item_count(flags) when is_map(flags) do
+    flags
+    |> Map.values()
+    |> Enum.count(&(&1 != []))
+  end
+
+  defp flagged_item_count(_), do: 0
+
+  defp truncate_id(value) when is_binary(value) do
+    if String.length(value) <= 10 do
+      value
+    else
+      String.slice(value, 0, 6) <> "…" <> String.slice(value, -4, 4)
+    end
+  end
+
+  defp truncate_id(value) when not is_nil(value),
+    do: truncate_id(to_string(value))
+
+  defp truncate_id(_), do: ""
+
+  defp format_datetime_human(%DateTime{} = datetime, timezone) do
+    datetime
+    |> DateTime.shift_zone!(timezone)
+    |> Calendar.strftime("%b %-d, %Y, %-I:%M %p")
+  end
+
+  defp format_datetime_human(_, _), do: "—"
+
+  defp format_item_date(%Date{} = date),
+    do: Calendar.strftime(date, "%b %-d, %Y")
+
+  defp format_item_date(_), do: "—"
+
+  defp submitted_label(%DateTime{} = dt, timezone) do
+    now = DateTime.now!(timezone)
+    local = DateTime.shift_zone!(dt, timezone)
+    days = Date.diff(DateTime.to_date(now), DateTime.to_date(local))
+    absolute = Calendar.strftime(local, "%b %-d, %Y")
+
+    phrase =
+      cond do
+        days <= 0 -> "Submitted today"
+        days == 1 -> "Submitted 1 day ago"
+        true -> "Submitted #{days} days ago"
+      end
+
+    {phrase, absolute}
+  end
+
+  defp submitted_label(_, _), do: {"Submitted", nil}
+
+  defp reimbursement_destination_summary(report, totals) do
+    amount = Money.to_string!(totals.net_total)
+
+    verb =
+      if Money.negative?(totals.net_total) do
+        "Member owes"
+      else
+        "Reimburse"
+      end
+
+    destination =
+      case report.reimbursement_method do
+        "check" ->
+          if Ecto.assoc_loaded?(report.address) && report.address do
+            address = report.address
+
+            "via check to #{address.address}, #{address.city} #{address.region}"
+          else
+            "via check"
+          end
+
+        "bank_transfer" ->
+          if Ecto.assoc_loaded?(report.bank_account) && report.bank_account do
+            "via bank transfer to account ending #{report.bank_account.account_number_last_4}"
+          else
+            "via bank transfer"
+          end
+
+        nil ->
+          "Method not set"
+
+        other ->
+          "via #{other}"
+      end
+
+    "#{verb} #{amount} #{destination}"
+  end
+
+  defp attachment_open_url(%{media: :pdf, preview_url: url})
+       when is_binary(url),
+       do: url
+
+  defp attachment_open_url(%{url: url}) when is_binary(url), do: url
+  defp attachment_open_url(_), do: nil
+
+  defp receipt_cell_label(row) do
+    cond do
+      row.media == :image -> "Image"
+      row.media == :pdf -> "PDF"
+      row.kind == :income && is_nil(row.s3_path) -> "No proof"
+      row.expense_type == "mileage" -> "Mileage — no receipt required"
+      true -> "No receipt"
+    end
+  end
+
+  defp expense_attachment_rows(attachments),
+    do: Enum.filter(attachments, &(&1.kind == :expense))
+
+  defp income_attachment_rows(attachments),
+    do: Enum.filter(attachments, &(&1.kind == :income))
+
+  defp sum_attachment_amounts(rows) do
+    Enum.reduce(rows, Money.new(0, :USD), fn row, acc ->
+      case row.amount do
+        %Money{} = money ->
+          case Money.add(acc, money) do
+            {:ok, sum} -> sum
+            _ -> acc
+          end
+
+        _ ->
+          acc
+      end
+    end)
   end
 
   # Helper functions

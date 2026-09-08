@@ -15,7 +15,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <div class="yellow-alert-box">
-        <strong>Refund policy:</strong> Because this booking was modified, cancellation refunds no longer apply if you cancel later.
+        <strong>Refund policy:</strong> <%= YscWeb.BookingUserMessages.modification_forfeiture_after_change() %>
       </div>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>

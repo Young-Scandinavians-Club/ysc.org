@@ -836,7 +836,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Please select dates to see available booking options for your selected period.
+                      {YscWeb.BookingUserMessages.clear_lake_no_booking_options()}
                     </span>
                     <span
                       :if={

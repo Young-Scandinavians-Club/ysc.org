@@ -43,7 +43,7 @@ defmodule YscWeb.UploadErrors do
         "Only JPG, PNG, WebP, and GIF files are accepted"
 
       :expense ->
-        "Invalid file type. Use PDF, JPG, JPEG, PNG, or WEBP"
+        "That file type isn't supported. Use PDF, JPG, JPEG, PNG, or WEBP"
 
       :event_photo ->
         "File type not accepted — use a photo or video format we support"
