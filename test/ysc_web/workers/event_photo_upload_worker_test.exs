@@ -9,11 +9,13 @@ defmodule YscWeb.Workers.EventPhotoUploadWorkerTest do
   use Ysc.DataCase, async: false
 
   alias Ysc.EventPhotos
+  alias Ysc.GooglePhotos
   alias Ysc.S3Config
   alias YscWeb.Workers.EventPhotoUploadWorker
 
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.GooglePhotos.Api.ReqTestHelper
 
   @tiny_png Base.decode64!(
               "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
@@ -186,5 +188,99 @@ defmodule YscWeb.Workers.EventPhotoUploadWorkerTest do
 
     assert {:error, _reason} = result
     assert s3_object_exists?(key)
+  end
+
+  describe "non_retryable_api_error?/1" do
+    test "auth / permission / bad-request / not-found statuses are terminal" do
+      for status <- [400, 401, 403, 404] do
+        assert EventPhotoUploadWorker.non_retryable_api_error?(
+                 {:api_error, status}
+               )
+      end
+    end
+
+    test "rate-limit and server errors stay retryable" do
+      for status <- [429, 500, 502, 503] do
+        refute EventPhotoUploadWorker.non_retryable_api_error?(
+                 {:api_error, status}
+               )
+      end
+    end
+
+    test "non-API reasons stay retryable" do
+      refute EventPhotoUploadWorker.non_retryable_api_error?(
+               {:s3_download_failed, :timeout}
+             )
+
+      refute EventPhotoUploadWorker.non_retryable_api_error?(:whatever)
+    end
+  end
+
+  describe "backoff/1" do
+    test "is floored at 30s and capped at 10min across every attempt" do
+      for attempt <- 1..8, _ <- 1..100 do
+        wait = EventPhotoUploadWorker.backoff(%Oban.Job{attempt: attempt})
+        assert wait in 30..600
+      end
+    end
+  end
+
+  describe "Google Photos API failures" do
+    setup {Req.Test, :set_req_test_from_context}
+
+    setup %{user: user} do
+      GooglePhotos.connect!(
+        %{
+          access_token: "access-token",
+          refresh_token: "refresh-token-value",
+          expires_in: 3600
+        },
+        user.id,
+        "photos@example.com"
+      )
+
+      on_exit(&GooglePhotos.disconnect!/0)
+      :ok
+    end
+
+    test "discards (no retry) when Google rejects album creation with a 403",
+         %{collection: collection, user: user} do
+      key = "event_photo_uploads/#{collection.id}/#{Ecto.UUID.generate()}.png"
+      put_s3_object(key, @tiny_png)
+
+      Req.Test.stub(stub(), stub_route(%{albums: &api_error(&1, 403)}))
+
+      job =
+        make_job(%{
+          "collection_id" => collection.id,
+          "s3_key" => key,
+          "filename" => "party.png",
+          "user_id" => user.id
+        })
+
+      assert {:discard, {:api_error, 403}} = EventPhotoUploadWorker.perform(job)
+
+      # Never destroy the source for an API failure — left for manual recovery.
+      assert s3_object_exists?(key)
+    end
+
+    test "still asks Oban to retry on a 503 from Google",
+         %{collection: collection, user: user} do
+      key = "event_photo_uploads/#{collection.id}/#{Ecto.UUID.generate()}.png"
+      put_s3_object(key, @tiny_png)
+
+      Req.Test.stub(stub(), stub_route(%{albums: &api_error(&1, 503)}))
+
+      job =
+        make_job(%{
+          "collection_id" => collection.id,
+          "s3_key" => key,
+          "filename" => "party.png",
+          "user_id" => user.id
+        })
+
+      assert {:error, {:api_error, 503}} = EventPhotoUploadWorker.perform(job)
+      assert s3_object_exists?(key)
+    end
   end
 end

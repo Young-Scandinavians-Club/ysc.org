@@ -31,8 +31,16 @@ defmodule Ysc.Application do
       ],
       config: %{
         # Explicit allowlist only — do not forward newly added Logger options
-        # automatically. Keep scrubbed diagnostic identifiers used at error sites.
-        capture_metadata: [:user_id, :reason],
+        # automatically. Keep scrubbed diagnostic identifiers used at error sites
+        # (DB ids and enum-ish codes — never free-form payloads or response bodies).
+        capture_metadata: [
+          :user_id,
+          :reason,
+          :collection_id,
+          :google_photos_operation,
+          :google_photos_status,
+          :google_photos_error
+        ],
         # Most call sites use Ysc.Logging.error/2 without an :error struct; still report
         # those Logger.error lines to Sentry (crashes were already captured by default).
         capture_log_messages: true,

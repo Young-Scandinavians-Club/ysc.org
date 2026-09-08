@@ -31,6 +31,13 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
     :invalid_path
   ]
 
+  # Google Photos HTTP statuses that a retry cannot clear: the request itself is
+  # rejected (malformed), the credentials are bad, the granted scopes don't
+  # cover album/media writes, or the target is gone. These need an admin to
+  # reconnect the integration or fix the request — hammering them five times
+  # just delays the page. 429 (rate limit) and 5xx stay retryable.
+  @non_retryable_api_statuses [400, 401, 403, 404]
+
   @impl Oban.Worker
   def perform(%Oban.Job{
         attempt: attempt,
@@ -87,18 +94,29 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
         {:error, reason} ->
           log_opts = log_opts_for(collection_id, s3_key, reason)
 
-          # Sentry-visible only once retries are exhausted — a lone transient
-          # blip that a retry clears up on its own shouldn't page anyone.
-          if final_attempt? do
-            Ysc.Logging.error(
-              "Event media upload permanently failed after #{max_attempts} attempts",
-              log_opts
-            )
-          else
-            Ysc.Logging.warning(
-              "Event media upload failed, will retry",
-              log_opts
-            )
+          cond do
+            # Won't come right on its own — discard now rather than burning
+            # four more attempts and paging late.
+            non_retryable_api_error?(reason) ->
+              Ysc.Logging.error(
+                "Event media upload discarded: Google Photos rejected the " <>
+                  "request and a retry can't fix it",
+                log_opts
+              )
+
+            # Sentry-visible only once retries are exhausted — a lone transient
+            # blip that a retry clears up on its own shouldn't page anyone.
+            final_attempt? ->
+              Ysc.Logging.error(
+                "Event media upload permanently failed after #{max_attempts} attempts",
+                log_opts
+              )
+
+            true ->
+              Ysc.Logging.warning(
+                "Event media upload failed, will retry (attempt #{attempt}/#{max_attempts})",
+                log_opts
+              )
           end
 
           {:error, reason}
@@ -111,8 +129,29 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
     oban_result(result)
   end
 
+  # Retry pacing: full jitter, floored at 30s so the five attempts can't all
+  # burn out inside two minutes (as they did on 2026-09-08, when Google Photos
+  # briefly rejected every album/media write), capped at 10 minutes. The jitter
+  # also spreads a single event's photos out instead of retrying them together
+  # and re-hitting the same per-user write quota.
+  @impl Oban.Worker
+  def backoff(%Oban.Job{attempt: attempt}) do
+    Ysc.Workers.Backoff.full_jitter(attempt, min: 30, cap: 10 * 60)
+  end
+
   defp oban_result({:error, reason}) when reason in @terminal_errors, do: :ok
+
+  defp oban_result({:error, reason} = result) do
+    if non_retryable_api_error?(reason), do: {:discard, reason}, else: result
+  end
+
   defp oban_result(result), do: result
+
+  @doc false
+  def non_retryable_api_error?({:api_error, status}),
+    do: status in @non_retryable_api_statuses
+
+  def non_retryable_api_error?(_), do: false
 
   defp log_opts_for(
          collection_id,
@@ -128,8 +167,23 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
   end
 
   defp log_opts_for(collection_id, s3_key, reason) do
-    [collection_id: collection_id, s3_key: s3_key, reason: inspect(reason)]
+    [
+      collection_id: collection_id,
+      s3_key: s3_key,
+      reason: describe_reason(reason)
+    ]
   end
+
+  # `reason` is the one field forwarded to Sentry (see the handler allowlist in
+  # Ysc.Application) — spell the Google Photos failures out so the issue is
+  # triageable without digging through Fly logs for the matching request.
+  defp describe_reason({:api_error, status}),
+    do: "google_photos_api_error http=#{status}"
+
+  defp describe_reason({:s3_download_failed, detail}),
+    do: "s3_download_failed #{inspect(detail)}"
+
+  defp describe_reason(reason), do: inspect(reason)
 
   @download_timeout :timer.minutes(30)
 
