@@ -200,7 +200,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     |> render_click()
 
     # Navigate to the month containing the Saturday if needed
-    navigate_calendar_to_month!(view, saturday)
+    navigate_calendar_to_month!(view, saturday, checkin)
 
     assert has_element?(
              view,
@@ -223,15 +223,17 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     {view, _html} = live_change(conn, booking)
 
-    saturday = first_saturday_on_or_after(Date.add(booking.checkin_date, 7))
-    friday = Date.add(saturday, -1)
-    sunday = Date.add(saturday, 1)
+    # Stay inside Tahoe summer (May 1–Oct 31). `checkin + 7` can land on
+    # Saturday Oct 31; Sunday is then winter / past calendar max, Friday–
+    # Saturday is blocked by the weekend rule, and Friday is disabled as a
+    # start date (CI 2026-09-08).
+    {friday, saturday, sunday} = next_tahoe_summer_friday_sunday_span()
 
     view
     |> element("#modification-dates [phx-click=open-calendar]")
     |> render_click()
 
-    navigate_calendar_to_month!(view, saturday)
+    navigate_calendar_to_month!(view, saturday, booking.checkin_date)
 
     assert has_element?(
              view,
@@ -240,7 +242,7 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     view
     |> element(
-      ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(friday)}T00:00:00Z"]|
+      ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(friday)}T00:00:00Z"]:not([disabled])|
     )
     |> render_click()
 
@@ -780,6 +782,44 @@ defmodule YscWeb.BookingChangeLiveTest do
     days_until_saturday = rem(6 - Date.day_of_week(date, :monday), 7)
     Date.add(date, days_until_saturday)
   end
+
+  # Canonical Tahoe summer is May 1 – Oct 31. A Friday–Sunday stay that
+  # crosses Oct 31 has no valid buyout checkout (Sunday is winter; Fri–Sat
+  # includes Saturday without Sunday).
+  defp next_tahoe_summer_friday_sunday_span do
+    today = Date.utc_today()
+
+    max_date =
+      Ysc.Bookings.SeasonHelpers.calculate_max_booking_date(:tahoe, today)
+
+    saturday =
+      today
+      |> Date.add(1)
+      |> first_saturday_on_or_after()
+      |> Stream.iterate(&Date.add(&1, 7))
+      |> Stream.take(40)
+      |> Enum.find(fn saturday ->
+        friday = Date.add(saturday, -1)
+        sunday = Date.add(saturday, 1)
+
+        Date.compare(friday, today) != :lt and
+          Date.compare(sunday, max_date) != :gt and
+          tahoe_summer_calendar_date?(friday) and
+          tahoe_summer_calendar_date?(sunday)
+      end)
+
+    saturday ||
+      flunk(
+        "Could not find a Friday–Sunday Tahoe summer weekend after #{today} within #{max_date}"
+      )
+
+    {Date.add(saturday, -1), saturday, Date.add(saturday, 1)}
+  end
+
+  defp tahoe_summer_calendar_date?(%Date{month: month}) when month in 5..10,
+    do: true
+
+  defp tahoe_summer_calendar_date?(_), do: false
 
   defp ensure_clear_lake_day_pricing_rule! do
     Ysc.Bookings.SeasonCache.invalidate()
@@ -1342,22 +1382,30 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert has_element?(view, "#modification-payment-step")
   end
 
-  defp navigate_calendar_to_month!(view, %Date{} = target) do
-    Enum.reduce_while(1..24, nil, fn _, _ ->
-      html = render(view)
+  defp navigate_calendar_to_month!(view, %Date{} = target, %Date{} = focused_on) do
+    target_label = Calendar.strftime(target, "%B %Y")
+    target_sel = "#calendar_days_#{String.replace(target_label, " ", "-")}"
+    from_month = Date.beginning_of_month(focused_on)
+    to_month = Date.beginning_of_month(target)
 
-      if html =~ Calendar.strftime(target, "%B %Y") do
+    event =
+      if Date.compare(from_month, to_month) == :lt do
+        "next-month"
+      else
+        "prev-month"
+      end
+
+    Enum.reduce_while(1..24, nil, fn _, _ ->
+      if has_element?(view, target_sel) do
         {:halt, :ok}
       else
         view
-        |> element("#modification-dates [phx-click=next-month]")
+        |> element("#modification-dates [phx-click=#{event}]")
         |> render_click()
 
         {:cont, nil}
       end
     end) ||
-      flunk(
-        "Could not navigate calendar to #{Calendar.strftime(target, "%B %Y")}"
-      )
+      flunk("Could not navigate calendar to #{target_label}")
   end
 end
