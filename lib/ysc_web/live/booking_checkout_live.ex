@@ -2178,10 +2178,13 @@ defmodule YscWeb.BookingCheckoutLive do
             booking_id: reloaded_booking.id
           )
 
+          # Always use :booking_confirmation_failed here: confirm_booking/1
+          # returns nested {:error, inventory_atom} tuples after a released
+          # hold loses a race for seats, and those atoms must still refund.
           Bookings.maybe_refund_unfulfilled_checkout_payment(
             reloaded_booking,
             payment_intent,
-            reason
+            :booking_confirmation_failed
           )
 
           {:error, :booking_confirmation_failed}

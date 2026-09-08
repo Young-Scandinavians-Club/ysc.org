@@ -3394,6 +3394,34 @@ defmodule Ysc.BookingsTest do
       assert String.starts_with?(refund_id, "re_test")
     end
 
+    test "refunds canceled holds when confirm loses inventory race after hold expiry" do
+      booking = booking_fixture(%{status: :canceled})
+
+      for reason <- [
+            :buyout_unavailable,
+            :room_unavailable,
+            :insufficient_capacity,
+            :property_buyout_active,
+            {:error, :room_unavailable}
+          ] do
+        payment_intent = %Stripe.PaymentIntent{
+          id: "pi_hold_race_#{System.unique_integer([:positive])}",
+          status: "succeeded",
+          amount: 5000,
+          latest_charge: "ch_test_hold_race"
+        }
+
+        assert {:ok, %Stripe.Refund{id: refund_id}} =
+                 Bookings.maybe_refund_unfulfilled_checkout_payment(
+                   booking,
+                   payment_intent,
+                   reason
+                 )
+
+        assert String.starts_with?(refund_id, "re_test")
+      end
+    end
+
     test "skips refund when payment intent is not succeeded" do
       booking = booking_fixture(%{status: :hold})
 
