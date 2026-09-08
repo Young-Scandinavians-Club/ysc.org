@@ -804,7 +804,9 @@ defmodule Ysc.ExpenseReportsTest do
       other = user_fixture()
       ts = DateTime.to_unix(DateTime.utc_now(), :second)
       path = "receipts/#{other.id}/#{ts}_leaked.pdf"
-      assert {:error, :unauthorized} = ExpenseReports.can_access_file?(user, path)
+
+      assert {:error, :unauthorized} =
+               ExpenseReports.can_access_file?(user, path)
     end
 
     test "admin may access another user's recent unsaved scoped path" do
