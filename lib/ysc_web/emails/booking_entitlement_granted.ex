@@ -98,14 +98,19 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
     case ent.benefit_kind do
       :free_nights ->
         n = ent.free_nights || 0
+        nights_word = if n == 1, do: "night", else: "nights"
+        example_nights = if n < 1, do: 2, else: n * 2
 
-        "#{n} free night#{if n == 1, do: "", else: "s"} on your next eligible stay (applied proportionally to the trip subtotal)."
+        "#{n} free #{nights_word} on your next cabin stay. " <>
+          "If you book more nights than that, you still pay for the extra nights — " <>
+          "for example, #{n} free #{nights_word} on a #{example_nights}-night stay " <>
+          "is half off the cabin price."
 
       :percent_off ->
-        "#{Decimal.round(ent.percent_off || Decimal.new(0), 2)}% off your next eligible cabin stay."
+        "#{Decimal.round(ent.percent_off || Decimal.new(0), 2)}% off your next cabin stay."
 
       :fixed_amount_off ->
-        "A fixed discount of #{format_money(ent.amount_off)} on your next eligible cabin stay."
+        "A #{format_money(ent.amount_off)} discount on your next cabin stay."
     end
   end
 

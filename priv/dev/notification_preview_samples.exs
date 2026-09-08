@@ -186,7 +186,7 @@
       header_image_url: "http://localhost:4000/images/tahoe-cabin-feature.jpg",
       header_image_alt: "Lake Tahoe cabin",
       benefit_description:
-        "2 free nights on your next eligible stay (applied proportionally to the trip subtotal).",
+        "2 free nights on your next cabin stay. If you book more nights than that, you still pay for the extra nights — for example, 2 free nights on a 4-night stay is half off the cabin price.",
       property_line: "Cabin: Lake Tahoe.",
       buyout_cap_line: "",
       expiry_line: "This benefit does not expire.",

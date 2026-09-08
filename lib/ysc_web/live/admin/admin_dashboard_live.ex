@@ -354,182 +354,20 @@ defmodule YscWeb.AdminDashboardLive do
         id="property-matrix"
         class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8"
       >
-        <.link
+        <.admin_property_occupancy_card
+          id="dashboard-property-tahoe"
           navigate={~p"/admin/bookings?property=tahoe"}
-          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
-        >
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <p class="flex items-center gap-1.5 text-xs font-black text-sky-600 uppercase tracking-[0.2em]">
-                <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> Tahoe
-              </p>
-              <span class="flex items-center gap-1.5">
-                <span class={[
-                  "w-1.5 h-1.5 rounded-full",
-                  if(@property_stats.tahoe.staying > 0,
-                    do: "bg-emerald-500",
-                    else: "bg-zinc-300"
-                  )
-                ]}></span>
-                <span class="text-[10px] font-bold text-zinc-400 uppercase">
-                  {if(@property_stats.tahoe.staying > 0,
-                    do: "Active",
-                    else: "Empty"
-                  )}
-                </span>
-              </span>
-            </div>
-            <div class="flex items-baseline gap-2">
-              <p class="text-3xl font-black font-mono text-zinc-900 group-hover:text-sky-600 transition-colors">
-                {@property_stats.tahoe.staying}
-              </p>
-              <span class="text-xs font-bold text-zinc-400">staying now</span>
-            </div>
-            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div class="rounded-lg bg-emerald-50 p-2 flex items-center gap-2">
-                <.icon
-                  name="hero-arrow-right-circle"
-                  class="w-6 h-6 text-emerald-500 shrink-0"
-                />
-                <div>
-                  <p class="font-bold text-emerald-700 uppercase text-[10px] leading-none">
-                    Checking in
-                  </p>
-                  <p class="font-black font-mono text-emerald-800 text-lg leading-tight">
-                    {@property_stats.tahoe.checkins_today}
-                  </p>
-                </div>
-              </div>
-              <div class="rounded-lg bg-amber-50 p-2 flex items-center gap-2">
-                <.icon
-                  name="hero-arrow-left-circle"
-                  class="w-6 h-6 text-amber-500 shrink-0"
-                />
-                <div>
-                  <p class="font-bold text-amber-700 uppercase text-[10px] leading-none">
-                    Checking out
-                  </p>
-                  <p class="font-black font-mono text-amber-800 text-lg leading-tight">
-                    {@property_stats.tahoe.checkouts_today}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="mt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <p class="font-bold text-zinc-400 uppercase text-[10px]">
-                Next 14 days
-              </p>
-              <p class="font-black font-mono text-zinc-800 mt-0.5">
-                {@property_stats.tahoe.upcoming_bookings}
-                {if(@property_stats.tahoe.upcoming_bookings == 1,
-                  do: "booking",
-                  else: "bookings"
-                )}
-              </p>
-            </div>
-            <div>
-              <p class="font-bold text-zinc-400 uppercase text-[10px]">
-                Expected guests
-              </p>
-              <p class="font-black font-mono text-zinc-800 mt-0.5">
-                {@property_stats.tahoe.upcoming_guests}
-              </p>
-            </div>
-          </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            View Tahoe bookings →
-          </p>
-        </.link>
-        <.link
+          label="Tahoe"
+          accent={:sky}
+          stats={@property_stats.tahoe}
+        />
+        <.admin_property_occupancy_card
+          id="dashboard-property-clear-lake"
           navigate={~p"/admin/bookings?property=clear_lake"}
-          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
-        >
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <p class="flex items-center gap-1.5 text-xs font-black text-teal-600 uppercase tracking-[0.2em]">
-                <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> Clear Lake
-              </p>
-              <span class="flex items-center gap-1.5">
-                <span class={[
-                  "w-1.5 h-1.5 rounded-full",
-                  if(@property_stats.clear_lake.staying > 0,
-                    do: "bg-emerald-500",
-                    else: "bg-zinc-300"
-                  )
-                ]}></span>
-                <span class="text-[10px] font-bold text-zinc-400 uppercase">
-                  {if(@property_stats.clear_lake.staying > 0,
-                    do: "Active",
-                    else: "Empty"
-                  )}
-                </span>
-              </span>
-            </div>
-            <div class="flex items-baseline gap-2">
-              <p class="text-3xl font-black font-mono text-zinc-900 group-hover:text-teal-600 transition-colors">
-                {@property_stats.clear_lake.staying}
-              </p>
-              <span class="text-xs font-bold text-zinc-400">staying now</span>
-            </div>
-            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div class="rounded-lg bg-emerald-50 p-2 flex items-center gap-2">
-                <.icon
-                  name="hero-arrow-right-circle"
-                  class="w-6 h-6 text-emerald-500 shrink-0"
-                />
-                <div>
-                  <p class="font-bold text-emerald-700 uppercase text-[10px] leading-none">
-                    Checking in
-                  </p>
-                  <p class="font-black font-mono text-emerald-800 text-lg leading-tight">
-                    {@property_stats.clear_lake.checkins_today}
-                  </p>
-                </div>
-              </div>
-              <div class="rounded-lg bg-amber-50 p-2 flex items-center gap-2">
-                <.icon
-                  name="hero-arrow-left-circle"
-                  class="w-6 h-6 text-amber-500 shrink-0"
-                />
-                <div>
-                  <p class="font-bold text-amber-700 uppercase text-[10px] leading-none">
-                    Checking out
-                  </p>
-                  <p class="font-black font-mono text-amber-800 text-lg leading-tight">
-                    {@property_stats.clear_lake.checkouts_today}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="mt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <p class="font-bold text-zinc-400 uppercase text-[10px]">
-                Next 14 days
-              </p>
-              <p class="font-black font-mono text-zinc-800 mt-0.5">
-                {@property_stats.clear_lake.upcoming_bookings}
-                {if(@property_stats.clear_lake.upcoming_bookings == 1,
-                  do: "booking",
-                  else: "bookings"
-                )}
-              </p>
-            </div>
-            <div>
-              <p class="font-bold text-zinc-400 uppercase text-[10px]">
-                Expected guests
-              </p>
-              <p class="font-black font-mono text-zinc-800 mt-0.5">
-                {@property_stats.clear_lake.upcoming_guests}
-              </p>
-            </div>
-          </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            View Clear Lake bookings →
-          </p>
-        </.link>
+          label="Clear Lake"
+          accent={:teal}
+          stats={@property_stats.clear_lake}
+        />
       </div>
 
       <.admin_volunteer_help_banner :if={@admin_role == :volunteer} />
