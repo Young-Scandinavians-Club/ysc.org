@@ -1112,6 +1112,46 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert fixed.id in ids
       refute percent.id in ids
     end
+
+    test "does not SELECT user password hashes or board bios", %{
+      user: user,
+      admin: admin
+    } do
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 5)
+                 },
+                 send_notification: false
+               )
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Entitlements.list_outstanding() end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      [ent] = results
+      assert password_cols == 0
+      assert ent.user.first_name == user.first_name
+      assert ent.user.email == user.email
+      assert ent.issued_by_user.email == admin.email
+      assert is_nil(ent.user.hashed_password)
+      assert is_nil(ent.issued_by_user.hashed_password)
+
+      {_results, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Entitlements.list_outstanding() end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+    end
   end
 
   describe "list_all_for_user/1" do
@@ -1171,7 +1211,26 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert length(ids) == 2
 
       first = Enum.find(results, &(&1.id == active.id))
-      assert match?(%Ysc.Accounts.User{}, first.issued_by_user)
+      assert match?(%Ecto.Association.NotLoaded{}, first.issued_by_user)
+      assert match?(%Ecto.Association.NotLoaded{}, first.consumed_booking)
+
+      {_results, user_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Entitlements.list_all_for_user(user.id) end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      assert user_queries == 0
+
+      {_results, booking_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Entitlements.list_all_for_user(user.id) end,
+          pattern: ~r/FROM "bookings"/i,
+          caller_pids: [self()]
+        )
+
+      assert booking_queries == 0
     end
   end
 
