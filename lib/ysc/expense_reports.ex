@@ -157,8 +157,8 @@ defmodule Ysc.ExpenseReports do
     end)
   end
 
-
-  defp collect_upload_paths_from_report(%ExpenseReport{id: nil}), do: MapSet.new()
+  defp collect_upload_paths_from_report(%ExpenseReport{id: nil}),
+    do: MapSet.new()
 
   defp collect_upload_paths_from_report(%ExpenseReport{} = report) do
     report = Repo.preload(report, [:expense_items, :income_items])
@@ -510,7 +510,7 @@ defmodule Ysc.ExpenseReports do
     |> validate_all_expense_items_have_receipts_for_submission()
   end
 
-  # Finding 59: never persist another member's receipt/proof S3 key on this
+  # Finding 60: never persist another member's receipt/proof S3 key on this
   # user's report (client-supplied path claiming).
   defp validate_upload_paths_owned_by_user(
          changeset,
@@ -1427,7 +1427,7 @@ defmodule Ysc.ExpenseReports do
   uploaded files (within 24 hours) that haven't been submitted yet, so users can
   preview their uploads during form editing.
 
-  Finding 59: User-scoped keys (`receipts|proofs/<user_id>/…`) are only readable
+  Finding 60: User-scoped keys (`receipts|proofs/<user_id>/…`) are only readable
   by that user (or an admin). Claiming another member's path on your own report
   must not grant a presigned download.
 
@@ -1532,10 +1532,12 @@ defmodule Ysc.ExpenseReports do
   only allowed when already present on this report (`previously_allowed`) or
   another of the user's reports — so a member cannot claim another member's
   receipt by forging LiveView params.
+
+  Finding 60.
   """
   def upload_path_allowed_for_user?(
         path,
-        %User{} = user,
+        user,
         previously_allowed \\ MapSet.new()
       )
 
@@ -1554,37 +1556,42 @@ defmodule Ysc.ExpenseReports do
             path_user_id == user.id
 
           :error ->
-            user_already_references_upload_path?(user, normalized)
+            # Legacy flat keys (no /<user_id>/ segment): allow first writer and
+            # re-saves, but never claim a path already stored on another member's
+            # report (Finding 60).
+            not upload_path_referenced_by_other_user?(normalized, user.id)
         end
     end
   end
 
   def upload_path_allowed_for_user?(path, %User{}, _previously_allowed)
-      when is_nil(path) or path == "",
+      when path in [nil, ""],
       do: true
 
   def upload_path_allowed_for_user?(_, _, _), do: false
 
-  defp user_already_references_upload_path?(%User{} = user, normalized_path) do
-    receipt_exists? =
+  defp upload_path_referenced_by_other_user?(normalized_path, user_id) do
+    receipt_elsewhere? =
       Repo.exists?(
         from eri in ExpenseReportItem,
           join: er in ExpenseReport,
           on: eri.expense_report_id == er.id,
           where:
-            er.user_id == ^user.id and eri.receipt_s3_path == ^normalized_path
+            er.user_id != ^user_id and
+              eri.receipt_s3_path == ^normalized_path
       )
 
-    proof_exists? =
+    proof_elsewhere? =
       Repo.exists?(
         from erii in ExpenseReportIncomeItem,
           join: er in ExpenseReport,
           on: erii.expense_report_id == er.id,
           where:
-            er.user_id == ^user.id and erii.proof_s3_path == ^normalized_path
+            er.user_id != ^user_id and
+              erii.proof_s3_path == ^normalized_path
       )
 
-    receipt_exists? or proof_exists?
+    receipt_elsewhere? or proof_elsewhere?
   end
 
   defp upload_s3_key_prefix_for_kind(:receipt), do: "receipts"

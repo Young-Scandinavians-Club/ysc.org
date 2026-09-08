@@ -213,6 +213,7 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
   end
 
   # Purchase lines only — mileage amounts are derived from miles_driven (already capped).
+  # Finding 61: sibling to Finding 37's miles_driven bound.
   defp validate_purchase_amount_cap(changeset) do
     if get_field(changeset, :expense_type) == "mileage" do
       changeset
@@ -220,8 +221,9 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
       validate_change(changeset, :amount, fn :amount, value ->
         case value do
           %Money{currency: :USD} = money ->
+            # Money.cmp/2 returns -1 / 0 / 1 (not :gt / :eq / :lt).
             case Money.cmp(money, @max_purchase_amount) do
-              :gt ->
+              1 ->
                 [
                   {:amount,
                    "must be less than or equal to #{Money.to_string!(@max_purchase_amount)}"}

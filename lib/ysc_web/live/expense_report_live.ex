@@ -226,7 +226,7 @@ defmodule YscWeb.ExpenseReportLive do
     expense_report_params = normalize_params_keys(expense_report_params)
 
     # Rebuild the expense report from params, ensuring we have at least one expense item
-    # Finding 59: drop forged receipt/proof paths that this user does not own.
+    # Finding 60: drop forged receipt/proof paths that this user does not own.
     expense_items =
       build_expense_items_from_params(
         expense_report_params["expense_items"] || %{}
@@ -1094,7 +1094,7 @@ defmodule YscWeb.ExpenseReportLive do
               do: get_receipt_path_from_item(existing_item),
               else: nil
 
-          # Finding 59: never trust client-supplied receipt_s3_path. Always keep
+          # Finding 60: never trust client-supplied receipt_s3_path. Always keep
           # the server-side path from the current changeset (set only via upload).
           item_params =
             cond do
@@ -1160,7 +1160,7 @@ defmodule YscWeb.ExpenseReportLive do
               do: get_proof_path_from_item(existing_item),
               else: nil
 
-          # Finding 59: never trust client-supplied proof_s3_path.
+          # Finding 60: never trust client-supplied proof_s3_path.
           item_params =
             cond do
               existing_proof_path && existing_proof_path != "" ->
