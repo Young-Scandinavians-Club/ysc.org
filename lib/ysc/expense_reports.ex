@@ -1466,26 +1466,20 @@ defmodule Ysc.ExpenseReports do
   end
 
   defp resolve_file_access(%User{} = user, normalized_path, is_admin) do
-    expense_item_query =
-      from eri in ExpenseReportItem,
-        join: er in ExpenseReport,
-        on: eri.expense_report_id == er.id,
-        where: eri.receipt_s3_path == ^normalized_path,
-        select: er
-
-    case pick_accessible_report(Repo.all(expense_item_query), user, is_admin) do
+    case pick_accessible_report(
+           Repo.all(receipt_reports_by_path_query(normalized_path)),
+           user,
+           is_admin
+         ) do
       {:ok, _} = ok ->
         ok
 
       :none ->
-        income_item_query =
-          from erii in ExpenseReportIncomeItem,
-            join: er in ExpenseReport,
-            on: erii.expense_report_id == er.id,
-            where: erii.proof_s3_path == ^normalized_path,
-            select: er
-
-        case pick_accessible_report(Repo.all(income_item_query), user, is_admin) do
+        case pick_accessible_report(
+               Repo.all(proof_reports_by_path_query(normalized_path)),
+               user,
+               is_admin
+             ) do
           {:ok, _} = ok ->
             ok
 
@@ -1571,27 +1565,46 @@ defmodule Ysc.ExpenseReports do
   def upload_path_allowed_for_user?(_, _, _), do: false
 
   defp upload_path_referenced_by_other_user?(normalized_path, user_id) do
-    receipt_elsewhere? =
+    Repo.exists?(
+      receipt_path_owned_by_other_user_query(normalized_path, user_id)
+    ) or
       Repo.exists?(
-        from eri in ExpenseReportItem,
-          join: er in ExpenseReport,
-          on: eri.expense_report_id == er.id,
-          where:
-            er.user_id != ^user_id and
-              eri.receipt_s3_path == ^normalized_path
+        proof_path_owned_by_other_user_query(normalized_path, user_id)
       )
+  end
 
-    proof_elsewhere? =
-      Repo.exists?(
-        from erii in ExpenseReportIncomeItem,
-          join: er in ExpenseReport,
-          on: erii.expense_report_id == er.id,
-          where:
-            er.user_id != ^user_id and
-              erii.proof_s3_path == ^normalized_path
-      )
+  defp receipt_reports_by_path_query(normalized_path) do
+    from eri in ExpenseReportItem,
+      join: er in ExpenseReport,
+      on: eri.expense_report_id == er.id,
+      where: eri.receipt_s3_path == ^normalized_path,
+      select: er
+  end
 
-    receipt_elsewhere? or proof_elsewhere?
+  defp proof_reports_by_path_query(normalized_path) do
+    from erii in ExpenseReportIncomeItem,
+      join: er in ExpenseReport,
+      on: erii.expense_report_id == er.id,
+      where: erii.proof_s3_path == ^normalized_path,
+      select: er
+  end
+
+  defp receipt_path_owned_by_other_user_query(normalized_path, user_id) do
+    from eri in ExpenseReportItem,
+      join: er in ExpenseReport,
+      on: eri.expense_report_id == er.id,
+      where:
+        er.user_id != ^user_id and
+          eri.receipt_s3_path == ^normalized_path
+  end
+
+  defp proof_path_owned_by_other_user_query(normalized_path, user_id) do
+    from erii in ExpenseReportIncomeItem,
+      join: er in ExpenseReport,
+      on: erii.expense_report_id == er.id,
+      where:
+        er.user_id != ^user_id and
+          erii.proof_s3_path == ^normalized_path
   end
 
   defp upload_s3_key_prefix_for_kind(:receipt), do: "receipts"
@@ -1717,6 +1730,32 @@ defmodule Ysc.ExpenseReports do
   @doc false
   def ci_query_explain_active_draft_query do
     active_draft_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_receipt_reports_by_path_query do
+    receipt_reports_by_path_query("receipts/example.pdf")
+  end
+
+  @doc false
+  def ci_query_explain_proof_reports_by_path_query do
+    proof_reports_by_path_query("proofs/example.pdf")
+  end
+
+  @doc false
+  def ci_query_explain_receipt_path_owned_by_other_user_query do
+    receipt_path_owned_by_other_user_query(
+      "receipts/example.pdf",
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    )
+  end
+
+  @doc false
+  def ci_query_explain_proof_path_owned_by_other_user_query do
+    proof_path_owned_by_other_user_query(
+      "proofs/example.pdf",
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    )
   end
 
   defp validate_and_send_expense_report_emails(loaded_report) do
