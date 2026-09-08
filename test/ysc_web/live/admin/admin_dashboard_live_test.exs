@@ -67,6 +67,24 @@ defmodule YscWeb.AdminDashboardLiveTest do
       refute has_element?(view, "#volunteer-stats-row")
     end
 
+    test "shows Tahoe and Clear Lake occupancy cards", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(view, "#property-matrix")
+      assert has_element?(view, "#dashboard-property-tahoe")
+      assert has_element?(view, "#dashboard-property-clear-lake")
+
+      assert has_element?(
+               view,
+               ~s|#dashboard-property-tahoe[href="/admin/bookings?property=tahoe"]|
+             )
+
+      assert has_element?(
+               view,
+               ~s|#dashboard-property-clear-lake[href="/admin/bookings?property=clear_lake"]|
+             )
+    end
+
     test "memberships card shows net new as joins minus YTD losses", %{
       conn: conn
     } do
@@ -265,6 +283,8 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert has_element?(view, "#volunteer-help-banner a[href='/admin/help']")
       assert has_element?(view, "#volunteer-stats-row")
       refute has_element?(view, "#admin-stats-row")
+      refute has_element?(view, "#property-matrix")
+      refute has_element?(view, "#dashboard-property-tahoe")
       assert has_element?(view, "#dashboard-events-timeline")
       refute has_element?(view, "#dashboard-financials")
     end
