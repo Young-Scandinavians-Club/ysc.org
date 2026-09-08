@@ -226,15 +226,18 @@ defmodule YscWeb.ExpenseReportLive do
     expense_report_params = normalize_params_keys(expense_report_params)
 
     # Rebuild the expense report from params, ensuring we have at least one expense item
+    # Finding 59: drop forged receipt/proof paths that this user does not own.
     expense_items =
       build_expense_items_from_params(
         expense_report_params["expense_items"] || %{}
       )
+      |> Enum.map(&scrub_recovered_expense_item_path(&1, user))
 
     income_items =
       build_income_items_from_params(
         expense_report_params["income_items"] || %{}
       )
+      |> Enum.map(&scrub_recovered_income_item_path(&1, user))
 
     # Ensure at least one expense item exists
     expense_items =
@@ -1091,13 +1094,15 @@ defmodule YscWeb.ExpenseReportLive do
               do: get_receipt_path_from_item(existing_item),
               else: nil
 
-          # Preserve receipt path if it exists in the current changeset and isn't in params
+          # Finding 59: never trust client-supplied receipt_s3_path. Always keep
+          # the server-side path from the current changeset (set only via upload).
           item_params =
-            if existing_receipt_path &&
-                 !Map.has_key?(item_params, "receipt_s3_path") do
-              Map.put(item_params, "receipt_s3_path", existing_receipt_path)
-            else
-              item_params
+            cond do
+              existing_receipt_path && existing_receipt_path != "" ->
+                Map.put(item_params, "receipt_s3_path", existing_receipt_path)
+
+              true ->
+                Map.delete(item_params, "receipt_s3_path")
             end
 
           {index, item_params}
@@ -1155,13 +1160,14 @@ defmodule YscWeb.ExpenseReportLive do
               do: get_proof_path_from_item(existing_item),
               else: nil
 
-          # Preserve proof path if it exists in the current changeset and isn't in params
+          # Finding 59: never trust client-supplied proof_s3_path.
           item_params =
-            if existing_proof_path &&
-                 !Map.has_key?(item_params, "proof_s3_path") do
-              Map.put(item_params, "proof_s3_path", existing_proof_path)
-            else
-              item_params
+            cond do
+              existing_proof_path && existing_proof_path != "" ->
+                Map.put(item_params, "proof_s3_path", existing_proof_path)
+
+              true ->
+                Map.delete(item_params, "proof_s3_path")
             end
 
           {index, item_params}
@@ -1268,6 +1274,22 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp build_expense_items_from_params(_), do: []
+
+  defp scrub_recovered_expense_item_path(%ExpenseReportItem{} = item, user) do
+    if ExpenseReports.upload_path_allowed_for_user?(item.receipt_s3_path, user) do
+      item
+    else
+      %{item | receipt_s3_path: nil}
+    end
+  end
+
+  defp scrub_recovered_income_item_path(%ExpenseReportIncomeItem{} = item, user) do
+    if ExpenseReports.upload_path_allowed_for_user?(item.proof_s3_path, user) do
+      item
+    else
+      %{item | proof_s3_path: nil}
+    end
+  end
 
   defp build_income_items_from_params(items_params) when is_map(items_params) do
     items_params
