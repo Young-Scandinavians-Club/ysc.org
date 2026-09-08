@@ -258,7 +258,10 @@ defmodule Ysc.MixProject do
       # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
       # DSL and authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
-      {:live_toast, "~> 0.9"},
+      # 0.10.0: gettext on put_toast/send_toast messages is gone; connection-notice
+      # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix
+      # flash components rerender on same-kind replacement and LiveView navigation.
+      {:live_toast, "~> 0.10"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.
