@@ -1389,8 +1389,9 @@ defmodule Ysc.ExpenseReports do
              object_key,
              presign_opts
            ),
+         :ok <- validate_presigned_fetch_url(url),
          {:ok, %{status: 200, body: body}} <-
-           Req.get(url, decode_body: false) do
+           Req.get(url, decode_body: false, redirect: false) do
       {:ok, body}
     else
       {:ok, %{status: status}} -> {:error, {:http_status, status}}
@@ -1398,6 +1399,31 @@ defmodule Ysc.ExpenseReports do
     end
   rescue
     e -> {:error, e}
+  end
+
+  # Presigned URLs are generated from our S3 config (HTTPS in production,
+  # HTTP MinIO on loopback in dev/test). Do not follow redirects: a 3xx to a
+  # different host could leak the signed query string.
+  defp validate_presigned_fetch_url(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: "https", host: host} when is_binary(host) and host != "" ->
+        :ok
+
+      %URI{scheme: "http", host: host} when is_binary(host) and host != "" ->
+        if local_s3_fetch_host?(host) do
+          :ok
+        else
+          {:error, :insecure_url}
+        end
+
+      _ ->
+        {:error, :insecure_url}
+    end
+  end
+
+  defp local_s3_fetch_host?(host) do
+    normalized = host |> String.downcase() |> String.trim_trailing(".")
+    normalized in ["localhost", "127.0.0.1", "::1", "[::1]"]
   end
 
   @doc """

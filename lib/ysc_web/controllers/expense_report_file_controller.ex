@@ -1,4 +1,8 @@
 defmodule YscWeb.ExpenseReportFileController do
+  # Register @sobelow_skip so the Elixir compiler does not warn about the attribute
+  # being unused (Sobelow consumes it from the source AST, not via Elixir reflection).
+  Module.register_attribute(__MODULE__, :sobelow_skip, accumulate: true)
+
   use YscWeb, :controller
 
   alias Ysc.ExpenseReports
@@ -145,6 +149,9 @@ defmodule YscWeb.ExpenseReportFileController do
     end
   end
 
+  # send_resp delivers receipt bytes with a non-HTML content type (PDF/image)
+  # and an explicit Content-Disposition. Sobelow flags send_resp binaries as XSS.
+  @sobelow_skip ["XSS.SendResp"]
   defp serve_inline_file(conn, user, s3_path, expense_report) do
     case ExpenseReports.fetch_file(s3_path) do
       {:ok, binary} when is_binary(binary) ->
@@ -172,7 +179,7 @@ defmodule YscWeb.ExpenseReportFileController do
           "content-disposition",
           ~s[#{disposition}; filename="#{filename}"]
         )
-        |> put_resp_header("cache-control", "private, max-age=3600")
+        |> put_resp_header("cache-control", "no-store")
         |> send_resp(200, binary)
 
       {:error, reason} ->

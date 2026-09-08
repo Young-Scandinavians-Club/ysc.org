@@ -1,5 +1,6 @@
 defmodule YscWeb.ExpenseReportFileControllerTest do
-  use YscWeb.ConnCase, async: true
+  # Mutates `:expense_reports_file_fetcher` application env in the preview tests.
+  use YscWeb.ConnCase, async: false
 
   import Ysc.AccountsFixtures
 
@@ -253,6 +254,7 @@ defmodule YscWeb.ExpenseReportFileControllerTest do
       assert conn.status == 200
       assert conn.resp_body == "%PDF-1.4 test"
       assert get_resp_header(conn, "content-type") == ["application/pdf"]
+      assert get_resp_header(conn, "cache-control") == ["no-store"]
       [disposition] = get_resp_header(conn, "content-disposition")
       assert disposition =~ "inline"
       assert disposition =~ Path.basename(receipt_path)
