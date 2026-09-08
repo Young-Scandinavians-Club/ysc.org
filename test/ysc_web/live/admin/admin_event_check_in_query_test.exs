@@ -109,6 +109,40 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
       assert render(view) =~ "Single Fetch Event XYZ"
     end
 
+    test "connected mount does not SELECT event body HTML", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "No Toast Event XYZ",
+          state: :published,
+          raw_details: "<p>A long event body that check-in must not load</p>",
+          rendered_details:
+            "<p>A long event body that check-in must not load</p>"
+        })
+
+      html_pattern = ~r/raw_details|rendered_details/i
+
+      {{:ok, view, _html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} =
+              live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+            render(view)
+            {:ok, view, html}
+          end,
+          pattern: html_pattern,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+      assert render(view) =~ "No Toast Event XYZ"
+    end
+
     test "initial connect issues at most one ticket list query", %{
       conn: conn,
       admin: admin

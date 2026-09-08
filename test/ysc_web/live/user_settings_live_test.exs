@@ -1061,11 +1061,20 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(
                view,
                "#member-ticket-reservations-section h2",
-               "Tickets waiting for payment"
+               "Tickets reserved for you"
              )
 
-      assert html =~ "Finish buying these tickets before the time shown"
+      assert html =~ "The YSC team has set aside event tickets for you"
+      assert html =~ "Finish buying them before the time shown"
+      refute html =~ "You started buying event tickets"
+      refute html =~ "Payment not finished"
       refute html =~ "Finish checkout"
+
+      assert has_element?(
+               view,
+               "#member-ticket-reservation-#{reservation.id}",
+               "Reserved for you"
+             )
 
       assert has_element?(
                view,
