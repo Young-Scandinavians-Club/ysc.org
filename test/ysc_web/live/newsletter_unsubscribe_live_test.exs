@@ -20,7 +20,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       {:ok, _view, html} =
         live(conn, ~p"/newsletter/unsubscribe/invalid-token-xyz")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
       assert html =~ "mailto:info@ysc.org"
       assert html =~ "info@ysc.org"
       assert html =~ "outdated or mistyped"
@@ -31,7 +31,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       {:ok, _view, html} =
         live(conn, "/newsletter/unsubscribe/%20%20")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
     end
 
     test "always shows Return to home link when token is invalid", %{conn: conn} do
@@ -50,7 +50,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       {:ok, view, html} =
         live(conn, ~p"/newsletter/unsubscribe/#{sub.subscription_token}")
 
-      refute html =~ "Invalid or expired link"
+      refute html =~ "This link no longer works"
       assert html =~ "Unsubscribe from our newsletter"
       assert has_element?(view, "button", "Unsubscribe")
     end
@@ -289,7 +289,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/newsletter/unsubscribe/#{email}")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
       refute has_element?(view, "button", "Unsubscribe")
 
       render_click(view, "unsubscribe")
@@ -317,7 +317,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       {:ok, _view, html} =
         live(conn, "/newsletter/unsubscribe/#{long_token}")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
     end
 
     test "token with special characters does not crash", %{conn: conn} do
@@ -326,7 +326,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
         live(conn, "/newsletter/unsubscribe/abc%2B%2F%3Ddef")
 
       # Either invalid link or, if that happens to match a token, we handle it
-      assert html =~ "Invalid or expired link" or html =~ "Unsubscribe"
+      assert html =~ "This link no longer works" or html =~ "Unsubscribe"
     end
   end
 end

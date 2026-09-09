@@ -15,6 +15,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     BookingCheckoutReminder,
     BookingConfirmation,
     BookingEntitlementGranted,
+    BookingRefundPending,
     BookingRefundProcessed,
     EventNotification,
     EventUpdateNotification,
@@ -215,7 +216,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
             checkout_date: "December 3, 2026",
             guests_count: 2,
             children_count: 0,
-            booking_mode: "Room Booking",
+            booking_mode: "Individual room(s)",
             room_names: "Room 1",
             nights: 2,
             total_amount: "$200.00",
@@ -231,7 +232,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       assert text =~ "host you at the Tahoe cabin"
       assert text =~ "Cabin:"
+      assert text =~ "Individual room(s)"
       assert text =~ "Tahoe Cabin Master at tahoe@ysc.org"
+      refute text =~ "Room Booking"
+      refute text =~ "Day Booking"
       refute text =~ "our Tahoe property"
       refute text =~ "Property:"
       refute text =~ "info@ysc.org"
@@ -251,7 +255,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           checkout_time: "11:00 AM",
           days_until_checkin: 2,
           booking_reference_id: "BK-TEST-123",
-          booking_mode: "Room Booking",
+          booking_mode: "Individual room(s)",
           room_names: "Room 1",
           nights: 2,
           is_buyout: false,
@@ -629,6 +633,47 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Cabin Master"
       refute text =~ "has been processed"
       refute text =~ "will be processed"
+    end
+
+    test "pending booking refund is a review, not a member-submitted request" do
+      html =
+        BookingRefundPending.render(%{
+          first_name: "Jane",
+          booking: %{
+            reference_id: "BK-123",
+            property: "Tahoe",
+            checkin_date: "December 1, 2026",
+            checkout_date: "December 3, 2026",
+            guests_count: 2,
+            children_count: 0
+          },
+          pending_refund: %{
+            policy_refund_amount: "$100.00",
+            cancellation_reason: "Change of plans",
+            request_date: "Nov 2, 2026 at 10:00 AM",
+            refund_percentage: 50.0
+          },
+          payment: %{
+            reference_id: "PMT-123",
+            amount: "$200.00"
+          },
+          request_date: "Nov 2, 2026 at 10:00 AM",
+          policy_refund_amount: "$100.00",
+          refund_percentage: 50.0,
+          booking_url: "https://example.com/bookings/preview"
+        })
+
+      text = html_text(html)
+
+      assert BookingRefundPending.get_subject() ==
+               "We're reviewing your cabin booking refund"
+
+      assert text =~ "Your cabin booking is cancelled"
+      assert text =~ "You don't need to do anything else"
+      assert text =~ "Cabin Master"
+      assert text =~ "money is on the way"
+      refute text =~ "refund request"
+      refute text =~ "approved and processed"
     end
   end
 

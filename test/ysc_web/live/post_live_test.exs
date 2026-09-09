@@ -311,7 +311,7 @@ defmodule YscWeb.PostLiveTest do
 
       assert html =~ "Jane"
       assert html =~ "Doe"
-      assert html =~ "Post By"
+      assert html =~ "Posted by"
     end
 
     test "displays author board position when present", %{conn: conn} do

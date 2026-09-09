@@ -7,9 +7,14 @@ defmodule Ysc.Bookings.Entitlements do
   import Ecto.Changeset, only: [put_change: 3]
 
   alias Ysc.Repo
+  alias Ysc.Accounts.User
   alias Ysc.Bookings.{Booking, BookingEntitlement, EntitlementDiscount}
   alias YscWeb.Emails.BookingEntitlementGranted
   alias YscWeb.Emails.Notifier
+
+  # Display fields for admin entitlement tables. Omits hashed_password,
+  # board_bio, and other columns the member/issuer cells never render.
+  @list_user_fields [:id, :email, :first_name, :last_name]
 
   ## Queries
 
@@ -92,23 +97,32 @@ defmodule Ysc.Bookings.Entitlements do
 
   @doc """
   Outstanding entitlements: active, not consumed, not expired.
+
+  Member and issuer are slim `select: struct` preloads (name/email only).
+  Do not JOIN full `users` rows — the org list never renders password hashes
+  or board bios.
   """
   def list_outstanding(opts \\ []) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
+    opts
+    |> list_outstanding_query(now)
+    |> Repo.all()
+  end
+
+  defp list_outstanding_query(opts, now) do
     property = Keyword.get(opts, :property)
     benefit = Keyword.get(opts, :benefit_kind)
+    user_query = list_user_query()
 
     q =
       from(e in BookingEntitlement,
-        join: u in assoc(e, :user),
-        left_join: iu in assoc(e, :issued_by_user),
         where: e.status == :active,
         where: is_nil(e.consumed_at),
         where: is_nil(e.consumed_booking_id),
         where: is_nil(e.expires_at) or e.expires_at > ^now,
         order_by: [asc: e.expires_at, asc: e.inserted_at],
-        preload: [user: u, issued_by_user: iu]
+        preload: [user: ^user_query, issued_by_user: ^user_query]
       )
 
     q =
@@ -118,14 +132,15 @@ defmodule Ysc.Bookings.Entitlements do
         q
       end
 
-    q =
-      if benefit do
-        where(q, [e], e.benefit_kind == ^benefit)
-      else
-        q
-      end
+    if benefit do
+      where(q, [e], e.benefit_kind == ^benefit)
+    else
+      q
+    end
+  end
 
-    Repo.all(q)
+  defp list_user_query do
+    from(u in User, select: struct(u, ^@list_user_fields))
   end
 
   @doc """
@@ -151,13 +166,23 @@ defmodule Ysc.Bookings.Entitlements do
     |> Repo.all()
   end
 
+  @doc """
+  Every entitlement for a member, newest first.
+
+  Does not preload `:issued_by_user` or `:consumed_booking` — the admin user
+  detail table only shows status, benefit summary, property, and dates.
+  """
   def list_all_for_user(user_id) do
+    user_id
+    |> list_all_for_user_query()
+    |> Repo.all()
+  end
+
+  defp list_all_for_user_query(user_id) do
     from(e in BookingEntitlement,
       where: e.user_id == ^user_id,
-      order_by: [desc: e.inserted_at],
-      preload: [:issued_by_user, :consumed_booking]
+      order_by: [desc: e.inserted_at]
     )
-    |> Repo.all()
   end
 
   @doc """
@@ -668,7 +693,7 @@ defmodule Ysc.Bookings.Entitlements do
   end
 
   defp schedule_granted_email(%BookingEntitlement{} = ent) do
-    ent = Repo.preload(ent, :user)
+    ent = Repo.preload(ent, user: list_user_query())
     user = ent.user
 
     if user && user.email do
@@ -691,19 +716,11 @@ defmodule Ysc.Bookings.Entitlements do
 
   @doc false
   def ci_query_explain_query do
-    alias Ysc.Ci.QueryExplain.Fixtures
+    list_outstanding_query([], Ysc.Ci.QueryExplain.Fixtures.now())
+  end
 
-    now = Fixtures.now()
-
-    from(e in BookingEntitlement,
-      join: u in assoc(e, :user),
-      left_join: iu in assoc(e, :issued_by_user),
-      where: e.status == :active,
-      where: is_nil(e.consumed_at),
-      where: is_nil(e.consumed_booking_id),
-      where: is_nil(e.expires_at) or e.expires_at > ^now,
-      order_by: [asc: e.expires_at, asc: e.inserted_at],
-      preload: [user: u, issued_by_user: iu]
-    )
+  @doc false
+  def ci_query_explain_list_all_for_user_query do
+    list_all_for_user_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

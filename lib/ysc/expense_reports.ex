@@ -122,6 +122,10 @@ defmodule Ysc.ExpenseReports do
 
       base = draft_row_for_save(user, draft_id) || %ExpenseReport{}
 
+      # Capture paths already on this draft before delete-and-recreate so
+      # re-saving a legacy key the member already had is not rejected.
+      previously_allowed_paths = collect_upload_paths_from_report(base)
+
       if base.id do
         Repo.delete_all(
           from(i in ExpenseReportItem, where: i.expense_report_id == ^base.id)
@@ -137,6 +141,7 @@ defmodule Ysc.ExpenseReports do
       result =
         %{base | expense_items: [], income_items: []}
         |> ExpenseReport.draft_changeset(attrs)
+        |> validate_upload_paths_owned_by_user(user, previously_allowed_paths)
         |> Repo.insert_or_update()
 
       case result do
@@ -151,6 +156,27 @@ defmodule Ysc.ExpenseReports do
       end
     end)
   end
+
+  defp collect_upload_paths_from_report(%ExpenseReport{id: nil}),
+    do: MapSet.new()
+
+  defp collect_upload_paths_from_report(%ExpenseReport{} = report) do
+    report = Repo.preload(report, [:expense_items, :income_items])
+
+    receipt_paths =
+      report.expense_items
+      |> Enum.map(& &1.receipt_s3_path)
+      |> Enum.reject(&(is_nil(&1) or &1 == ""))
+
+    proof_paths =
+      report.income_items
+      |> Enum.map(& &1.proof_s3_path)
+      |> Enum.reject(&(is_nil(&1) or &1 == ""))
+
+    MapSet.new(receipt_paths ++ proof_paths)
+  end
+
+  defp collect_upload_paths_from_report(_), do: MapSet.new()
 
   # Transaction-scoped advisory lock keyed on the user, so two concurrent
   # save_draft/3 calls for the same user run one after the other.
@@ -282,6 +308,14 @@ defmodule Ysc.ExpenseReports do
   # board_bio, and other columns the submitter-name cell never renders.
   @event_list_user_fields [:id, :first_name, :last_name]
 
+  # Treasurer inbox / list / review: name, email, and user-detail link only.
+  @admin_list_user_fields [:id, :email, :first_name, :last_name]
+
+  # Review footer only shows last-4. Skip encrypted routing/account numbers.
+  @admin_review_bank_fields [:id, :account_number_last_4]
+
+  @submitted_inbox_limit 50
+
   @doc """
   List filed expense reports for an event, newest first, with submitter
   preloaded and per-report net totals attached from SQL.
@@ -307,6 +341,95 @@ defmodule Ysc.ExpenseReports do
       order_by: [desc: :inserted_at],
       preload: [user: ^user_query]
     )
+  end
+
+  @doc """
+  Submitted reports waiting on treasurer review, oldest first.
+
+  Member is a slim `select: struct` preload (name/email). Item rows, event
+  body HTML, addresses, and encrypted bank accounts are not loaded — the
+  inbox table only shows submitter, purpose, and submitted date.
+  """
+  def list_submitted_inbox(limit \\ @submitted_inbox_limit) do
+    limit
+    |> list_submitted_inbox_query()
+    |> Repo.all()
+  end
+
+  defp list_submitted_inbox_query(limit) do
+    user_query = admin_user_preload_query()
+
+    from(er in ExpenseReport,
+      where: er.status == "submitted",
+      preload: [user: ^user_query],
+      order_by: [asc: er.inserted_at],
+      limit: ^limit
+    )
+  end
+
+  @doc """
+  Filed (non-draft) expense reports in a date window, newest first.
+
+  Same slim member preload as the inbox. Drafts are omitted — they are a
+  member's in-progress scratch copy and do not belong in reconciliation.
+  """
+  def list_for_admin(start_date, end_date, page, per_page) do
+    start_date
+    |> list_for_admin_query(end_date, page, per_page)
+    |> Repo.all()
+  end
+
+  defp list_for_admin_query(start_date, end_date, page, per_page) do
+    offset = (page - 1) * per_page
+    user_query = admin_user_preload_query()
+
+    from(er in ExpenseReport,
+      where: er.status != "draft",
+      where: er.inserted_at >= ^start_date,
+      where: er.inserted_at <= ^end_date,
+      preload: [user: ^user_query],
+      order_by: [desc: er.inserted_at],
+      limit: ^per_page,
+      offset: ^offset
+    )
+  end
+
+  @doc """
+  One expense report for the treasurer review modal, or `nil`.
+
+  Member is name/email only. Event is `Event.summary_fields/0` (no body
+  HTML). Bank account is last-4 only so Cloak does not decrypt routing or
+  account numbers. Line items, mailing address, and totals still load —
+  the modal renders receipts and reimbursement destination.
+  """
+  def get_for_admin_review(id) do
+    id
+    |> admin_review_query()
+    |> Repo.one()
+  end
+
+  defp admin_review_query(id) do
+    user_query = admin_user_preload_query()
+    event_query = event_summary_preload_query()
+
+    bank_query =
+      from(ba in BankAccount, select: struct(ba, ^@admin_review_bank_fields))
+
+    from(er in ExpenseReport,
+      where: er.id == ^id,
+      preload: [
+        :expense_items,
+        :income_items,
+        :address,
+        user: ^user_query,
+        event: ^event_query,
+        bank_account: ^bank_query
+      ]
+    )
+  end
+
+  defp admin_user_preload_query do
+    from(u in User, select: struct(u, ^@admin_list_user_fields))
   end
 
   @doc """
@@ -480,7 +603,75 @@ defmodule Ysc.ExpenseReports do
     |> ExpenseReport.submission_changeset(Map.put(attrs, "user_id", user.id))
     |> validate_reimbursement_setup(user)
     |> validate_reimbursement_ownership(user)
+    |> validate_upload_paths_owned_by_user(user, MapSet.new())
     |> validate_all_expense_items_have_receipts_for_submission()
+  end
+
+  # Finding 60: never persist another member's receipt/proof S3 key on this
+  # user's report (client-supplied path claiming).
+  defp validate_upload_paths_owned_by_user(
+         changeset,
+         %User{} = user,
+         previously_allowed_paths
+       ) do
+    changeset
+    |> validate_assoc_upload_paths(
+      :expense_items,
+      :receipt_s3_path,
+      user,
+      previously_allowed_paths
+    )
+    |> validate_assoc_upload_paths(
+      :income_items,
+      :proof_s3_path,
+      user,
+      previously_allowed_paths
+    )
+  end
+
+  defp validate_assoc_upload_paths(
+         changeset,
+         assoc,
+         field,
+         user,
+         previously_allowed_paths
+       ) do
+    case Ecto.Changeset.get_change(changeset, assoc) do
+      items when is_list(items) and items != [] ->
+        updated_items =
+          Enum.map(items, fn
+            %Ecto.Changeset{} = item_cs ->
+              path = Ecto.Changeset.get_field(item_cs, field)
+
+              if upload_path_allowed_for_user?(
+                   path,
+                   user,
+                   previously_allowed_paths
+                 ) do
+                item_cs
+              else
+                Ecto.Changeset.add_error(
+                  item_cs,
+                  field,
+                  "must reference a file you uploaded"
+                )
+              end
+
+            other ->
+              other
+          end)
+
+        changeset = Ecto.Changeset.put_change(changeset, assoc, updated_items)
+
+        if Enum.any?(updated_items, &match?(%Ecto.Changeset{valid?: false}, &1)) do
+          %{changeset | valid?: false}
+        else
+          changeset
+        end
+
+      _ ->
+        changeset
+    end
   end
 
   defp after_expense_report_insert({:ok, expense_report} = result) do
@@ -1328,10 +1519,113 @@ defmodule Ysc.ExpenseReports do
   def receipt_url(_), do: nil
 
   @doc """
+  Same-origin URL that streams the file inline (correct Content-Type) so PDFs
+  can render in an `<iframe>` without CSP `frame-src` changes.
+  """
+  def receipt_preview_url(s3_path) when is_binary(s3_path) do
+    "#{receipt_url(s3_path)}/preview"
+  end
+
+  def receipt_preview_url(_), do: nil
+
+  @doc """
+  Classifies a stored receipt/proof key by extension for admin preview UI.
+
+  Returns `:image`, `:pdf`, `:other`, or `:none`.
+  """
+  def media_type_for_path(s3_path) when is_binary(s3_path) and s3_path != "" do
+    case s3_path |> Path.extname() |> String.downcase() do
+      ".pdf" -> :pdf
+      ext when ext in [".jpg", ".jpeg", ".png", ".webp"] -> :image
+      "" -> :other
+      _ -> :other
+    end
+  end
+
+  def media_type_for_path(_), do: :none
+
+  @doc """
+  Fetches the bytes of an expense-report receipt/proof from S3.
+
+  Uses a presigned URL + `Req.get` (the same technique as QuickBooks receipt
+  upload) because signed ExAws GET requests are rewritten to POST in this
+  environment.
+
+  Override with `Application.put_env(:ysc, :expense_reports_file_fetcher, fun)`
+  in tests (`fun` is `s3_path -> {:ok, binary} | {:error, reason}`).
+  """
+  def fetch_file(s3_path) when is_binary(s3_path) do
+    fetcher = Application.get_env(:ysc, :expense_reports_file_fetcher)
+
+    if is_function(fetcher, 1) do
+      fetcher.(s3_path)
+    else
+      fetch_file_via_presigned_url(s3_path)
+    end
+  end
+
+  def fetch_file(_), do: {:error, :invalid_path}
+
+  defp fetch_file_via_presigned_url(s3_path) do
+    normalized_path = normalize_s3_path(s3_path)
+
+    {config, method, bucket_or_host, object_key, presign_opts} =
+      S3Config.expense_report_file_presigned_url_args(normalized_path, 300)
+
+    with {:ok, url} <-
+           ExAws.S3.presigned_url(
+             config,
+             method,
+             bucket_or_host,
+             object_key,
+             presign_opts
+           ),
+         :ok <- validate_presigned_fetch_url(url),
+         {:ok, %{status: 200, body: body}} <-
+           Req.get(url, decode_body: false, redirect: false) do
+      {:ok, body}
+    else
+      {:ok, %{status: status}} -> {:error, {:http_status, status}}
+      {:error, reason} -> {:error, reason}
+    end
+  rescue
+    e -> {:error, e}
+  end
+
+  # Presigned URLs are generated from our S3 config (HTTPS in production,
+  # HTTP MinIO on loopback in dev/test). Do not follow redirects: a 3xx to a
+  # different host could leak the signed query string.
+  defp validate_presigned_fetch_url(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: "https", host: host} when is_binary(host) and host != "" ->
+        :ok
+
+      %URI{scheme: "http", host: host} when is_binary(host) and host != "" ->
+        if local_s3_fetch_host?(host) do
+          :ok
+        else
+          {:error, :insecure_url}
+        end
+
+      _ ->
+        {:error, :insecure_url}
+    end
+  end
+
+  defp local_s3_fetch_host?(host) do
+    normalized = host |> String.downcase() |> String.trim_trailing(".")
+    normalized in ["localhost", "127.0.0.1", "::1", "[::1]"]
+  end
+
+  @doc """
   Checks if a user can access a file by verifying they own the expense report
   that contains the file, or if they are an admin. Also allows access to recently
   uploaded files (within 24 hours) that haven't been submitted yet, so users can
   preview their uploads during form editing.
+
+  Finding 60: User-scoped keys (`receipts|proofs/<user_id>/…`) are only readable
+  by that user (or an admin). Claiming another member's path on your own report
+  must not grant a presigned download.
 
   Returns:
   - `{:ok, expense_report}` if the user has access (expense_report may be nil for unsaved reports)
@@ -1339,67 +1633,175 @@ defmodule Ysc.ExpenseReports do
   - `{:error, :unauthorized}` if the user does not own the expense report and is not an admin
   """
   def can_access_file?(%User{} = user, s3_path) when is_binary(s3_path) do
-    # Check if user is admin - admins can access any file
     is_admin = user.role == :admin
-
-    # Normalize the S3 path - remove bucket name prefix if present
-    # The database stores just the key (e.g., "receipts/..."), not "bucket-name/receipts/..."
     normalized_path = normalize_s3_path(s3_path)
 
-    # First, try to find the file in expense_report_items (for submitted reports)
-    expense_item_query =
-      from eri in ExpenseReportItem,
-        join: er in ExpenseReport,
-        on: eri.expense_report_id == er.id,
-        where: eri.receipt_s3_path == ^normalized_path,
-        select: er
+    case authorize_upload_path_prefix(user, normalized_path, is_admin) do
+      :ok ->
+        resolve_file_access(user, normalized_path, is_admin)
 
-    expense_report = Repo.one(expense_item_query)
-
-    if expense_report do
-      # Check if user owns the report or is admin
-      if expense_report.user_id == user.id || is_admin do
-        {:ok, expense_report}
-      else
-        {:error, :unauthorized}
-      end
-    else
-      # If not found in expense items, check income items (for submitted reports)
-      income_item_query =
-        from erii in ExpenseReportIncomeItem,
-          join: er in ExpenseReport,
-          on: erii.expense_report_id == er.id,
-          where: erii.proof_s3_path == ^normalized_path,
-          select: er
-
-      expense_report = Repo.one(income_item_query)
-
-      if expense_report do
-        # Check if user owns the report or is admin
-        if expense_report.user_id == user.id || is_admin do
-          {:ok, expense_report}
-        else
-          {:error, :unauthorized}
-        end
-      else
-        # File not found in any submitted expense report
-        # Check if it's a recently uploaded file (for preview during form editing)
-        # Files uploaded via LiveView have timestamps in their names like: receipts/1767121378_filename
-        if recently_uploaded_unsaved_accessible?(
-             user,
-             normalized_path,
-             is_admin
-           ) do
-          # Unsaved in-DB: user-scoped key receipts|proofs/USER_ID/TIMESTAMP_name (24h)
-          {:ok, nil}
-        else
-          {:error, :not_found}
-        end
-      end
+      {:error, _} = error ->
+        error
     end
   end
 
   def can_access_file?(_, _), do: {:error, :not_found}
+
+  defp authorize_upload_path_prefix(%User{} = user, s3_path, is_admin) do
+    case parse_user_scoped_upload_path(s3_path) do
+      {:ok, path_user_id, _timestamp} ->
+        if is_admin or path_user_id == user.id do
+          :ok
+        else
+          {:error, :unauthorized}
+        end
+
+      :error ->
+        :ok
+    end
+  end
+
+  defp resolve_file_access(%User{} = user, normalized_path, is_admin) do
+    case pick_accessible_report(
+           Repo.all(receipt_reports_by_path_query(normalized_path)),
+           user,
+           is_admin
+         ) do
+      {:ok, _} = ok ->
+        ok
+
+      :none ->
+        case pick_accessible_report(
+               Repo.all(proof_reports_by_path_query(normalized_path)),
+               user,
+               is_admin
+             ) do
+          {:ok, _} = ok ->
+            ok
+
+          :none ->
+            if recently_uploaded_unsaved_accessible?(
+                 user,
+                 normalized_path,
+                 is_admin
+               ) do
+              {:ok, nil}
+            else
+              {:error, :not_found}
+            end
+
+          {:error, _} = error ->
+            error
+        end
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp pick_accessible_report([], _user, _is_admin), do: :none
+
+  defp pick_accessible_report(reports, user, is_admin) do
+    cond do
+      is_admin ->
+        {:ok, List.first(reports)}
+
+      owned = Enum.find(reports, &(&1.user_id == user.id)) ->
+        {:ok, owned}
+
+      true ->
+        {:error, :unauthorized}
+    end
+  end
+
+  @doc """
+  Returns true when an S3 upload key is allowed to be stored on this user's
+  expense report.
+
+  User-scoped keys must belong to `user`. Legacy keys (no user id segment) are
+  only allowed when already present on this report (`previously_allowed`) or
+  another of the user's reports — so a member cannot claim another member's
+  receipt by forging LiveView params.
+
+  Finding 60.
+  """
+  def upload_path_allowed_for_user?(
+        path,
+        user,
+        previously_allowed \\ MapSet.new()
+      )
+
+  def upload_path_allowed_for_user?(path, %User{} = user, previously_allowed)
+      when is_binary(path) and path != "" do
+    normalized = normalize_s3_path(path)
+
+    cond do
+      MapSet.member?(previously_allowed, normalized) or
+          MapSet.member?(previously_allowed, path) ->
+        true
+
+      true ->
+        case parse_user_scoped_upload_path(normalized) do
+          {:ok, path_user_id, _timestamp} ->
+            path_user_id == user.id
+
+          :error ->
+            # Legacy flat keys (no /<user_id>/ segment): allow first writer and
+            # re-saves, but never claim a path already stored on another member's
+            # report (Finding 60).
+            not upload_path_referenced_by_other_user?(normalized, user.id)
+        end
+    end
+  end
+
+  def upload_path_allowed_for_user?(path, %User{}, _previously_allowed)
+      when path in [nil, ""],
+      do: true
+
+  def upload_path_allowed_for_user?(_, _, _), do: false
+
+  defp upload_path_referenced_by_other_user?(normalized_path, user_id) do
+    Repo.exists?(
+      receipt_path_owned_by_other_user_query(normalized_path, user_id)
+    ) or
+      Repo.exists?(
+        proof_path_owned_by_other_user_query(normalized_path, user_id)
+      )
+  end
+
+  defp receipt_reports_by_path_query(normalized_path) do
+    from eri in ExpenseReportItem,
+      join: er in ExpenseReport,
+      on: eri.expense_report_id == er.id,
+      where: eri.receipt_s3_path == ^normalized_path,
+      select: er
+  end
+
+  defp proof_reports_by_path_query(normalized_path) do
+    from erii in ExpenseReportIncomeItem,
+      join: er in ExpenseReport,
+      on: erii.expense_report_id == er.id,
+      where: erii.proof_s3_path == ^normalized_path,
+      select: er
+  end
+
+  defp receipt_path_owned_by_other_user_query(normalized_path, user_id) do
+    from eri in ExpenseReportItem,
+      join: er in ExpenseReport,
+      on: eri.expense_report_id == er.id,
+      where:
+        er.user_id != ^user_id and
+          eri.receipt_s3_path == ^normalized_path
+  end
+
+  defp proof_path_owned_by_other_user_query(normalized_path, user_id) do
+    from erii in ExpenseReportIncomeItem,
+      join: er in ExpenseReport,
+      on: erii.expense_report_id == er.id,
+      where:
+        er.user_id != ^user_id and
+          erii.proof_s3_path == ^normalized_path
+  end
 
   defp upload_s3_key_prefix_for_kind(:receipt), do: "receipts"
   defp upload_s3_key_prefix_for_kind(:proof), do: "proofs"
@@ -1496,6 +1898,22 @@ defmodule Ysc.ExpenseReports do
   end
 
   @doc false
+  def ci_query_explain_list_submitted_inbox_query do
+    list_submitted_inbox_query(@submitted_inbox_limit)
+  end
+
+  @doc false
+  def ci_query_explain_list_for_admin_query do
+    now = DateTime.utc_now()
+    list_for_admin_query(now, now, 1, 20)
+  end
+
+  @doc false
+  def ci_query_explain_admin_review_query do
+    admin_review_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
   def ci_query_explain_list_item_aggregates_query do
     item_aggregates_query(
       [Ysc.Ci.QueryExplain.Fixtures.ulid()],
@@ -1524,6 +1942,32 @@ defmodule Ysc.ExpenseReports do
   @doc false
   def ci_query_explain_active_draft_query do
     active_draft_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_receipt_reports_by_path_query do
+    receipt_reports_by_path_query("receipts/example.pdf")
+  end
+
+  @doc false
+  def ci_query_explain_proof_reports_by_path_query do
+    proof_reports_by_path_query("proofs/example.pdf")
+  end
+
+  @doc false
+  def ci_query_explain_receipt_path_owned_by_other_user_query do
+    receipt_path_owned_by_other_user_query(
+      "receipts/example.pdf",
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    )
+  end
+
+  @doc false
+  def ci_query_explain_proof_path_owned_by_other_user_query do
+    proof_path_owned_by_other_user_query(
+      "proofs/example.pdf",
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    )
   end
 
   defp validate_and_send_expense_report_emails(loaded_report) do

@@ -765,7 +765,13 @@ defmodule YscWeb.HomeLiveTest do
       assert has_element?(view, "#membership-family", "Family")
       assert has_element?(view, "#membership-apply-link")
       assert render(view) =~ "Nordic Living"
-      assert has_element?(view, "#home-community-eyebrow", "Velkommen")
+
+      assert has_element?(
+               view,
+               "#home-community-eyebrow",
+               "Velkommen (Welcome)"
+             )
+
       refute has_element?(view, "#home-community-eyebrow", "Velkommen back")
     end
 

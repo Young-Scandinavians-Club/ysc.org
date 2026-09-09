@@ -308,7 +308,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Repo.update()
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
-      assert html =~ "Room Booking"
+      assert html =~ "Individual room(s)"
       assert html =~ "3"
     end
 

@@ -471,6 +471,10 @@ defmodule YscWeb.Router do
       :require_onboarding_complete
     ]
 
+    get "/expensereport/files/:encoded_path/preview",
+        ExpenseReportFileController,
+        :preview
+
     get "/expensereport/files/:encoded_path", ExpenseReportFileController, :show
     get "/wallet/tickets/:ticket_id", AppleWalletController, :ticket
     get "/wallet/membership", AppleWalletController, :membership

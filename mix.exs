@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.37.2",
+      version: "2.38.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -23,7 +23,7 @@ defmodule Ysc.MixProject do
         ignore_advisories: [
           "EEF-CVE-2026-43966",
           "EEF-CVE-2026-43969",
-          # Published 2026-08-18; still unpatched on Hex cowlib 2.19.0.
+          # Published 2026-08-18; still unpatched on Hex cowlib 2.20.0.
           "EEF-CVE-2026-43971"
         ]
       ],
@@ -193,11 +193,14 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
-      # Official Hex cowlib 2.19.0 (cowboy 2.18 needs >= 2.19; fixes EEF-CVE-2026-59248).
-      # EEF-CVE-2026-43969/43966/43971: still unpatched — ignored until 2026-10-04
-      # (see mix.exs hex config).
-      {:cowboy, "~> 2.18", override: true},
-      {:cowlib, "~> 2.19", override: true},
+      # Official Hex cowlib 2.20.0 (cowboy 2.19 needs >= 2.20). Cowboy 2.19
+      # requires OTP 27+ (we run OTP 27/28). HPACK only indexes known-safe
+      # field names (HTTP/2 messages may be larger). Number parsing in
+      # protocol components is stricter; digit limit 17 → 20.
+      # EEF-CVE-2026-43969/43966/43971: still unpatched on Hex cowlib 2.20.0
+      # — ignored until 2026-10-04 (see mix.exs hex config).
+      {:cowboy, "~> 2.19", override: true},
+      {:cowlib, "~> 2.20", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
@@ -258,7 +261,10 @@ defmodule Ysc.MixProject do
       # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
       # DSL and authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
-      {:live_toast, "~> 0.9"},
+      # 0.10.0: gettext on put_toast/send_toast messages is gone; connection-notice
+      # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix
+      # flash components rerender on same-kind replacement and LiveView navigation.
+      {:live_toast, "~> 0.10"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.

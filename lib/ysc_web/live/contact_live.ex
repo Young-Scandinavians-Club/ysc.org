@@ -187,47 +187,23 @@ defmodule YscWeb.ContactLive do
       |> Ysc.Forms.ContactForm.changeset(params)
       |> Ysc.Forms.ContactForm.put_submitter(socket.assigns[:current_user])
 
-    if socket.assigns.logged_in? do
-      case Ysc.Forms.create_contact_form(changeset) do
-        {:ok, _contact_form} ->
-          {:noreply,
-           socket
-           |> assign(:submitted, true)
-           |> YscWeb.Flash.put_toast(:info, "Your message has been sent",
-             title: "Contact"
-           )}
+    case YscWeb.GuestTurnstile.verify(socket, values, title: "Contact") do
+      :ok ->
+        case Ysc.Forms.create_contact_form(changeset) do
+          {:ok, _contact_form} ->
+            {:noreply,
+             socket
+             |> assign(:submitted, true)
+             |> YscWeb.Flash.put_toast(:info, "Your message has been sent",
+               title: "Contact"
+             )}
 
-        {:error, changeset} ->
-          {:noreply, assign_form(socket, changeset)}
-      end
-    else
-      case Turnstile.verify(values, socket.assigns.remote_ip) do
-        {:ok, _} ->
-          case Ysc.Forms.create_contact_form(changeset) do
-            {:ok, _contact_form} ->
-              {:noreply,
-               socket
-               |> assign(:submitted, true)
-               |> YscWeb.Flash.put_toast(:info, "Your message has been sent",
-                 title: "Contact"
-               )}
+          {:error, changeset} ->
+            {:noreply, assign_form(socket, changeset)}
+        end
 
-            {:error, changeset} ->
-              {:noreply, assign_form(socket, changeset)}
-          end
-
-        {:error, _} ->
-          socket =
-            socket
-            |> YscWeb.Flash.put_toast(
-              :error,
-              "We couldn't verify you're a real person. Please try submitting again. If this keeps happening, refresh the page or try a different browser.",
-              title: "Contact"
-            )
-            |> Turnstile.refresh()
-
-          {:noreply, assign_form(socket, changeset)}
-      end
+      {:error, socket} ->
+        {:noreply, assign_form(socket, changeset)}
     end
   end
 

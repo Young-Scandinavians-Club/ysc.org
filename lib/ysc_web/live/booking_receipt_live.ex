@@ -1730,10 +1730,12 @@ defmodule YscWeb.BookingReceiptLive do
             booking_id: reloaded_booking.id
           )
 
+          # Mirror BookingCheckoutLive: released-hold inventory races return
+          # nested confirm errors; always refund under this umbrella reason.
           Bookings.maybe_refund_unfulfilled_checkout_payment(
             reloaded_booking,
             payment_intent,
-            reason
+            :booking_confirmation_failed
           )
 
           {:error, :booking_confirmation_failed}

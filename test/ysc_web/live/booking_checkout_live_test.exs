@@ -236,7 +236,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       case result do
         {:error, {:redirect, %{to: _path, flash: flash}}} ->
-          assert flash["info"] =~ "canceled"
+          assert flash["info"] =~ "cancelled"
 
         html when is_binary(html) ->
           assert html =~ "cancel" or html =~ "Cancel" or html =~ "error"

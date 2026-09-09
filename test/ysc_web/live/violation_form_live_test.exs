@@ -132,6 +132,36 @@ defmodule YscWeb.ViolationFormLiveTest do
       refute html =~ "Thank You for Your Report"
       assert html =~ "violation-form"
     end
+
+    test "blocks guest submit when Turnstile verification fails", %{conn: conn} do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+      {:ok, view, _html} = live(conn, ~p"/report-conduct-violation")
+
+      html =
+        view
+        |> form("#violation-form",
+          conduct_form: %{
+            "first_name" => "Sam",
+            "last_name" => "Case",
+            "email" => "sam.guest#{System.unique_integer()}@example.com",
+            "phone" => "555-123-4567",
+            "summary" =>
+              "This is a complete summary of what happened for the report.",
+            "anonymous" => "false"
+          }
+        )
+        |> render_submit()
+
+      assert html =~ "verify you"
+      assert html =~ "real person"
+      refute html =~ "Thank You for Your Report"
+      assert has_element?(view, "#violation-form")
+    end
   end
 
   describe "handle_params" do

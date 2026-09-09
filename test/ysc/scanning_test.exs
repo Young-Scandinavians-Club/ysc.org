@@ -44,6 +44,40 @@ defmodule Ysc.ScanningTest do
     Ysc.Repo.preload(fresh, tickets: [:ticket_tier, :registration])
   end
 
+  # Confirmed tickets can exist without a purchaser (`user_id: nil`) — legacy
+  # walk-up / orphaned rows. Insert via the schema so we skip Ticket.changeset/2
+  # which requires `:user_id`.
+  defp insert_confirmed_checkin_ticket(attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    unique = System.unique_integer([:positive])
+
+    %Ysc.Events.Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: attrs.event_id,
+      ticket_tier_id: attrs.ticket_tier_id,
+      ticket_order_id: Map.get(attrs, :ticket_order_id),
+      user_id: Map.get(attrs, :user_id),
+      status: :confirmed,
+      reference_id: Map.get(attrs, :reference_id, "TKT-CHKIN-#{unique}"),
+      checked_in: Map.get(attrs, :checked_in, false),
+      inserted_at: now,
+      expires_at: DateTime.add(now, 1, :day)
+    }
+    |> Ysc.Repo.insert!()
+  end
+
+  defp add_registration!(ticket, attrs) do
+    {:ok, registration} =
+      Ysc.Events.create_registration(%{
+        "ticket_id" => ticket.id,
+        "first_name" => attrs.first_name,
+        "last_name" => attrs.last_name,
+        "email" => attrs.email
+      })
+
+    registration
+  end
+
   # ──────────────────────────────────────────────────────────────────────────
   # Session management
   # ──────────────────────────────────────────────────────────────────────────
@@ -1452,6 +1486,140 @@ defmodule Ysc.ScanningTest do
         )
 
       assert notes_cols == 0
+    end
+
+    test "includes confirmed tickets with no purchaser in the unfiltered list",
+         %{event: event, order: order} do
+      walkup =
+        insert_confirmed_checkin_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: List.first(order.tickets).ticket_tier_id,
+          user_id: nil
+        })
+
+      ids =
+        event.id
+        |> Scanning.list_event_checkin_tickets()
+        |> Enum.map(& &1.id)
+        |> MapSet.new()
+
+      assert MapSet.member?(ids, walkup.id)
+
+      listed =
+        Enum.find(
+          Scanning.list_event_checkin_tickets(event.id),
+          &(&1.id == walkup.id)
+        )
+
+      assert listed.user_id == nil
+      assert listed.user == nil
+    end
+
+    test "search EXISTS matches attendee registration name, not only the buyer",
+         %{event: event, buyer: buyer, order: order} do
+      unique = System.unique_integer([:positive])
+      ticket = List.first(order.tickets)
+      guest_first = "GiftGuest#{unique}"
+
+      add_registration!(ticket, %{
+        first_name: guest_first,
+        last_name: "Attendee",
+        email: "gift-guest-#{unique}@example.com"
+      })
+
+      by_guest = Scanning.list_event_checkin_tickets(event.id, guest_first)
+      assert Enum.map(by_guest, & &1.id) == [ticket.id]
+      assert hd(by_guest).registration.first_name == guest_first
+
+      by_buyer = Scanning.list_event_checkin_tickets(event.id, buyer.first_name)
+      assert Enum.map(by_buyer, & &1.id) == [ticket.id]
+
+      assert Scanning.list_event_checkin_tickets(
+               event.id,
+               "NoSuchGuest#{unique}"
+             ) ==
+               []
+    end
+
+    test "search still finds a nil-purchaser ticket by registration or ticket ref",
+         %{event: event, order: order} do
+      unique = System.unique_integer([:positive])
+      guest_first = "WalkupGuest#{unique}"
+      reference_id = "TKT-WALK-#{unique}"
+
+      walkup =
+        insert_confirmed_checkin_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: List.first(order.tickets).ticket_tier_id,
+          user_id: nil,
+          reference_id: reference_id
+        })
+
+      add_registration!(walkup, %{
+        first_name: guest_first,
+        last_name: "Door",
+        email: "walkup-#{unique}@example.com"
+      })
+
+      by_name = Scanning.list_event_checkin_tickets(event.id, guest_first)
+      assert Enum.map(by_name, & &1.id) == [walkup.id]
+      assert hd(by_name).user == nil
+      assert hd(by_name).registration.email == "walkup-#{unique}@example.com"
+
+      by_ref = Scanning.list_event_checkin_tickets(event.id, reference_id)
+      assert Enum.map(by_ref, & &1.id) == [walkup.id]
+
+      refute Enum.any?(
+               Scanning.list_event_checkin_tickets(
+                 event.id,
+                 "ZZZNOMATCHWALKUP"
+               ),
+               &(&1.id == walkup.id)
+             )
+    end
+  end
+
+  describe "get_checkin_ticket/1" do
+    test "returns the same slim preloads as the check-in list, including nil user" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+      unique = System.unique_integer([:positive])
+
+      ticket =
+        insert_confirmed_checkin_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: nil,
+          reference_id: "TKT-GET-#{unique}"
+        })
+
+      add_registration!(ticket, %{
+        first_name: "DeskGuest#{unique}",
+        last_name: "Walkup",
+        email: "desk-#{unique}@example.com"
+      })
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.get_checkin_ticket(ticket.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert loaded.id == ticket.id
+      assert loaded.user_id == nil
+      assert loaded.user == nil
+      assert loaded.registration.first_name == "DeskGuest#{unique}"
+      assert loaded.registration.email == "desk-#{unique}@example.com"
+      assert loaded.ticket_tier.name == tier.name
+      assert loaded.reference_id == "TKT-GET-#{unique}"
+      assert loaded.ticket_order == nil
+    end
+
+    test "returns nil for an unknown ticket id" do
+      assert Scanning.get_checkin_ticket(Ecto.ULID.generate()) == nil
     end
   end
 

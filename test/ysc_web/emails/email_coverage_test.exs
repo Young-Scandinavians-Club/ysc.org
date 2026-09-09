@@ -1015,7 +1015,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         checkout_time: "11:00 AM",
         days_until_checkin: 2,
         booking_reference_id: "BK-123",
-        booking_mode: "Room Booking",
+        booking_mode: "Individual room(s)",
         room_names: "Room 1",
         nights: 2,
         is_buyout: false,

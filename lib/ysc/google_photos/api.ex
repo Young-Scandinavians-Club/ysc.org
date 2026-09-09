@@ -288,8 +288,26 @@ defmodule Ysc.GooglePhotos.Api do
 
   defp log_api_error(operation, status, body) do
     Ysc.Logging.error("Google Photos API: #{operation} failed",
+      # Namespaced keys below are on the Sentry logger-handler allowlist
+      # (see Ysc.Application) so the issue carries the operation, HTTP status
+      # and Google's fixed error code instead of just a bare title. The
+      # free-form error message and full `body` stay off the allowlist —
+      # they're only in the Fly logs.
+      google_photos_operation: operation,
+      google_photos_status: status,
+      google_photos_error: google_error_code(body),
       status: status,
       body: inspect(body, limit: 300)
     )
   end
+
+  # Library API errors come back as
+  #   %{"error" => %{"code" => 403, "status" => "PERMISSION_DENIED", "message" => "..."}}
+  # Only the `status` enum is safe for Sentry metadata — the `message` is
+  # free-form and can echo request content, so it stays in the logged `body`.
+  defp google_error_code(%{"error" => %{"status" => status}})
+       when is_binary(status),
+       do: status
+
+  defp google_error_code(_), do: nil
 end

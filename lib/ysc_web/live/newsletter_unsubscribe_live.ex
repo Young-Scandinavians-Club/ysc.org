@@ -80,7 +80,7 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
           You have been unsubscribed
         </h1>
         <h1 :if={!@subscriber} class="text-2xl font-bold text-zinc-900">
-          Invalid or expired link
+          This link no longer works
         </h1>
 
         <p :if={@subscriber && !@unsubscribed} class="mt-4 text-zinc-600">

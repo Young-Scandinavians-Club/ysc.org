@@ -18,6 +18,11 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
   # club trip and still leaves room for a cross-country drive.
   @max_miles_driven 10_000
 
+  # Per-line cap for purchase amounts. Submit creates a QuickBooks Bill with no
+  # in-app approval gate; without a bound a member could mint an arbitrarily
+  # large AP liability (and bank-transfer instructions) for themselves.
+  @max_purchase_amount Money.new(:USD, "10000")
+
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
   @timestamps_opts [type: :utc_datetime]
@@ -57,6 +62,11 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
   def max_miles_driven, do: @max_miles_driven
 
   @doc """
+  Maximum USD amount allowed on a single purchase expense line.
+  """
+  def max_purchase_amount, do: @max_purchase_amount
+
+  @doc """
   Creates a changeset for an expense report item.
   """
   def changeset(expense_report_item, attrs) do
@@ -81,6 +91,7 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
     |> validate_length(:vendor, max: 255)
     |> validate_length(:description, max: 1000)
     |> validate_money(:amount)
+    |> validate_purchase_amount_cap()
     |> validate_length(:receipt_s3_path, max: 2048)
     |> validate_mileage_fields()
   end
@@ -112,6 +123,7 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
     |> validate_length(:vendor, max: 255)
     |> validate_length(:description, max: 1000)
     |> validate_draft_money(:amount)
+    |> validate_purchase_amount_cap()
     |> validate_length(:receipt_s3_path, max: 2048)
     |> validate_number(:miles_driven, less_than_or_equal_to: @max_miles_driven)
     |> validate_length(:mileage_from_to, max: 255)
@@ -198,5 +210,33 @@ defmodule Ysc.ExpenseReports.ExpenseReportItem do
           [{field, "invalid money format"}]
       end
     end)
+  end
+
+  # Purchase lines only — mileage amounts are derived from miles_driven (already capped).
+  # Finding 61: sibling to Finding 37's miles_driven bound.
+  defp validate_purchase_amount_cap(changeset) do
+    if get_field(changeset, :expense_type) == "mileage" do
+      changeset
+    else
+      validate_change(changeset, :amount, fn :amount, value ->
+        case value do
+          %Money{currency: :USD} = money ->
+            # Money.cmp/2 returns -1 / 0 / 1 (not :gt / :eq / :lt).
+            case Money.cmp(money, @max_purchase_amount) do
+              1 ->
+                [
+                  {:amount,
+                   "must be less than or equal to #{Money.to_string!(@max_purchase_amount)}"}
+                ]
+
+              _ ->
+                []
+            end
+
+          _ ->
+            []
+        end
+      end)
+    end
   end
 end
