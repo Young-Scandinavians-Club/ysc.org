@@ -1042,24 +1042,8 @@ defmodule YscWeb.HomeLive do
       class="flex-1 w-full bg-zinc-50/50 min-h-screen"
     >
       <%!-- Passkey Setup Prompt Banner.
-           When just_logged_in, reserve banner height during async load so showing
-           the real prompt does not shift the dashboard (CLS). --%>
-      <div
-        :if={@just_logged_in && !@async_data_loaded}
-        id="passkey-prompt-banner-placeholder"
-        class="bg-blue-50/60 border-b border-blue-100 min-h-[4.75rem] sm:min-h-[5.25rem]"
-        aria-hidden="true"
-      >
-        <div class="max-w-screen-xl mx-auto px-4 py-3 sm:py-3.5 animate-pulse">
-          <div class="flex items-center gap-4">
-            <div class="hidden sm:block h-10 w-10 rounded-full bg-blue-100"></div>
-            <div class="flex-1 space-y-2">
-              <div class="h-4 w-48 bg-blue-100 rounded"></div>
-              <div class="h-3 w-72 max-w-full bg-blue-100/80 rounded"></div>
-            </div>
-          </div>
-        </div>
-      </div>
+           Hidden until the async user load confirms the prompt should be shown,
+           then fades in. No placeholder: most reloads never show the prompt. --%>
       <div
         :if={@show_passkey_prompt}
         id="passkey-prompt-banner"
