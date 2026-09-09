@@ -188,6 +188,7 @@ defmodule Ysc.Agendas do
     Repo.preload(item, :agenda)
   end
 
+  @dialyzer {:nowarn_function, do_move_agenda_item_to_agenda: 4}
   defp do_move_agenda_item_to_agenda(event_id, agenda_item, agenda, at_index) do
     Ecto.Multi.new()
     |> multi_update_all(:dec_positions, fn _ ->
