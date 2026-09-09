@@ -242,4 +242,61 @@ defmodule Ysc.ExpenseReports.ExpenseReportTest do
       refute Ecto.Changeset.get_field(item_cs, :date)
     end
   end
+
+  describe "rejection_changeset/2" do
+    test "forces status to rejected and keeps the trimmed note" do
+      cs =
+        ExpenseReport.rejection_changeset(
+          %ExpenseReport{status: "submitted"},
+          %{
+            rejection_note: "  Receipt for the hotel line is missing.  "
+          }
+        )
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :status) == "rejected"
+
+      assert Ecto.Changeset.get_field(cs, :rejection_note) ==
+               "Receipt for the hotel line is missing."
+    end
+
+    test "requires a non-blank note" do
+      for note <- [nil, "", "   "] do
+        cs =
+          ExpenseReport.rejection_changeset(
+            %ExpenseReport{status: "submitted"},
+            %{
+              rejection_note: note
+            }
+          )
+
+        refute cs.valid?
+        assert %{rejection_note: [_ | _]} = errors_on(cs)
+      end
+    end
+  end
+
+  describe "status_changeset/2" do
+    test "clears a stale rejection note on a non-rejected transition" do
+      cs =
+        ExpenseReport.status_changeset(
+          %ExpenseReport{status: "rejected", rejection_note: "Fix the totals"},
+          %{status: "submitted"}
+        )
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :rejection_note) == nil
+    end
+
+    test "leaves the note in place while the report stays rejected" do
+      cs =
+        ExpenseReport.status_changeset(
+          %ExpenseReport{status: "rejected", rejection_note: "Fix the totals"},
+          %{status: "rejected", quickbooks_sync_error: "QB said no"}
+        )
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :rejection_note) == "Fix the totals"
+    end
+  end
 end

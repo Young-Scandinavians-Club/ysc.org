@@ -83,6 +83,10 @@ defmodule YscWeb.AdminMoneyLive do
         :expense_report_status_form,
         to_form(%{}, as: :expense_report_status)
       )
+      |> assign(
+        :expense_report_reject_form,
+        to_form(%{"rejection_note" => ""}, as: :reject)
+      )
       |> assign(:payments_end?, true)
       |> assign(:payments_empty?, true)
       |> assign(:payments_count, 0)
@@ -1099,6 +1103,15 @@ defmodule YscWeb.AdminMoneyLive do
         socket
       ) do
     apply_expense_report_status(socket, %{"status" => status})
+  end
+
+  @impl true
+  def handle_event(
+        "reject_expense_report",
+        %{"reject" => %{"rejection_note" => note}},
+        socket
+      ) do
+    reject_expense_report_flow(socket, note)
   end
 
   @impl true
@@ -3512,6 +3525,19 @@ defmodule YscWeb.AdminMoneyLive do
                 </p>
               <% end %>
 
+              <div
+                :if={report.status == "rejected" && report.rejection_note}
+                id="expense-report-rejection-note"
+                class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm"
+              >
+                <p class="font-medium text-red-800">
+                  Rejection note sent to the member
+                </p>
+                <p class="mt-1 whitespace-pre-wrap text-red-700">
+                  {report.rejection_note}
+                </p>
+              </div>
+
               <.line_items_table
                 id="expense-report-expense-items"
                 title={"Expense items (#{length(expense_rows)})"}
@@ -3704,16 +3730,6 @@ defmodule YscWeb.AdminMoneyLive do
                 <%= case report.status do %>
                   <% "submitted" -> %>
                     <.button
-                      id="expense-report-reject"
-                      type="button"
-                      color="red"
-                      phx-click="update_expense_report_status"
-                      phx-value-status="rejected"
-                      data-confirm="Reject this expense report?"
-                    >
-                      Reject
-                    </.button>
-                    <.button
                       id="expense-report-approve"
                       type="button"
                       color="green"
@@ -3755,6 +3771,37 @@ defmodule YscWeb.AdminMoneyLive do
                   <% _ -> %>
                 <% end %>
               </div>
+
+              <div
+                :if={report.status == "submitted"}
+                id="expense-report-reject-panel"
+                class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3"
+              >
+                <.form
+                  for={@expense_report_reject_form}
+                  id="expense-report-reject-form"
+                  phx-submit="reject_expense_report"
+                >
+                  <.input
+                    field={@expense_report_reject_form[:rejection_note]}
+                    type="textarea"
+                    label="Reason for rejection"
+                    placeholder="Explain what the member needs to fix. They'll see this note and can then submit a corrected expense report."
+                    rows="3"
+                    required
+                  />
+                  <div class="mt-2 flex justify-end">
+                    <.button
+                      id="expense-report-reject"
+                      type="submit"
+                      color="red"
+                      phx-disable-with="Rejecting…"
+                    >
+                      Reject &amp; email member
+                    </.button>
+                  </div>
+                </.form>
+              </div>
               <details id="expense-report-status-form" class="mt-3">
                 <summary class="cursor-pointer text-xs text-zinc-500">
                   Change status manually
@@ -3776,6 +3823,13 @@ defmodule YscWeb.AdminMoneyLive do
                       {"Paid", "paid"}
                     ]}
                     required
+                  />
+                  <.input
+                    field={@expense_report_status_form[:rejection_note]}
+                    type="textarea"
+                    label="Rejection note"
+                    placeholder="Required when setting the status to Rejected — the member is emailed this note."
+                    rows="3"
                   />
                   <div class="mt-2 flex justify-end">
                     <.button type="submit" phx-disable-with="Updating...">
@@ -4050,6 +4104,13 @@ defmodule YscWeb.AdminMoneyLive do
     """
   end
 
+  # Rejecting requires a treasurer note and emails the member, so it always
+  # routes through the dedicated reject flow regardless of which control
+  # (the Reject panel or the manual status form) triggered it.
+  defp apply_expense_report_status(socket, %{"status" => "rejected"} = params) do
+    reject_expense_report_flow(socket, params["rejection_note"])
+  end
+
   defp apply_expense_report_status(socket, status_params) do
     expense_report = socket.assigns.selected_expense_report
 
@@ -4099,12 +4160,85 @@ defmodule YscWeb.AdminMoneyLive do
     end
   end
 
+  defp reject_expense_report_flow(socket, raw_note) do
+    expense_report =
+      case socket.assigns.selected_expense_report do
+        %{id: id} -> ExpenseReports.get_for_admin_review(id)
+        _ -> nil
+      end
+
+    note = String.trim(raw_note || "")
+
+    cond do
+      is_nil(expense_report) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Expense report not found",
+           title: "Expense report"
+         )
+         |> clear_expense_report_modal()}
+
+      note == "" ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Add a note explaining what needs to change — the member sees it.",
+           title: "Expense report"
+         )
+         |> assign(
+           :expense_report_reject_form,
+           to_form(%{"rejection_note" => raw_note || ""},
+             as: :reject,
+             errors: [
+               rejection_note: {"is required when rejecting a report", []}
+             ]
+           )
+         )}
+
+      true ->
+        case ExpenseReports.reject_expense_report(expense_report, note) do
+          {:ok, rejected_report} ->
+            ExpenseReports.deliver_expense_report_rejection_email(
+              rejected_report
+            )
+
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Expense report rejected. The member has been emailed the note.",
+               title: "Expense report"
+             )
+             |> clear_expense_report_modal()
+             |> load_expense_reports_inbox()
+             |> maybe_refresh_expense_reports_list()}
+
+          {:error, changeset} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Failed to reject expense report",
+               title: "Expense report"
+             )
+             |> assign(
+               :expense_report_reject_form,
+               to_form(changeset, as: :reject)
+             )}
+        end
+    end
+  end
+
   defp assign_expense_report_modal(socket, expense_report) do
     attachments = build_expense_attachments(expense_report)
     flags = compute_item_flags(expense_report)
 
     status_form =
-      %{status: expense_report.status}
+      %{
+        status: expense_report.status,
+        rejection_note: expense_report.rejection_note
+      }
       |> expense_report_status_changeset()
       |> to_form(as: :expense_report_status)
 
@@ -4119,6 +4253,10 @@ defmodule YscWeb.AdminMoneyLive do
       ExpenseReports.calculate_totals(expense_report)
     )
     |> assign(:expense_report_status_form, status_form)
+    |> assign(
+      :expense_report_reject_form,
+      to_form(%{"rejection_note" => ""}, as: :reject)
+    )
   end
 
   defp clear_expense_report_modal(socket) do
@@ -4132,6 +4270,10 @@ defmodule YscWeb.AdminMoneyLive do
     |> assign(
       :expense_report_status_form,
       to_form(%{}, as: :expense_report_status)
+    )
+    |> assign(
+      :expense_report_reject_form,
+      to_form(%{"rejection_note" => ""}, as: :reject)
     )
   end
 
@@ -4646,7 +4788,8 @@ defmodule YscWeb.AdminMoneyLive do
 
   defp expense_report_status_changeset(params) do
     types = %{
-      status: :string
+      status: :string,
+      rejection_note: :string
     }
 
     {%{}, types}
