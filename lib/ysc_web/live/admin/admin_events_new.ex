@@ -1933,23 +1933,41 @@ defmodule YscWeb.AdminEventsNewLive do
     prompt = socket.assigns[:blackout_prompt]
 
     socket =
-      case prompt && Bookings.create_blackout(prompt.attrs) do
-        {:ok, _blackout} ->
+      cond do
+        is_nil(prompt) ->
+          socket
+
+        # Re-check right before creating: another admin may have added an
+        # overlapping blackout while this modal was open.
+        existing_blackout_overlap(prompt.attrs) != [] ->
           YscWeb.Flash.put_toast(
             socket,
             :info,
-            "Blackout added for #{prompt.property_label} (#{prompt.date_label}).",
+            "A blackout for #{prompt.property_label} already covers " <>
+              "#{prompt.date_label}. Publishing without adding a duplicate.",
             title: "Blackout"
           )
 
-        _ ->
-          YscWeb.Flash.put_toast(
-            socket,
-            :error,
-            "Could not add the blackout. Publishing the event anyway — " <>
-              "add the blackout from the bookings calendar.",
-            title: "Blackout"
-          )
+        true ->
+          case Bookings.create_blackout(prompt.attrs) do
+            {:ok, _blackout} ->
+              YscWeb.Flash.put_toast(
+                socket,
+                :info,
+                "Blackout added for #{prompt.property_label} " <>
+                  "(#{prompt.date_label}).",
+                title: "Blackout"
+              )
+
+            {:error, _changeset} ->
+              YscWeb.Flash.put_toast(
+                socket,
+                :error,
+                "Could not add the blackout. Publishing the event anyway — " <>
+                  "add the blackout from the bookings calendar.",
+                title: "Blackout"
+              )
+          end
       end
 
     do_publish_event(assign(socket, :blackout_prompt, nil))
@@ -3335,8 +3353,7 @@ defmodule YscWeb.AdminEventsNewLive do
            "end_date" => end_date
          } <-
            attrs,
-         [] <-
-           Bookings.get_overlapping_blackouts(property, start_date, end_date) do
+         [] <- existing_blackout_overlap(attrs) do
       %{
         attrs: attrs,
         property: property,
@@ -3346,6 +3363,15 @@ defmodule YscWeb.AdminEventsNewLive do
     else
       _ -> nil
     end
+  end
+
+  # Blackouts already on the calendar that overlap the event's date range.
+  defp existing_blackout_overlap(%{
+         "property" => property,
+         "start_date" => start_date,
+         "end_date" => end_date
+       }) do
+    Bookings.get_overlapping_blackouts(property, start_date, end_date)
   end
 
   defp blackout_date_label(start_date, end_date) do

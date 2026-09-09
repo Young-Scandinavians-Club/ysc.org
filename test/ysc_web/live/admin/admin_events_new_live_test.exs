@@ -1896,6 +1896,36 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert Repo.get!(Event, event.id).state == :published
     end
 
+    test "no duplicate blackout when one is added while the prompt is open", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view |> element("button[phx-click=publish-event]") |> render_click()
+      assert has_element?(view, "#event-blackout-prompt-modal")
+
+      # Another admin adds an overlapping blackout before this one confirms.
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          "property" => :clear_lake,
+          "reason" => "Beat you to it",
+          "start_date" => ~D[2030-07-05],
+          "end_date" => ~D[2030-07-07]
+        })
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=publish-with-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+
+      assert [%{reason: "Beat you to it"}] =
+               Bookings.list_blackouts_from_db(:clear_lake)
+    end
+
     test "prompt is skipped when a blackout already covers the event dates", %{
       conn: conn,
       admin: admin
