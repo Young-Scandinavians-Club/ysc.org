@@ -317,10 +317,27 @@ defmodule YscWeb.AdminEventsNewLive do
             max_width="max-w-lg"
           >
             <.modal_title id="event-blackout-prompt-modal-title">
-              Block the booking calendar?
+              {if @blackout_prompt.booking_conflict?,
+                do: "Heads up — existing cabin booking",
+                else: "Block the booking calendar?"}
             </.modal_title>
 
-            <p class="text-sm text-zinc-600">
+            <div
+              :if={@blackout_prompt.booking_conflict?}
+              class="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            >
+              <p class="font-semibold">
+                There's already a held or confirmed booking for the {@blackout_prompt.property_label} that overlaps {@blackout_prompt.date_label}.
+              </p>
+              <p class="mt-1">
+                Publishing won't cancel it. Double-check the event dates, and
+                contact the cabin master to resolve the conflict. You can still {blackout_pending_verb(
+                  @blackout_prompt.pending
+                )} the event now.
+              </p>
+            </div>
+
+            <p :if={@blackout_prompt.blackout_needed?} class="text-sm text-zinc-600">
               This event is at the <span class="font-semibold">{@blackout_prompt.property_label}</span>. Add a blackout
               block for
               <span class="font-semibold">{@blackout_prompt.date_label}</span>
@@ -332,18 +349,27 @@ defmodule YscWeb.AdminEventsNewLive do
                 type="button"
                 variant="outline"
                 color="zinc"
-                phx-click="publish-without-blackout"
-                phx-disable-with="Publishing..."
+                phx-click="skip-blackout"
+                phx-disable-with="Working..."
               >
-                Publish without blackout
+                {if @blackout_prompt.blackout_needed?,
+                  do:
+                    String.capitalize(
+                      blackout_pending_verb(@blackout_prompt.pending)
+                    ) <> " without blackout",
+                  else:
+                    String.capitalize(
+                      blackout_pending_verb(@blackout_prompt.pending)
+                    ) <> " anyway"}
               </.button>
               <.button
+                :if={@blackout_prompt.blackout_needed?}
                 type="button"
                 color="blue"
-                phx-click="publish-with-blackout"
-                phx-disable-with="Publishing..."
+                phx-click="confirm-blackout"
+                phx-disable-with="Working..."
               >
-                Add blackout &amp; publish
+                Add blackout &amp; {blackout_pending_verb(@blackout_prompt.pending)}
               </.button>
             </div>
           </.modal>
@@ -1909,73 +1935,44 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("publish-event", _, socket) do
-    cond do
-      not socket.assigns.can_publish ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "A title and event date must be set before publishing.",
-           title: "Event"
-         )}
-
-      prompt = blackout_prompt_for_event(socket.assigns.event) ->
-        # Cabin event: offer to block the booking calendar before publishing.
-        {:noreply, assign(socket, :blackout_prompt, prompt)}
-
-      true ->
-        do_publish_event(socket)
+    if socket.assigns.can_publish do
+      maybe_prompt_blackout(socket, :publish)
+    else
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "A title and event date must be set before publishing.",
+         title: "Event"
+       )}
     end
   end
 
   @impl true
-  def handle_event("publish-with-blackout", _, socket) do
-    prompt = socket.assigns[:blackout_prompt]
+  def handle_event("confirm-blackout", _, socket) do
+    case socket.assigns[:blackout_prompt] do
+      nil ->
+        {:noreply, socket}
 
-    socket =
-      cond do
-        is_nil(prompt) ->
-          socket
-
-        # Re-check right before creating: another admin may have added an
-        # overlapping blackout while this modal was open.
-        existing_blackout_overlap(prompt.attrs) != [] ->
-          YscWeb.Flash.put_toast(
-            socket,
-            :info,
-            "A blackout for #{prompt.property_label} already covers " <>
-              "#{prompt.date_label}. Publishing without adding a duplicate.",
-            title: "Blackout"
-          )
-
-        true ->
-          case Bookings.create_blackout(prompt.attrs) do
-            {:ok, _blackout} ->
-              YscWeb.Flash.put_toast(
-                socket,
-                :info,
-                "Blackout added for #{prompt.property_label} " <>
-                  "(#{prompt.date_label}).",
-                title: "Blackout"
-              )
-
-            {:error, _changeset} ->
-              YscWeb.Flash.put_toast(
-                socket,
-                :error,
-                "Could not add the blackout. Publishing the event anyway — " <>
-                  "add the blackout from the bookings calendar.",
-                title: "Blackout"
-              )
-          end
-      end
-
-    do_publish_event(assign(socket, :blackout_prompt, nil))
+      prompt ->
+        socket
+        |> maybe_create_blackout(prompt)
+        |> assign(:blackout_prompt, nil)
+        |> run_blackout_pending(prompt.pending)
+    end
   end
 
   @impl true
-  def handle_event("publish-without-blackout", _, socket) do
-    do_publish_event(assign(socket, :blackout_prompt, nil))
+  def handle_event("skip-blackout", _, socket) do
+    case socket.assigns[:blackout_prompt] do
+      nil ->
+        {:noreply, socket}
+
+      prompt ->
+        socket
+        |> assign(:blackout_prompt, nil)
+        |> run_blackout_pending(prompt.pending)
+    end
   end
 
   @impl true
@@ -2615,6 +2612,120 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
+  # Interpose the cabin prompt (offer a blackout, and/or warn about an existing
+  # booking) before running `pending` (`:publish` or `{:schedule, publish_at}`).
+  # Non-cabin events — and cabin events with a blackout already in place and no
+  # conflicting booking — run `pending` straight away.
+  defp maybe_prompt_blackout(socket, pending) do
+    case cabin_publish_prompt(socket.assigns.event) do
+      nil ->
+        run_blackout_pending(socket, pending)
+
+      prompt ->
+        {:noreply,
+         assign(socket, :blackout_prompt, Map.put(prompt, :pending, pending))}
+    end
+  end
+
+  defp run_blackout_pending(socket, :publish), do: do_publish_event(socket)
+
+  defp run_blackout_pending(socket, {:schedule, publish_at}),
+    do: do_schedule_event(socket, publish_at)
+
+  # No blackout to add (one already covers the dates); nothing to create.
+  defp maybe_create_blackout(socket, %{blackout_needed?: false}), do: socket
+
+  defp maybe_create_blackout(socket, prompt) do
+    cond do
+      # Re-check right before creating: another admin may have added an
+      # overlapping blackout while this modal was open.
+      existing_blackout_overlap(prompt.attrs) != [] ->
+        YscWeb.Flash.put_toast(
+          socket,
+          :info,
+          "A blackout for #{prompt.property_label} already covers " <>
+            "#{prompt.date_label}. Continuing without adding a duplicate.",
+          title: "Blackout"
+        )
+
+      true ->
+        case Bookings.create_blackout(prompt.attrs) do
+          {:ok, _blackout} ->
+            YscWeb.Flash.put_toast(
+              socket,
+              :info,
+              "Blackout added for #{prompt.property_label} " <>
+                "(#{prompt.date_label}).",
+              title: "Blackout"
+            )
+
+          {:error, _changeset} ->
+            YscWeb.Flash.put_toast(
+              socket,
+              :error,
+              "Could not add the blackout — add it from the bookings " <>
+                "calendar. Continuing with the event.",
+              title: "Blackout"
+            )
+        end
+    end
+  end
+
+  defp do_schedule_event(socket, publish_at_string) do
+    require Ysc.Logging
+
+    result =
+      try do
+        Events.schedule_event(socket.assigns.event, publish_at_string)
+      rescue
+        error ->
+          Ysc.Logging.error("Error scheduling event",
+            event_id: socket.assigns.event.id,
+            error: Exception.message(error)
+          )
+
+          {:error, :invalid_datetime}
+      end
+
+    case result do
+      {:ok, _event} ->
+        # The EventUpdated broadcast refreshes @event in handle_info/2.
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :info, "Event scheduled successfully",
+           title: "Event",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
+         )}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        details =
+          Enum.map_join(changeset.errors, ", ", fn {field, {message, _}} ->
+            "#{field}: #{message}"
+          end)
+
+        Ysc.Logging.error("Failed to schedule event",
+          event_id: socket.assigns.event.id,
+          errors: details
+        )
+
+        message =
+          if details == "",
+            do: "Failed to schedule event. Please check the form for errors.",
+            else: "Failed to schedule event: #{details}"
+
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, message, title: "Event")}
+
+      {:error, :invalid_datetime} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to schedule event: invalid date and time.",
+           title: "Event"
+         )}
+    end
+  end
+
   @impl true
   def handle_async(:load_statistics, {:ok, data}, socket) do
     {:noreply, assign_statistics_tab_data(socket, data)}
@@ -2624,6 +2735,15 @@ defmodule YscWeb.AdminEventsNewLive do
     Ysc.Logging.warning("Failed to load event statistics: #{inspect(reason)}")
 
     {:noreply, assign(socket, :statistics_loading?, false)}
+  end
+
+  @impl true
+  def handle_info(
+        {YscWeb.AdminEventsLive.ScheduleEventForm,
+         {:schedule_requested, publish_at_string}},
+        socket
+      ) do
+    maybe_prompt_blackout(socket, {:schedule, publish_at_string})
   end
 
   @impl true
@@ -3342,24 +3462,34 @@ defmodule YscWeb.AdminEventsNewLive do
     start_date not in [nil, ""] and title not in [nil, ""]
   end
 
-  # Builds the "add a blackout block?" prompt shown before publishing an event
-  # held at the Tahoe or Clear Lake cabin. Returns `nil` when the event is not
-  # at a cabin, or when a blackout already covers the event dates.
-  defp blackout_prompt_for_event(event) do
+  # Builds the cabin prompt shown before publishing/scheduling an event held at
+  # the Tahoe or Clear Lake cabin. Returns `nil` for non-cabin events, and for
+  # cabin events that already have a covering blackout and no conflicting
+  # booking (nothing to ask). Otherwise returns a map describing what to warn
+  # about: `blackout_needed?` (offer to add one) and `booking_conflict?`
+  # (an existing hold/complete booking overlaps — warn but never block).
+  defp cabin_publish_prompt(event) do
     with {:ok, attrs} <- CabinBlackout.blackout_attrs(event),
          %{
            "property" => property,
            "start_date" => start_date,
            "end_date" => end_date
-         } <-
-           attrs,
-         [] <- existing_blackout_overlap(attrs) do
-      %{
-        attrs: attrs,
-        property: property,
-        property_label: Bookings.PropertyDisplay.full_name(property),
-        date_label: blackout_date_label(start_date, end_date)
-      }
+         } <- attrs do
+      blackout_needed? = existing_blackout_overlap(attrs) == []
+
+      booking_conflict? =
+        Bookings.has_conflicting_bookings?(property, start_date, end_date)
+
+      if blackout_needed? or booking_conflict? do
+        %{
+          attrs: attrs,
+          property: property,
+          property_label: Bookings.PropertyDisplay.full_name(property),
+          date_label: blackout_date_label(start_date, end_date),
+          blackout_needed?: blackout_needed?,
+          booking_conflict?: booking_conflict?
+        }
+      end
     else
       _ -> nil
     end
@@ -3373,6 +3503,9 @@ defmodule YscWeb.AdminEventsNewLive do
        }) do
     Bookings.get_overlapping_blackouts(property, start_date, end_date)
   end
+
+  defp blackout_pending_verb(:publish), do: "publish"
+  defp blackout_pending_verb({:schedule, _publish_at}), do: "schedule"
 
   defp blackout_date_label(start_date, end_date) do
     if Date.compare(start_date, end_date) == :eq do

@@ -4,6 +4,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
   import Ysc.ScanningFixtures
 
@@ -1846,7 +1847,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
                view
-               |> element("button[phx-click=publish-with-blackout]")
+               |> element("button[phx-click=confirm-blackout]")
                |> render_click()
 
       assert Repo.get!(Event, event.id).state == :published
@@ -1869,7 +1870,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
                view
-               |> element("button[phx-click=publish-without-blackout]")
+               |> element("button[phx-click=skip-blackout]")
                |> render_click()
 
       assert Repo.get!(Event, event.id).state == :published
@@ -1917,7 +1918,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
                view
-               |> element("button[phx-click=publish-with-blackout]")
+               |> element("button[phx-click=confirm-blackout]")
                |> render_click()
 
       assert Repo.get!(Event, event.id).state == :published
@@ -1951,6 +1952,169 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       # No duplicate blackout was created.
       assert [%{reason: "Existing hold"}] =
                Bookings.list_blackouts_from_db(:clear_lake)
+    end
+  end
+
+  describe "publish - existing cabin booking warning" do
+    setup [:create_admin]
+
+    defp clear_lake_booking(dates \\ {~D[2030-07-05], ~D[2030-07-07]}) do
+      {checkin, checkout} = dates
+
+      booking_fixture(%{
+        property: :clear_lake,
+        status: :complete,
+        checkin_date: checkin,
+        checkout_date: checkout
+      })
+    end
+
+    test "warns about an overlapping booking but still lets the event publish",
+         %{conn: conn, admin: admin} do
+      event = cabin_event(admin)
+      _booking = clear_lake_booking()
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html =
+        view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert html =~ "existing cabin booking"
+      assert html =~ "contact the cabin master"
+      assert Repo.get!(Event, event.id).state == :draft
+
+      # The warning does not block: skip-blackout still publishes.
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=skip-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+    end
+
+    test "still prompts when a blackout already covers the dates but a booking overlaps",
+         %{conn: conn, admin: admin} do
+      event = cabin_event(admin)
+      _booking = clear_lake_booking()
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          "property" => :clear_lake,
+          "reason" => "Existing hold",
+          "start_date" => ~D[2030-07-04],
+          "end_date" => ~D[2030-07-08]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html =
+        view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert html =~ "existing cabin booking"
+      # No "add blackout" button — one already covers the dates.
+      refute has_element?(view, "button[phx-click=confirm-blackout]")
+      assert has_element?(view, "button[phx-click=skip-blackout]")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=skip-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+    end
+
+    test "a booking that only abuts the event dates is not a conflict", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = cabin_event(admin)
+      # Checkout on the event's start day — same-day turnaround, no overlap.
+      _booking = clear_lake_booking({~D[2030-07-02], ~D[2030-07-05]})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html =
+        view |> element("button[phx-click=publish-event]") |> render_click()
+
+      refute html =~ "existing cabin booking"
+      assert html =~ "Block the booking calendar?"
+    end
+  end
+
+  describe "schedule publish - cabin blackout prompt" do
+    setup [:create_admin]
+
+    defp submit_schedule(view, event, publish_at \\ "2030-07-01T09:00") do
+      view
+      |> element("#schedule_form-#{event.id}")
+      |> render_submit(%{"event" => %{"publish_at" => publish_at}})
+    end
+
+    test "submitting the schedule form on a cabin event opens the blackout prompt",
+         %{conn: conn, admin: admin} do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      submit_schedule(view, event)
+
+      # The component hands off to the parent via send/2; the modal renders
+      # once that message is processed.
+      html = render(view)
+      assert html =~ "Block the booking calendar?"
+      assert html =~ "Add blackout &amp; schedule"
+      assert has_element?(view, "#event-blackout-prompt-modal")
+      assert Repo.get!(Event, event.id).state == :draft
+      assert Bookings.list_blackouts_from_db(:clear_lake) == []
+    end
+
+    test "Add blackout & schedule creates the blackout and schedules the event",
+         %{conn: conn, admin: admin} do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      submit_schedule(view, event)
+
+      view |> element("button[phx-click=confirm-blackout]") |> render_click()
+
+      reloaded = Repo.get!(Event, event.id)
+      assert reloaded.state == :scheduled
+      assert reloaded.publish_at
+
+      assert [blackout] = Bookings.list_blackouts_from_db(:clear_lake)
+      assert blackout.start_date == ~D[2030-07-05]
+      assert blackout.end_date == ~D[2030-07-07]
+    end
+
+    test "Schedule without blackout schedules the event and adds no blackout",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      submit_schedule(view, event)
+      view |> element("button[phx-click=skip-blackout]") |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :scheduled
+      assert Bookings.list_blackouts_from_db(:clear_lake) == []
+    end
+
+    test "non-cabin event schedules immediately without a prompt", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        cabin_event(admin, %{
+          location_name: "Swedish American Hall",
+          address: "2174 Market St, San Francisco, CA 94114"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      submit_schedule(view, event)
+
+      refute has_element?(view, "#event-blackout-prompt-modal")
+      assert Repo.get!(Event, event.id).state == :scheduled
     end
   end
 
