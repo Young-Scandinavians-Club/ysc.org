@@ -22,4 +22,7 @@ defmodule Ysc.Stripe.PaymentMethodBehaviour do
               opts :: keyword()
             ) ::
               {:ok, Stripe.PaymentMethod.t()} | {:error, Stripe.Error.t()}
+
+  @callback detach(payment_method_id :: String.t()) ::
+              {:ok, Stripe.PaymentMethod.t()} | {:error, Stripe.Error.t()}
 end

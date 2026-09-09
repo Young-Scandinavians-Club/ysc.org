@@ -27,4 +27,7 @@ defmodule Ysc.TestStripePaymentMethodStub do
   @impl true
   def update(id, _params, _opts),
     do: {:ok, %Stripe.PaymentMethod{id: id, type: "card"}}
+
+  @impl true
+  def detach(id), do: {:ok, %Stripe.PaymentMethod{id: id, type: "card"}}
 end
