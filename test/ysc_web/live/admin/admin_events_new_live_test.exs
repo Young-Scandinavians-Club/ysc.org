@@ -8,6 +8,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   import Ysc.ScanningFixtures
 
   alias Ysc.Agendas
+  alias Ysc.Bookings
   alias Ysc.EventPhotos
   alias Ysc.Events
   alias Ysc.Events.Event
@@ -1790,6 +1791,136 @@ defmodule YscWeb.AdminEventsNewLiveTest do
                ~s|a[href="/events/#{event.id}"][target="_blank"]|,
                "View Event"
              )
+    end
+  end
+
+  @cabin_start ~U[2030-07-05 07:00:00Z]
+  @cabin_end ~U[2030-07-07 07:00:00Z]
+
+  defp cabin_event(admin, overrides \\ %{}) do
+    event_fixture(
+      Map.merge(
+        %{
+          organizer_id: admin.id,
+          state: :draft,
+          title: "Cabin Retreat",
+          location_name: "Clear Lake Cabin",
+          address: "9325 Bass Road, Kelseyville, CA 95451",
+          start_date: @cabin_start,
+          end_date: @cabin_end
+        },
+        overrides
+      )
+    )
+  end
+
+  describe "publish - cabin blackout prompt" do
+    setup [:create_admin]
+
+    test "clicking Publish on a cabin event opens the blackout prompt instead of publishing",
+         %{conn: conn, admin: admin} do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html =
+        view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert html =~ "Block the booking calendar?"
+      assert html =~ "Clear Lake Cabin"
+      assert has_element?(view, "#event-blackout-prompt-modal")
+
+      # Event is not published until the admin resolves the prompt.
+      assert Repo.get!(Event, event.id).state == :draft
+      assert Bookings.list_blackouts_from_db(:clear_lake) == []
+    end
+
+    test "Add blackout & publish creates the blackout and publishes the event",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=publish-with-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+
+      assert [blackout] = Bookings.list_blackouts_from_db(:clear_lake)
+      assert blackout.property == :clear_lake
+      assert blackout.start_date == ~D[2030-07-05]
+      assert blackout.end_date == ~D[2030-07-07]
+      assert blackout.reason =~ "Cabin Retreat"
+    end
+
+    test "Publish without blackout publishes the event and adds no blackout", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=publish-without-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+      assert Bookings.list_blackouts_from_db(:clear_lake) == []
+    end
+
+    test "non-cabin event publishes immediately without a prompt", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        cabin_event(admin, %{
+          location_name: "Swedish American Hall",
+          address: "2174 Market St, San Francisco, CA 94114"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=publish-event]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+    end
+
+    test "prompt is skipped when a blackout already covers the event dates", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = cabin_event(admin)
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          "property" => :clear_lake,
+          "reason" => "Existing hold",
+          "start_date" => ~D[2030-07-04],
+          "end_date" => ~D[2030-07-08]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=publish-event]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+      # No duplicate blackout was created.
+      assert [%{reason: "Existing hold"}] =
+               Bookings.list_blackouts_from_db(:clear_lake)
     end
   end
 
