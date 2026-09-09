@@ -2087,7 +2087,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div
               id="calendar-scroll-area"
               phx-hook="CalendarScrollSync"
-              class="flex-1 overflow-x-scroll calendar-scroll-area"
+              class="flex-1 min-w-0 overflow-x-scroll calendar-scroll-area"
             >
               <!-- Header: Date columns -->
               <div>
