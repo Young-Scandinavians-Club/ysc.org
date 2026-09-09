@@ -2795,6 +2795,216 @@ defmodule Ysc.ExpenseReportsTest do
     end
   end
 
+  describe "list_submitted_inbox/1" do
+    test "returns submitted reports oldest first and omits drafts", %{
+      user: user
+    } do
+      older =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "submitted",
+          purpose: "Older inbox",
+          reimbursement_method: "bank_transfer",
+          inserted_at: ~U[2026-01-01 00:00:00Z],
+          updated_at: ~U[2026-01-01 00:00:00Z]
+        })
+
+      newer =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "submitted",
+          purpose: "Newer inbox",
+          reimbursement_method: "bank_transfer",
+          inserted_at: ~U[2026-02-01 00:00:00Z],
+          updated_at: ~U[2026-02-01 00:00:00Z]
+        })
+
+      _draft =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "draft",
+          purpose: "Still writing",
+          reimbursement_method: "bank_transfer"
+        })
+
+      _approved =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "approved",
+          purpose: "Already reviewed",
+          reimbursement_method: "bank_transfer"
+        })
+
+      results = ExpenseReports.list_submitted_inbox()
+
+      assert Enum.map(results, & &1.id) == [older.id, newer.id]
+      assert hd(results).user.email == user.email
+      refute Ecto.assoc_loaded?(hd(results).expense_items)
+    end
+
+    test "does not SELECT user password hashes or board bios", %{user: user} do
+      Repo.insert!(%ExpenseReport{
+        user_id: user.id,
+        status: "submitted",
+        purpose: "Slim inbox user",
+        reimbursement_method: "bank_transfer"
+      })
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_submitted_inbox() end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_submitted_inbox() end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      [report] = results
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert report.user.first_name == user.first_name
+      assert report.user.email == user.email
+      assert is_nil(report.user.hashed_password)
+    end
+  end
+
+  describe "list_for_admin/4" do
+    test "omits drafts and does not SELECT user password hashes", %{user: user} do
+      start_date = ~U[2026-01-01 00:00:00Z]
+      end_date = ~U[2026-12-31 23:59:59Z]
+
+      filed =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "submitted",
+          purpose: "Filed this year",
+          reimbursement_method: "bank_transfer",
+          inserted_at: ~U[2026-06-01 12:00:00Z],
+          updated_at: ~U[2026-06-01 12:00:00Z]
+        })
+
+      _draft =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "draft",
+          purpose: "Scratch copy",
+          reimbursement_method: "bank_transfer",
+          inserted_at: ~U[2026-06-02 12:00:00Z],
+          updated_at: ~U[2026-06-02 12:00:00Z]
+        })
+
+      _outside =
+        Repo.insert!(%ExpenseReport{
+          user_id: user.id,
+          status: "submitted",
+          purpose: "Last year",
+          reimbursement_method: "bank_transfer",
+          inserted_at: ~U[2025-06-01 12:00:00Z],
+          updated_at: ~U[2025-06-01 12:00:00Z]
+        })
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.list_for_admin(start_date, end_date, 1, 20) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert Enum.map(results, & &1.id) == [filed.id]
+      assert password_cols == 0
+      assert hd(results).user.email == user.email
+      refute Ecto.assoc_loaded?(hd(results).expense_items)
+    end
+  end
+
+  describe "get_for_admin_review/1" do
+    test "loads line items and slim user/event/bank without password or event HTML",
+         %{user: user} do
+      event =
+        event_fixture(%{
+          title: "Review Event Title",
+          raw_details: "<p>toast body that review must not load</p>",
+          rendered_details: "<p>toast body that review must not load</p>"
+        })
+
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Review modal",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "REI",
+                "description" => "Supplies",
+                "amount" => "42.00",
+                "receipt_s3_path" => "receipts/review.pdf"
+              }
+            ]
+          },
+          user
+        )
+
+      {:ok, _} =
+        ExpenseReports.update_expense_report(report, %{status: "submitted"})
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.get_for_admin_review(report.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.get_for_admin_review(report.id) end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_, encrypted_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpenseReports.get_for_admin_review(report.id) end,
+          pattern: ~r/routing_number|account_number[^_]/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.purpose == "Review modal"
+      assert loaded.user.email == user.email
+      assert loaded.event.title == "Review Event Title"
+      assert loaded.bank_account.account_number_last_4 == "7890"
+      assert [%{vendor: "REI"}] = loaded.expense_items
+      assert is_nil(loaded.user.hashed_password)
+      assert is_nil(loaded.event.raw_details)
+      assert is_nil(loaded.bank_account.routing_number)
+      assert password_cols == 0
+      assert html_cols == 0
+      assert encrypted_cols == 0
+    end
+
+    test "returns nil when the report does not exist" do
+      assert ExpenseReports.get_for_admin_review(Ecto.ULID.generate()) == nil
+    end
+  end
+
   describe "total_for_event/2 and totals_for_event/2" do
     test "only counts approved/paid reports by default, netting income against expenses",
          %{user: user} do
@@ -3277,6 +3487,15 @@ defmodule Ysc.ExpenseReportsTest do
 
       assert %Ecto.Query{} =
                ExpenseReports.ci_query_explain_active_draft_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_list_submitted_inbox_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_list_for_admin_query()
+
+      assert %Ecto.Query{} =
+               ExpenseReports.ci_query_explain_admin_review_query()
     end
   end
 
