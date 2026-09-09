@@ -222,22 +222,24 @@ defmodule YscWeb.ExpenseReportLive do
     # This ensures nested items and form state are properly restored
     user = socket.assigns.current_user
 
-    # Normalize params to ensure all keys are strings (not mixed atoms/strings)
-    expense_report_params = normalize_params_keys(expense_report_params)
+    # Normalize params to ensure all keys are strings (not mixed atoms/strings).
+    # Finding 60: drop forged receipt/proof paths before changeset/cast_assoc,
+    # otherwise the recovered structs are overwritten by the client paths.
+    expense_report_params =
+      expense_report_params
+      |> normalize_params_keys()
+      |> scrub_recovered_upload_paths(user)
 
     # Rebuild the expense report from params, ensuring we have at least one expense item
-    # Finding 60: drop forged receipt/proof paths that this user does not own.
     expense_items =
       build_expense_items_from_params(
         expense_report_params["expense_items"] || %{}
       )
-      |> Enum.map(&scrub_recovered_expense_item_path(&1, user))
 
     income_items =
       build_income_items_from_params(
         expense_report_params["income_items"] || %{}
       )
-      |> Enum.map(&scrub_recovered_income_item_path(&1, user))
 
     # Ensure at least one expense item exists
     expense_items =
@@ -1279,21 +1281,34 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp build_expense_items_from_params(_), do: []
 
-  defp scrub_recovered_expense_item_path(%ExpenseReportItem{} = item, user) do
-    if ExpenseReports.upload_path_allowed_for_user?(item.receipt_s3_path, user) do
-      item
-    else
-      %{item | receipt_s3_path: nil}
-    end
+  defp scrub_recovered_upload_paths(params, user) when is_map(params) do
+    params
+    |> Map.update("expense_items", %{}, fn items ->
+      scrub_recovered_item_path_map(items, "receipt_s3_path", user)
+    end)
+    |> Map.update("income_items", %{}, fn items ->
+      scrub_recovered_item_path_map(items, "proof_s3_path", user)
+    end)
   end
 
-  defp scrub_recovered_income_item_path(%ExpenseReportIncomeItem{} = item, user) do
-    if ExpenseReports.upload_path_allowed_for_user?(item.proof_s3_path, user) do
-      item
-    else
-      %{item | proof_s3_path: nil}
-    end
+  defp scrub_recovered_item_path_map(items, field, user) when is_map(items) do
+    Map.new(items, fn {index, item} ->
+      item =
+        if is_map(item) and
+             not ExpenseReports.upload_path_allowed_for_user?(
+               item[field],
+               user
+             ) do
+          Map.delete(item, field)
+        else
+          item
+        end
+
+      {index, item}
+    end)
   end
+
+  defp scrub_recovered_item_path_map(items, _field, _user), do: items
 
   defp build_income_items_from_params(items_params) when is_map(items_params) do
     items_params
