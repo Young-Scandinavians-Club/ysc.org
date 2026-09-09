@@ -367,6 +367,78 @@ defmodule YscWeb.ExpenseReportLiveTest do
       assert has_element?(view, "#receipt-preview-0")
     end
 
+    test "reconnect recover keeps uploaded receipts through the next autosave",
+         %{conn: conn, user: user} do
+      receipt_path = "receipts/u/regatta-recover.pdf"
+
+      {:ok, draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Regatta catering",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Safeway",
+              "description" => "Sandwiches",
+              "amount" => "48.20",
+              "date" => "2026-02-01",
+              "receipt_s3_path" => receipt_path
+            }
+          }
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+      assert has_element?(view, "#receipt-preview-0")
+
+      assert has_element?(
+               view,
+               "#expense-report-form[phx-auto-recover=ignore]"
+             )
+
+      # Phoenix reconnect used to push DOM params (no receipt_s3_path input)
+      # into `recover`, which dropped the uploaded path from assigns. The next
+      # validate/autosave then delete-and-recreated draft items without it.
+      render_change(view, "recover", %{
+        "expense_report" => %{
+          "purpose" => "Regatta catering",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Safeway",
+              "description" => "Sandwiches",
+              "amount" => "48.20",
+              "date" => "2026-02-01"
+            }
+          }
+        }
+      })
+
+      assert has_element?(view, "#receipt-preview-0")
+
+      view
+      |> form("#expense-report-form", %{
+        "expense_report" => %{
+          "purpose" => "Regatta catering plus ice",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Safeway",
+              "description" => "Sandwiches",
+              "amount" => "48.20",
+              "date" => "2026-02-01"
+            }
+          }
+        }
+      })
+      |> render_change()
+
+      flush_autosave(view)
+
+      reloaded = ExpenseReports.get_active_draft(user)
+      assert reloaded.id == draft.id
+
+      assert Enum.any?(reloaded.expense_items, fn item ->
+               item.receipt_s3_path == receipt_path
+             end)
+    end
+
     test "the reports list shows a Drafts section with a Continue link", %{
       conn: conn,
       user: user
