@@ -3447,6 +3447,37 @@ defmodule YscWeb.SecurityAuditTest do
       assert {:ok, deleted} = Ysc.Posts.soft_delete_post(post, volunteer)
       assert deleted.state == :deleted
     end
+
+    test "volunteer delete-post event on a published post is refused", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 62 Editor #{System.unique_integer([:positive])}",
+          raw_body: "<p>Live Club News</p>",
+          url_name: "f62-editor-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: volunteer.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/posts/#{post.id}")
+
+      refute has_element?(view, "#delete-post-#{post.id}")
+
+      render_click(view, "delete-post")
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -3522,7 +3553,11 @@ defmodule YscWeb.SecurityAuditTest do
           state: "draft",
           organizer_id: organizer.id,
           start_date:
-            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 30, :day)
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
         })
 
       {:ok, event_b} =
@@ -3531,7 +3566,11 @@ defmodule YscWeb.SecurityAuditTest do
           state: "draft",
           organizer_id: organizer.id,
           start_date:
-            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 40, :day)
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
         })
 
       {:ok, agenda_b} =
@@ -3553,7 +3592,11 @@ defmodule YscWeb.SecurityAuditTest do
           state: "draft",
           organizer_id: organizer.id,
           start_date:
-            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 30, :day)
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
         })
 
       {:ok, event_b} =
@@ -3562,7 +3605,11 @@ defmodule YscWeb.SecurityAuditTest do
           state: "draft",
           organizer_id: organizer.id,
           start_date:
-            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 40, :day)
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
         })
 
       {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "A"})

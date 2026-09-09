@@ -181,7 +181,8 @@ defmodule Ysc.Agendas do
     end
   end
 
-  defp preload_agenda_item_event(%AgendaItem{agenda: %Agenda{}} = item), do: item
+  defp preload_agenda_item_event(%AgendaItem{agenda: %Agenda{}} = item),
+    do: item
 
   defp preload_agenda_item_event(%AgendaItem{} = item) do
     Repo.preload(item, :agenda)
