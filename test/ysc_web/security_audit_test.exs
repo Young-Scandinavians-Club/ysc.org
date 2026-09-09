@@ -50,10 +50,15 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
   Finding 56 (MEDIUM)   Public newsletter unsubscribe LiveView treated an email URL param as a token, then unsubscribed by email
   Finding 57 (MEDIUM)   Leftover event editor save created events via Event.changeset, allowing organizer/state mass assignment
+  Finding 60 (HIGH)     Expense reports accepted client-supplied receipt/proof S3 paths, enabling cross-member receipt download
+  Finding 61 (HIGH)     Purchase expense lines had no upper bound; submit creates a QuickBooks Bill with no approval gate
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
   or explicitly out of scope per the fix plan.
+
+  Finding 59 (volunteer soft-delete of published events) is covered by open PR #1251.
+  Findings 51 / 54 / 58 are covered by open PRs #1190 / #1210 / #1251.
   """
   use YscWeb.ConnCase, async: true
 
@@ -3199,6 +3204,193 @@ defmodule YscWeb.SecurityAuditTest do
       assert reloaded.rendered_details == event.rendered_details
 
       refute Enum.any?(Events.list_event_hosts(reloaded), &(&1.id == victim.id))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 60 (HIGH): Expense receipt/proof S3 path claiming
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 60: expense receipt path claiming is rejected" do
+    alias Ysc.ExpenseReports
+
+    test "save_draft refuses another member's user-scoped receipt key" do
+      victim = user_fixture()
+      attacker = user_fixture()
+
+      victim_path =
+        "receipts/#{victim.id}/#{System.system_time(:second)}_secret.pdf"
+
+      {:ok, attacker_bank} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "222222222"},
+          attacker
+        )
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               ExpenseReports.save_draft(attacker, %{
+                 "purpose" => "Claim victim receipt",
+                 "reimbursement_method" => "bank_transfer",
+                 "bank_account_id" => attacker_bank.id,
+                 "expense_items" => %{
+                   "0" => %{
+                     "date" => Date.to_iso8601(~D[2026-01-15]),
+                     "expense_type" => "purchase",
+                     "vendor" => "Store",
+                     "description" => "Forged path",
+                     "amount" => "10.00",
+                     "receipt_s3_path" => victim_path
+                   }
+                 }
+               })
+
+      refute changeset.valid?
+
+      assert {:error, :unauthorized} =
+               ExpenseReports.can_access_file?(attacker, victim_path)
+    end
+
+    test "can_access_file? rejects user-scoped keys even if claimed on own report" do
+      victim = user_fixture()
+      attacker = user_fixture()
+      path = "receipts/#{victim.id}/1700000000_private.pdf"
+
+      # Prefix gate must fail before report ownership is considered.
+      assert {:error, :unauthorized} =
+               ExpenseReports.can_access_file?(attacker, path)
+
+      assert ExpenseReports.upload_path_allowed_for_user?(path, attacker) ==
+               false
+
+      assert ExpenseReports.upload_path_allowed_for_user?(path, victim) == true
+    end
+
+    test "save_draft refuses a legacy flat key already stored on another report" do
+      victim = user_fixture()
+      attacker = user_fixture()
+
+      shared_legacy =
+        "receipts/legacy_shared_#{System.unique_integer([:positive])}.pdf"
+
+      {:ok, victim_bank} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "111111111"},
+          victim
+        )
+
+      assert {:ok, _} =
+               ExpenseReports.save_draft(victim, %{
+                 "purpose" => "Victim legacy",
+                 "reimbursement_method" => "bank_transfer",
+                 "bank_account_id" => victim_bank.id,
+                 "expense_items" => %{
+                   "0" => %{
+                     "date" => Date.to_iso8601(~D[2026-01-15]),
+                     "expense_type" => "purchase",
+                     "vendor" => "Store",
+                     "description" => "Mine",
+                     "amount" => "10.00",
+                     "receipt_s3_path" => shared_legacy
+                   }
+                 }
+               })
+
+      {:ok, attacker_bank} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "222222222"},
+          attacker
+        )
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               ExpenseReports.save_draft(attacker, %{
+                 "purpose" => "Claim legacy",
+                 "reimbursement_method" => "bank_transfer",
+                 "bank_account_id" => attacker_bank.id,
+                 "expense_items" => %{
+                   "0" => %{
+                     "date" => Date.to_iso8601(~D[2026-01-15]),
+                     "expense_type" => "purchase",
+                     "vendor" => "Store",
+                     "description" => "Stolen",
+                     "amount" => "10.00",
+                     "receipt_s3_path" => shared_legacy
+                   }
+                 }
+               })
+
+      refute changeset.valid?
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 61 (HIGH): Purchase expense amount must be capped
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 61: purchase expense amount cap" do
+    alias Ysc.ExpenseReports
+    alias Ysc.ExpenseReports.ExpenseReportItem
+
+    test "save_draft rejects purchase lines above the per-line cap" do
+      user = user_fixture()
+
+      {:ok, bank} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "333333333"},
+          user
+        )
+
+      over =
+        Money.add!(ExpenseReportItem.max_purchase_amount(), Money.new(:USD, 1))
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               ExpenseReports.save_draft(user, %{
+                 "purpose" => "Huge AP liability",
+                 "reimbursement_method" => "bank_transfer",
+                 "bank_account_id" => bank.id,
+                 "expense_items" => %{
+                   "0" => %{
+                     "date" => Date.to_iso8601(~D[2026-01-15]),
+                     "expense_type" => "purchase",
+                     "vendor" => "Vendor",
+                     "description" => "Mint bill",
+                     "amount" => Money.to_string!(over),
+                     "receipt_s3_path" => "receipts/#{user.id}/1_x.pdf"
+                   }
+                 }
+               })
+
+      refute changeset.valid?
+    end
+
+    test "amounts at the cap remain valid" do
+      user = user_fixture()
+      cap = ExpenseReportItem.max_purchase_amount()
+
+      {:ok, bank} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "444444444"},
+          user
+        )
+
+      assert {:ok, draft} =
+               ExpenseReports.save_draft(user, %{
+                 "purpose" => "At cap",
+                 "reimbursement_method" => "bank_transfer",
+                 "bank_account_id" => bank.id,
+                 "expense_items" => %{
+                   "0" => %{
+                     "date" => Date.to_iso8601(~D[2026-01-15]),
+                     "expense_type" => "purchase",
+                     "vendor" => "Vendor",
+                     "description" => "At cap",
+                     "amount" => Money.to_string!(cap),
+                     "receipt_s3_path" => "receipts/#{user.id}/2_x.pdf"
+                   }
+                 }
+               })
+
+      [item] = draft.expense_items
+      assert Money.equal?(item.amount, cap)
     end
   end
 
