@@ -28,7 +28,7 @@ defmodule Ysc.Workers.Backoff do
     * `:base` - first-attempt ceiling, in seconds (default `#{@default_base_seconds}`)
     * `:cap`  - maximum backoff, in seconds (default `#{@default_cap_seconds}`)
     * `:min`  - floor, in seconds, so a retry never stampedes back in almost
-      immediately after a failure (default `0`)
+      immediately after a failure (default `0`; clamped into `1..cap`)
 
   With the defaults this matches the plain full-jitter formula the mailer and
   newsletter workers have always used; pass `:min` / `:cap` to tighten it for a
@@ -39,14 +39,17 @@ defmodule Ysc.Workers.Backoff do
       when is_integer(attempt) and attempt > 0 do
     base = Keyword.get(opts, :base, @default_base_seconds)
     cap = Keyword.get(opts, :cap, @default_cap_seconds)
-    floor = Keyword.get(opts, :min, 0)
+    # At least 1s (an instant "retry" just burns an attempt), never above the
+    # cap (a contradictory `min > cap` resolves to the cap rather than blowing it).
+    floor = opts |> Keyword.get(:min, 0) |> max(1) |> min(cap)
 
     ceiling =
       (base * :math.pow(2, min(attempt, @exponent_cap)))
       |> trunc()
       |> min(cap)
-      |> max(floor + 1)
+      |> max(floor)
 
-    floor + :rand.uniform(ceiling - floor)
+    # Inclusive over [floor, ceiling]; never exceeds cap even when min >= cap.
+    floor + :rand.uniform(ceiling - floor + 1) - 1
   end
 end

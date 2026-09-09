@@ -36,6 +36,16 @@ defmodule Ysc.Workers.BackoffTest do
       end
     end
 
+    test "never exceeds the cap even when :min meets or exceeds it" do
+      for opts <- [[min: 30, cap: 30], [min: 45, cap: 30], [min: 30, cap: 31]],
+          attempt <- 1..5,
+          _ <- 1..200 do
+        wait = Backoff.full_jitter(attempt, opts)
+        assert wait <= Keyword.fetch!(opts, :cap)
+        assert wait >= 1
+      end
+    end
+
     test "the ceiling grows with the attempt number" do
       max_for = fn attempt ->
         1..2_000
