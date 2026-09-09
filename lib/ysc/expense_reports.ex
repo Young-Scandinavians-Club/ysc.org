@@ -308,6 +308,14 @@ defmodule Ysc.ExpenseReports do
   # board_bio, and other columns the submitter-name cell never renders.
   @event_list_user_fields [:id, :first_name, :last_name]
 
+  # Treasurer inbox / list / review: name, email, and user-detail link only.
+  @admin_list_user_fields [:id, :email, :first_name, :last_name]
+
+  # Review footer only shows last-4. Skip encrypted routing/account numbers.
+  @admin_review_bank_fields [:id, :account_number_last_4]
+
+  @submitted_inbox_limit 50
+
   @doc """
   List filed expense reports for an event, newest first, with submitter
   preloaded and per-report net totals attached from SQL.
@@ -333,6 +341,95 @@ defmodule Ysc.ExpenseReports do
       order_by: [desc: :inserted_at],
       preload: [user: ^user_query]
     )
+  end
+
+  @doc """
+  Submitted reports waiting on treasurer review, oldest first.
+
+  Member is a slim `select: struct` preload (name/email). Item rows, event
+  body HTML, addresses, and encrypted bank accounts are not loaded — the
+  inbox table only shows submitter, purpose, and submitted date.
+  """
+  def list_submitted_inbox(limit \\ @submitted_inbox_limit) do
+    limit
+    |> list_submitted_inbox_query()
+    |> Repo.all()
+  end
+
+  defp list_submitted_inbox_query(limit) do
+    user_query = admin_user_preload_query()
+
+    from(er in ExpenseReport,
+      where: er.status == "submitted",
+      preload: [user: ^user_query],
+      order_by: [asc: er.inserted_at],
+      limit: ^limit
+    )
+  end
+
+  @doc """
+  Filed (non-draft) expense reports in a date window, newest first.
+
+  Same slim member preload as the inbox. Drafts are omitted — they are a
+  member's in-progress scratch copy and do not belong in reconciliation.
+  """
+  def list_for_admin(start_date, end_date, page, per_page) do
+    start_date
+    |> list_for_admin_query(end_date, page, per_page)
+    |> Repo.all()
+  end
+
+  defp list_for_admin_query(start_date, end_date, page, per_page) do
+    offset = (page - 1) * per_page
+    user_query = admin_user_preload_query()
+
+    from(er in ExpenseReport,
+      where: er.status != "draft",
+      where: er.inserted_at >= ^start_date,
+      where: er.inserted_at <= ^end_date,
+      preload: [user: ^user_query],
+      order_by: [desc: er.inserted_at],
+      limit: ^per_page,
+      offset: ^offset
+    )
+  end
+
+  @doc """
+  One expense report for the treasurer review modal, or `nil`.
+
+  Member is name/email only. Event is `Event.summary_fields/0` (no body
+  HTML). Bank account is last-4 only so Cloak does not decrypt routing or
+  account numbers. Line items, mailing address, and totals still load —
+  the modal renders receipts and reimbursement destination.
+  """
+  def get_for_admin_review(id) do
+    id
+    |> admin_review_query()
+    |> Repo.one()
+  end
+
+  defp admin_review_query(id) do
+    user_query = admin_user_preload_query()
+    event_query = event_summary_preload_query()
+
+    bank_query =
+      from(ba in BankAccount, select: struct(ba, ^@admin_review_bank_fields))
+
+    from(er in ExpenseReport,
+      where: er.id == ^id,
+      preload: [
+        :expense_items,
+        :income_items,
+        :address,
+        user: ^user_query,
+        event: ^event_query,
+        bank_account: ^bank_query
+      ]
+    )
+  end
+
+  defp admin_user_preload_query do
+    from(u in User, select: struct(u, ^@admin_list_user_fields))
   end
 
   @doc """
@@ -1798,6 +1895,22 @@ defmodule Ysc.ExpenseReports do
   @doc false
   def ci_query_explain_list_expense_reports_for_event_query do
     list_expense_reports_for_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_submitted_inbox_query do
+    list_submitted_inbox_query(@submitted_inbox_limit)
+  end
+
+  @doc false
+  def ci_query_explain_list_for_admin_query do
+    now = DateTime.utc_now()
+    list_for_admin_query(now, now, 1, 20)
+  end
+
+  @doc false
+  def ci_query_explain_admin_review_query do
+    admin_review_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

@@ -11,7 +11,6 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.Bookings.BookingLocker
   alias Ysc.Tickets
   alias Ysc.ExpenseReports
-  alias Ysc.ExpenseReports.ExpenseReport
   alias Ysc.ExpenseReports.ExpenseReportItem
   alias Ysc.Repo
   alias YscWeb.AdminBadgeHelpers
@@ -528,16 +527,11 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp load_expense_reports_inbox(socket) do
-    expense_reports =
-      from(er in ExpenseReport,
-        where: er.status == "submitted",
-        preload: [:user],
-        order_by: [asc: er.inserted_at],
-        limit: 50
-      )
-      |> Repo.all()
-
-    assign(socket, :expense_reports_inbox, expense_reports)
+    assign(
+      socket,
+      :expense_reports_inbox,
+      ExpenseReports.list_submitted_inbox()
+    )
   end
 
   defp sum_account_balances(accounts_with_balances, account_names) do
@@ -1071,19 +1065,7 @@ defmodule YscWeb.AdminMoneyLive do
         %{"expense_report_id" => expense_report_id},
         socket
       ) do
-    expense_report =
-      from(er in ExpenseReport,
-        where: er.id == ^expense_report_id,
-        preload: [
-          :user,
-          :expense_items,
-          :income_items,
-          :address,
-          :bank_account,
-          :event
-        ]
-      )
-      |> Repo.one()
+    expense_report = ExpenseReports.get_for_admin_review(expense_report_id)
 
     if expense_report do
       {:noreply, assign_expense_report_modal(socket, expense_report)}
@@ -1257,22 +1239,8 @@ defmodule YscWeb.AdminMoneyLive do
     %{per_page: per_page, start_date: start_date, end_date: end_date} =
       socket.assigns
 
-    offset = (page - 1) * per_page
-
     expense_reports =
-      from(er in ExpenseReport,
-        # Drafts are a member's in-progress scratch copy (autosaved from the
-        # expense form) - they have no QuickBooks sync and change constantly,
-        # so they don't belong in the treasurer's reconciliation table.
-        where: er.status != "draft",
-        where: er.inserted_at >= ^start_date,
-        where: er.inserted_at <= ^end_date,
-        preload: [:user],
-        order_by: [desc: er.inserted_at],
-        limit: ^per_page,
-        offset: ^offset
-      )
-      |> Repo.all()
+      ExpenseReports.list_for_admin(start_date, end_date, page, per_page)
 
     socket
     |> assign(:expense_reports, expense_reports)
@@ -4087,18 +4055,7 @@ defmodule YscWeb.AdminMoneyLive do
 
     expense_report =
       if expense_report do
-        from(er in ExpenseReport,
-          where: er.id == ^expense_report.id,
-          preload: [
-            :user,
-            :expense_items,
-            :income_items,
-            :address,
-            :bank_account,
-            :event
-          ]
-        )
-        |> Repo.one()
+        ExpenseReports.get_for_admin_review(expense_report.id)
       end
 
     if expense_report do
