@@ -3852,6 +3852,28 @@ defmodule YscWeb.AdminMoneyLive do
                 </div>
               </div>
               <div class="relative min-h-0 flex-1 overflow-hidden rounded bg-zinc-100">
+                <div
+                  :if={
+                    (selected.media == :image && selected.url) ||
+                      (selected.media == :pdf && selected.preview_url)
+                  }
+                  id={"expense-receipt-loading-#{selected.index}"}
+                  phx-update="ignore"
+                  data-error-label="Couldn’t load preview"
+                  class="absolute inset-0 z-10 flex items-center justify-center gap-3 bg-zinc-100 transition-opacity duration-200"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <.icon
+                    name="hero-arrow-path"
+                    class="h-6 w-6 shrink-0 animate-spin text-blue-600"
+                    data-load-spinner="true"
+                    aria-hidden="true"
+                  />
+                  <span class="text-sm text-zinc-600" data-load-label="true">
+                    Loading preview…
+                  </span>
+                </div>
                 <%= cond do %>
                   <% selected.media == :image && selected.url -> %>
                     <div
@@ -3865,6 +3887,9 @@ defmodule YscWeb.AdminMoneyLive do
                         class="flex h-full max-h-full w-full cursor-zoom-in items-center justify-center"
                       >
                         <img
+                          id={"expense-receipt-img-#{selected.index}"}
+                          phx-hook="MediaLoadState"
+                          data-loading-overlay={"expense-receipt-loading-#{selected.index}"}
                           src={selected.url}
                           alt={"Receipt for #{selected.label}"}
                           class="max-h-full max-w-full object-contain"
@@ -3874,6 +3899,8 @@ defmodule YscWeb.AdminMoneyLive do
                   <% selected.media == :pdf && selected.preview_url -> %>
                     <iframe
                       id={"expense-receipt-pdf-#{selected.index}"}
+                      phx-hook="MediaLoadState"
+                      data-loading-overlay={"expense-receipt-loading-#{selected.index}"}
                       src={selected.preview_url}
                       title={"Receipt for #{selected.label}"}
                       tabindex="-1"
