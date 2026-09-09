@@ -60,10 +60,9 @@ defmodule YscWeb.Workers.NewsletterSender do
   end
 
   @impl Oban.Worker
-  def backoff(%Oban.Job{attempt: attempt}) do
-    cap = min((60 * :math.pow(2, min(attempt, 8))) |> trunc(), 60 * 60)
-    :rand.uniform(max(cap, 1))
-  end
+  # Full jitter keeps a throttled send from retrying every recipient in lockstep.
+  def backoff(%Oban.Job{attempt: attempt}),
+    do: Ysc.Workers.Backoff.full_jitter(attempt)
 
   if Ysc.Env.dev?() do
     defp maybe_dev_delay, do: Process.sleep(8_000)

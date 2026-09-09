@@ -297,11 +297,9 @@ defmodule YscWeb.Workers.EmailNotifier do
   end
 
   @impl Oban.Worker
-  def backoff(%Oban.Job{attempt: attempt}) do
-    # Full jitter prevents a throttled batch from retrying in lockstep.
-    cap = min((60 * :math.pow(2, min(attempt, 8))) |> trunc(), 60 * 60)
-    :rand.uniform(max(cap, 1))
-  end
+  # Full jitter prevents a throttled batch from retrying in lockstep.
+  def backoff(%Oban.Job{attempt: attempt}),
+    do: Ysc.Workers.Backoff.full_jitter(attempt)
 
   defp handle_delivery_error(params, %{category: category} = delivery_error) do
     age_seconds =
