@@ -433,18 +433,7 @@ defmodule YscWeb.AdminPostsLive do
 
     with {:ok, target_id} <- Ecto.ULID.cast(id),
          %Post{} = target <- Posts.get_post(target_id, [:author]),
-         :draft <- target.state,
-         {:ok, _} <-
-           Posts.update_post(
-             target,
-             %{
-               state: :deleted,
-               deleted_on: Timex.now(),
-               published_on: nil,
-               featured_post: false
-             },
-             current_user
-           ) do
+         {:ok, _} <- Posts.soft_delete_post(target, current_user) do
       {:noreply,
        socket
        |> assign(
@@ -467,12 +456,21 @@ defmodule YscWeb.AdminPostsLive do
            title: "Delete failed"
          )}
 
-      _ ->
+      {:error, :invalid_state} ->
         {:noreply,
          YscWeb.Flash.put_toast(
            socket,
            :error,
            "Only draft posts can be deleted from here.",
+           title: "Delete failed"
+         )}
+
+      _ ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Something went wrong. Please try again.",
            title: "Delete failed"
          )}
     end

@@ -339,6 +339,30 @@ defmodule Ysc.Posts do
   end
 
   @doc """
+  Soft-deletes a draft post.
+
+  Published posts must be unpublished (or left published) rather than deleted
+  from the editor, matching the posts-list delete affordance. Prevents
+  volunteers from wiping live Club News via the editor menu (Finding 62).
+  """
+  def soft_delete_post(%Post{} = post, %User{} = current_user) do
+    if post.state == :draft do
+      update_post(
+        post,
+        %{
+          state: :deleted,
+          deleted_on: Timex.now(),
+          published_on: nil,
+          featured_post: false
+        },
+        current_user
+      )
+    else
+      {:error, :invalid_state}
+    end
+  end
+
+  @doc """
   Updates editorial post fields from the admin editor auto-save path.
 
   Ignores mass-assigned lifecycle controls (`state`, `published_on`, `deleted_on`,
@@ -525,13 +549,20 @@ defmodule Ysc.Posts do
       params
       |> Map.put("user_id", author.id)
 
-    Repo.transaction(add_comment_to_post_multi(corrected_params))
-    |> case do
-      {:ok, %{new_comment: comment}} ->
-        {:ok, comment} |> broadcast_change("new_comment")
+    # Finding 63: only published posts accept public comments. Draft/deleted
+    # targets must not gain comment rows via a forged post_id.
+    with post_id when is_binary(post_id) <- corrected_params["post_id"],
+         %Post{state: :published} <- get_post(post_id) do
+      Repo.transaction(add_comment_to_post_multi(corrected_params))
+      |> case do
+        {:ok, %{new_comment: comment}} ->
+          {:ok, comment} |> broadcast_change("new_comment")
 
-      {:error, _, changeset, _} ->
-        {:error, changeset}
+        {:error, _, changeset, _} ->
+          {:error, changeset}
+      end
+    else
+      _ -> {:error, :post_not_commentable}
     end
   end
 

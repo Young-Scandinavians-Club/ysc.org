@@ -1,5 +1,4 @@
 defmodule YscWeb.TrixUploadsController do
-  alias Ysc.Posts
   alias Ysc.Media
   alias YscWeb.Validators.FileValidator
   use YscWeb, :controller
@@ -40,18 +39,13 @@ defmodule YscWeb.TrixUploadsController do
   defp handle_image_upload(
          conn,
          %Plug.Upload{filename: filename} = upload,
-         params,
+         _params,
          current_user
        ) do
     case upload_image_file(upload, current_user) do
       {:ok, updated_image} ->
-        if post_id = params["post_id"] do
-          post = Posts.get_post(post_id)
-
-          if post != nil,
-            do: set_cover_photo(post, updated_image.id, current_user)
-        end
-
+        # Finding 65: do not trust client `post_id` to mutate another post's
+        # cover image. Uploads only return a URL for embedding in the editor.
         url = get_image_url(updated_image)
 
         conn
@@ -62,12 +56,6 @@ defmodule YscWeb.TrixUploadsController do
         conn
         |> put_status(422)
         |> json(%{error: reason})
-    end
-  end
-
-  defp set_cover_photo(post, image_id, user) do
-    if post.image_id == nil do
-      Posts.update_post(post, %{"image_id" => image_id}, user)
     end
   end
 

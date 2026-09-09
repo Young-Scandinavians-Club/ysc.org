@@ -52,12 +52,17 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 57 (MEDIUM)   Leftover event editor save created events via Event.changeset, allowing organizer/state mass assignment
   Finding 60 (HIGH)     Expense reports accepted client-supplied receipt/proof S3 paths, enabling cross-member receipt download
   Finding 61 (HIGH)     Purchase expense lines had no upper bound; submit creates a QuickBooks Bill with no approval gate
+  Finding 62 (HIGH)     Volunteers could soft-delete published posts via the post editor (list only allowed drafts)
+  Finding 63 (MEDIUM)   Public post comments trusted client post_id, allowing comments on draft/other posts
+  Finding 64 (MEDIUM)   Event agenda delete/move did not verify event ownership (cross-event agenda IDOR)
+  Finding 65 (MEDIUM)   Trix upload post_id auto-set cover image on any post without ownership binding
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
   or explicitly out of scope per the fix plan.
 
-  Finding 59 (volunteer soft-delete of published events) is covered by open PR #1251.
+  Finding 59 (volunteer soft-delete of published events) is covered by open PR #1251
+  (bundled with Finding 58 despite that PR's title).
   Findings 51 / 54 / 58 are covered by open PRs #1190 / #1210 / #1251.
   """
   use YscWeb.ConnCase, async: true
@@ -3391,6 +3396,240 @@ defmodule YscWeb.SecurityAuditTest do
 
       [item] = draft.expense_items
       assert Money.equal?(item.amount, cap)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 62 (HIGH): Volunteers must not soft-delete published posts
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 62: volunteers cannot delete published posts" do
+    test "soft_delete_post refuses published posts" do
+      author = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 62 Published #{System.unique_integer([:positive])}",
+          raw_body: "<p>Live article</p>",
+          url_name: "f62-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert {:error, :invalid_state} =
+               Ysc.Posts.soft_delete_post(post, volunteer)
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+    end
+
+    test "soft_delete_post allows drafts" do
+      author = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 62 Draft #{System.unique_integer([:positive])}",
+          raw_body: "<p>Draft</p>",
+          url_name: "f62-draft-#{System.unique_integer([:positive])}",
+          state: :draft,
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert {:ok, deleted} = Ysc.Posts.soft_delete_post(post, volunteer)
+      assert deleted.state == :deleted
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 63 (MEDIUM): Comments must not trust client post_id
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 63: comment post_id binding" do
+    test "add_comment_to_post rejects draft post_id", %{conn: conn} do
+      member = user_fixture()
+      author = user_fixture(%{role: :admin})
+
+      {:ok, draft} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 63 Draft #{System.unique_integer([:positive])}",
+          raw_body: "<p>Secret draft</p>",
+          url_name: "f63-draft-#{System.unique_integer([:positive])}",
+          state: :draft,
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert {:error, :post_not_commentable} =
+               Ysc.Posts.add_comment_to_post(
+                 %{"text" => "leak", "post_id" => draft.id},
+                 member
+               )
+
+      assert Ysc.Posts.get_comments_for_post(draft.id) == []
+
+      # LiveView must also bind to the mounted published post, not client post_id
+      {:ok, published} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 63 Published #{System.unique_integer([:positive])}",
+          raw_body: "<p>Public</p>",
+          url_name: "f63-pub-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/posts/#{published.id}")
+
+      view
+      |> form("#primary-post-comment",
+        comment: %{text: "forged target", post_id: draft.id}
+      )
+      |> render_submit()
+
+      assert Ysc.Posts.get_comments_for_post(draft.id) == []
+      comments = Ysc.Posts.get_comments_for_post(published.id)
+      assert length(comments) == 1
+      assert hd(comments).text =~ "forged target"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 64 (MEDIUM): Agenda mutations must stay within the event
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 64: agenda cross-event ownership" do
+    test "delete_agenda refuses agendas from another event" do
+      organizer = user_fixture(%{role: :admin})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 64 A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 30, :day)
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 64 B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 40, :day)
+        })
+
+      {:ok, agenda_b} =
+        Ysc.Agendas.create_agenda(event_b, %{title: "Victim Day"})
+
+      assert {:error, :wrong_event} =
+               Ysc.Agendas.delete_agenda(event_a, agenda_b)
+
+      assert [%{id: id}] = Ysc.Agendas.list_agendas_for_event(event_b.id)
+      assert id == agenda_b.id
+    end
+
+    test "move_agenda_item_to_agenda refuses foreign event agendas" do
+      organizer = user_fixture(%{role: :admin})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 64 Move A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 30, :day)
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 64 Move B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 40, :day)
+        })
+
+      {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "A"})
+      {:ok, agenda_b} = Ysc.Agendas.create_agenda(event_b, %{title: "B"})
+
+      {:ok, item} =
+        Ysc.Agendas.create_agenda_item(event_a.id, agenda_a, %{title: "Talk"})
+
+      assert {:error, :wrong_event} =
+               Ysc.Agendas.move_agenda_item_to_agenda(
+                 event_a.id,
+                 item,
+                 agenda_b,
+                 0
+               )
+
+      reloaded = Ysc.Agendas.get_agenda_item!(item.id)
+      assert reloaded.agenda_id == agenda_a.id
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 65 (MEDIUM): Trix uploads must not set cover via client post_id
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 65: trix upload ignores forged post_id cover" do
+    test "image upload does not mutate another post cover", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      author = user_fixture(%{role: :admin})
+
+      {:ok, victim_post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 65 Victim #{System.unique_integer([:positive])}",
+          raw_body: "<p>No cover</p>",
+          url_name: "f65-#{System.unique_integer([:positive])}",
+          state: :draft,
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert is_nil(victim_post.image_id)
+
+      jpeg =
+        <<0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46>>
+
+      path = "/tmp/f65_#{System.unique_integer([:positive])}.jpg"
+      File.write!(path, jpeg)
+
+      on_exit(fn -> if File.exists?(path), do: File.rm(path) end)
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> post(~p"/admin/trix-uploads", %{
+          "file" => %Plug.Upload{
+            path: path,
+            filename: "cover.jpg",
+            content_type: "image/jpeg"
+          },
+          "post_id" => victim_post.id
+        })
+
+      assert json_response(conn, 201)["url"]
+      reloaded = Ysc.Posts.get_post(victim_post.id)
+      assert is_nil(reloaded.image_id)
     end
   end
 
