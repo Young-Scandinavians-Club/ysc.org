@@ -16,6 +16,8 @@ defmodule Ysc.Bookings.RefundPolicyCacheTest do
   """
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Bookings.{RefundPolicyCache, RefundPolicy, RefundPolicyRule}
   alias Ysc.Repo
 
@@ -536,6 +538,58 @@ defmodule Ysc.Bookings.RefundPolicyCacheTest do
       assert cached.id == policy.id
       {:ok, v} = Cachex.get(:ysc_cache, "refund_policy:version")
       assert is_integer(v)
+    end
+  end
+
+  describe "VersionedCache integration" do
+    test "stores a version-stamped Cachex entry" do
+      policy =
+        create_refund_policy(%{
+          name: "Versioned Stamp",
+          property: :tahoe,
+          booking_mode: :room,
+          is_active: true
+        })
+
+      create_refund_policy_rule(policy.id, 14, "100.0")
+
+      RefundPolicyCache.get_active(:tahoe, :room)
+
+      cache_key = "refund_policy:property:tahoe:booking_mode:room"
+
+      assert {:ok, {:version, version, cached}} =
+               Cachex.get(:ysc_cache, cache_key)
+
+      assert is_integer(version)
+      assert cached.id == policy.id
+      assert is_list(cached.rules)
+    end
+
+    test "does not write Cachex when process caches are disabled" do
+      previous = Application.get_env(:ysc, :process_caches_enabled)
+      Application.put_env(:ysc, :process_caches_enabled, false)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :process_caches_enabled, previous)
+      end)
+
+      policy =
+        create_refund_policy(%{
+          name: "Uncached Lookup",
+          property: :tahoe,
+          booking_mode: :room,
+          is_active: true
+        })
+
+      create_refund_policy_rule(policy.id, 14, "100.0")
+
+      cache_key = "refund_policy:property:tahoe:booking_mode:room"
+      Cachex.del(:ysc_cache, cache_key)
+
+      result = RefundPolicyCache.get_active(:tahoe, :room)
+
+      assert result.id == policy.id
+      assert Cachex.get(:ysc_cache, cache_key) == {:ok, nil}
     end
   end
 end
