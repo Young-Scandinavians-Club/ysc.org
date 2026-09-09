@@ -504,5 +504,129 @@ defmodule YscWeb.ExpenseReportLiveTest do
                "#expense-report-draft-continue-#{draft.id}"
              )
     end
+
+    test "autosave ignores a client-supplied foreign receipt path", %{
+      conn: conn,
+      user: user
+    } do
+      victim = Ysc.AccountsFixtures.user_fixture()
+
+      victim_path =
+        "receipts/#{victim.id}/#{System.system_time(:second)}_secret.pdf"
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+      # receipt_s3_path is not a form input; a forged request still includes it.
+      render_click(view, "validate", %{
+        "expense_report" => %{
+          "purpose" => "Claimed receipt",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Store",
+              "description" => "Snacks",
+              "amount" => "12.00",
+              "date" => "2026-02-01",
+              "receipt_s3_path" => victim_path
+            }
+          }
+        }
+      })
+
+      flush_autosave(view)
+
+      draft = ExpenseReports.get_active_draft(user)
+      assert draft
+      refute has_element?(view, "#receipt-preview-0")
+
+      assert Enum.all?(draft.expense_items, fn item ->
+               item.receipt_s3_path != victim_path
+             end)
+    end
+
+    test "autosave keeps the server receipt when the client sends another path",
+         %{
+           conn: conn,
+           user: user
+         } do
+      own_path = "receipts/#{user.id}/1700000000_mine.pdf"
+      other_path = "receipts/other-member/1700000000_not_mine.pdf"
+
+      {:ok, _draft} =
+        ExpenseReports.save_draft(user, %{
+          "purpose" => "Keep my receipt",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Safeway",
+              "description" => "Groceries",
+              "amount" => "18.50",
+              "date" => "2026-02-01",
+              "receipt_s3_path" => own_path
+            }
+          }
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+      assert has_element?(view, "#receipt-preview-0")
+
+      render_click(view, "validate", %{
+        "expense_report" => %{
+          "purpose" => "Keep my receipt",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Safeway",
+              "description" => "Groceries",
+              "amount" => "18.50",
+              "date" => "2026-02-01",
+              "receipt_s3_path" => other_path
+            }
+          }
+        }
+      })
+
+      flush_autosave(view)
+
+      draft = ExpenseReports.get_active_draft(user)
+      assert hd(draft.expense_items).receipt_s3_path == own_path
+      assert has_element?(view, "#receipt-preview-0")
+    end
+
+    test "form recover scrubs a forged receipt path before it hits the changeset",
+         %{
+           conn: conn,
+           user: user
+         } do
+      victim = Ysc.AccountsFixtures.user_fixture()
+
+      victim_path =
+        "receipts/#{victim.id}/#{System.system_time(:second)}_crash.pdf"
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+      render_click(view, "recover", %{
+        "expense_report" => %{
+          "purpose" => "Recovered claim",
+          "expense_items" => %{
+            "0" => %{
+              "vendor" => "Store",
+              "description" => "Forged upload",
+              "amount" => "9.00",
+              "date" => "2026-02-01",
+              "receipt_s3_path" => victim_path
+            }
+          }
+        }
+      })
+
+      refute has_element?(view, "#receipt-preview-0")
+
+      flush_autosave(view)
+
+      draft = ExpenseReports.get_active_draft(user)
+      assert draft
+
+      assert Enum.all?(draft.expense_items, fn item ->
+               item.receipt_s3_path != victim_path
+             end)
+    end
   end
 end

@@ -226,9 +226,14 @@ defmodule YscWeb.ExpenseReportLive do
     user = socket.assigns.current_user
     current_changeset = socket.assigns.form.source
 
+    # Overlay DOM fields onto the current changeset so reconnect does not wipe
+    # receipt/proof paths. Finding 60: merge_existing_items_into_params never
+    # keeps a client-supplied upload path.
     expense_report_params =
-      merge_existing_items_into_params(expense_report_params, current_changeset)
-      |> normalize_params_keys()
+      merge_existing_items_into_params(
+        normalize_params_keys(expense_report_params),
+        current_changeset
+      )
 
     changeset =
       socket.assigns.expense_report
