@@ -51,10 +51,10 @@ defmodule YscWeb.Emails.NewSignInDetected do
     Location: #{location}
     Time: #{signed_in_at}
 
-    Go to your security settings for a list of your recent sign-ins and active sessions:
+    Go to your security settings for a list of your recent sign-ins and the devices currently signed in:
     #{security_url}
 
-    If you didn't sign in or don't recognize this activity, sign out unfamiliar sessions from your security settings and contact us at info@ysc.org.
+    If you didn't sign in or don't recognize this activity, sign out of unfamiliar devices from your security settings and email us at info@ysc.org.
 
     ==============================
     """

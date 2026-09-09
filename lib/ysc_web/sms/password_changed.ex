@@ -30,7 +30,7 @@ defmodule YscWeb.Sms.PasswordChanged do
   def render(variables) do
     Template.security_notification_body(
       Template.first_name(variables),
-      "Your account password was changed. If this wasn't you, please contact us right away."
+      "Your account password was changed. If this wasn't you, email #{Ysc.EmailConfig.contact_email()} right away."
     )
   end
 
