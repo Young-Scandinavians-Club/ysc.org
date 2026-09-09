@@ -76,6 +76,7 @@ defmodule YscWeb.Emails.Notifier do
     "event_notification" => YscWeb.Emails.EventNotification,
     "save_the_date_available" => YscWeb.Emails.SaveTheDateAvailable,
     "expense_report_confirmation" => YscWeb.Emails.ExpenseReportConfirmation,
+    "expense_report_rejected" => YscWeb.Emails.ExpenseReportRejected,
     "expense_report_treasurer_notification" =>
       YscWeb.Emails.ExpenseReportTreasurerNotification,
     "booking_cancellation_cabin_master_notification" =>

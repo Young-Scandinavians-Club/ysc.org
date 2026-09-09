@@ -404,6 +404,16 @@
       },
       expense_report_url: "http://localhost:4000/expensereport/preview"
     },
+    "expense_report_rejected" => %{
+      first_name: "Astrid",
+      expense_report: %{
+        id: "EXP-PREVIEW-123",
+        purpose: "Event supplies"
+      },
+      rejection_note:
+        "The receipt for the $60.00 grocery line is missing — please re-upload it.\n\nAlso, the mileage route needs a start and end address, not just \"Board meeting\".",
+      new_expense_report_url: "http://localhost:4000/expensereport"
+    },
     "expense_report_treasurer_notification" => %{
       expense_report: %{
         id: "EXP-PREVIEW-123",

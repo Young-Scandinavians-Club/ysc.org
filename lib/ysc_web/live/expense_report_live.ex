@@ -4020,8 +4020,27 @@ defmodule YscWeb.ExpenseReportLive do
             status={:rejected}
             icon="hero-x-mark"
             title="Report Rejected"
-            description="Your expense report was not approved. Please review the feedback and resubmit."
+            description="Your expense report was not approved. Review the note below, then submit a new expense report with the fixes."
           />
+        </div>
+        <div
+          :if={present?(@expense_report.rejection_note)}
+          id="expense-report-rejection-note"
+          class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4"
+        >
+          <p class="text-sm font-semibold text-red-800">
+            What needs to change
+          </p>
+          <p class="mt-1 whitespace-pre-wrap text-sm text-red-700">
+            {@expense_report.rejection_note}
+          </p>
+          <.link
+            navigate={~p"/expensereport"}
+            class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-red-800 hover:underline"
+          >
+            Start a corrected expense report
+            <.icon name="hero-arrow-right" class="w-4 h-4" />
+          </.link>
         </div>
       <% else %>
         <!-- Normal flow: submitted -> approved -> paid -->

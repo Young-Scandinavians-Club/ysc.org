@@ -21,6 +21,7 @@ defmodule Ysc.ExpenseReports do
   alias YscWeb.Emails.{
     Notifier,
     ExpenseReportConfirmation,
+    ExpenseReportRejected,
     ExpenseReportTreasurerNotification
   }
 
@@ -823,6 +824,67 @@ defmodule Ysc.ExpenseReports do
     expense_report
     |> ExpenseReport.status_changeset(attrs)
     |> Repo.update()
+  end
+
+  @doc """
+  Rejects an expense report with a required treasurer note.
+
+  The note (enforced by `ExpenseReport.rejection_changeset/2`) explains what the
+  member must fix. On success the caller should invoke
+  `deliver_expense_report_rejection_email/1` to email the note to the report
+  owner; the member then submits a new, corrected expense report.
+  """
+  def reject_expense_report(%ExpenseReport{} = expense_report, note) do
+    expense_report
+    |> ExpenseReport.rejection_changeset(%{rejection_note: note})
+    |> Repo.update()
+  end
+
+  @doc """
+  Schedules the "your expense report was rejected" email to the report owner,
+  including the treasurer's rejection note and a link to start a new report.
+
+  Best-effort: logs and returns `:ok` even when preloading, preparing, or
+  enqueueing fails, so an email hiccup never rolls back the rejection itself.
+  """
+  def deliver_expense_report_rejection_email(%ExpenseReport{} = expense_report) do
+    expense_report = Repo.preload(expense_report, [:user, :event])
+
+    if is_nil(expense_report.user) do
+      Ysc.Logging.warning(
+        "Skipping expense report rejection email: report has no user",
+        expense_report_id: expense_report.id
+      )
+
+      :ok
+    else
+      try do
+        email_data = ExpenseReportRejected.prepare_email_data(expense_report)
+
+        idempotency_key =
+          "expense_report_rejected_#{expense_report.id}_#{System.system_time(:second)}"
+
+        Notifier.schedule_email(
+          expense_report.user.email,
+          idempotency_key,
+          ExpenseReportRejected.get_subject(),
+          ExpenseReportRejected.get_template_name(),
+          email_data,
+          "",
+          expense_report.user.id
+        )
+
+        :ok
+      rescue
+        e ->
+          Ysc.Logging.error(
+            "Failed to schedule expense report rejection email: #{Exception.message(e)}",
+            expense_report_id: expense_report.id
+          )
+
+          :ok
+      end
+    end
   end
 
   @doc """
