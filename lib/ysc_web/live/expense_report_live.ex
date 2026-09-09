@@ -218,45 +218,25 @@ defmodule YscWeb.ExpenseReportLive do
         %{"expense_report" => expense_report_params},
         socket
       ) do
-    # Custom recovery handler for form recovery after crash/disconnection
-    # This ensures nested items and form state are properly restored
+    # Reconnect used to rebuild items from DOM params. Receipt/proof paths are
+    # not form inputs — only LiveView assigns / the draft row hold them — so
+    # that wipe then persisted on the next autosave. Overlay DOM fields onto
+    # the current changeset the same way validate does, and never trust
+    # client-supplied upload paths (Finding 60).
     user = socket.assigns.current_user
+    current_changeset = socket.assigns.form.source
 
-    # Normalize params to ensure all keys are strings (not mixed atoms/strings).
-    # Finding 60: drop forged receipt/proof paths before changeset/cast_assoc,
-    # otherwise the recovered structs are overwritten by the client paths.
+    # Overlay DOM fields onto the current changeset so reconnect does not wipe
+    # receipt/proof paths. Finding 60: merge_existing_items_into_params never
+    # keeps a client-supplied upload path.
     expense_report_params =
-      expense_report_params
-      |> normalize_params_keys()
-      |> scrub_recovered_upload_paths(user)
-
-    # Rebuild the expense report from params, ensuring we have at least one expense item
-    expense_items =
-      build_expense_items_from_params(
-        expense_report_params["expense_items"] || %{}
+      merge_existing_items_into_params(
+        normalize_params_keys(expense_report_params),
+        current_changeset
       )
-
-    income_items =
-      build_income_items_from_params(
-        expense_report_params["income_items"] || %{}
-      )
-
-    # Ensure at least one expense item exists
-    expense_items =
-      if Enum.empty?(expense_items),
-        do: [%ExpenseReportItem{}],
-        else: expense_items
-
-    expense_report = %ExpenseReport{
-      user_id: user.id,
-      reimbursement_method:
-        expense_report_params["reimbursement_method"] || "bank_transfer",
-      expense_items: expense_items,
-      income_items: income_items
-    }
 
     changeset =
-      expense_report
+      socket.assigns.expense_report
       |> ExpenseReport.changeset(expense_report_params)
       |> validate_reimbursement_setup_in_liveview(user)
       |> Map.put(:action, :validate)
@@ -264,7 +244,6 @@ defmodule YscWeb.ExpenseReportLive do
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
-     |> assign(:expense_report, expense_report)
      |> assign_expense_form_state(changeset)
      |> assign(:bank_accounts, ExpenseReports.list_bank_accounts(user))
      |> assign(:billing_address, Accounts.get_billing_address(user))}
@@ -1261,118 +1240,6 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp get_proof_path_from_item(_), do: nil
 
-  defp build_expense_items_from_params(items_params)
-       when is_map(items_params) do
-    items_params
-    |> Enum.map(fn {_index, item_params} ->
-      %ExpenseReportItem{
-        date: parse_date(item_params["date"]),
-        expense_type: item_params["expense_type"] || "purchase",
-        vendor: item_params["vendor"],
-        description: item_params["description"],
-        amount: parse_money(item_params["amount"]),
-        receipt_s3_path: item_params["receipt_s3_path"],
-        miles_driven: parse_integer(item_params["miles_driven"]),
-        mileage_from_to: item_params["mileage_from_to"]
-      }
-    end)
-    |> Enum.filter(fn item -> not expense_item_empty?(item) end)
-  end
-
-  defp build_expense_items_from_params(_), do: []
-
-  defp scrub_recovered_upload_paths(params, user) when is_map(params) do
-    params
-    |> Map.update("expense_items", %{}, fn items ->
-      scrub_recovered_item_path_map(items, "receipt_s3_path", user)
-    end)
-    |> Map.update("income_items", %{}, fn items ->
-      scrub_recovered_item_path_map(items, "proof_s3_path", user)
-    end)
-  end
-
-  defp scrub_recovered_item_path_map(items, field, user) when is_map(items) do
-    Map.new(items, fn {index, item} ->
-      item =
-        if is_map(item) and
-             not ExpenseReports.upload_path_allowed_for_user?(
-               item[field],
-               user
-             ) do
-          Map.delete(item, field)
-        else
-          item
-        end
-
-      {index, item}
-    end)
-  end
-
-  defp scrub_recovered_item_path_map(items, _field, _user), do: items
-
-  defp build_income_items_from_params(items_params) when is_map(items_params) do
-    items_params
-    |> Enum.map(fn {_index, item_params} ->
-      %ExpenseReportIncomeItem{
-        date: parse_date(item_params["date"]),
-        description: item_params["description"],
-        amount: parse_money(item_params["amount"]),
-        proof_s3_path: item_params["proof_s3_path"]
-      }
-    end)
-    |> Enum.filter(fn item -> not income_item_empty?(item) end)
-  end
-
-  defp build_income_items_from_params(_), do: []
-
-  defp expense_item_empty?(%ExpenseReportItem{} = item) do
-    is_nil(item.date) &&
-      (is_nil(item.vendor) || item.vendor == "") &&
-      (is_nil(item.description) || item.description == "") &&
-      (is_nil(item.amount) || item.amount == Money.new(0, :USD)) &&
-      is_nil(item.miles_driven) &&
-      (is_nil(item.mileage_from_to) || item.mileage_from_to == "")
-  end
-
-  defp income_item_empty?(%ExpenseReportIncomeItem{} = item) do
-    is_nil(item.date) &&
-      (is_nil(item.description) || item.description == "") &&
-      (is_nil(item.amount) || item.amount == Money.new(0, :USD))
-  end
-
-  defp parse_date(nil), do: nil
-  defp parse_date(""), do: nil
-
-  defp parse_date(date_string) when is_binary(date_string) do
-    case Date.from_iso8601(date_string) do
-      {:ok, date} -> date
-      _ -> nil
-    end
-  end
-
-  defp parse_integer(nil), do: nil
-  defp parse_integer(""), do: nil
-  defp parse_integer(value) when is_integer(value), do: value
-
-  defp parse_integer(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, _} -> int
-      :error -> nil
-    end
-  end
-
-  defp parse_integer(_), do: nil
-
-  defp parse_money(nil), do: nil
-  defp parse_money(""), do: nil
-
-  defp parse_money(amount_string) when is_binary(amount_string) do
-    case Money.new(:USD, amount_string) do
-      %Money{} = money -> money
-      _ -> nil
-    end
-  end
-
   defp validate_reimbursement_setup_in_liveview(changeset, %User{} = user) do
     method = Ecto.Changeset.get_field(changeset, :reimbursement_method)
 
@@ -2135,12 +2002,15 @@ defmodule YscWeb.ExpenseReportLive do
                 idle_label="Draft not started"
                 class="mb-3"
               />
+              <%!-- Draft rows (maybe_resume_draft/2) are the reconnect source of
+                   truth. DOM recover cannot restore receipt/proof paths because they
+                   are not form inputs; rebuilding from params used to persist nils. --%>
               <.simple_form
                 for={@form}
                 id="expense-report-form"
                 phx-submit="save"
                 phx-change="validate"
-                phx-auto-recover="recover"
+                phx-auto-recover="ignore"
                 multipart={true}
               >
                 <!-- Step 1: Basic Information -->
