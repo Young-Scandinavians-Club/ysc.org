@@ -47,7 +47,7 @@ defmodule YscWeb.Emails.NewSignInDetected do
 
     #{intro_text}
 
-    Platform: #{device}
+    Device: #{device}
     Location: #{location}
     Time: #{signed_in_at}
 

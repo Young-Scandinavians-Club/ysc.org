@@ -47,6 +47,37 @@ defmodule Ysc.ExpenseReports.ExpenseReportItemTest do
 
       assert cs.valid?
     end
+
+    test "rejects purchase amounts above the per-line cap" do
+      over =
+        Money.add!(ExpenseReportItem.max_purchase_amount(), Money.new(:USD, 1))
+
+      cs =
+        ExpenseReportItem.changeset(%ExpenseReportItem{}, %{
+          date: ~D[2026-01-15],
+          expense_type: "purchase",
+          vendor: "Vendor",
+          description: "Description",
+          amount: over
+        })
+
+      refute cs.valid?
+      assert %{amount: [message]} = errors_on(cs)
+      assert message =~ "must be less than or equal to"
+    end
+
+    test "accepts purchase amounts at the per-line cap" do
+      cs =
+        ExpenseReportItem.changeset(%ExpenseReportItem{}, %{
+          date: ~D[2026-01-15],
+          expense_type: "purchase",
+          vendor: "Vendor",
+          description: "Description",
+          amount: ExpenseReportItem.max_purchase_amount()
+        })
+
+      assert cs.valid?
+    end
   end
 
   describe "changeset/2 mileage expense items" do

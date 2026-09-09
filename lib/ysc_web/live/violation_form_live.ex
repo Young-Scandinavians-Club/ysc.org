@@ -380,51 +380,24 @@ defmodule YscWeb.ConductViolationReportLive do
 
     summary_text = Map.get(form_values, "summary", "")
 
-    if socket.assigns.logged_in? do
-      case Ysc.Forms.create_conduct_violation_report(changeset) do
-        {:ok, _conduct_report} ->
-          {:noreply,
-           socket
-           |> assign(:submitted, true)
-           |> assign(:submitted_summary, summary_text)
-           |> YscWeb.Flash.put_toast(:info, "Your report has been submitted",
-             title: "Report"
-           )}
+    case YscWeb.GuestTurnstile.verify(socket, values, title: "Report") do
+      :ok ->
+        case Ysc.Forms.create_conduct_violation_report(changeset) do
+          {:ok, _conduct_report} ->
+            {:noreply,
+             socket
+             |> assign(:submitted, true)
+             |> assign(:submitted_summary, summary_text)
+             |> YscWeb.Flash.put_toast(:info, "Your report has been submitted",
+               title: "Report"
+             )}
 
-        {:error, changeset} ->
-          {:noreply, assign_form(socket, changeset)}
-      end
-    else
-      case Turnstile.verify(values, socket.assigns.remote_ip) do
-        {:ok, _} ->
-          case Ysc.Forms.create_conduct_violation_report(changeset) do
-            {:ok, _conduct_report} ->
-              {:noreply,
-               socket
-               |> assign(:submitted, true)
-               |> assign(:submitted_summary, summary_text)
-               |> YscWeb.Flash.put_toast(
-                 :info,
-                 "Your report has been submitted",
-                 title: "Report"
-               )}
+          {:error, changeset} ->
+            {:noreply, assign_form(socket, changeset)}
+        end
 
-            {:error, changeset} ->
-              {:noreply, assign_form(socket, changeset)}
-          end
-
-        {:error, _} ->
-          socket =
-            socket
-            |> YscWeb.Flash.put_toast(
-              :error,
-              "We couldn't verify you're a real person. Please try submitting again. If this keeps happening, refresh the page or try a different browser.",
-              title: "Report"
-            )
-            |> Turnstile.refresh()
-
-          {:noreply, assign_form(socket, changeset)}
-      end
+      {:error, socket} ->
+        {:noreply, assign_form(socket, changeset)}
     end
   end
 

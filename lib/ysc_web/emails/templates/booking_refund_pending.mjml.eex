@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Booking Refund Under Review</strong>
+      <strong>We're reviewing your refund</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -11,10 +11,10 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We have received your booking cancellation and refund request. Your request is currently under review by the Cabin Master.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your cabin booking is cancelled. We're reviewing your refund — this is normal for some cancellations. The Cabin Master will review it, and we'll email you when the money is on the way. You don't need to do anything else.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <!-- Refund Request Details -->
-    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund Request Details</mj-text>
+    <!-- Refund details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund details</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Estimated Refund Amount:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @policy_refund_amount %></span>
@@ -23,7 +23,7 @@
       <% end %>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Request Date:</strong> <%= @request_date %>
+      <strong>Cancelled on:</strong> <%= @request_date %>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Cancellation Reason:</strong> <%= @pending_refund.cancellation_reason %>
@@ -75,16 +75,16 @@
       <strong>What Happens Next?</strong>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The Cabin Master will review your refund request</mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• You will receive an email notification once the refund has been approved and processed</mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The refund amount is based on our refund policy and the timing of your cancellation</mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If approved, the refund will be credited to your original payment method within 5-10 business days</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The Cabin Master will review your refund</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• We'll email you when the money is on the way</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The amount is based on our refund policy and when you cancelled</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If approved, the refund goes back to your original payment method in 5-10 business days</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #FEF3C7; padding: 16px; border-radius: 6px; border-left: 4px solid #F59E0B;">
-      <strong>Note:</strong> The estimated refund amount shown above is based on our refund policy. The final refund amount may be adjusted during the review process.
+      <strong>Note:</strong> The estimated refund amount shown above is based on our refund policy. The final amount may change during review.
     </mj-text>
     <mj-spacer height="36px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you have any questions about your refund request, please contact the Cabin Master or reach out to us at <a href="mailto:info@ysc.org">info@ysc.org</a>.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you have any questions about your refund, please contact the Cabin Master or reach out to us at <a href="mailto:info@ysc.org">info@ysc.org</a>.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Young Scandinavians Club</mj-text>
     <mj-spacer height="12px"></mj-spacer>

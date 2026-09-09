@@ -821,7 +821,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             <div>
               <strong>Plan: {plan_name(@membership_plan)}</strong>
               <br />
-              You'll be billed annually. You can cancel at any time from your account settings.
+              You'll be billed once a year. You can turn off automatic renewal anytime from your account settings.
             </div>
           </div>
         </div>

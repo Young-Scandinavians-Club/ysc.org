@@ -183,48 +183,28 @@ defmodule YscWeb.VolunteerLive do
       |> Ysc.Forms.Volunteer.changeset(volunteer_params)
       |> Ysc.Forms.Volunteer.put_submitter(socket.assigns[:current_user])
 
-    if socket.assigns.logged_in? do
-      case Ysc.Forms.create_volunteer(changeset) do
-        {:ok, _volunteer} ->
-          {:noreply,
-           socket
-           |> assign(:submitted, true)
-           |> YscWeb.Flash.put_toast(:info, "Volunteer form submitted",
-             title: "Volunteer"
-           )}
+    case YscWeb.GuestTurnstile.verify(socket, values, title: "Volunteer") do
+      :ok ->
+        case Ysc.Forms.create_volunteer(changeset) do
+          {:ok, _volunteer} ->
+            message =
+              if socket.assigns.logged_in? do
+                "Volunteer form submitted"
+              else
+                "Thank you for your interest in volunteering with the YSC!"
+              end
 
-        {:error, changeset} ->
-          {:noreply, assign_form(socket, changeset)}
-      end
-    else
-      case Turnstile.verify(values, socket.assigns.remote_ip) do
-        {:ok, _} ->
-          case Ysc.Forms.create_volunteer(changeset) do
-            {:ok, _volunteer} ->
-              {:noreply,
-               assign(socket, submitted: true)
-               |> YscWeb.Flash.put_toast(
-                 :info,
-                 "Thank you for your interest in volunteering with the YSC!",
-                 title: "Volunteer"
-               )}
+            {:noreply,
+             socket
+             |> assign(:submitted, true)
+             |> YscWeb.Flash.put_toast(:info, message, title: "Volunteer")}
 
-            {:error, changeset} ->
-              {:noreply, assign_form(socket, changeset)}
-          end
+          {:error, changeset} ->
+            {:noreply, assign_form(socket, changeset)}
+        end
 
-        {:error, _} ->
-          socket =
-            socket
-            |> YscWeb.Flash.put_toast(
-              :error,
-              "We couldn't verify you're a real person. Please try submitting again. If this keeps happening, refresh the page or try a different browser.",
-              title: "Volunteer"
-            )
-            |> Turnstile.refresh()
-
-          {:noreply, assign_form(socket, changeset)}
-      end
+      {:error, socket} ->
+        {:noreply, assign_form(socket, changeset)}
     end
   end
 

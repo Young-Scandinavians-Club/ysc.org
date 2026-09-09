@@ -45,9 +45,11 @@ defmodule YscWeb.CoreComponents do
   attr :id, :string, required: true
   attr :show, :boolean, default: false
   attr :fullscreen, :boolean, default: false
+  attr :fill_viewport, :boolean, default: false
   attr :max_width, :string, default: "max-w-3xl"
   attr :on_cancel, JS, default: %JS{}
   attr :z_index, :string, default: "z-[200]"
+  attr :panel_class, :any, default: nil
   slot :inner_block, required: true
 
   def modal(assigns) do
@@ -64,16 +66,30 @@ defmodule YscWeb.CoreComponents do
       <%!-- No aria-hidden on backdrop: dialog has aria-modal="true"; avoids blocking focus/hidden violation --%>
       <div id={"#{@id}-bg"} class="fixed inset-0 transition-opacity bg-zinc-50/90" />
       <div
-        class="fixed inset-0 overflow-y-auto"
+        class={[
+          "fixed inset-0",
+          if(@fill_viewport,
+            do: "h-dvh overflow-hidden",
+            else: "overflow-y-auto"
+          )
+        ]}
         aria-labelledby={"#{@id}-title"}
         aria-describedby={"#{@id}-description"}
         role="dialog"
         aria-modal="true"
         tabindex="0"
       >
-        <div class="flex items-center justify-center min-h-full">
+        <div class={[
+          "flex min-h-full",
+          if(@fill_viewport,
+            do: "h-full items-stretch",
+            else: "items-center justify-center"
+          )
+        ]}>
           <div class={[
-            "w-full sm:p-4 sm:py-6 lg:py-8",
+            "w-full",
+            @fill_viewport && "h-full",
+            @fill_viewport != true && "sm:p-4 sm:py-6 lg:py-8",
             if(@fullscreen != true, do: @max_width, else: "")
           ]}>
             <.focus_wrap
@@ -81,7 +97,15 @@ defmodule YscWeb.CoreComponents do
               phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
               phx-key="escape"
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-              class="relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1 p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
+              class={[
+                "relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1",
+                if(@fill_viewport,
+                  do:
+                    "h-full min-h-0 max-h-full overflow-hidden p-0 sm:rounded-none",
+                  else: "p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
+                ),
+                @panel_class
+              ]}
             >
               <div class="absolute top-1 right-2 sm:top-0.5 sm:right-1 z-20">
                 <button
@@ -96,7 +120,13 @@ defmodule YscWeb.CoreComponents do
                   />
                 </button>
               </div>
-              <div id={"#{@id}-content"}>
+              <div
+                id={"#{@id}-content"}
+                class={[
+                  "h-full min-h-0",
+                  @fill_viewport && "flex flex-col"
+                ]}
+              >
                 {render_slot(@inner_block)}
               </div>
             </.focus_wrap>

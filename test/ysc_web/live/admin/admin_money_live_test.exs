@@ -7,8 +7,10 @@ defmodule YscWeb.AdminMoneyLiveTest do
   import Mox
   import Ecto.Query
 
+  alias Ysc.Accounts
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReportItem
+  alias Ysc.ExpenseReports.ExpenseReportIncomeItem
   alias Ysc.Ledgers
   alias Ysc.Ledgers.Refund
   alias Ysc.LedgersFixtures
@@ -1138,6 +1140,359 @@ defmodule YscWeb.AdminMoneyLiveTest do
                "#expense-report-item-#{purchase.id}-receipt",
                "Mileage — no receipt required"
              )
+
+      refute has_element?(view, "#expense-report-income-items")
+      assert has_element?(view, "#expense-report-approve")
+      assert has_element?(view, "#expense-report-reject")
+      refute has_element?(view, "#expense-report-mark-paid")
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-flags",
+               "Missing receipt"
+             )
+
+      refute has_element?(view, "#expense-report-item-#{mileage.id}-flags")
+
+      assert has_element?(
+               view,
+               "#expense-receipt-viewer",
+               "Mileage — no receipt required"
+             )
+    end
+  end
+
+  describe "expense report review viewer" do
+    setup [:create_admin]
+
+    test "selects the first attached receipt and navigates between items", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      {report, image_item, pdf_item, income_item} =
+        submitted_report_with_image_pdf_and_income!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(view, "#expense-report-modal")
+      assert has_element?(view, "#expense-receipt-viewer img")
+      refute has_element?(view, "#expense-receipt-viewer iframe")
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{image_item.id}-receipt img"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{pdf_item.id}-receipt .hero-document-text"
+             )
+
+      assert has_element?(view, "#expense-report-income-items")
+      assert has_element?(view, "#income-report-item-#{income_item.id}")
+
+      view
+      |> element("#expense-report-item-#{pdf_item.id}")
+      |> render_click()
+
+      assert has_element?(view, "#expense-receipt-viewer iframe")
+      refute has_element?(view, "#expense-receipt-viewer img")
+
+      view
+      |> element("#expense-receipt-next")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#expense-receipt-caption",
+               income_item.description
+             )
+
+      view
+      |> element("#expense-receipt-next")
+      |> render_click()
+
+      assert has_element?(view, "#expense-receipt-viewer img")
+
+      view
+      |> element("#expense-receipt-prev")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#expense-receipt-caption",
+               income_item.description
+             )
+    end
+
+    test "arrow keys move between expense items", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _image_item, pdf_item, income_item} =
+        submitted_report_with_image_pdf_and_income!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(view, "#expense-receipt-viewer img")
+
+      view
+      |> element("#expense-receipt-key-down")
+      |> render_keydown(%{"key" => "ArrowDown"})
+
+      assert has_element?(view, "#expense-receipt-viewer iframe")
+
+      view
+      |> element("#expense-receipt-key-right")
+      |> render_keydown(%{"key" => "ArrowRight"})
+
+      assert has_element?(
+               view,
+               "#expense-receipt-caption",
+               income_item.description
+             )
+
+      view
+      |> element("#expense-receipt-key-up")
+      |> render_keydown(%{"key" => "ArrowUp"})
+
+      assert has_element?(
+               view,
+               "#expense-receipt-caption",
+               pdf_item.vendor
+             )
+
+      view
+      |> element("#expense-receipt-key-left")
+      |> render_keydown(%{"key" => "ArrowLeft"})
+
+      assert has_element?(view, "#expense-receipt-viewer img")
+    end
+
+    test "shows empty-state copy when a line has no receipt", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      view
+      |> element("#expense-report-item-#{purchase.id}")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#expense-receipt-viewer",
+               "No receipt attached"
+             )
+    end
+  end
+
+  describe "expense report review actions and flags" do
+    setup [:create_admin]
+
+    test "approving a submitted report updates its status", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      view
+      |> element("#expense-report-approve")
+      |> render_click()
+
+      assert Repo.reload!(report).status == "approved"
+      refute has_element?(view, "#expense-report-modal")
+    end
+
+    test "paid reports show no primary action buttons", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      report =
+        report
+        |> Ecto.Changeset.change(%{status: "paid"})
+        |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money?tab=expenses")
+
+      view
+      |> element("#expense-report-view-#{report.id}")
+      |> render_click()
+
+      assert has_element?(view, "#expense-report-modal")
+      refute has_element?(view, "#expense-report-approve")
+      refute has_element?(view, "#expense-report-reject")
+      refute has_element?(view, "#expense-report-mark-paid")
+    end
+
+    test "flags missing receipts, future dates, and duplicates", %{conn: conn} do
+      member = user_fixture()
+      report = submitted_flagged_items_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      [clean, missing, future, dup_a, dup_b] =
+        report.expense_items
+        |> Enum.sort_by(& &1.description)
+
+      refute has_element?(view, "#expense-report-item-#{clean.id}-flags")
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{missing.id}-flags",
+               "Missing receipt"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{future.id}-flags",
+               "Future date"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{dup_a.id}-flags",
+               "Possible duplicate"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{dup_b.id}-flags",
+               "Possible duplicate"
+             )
+
+      assert has_element?(view, "#expense-report-attention")
+    end
+
+    test "opens more details when QuickBooks sync error is present", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      report =
+        report
+        |> Ecto.Changeset.change(%{
+          quickbooks_sync_error: "Bill failed to sync"
+        })
+        |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(view, "#expense-report-more-details[open]")
+
+      assert has_element?(
+               view,
+               "#expense-report-qb-error",
+               "Bill failed to sync"
+             )
+    end
+
+    test "shows a QuickBooks bill link when the report has been exported", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      report =
+        report
+        |> Ecto.Changeset.change(%{quickbooks_bill_id: "qb-bill-99"})
+        |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#expense-report-quickbooks-bill",
+               "View in QuickBooks"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-quickbooks-bill[href*='txnId=qb-bill-99']"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-quickbooks-bill-footer",
+               "View bill in QuickBooks"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-quickbooks-bill-footer[href*='txnId=qb-bill-99']"
+             )
+    end
+
+    test "footer shows bank last-4 for bank transfer reports", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#expense-report-decision",
+               "account ending 7890"
+             )
+    end
+
+    test "footer shows check address for check reports", %{conn: conn} do
+      member = user_fixture()
+      report = submitted_check_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(view, "#expense-report-decision", "123 Main St")
+      assert has_element?(view, "#expense-report-decision", "Oakland")
     end
   end
 
@@ -1192,5 +1547,199 @@ defmodule YscWeb.AdminMoneyLiveTest do
       |> Repo.update!()
 
     {report, mileage, purchase}
+  end
+
+  defp submitted_report_with_image_pdf_and_income!(user) do
+    {:ok, bank_account} =
+      ExpenseReports.create_bank_account(
+        %{"routing_number" => "021000021", "account_number" => "1234567890"},
+        user
+      )
+
+    {:ok, report} =
+      ExpenseReports.create_expense_report(
+        %{
+          "user_id" => user.id,
+          "status" => "draft",
+          "purpose" => "Receipt viewer fixtures",
+          "reimbursement_method" => "bank_transfer",
+          "bank_account_id" => bank_account.id
+        },
+        user
+      )
+
+    image_item =
+      %ExpenseReportItem{}
+      |> ExpenseReportItem.changeset(%{
+        expense_report_id: report.id,
+        date: Date.utc_today(),
+        vendor: "Photo Shop",
+        description: "Printed photos",
+        amount: "15.00",
+        receipt_s3_path: "receipts/#{user.id}/1_photo.jpg"
+      })
+      |> Repo.insert!()
+
+    pdf_item =
+      %ExpenseReportItem{}
+      |> ExpenseReportItem.changeset(%{
+        expense_report_id: report.id,
+        date: Date.utc_today(),
+        vendor: "Office Supply",
+        description: "Paper",
+        amount: "8.00",
+        receipt_s3_path: "receipts/#{user.id}/1_scan.pdf"
+      })
+      |> Repo.insert!()
+
+    income_item =
+      %ExpenseReportIncomeItem{}
+      |> ExpenseReportIncomeItem.changeset(%{
+        expense_report_id: report.id,
+        date: Date.utc_today(),
+        description: "Cash collected",
+        amount: "5.00",
+        proof_s3_path: "proofs/#{user.id}/1_proof.jpg"
+      })
+      |> Repo.insert!()
+
+    report =
+      report
+      |> Ecto.Changeset.change(%{
+        status: "submitted",
+        certification_accepted: true
+      })
+      |> Repo.update!()
+
+    {report, image_item, pdf_item, income_item}
+  end
+
+  defp submitted_flagged_items_report!(user) do
+    {:ok, bank_account} =
+      ExpenseReports.create_bank_account(
+        %{"routing_number" => "021000021", "account_number" => "1234567890"},
+        user
+      )
+
+    {:ok, report} =
+      ExpenseReports.create_expense_report(
+        %{
+          "user_id" => user.id,
+          "status" => "draft",
+          "purpose" => "Flagged items",
+          "reimbursement_method" => "bank_transfer",
+          "bank_account_id" => bank_account.id
+        },
+        user
+      )
+
+    today = Date.utc_today()
+
+    clean =
+      insert_purchase_item!(report.id, %{
+        vendor: "Clean Co",
+        description: "A clean",
+        amount: "11.00",
+        date: today,
+        receipt_s3_path: "receipts/#{user.id}/clean.jpg"
+      })
+
+    missing =
+      insert_purchase_item!(report.id, %{
+        vendor: "Missing Co",
+        description: "B missing",
+        amount: "12.00",
+        date: today
+      })
+
+    future =
+      insert_purchase_item!(report.id, %{
+        vendor: "Future Co",
+        description: "C future",
+        amount: "13.00",
+        date: Date.add(today, 10),
+        receipt_s3_path: "receipts/#{user.id}/future.jpg"
+      })
+
+    dup_a =
+      insert_purchase_item!(report.id, %{
+        vendor: "Dup Co",
+        description: "D dup a",
+        amount: "14.00",
+        date: today,
+        receipt_s3_path: "receipts/#{user.id}/dup_a.jpg"
+      })
+
+    dup_b =
+      insert_purchase_item!(report.id, %{
+        vendor: "Dup Co",
+        description: "E dup b",
+        amount: "14.00",
+        date: today,
+        receipt_s3_path: "receipts/#{user.id}/dup_b.jpg"
+      })
+
+    report =
+      report
+      |> Ecto.Changeset.change(%{
+        status: "submitted",
+        certification_accepted: true
+      })
+      |> Repo.update!()
+      |> Map.put(:expense_items, [clean, missing, future, dup_a, dup_b])
+
+    report
+  end
+
+  defp insert_purchase_item!(report_id, attrs) do
+    %ExpenseReportItem{}
+    |> ExpenseReportItem.changeset(
+      Map.merge(
+        %{
+          expense_report_id: report_id,
+          expense_type: "purchase"
+        },
+        attrs
+      )
+    )
+    |> Repo.insert!()
+  end
+
+  defp submitted_check_report!(user) do
+    {:ok, _} =
+      Accounts.update_billing_address(user, %{
+        "address" => "123 Main St",
+        "city" => "Oakland",
+        "region" => "CA",
+        "postal_code" => "94601",
+        "country" => "US"
+      })
+
+    {:ok, report} =
+      ExpenseReports.create_expense_report(
+        %{
+          "user_id" => user.id,
+          "status" => "draft",
+          "purpose" => "Check reimbursement",
+          "reimbursement_method" => "check"
+        },
+        user
+      )
+
+    _item =
+      insert_purchase_item!(report.id, %{
+        vendor: "Hardware",
+        description: "Nails",
+        amount: "9.00",
+        date: Date.utc_today(),
+        receipt_s3_path: "receipts/#{user.id}/nails.jpg"
+      })
+
+    report
+    |> Ecto.Changeset.change(%{
+      status: "submitted",
+      certification_accepted: true
+    })
+    |> Repo.update!()
   end
 end

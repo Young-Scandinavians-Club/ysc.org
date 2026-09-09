@@ -390,7 +390,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           checkout_date: "December 3, 2024",
           guests_count: 2,
           children_count: 0,
-          booking_mode: "Room Booking",
+          booking_mode: "Individual room(s)",
           room_names: "Room 1",
           nights: 2,
           is_buyout: false,
@@ -490,7 +490,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         checkout_time: "11:00 AM",
         days_until_checkin: 2,
         booking_reference_id: "BK-123",
-        booking_mode: "Room Booking",
+        booking_mode: "Individual room(s)",
         room_names: "Room 1",
         nights: 2,
         is_buyout: false,
@@ -836,7 +836,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert String.length(html) > 0
       assert html =~ "Membership Upgrade Successful"
       assert html =~ "upgraded from Single to Family"
-      assert html =~ "prorated payment"
+      assert html =~ "We charged"
       assert html =~ "$15.08"
     end
 
@@ -860,7 +860,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert String.length(html) > 0
       assert html =~ "Membership Updated"
       assert html =~ "changed from Family to Single"
-      assert html =~ "prorated payment"
+      assert html =~ "We processed a payment"
       assert html =~ "$10.00"
     end
 

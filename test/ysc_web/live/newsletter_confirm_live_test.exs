@@ -16,14 +16,14 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
     test "shows invalid link message for unknown token", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/newsletter/confirm/invalid-token-xyz")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
       assert html =~ "sign up again"
     end
 
     test "shows invalid link for token that is only whitespace", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/newsletter/confirm/%20%20")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
     end
 
     test "always shows Return to home link when token is invalid", %{conn: conn} do
@@ -54,7 +54,7 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
       {:ok, view, html} =
         live(conn, ~p"/newsletter/confirm/#{pending.confirmation_token}")
 
-      refute html =~ "Invalid or expired link"
+      refute html =~ "This link no longer works"
       assert html =~ "You&#39;re subscribed!"
       assert has_element?(view, "strong", email)
 
@@ -128,13 +128,13 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
 
       {:ok, _view, html} = live(conn, "/newsletter/confirm/#{long_token}")
 
-      assert html =~ "Invalid or expired link"
+      assert html =~ "This link no longer works"
     end
 
     test "token with special characters does not crash", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/newsletter/confirm/abc%2B%2F%3Ddef")
 
-      assert html =~ "Invalid or expired link" or
+      assert html =~ "This link no longer works" or
                html =~ "You&#39;re subscribed!"
     end
   end

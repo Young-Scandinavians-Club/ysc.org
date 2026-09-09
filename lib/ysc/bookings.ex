@@ -1179,6 +1179,10 @@ defmodule Ysc.Bookings do
     end
   end
 
+  # Includes inventory-contention errors from confirm_booking/1 when a canceled
+  # hold is reclaimed after HoldExpiryWorker released seats (Stripe already
+  # succeeded). Those atoms are what confirm_*_from_available! roll back with;
+  # without them, checkout/receipt pass the raw reason and skip the refund.
   @refundable_unfulfilled_checkout_errors ~w(
     entitlement_no_longer_valid
     entitlement_not_eligible_for_booking
@@ -1187,6 +1191,14 @@ defmodule Ysc.Bookings do
     booking_confirmation_failed
     booking_confirmation_email_enqueue_failed
     inventory_update_failed
+    buyout_unavailable
+    room_unavailable
+    insufficient_capacity
+    property_buyout_active
+    property_unavailable
+    rooms_already_booked
+    blackout_conflict
+    invalid_status
   )a
 
   @doc """

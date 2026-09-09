@@ -48,7 +48,7 @@ defmodule YscWeb.NewsletterConfirmLive do
           You're subscribed!
         </h1>
         <h1 :if={!@subscriber} class="text-2xl font-bold text-zinc-900">
-          Invalid or expired link
+          This link no longer works
         </h1>
 
         <p :if={@subscriber} class="mt-4 text-zinc-600">

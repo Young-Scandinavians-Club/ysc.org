@@ -35,7 +35,7 @@ defmodule YscWeb.UserResetPasswordLiveTest do
       assert to[:to] == ~p"/"
 
       assert to[:flash]["error"] ==
-               "Reset password link is invalid or it has expired."
+               "This password reset link no longer works. It may have expired — request a new one from the sign-in page."
     end
 
     test "renders errors for invalid data", %{conn: conn, token: token} do

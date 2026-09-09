@@ -4,6 +4,21 @@ The sidebar-collapsed class is toggled on <html> so it survives LiveView DOM mor
 Transitions use opacity + max-height instead of display:none so everything can animate.
 */
 
+/* Expense report review: fill the viewport so receipt previews are not
+   height-capped by the left column's content. */
+#expense-report-modal [role="dialog"] {
+    height: 100dvh;
+    max-height: 100dvh;
+}
+
+#expense-report-modal-container,
+#expense-report-modal-content,
+#expense-report-review {
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+}
+
 
 /* Chevron rotation */
 
