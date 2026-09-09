@@ -7480,7 +7480,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     """
     <div
-      class="h-12 shadow-sm border text-xs font-medium flex flex-col items-start justify-center bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{continuation_classes}"
+      class="h-12 shadow-sm border text-xs font-medium flex flex-col items-stretch justify-center overflow-hidden bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{continuation_classes}"
       style="#{style_val}"
       title="#{escaped_title_str}"
       phx-click="view-blackout"
@@ -7488,7 +7488,7 @@ defmodule YscWeb.AdminBookingsLive do
       phx-disable-with="Opening..."
     >
       #{left_edge}
-      <div class="truncate px-2 font-semibold">#{escaped_reason_str}</div>
+      <div class="min-w-0 px-2 font-semibold leading-tight line-clamp-2 break-words">#{escaped_reason_str}</div>
       #{right_edge}
     </div>
     """
