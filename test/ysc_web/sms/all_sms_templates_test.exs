@@ -91,6 +91,7 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
       assert String.contains?(message, user.first_name)
       assert String.contains?(message, "newemail@example.com")
       assert String.contains?(message, "[YSC]")
+      assert String.contains?(message, "info@ysc.org")
       assert EmailChanged.get_template_name() == "email_changed"
     end
 
@@ -114,6 +115,7 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
       assert String.length(message) > 0
       assert String.contains?(message, user.first_name)
       assert String.contains?(message, "[YSC]")
+      assert String.contains?(message, "info@ysc.org")
       assert PasswordChanged.get_template_name() == "password_changed"
     end
 

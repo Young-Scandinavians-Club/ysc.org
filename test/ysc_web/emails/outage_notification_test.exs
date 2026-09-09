@@ -200,6 +200,8 @@ defmodule YscWeb.Emails.OutageNotificationTest do
       assert body =~ "pgealerts.alerts.pge.com"
       assert body =~ "Check the outage map"
       assert body =~ "Young Scandinavians Club"
+      assert body =~ "info@ysc.org"
+      refute body =~ "don't hesitate to reach out"
     end
 
     test "text_body omits description and cabin block when not provided" do
@@ -296,6 +298,7 @@ defmodule YscWeb.Emails.OutageNotificationTest do
       assert html =~ "555-0100"
       assert html =~ "pgealerts.alerts.pge.com"
       assert html =~ "Check the outage map"
+      assert html =~ "info@ysc.org"
     end
 
     test "omits description and cabin block when not provided", %{user: user} do

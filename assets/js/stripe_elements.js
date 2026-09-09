@@ -154,7 +154,7 @@ const StripeElements = {
 
             if (!window.Stripe) {
                 console.error('Stripe not available');
-                this.showMessage('Payment system not ready. Please refresh and try again.');
+                this.showMessage('The payment form is still loading. Please refresh the page and try again.');
                 return;
             }
 
@@ -176,7 +176,7 @@ const StripeElements = {
 
             if (!stripe) {
                 console.error('Failed to initialize Stripe - check publishable key configuration');
-                this.showMessage('Payment system not configured. Please contact support.');
+                this.showMessage("We couldn't load the payment form. Please refresh the page, or email info@ysc.org if this keeps happening.");
                 return;
             }
 
@@ -186,7 +186,7 @@ const StripeElements = {
             const paymentElementContainer = document.getElementById('payment-element');
             if (!paymentElementContainer) {
                 console.error('Payment element container not found');
-                this.showMessage('Payment form container not found. Please refresh and try again.');
+                this.showMessage("We couldn't show the payment form. Please refresh the page and try again.");
                 return;
             }
 
@@ -244,7 +244,7 @@ const StripeElements = {
                     this.showPaymentElementContainer(paymentElementContainer);
                 } else {
                     console.error('Payment element container is not in the DOM');
-                    this.showMessage('Payment form container is not available. Please refresh and try again.');
+                    this.showMessage("We couldn't show the payment form. Please refresh the page and try again.");
                     return;
                 }
             } else {
@@ -270,7 +270,7 @@ const StripeElements = {
                                 this.showPaymentElementContainer(paymentElementContainer);
                             } catch (recreateError) {
                                 console.error('Failed to recreate payment element:', recreateError);
-                                this.showMessage('Failed to initialize payment form. Please refresh and try again.');
+                                this.showMessage("We couldn't load the payment form. Please refresh the page and try again.");
                                 return;
                             }
                         }
@@ -291,7 +291,7 @@ const StripeElements = {
 
         } catch (error) {
             console.error('Error initializing Stripe Elements:', error);
-            this.showMessage('Failed to initialize payment form. Please refresh and try again.');
+            this.showMessage("We couldn't load the payment form. Please refresh the page and try again.");
         } finally {
             this.initializing = false;
         }
@@ -316,7 +316,7 @@ const StripeElements = {
         // Check if the hook element is still in the DOM
         if (!this.el || !document.contains(this.el)) {
             console.error('Stripe Elements hook element is not in the DOM');
-            this.showMessage('Payment form is no longer available. Please refresh and try again.');
+            this.showMessage('The payment form timed out. Please refresh the page and try again.');
             return;
         }
 
@@ -324,12 +324,12 @@ const StripeElements = {
         const paymentElementContainer = document.getElementById('payment-element');
         if (!paymentElementContainer || !document.contains(paymentElementContainer)) {
             console.error('Payment element container is not in the DOM');
-            this.showMessage('Payment form is no longer available. Please refresh and try again.');
+            this.showMessage('The payment form timed out. Please refresh the page and try again.');
             return;
         }
 
         if (!this.stripe || !this.paymentElement) {
-            this.showMessage('Payment form not ready. Please try again.');
+            this.showMessage('The payment form is still loading. Please wait a moment and try again.');
             return;
         }
 
@@ -343,7 +343,7 @@ const StripeElements = {
                     // Wait a moment for the element to mount
                     await new Promise(resolve => setTimeout(resolve, 100));
                 } else {
-                    this.showMessage('Payment form is no longer available. Please refresh and try again.');
+                    this.showMessage('The payment form timed out. Please refresh the page and try again.');
                     return;
                 }
             } catch (mountError) {
@@ -352,7 +352,7 @@ const StripeElements = {
             }
         } else if (!paymentElementHasStripeContent(paymentElementContainer) && !this.paymentElement) {
             // No element exists at all - this is a real problem
-            this.showMessage('Payment form is not ready. Please refresh and try again.');
+            this.showMessage('The payment form is still loading. Please refresh the page and try again.');
             return;
         }
 
@@ -364,7 +364,7 @@ const StripeElements = {
         // Disable the submit button
         if (submitButton) {
             submitButton.disabled = true;
-            submitButton.textContent = 'Processing...';
+            submitButton.textContent = 'Please wait...';
         }
 
         this._paymentConfirmInFlight = true;
@@ -423,7 +423,7 @@ const StripeElements = {
                     pi.status === 'succeeded';
 
                 if (alreadySucceeded) {
-                    this.showMessage('Payment successful! Processing your order...', true);
+                    this.showMessage('Payment received. Finishing your order...', true);
                     safePushEvent(this, 'payment-success', {
                         payment_intent_id: pi.id || this.clientSecret.split('_secret_')[0]
                     });
@@ -439,7 +439,7 @@ const StripeElements = {
                 }
             } else {
                 // Payment succeeded
-                this.showMessage('Payment successful! Processing your order...', true);
+                this.showMessage('Payment received. Finishing your order...', true);
 
                 // Notify the LiveView that payment was successful
                 safePushEvent(this, 'payment-success', {
@@ -449,7 +449,7 @@ const StripeElements = {
         } catch (err) {
             console.error('Payment confirmation error:', err);
             this._paymentConfirmInFlight = false;
-            this.showMessage('An unexpected error occurred. Please try again.');
+            this.showMessage('Something went wrong. Please try again.');
             if (submitButton) {
                 submitButton.disabled = false;
                 submitButton.textContent = this.originalButtonText;
