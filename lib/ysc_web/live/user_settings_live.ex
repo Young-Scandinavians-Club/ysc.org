@@ -247,70 +247,113 @@ defmodule YscWeb.UserSettingsLive do
                 Saved methods
               </p>
               <div class="space-y-2">
-                <div
-                  :for={payment_method <- @all_payment_methods}
-                  class={[
-                    "border rounded-lg p-4 transition-all duration-200",
-                    @selecting_payment_method && "cursor-not-allowed opacity-50",
-                    !@selecting_payment_method && "cursor-pointer",
+                <%= for payment_method <- @all_payment_methods do %>
+                  <% deleting_this? =
+                    @deleting_payment_method_id == payment_method.id %>
+                  <% busy? = @selecting_payment_method || deleting_this? %>
+                  <div class={[
+                    "border rounded-lg p-4 transition-all duration-200 flex items-center gap-2",
+                    busy? && "opacity-50",
                     @default_payment_method &&
                       payment_method.id == @default_payment_method.id &&
                       "border-blue-500 bg-blue-50",
                     (!@default_payment_method ||
                        payment_method.id != @default_payment_method.id) &&
-                      !@selecting_payment_method &&
+                      !busy? &&
                       "border-zinc-200 hover:border-zinc-300"
-                  ]}
-                  phx-click={
-                    if @selecting_payment_method,
-                      do: nil,
-                      else: "select-payment-method"
-                  }
-                  phx-value-payment_method_id={payment_method.id}
-                >
-                  <div class="flex items-center space-x-3 flex-1 min-w-0">
-                    <div class="flex-1 min-w-0">
-                      <.stored_payment_method_display
-                        payment_method={payment_method}
-                        text_class="text-zinc-800 text-sm font-semibold"
-                        expiry_class="text-zinc-500 text-xs mt-0.5"
-                      />
-                    </div>
-                    <div class="flex-shrink-0">
-                      <div
-                        :if={
-                          @default_payment_method &&
-                            payment_method.id == @default_payment_method.id
-                        }
-                        class="flex items-center gap-1 text-blue-600"
-                      >
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path
-                            fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clip-rule="evenodd"
-                          >
-                          </path>
-                        </svg>
-                        <span class="text-xs font-semibold">Default</span>
+                  ]}>
+                    <div
+                      class={[
+                        "flex items-center space-x-3 flex-1 min-w-0",
+                        busy? && "cursor-not-allowed",
+                        !busy? && "cursor-pointer"
+                      ]}
+                      phx-click={if busy?, do: nil, else: "select-payment-method"}
+                      phx-value-payment_method_id={payment_method.id}
+                    >
+                      <div class="flex-1 min-w-0">
+                        <.stored_payment_method_display
+                          payment_method={payment_method}
+                          text_class="text-zinc-800 text-sm font-semibold"
+                          expiry_class="text-zinc-500 text-xs mt-0.5"
+                        />
                       </div>
-                      <span
-                        :if={
-                          !@default_payment_method ||
-                            payment_method.id != @default_payment_method.id
-                        }
-                        class="text-xs text-zinc-400"
-                      >
-                        <%= cond do %>
-                          <% @selecting_payment_method -> %>
-                            Updating...
-                          <% true -> %>
-                            Set as default
-                        <% end %>
-                      </span>
+                      <div class="flex-shrink-0">
+                        <div
+                          :if={
+                            @default_payment_method &&
+                              payment_method.id == @default_payment_method.id
+                          }
+                          class="flex items-center gap-1 text-blue-600"
+                        >
+                          <svg
+                            class="w-4 h-4"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fill-rule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                              clip-rule="evenodd"
+                            >
+                            </path>
+                          </svg>
+                          <span class="text-xs font-semibold">Default</span>
+                        </div>
+                        <span
+                          :if={
+                            !@default_payment_method ||
+                              payment_method.id != @default_payment_method.id
+                          }
+                          class="text-xs text-zinc-400"
+                        >
+                          <%= cond do %>
+                            <% @selecting_payment_method -> %>
+                              Updating...
+                            <% true -> %>
+                              Set as default
+                          <% end %>
+                        </span>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      phx-click="delete-payment-method"
+                      phx-value-payment_method_id={payment_method.id}
+                      disabled={busy?}
+                      data-confirm="Remove this payment method? It will be detached from your account and can no longer be used for membership payments."
+                      aria-label="Remove payment method"
+                      class="flex-shrink-0 p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <.icon
+                        :if={!deleting_this?}
+                        name="hero-trash"
+                        class="w-4 h-4"
+                      />
+                      <svg
+                        :if={deleting_this?}
+                        class="w-4 h-4 animate-spin text-red-600"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          class="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          stroke-width="4"
+                        />
+                        <path
+                          class="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                    </button>
                   </div>
-                </div>
+                <% end %>
               </div>
             </div>
             <%!-- Separator --%>
@@ -2720,6 +2763,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:loading_payment_methods, true)
       |> assign(:show_new_payment_form, false)
       |> assign(:selecting_payment_method, false)
+      |> assign(:deleting_payment_method_id, nil)
       |> assign(:membership_plans, membership_plans)
       |> assign(:scheduled_downgrade_info, nil)
       |> assign(:active_plan_type, active_plan)
@@ -4044,6 +4088,46 @@ defmodule YscWeb.UserSettingsLive do
     end
   end
 
+  def handle_event(
+        "delete-payment-method",
+        %{"payment_method_id" => payment_method_id},
+        socket
+      ) do
+    user = socket.assigns.user
+
+    result =
+      with :ok <- validate_not_selecting(socket),
+           :ok <- validate_not_deleting(socket),
+           %{} = payment_method <-
+             find_payment_method(socket, payment_method_id),
+           :ok <- validate_can_remove_payment_method(socket, user) do
+        remove_payment_method(socket, user, payment_method)
+      end
+
+    case result do
+      {:noreply, _socket} = reply ->
+        reply
+
+      nil ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Payment method not found.",
+           title: "Payment"
+         )}
+
+      {:error, reason} when reason in [:already_selecting, :already_deleting] ->
+        {:noreply, socket}
+
+      {:error, :last_method_with_active_membership} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "This is the only payment method on file for your active membership. Add another payment method first, or cancel your membership, before removing it.",
+           title: "Payment"
+         )}
+    end
+  end
+
   def handle_event("add-new-payment-method", _params, socket) do
     require Ysc.Logging
     user = socket.assigns.user
@@ -4947,6 +5031,71 @@ defmodule YscWeb.UserSettingsLive do
     do: {:error, :payment_method_not_found}
 
   defp validate_payment_method_exists(_payment_method), do: :ok
+
+  defp validate_not_deleting(socket) do
+    if socket.assigns.deleting_payment_method_id,
+      do: {:error, :already_deleting},
+      else: :ok
+  end
+
+  # Removing the only payment method while a membership is auto-renewing would
+  # leave Stripe with nothing to charge at the next renewal. Make the member add
+  # a replacement (or cancel the membership) first.
+  defp validate_can_remove_payment_method(socket, user) do
+    last_one? = length(socket.assigns.all_payment_methods) <= 1
+
+    if last_one? && Subscriptions.get_active_subscription(user) do
+      {:error, :last_method_with_active_membership}
+    else
+      :ok
+    end
+  end
+
+  defp remove_payment_method(socket, user, payment_method) do
+    require Ysc.Logging
+
+    socket = assign(socket, :deleting_payment_method_id, payment_method.id)
+
+    case Ysc.Payments.detach_payment_method(payment_method) do
+      {:ok, _deleted} ->
+        Ysc.Logging.info("Removed payment method",
+          user_id: user.id,
+          payment_method_id: payment_method.id
+        )
+
+        {:noreply,
+         socket
+         |> assign(:deleting_payment_method_id, nil)
+         |> assign(
+           :all_payment_methods,
+           Ysc.Payments.list_payment_methods(user)
+         )
+         |> assign(
+           :default_payment_method,
+           Ysc.Payments.get_default_payment_method(user)
+         )
+         |> YscWeb.Flash.put_toast(:info, "Payment method removed.",
+           title: "Payment",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
+         )}
+
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to remove payment method",
+          user_id: user.id,
+          payment_method_id: payment_method.id,
+          reason: inspect(reason)
+        )
+
+        {:noreply,
+         socket
+         |> assign(:deleting_payment_method_id, nil)
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "We couldn't remove that payment method. Please try again, or contact us at info@ysc.org if this keeps happening.",
+           title: "Payment"
+         )}
+    end
+  end
 
   defp process_payment_method_selection(
          socket,

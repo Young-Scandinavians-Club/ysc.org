@@ -113,6 +113,58 @@ defmodule Ysc.Payments do
   end
 
   @doc """
+  Removes a payment method a user no longer wants: detaches it from Stripe so it
+  can never be charged again, then deletes the local record.
+
+  If the removed method was the default and others remain, `delete_payment_method/1`
+  promotes the oldest remaining one; we then push that new default to Stripe so
+  automatic charges (renewals, retries) follow what the app shows.
+
+  Best-effort on the Stripe side: a payment method Stripe already lost track of
+  (`resource_missing`) is treated as detached so the stale local row still goes
+  away. Any other Stripe failure aborts before the local record is touched.
+  """
+  def detach_payment_method(%PaymentMethod{} = payment_method) do
+    user = Ysc.Accounts.get_user!(payment_method.user_id)
+
+    with :ok <- detach_payment_method_from_stripe(payment_method),
+         {:ok, deleted} <- delete_payment_method(payment_method) do
+      case get_default_payment_method(user) do
+        nil -> :ok
+        new_default -> push_default_payment_method_to_stripe(user, new_default)
+      end
+
+      {:ok, deleted}
+    end
+  end
+
+  defp detach_payment_method_from_stripe(%PaymentMethod{
+         provider: :stripe,
+         provider_id: provider_id
+       })
+       when is_binary(provider_id) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           stripe_payment_method_module().detach(provider_id)
+         end) do
+      {:ok, _} ->
+        :ok
+
+      {:error, %Stripe.Error{code: :resource_missing}} ->
+        :ok
+
+      {:error, error} ->
+        Ysc.Logging.error("Failed to detach payment method from Stripe",
+          payment_method_provider_id: provider_id,
+          error: inspect(error)
+        )
+
+        {:error, :stripe_error}
+    end
+  end
+
+  defp detach_payment_method_from_stripe(_payment_method), do: :ok
+
+  @doc """
   Returns an `%Ecto.Changeset{}` for tracking payment method changes.
   """
   def change_payment_method(%PaymentMethod{} = payment_method, attrs \\ %{}) do
@@ -291,11 +343,15 @@ defmodule Ysc.Payments do
   def push_default_payment_method_to_stripe(user, payment_method) do
     if user.stripe_id do
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             stripe_customer_module().update(user.stripe_id, %{
-               invoice_settings: %{
-                 default_payment_method: payment_method.provider_id
-               }
-             })
+             stripe_customer_module().update(
+               user.stripe_id,
+               %{
+                 invoice_settings: %{
+                   default_payment_method: payment_method.provider_id
+                 }
+               },
+               []
+             )
            end) do
         {:ok, _customer} ->
           :ok
