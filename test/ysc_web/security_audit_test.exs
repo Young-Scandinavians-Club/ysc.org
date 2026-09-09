@@ -3495,11 +3495,11 @@ defmodule YscWeb.SecurityAuditTest do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/posts/#{published.id}")
 
-      view
-      |> form("#primary-post-comment",
-        comment: %{text: "forged target", post_id: draft.id}
-      )
-      |> render_submit()
+      # Bypass form hidden-field allowlist so we can assert the LiveView
+      # event handler ignores a forged post_id (Finding 63).
+      render_submit(view, "save", %{
+        "comment" => %{"text" => "forged target", "post_id" => draft.id}
+      })
 
       assert Ysc.Posts.get_comments_for_post(draft.id) == []
       comments = Ysc.Posts.get_comments_for_post(published.id)
@@ -3607,11 +3607,9 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert is_nil(victim_post.image_id)
 
-      jpeg =
-        <<0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46>>
-
-      path = "/tmp/f65_#{System.unique_integer([:positive])}.jpg"
-      File.write!(path, jpeg)
+      tiny = File.read!("test/support/fixtures/tiny.png")
+      path = "/tmp/f65_#{System.unique_integer([:positive])}.png"
+      File.write!(path, tiny)
 
       on_exit(fn -> if File.exists?(path), do: File.rm(path) end)
 
@@ -3621,8 +3619,8 @@ defmodule YscWeb.SecurityAuditTest do
         |> post(~p"/admin/trix-uploads", %{
           "file" => %Plug.Upload{
             path: path,
-            filename: "cover.jpg",
-            content_type: "image/jpeg"
+            filename: "cover.png",
+            content_type: "image/png"
           },
           "post_id" => victim_post.id
         })
