@@ -365,14 +365,21 @@ defmodule YscWeb.AgendaEditComponent do
       agenda_item = Agendas.get_agenda_item!(id)
       agenda = Agendas.get_agenda!(new_agenda_id)
 
-      Agendas.move_agenda_item_to_agenda(
-        agenda.event_id,
-        agenda_item,
-        agenda,
-        new_idx
-      )
+      case Agendas.move_agenda_item_to_agenda(
+             socket.assigns.event_id,
+             agenda_item,
+             agenda,
+             new_idx
+           ) do
+        :ok ->
+          {:noreply, socket}
 
-      {:noreply, socket}
+        {:error, :wrong_event} ->
+          {:noreply, resync_agenda_items(socket)}
+
+        {:error, _} ->
+          {:noreply, resync_agenda_items(socket)}
+      end
     else
       case find_agenda_item(socket, id) do
         nil ->

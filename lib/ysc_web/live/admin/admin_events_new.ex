@@ -1980,9 +1980,33 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("delete-agenda", %{"id" => id}, socket) do
-    agenda = %Agenda{id: id}
-    Agendas.delete_agenda(socket.assigns[:event], agenda)
-    {:noreply, socket}
+    event = socket.assigns[:event]
+
+    case Agendas.get_agenda(id) do
+      %Agenda{} = agenda ->
+        case Agendas.delete_agenda(event, agenda) do
+          {:ok, _} ->
+            {:noreply, socket}
+
+          {:error, :wrong_event} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "That agenda does not belong to this event.",
+               title: "Agenda"
+             )}
+
+          {:error, _} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(socket, :error, "Could not delete agenda.",
+               title: "Agenda"
+             )}
+        end
+
+      nil ->
+        {:noreply, socket}
+    end
   end
 
   # Autosave is `phx-change="validate"` via `Event.editor_changeset/2`. A leftover
