@@ -1407,6 +1407,35 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert Events.list_all_ticket_reservations_for_user(volunteer.id) == []
     end
 
+    test "volunteer cannot add or edit ticket tiers from the tickets tab (Finding 54)",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      conn = log_in_user(conn, volunteer)
+      event = event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Volunteer Tier Edit",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 50
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#add-ticket-tier-btn-#{event.id}")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-edit")
+      refute has_element?(view, "#ticket-tier-actions-#{tier.id}-delete")
+
+      view
+      |> element("#ticket-tier-add-event-#{event.id}")
+      |> render_click()
+
+      refute has_element?(view, "#add-ticket-tier-modal")
+      assert length(Events.list_ticket_tiers_for_event(event.id)) == 1
+    end
+
     test "admin can open the reserve tickets modal", %{
       conn: conn,
       admin: admin
@@ -1445,7 +1474,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
 
       view
-      |> element("[phx-click='open-add-ticket-tier-modal']")
+      |> element("#add-ticket-tier-btn-#{event.id}")
       |> render_click()
 
       assert has_element?(view, "#ticket-tier-type-options[role='radiogroup']")
@@ -1469,7 +1498,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
 
       view
-      |> element("[phx-click='open-add-ticket-tier-modal']")
+      |> element("#add-ticket-tier-btn-#{event.id}")
       |> render_click()
 
       # Switch to a paid tier so the price input appears.
