@@ -110,6 +110,10 @@ jobs:
     name: Tests
     needs: build_test
     runs-on: ubuntu-latest
+    # Typical mix coveralls.lcov is ~15m. Cap well below the 47m+ runner
+    # disconnect seen on 34416092041 so a hang fails with logs, not
+    # "hosted runner lost communication".
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
@@ -136,6 +140,15 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: build-test-${{ github.run_id }}
+
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles (warning: redefining module, since the old .beam
+      # is already loaded from the artifact). Touch the restored files so their
+      # mtimes win and Mix's compile manifest treats them as up to date.
+      # Kept in sync with the identical step in ci.yml (#1017 added it there only).
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
 
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
@@ -172,10 +185,15 @@ jobs:
               mc anonymous set public local/avatars
             "
 
+      # GitHub-hosted runners have ~7GiB RAM. mix coveralls.lcov on this suite
+      # can OOM and drop the runner heartbeat (run 34416092041, 2026-09-09).
+      - name: Enable swap
+        run: ./etc/scripts/ci/enable_runner_swap.sh
+
       - name: Run tests and generate lcov report
         env:
           MIX_ENV: test
-        run: mix coveralls.lcov
+        run: ./etc/scripts/ci/run_coveralls_lcov.sh
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
@@ -229,6 +247,12 @@ jobs:
         with:
           name: build-dev-${{ github.run_id }}
 
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles. Kept in sync with ci.yml.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
+
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
       # fast no-op verification here since nothing actually needs re-fetching.
@@ -254,6 +278,12 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: build-dev-${{ github.run_id }}
+
+      # actions/checkout resets source file mtimes to now, which is *after* the
+      # artifact's _build/deps were compiled, so Mix sees "source newer than .beam"
+      # and needlessly recompiles. Kept in sync with ci.yml.
+      - name: Mark restored build artifact as fresh
+        run: find deps _build -exec touch {} +
 
       # deps/_build come from the artifact, but Mix's dependency freshness check
       # (mix.lock vs deps/*/hex_metadata.config) still needs this to pass — it's a
