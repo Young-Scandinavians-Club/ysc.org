@@ -50,6 +50,12 @@ defmodule YscWeb.Api.FallbackController do
     |> json(%{error: reason})
   end
 
+  def call(conn, {:error, :full_admin_required}) do
+    conn
+    |> put_status(:forbidden)
+    |> json(%{error: "this action requires a full admin"})
+  end
+
   # Errors surfaced by the admin/volunteer mobile app's endpoints
   # (AppTicketsController, AppMembershipsController, AppPaymentsController).
   @app_error_messages %{
