@@ -208,12 +208,12 @@ defmodule YscWeb.BookingUserMessages do
 
   def checkout_hold_expired do
     trim("""
-    Your hold on these dates has expired and they've been released. Go back to the cabin page and start a new booking.
+    These dates are no longer reserved for you. Go back to the cabin page and start a new booking.
     """)
   end
 
   def checkout_hold_expired_toast do
-    "Your hold on these dates has expired. Start a new booking from the cabin page."
+    "These dates are no longer reserved. Start a new booking from the cabin page."
   end
 
   def booking_creation_failed do
@@ -259,13 +259,13 @@ defmodule YscWeb.BookingUserMessages do
 
     case reason do
       {:payment_not_found, _} ->
-        "We cancelled your booking, but we couldn't find your payment record to process a refund. #{support} and we'll help."
+        "We cancelled your booking, but we couldn't find your payment record to start your refund. #{support} and we'll help."
 
       {:calculation_failed, _} ->
         "We cancelled your booking, but we couldn't calculate your refund right now. #{support} and we'll follow up."
 
       {:refund_failed, _} ->
-        "We cancelled your booking, but your refund couldn't be processed automatically. #{support} and we'll help."
+        "We cancelled your booking, but we couldn't send your refund automatically. #{support} and we'll help."
 
       {:pending_refund_failed, _} ->
         "We cancelled your booking, but we couldn't submit your refund for review. #{support} and we'll follow up."

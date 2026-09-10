@@ -15,7 +15,7 @@ defmodule YscWeb.Emails.ApplicationApprovedFamilyLinked do
   end
 
   def get_subject do
-    "Velkommen! You're officially a Young Scandinavian 🎉"
+    "Velkommen! (Welcome!) You're officially a Young Scandinavian 🎉"
   end
 
   def upcoming_events_url, do: YscWeb.Emails.Helpers.upcoming_events_url()
