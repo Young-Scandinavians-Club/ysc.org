@@ -255,6 +255,29 @@ defmodule Ysc.Tickets.BookingLockerTest do
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
     end
 
+    test "returns tier_validation_failed when tier sale window has ended", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      past_end =
+        DateTime.add(DateTime.utc_now(), -3600, :second)
+        |> DateTime.truncate(:second)
+
+      past_start =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Events.update_ticket_tier(tier, %{
+          start_date: past_start,
+          end_date: past_end
+        })
+
+      assert {:error, :tier_validation_failed} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+    end
+
     test "returns tier_validation_failed when quantity exceeds tier capacity",
          %{
            user: user,

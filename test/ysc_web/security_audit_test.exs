@@ -3765,7 +3765,9 @@ defmodule YscWeb.SecurityAuditTest do
       assert Ysc.Events.TicketTierHelpers.tier_sale_started?(early_bird)
       assert Ysc.Events.TicketTierHelpers.tier_sale_ended?(early_bird)
 
-      assert {:error, :tier_not_on_sale} =
+      # BookingLocker collapses per-tier reasons to :tier_validation_failed for
+      # create_ticket_order/3; the underlying gate is tier_on_sale?/1.
+      assert {:error, :tier_validation_failed} =
                Tickets.create_ticket_order(user.id, event.id, %{
                  early_bird.id => 1
                })
