@@ -473,7 +473,7 @@ defmodule Ysc.Tickets.BookingLocker do
             {:error, :tier_not_for_event}
 
           not skip_sale_guards? and
-              not TicketTierHelpers.tier_sale_started?(tier) ->
+              not TicketTierHelpers.tier_on_sale?(tier) ->
             {:error, :tier_not_on_sale}
 
           quantity <= 0 ->

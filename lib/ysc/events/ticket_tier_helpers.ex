@@ -28,7 +28,7 @@ defmodule Ysc.Events.TicketTierHelpers do
   @doc """
   Returns true when the tier sale has started (ignores end date).
 
-  Booking validation uses this check; sale end is not enforced there today.
+  Prefer `tier_on_sale?/1` for checkout and grant gates so sale end is enforced.
   """
   def tier_sale_started?(tier, now \\ DateTime.utc_now()) do
     case tier_start_date(tier) do
@@ -39,6 +39,10 @@ defmodule Ysc.Events.TicketTierHelpers do
 
   @doc """
   Returns true when the tier is currently on sale (started and not ended).
+
+  Web ticket checkout (`BookingValidator` / `BookingLocker`) uses this so a
+  closed early-bird window cannot be purchased after `end_date` via crafted
+  LiveView events while the UI already hides the tier.
   """
   def tier_on_sale?(tier, now \\ DateTime.utc_now()) do
     tier_sale_started?(tier, now) and not tier_sale_ended?(tier, now)

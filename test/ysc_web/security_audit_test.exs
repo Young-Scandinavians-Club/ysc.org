@@ -57,6 +57,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 63 (MEDIUM)   Public post comments trusted client post_id, allowing comments on draft/other posts
   Finding 64 (MEDIUM)   Event agenda delete/move did not verify event ownership (cross-event agenda IDOR)
   Finding 65 (MEDIUM)   Trix upload post_id auto-set cover image on any post without ownership binding
+  Finding 66 (MEDIUM)   Ticket checkout ignored tier sale end_date (early-bird price after window)
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -3730,6 +3731,72 @@ defmodule YscWeb.SecurityAuditTest do
       assert json_response(conn, 201)["url"]
       reloaded = Ysc.Posts.get_post(victim_post.id)
       assert is_nil(reloaded.image_id)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 66 (MEDIUM): Paid ticket checkout must enforce tier sale end_date
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 66: ticket checkout enforces tier sale end_date" do
+    test "create_ticket_order rejects a paid tier after its sale window ended" do
+      user = user_with_membership(:lifetime)
+      event = event_with_tickets(tier_count: 0, state: :upcoming)
+
+      past_end =
+        DateTime.utc_now()
+        |> DateTime.add(-3600, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, early_bird} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Early Bird Finding 66",
+          type: :paid,
+          price: Money.new(30, :USD),
+          quantity: 50,
+          event_id: event.id,
+          start_date:
+            DateTime.utc_now()
+            |> DateTime.add(-86_400, :second)
+            |> DateTime.truncate(:second),
+          end_date: past_end
+        })
+
+      assert Ysc.Events.TicketTierHelpers.tier_sale_started?(early_bird)
+      assert Ysc.Events.TicketTierHelpers.tier_sale_ended?(early_bird)
+
+      assert {:error, :tier_not_on_sale} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 early_bird.id => 1
+               })
+    end
+
+    test "create_ticket_order still allows a paid tier while its sale window is open" do
+      user = user_with_membership(:lifetime)
+      event = event_with_tickets(tier_count: 0, state: :upcoming)
+
+      {:ok, ga} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "GA Finding 66",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 50,
+          event_id: event.id,
+          start_date:
+            DateTime.utc_now()
+            |> DateTime.add(-3600, :second)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.utc_now()
+            |> DateTime.add(86_400, :second)
+            |> DateTime.truncate(:second)
+        })
+
+      assert {:ok, order} =
+               Tickets.create_ticket_order(user.id, event.id, %{ga.id => 1})
+
+      assert order.status == :pending
+      assert Money.equal?(order.total_amount, Money.new(50, :USD))
     end
   end
 
