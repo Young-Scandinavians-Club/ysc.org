@@ -220,12 +220,16 @@ defmodule YscWeb.VolunteerRoleTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
-      assert has_element?(view, "#volunteer-stats-row a[href='/admin/events']")
-      assert has_element?(view, "#volunteer-stats-row a[href='/admin/posts']")
+      assert has_element?(
+               view,
+               "#volunteer-events-card[href='/admin/events']"
+             )
+
+      assert has_element?(view, "#volunteer-posts-card[href='/admin/posts']")
 
       assert has_element?(
                view,
-               "#volunteer-stats-row a[href='/admin/newsletters']"
+               "#volunteer-newsletters-card[href='/admin/newsletters']"
              )
     end
   end
