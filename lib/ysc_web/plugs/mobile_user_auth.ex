@@ -31,6 +31,21 @@ defmodule YscWeb.Plugs.MobileUserAuth do
     end
   end
 
+  @doc """
+  Returns `:ok` when the authenticated mobile-app user is a full admin.
+
+  Volunteers share this API with admins for in-person card-present door
+  sales, but unpaid honor-system actions (offline ticket grants and
+  out-of-band memberships) must stay admin-only — the same split Findings
+  46 and 50 enforce on the web Tickets tab.
+  """
+  def require_full_admin(conn) do
+    case conn.assigns[:current_user] do
+      %{role: :admin} -> :ok
+      _ -> {:error, :full_admin_required}
+    end
+  end
+
   defp halt_unauthorized(conn) do
     conn
     |> put_resp_content_type("application/json")
