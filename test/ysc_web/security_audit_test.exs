@@ -52,6 +52,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
   Finding 56 (MEDIUM)   Public newsletter unsubscribe LiveView treated an email URL param as a token, then unsubscribed by email
   Finding 57 (MEDIUM)   Leftover event editor save created events via Event.changeset, allowing organizer/state mass assignment
+  Finding 58 (HIGH)     App ticket PaymentIntent accepted free / $0 tiers, leaving pending comps completable via web confirm-free
+  Finding 59 (HIGH)     Volunteers could soft-delete any published event (including others') via the event editor
   Finding 60 (HIGH)     Expense reports accepted client-supplied receipt/proof S3 paths, enabling cross-member receipt download
   Finding 61 (HIGH)     Purchase expense lines had no upper bound; submit creates a QuickBooks Bill with no approval gate
   Finding 62 (HIGH)     Volunteers could soft-delete published posts via the post editor (list only allowed drafts)
@@ -62,9 +64,6 @@ defmodule YscWeb.SecurityAuditTest do
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
   or explicitly out of scope per the fix plan.
-
-  Finding 59 (volunteer soft-delete of published events) is covered by open PR #1251
-  (bundled with Finding 58 despite that PR's title).
   """
   use YscWeb.ConnCase, async: true
 
@@ -1345,7 +1344,7 @@ defmodule YscWeb.SecurityAuditTest do
     end
 
     test "update_event_editor cannot resurrect a deleted event via forged publish params" do
-      event = event_fixture(%{state: :published})
+      event = event_fixture(%{state: :draft})
       {:ok, deleted} = Events.delete_event(event)
 
       assert deleted.state == :deleted
@@ -2736,6 +2735,107 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Finding 58 (HIGH): App PaymentIntent must reject free / $0 tiers
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 58: app tickets reject free and $0 tiers" do
+    import Ysc.EventsFixtures
+
+    test "volunteer cannot create a pending free-tier order via payment_intent" do
+      volunteer = user_fixture(%{role: :volunteer})
+      token = Accounts.generate_user_mobile_token(volunteer)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      _paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 58",
+          type: :paid,
+          price: Money.new(40, :USD)
+        })
+
+      free =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Free RSVP Finding 58",
+          type: :free,
+          price: Money.new(0, :USD)
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{free.id => 2}
+        })
+
+      assert %{
+               "error" =>
+                 "free or $0 ticket tiers cannot be charged via the in-person app; use the website free checkout or an admin offline sale"
+             } = json_response(conn, 422)
+
+      orders =
+        from(to in Ysc.Tickets.TicketOrder,
+          where: to.user_id == ^member.id and to.event_id == ^event.id
+        )
+        |> Repo.all()
+
+      assert orders == []
+    end
+
+    test "$0 paid tiers are refused the same way as free tiers" do
+      admin = user_fixture(%{role: :admin})
+      token = Accounts.generate_user_mobile_token(admin)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      zero_paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Zero GA Finding 58",
+          type: :paid,
+          price: Money.new(0, :USD)
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{zero_paid.id => 1}
+        })
+
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "free or $0 ticket tiers"
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 49 (HIGH): Already-authenticated mobile handoff must not mint on GET
   # ---------------------------------------------------------------------------
 
@@ -3250,6 +3350,58 @@ defmodule YscWeb.SecurityAuditTest do
         Newsletter.get_subscriber_by_email("finding56.victim@gmail.com")
 
       assert subscriber.subscribed
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 59 (HIGH): Volunteers must not soft-delete published events
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 59: volunteers cannot delete published events" do
+    import Ysc.EventsFixtures
+
+    test "volunteer delete-event on another organizer's published event is refused" do
+      organizer = user_fixture(%{role: :member})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 59 Victim Event #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      refute has_element?(view, "#delete-event-btn")
+
+      render_click(view, "delete-event", %{})
+
+      reloaded = Ysc.Events.get_event!(event.id)
+      assert reloaded.state == :published
+      assert reloaded.organizer_id == organizer.id
+    end
+
+    test "volunteer can still delete their own draft from the editor" do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :draft,
+          title: "Finding 59 Draft #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#delete-event-btn")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               render_click(view, "delete-event", %{})
+
+      assert Ysc.Events.get_event!(event.id).state == :deleted
     end
   end
 
