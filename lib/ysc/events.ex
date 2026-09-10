@@ -1573,35 +1573,42 @@ defmodule Ysc.Events do
 
   defp maybe_reschedule_event_notification(_event), do: :ok
 
-  def unpublish_event(%Event{} = event) do
-    event
-    |> Event.changeset(%{state: "draft", published_at: nil})
-    |> Repo.update()
-    |> case do
-      {:ok, event} ->
-        invalidate_event_caches()
-        broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
-        {:ok, event}
-
-      {:error, changeset} ->
-        {:error, changeset}
+  # Finding 67: volunteers must not unpublish or cancel live events (sibling of
+  # Finding 59's published-event delete gate). Pass `acting_role:` from the
+  # editor; omitted role stays admin-compatible for existing callers.
+  def unpublish_event(%Event{} = event, opts \\ []) do
+    with :ok <- require_full_admin_lifecycle(opts) do
+      event
+      |> Event.changeset(%{state: "draft", published_at: nil})
+      |> Repo.update()
+      |> finalize_lifecycle_broadcast()
     end
   end
 
-  def cancel_event(%Event{} = event) do
-    event
-    |> Event.changeset(%{state: "cancelled"})
-    |> Repo.update()
-    |> case do
-      {:ok, event} ->
-        invalidate_event_caches()
-        broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
-        {:ok, event}
-
-      {:error, changeset} ->
-        {:error, changeset}
+  def cancel_event(%Event{} = event, opts \\ []) do
+    with :ok <- require_full_admin_lifecycle(opts) do
+      event
+      |> Event.changeset(%{state: "cancelled"})
+      |> Repo.update()
+      |> finalize_lifecycle_broadcast()
     end
   end
+
+  defp require_full_admin_lifecycle(opts) when is_list(opts) do
+    case Keyword.get(opts, :acting_role, :admin) do
+      role when role in [:admin, "admin"] -> :ok
+      _ -> {:error, :unauthorized}
+    end
+  end
+
+  defp finalize_lifecycle_broadcast({:ok, event}) do
+    invalidate_event_caches()
+    broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
+    {:ok, event}
+  end
+
+  defp finalize_lifecycle_broadcast({:error, changeset}),
+    do: {:error, changeset}
 
   def schedule_event(%Event{} = event, publish_at) when is_binary(publish_at) do
     # Try to parse as full ISO8601 first, then fall back to datetime-local format

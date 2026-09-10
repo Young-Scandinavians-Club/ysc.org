@@ -58,6 +58,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 64 (MEDIUM)   Event agenda delete/move did not verify event ownership (cross-event agenda IDOR)
   Finding 65 (MEDIUM)   Trix upload post_id auto-set cover image on any post without ownership binding
   Finding 66 (MEDIUM)   Ticket checkout ignored tier sale end_date (early-bird price after window)
+  Finding 67 (HIGH)     Volunteers could unpublish or cancel any published event
+  Finding 68 (HIGH)     Volunteers could create irreversible cabin booking blackouts via event publish
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -3799,6 +3801,122 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert order.status == :pending
       assert Money.equal?(order.total_amount, Money.new(50, :USD))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 67 (HIGH): Volunteers must not unpublish or cancel live events
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 67: volunteers cannot unpublish or cancel published events" do
+    import Ysc.EventsFixtures
+
+    test "volunteer editor hides unpublish/cancel and refuses the events", %{
+      conn: conn
+    } do
+      organizer = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 67 Published #{System.unique_integer([:positive])}"
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/edit")
+
+      refute has_element?(view, "#unpublish-event-btn")
+      refute has_element?(view, "#unpublish-event-btn-mobile")
+      refute has_element?(view, "#cancel-event-btn")
+      refute has_element?(view, "button[phx-click=unpublish-event]")
+      refute has_element?(view, "button[phx-click=cancel-event]")
+
+      render_click(view, "unpublish-event")
+      assert Repo.get!(Ysc.Events.Event, event.id).state == :published
+
+      render_click(view, "cancel-event")
+      assert Repo.get!(Ysc.Events.Event, event.id).state == :published
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 68 (HIGH): Volunteers must not create cabin blackouts
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 68: volunteers cannot create cabin blackouts" do
+    import Ysc.EventsFixtures
+
+    @cabin_start ~U[2031-06-01 07:00:00Z]
+    @cabin_end ~U[2031-12-31 07:00:00Z]
+
+    test "volunteer confirm-blackout does not create a blackout or publish", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :draft,
+          title: "Finding 68 Cabin #{System.unique_integer([:positive])}",
+          location_name: "Clear Lake Cabin",
+          address: "9325 Bass Road, Kelseyville, CA 95451",
+          start_date: @cabin_start,
+          end_date: @cabin_end
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/edit")
+
+      html =
+        view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert html =~ "Block the booking calendar?"
+      refute has_element?(view, "#confirm-blackout-btn")
+      refute has_element?(view, "button[phx-click=confirm-blackout]")
+
+      render_click(view, "confirm-blackout")
+
+      assert Repo.get!(Ysc.Events.Event, event.id).state == :draft
+      assert Ysc.Bookings.list_blackouts_from_db(:clear_lake) == []
+    end
+
+    test "volunteer can still publish a cabin event without a blackout", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :draft,
+          title: "Finding 68 Skip #{System.unique_integer([:positive])}",
+          location_name: "Clear Lake Cabin",
+          address: "9325 Bass Road, Kelseyville, CA 95451",
+          start_date: @cabin_start,
+          end_date: @cabin_end
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/edit")
+
+      view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=skip-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Ysc.Events.Event, event.id).state == :published
+      assert Ysc.Bookings.list_blackouts_from_db(:clear_lake) == []
     end
   end
 
