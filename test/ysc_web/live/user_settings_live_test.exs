@@ -1960,6 +1960,53 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert Payments.get_payment_method!(only.id).id == only.id
     end
 
+    test "delete-payment-method refuses to remove the only method for a past_due membership",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_delpm_pastdue_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, only} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_del_only_pastdue",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_delpm_pastdue_#{System.unique_integer()}",
+          stripe_status: "past_due",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 5, :day)
+        })
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      render(view)
+
+      view
+      |> element(
+        "button[phx-click=\"delete-payment-method\"][phx-value-payment_method_id=\"#{only.id}\"]"
+      )
+      |> render_click()
+
+      assert render(view) =~ "only payment method"
+      assert Payments.get_payment_method!(only.id).id == only.id
+    end
+
     test "cancel-new-payment-method hides the add form", %{conn: conn} do
       user = user_fixture(%{state: :active})
 

@@ -4,6 +4,7 @@ defmodule Ysc.PaymentsTest do
   alias Ysc.Payments
   alias Ysc.Payments.PaymentMethod
   alias Ysc.Repo
+  alias Ysc.Subscriptions
   import Ecto.Query
   import Ysc.AccountsFixtures
 
@@ -275,6 +276,195 @@ defmodule Ysc.PaymentsTest do
 
       assert {:error, :stripe_error} = Payments.detach_payment_method(method)
       assert Payments.get_payment_method!(method.id).id == method.id
+    end
+
+    test "re-points the Stripe subscription to the remaining card before detach" do
+      user = user_with_stripe_id("cus_detach_repoint")
+
+      pinned =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_pinned_signup",
+          is_default: true
+        })
+
+      keep =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_keep_on_file",
+          is_default: false
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_detach_repoint",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, order} = Agent.start_link(fn -> [] end)
+
+      expect(Stripe.CustomerMock, :update, fn "cus_detach_repoint",
+                                              params,
+                                              _opts ->
+        Agent.update(order, &(&1 ++ [:customer]))
+
+        assert params.invoice_settings.default_payment_method ==
+                 "pm_keep_on_file"
+
+        {:ok, %Stripe.Customer{id: "cus_detach_repoint"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, fn "sub_detach_repoint",
+                                                  params ->
+        Agent.update(order, &(&1 ++ [:subscription]))
+        assert params.default_payment_method == "pm_keep_on_file"
+        {:ok, %Stripe.Subscription{id: "sub_detach_repoint", status: "active"}}
+      end)
+
+      expect(Stripe.PaymentMethodMock, :detach, fn "pm_pinned_signup" ->
+        Agent.update(order, &(&1 ++ [:detach]))
+        {:ok, %Stripe.PaymentMethod{id: "pm_pinned_signup", type: "card"}}
+      end)
+
+      assert {:ok, _} = Payments.detach_payment_method(pinned)
+      assert Agent.get(order, & &1) == [:customer, :subscription, :detach]
+      assert Payments.get_default_payment_method(user).id == keep.id
+    end
+
+    test "re-points a past_due subscription when deleting a non-default card" do
+      user = user_with_stripe_id("cus_detach_pastdue")
+
+      default =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_pastdue_default",
+          is_default: true
+        })
+
+      old_signup =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_pastdue_old",
+          is_default: false
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_detach_pastdue",
+          stripe_status: "past_due",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 5, :day)
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_detach_pastdue",
+                                              params,
+                                              _opts ->
+        assert params.invoice_settings.default_payment_method ==
+                 "pm_pastdue_default"
+
+        {:ok, %Stripe.Customer{id: "cus_detach_pastdue"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, fn "sub_detach_pastdue",
+                                                  params ->
+        assert params.default_payment_method == "pm_pastdue_default"
+
+        {:ok,
+         %Stripe.Subscription{id: "sub_detach_pastdue", status: "past_due"}}
+      end)
+
+      expect(Stripe.PaymentMethodMock, :detach, fn "pm_pastdue_old" ->
+        {:ok, %Stripe.PaymentMethod{id: "pm_pastdue_old", type: "card"}}
+      end)
+
+      assert {:ok, _} = Payments.detach_payment_method(old_signup)
+      assert Payments.get_default_payment_method(user).id == default.id
+    end
+
+    test "does not detach when Stripe subscription re-point fails" do
+      user = user_with_stripe_id("cus_detach_subfail")
+
+      default =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_subfail_default",
+          is_default: true
+        })
+
+      _other =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_subfail_other",
+          is_default: false
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_detach_subfail",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_detach_subfail",
+                                              _params,
+                                              _opts ->
+        {:ok, %Stripe.Customer{id: "cus_detach_subfail"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, fn "sub_detach_subfail",
+                                                  _params ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :api_error,
+           message: "boom",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      expect(Stripe.PaymentMethodMock, :detach, 0, fn _id ->
+        flunk("must not detach after subscription update fails")
+      end)
+
+      assert {:error, :stripe_error} = Payments.detach_payment_method(default)
+      assert Payments.get_payment_method!(default.id).id == default.id
+    end
+
+    test "refuses to remove the last method when a past_due subscription can still be charged" do
+      user = user_with_stripe_id("cus_detach_last_pastdue")
+
+      only =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_last_pastdue",
+          is_default: true
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_last_pastdue",
+          stripe_status: "past_due",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 5, :day)
+        })
+
+      expect(Stripe.PaymentMethodMock, :detach, 0, fn _id ->
+        flunk("must not detach the last card on a chargeable membership")
+      end)
+
+      assert {:error, :last_method_with_active_membership} =
+               Payments.detach_payment_method(only)
+
+      assert Payments.get_payment_method!(only.id).id == only.id
     end
   end
 
@@ -1116,6 +1306,68 @@ defmodule Ysc.PaymentsTest do
       end)
 
       assert :ok = Payments.push_default_payment_method_to_stripe(user, pm)
+    end
+
+    test "updates chargeable Stripe subscriptions' pinned default_payment_method" do
+      user = user_fixture(%{stripe_id: "cus_push_sub"})
+
+      pm =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_push_sub"
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_push_sub",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_sub", params, _opts ->
+        assert params.invoice_settings.default_payment_method == "pm_push_sub"
+        {:ok, %Stripe.Customer{id: "cus_push_sub"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, fn "sub_push_sub", params ->
+        assert params.default_payment_method == "pm_push_sub"
+        {:ok, %Stripe.Subscription{id: "sub_push_sub", status: "active"}}
+      end)
+
+      assert :ok = Payments.sync_stripe_default_payment_method(user, pm)
+    end
+
+    test "skips migrated_ subscription ids when pushing the default" do
+      user = user_fixture(%{stripe_id: "cus_push_migrated"})
+
+      pm =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_push_migrated"
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_migrated",
+                                              _params,
+                                              _opts ->
+        {:ok, %Stripe.Customer{id: "cus_push_migrated"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, 0, fn _id, _params ->
+        flunk("must not call Stripe with a migrated_ subscription id")
+      end)
+
+      assert :ok = Payments.sync_stripe_default_payment_method(user, pm)
     end
 
     test "is a no-op when the user has no Stripe customer id" do
