@@ -933,7 +933,7 @@ defmodule Ysc.Tickets.BookingLocker do
       total_quantity: tier.quantity,
       available: available,
       sold: Map.get(counts.sold, tier.id, 0),
-      on_sale: TicketTierHelpers.tier_sale_started?(tier),
+      on_sale: TicketTierHelpers.tier_on_sale?(tier),
       start_date: tier.start_date,
       end_date: tier.end_date
     }
