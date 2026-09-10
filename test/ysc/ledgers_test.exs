@@ -2984,6 +2984,92 @@ defmodule Ysc.LedgersTest do
              end)
     end
 
+    test "list_payments_for_admin/3 slims user columns and event titles", %{
+      user: user
+    } do
+      event =
+        event_fixture(%{
+          title: "Slim Payment Event XYZ",
+          raw_details: "<p>toast body that money overview must not load</p>",
+          rendered_details:
+            "<p>toast body that money overview must not load</p>"
+        })
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(10_000, :USD),
+          event_amount: Money.new(10_000, :USD),
+          donation_amount: Money.new(0, :USD),
+          event_id: event.id,
+          external_payment_id:
+            "pi_admin_list_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          payment_method_id: nil
+        })
+
+      {:ok, payment_method} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_admin_list_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_admin_list",
+          type: :card,
+          provider_type: "card",
+          last_four: "4242",
+          display_brand: "visa",
+          payload: %{"card" => %{"brand" => "visa"}}
+        })
+
+      payment
+      |> Ecto.Changeset.change(%{payment_method_id: payment_method.id})
+      |> Repo.update!()
+
+      start_date = DateTime.add(DateTime.utc_now(), -30, :day)
+      end_date = DateTime.utc_now()
+
+      {_payments, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.list_payments_for_admin(start_date, end_date, limit: 20)
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_payments, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.list_payments_for_admin(start_date, end_date, limit: 20)
+          end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_payments, method_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.list_payments_for_admin(start_date, end_date, limit: 20)
+          end,
+          pattern: ~r/FROM "payment_methods"/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] =
+        Ledgers.list_payments_for_admin(start_date, end_date, limit: 20)
+        |> Enum.filter(&(&1.id == payment.id))
+
+      assert password_cols == 0
+      assert html_cols == 0
+      assert method_queries == 0
+      assert loaded.user.email == user.email
+      assert loaded.user.hashed_password == nil
+      refute Ecto.assoc_loaded?(loaded.payment_method)
+      assert loaded.payment_type_info.type == "Event"
+      assert loaded.payment_type_info.details == "Slim Payment Event XYZ"
+    end
+
     test "get_ledger_entries/3 returns ledger entries", %{user: user} do
       {:ok, {_payment, _transaction, _entries}} =
         Ledgers.process_payment(%{

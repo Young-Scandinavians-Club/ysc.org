@@ -36,6 +36,18 @@ defmodule Ysc.Ledgers do
     :membership
   ]
 
+  # Treasurer payment tables only show name/email. Skip hashed_password,
+  # board_bio, and other columns the overview never renders.
+  @admin_payment_user_fields [:id, :email, :first_name, :last_name]
+  @admin_payout_list_fields [:id, :payment_id, :stripe_payout_id]
+  @admin_subscription_list_fields [:id]
+
+  @admin_subscription_item_list_fields [
+    :id,
+    :subscription_id,
+    :stripe_price_id
+  ]
+
   @admin_dashboard_revenue_account_names [
     "membership_revenue",
     "event_revenue",
@@ -3386,33 +3398,56 @@ defmodule Ysc.Ledgers do
   end
 
   @doc """
-  Gets recent payments within a date range.
+  Paginated payments for the treasurer Money overview.
+
+  Member is a slim `select: struct` preload (name/email). Payment methods
+  (including Stripe `payload` JSON) are not loaded — the table never
+  renders card last-4. Type labels are attached in one batch so event
+  titles, membership plan names, and payout ids do not N+1.
+
+  Do not JOIN full `users` or `events` rows. Event type details only
+  need `title`; loading `raw_details` / `rendered_details` would pull
+  TOAST HTML for every ticket payment on the page.
   """
-  def get_recent_payments(start_date, end_date, limit \\ 50) do
+  def list_payments_for_admin(start_date, end_date, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+    offset = Keyword.get(opts, :offset, 0)
+
+    start_date
+    |> list_payments_for_admin_query(end_date, limit, offset)
+    |> Repo.all()
+    |> add_payment_type_info_batch()
+  end
+
+  defp list_payments_for_admin_query(start_date, end_date, limit, offset) do
+    user_query = admin_payment_user_query()
+
     from(p in Payment,
-      preload: [:user, :payment_method],
+      preload: [user: ^user_query],
       where: p.payment_date >= ^start_date,
       where: p.payment_date <= ^end_date,
       order_by: [desc: p.payment_date],
-      limit: ^limit
+      limit: ^limit,
+      offset: ^offset
     )
-    |> Repo.all()
-    |> Enum.map(&add_payment_type_info/1)
+  end
+
+  defp admin_payment_user_query do
+    from(u in Ysc.Accounts.User, select: struct(u, ^@admin_payment_user_fields))
+  end
+
+  @doc """
+  Gets recent payments within a date range.
+  """
+  def get_recent_payments(start_date, end_date, limit \\ 50) do
+    list_payments_for_admin(start_date, end_date, limit: limit)
   end
 
   @doc """
   Gets recent payments with payment type information.
   """
   def get_recent_payments_with_types(start_date, end_date, limit \\ 50) do
-    from(p in Payment,
-      preload: [:user, :payment_method],
-      where: p.payment_date >= ^start_date,
-      where: p.payment_date <= ^end_date,
-      order_by: [desc: p.payment_date],
-      limit: ^limit
-    )
-    |> Repo.all()
-    |> Enum.map(&add_payment_type_info/1)
+    list_payments_for_admin(start_date, end_date, limit: limit)
   end
 
   @doc """
@@ -3545,10 +3580,11 @@ defmodule Ysc.Ledgers do
     else
       payment_ids = Enum.map(payments, & &1.id)
 
-      # Batch fetch all payouts
+      # Batch fetch all payouts (id + Stripe payout id only)
       payouts =
         from(p in Payout,
-          where: p.payment_id in ^payment_ids
+          where: p.payment_id in ^payment_ids,
+          select: struct(p, ^@admin_payout_list_fields)
         )
         |> Repo.all()
         |> Map.new(&{&1.payment_id, &1})
@@ -3585,37 +3621,39 @@ defmodule Ysc.Ledgers do
         |> Enum.uniq()
         |> Enum.filter(& &1)
 
-      # Batch fetch events
+      # Batch fetch event titles only — skip body HTML TOAST columns
       events =
         if Enum.empty?(event_ids) do
           %{}
         else
-          from(e in Ysc.Events.Event,
-            where: e.id in ^event_ids
-          )
+          event_ids
+          |> admin_event_titles_query()
           |> Repo.all()
-          |> Map.new(&{&1.id, &1})
+          |> Map.new()
         end
 
-      # Batch fetch subscriptions
+      # Batch fetch subscriptions (id only) so missing vs empty-item
+      # memberships still distinguish "Unknown membership" / "Membership"
       subscriptions =
         if Enum.empty?(subscription_ids) do
           %{}
         else
           from(s in Ysc.Subscriptions.Subscription,
-            where: s.id in ^subscription_ids
+            where: s.id in ^subscription_ids,
+            select: struct(s, ^@admin_subscription_list_fields)
           )
           |> Repo.all()
           |> Map.new(&{&1.id, &1})
         end
 
-      # Batch fetch subscription items for all subscriptions
+      # Batch fetch subscription items (price id only)
       subscription_items_map =
         if Enum.empty?(subscription_ids) do
           %{}
         else
           from(si in Ysc.Subscriptions.SubscriptionItem,
-            where: si.subscription_id in ^subscription_ids
+            where: si.subscription_id in ^subscription_ids,
+            select: struct(si, ^@admin_subscription_item_list_fields)
           )
           |> Repo.all()
           |> Enum.group_by(& &1.subscription_id)
@@ -3660,8 +3698,9 @@ defmodule Ysc.Ledgers do
                     %{type: "Membership", details: details}
 
                   :event ->
-                    event = Map.get(events, entry.related_entity_id)
-                    details = if event, do: event.title, else: "Unknown Event"
+                    details =
+                      Map.get(events, entry.related_entity_id, "Unknown Event")
+
                     %{type: "Event", details: details}
 
                   :booking ->
@@ -3791,13 +3830,18 @@ defmodule Ysc.Ledgers do
 
   defp get_membership_plan_by_price_id(_), do: "Membership"
 
-  # Helper function to get event details
+  defp admin_event_titles_query(event_ids) do
+    from(e in Ysc.Events.Event,
+      where: e.id in ^event_ids,
+      select: {e.id, e.title}
+    )
+  end
+
+  # Title only — do not load event body HTML (raw_details / rendered_details)
   defp get_event_details(event_id) when is_binary(event_id) do
-    try do
-      event = Ysc.Events.get_event!(event_id)
-      event.title
-    rescue
-      Ecto.NoResultsError -> "Unknown Event"
+    case Repo.one(admin_event_titles_query([event_id])) do
+      nil -> "Unknown Event"
+      {_id, title} -> title
     end
   end
 
@@ -4255,6 +4299,17 @@ defmodule Ysc.Ledgers do
       where: pp.payout_id == ^payout_id,
       preload: [:user, :payment_method]
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_payments_for_admin_query do
+    now = Ysc.Ci.QueryExplain.Fixtures.now()
+    list_payments_for_admin_query(now, now, 20, 0)
+  end
+
+  @doc false
+  def ci_query_explain_admin_event_titles_query do
+    admin_event_titles_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 
   @doc false
