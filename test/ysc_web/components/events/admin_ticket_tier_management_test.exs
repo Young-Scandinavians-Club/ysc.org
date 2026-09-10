@@ -33,7 +33,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
         render_component(TicketTierManagement, %{
           id: "tier-management",
           event_id: event.id,
-          current_user: user
+          current_user: user,
+          admin_role: :admin
         })
 
       assert html =~ "Add" or html =~ "New"
@@ -186,7 +187,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
         render_component(TicketTierManagement, %{
           id: "tier-management",
           event_id: event.id,
-          current_user: user
+          current_user: user,
+          admin_role: :admin
         })
 
       assert html =~ "Edit" or html =~ "edit"
@@ -201,7 +203,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
         render_component(TicketTierManagement, %{
           id: "tier-management",
           event_id: event.id,
-          current_user: user
+          current_user: user,
+          admin_role: :admin
         })
 
       assert html =~ "Reserve" or html =~ "reserve"
@@ -281,7 +284,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
         render_component(TicketTierManagement, %{
           id: "tier-management",
           event_id: event.id,
-          current_user: user
+          current_user: user,
+          admin_role: :admin
         })
 
       assert html =~ "Partiful link"
@@ -298,7 +302,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
         render_component(TicketTierManagement, %{
           id: "tier-management",
           event_id: event.id,
-          current_user: user
+          current_user: user,
+          admin_role: :admin
         })
 
       refute html =~ "Partiful link"

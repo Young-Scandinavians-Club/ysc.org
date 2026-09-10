@@ -188,7 +188,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • At the event, show the tickets on your phone (use the button above) so staff can check you in </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • You'll receive a reminder email 24 hours before the event </mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • If you have any questions, reply to this email or contact us </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • If you have any questions, reply to this email or write to us at <a href="mailto:info@ysc.org">info@ysc.org</a> </mj-text>
     <mj-spacer height="36px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> We look forward to seeing you at the event! </mj-text>
     <mj-spacer height="24px"></mj-spacer>

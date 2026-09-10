@@ -15,6 +15,8 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
   """
   use Ysc.DataCase, async: false
 
+  @moduletag process_caches: true
+
   alias Ysc.Bookings.{PricingRuleCache, PricingRule, Room, Season}
   alias Ysc.Repo
 
@@ -565,6 +567,109 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
       assert cached1.id == rule1.id
       assert cached2.id == rule2.id
       assert cached1.id != cached2.id
+    end
+  end
+
+  describe "VersionedCache integration" do
+    test "stores a version-stamped Cachex entry for get/6" do
+      season = create_season()
+
+      rule =
+        create_pricing_rule(%{
+          amount: Money.new(10_000, :USD),
+          property: :tahoe,
+          season_id: season.id,
+          booking_mode: :room,
+          price_unit: :per_person_per_night
+        })
+
+      PricingRuleCache.get(
+        :tahoe,
+        season.id,
+        nil,
+        nil,
+        :room,
+        :per_person_per_night
+      )
+
+      cache_key =
+        "pricing_rule:room_id:nil:room_category_id:nil:property:tahoe:season_id:#{season.id}:booking_mode:room:price_unit:per_person_per_night"
+
+      assert {:ok, {:version, version, cached}} =
+               Cachex.get(:ysc_cache, cache_key)
+
+      assert is_integer(version)
+      assert cached.id == rule.id
+    end
+
+    test "stores children lookups under a distinct version-stamped key" do
+      season = create_season()
+
+      rule =
+        create_pricing_rule(%{
+          amount: Money.new(10_000, :USD),
+          children_amount: Money.new(5000, :USD),
+          property: :tahoe,
+          season_id: season.id,
+          booking_mode: :room,
+          price_unit: :per_person_per_night
+        })
+
+      PricingRuleCache.get_children(
+        :tahoe,
+        season.id,
+        nil,
+        nil,
+        :room,
+        :per_person_per_night
+      )
+
+      cache_key =
+        "pricing_rule:room_id:nil:room_category_id:nil:property:tahoe:season_id:#{season.id}:booking_mode:room:price_unit:per_person_per_night:children"
+
+      assert {:ok, {:version, version, cached}} =
+               Cachex.get(:ysc_cache, cache_key)
+
+      assert is_integer(version)
+      assert cached.id == rule.id
+    end
+
+    test "does not write Cachex when process caches are disabled" do
+      previous = Application.get_env(:ysc, :process_caches_enabled)
+      Application.put_env(:ysc, :process_caches_enabled, false)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :process_caches_enabled, previous)
+      end)
+
+      season = create_season()
+
+      rule =
+        create_pricing_rule(%{
+          amount: Money.new(10_000, :USD),
+          property: :tahoe,
+          season_id: season.id,
+          booking_mode: :room,
+          price_unit: :per_person_per_night
+        })
+
+      cache_key =
+        "pricing_rule:room_id:nil:room_category_id:nil:property:tahoe:season_id:#{season.id}:booking_mode:room:price_unit:per_person_per_night"
+
+      Cachex.del(:ysc_cache, cache_key)
+
+      result =
+        PricingRuleCache.get(
+          :tahoe,
+          season.id,
+          nil,
+          nil,
+          :room,
+          :per_person_per_night
+        )
+
+      assert result.id == rule.id
+      assert Cachex.get(:ysc_cache, cache_key) == {:ok, nil}
     end
   end
 end

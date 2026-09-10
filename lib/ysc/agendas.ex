@@ -37,6 +37,13 @@ defmodule Ysc.Agendas do
     Repo.get!(Agenda, id) |> Repo.preload(:agenda_items)
   end
 
+  def get_agenda(id) do
+    case Repo.get(Agenda, id) do
+      nil -> nil
+      agenda -> Repo.preload(agenda, :agenda_items)
+    end
+  end
+
   def list_agendas_for_event(event_id) do
     Repo.all(
       from a in Agenda,
@@ -47,32 +54,55 @@ defmodule Ysc.Agendas do
   end
 
   def delete_agenda(event, agenda) do
-    Repo.delete(agenda)
-    |> case do
-      {:ok, _} ->
-        broadcast(event.id, %Ysc.MessagePassingEvents.AgendaDeleted{
-          agenda: agenda
-        })
+    # Finding 64: refuse deleting an agenda that belongs to a different event
+    # (LiveView delete-event used to pass a stub `%Agenda{id: ...}`).
+    agenda = ensure_agenda_struct(agenda)
 
-        {:ok, agenda}
+    if agenda.event_id == event.id do
+      Repo.delete(agenda)
+      |> case do
+        {:ok, _} ->
+          broadcast(event.id, %Ysc.MessagePassingEvents.AgendaDeleted{
+            agenda: agenda
+          })
 
-      {:error, _} ->
-        {:error, agenda}
+          {:ok, agenda}
+
+        {:error, _} ->
+          {:error, agenda}
+      end
+    else
+      {:error, :wrong_event}
     end
   end
 
+  defp ensure_agenda_struct(%Agenda{event_id: event_id} = agenda)
+       when not is_nil(event_id),
+       do: agenda
+
+  defp ensure_agenda_struct(%Agenda{id: id}) when not is_nil(id),
+    do: get_agenda!(id)
+
+  defp ensure_agenda_struct(agenda), do: agenda
+
   def delete_agenda_item(event_id, agenda_item) do
-    Repo.delete(agenda_item)
-    |> case do
-      {:ok, _} ->
-        broadcast(event_id, %Ysc.MessagePassingEvents.AgendaItemDeleted{
-          agenda_item: agenda_item
-        })
+    agenda_item = preload_agenda_item_event(agenda_item)
 
-        {:ok, agenda_item}
+    if agenda_item.agenda && agenda_item.agenda.event_id == event_id do
+      Repo.delete(agenda_item)
+      |> case do
+        {:ok, _} ->
+          broadcast(event_id, %Ysc.MessagePassingEvents.AgendaItemDeleted{
+            agenda_item: agenda_item
+          })
 
-      {:error, _} ->
-        {:error, agenda_item}
+          {:ok, agenda_item}
+
+        {:error, _} ->
+          {:error, agenda_item}
+      end
+    else
+      {:error, :wrong_event}
     end
   end
 
@@ -80,21 +110,25 @@ defmodule Ysc.Agendas do
   def update_agenda_position(event_id, agenda, new_index) do
     %Agenda{} = agenda
 
-    Ecto.Multi.new()
-    |> multi_reposition(:new, agenda, agenda, new_index, event_id: event_id)
-    |> Repo.transaction()
-    |> case do
-      {:ok, _} ->
-        new_agenda = %{agenda | position: new_index}
+    if agenda.event_id == event_id do
+      Ecto.Multi.new()
+      |> multi_reposition(:new, agenda, agenda, new_index, event_id: event_id)
+      |> Repo.transaction()
+      |> case do
+        {:ok, _} ->
+          new_agenda = %{agenda | position: new_index}
 
-        broadcast(event_id, %Ysc.MessagePassingEvents.AgendaRepositioned{
-          agenda: new_agenda
-        })
+          broadcast(event_id, %Ysc.MessagePassingEvents.AgendaRepositioned{
+            agenda: new_agenda
+          })
 
-        :ok
+          :ok
 
-      {:error, _failed_op, failed_val, _changes_so_far} ->
-        {:error, failed_val}
+        {:error, _failed_op, failed_val, _changes_so_far} ->
+          {:error, failed_val}
+      end
+    else
+      {:error, :wrong_event}
     end
   end
 
@@ -129,7 +163,33 @@ defmodule Ysc.Agendas do
   @dialyzer {:nowarn_function, move_agenda_item_to_agenda: 4}
   def move_agenda_item_to_agenda(event_id, agenda_item, agenda, at_index) do
     %AgendaItem{} = agenda_item
+    %Agenda{} = agenda
 
+    # Finding 64: do not move items into (or out of) another event's agenda
+    # via forged Sortable `to.agenda_id` params.
+    agenda_item = preload_agenda_item_event(agenda_item)
+
+    cond do
+      agenda.event_id != event_id ->
+        {:error, :wrong_event}
+
+      agenda_item.agenda && agenda_item.agenda.event_id != event_id ->
+        {:error, :wrong_event}
+
+      true ->
+        do_move_agenda_item_to_agenda(event_id, agenda_item, agenda, at_index)
+    end
+  end
+
+  defp preload_agenda_item_event(%AgendaItem{agenda: %Agenda{}} = item),
+    do: item
+
+  defp preload_agenda_item_event(%AgendaItem{} = item) do
+    Repo.preload(item, :agenda)
+  end
+
+  @dialyzer {:nowarn_function, do_move_agenda_item_to_agenda: 4}
+  defp do_move_agenda_item_to_agenda(event_id, agenda_item, agenda, at_index) do
     Ecto.Multi.new()
     |> multi_update_all(:dec_positions, fn _ ->
       from(a in AgendaItem,

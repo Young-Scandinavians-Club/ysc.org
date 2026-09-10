@@ -11,6 +11,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
   require Ysc.Logging
   import Ecto.Query
   alias Ysc.Bookings.{ConfigCacheTelemetry, RefundPolicy}
+  alias Ysc.VersionedCache
 
   @cache_name :ysc_cache
   @cache_prefix "refund_policy:"
@@ -32,38 +33,13 @@ defmodule Ysc.Bookings.RefundPolicyCache do
   def get_active(property, booking_mode) do
     cache_key = build_cache_key(property, booking_mode)
 
-    case Cachex.get(@cache_name, cache_key) do
-      {:ok, nil} ->
-        # Cache miss - fetch from database
-        policy = get_active_refund_policy_db(property, booking_mode)
-        # Cache the result (even if nil) with version check
-        cache_with_version(cache_key, policy)
-        policy
-
-      {:ok, {:version, version, policy}} ->
-        # Check if cache version is still valid
-        case Cachex.get(@cache_name, @cache_version_key) do
-          {:ok, current_version} when current_version == version ->
-            policy_with_loaded_rules(policy, property, booking_mode)
-
-          _ ->
-            # Version mismatch - invalidate and refetch
-            Cachex.del(@cache_name, cache_key)
-            policy = get_active_refund_policy_db(property, booking_mode)
-            cache_with_version(cache_key, policy)
-            policy
-        end
-
-      {:ok, policy} ->
-        # Legacy format (no version) - upgrade to versioned
-        policy = policy_with_loaded_rules(policy, property, booking_mode)
-        cache_with_version(cache_key, policy)
-        policy
-
-      {:error, _reason} ->
-        # Cache error - fallback to database
-        get_active_refund_policy_db(property, booking_mode)
-    end
+    VersionedCache.fetch(
+      @cache_version_key,
+      cache_key,
+      fn -> get_active_refund_policy_db(property, booking_mode) end,
+      cache_name: @cache_name
+    )
+    |> ensure_rules_loaded(property, booking_mode)
   end
 
   @doc """
@@ -125,40 +101,30 @@ defmodule Ysc.Bookings.RefundPolicyCache do
       :ok
   end
 
-  # Private functions
-
   defp build_cache_key(property, booking_mode) do
     "#{@cache_prefix}property:#{property}:booking_mode:#{booking_mode}"
   end
 
-  defp policy_with_loaded_rules(nil, _property, _booking_mode), do: nil
+  defp ensure_rules_loaded(nil, _property, _booking_mode), do: nil
 
-  defp policy_with_loaded_rules(
-         %{rules: rules} = policy,
-         _property,
-         _booking_mode
-       )
+  defp ensure_rules_loaded(%{rules: rules} = policy, _property, _booking_mode)
        when is_list(rules) do
     policy
   end
 
-  defp policy_with_loaded_rules(_policy, property, booking_mode) do
-    policy = get_active_refund_policy_db(property, booking_mode)
-    cache_with_version(build_cache_key(property, booking_mode), policy)
-    policy
-  end
+  defp ensure_rules_loaded(_policy, property, booking_mode) do
+    cache_key = build_cache_key(property, booking_mode)
 
-  defp cache_with_version(key, value) do
-    case Cachex.get(@cache_name, @cache_version_key) do
-      {:ok, version} when is_integer(version) ->
-        Cachex.put(@cache_name, key, {:version, version, value})
-
-      _ ->
-        # No version set yet - initialize it
-        version = System.unique_integer([:monotonic, :positive])
-        Cachex.put(@cache_name, @cache_version_key, version)
-        Cachex.put(@cache_name, key, {:version, version, value})
+    if Ysc.ProcessCache.enabled?() do
+      Cachex.del(@cache_name, cache_key)
     end
+
+    VersionedCache.fetch(
+      @cache_version_key,
+      cache_key,
+      fn -> get_active_refund_policy_db(property, booking_mode) end,
+      cache_name: @cache_name
+    )
   end
 
   # Internal function that actually queries the database (called by cache on miss)

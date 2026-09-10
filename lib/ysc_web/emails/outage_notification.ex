@@ -170,7 +170,7 @@ defmodule YscWeb.Emails.OutageNotification do
 
     Please note that outages can be unpredictable and restoration times may vary. We recommend checking the utility company's website for the most up-to-date information.
 
-    If you have any questions, please don't hesitate to reach out to us.
+    If you have any questions, email us at info@ysc.org.
 
     Young Scandinavians Club
     """

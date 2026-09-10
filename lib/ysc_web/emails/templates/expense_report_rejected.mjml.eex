@@ -1,0 +1,91 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding-bottom="24px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="48px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Your Expense Report Needs Changes</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding-bottom="48px"
+  padding-left="48px"
+  padding-right="48px"
+  padding-top="20px"
+  padding="48px"
+>
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Hej <%= @first_name %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Our Treasurer reviewed your expense report and it can't be reimbursed as submitted. Nothing has been paid out.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Report:</strong> <%= @expense_report.purpose %>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Reference number:</strong>
+      <span class="expense-report-id-badge"><%= @expense_report.id %></span>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">
+      What needs to change
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text
+      align="left"
+      font-size="18px"
+      line-height="1.8"
+      padding="20px"
+      background-color="#fef2f2"
+      border-radius="6px"
+      border="2px solid #dc2626"
+      color="#424242"
+      white-space="pre-wrap"
+    >
+<%= @rejection_note %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Once you've fixed the issues above, please submit a new expense report with the corrected details and receipts. You don't need to reply to this email.
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-button
+      href="<%= @new_expense_report_url %>"
+      css-class="btn_block"
+      inner-padding="15px"
+      width="100%"
+      background-color="#1447e6"
+      color="#ffffff"
+      align="center"
+      font-size="18px"
+      border-radius="4px"
+    >Submit a new expense report →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      If you have questions about this feedback, reply to this email or contact us at <a href="mailto:info@ysc.org">info@ysc.org</a>.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Med venlig hilsen, (Sincerely)
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Young Scandinavians Club
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

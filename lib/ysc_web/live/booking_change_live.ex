@@ -1288,7 +1288,7 @@ defmodule YscWeb.BookingChangeLive do
          )
          |> YscWeb.Flash.put_toast(
            :warning,
-           "Guest details could not be saved. Please contact support if needed.",
+           "We updated your dates, but we couldn't save the guest names. Email #{Ysc.EmailConfig.contact_email()} if the names on your booking look wrong.",
            title: "Guest details"
          )
          |> push_navigate(

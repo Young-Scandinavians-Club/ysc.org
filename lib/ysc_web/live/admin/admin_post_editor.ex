@@ -312,7 +312,7 @@ defmodule YscWeb.AdminPostEditorLive do
                   </li>
 
                   <li
-                    :if={@post_id}
+                    :if={@post_id && @post.state == :draft}
                     class="px-3 py-2 text-red-600 transition duration-200 ease-in-out hover:bg-zinc-100"
                   >
                     <button
@@ -320,6 +320,7 @@ defmodule YscWeb.AdminPostEditorLive do
                       type="button"
                       class="w-full px-1 text-left"
                       phx-click="delete-post"
+                      data-confirm="Delete this draft post? This cannot be undone."
                     >
                       <.icon name="hero-trash" class="inline h-5 w-5 -mt-1" />
                       <span>Delete Post</span>
@@ -679,19 +680,7 @@ defmodule YscWeb.AdminPostEditorLive do
   def handle_event("delete-post", _params, socket) do
     post = socket.assigns.post
 
-    res =
-      Posts.update_post(
-        post,
-        %{
-          state: :deleted,
-          deleted_on: Timex.now(),
-          published_on: nil,
-          featured_post: false
-        },
-        socket.assigns.current_user
-      )
-
-    case res do
+    case Posts.soft_delete_post(post, socket.assigns.current_user) do
       {:ok, new_post} ->
         {:noreply,
          socket
@@ -700,6 +689,15 @@ defmodule YscWeb.AdminPostEditorLive do
            title: "Post deleted"
          )
          |> redirect(to: ~p"/admin/posts")}
+
+      {:error, :invalid_state} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Only draft posts can be deleted. Unpublish or restore to draft first.",
+           title: "Delete failed"
+         )}
 
       {:error, _changeset} ->
         {:noreply,

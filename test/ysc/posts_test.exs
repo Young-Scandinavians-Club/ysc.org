@@ -609,7 +609,12 @@ defmodule Ysc.PostsTest do
     test "adds a comment to a post", %{author: author, regular_user: user} do
       {:ok, post} =
         Posts.create_post(
-          %{"title" => "Test", "body" => "Body", "url_name" => "comment-test"},
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "comment-test",
+            "state" => "published"
+          },
           author
         )
 
@@ -623,6 +628,23 @@ defmodule Ysc.PostsTest do
       assert comment.post_id == post.id
     end
 
+    test "returns :post_not_commentable for draft posts", %{
+      author: author,
+      regular_user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{"title" => "Test", "body" => "Body", "url_name" => "comment-draft"},
+          author
+        )
+
+      assert {:error, :post_not_commentable} =
+               Posts.add_comment_to_post(
+                 %{"post_id" => post.id, "text" => "Nope"},
+                 user
+               )
+    end
+
     test "increments comment count on post", %{
       author: author,
       regular_user: user
@@ -632,7 +654,8 @@ defmodule Ysc.PostsTest do
           %{
             "title" => "Test",
             "body" => "Body",
-            "url_name" => "comment-count-test"
+            "url_name" => "comment-count-test",
+            "state" => "published"
           },
           author
         )
@@ -663,7 +686,8 @@ defmodule Ysc.PostsTest do
           %{
             "title" => "Test",
             "body" => "Body",
-            "url_name" => "comment-invalid"
+            "url_name" => "comment-invalid",
+            "state" => "published"
           },
           author
         )
@@ -680,7 +704,12 @@ defmodule Ysc.PostsTest do
     test "returns comments for a post", %{author: author, regular_user: user} do
       {:ok, post} =
         Posts.create_post(
-          %{"title" => "Test", "body" => "Body", "url_name" => "list-comments"},
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "list-comments",
+            "state" => "published"
+          },
           author
         )
 
@@ -707,7 +736,8 @@ defmodule Ysc.PostsTest do
           %{
             "title" => "Test",
             "body" => "Body",
-            "url_name" => "list-comments-pre"
+            "url_name" => "list-comments-pre",
+            "state" => "published"
           },
           author
         )
@@ -994,7 +1024,12 @@ defmodule Ysc.PostsTest do
     test "adds reply to existing comment", %{author: author, regular_user: user} do
       {:ok, post} =
         Posts.create_post(
-          %{"title" => "Test", "body" => "Body", "url_name" => "reply-test"},
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "reply-test",
+            "state" => "published"
+          },
           author
         )
 
@@ -1024,7 +1059,12 @@ defmodule Ysc.PostsTest do
     } do
       {:ok, post} =
         Posts.create_post(
-          %{"title" => "Test", "body" => "Body", "url_name" => "sort-test"},
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "sort-test",
+            "state" => "published"
+          },
           author
         )
 
@@ -1100,7 +1140,12 @@ defmodule Ysc.PostsTest do
     test "returns comment by id", %{author: author, regular_user: user} do
       {:ok, post} =
         Posts.create_post(
-          %{"title" => "Test", "body" => "Body", "url_name" => "get-comment"},
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "get-comment",
+            "state" => "published"
+          },
           author
         )
 
@@ -1123,7 +1168,8 @@ defmodule Ysc.PostsTest do
           %{
             "title" => "Test",
             "body" => "Body",
-            "url_name" => "get-comment-pre"
+            "url_name" => "get-comment-pre",
+            "state" => "published"
           },
           author
         )
@@ -1156,7 +1202,12 @@ defmodule Ysc.PostsTest do
     } do
       {:ok, post} =
         Posts.create_post(
-          %{"title" => "Test", "body" => "Body", "url_name" => "index-test"},
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "index-test",
+            "state" => "published"
+          },
           author
         )
 

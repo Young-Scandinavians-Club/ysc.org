@@ -91,6 +91,10 @@ jobs:
     name: Tests
     needs: build_test
     runs-on: ubuntu-latest
+    # Typical mix coveralls.lcov is ~15m. Cap well below the 47m+ runner
+    # disconnect seen on 34416092041 so a hang fails with logs, not
+    # "hosted runner lost communication".
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:15.17-alpine@sha256:fceb6f86328c36f2438fae3b851b0cc57c4a7e69a58c866d9ce24281f2cf0c9c
@@ -160,10 +164,15 @@ jobs:
               mc anonymous set public local/avatars
             "
 
+      # GitHub-hosted runners have ~7GiB RAM. mix coveralls.lcov on this suite
+      # can OOM and drop the runner heartbeat (run 34416092041, 2026-09-09).
+      - name: Enable swap
+        run: ./etc/scripts/ci/enable_runner_swap.sh
+
       - name: Run tests with coverage
         env:
           MIX_ENV: test
-        run: mix coveralls.lcov
+        run: ./etc/scripts/ci/run_coveralls_lcov.sh
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
@@ -217,6 +226,12 @@ jobs:
 
       - name: sync_geoip_database self-test
         run: ./etc/scripts/sync_geoip_database.sh --self-test
+
+      - name: enable_runner_swap self-test
+        run: ./etc/scripts/ci/enable_runner_swap.sh --self-test
+
+      - name: run_coveralls_lcov self-test
+        run: ./etc/scripts/ci/run_coveralls_lcov.sh --self-test
 
       - name: dprint (format check)
         run: dprint check

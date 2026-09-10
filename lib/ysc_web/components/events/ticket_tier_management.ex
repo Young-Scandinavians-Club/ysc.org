@@ -34,6 +34,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <h3 class="text-lg font-semibold">Ticket Tiers</h3>
           <div class="flex items-center">
             <.button
+              :if={@admin_role == :admin}
+              id={"add-ticket-tier-btn-#{@event_id}"}
               phx-click="open-add-ticket-tier-modal"
               phx-target={@myself}
               class="w-full sm:w-auto"
@@ -74,7 +76,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           class="text-center py-8 text-zinc-500"
         >
           <p class="font-semibold">No ticket tiers created yet.</p>
-          <p class="text-sm">
+          <p :if={@admin_role == :admin} class="text-sm">
             Click "Add Ticket Tier" to create your first ticket tier.
           </p>
         </div>
@@ -211,6 +213,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
                 <div class="flex justify-end pt-4 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
                   <.row_actions_dropdown
+                    :if={@admin_role == :admin}
                     id={"ticket-tier-actions-#{ticket_tier.id}"}
                     label={"Actions for #{ticket_tier.name}"}
                   >
@@ -237,6 +240,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       Reserve tickets
                     </.dropdown_menu_item>
                     <.dropdown_menu_item
+                      :if={@admin_role == :admin}
                       id={"ticket-tier-actions-#{ticket_tier.id}-edit"}
                       icon="hero-pencil-square"
                       phx-click="edit-ticket-tier"
@@ -246,6 +250,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       Edit tier
                     </.dropdown_menu_item>
                     <.dropdown_menu_item
+                      :if={@admin_role == :admin}
                       id={"ticket-tier-actions-#{ticket_tier.id}-delete"}
                       icon="hero-trash"
                       tone={:danger}
@@ -407,6 +412,27 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         phx-click="cancel-reservation"
         phx-target={@myself}
       />
+      <button
+        id={"ticket-tier-add-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="open-add-ticket-tier-modal"
+        phx-target={@myself}
+      />
+      <button
+        id={"ticket-tier-edit-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="edit-ticket-tier"
+        phx-target={@myself}
+      />
+      <button
+        id={"ticket-tier-delete-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="delete-ticket-tier"
+        phx-target={@myself}
+      />
       <%!-- Add Ticket Tier Modal --%>
       <.modal
         :if={@show_add_modal}
@@ -419,6 +445,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           module={YscWeb.AdminEventsLive.TicketTierForm}
           event_id={@event_id}
           dialog_id="add-ticket-tier-modal"
+          admin_role={@admin_role}
         />
       </.modal>
       <%!-- Edit Ticket Tier Modal --%>
@@ -435,6 +462,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           event_id={@event_id}
           ticket_tier={@editing_ticket_tier}
           dialog_id="edit-ticket-tier-modal"
+          admin_role={@admin_role}
         />
       </.modal>
       <%!-- Reserve Tickets Modal --%>
@@ -701,7 +729,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("open-add-ticket-tier-modal", _params, socket) do
-    {:noreply, assign(socket, :show_add_modal, true)}
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Add Ticket Tier")}
+    else
+      {:noreply, assign(socket, :show_add_modal, true)}
+    end
   end
 
   @impl true
@@ -732,51 +764,24 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("edit-ticket-tier", %{"id" => id}, socket) do
-    ticket_tier = Events.get_ticket_tier!(id)
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Edit Ticket Tier")}
+    else
+      ticket_tier = Events.get_ticket_tier!(id)
 
-    {:noreply,
-     socket
-     |> assign(:show_edit_modal, true)
-     |> assign(:editing_ticket_tier, ticket_tier)}
+      {:noreply,
+       socket
+       |> assign(:show_edit_modal, true)
+       |> assign(:editing_ticket_tier, ticket_tier)}
+    end
   end
 
   @impl true
   def handle_event("delete-ticket-tier", %{"id" => id}, socket) do
-    ticket_tier = Events.get_ticket_tier!(id)
-
-    # Check if any tickets have been sold for this tier
-    sold_count = Events.count_tickets_for_tier(id)
-
-    if sold_count > 0 do
-      {:noreply,
-       YscWeb.Flash.put_toast(
-         socket,
-         :error,
-         "Cannot delete ticket tier with sold tickets",
-         title: "Tickets"
-       )}
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Delete Ticket Tier")}
     else
-      case Events.delete_ticket_tier(ticket_tier) do
-        {:ok, _ticket_tier} ->
-          ticket_tiers =
-            Events.list_ticket_tiers_for_event(socket.assigns.event_id)
-
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(:info, "Ticket tier deleted successfully",
-             title: "Tickets"
-           )
-           |> assign(:ticket_tiers, ticket_tiers)}
-
-        {:error, _changeset} ->
-          {:noreply,
-           YscWeb.Flash.put_toast(
-             socket,
-             :error,
-             "Failed to delete ticket tier",
-             title: "Tickets"
-           )}
-      end
+      delete_ticket_tier_as_admin(socket, id)
     end
   end
 
@@ -1171,6 +1176,45 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       "You do not have permission to perform this action.",
       title: title
     )
+  end
+
+  defp delete_ticket_tier_as_admin(socket, id) do
+    ticket_tier = Events.get_ticket_tier!(id)
+
+    # Check if any tickets have been sold for this tier
+    sold_count = Events.count_tickets_for_tier(id)
+
+    if sold_count > 0 do
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "Cannot delete ticket tier with sold tickets",
+         title: "Tickets"
+       )}
+    else
+      case Events.delete_ticket_tier(ticket_tier) do
+        {:ok, _ticket_tier} ->
+          ticket_tiers =
+            Events.list_ticket_tiers_for_event(socket.assigns.event_id)
+
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "Ticket tier deleted successfully",
+             title: "Tickets"
+           )
+           |> assign(:ticket_tiers, ticket_tiers)}
+
+        {:error, _changeset} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to delete ticket tier",
+             title: "Tickets"
+           )}
+      end
+    end
   end
 
   defp reserve_tickets_for_tier(socket, ticket_tier) do

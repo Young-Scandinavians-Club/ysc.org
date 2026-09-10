@@ -1172,6 +1172,84 @@ defmodule Ysc.ExpenseReportsTest do
       assert updated.status == "rejected"
     end
 
+    test "reject_expense_report/2 stores the note and requires it", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Reject with note",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      assert {:error, cs} = ExpenseReports.reject_expense_report(report, "   ")
+      assert %{rejection_note: [_ | _]} = errors_on(cs)
+
+      assert {:ok, rejected} =
+               ExpenseReports.reject_expense_report(
+                 report,
+                 "The airfare receipt is unreadable — please re-upload it."
+               )
+
+      assert rejected.status == "rejected"
+
+      assert rejected.rejection_note ==
+               "The airfare receipt is unreadable — please re-upload it."
+    end
+
+    test "deliver_expense_report_rejection_email/1 enqueues the rejection email",
+         %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Reject email",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      {:ok, rejected} =
+        ExpenseReports.reject_expense_report(report, "Add the missing receipt.")
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 ExpenseReports.deliver_expense_report_rejection_email(rejected)
+
+        assert [job] =
+                 all_enqueued(worker: EmailNotifier)
+                 |> Enum.filter(
+                   &(&1.args["template"] == "expense_report_rejected")
+                 )
+
+        assert job.args["recipient"] == user.email
+
+        assert job.args["params"]["rejection_note"] ==
+                 "Add the missing receipt."
+
+        assert job.args["params"]["new_expense_report_url"] =~ "/expensereport"
+      end)
+    end
+
     test "create_expense_report returns error when expense item is missing vendor",
          %{
            user: user

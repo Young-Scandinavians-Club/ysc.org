@@ -32,7 +32,7 @@ defmodule YscWeb.Sms.EmailChanged do
 
     Template.security_notification_body(
       Template.first_name(variables),
-      "Your account email was changed to #{new_email}. If this wasn't you, please contact us right away."
+      "Your account email was changed to #{new_email}. If this wasn't you, email #{Ysc.EmailConfig.contact_email()} right away."
     )
   end
 

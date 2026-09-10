@@ -1324,6 +1324,76 @@ defmodule YscWeb.AdminMoneyLiveTest do
       refute has_element?(view, "#expense-report-modal")
     end
 
+    test "rejecting requires a note, stores it, and closes the modal", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      # A blank note does not reject the report.
+      view
+      |> form("#expense-report-reject-form", reject: %{rejection_note: "   "})
+      |> render_submit()
+
+      assert Repo.reload!(report).status == "submitted"
+      assert has_element?(view, "#expense-report-modal")
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        view
+        |> form("#expense-report-reject-form",
+          reject: %{rejection_note: "The hotel receipt is missing."}
+        )
+        |> render_submit()
+      end)
+
+      updated = Repo.reload!(report)
+      assert updated.status == "rejected"
+      assert updated.rejection_note == "The hotel receipt is missing."
+      refute has_element?(view, "#expense-report-modal")
+    end
+
+    test "shows the rejection note on review and clears it on reopen", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, rejected} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          ExpenseReports.reject_expense_report(report, "Totals do not add up.")
+        end)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money?tab=expenses")
+
+      view
+      |> element("#expense-report-view-#{rejected.id}")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#expense-report-rejection-note",
+               "Totals do not add up."
+             )
+
+      view
+      |> element("#expense-report-reopen")
+      |> render_click()
+
+      reopened = Repo.reload!(report)
+      assert reopened.status == "submitted"
+      assert reopened.rejection_note == nil
+    end
+
     test "paid reports show no primary action buttons", %{conn: conn} do
       member = user_fixture()
 
