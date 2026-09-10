@@ -28,6 +28,12 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
     field :status, :string, default: "draft"
     field :certification_accepted, :boolean, default: false
 
+    # Treasurer's explanation when a report is rejected. Shown to the member
+    # in-app and emailed to them so they know what to fix before submitting a
+    # corrected report. Set via `rejection_changeset/2`; cleared by
+    # `status_changeset/2` on any non-rejected transition.
+    field :rejection_note, :string
+
     # QuickBooks sync fields
     field :quickbooks_bill_id, :string
     field :quickbooks_vendor_id, :string
@@ -148,6 +154,52 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
     |> cast(attrs, [:status, :quickbooks_sync_error])
     |> validate_required([:status])
     |> validate_inclusion(:status, @all_statuses)
+    |> maybe_clear_rejection_note()
+  end
+
+  @doc """
+  Changeset for an admin rejecting a submitted report.
+
+  Requires a non-blank `:rejection_note`. The member is shown this text in-app
+  and emailed it (see `Ysc.ExpenseReports.deliver_expense_report_rejection_email/1`)
+  so they know what to fix before submitting a corrected report. Forces
+  `:status` to `"rejected"` and, like `status_changeset/2`, skips `cast_assoc/2`
+  and the expense-item gates so a stale line-item issue can't block the
+  rejection.
+  """
+  def rejection_changeset(expense_report, attrs) do
+    expense_report
+    |> cast(attrs, [:rejection_note])
+    |> put_change(:status, "rejected")
+    |> update_change(:rejection_note, &normalize_rejection_note/1)
+    |> validate_required([:rejection_note],
+      message: "is required when rejecting a report"
+    )
+    |> validate_length(:rejection_note, max: 5_000)
+  end
+
+  # `cast/3` already maps "" -> nil; this also collapses whitespace-only notes so
+  # `validate_required/2` rejects them.
+  defp normalize_rejection_note(note) when is_binary(note) do
+    case String.trim(note) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_rejection_note(note), do: note
+
+  # A non-rejected transition (admin "Reopen"/revert, or a QuickBooks-driven
+  # flip) clears any stale treasurer rejection note so it can't resurface on a
+  # later view. The QuickBooks auto-rejection path keeps its own explanation in
+  # `:quickbooks_sync_error`, not here, so leaving the note untouched while the
+  # status is still "rejected" is correct.
+  defp maybe_clear_rejection_note(changeset) do
+    if get_field(changeset, :status) == "rejected" do
+      changeset
+    else
+      put_change(changeset, :rejection_note, nil)
+    end
   end
 
   @doc """

@@ -1567,7 +1567,7 @@ defmodule YscWeb.BookingReceiptLive do
         {socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Payment failed. Please try again or contact support if the problem persists."
+           "Payment failed. Please try again, or email #{Ysc.EmailConfig.contact_email()} if the problem persists."
          ), false, false}
 
       _ ->

@@ -330,8 +330,11 @@ defmodule YscWeb.PostLive do
     text_body = Map.get(comment, "text", "")
     # Ensure no bad stuff gets rendered ever
     # It will be escaped later for safety but lets be defensive
+    # Finding 63: never trust client post_id — always bind to the mounted post.
     scrubbed_comment =
-      Map.put(comment, "text", Scrubber.scrub(text_body, Scrubber.BasicHTML))
+      comment
+      |> Map.put("text", Scrubber.scrub(text_body, Scrubber.BasicHTML))
+      |> Map.put("post_id", socket.assigns.post.id)
 
     current_user = socket.assigns[:current_user]
 

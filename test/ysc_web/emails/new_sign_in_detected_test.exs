@@ -103,6 +103,9 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
       assert body =~ "Location: Stockholm, Sweden"
       assert body =~ "Time: Jan 1, 2026 at 9:00 AM PST"
       assert body =~ "https://example.com/users/settings/security"
+      assert body =~ "devices currently signed in"
+      refute body =~ "active sessions"
+      assert body =~ "sign out of unfamiliar devices"
     end
   end
 end

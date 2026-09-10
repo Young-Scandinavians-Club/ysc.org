@@ -1,7 +1,6 @@
 defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
   use YscWeb, :live_component
 
-  alias Ysc.Events
   alias Ysc.Events.Event
 
   @impl true
@@ -82,63 +81,15 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
 
   @impl true
   def handle_event("save", %{"event" => event_params}, socket) do
-    require Ysc.Logging
+    # Hand the request up to the parent LiveView. Cabin events get a
+    # "block the booking calendar?" prompt before the schedule is set; the
+    # parent owns both that prompt and the call to `Events.schedule_event/2`.
+    send(
+      self(),
+      {__MODULE__, {:schedule_requested, event_params["publish_at"]}}
+    )
 
-    publish_at_string = event_params["publish_at"]
-
-    result =
-      try do
-        Events.schedule_event(socket.assigns.event, publish_at_string)
-      rescue
-        error ->
-          Ysc.Logging.error("Error scheduling event",
-            event_id: socket.assigns.event.id,
-            error: Exception.message(error)
-          )
-
-          # Create a changeset with an error
-          changeset =
-            socket.assigns.event
-            |> Event.changeset(%{})
-            |> Ecto.Changeset.add_error(:publish_at, "Invalid datetime format")
-
-          {:error, changeset}
-      end
-
-    case result do
-      {:ok, _event} ->
-        # The EventUpdated broadcast will trigger a refresh in the parent
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:info, "Event scheduled successfully",
-           title: "Event",
-           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
-         )}
-
-      {:error, changeset} ->
-        error_details =
-          changeset.errors
-          |> Enum.map_join(", ", fn {field, {message, _}} ->
-            "#{field}: #{message}"
-          end)
-
-        Ysc.Logging.error("Failed to schedule event",
-          event_id: socket.assigns.event.id,
-          errors: error_details
-        )
-
-        error_message =
-          if error_details != "" do
-            "Failed to schedule event: #{error_details}"
-          else
-            "Failed to schedule event. Please check the form for errors."
-          end
-
-        {:noreply,
-         socket
-         |> assign_form(changeset)
-         |> YscWeb.Flash.put_toast(:error, error_message, title: "Event")}
-    end
+    {:noreply, socket}
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do

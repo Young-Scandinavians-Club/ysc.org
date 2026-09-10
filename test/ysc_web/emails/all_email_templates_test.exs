@@ -1039,6 +1039,25 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
                "expense_report_treasurer_notification"
     end
 
+    test "ExpenseReportRejected renders", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        expense_report: %{
+          id: "EXP-123",
+          purpose: "Test expense report"
+        },
+        rejection_note: "The hotel receipt is missing.\nPlease re-upload it.",
+        new_expense_report_url: "https://example.com/expensereport"
+      }
+
+      html = YscWeb.Emails.ExpenseReportRejected.render(assigns)
+      assert is_binary(html)
+      assert html =~ "The hotel receipt is missing."
+
+      assert YscWeb.Emails.ExpenseReportRejected.get_template_name() ==
+               "expense_report_rejected"
+    end
+
     test "TahoeWinterWeekendAvailable renders", %{user: user} do
       assigns =
         TahoeWinterWeekendAvailable.prepare_email_data(

@@ -10,6 +10,7 @@ defmodule Ysc.Bookings.PricingRuleCache do
 
   require Ysc.Logging
   alias Ysc.Bookings.{ConfigCacheTelemetry, PricingRule}
+  alias Ysc.VersionedCache
 
   @cache_name :ysc_cache
   @cache_prefix "pricing_rule:"
@@ -36,7 +37,8 @@ defmodule Ysc.Bookings.PricingRuleCache do
         booking_mode,
         price_unit
       ) do
-    cache_key =
+    VersionedCache.fetch(
+      @cache_version_key,
       build_cache_key(
         property,
         season_id,
@@ -44,56 +46,8 @@ defmodule Ysc.Bookings.PricingRuleCache do
         room_category_id,
         booking_mode,
         price_unit
-      )
-
-    case Cachex.get(@cache_name, cache_key) do
-      {:ok, nil} ->
-        # Cache miss - fetch from database
-        rule =
-          PricingRule.find_most_specific_db(
-            property,
-            season_id,
-            room_id,
-            room_category_id,
-            booking_mode,
-            price_unit
-          )
-
-        # Cache the result (even if nil) with version check
-        cache_with_version(cache_key, rule)
-        rule
-
-      {:ok, {:version, version, rule}} ->
-        # Check if cache version is still valid
-        case Cachex.get(@cache_name, @cache_version_key) do
-          {:ok, current_version} when current_version == version ->
-            rule
-
-          _ ->
-            # Version mismatch - invalidate and refetch
-            Cachex.del(@cache_name, cache_key)
-
-            rule =
-              PricingRule.find_most_specific_db(
-                property,
-                season_id,
-                room_id,
-                room_category_id,
-                booking_mode,
-                price_unit
-              )
-
-            cache_with_version(cache_key, rule)
-            rule
-        end
-
-      {:ok, rule} ->
-        # Legacy format (no version) - upgrade to versioned
-        cache_with_version(cache_key, rule)
-        rule
-
-      {:error, _reason} ->
-        # Cache error - fallback to database
+      ),
+      fn ->
         PricingRule.find_most_specific_db(
           property,
           season_id,
@@ -102,7 +56,9 @@ defmodule Ysc.Bookings.PricingRuleCache do
           booking_mode,
           price_unit
         )
-    end
+      end,
+      cache_name: @cache_name
+    )
   end
 
   @doc """
@@ -118,7 +74,8 @@ defmodule Ysc.Bookings.PricingRuleCache do
         booking_mode,
         price_unit
       ) do
-    cache_key =
+    VersionedCache.fetch(
+      @cache_version_key,
       build_cache_key(
         property,
         season_id,
@@ -127,56 +84,8 @@ defmodule Ysc.Bookings.PricingRuleCache do
         booking_mode,
         price_unit,
         "children"
-      )
-
-    case Cachex.get(@cache_name, cache_key) do
-      {:ok, nil} ->
-        # Cache miss - fetch from database
-        rule =
-          PricingRule.find_children_pricing_rule_db(
-            property,
-            season_id,
-            room_id,
-            room_category_id,
-            booking_mode,
-            price_unit
-          )
-
-        # Cache the result (even if nil) with version check
-        cache_with_version(cache_key, rule)
-        rule
-
-      {:ok, {:version, version, rule}} ->
-        # Check if cache version is still valid
-        case Cachex.get(@cache_name, @cache_version_key) do
-          {:ok, current_version} when current_version == version ->
-            rule
-
-          _ ->
-            # Version mismatch - invalidate and refetch
-            Cachex.del(@cache_name, cache_key)
-
-            rule =
-              PricingRule.find_children_pricing_rule_db(
-                property,
-                season_id,
-                room_id,
-                room_category_id,
-                booking_mode,
-                price_unit
-              )
-
-            cache_with_version(cache_key, rule)
-            rule
-        end
-
-      {:ok, rule} ->
-        # Legacy format (no version) - upgrade to versioned
-        cache_with_version(cache_key, rule)
-        rule
-
-      {:error, _reason} ->
-        # Cache error - fallback to database
+      ),
+      fn ->
         PricingRule.find_children_pricing_rule_db(
           property,
           season_id,
@@ -185,7 +94,9 @@ defmodule Ysc.Bookings.PricingRuleCache do
           booking_mode,
           price_unit
         )
-    end
+      end,
+      cache_name: @cache_name
+    )
   end
 
   @doc """
@@ -197,7 +108,7 @@ defmodule Ysc.Bookings.PricingRuleCache do
     # Monotonic version so two invalidations in the same wall-clock second still
     # bump the global version (unix seconds alone matched embedded entry versions
     # and served stale rules after DB deletes — see pricing_calculation_test setup).
-    new_version = next_cache_version()
+    new_version = System.unique_integer([:monotonic, :positive])
     Ysc.DistributedCache.put(@cache_name, @cache_version_key, new_version)
 
     # Broadcast invalidation event via PubSub
@@ -213,8 +124,6 @@ defmodule Ysc.Bookings.PricingRuleCache do
     ConfigCacheTelemetry.invalidated(:pricing_rule)
     :ok
   end
-
-  # Private functions
 
   defp build_cache_key(
          property,
@@ -244,21 +153,6 @@ defmodule Ysc.Bookings.PricingRuleCache do
     key_parts = if suffix, do: key_parts ++ [":", suffix], else: key_parts
     Enum.join(key_parts)
   end
-
-  defp cache_with_version(key, value) do
-    case Cachex.get(@cache_name, @cache_version_key) do
-      {:ok, version} when is_integer(version) ->
-        Cachex.put(@cache_name, key, {:version, version, value})
-
-      _ ->
-        # No version set yet - initialize it
-        version = next_cache_version()
-        Cachex.put(@cache_name, @cache_version_key, version)
-        Cachex.put(@cache_name, key, {:version, version, value})
-    end
-  end
-
-  defp next_cache_version, do: System.unique_integer([:monotonic])
 
   @doc false
   def ci_query_explain_query do

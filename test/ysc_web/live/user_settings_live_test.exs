@@ -1855,6 +1855,111 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert render(view) =~ "default" or render(view) =~ "Default"
     end
 
+    test "delete-payment-method removes a saved method from the account", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_delpm_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, _default} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_del_default",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      {:ok, extra} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_del_extra",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      stub(Stripe.CustomerMock, :update, fn _cus_id, _params, _opts ->
+        {:ok, %Stripe.Customer{id: user.stripe_id}}
+      end)
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      render(view)
+
+      view
+      |> element(
+        "button[phx-click=\"delete-payment-method\"][phx-value-payment_method_id=\"#{extra.id}\"]"
+      )
+      |> render_click()
+
+      html = render(view)
+      assert html =~ "Payment method removed"
+
+      remaining = Payments.list_payment_methods(user)
+      refute Enum.any?(remaining, &(&1.id == extra.id))
+      assert Enum.map(remaining, & &1.provider_id) == ["pm_del_default"]
+    end
+
+    test "delete-payment-method refuses to remove the only method for an active membership",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_delpm_last_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, only} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_del_only",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_delpm_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      render(view)
+
+      view
+      |> element(
+        "button[phx-click=\"delete-payment-method\"][phx-value-payment_method_id=\"#{only.id}\"]"
+      )
+      |> render_click()
+
+      assert render(view) =~ "only payment method"
+      assert Payments.get_payment_method!(only.id).id == only.id
+    end
+
     test "cancel-new-payment-method hides the add form", %{conn: conn} do
       user = user_fixture(%{state: :active})
 

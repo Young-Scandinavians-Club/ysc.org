@@ -180,6 +180,104 @@ defmodule Ysc.PaymentsTest do
     end
   end
 
+  describe "detach_payment_method/1" do
+    test "detaches from Stripe and deletes the local record" do
+      user =
+        user_with_stripe_id("cus_detach_#{System.unique_integer([:positive])}")
+
+      method =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_detach_one",
+          is_default: true
+        })
+
+      expect(Stripe.PaymentMethodMock, :detach, fn "pm_detach_one" ->
+        {:ok, %Stripe.PaymentMethod{id: "pm_detach_one", type: "card"}}
+      end)
+
+      assert {:ok, _} = Payments.detach_payment_method(method)
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Payments.get_payment_method!(method.id)
+      end
+    end
+
+    test "promotes and pushes a new default when removing the default method" do
+      user = user_with_stripe_id("cus_detach_default")
+
+      default =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_detach_default",
+          is_default: true
+        })
+
+      other =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_detach_other",
+          is_default: false
+        })
+
+      expect(Stripe.PaymentMethodMock, :detach, fn "pm_detach_default" ->
+        {:ok, %Stripe.PaymentMethod{id: "pm_detach_default", type: "card"}}
+      end)
+
+      expect(Stripe.CustomerMock, :update, fn "cus_detach_default",
+                                              params,
+                                              _opts ->
+        assert params.invoice_settings.default_payment_method ==
+                 "pm_detach_other"
+
+        {:ok, %Stripe.Customer{id: "cus_detach_default"}}
+      end)
+
+      assert {:ok, _} = Payments.detach_payment_method(default)
+      assert Payments.get_default_payment_method(user).id == other.id
+    end
+
+    test "treats an already-missing Stripe payment method as detached" do
+      user = user_with_stripe_id("cus_detach_missing")
+
+      method =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_detach_missing"
+        })
+
+      expect(Stripe.PaymentMethodMock, :detach, fn "pm_detach_missing" ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :resource_missing,
+           message: "gone"
+         }}
+      end)
+
+      assert {:ok, _} = Payments.detach_payment_method(method)
+      assert Payments.list_payment_methods(user) == []
+    end
+
+    test "aborts local deletion when Stripe detach fails for another reason" do
+      user = user_with_stripe_id("cus_detach_err")
+
+      method =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_detach_err"
+        })
+
+      expect(Stripe.PaymentMethodMock, :detach, fn "pm_detach_err" ->
+        {:error,
+         %Stripe.Error{source: :stripe, code: :api_error, message: "boom"}}
+      end)
+
+      assert {:error, :stripe_error} = Payments.detach_payment_method(method)
+      assert Payments.get_payment_method!(method.id).id == method.id
+    end
+  end
+
   describe "change_payment_method/2" do
     test "returns a changeset" do
       method = create_payment_method_fixture()
@@ -1563,6 +1661,12 @@ defmodule Ysc.PaymentsTest do
   end
 
   # Helper function
+  defp user_with_stripe_id(stripe_id) do
+    user_fixture()
+    |> Ecto.Changeset.change(%{stripe_id: stripe_id})
+    |> Repo.update!()
+  end
+
   defp create_payment_method_fixture(attrs \\ %{}) do
     user = Map.get_lazy(attrs, :user_id, fn -> user_fixture().id end)
 

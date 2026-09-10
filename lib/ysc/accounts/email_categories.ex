@@ -53,6 +53,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "welcome_email" => :account,
     "booking_checkin_reminder" => :account,
     "expense_report_confirmation" => :account,
+    "expense_report_rejected" => :account,
     # Board/admin notifications (always sent, no user preference check)
     "admin_application_submitted" => :account,
     "admin_membership_report" => :account,
