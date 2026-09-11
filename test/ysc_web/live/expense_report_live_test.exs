@@ -7,6 +7,8 @@ defmodule YscWeb.ExpenseReportLiveTest do
   import Phoenix.LiveViewTest
 
   alias Ysc.ExpenseReports
+  alias Ysc.ExpenseReports.ExpenseReport
+  alias Ysc.Repo
 
   setup :register_and_log_in_user
 
@@ -111,6 +113,105 @@ defmodule YscWeb.ExpenseReportLiveTest do
     {:ok, _index_live, html} = live(conn, ~p"/expensereports")
 
     assert html =~ "Expense Report"
+  end
+
+  describe "rejected report member view" do
+    test "success page shows the treasurer rejection note and a new-report link",
+         %{
+           conn: conn,
+           user: user
+         } do
+      report =
+        insert_member_report!(user, %{
+          purpose: "Cabin groceries",
+          status: "rejected",
+          rejection_note: "The hotel receipt is missing.\nPlease re-upload it."
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport/#{report.id}/success")
+
+      assert has_element?(view, "#expense-report-success", "Report Rejected")
+
+      assert has_element?(
+               view,
+               "#expense-report-rejection-note",
+               "The hotel receipt is missing."
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-rejection-note",
+               "Please re-upload it."
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-rejection-note a[href='/expensereport']",
+               "Start a corrected expense report"
+             )
+    end
+
+    test "success page escapes HTML in the treasurer rejection note", %{
+      conn: conn,
+      user: user
+    } do
+      report =
+        insert_member_report!(user, %{
+          purpose: "Board dinner",
+          status: "rejected",
+          rejection_note: "Re-upload the receipt <script>alert(1)</script>"
+        })
+
+      {:ok, view, html} = live(conn, ~p"/expensereport/#{report.id}/success")
+
+      assert has_element?(
+               view,
+               "#expense-report-rejection-note",
+               "Re-upload the receipt"
+             )
+
+      refute html =~ "<script>alert(1)</script>"
+      assert html =~ "&lt;script&gt;alert(1)&lt;/script&gt;"
+    end
+
+    test "submitted reports do not show the rejection note", %{
+      conn: conn,
+      user: user
+    } do
+      report =
+        insert_member_report!(user, %{
+          purpose: "Cabin groceries",
+          status: "submitted"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport/#{report.id}/success")
+
+      assert has_element?(view, "#expense-report-success")
+      refute has_element?(view, "#expense-report-rejection-note")
+      refute has_element?(view, "#expense-report-success", "Report Rejected")
+    end
+
+    test "My Reports lists a rejected report with the Rejected badge", %{
+      conn: conn,
+      user: user
+    } do
+      report =
+        insert_member_report!(user, %{
+          purpose: "Cabin groceries",
+          status: "rejected",
+          rejection_note: "Add the itemized receipt."
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereports")
+
+      assert has_element?(view, "#expense-report-row-#{report.id}", "Rejected")
+
+      assert has_element?(
+               view,
+               "#expense-report-row-#{report.id}",
+               "Cabin groceries"
+             )
+    end
   end
 
   describe "per-row receipt uploads" do
@@ -628,5 +729,16 @@ defmodule YscWeb.ExpenseReportLiveTest do
                item.receipt_s3_path != victim_path
              end)
     end
+  end
+
+  defp insert_member_report!(user, attrs) do
+    %ExpenseReport{
+      user_id: user.id,
+      purpose: Map.get(attrs, :purpose, "Cabin groceries"),
+      status: Map.get(attrs, :status, "submitted"),
+      reimbursement_method: "check",
+      rejection_note: Map.get(attrs, :rejection_note)
+    }
+    |> Repo.insert!()
   end
 end
