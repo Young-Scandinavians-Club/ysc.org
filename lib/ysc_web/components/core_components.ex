@@ -3027,6 +3027,40 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Home-linked YSC logo used on unauthenticated and focused screens.
+
+  Sign-in, registration, password reset, account setup, error pages, and the
+  `Layouts.focus` template all share this 112px mark that navigates home.
+
+  ## Examples
+
+      <.home_logo_link id="login-home-logo" class="py-8" />
+
+      <.home_logo_link id="error-404-home-logo" />
+  """
+  attr :id, :string, default: "home-logo-link"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Extra classes on the link (e.g. `py-8` for auth pages)"
+
+  def home_logo_link(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      navigate={~p"/"}
+      class={[
+        "flex items-center justify-center hover:opacity-80 transition duration-200 ease-in-out",
+        @class
+      ]}
+      aria-label="Young Scandinavians Club home"
+    >
+      <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
+    </.link>
+    """
+  end
+
   attr :viking, :integer, default: 4
   attr :title, :string, default: "Looks like this page is empty"
   attr :suggestion, :string, default: nil

@@ -119,12 +119,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     ~H"""
     <div class="min-h-screen bg-white">
       <div class="max-w-2xl mx-auto py-8 px-4">
-        <%!-- Logo --%>
-        <div class="flex justify-center mb-8">
-          <.link navigate={~p"/"} class="hover:opacity-80 transition duration-200">
-            <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
-          </.link>
-        </div>
+        <.home_logo_link id="onboarding-home-logo" class="mb-8" />
 
         <div
           :if={@loading_onboarding_data}

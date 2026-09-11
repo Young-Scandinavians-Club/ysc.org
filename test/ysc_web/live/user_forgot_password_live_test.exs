@@ -9,11 +9,12 @@ defmodule YscWeb.UserForgotPasswordLiveTest do
 
   describe "Forgot password page" do
     test "renders email page", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/reset-password")
+      {:ok, lv, html} = live(conn, ~p"/users/reset-password")
 
       assert html =~ "Forgot your password?"
       assert html =~ "email you a link to reset your password"
       assert html =~ "Email me a reset link"
+      assert has_element?(lv, "#forgot-password-home-logo")
     end
 
     test "redirects if already logged in", %{conn: conn} do

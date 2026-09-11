@@ -75,6 +75,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       assert has_element?(view, "#onboarding-profile-form")
       assert has_element?(view, "#onboarding-avatar-section")
       assert has_element?(view, "#onboarding-avatar-upload-form")
+      assert has_element?(view, "#onboarding-home-logo")
 
       assert has_element?(
                view,

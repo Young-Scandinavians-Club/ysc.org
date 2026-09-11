@@ -8,12 +8,14 @@ defmodule YscWeb.ErrorHTMLTest do
     html = render_to_string(YscWeb.ErrorHTML, "404", "html", [])
     assert html =~ "404"
     assert html =~ "Page not found"
+    assert html =~ ~s(id="error-404-home-logo")
   end
 
   test "renders 500.html" do
     html = render_to_string(YscWeb.ErrorHTML, "500", "html", [])
     assert html =~ "500"
     assert html =~ "Something went wrong"
+    assert html =~ ~s(id="error-500-home-logo")
   end
 
   test "404 response includes document title", %{conn: conn} do
