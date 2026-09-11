@@ -58,10 +58,12 @@ defmodule YscWeb.EventBadgeHelpers do
   """
   @spec hero_badge_kinds(map()) :: [badge_kind()]
   def hero_badge_kinds(event) when is_map(event) do
+    sold_out = EventHelpers.event_sold_out?(event)
+
     []
     |> maybe_append(:save_the_date, get_field(event, :tickets_tbd))
-    |> maybe_append(:sold_out, EventHelpers.event_sold_out?(event))
-    |> maybe_append(:going_fast, get_field(event, :selling_fast))
+    |> maybe_append(:sold_out, sold_out)
+    |> maybe_append(:going_fast, !sold_out && get_field(event, :selling_fast))
     |> maybe_append(
       :cancelled,
       get_field(event, :state) in [:cancelled, "cancelled"]
