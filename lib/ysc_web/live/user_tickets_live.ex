@@ -132,7 +132,7 @@ defmodule YscWeb.UserTicketsLive do
                         phx-value-order-id={ticket_order.id}
                         color="red"
                         class="flex-1"
-                        data-confirm="Cancel this ticket checkout? Your selected tickets will be released and you may lose your member discount. You can buy tickets again if any are still available."
+                        data-confirm="Cancel this ticket checkout? Your selected tickets will go back on sale and you may lose your member discount. You can buy tickets again if any are still available."
                       >
                         Cancel checkout
                       </.button>
@@ -384,7 +384,7 @@ defmodule YscWeb.UserTicketsLive do
              |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
              |> YscWeb.Flash.put_toast(
                :info,
-               "Ticket checkout cancelled. Your selected tickets were released and are available for others to buy.",
+               "Ticket checkout cancelled. Your selected tickets are available for others to buy.",
                title: "Order"
              )}
 

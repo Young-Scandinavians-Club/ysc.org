@@ -1897,7 +1897,10 @@ defmodule YscWeb.UserSettingsLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
-      render(view)
+      html = render(view)
+
+      assert html =~ "It will be removed from your account"
+      refute html =~ "detached from your account"
 
       view
       |> element(

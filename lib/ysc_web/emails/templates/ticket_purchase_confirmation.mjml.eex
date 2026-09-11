@@ -160,7 +160,7 @@
     <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Date: <strong><%= @payment_date %></strong>
     </mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Transaction ID: <strong><%= @payment.reference_id %></strong>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Reference: <strong><%= @payment.reference_id %></strong>
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
