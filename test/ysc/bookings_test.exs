@@ -1823,6 +1823,92 @@ defmodule Ysc.BookingsTest do
              }) == []
     end
 
+    test "blackout_range_fully_covered?/3 requires occupied nights, not calendar overlap" do
+      start_date = ~D[2030-08-10]
+      end_date = ~D[2030-08-12]
+      # Event/blackout Aug 10–12 occupies nights Aug 10 and Aug 11.
+
+      refute Bookings.blackout_range_fully_covered?(
+               :clear_lake,
+               start_date,
+               end_date
+             )
+
+      # Ends on the event start date: calendar overlap, zero event nights covered.
+      create_blackout_fixture(%{
+        property: :clear_lake,
+        start_date: ~D[2030-08-05],
+        end_date: start_date,
+        reason: "Previous weekend"
+      })
+
+      refute Bookings.blackout_range_fully_covered?(
+               :clear_lake,
+               start_date,
+               end_date
+             )
+
+      # Covers only the first occupied night.
+      create_blackout_fixture(%{
+        property: :clear_lake,
+        start_date: start_date,
+        end_date: ~D[2030-08-11],
+        reason: "First night only"
+      })
+
+      refute Bookings.blackout_range_fully_covered?(
+               :clear_lake,
+               start_date,
+               end_date
+             )
+
+      # First-night occupies Aug 10; previous-weekend occupies Aug 5–9.
+      # Add the remaining night so the union covers Aug 10–11.
+      create_blackout_fixture(%{
+        property: :clear_lake,
+        start_date: ~D[2030-08-11],
+        end_date: end_date,
+        reason: "Second night"
+      })
+
+      assert Bookings.blackout_range_fully_covered?(
+               :clear_lake,
+               start_date,
+               end_date
+             )
+
+      # A Tahoe blackout on the same dates does not cover Clear Lake.
+      refute Bookings.blackout_range_fully_covered?(
+               :tahoe,
+               start_date,
+               end_date
+             )
+    end
+
+    test "blackout_range_fully_covered?/3 is true for a superset blackout and empty ranges" do
+      start_date = ~D[2030-09-10]
+      end_date = ~D[2030-09-12]
+
+      create_blackout_fixture(%{
+        property: :tahoe,
+        start_date: ~D[2030-09-09],
+        end_date: ~D[2030-09-14],
+        reason: "Superset"
+      })
+
+      assert Bookings.blackout_range_fully_covered?(
+               :tahoe,
+               start_date,
+               end_date
+             )
+
+      assert Bookings.blackout_range_fully_covered?(
+               :tahoe,
+               ~D[2030-09-12],
+               ~D[2030-09-10]
+             )
+    end
+
     test "get_overlapping_blackouts/3 returns overlapping blackouts" do
       checkin = Date.utc_today() |> Date.add(30)
       checkout = Date.add(checkin, 2)

@@ -2656,14 +2656,14 @@ defmodule YscWeb.AdminEventsNewLive do
   defp run_blackout_pending(socket, {:schedule, publish_at}),
     do: do_schedule_event(socket, publish_at)
 
-  # No blackout to add (one already covers the dates); nothing to create.
+  # No blackout to add (occupied nights already covered); nothing to create.
   defp maybe_create_blackout(socket, %{blackout_needed?: false}), do: socket
 
   defp maybe_create_blackout(socket, prompt) do
     cond do
-      # Re-check right before creating: another admin may have added an
-      # overlapping blackout while this modal was open.
-      existing_blackout_overlap(prompt.attrs) != [] ->
+      # Re-check right before creating: another admin may have added a blackout
+      # that now occupies every event night while this modal was open.
+      blackout_already_covers?(prompt.attrs) ->
         YscWeb.Flash.put_toast(
           socket,
           :info,
@@ -3488,10 +3488,15 @@ defmodule YscWeb.AdminEventsNewLive do
 
   # Builds the cabin prompt shown before publishing/scheduling an event held at
   # the Tahoe or Clear Lake cabin. Returns `nil` for non-cabin events, and for
-  # cabin events that already have a covering blackout and no conflicting
-  # booking (nothing to ask). Otherwise returns a map describing what to warn
-  # about: `blackout_needed?` (offer to add one) and `booking_conflict?`
-  # (an existing hold/complete booking overlaps — warn but never block).
+  # cabin events whose occupied nights are already blacked out and that have no
+  # conflicting booking (nothing to ask). Otherwise returns a map describing
+  # what to warn about: `blackout_needed?` (offer to add one) and
+  # `booking_conflict?` (an existing hold/complete booking overlaps — warn but
+  # never block).
+  #
+  # `blackout_needed?` requires every occupied night to already be covered, not
+  # merely calendar overlap. A blackout that ends on the event start date (same
+  # day turnaround) does not occupy the event's nights.
   defp cabin_publish_prompt(event) do
     with {:ok, attrs} <- CabinBlackout.blackout_attrs(event),
          %{
@@ -3499,7 +3504,7 @@ defmodule YscWeb.AdminEventsNewLive do
            "start_date" => start_date,
            "end_date" => end_date
          } <- attrs do
-      blackout_needed? = existing_blackout_overlap(attrs) == []
+      blackout_needed? = not blackout_already_covers?(attrs)
 
       booking_conflict? =
         Bookings.has_conflicting_bookings?(property, start_date, end_date)
@@ -3519,13 +3524,14 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
-  # Blackouts already on the calendar that overlap the event's date range.
-  defp existing_blackout_overlap(%{
+  # True when existing blackouts occupy every night of the proposed event block.
+  # Calendar overlap alone is not enough (see `Bookings.blackout_range_fully_covered?/3`).
+  defp blackout_already_covers?(%{
          "property" => property,
          "start_date" => start_date,
          "end_date" => end_date
        }) do
-    Bookings.get_overlapping_blackouts(property, start_date, end_date)
+    Bookings.blackout_range_fully_covered?(property, start_date, end_date)
   end
 
   defp blackout_pending_verb(:publish), do: "publish"
