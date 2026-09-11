@@ -133,7 +133,7 @@ defmodule YscWeb.VolunteerLive do
                 phx-disable-with="Sending..."
                 class="w-full md:w-auto"
               >
-                Submit volunteer form
+                I'd like to volunteer
               </.button>
             </:actions>
           </.simple_form>
@@ -187,17 +187,14 @@ defmodule YscWeb.VolunteerLive do
       :ok ->
         case Ysc.Forms.create_volunteer(changeset) do
           {:ok, _volunteer} ->
-            message =
-              if socket.assigns.logged_in? do
-                "Volunteer form submitted"
-              else
-                "Thank you for your interest in volunteering with the YSC!"
-              end
-
             {:noreply,
              socket
              |> assign(:submitted, true)
-             |> YscWeb.Flash.put_toast(:info, message, title: "Volunteer")}
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Thank you! A board member will reach out within a few days.",
+               title: "Volunteer"
+             )}
 
           {:error, changeset} ->
             {:noreply, assign_form(socket, changeset)}
