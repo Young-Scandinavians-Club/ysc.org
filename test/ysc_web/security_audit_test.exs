@@ -57,6 +57,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 60 (HIGH)     Expense reports accepted client-supplied receipt/proof S3 paths, enabling cross-member receipt download
   Finding 61 (HIGH)     Purchase expense lines had no upper bound; submit creates a QuickBooks Bill with no approval gate
   Finding 62 (HIGH)     Volunteers could soft-delete published posts via the post editor (list only allowed drafts)
+  Finding 69 (HIGH)     Volunteers could unpublish then delete live posts via restore-post (Finding 62 bypass)
   Finding 63 (MEDIUM)   Public post comments trusted client post_id, allowing comments on draft/other posts
   Finding 64 (MEDIUM)   Event agenda delete/move did not verify event ownership (cross-event agenda IDOR)
   Finding 65 (MEDIUM)   Trix upload post_id auto-set cover image on any post without ownership binding
@@ -3731,6 +3732,120 @@ defmodule YscWeb.SecurityAuditTest do
 
       refute has_element?(view, "#delete-post-#{post.id}")
 
+      render_click(view, "delete-post")
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 69 (HIGH): Volunteers must not unpublish live posts via restore-post
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 69: volunteers cannot restore published posts" do
+    test "restore_post refuses published posts" do
+      author = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Published #{System.unique_integer([:positive])}",
+          raw_body: "<p>Live article</p>",
+          url_name: "f69-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert {:error, :invalid_state} =
+               Ysc.Posts.restore_post(post, volunteer)
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+      assert reloaded.published_on
+    end
+
+    test "restore_post allows deleted posts" do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Deleted #{System.unique_integer([:positive])}",
+          raw_body: "<p>Deleted draft</p>",
+          url_name: "f69-deleted-#{System.unique_integer([:positive])}",
+          state: :deleted,
+          deleted_on: DateTime.utc_now(),
+          user_id: volunteer.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert {:ok, restored} = Ysc.Posts.restore_post(post, volunteer)
+      assert restored.state == :draft
+      assert is_nil(restored.deleted_on)
+    end
+
+    test "volunteer restore-post event on a published post is refused", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Editor #{System.unique_integer([:positive])}",
+          raw_body: "<p>Live Club News</p>",
+          url_name: "f69-editor-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: volunteer.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/posts/#{post.id}")
+
+      refute has_element?(view, "button[phx-click=restore-post]")
+
+      render_click(view, "restore-post")
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+      assert reloaded.published_on
+    end
+
+    test "volunteer restore-post then delete-post cannot wipe a published post",
+         %{conn: conn} do
+      author = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Chain #{System.unique_integer([:positive])}",
+          raw_body: "<p>Victim article</p>",
+          url_name: "f69-chain-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/posts/#{post.id}")
+
+      render_click(view, "restore-post")
       render_click(view, "delete-post")
 
       reloaded = Ysc.Posts.get_post(post.id)

@@ -643,19 +643,7 @@ defmodule YscWeb.AdminPostEditorLive do
   def handle_event("restore-post", _params, socket) do
     post = socket.assigns.post
 
-    res =
-      Posts.update_post(
-        post,
-        %{
-          state: :draft,
-          published_on: nil,
-          deleted_on: nil,
-          featured_post: false
-        },
-        socket.assigns.current_user
-      )
-
-    case res do
+    case Posts.restore_post(post, socket.assigns.current_user) do
       {:ok, new_post} ->
         {:noreply,
          socket
@@ -664,6 +652,15 @@ defmodule YscWeb.AdminPostEditorLive do
            title: "Post restored"
          )
          |> redirect(to: ~p"/admin/posts/#{post.id}")}
+
+      {:error, :invalid_state} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Only deleted posts can be restored.",
+           title: "Restore failed"
+         )}
 
       {:error, _changeset} ->
         {:noreply,

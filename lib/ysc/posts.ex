@@ -363,6 +363,31 @@ defmodule Ysc.Posts do
   end
 
   @doc """
+  Restores a soft-deleted post back to draft.
+
+  Only deleted posts can be restored. `restore-post` used to apply this
+  transition to any state, so a volunteer could unpublish live Club News and
+  then `delete-post` it (Finding 62 only blocked delete while `state` was
+  still `:published`) — Finding 69.
+  """
+  def restore_post(%Post{} = post, %User{} = current_user) do
+    if post.state == :deleted do
+      update_post(
+        post,
+        %{
+          state: :draft,
+          published_on: nil,
+          deleted_on: nil,
+          featured_post: false
+        },
+        current_user
+      )
+    else
+      {:error, :invalid_state}
+    end
+  end
+
+  @doc """
   Updates editorial post fields from the admin editor auto-save path.
 
   Ignores mass-assigned lifecycle controls (`state`, `published_on`, `deleted_on`,
