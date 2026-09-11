@@ -624,7 +624,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       assert html =~ "10.0.xxx.xxx"
     end
 
-    test "shows flagged badge for suspicious sign-in event", %{conn: conn} do
+    test "shows unfamiliar sign-in badge for suspicious sign-in event", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
@@ -647,7 +647,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       html = render(view)
       assert html =~ "Recent Activity"
       assert html =~ "Successful"
-      assert html =~ "Flagged"
+      assert html =~ "Unfamiliar sign-in"
     end
 
     test "limits to 10 most recent sign-in events", %{conn: conn} do

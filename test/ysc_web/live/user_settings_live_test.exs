@@ -1256,7 +1256,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       refute html =~ "Verify Your Phone Number"
       refute has_element?(view, "#phone_verification_form")
-      assert html =~ "SMS verification isn&#39;t available"
+      assert html =~ "We can&#39;t send a verification text"
 
       updated = Repo.get!(Ysc.Accounts.User, user.id)
       assert updated.phone_number == "+46701234567"
