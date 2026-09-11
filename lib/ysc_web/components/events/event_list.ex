@@ -102,7 +102,7 @@ defmodule YscWeb.EventsListLive do
                         do: DateDisplay.event_day_label(@hero_event) %>
                     <span
                       :if={hero_day_label == :today}
-                      class="px-3 py-1.5 bg-red-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400 animate-pulse"
+                      class="px-3 py-1.5 bg-rose-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-pulse"
                     >
                       <.icon
                         name="hero-bolt-solid"
@@ -530,7 +530,7 @@ defmodule YscWeb.EventsListLive do
     case badge.text do
       "Sold Out" -> "bg-red-600"
       "Going Fast!" -> "bg-emerald-600"
-      "Cancelled" -> "bg-zinc-600"
+      "Cancelled" -> "bg-zinc-700"
       "Save the Date" -> "bg-blue-600"
       _ -> "bg-zinc-600"
     end
@@ -545,7 +545,7 @@ defmodule YscWeb.EventsListLive do
         "sm:bg-emerald-500/90 sm:backdrop-blur-md sm:border sm:border-emerald-400"
 
       "Cancelled" ->
-        "sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400"
+        "sm:bg-zinc-600/90 sm:backdrop-blur-md sm:border sm:border-zinc-500"
 
       "Save the Date" ->
         "sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"

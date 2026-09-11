@@ -20,7 +20,7 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
   end
 
   def get_subject() do
-    "Velkommen! Your YSC Membership is Active! 🎉"
+    "Velkommen! (Welcome!) Your YSC Membership is Active! 🎉"
   end
 
   def dashboard_url(), do: YscWeb.Emails.Helpers.home_url()
@@ -52,7 +52,7 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
 
         If you have any questions, please don't hesitate to contact us at memberships@ysc.org.
 
-        Velkommen!
+        Velkommen! (Welcome!)
 
         Young Scandinavians Club
 
@@ -64,7 +64,7 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
 
         Hi #{user.email},
 
-        Your application has been approved and your membership payment has been processed! 🎉
+        Your application has been approved and your membership is now active! 🎉
 
         Your membership is now active. Welcome to the Young Scandinavians Club!
 
@@ -72,7 +72,7 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
 
         If you have any questions, please don't hesitate to contact us at memberships@ysc.org.
 
-        Velkommen!
+        Velkommen! (Welcome!)
 
         Young Scandinavians Club
 

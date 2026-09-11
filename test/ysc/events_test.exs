@@ -309,10 +309,24 @@ defmodule Ysc.EventsTest do
       assert updated.title == "Updated Title"
     end
 
-    test "delete_event/1 marks event as deleted", %{user: user} do
+    test "delete_event/1 marks draft event as deleted", %{user: user} do
       {:ok, event} =
         Events.create_event(%{
           title: "To Delete",
+          description: "Description",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert {:ok, deleted} = Events.delete_event(event)
+      assert deleted.state == :deleted
+    end
+
+    test "delete_event/1 refuses published events", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Published Keep",
           description: "Description",
           state: :published,
           organizer_id: user.id,
@@ -320,8 +334,8 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now()
         })
 
-      assert {:ok, deleted} = Events.delete_event(event)
-      assert deleted.state == :deleted
+      assert {:error, :invalid_state} = Events.delete_event(event)
+      assert Events.get_event!(event.id).state == :published
     end
   end
 

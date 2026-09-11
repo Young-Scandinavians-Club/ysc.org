@@ -38,6 +38,36 @@ defmodule Ysc.Events.TicketTierHelpersTest do
     end
   end
 
+  describe "free_tier?/1" do
+    test "recognizes free type atoms and strings" do
+      assert TicketTierHelpers.free_tier?(:free)
+      assert TicketTierHelpers.free_tier?("free")
+    end
+
+    test "returns false for paid and donation tiers" do
+      refute TicketTierHelpers.free_tier?(:paid)
+      refute TicketTierHelpers.free_tier?(%TicketTier{type: :donation})
+    end
+  end
+
+  describe "complimentary_tier?/1" do
+    test "true for free tiers and $0 paid tiers" do
+      assert TicketTierHelpers.complimentary_tier?(%TicketTier{type: :free})
+
+      assert TicketTierHelpers.complimentary_tier?(%TicketTier{
+               type: :paid,
+               price: Money.new(0, :USD)
+             })
+    end
+
+    test "false for positive-priced paid tiers" do
+      refute TicketTierHelpers.complimentary_tier?(%TicketTier{
+               type: :paid,
+               price: Money.new(25, :USD)
+             })
+    end
+  end
+
   describe "tier_sale_started?/2" do
     test "nil start_date means sale has started" do
       assert TicketTierHelpers.tier_sale_started?(

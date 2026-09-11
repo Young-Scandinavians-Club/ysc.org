@@ -282,6 +282,9 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert has_element?(view, "#volunteer-help-banner")
       assert has_element?(view, "#volunteer-help-banner a[href='/admin/help']")
       assert has_element?(view, "#volunteer-stats-row")
+      assert has_element?(view, "#volunteer-events-card")
+      assert has_element?(view, "#volunteer-posts-card")
+      assert has_element?(view, "#volunteer-newsletters-card")
       refute has_element?(view, "#admin-stats-row")
       refute has_element?(view, "#property-matrix")
       refute has_element?(view, "#dashboard-property-tahoe")
@@ -294,6 +297,18 @@ defmodule YscWeb.AdminDashboardLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/admin")
       html = render(view)
+
+      assert has_element?(
+               view,
+               "#volunteer-events-card[href='/admin/events']"
+             )
+
+      assert has_element?(view, "#volunteer-posts-card[href='/admin/posts']")
+
+      assert has_element?(
+               view,
+               "#volunteer-newsletters-card[href='/admin/newsletters']"
+             )
 
       assert html =~ "Upcoming Events"
       assert html =~ "News &amp; Posts"

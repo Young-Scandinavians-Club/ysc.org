@@ -162,7 +162,7 @@ defmodule YscWeb.Emails.TicketOrderRefundTest do
           refunded
         )
 
-      assert data.refund.reason == "Refund processed"
+      assert data.refund.reason == "Refund issued"
     end
 
     test "raises when refund is nil", %{

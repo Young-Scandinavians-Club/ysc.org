@@ -317,13 +317,13 @@ defmodule YscWeb.AdminEventsLive do
         Check in
       </.dropdown_menu_item>
       <.dropdown_menu_item
-        :if={@event.state == :draft}
+        :if={@event.state in [:draft, :scheduled]}
         id={"#{@menu_id}-delete"}
         icon="hero-trash"
         tone={:danger}
         phx-click="delete-event"
         phx-value-id={@event.id}
-        data-confirm="Delete this draft event? This cannot be undone."
+        data-confirm="Delete this event? This cannot be undone."
       >
         Delete
       </.dropdown_menu_item>
@@ -463,27 +463,31 @@ defmodule YscWeb.AdminEventsLive do
   def handle_event("delete-event", %{"id" => id}, socket) do
     event = Events.get_event!(id)
 
-    if event.state == :draft do
-      case Events.delete_event(event) do
-        {:ok, _event} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Event deleted.")
-           |> stream_delete(:events, event)
-           |> assign(
-             :events_by_id,
-             Map.delete(socket.assigns.events_by_id, event.id)
-           )
-           |> assign(
-             :event_list,
-             Enum.reject(socket.assigns.event_list, &(&1.id == event.id))
-           )}
+    case Events.delete_event(event) do
+      {:ok, _event} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Event deleted.")
+         |> stream_delete(:events, event)
+         |> assign(
+           :events_by_id,
+           Map.delete(socket.assigns.events_by_id, event.id)
+         )
+         |> assign(
+           :event_list,
+           Enum.reject(socket.assigns.event_list, &(&1.id == event.id))
+         )}
 
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to delete event")}
-      end
-    else
-      {:noreply, socket}
+      {:error, :invalid_state} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Published and cancelled events cannot be deleted. Cancel the event instead."
+         )}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete event")}
     end
   end
 

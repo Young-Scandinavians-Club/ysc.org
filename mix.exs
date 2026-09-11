@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.39.0",
+      version: "2.40.1",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -204,6 +204,9 @@ defmodule Ysc.MixProject do
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
+      # 1.4.8: OTP 28 warnings :exact_compare / :opaque_compare / :opaque_union;
+      # line-and-column locations match line-specific ignore entries. We use
+      # @dialyzer attributes (no ignore file) and list_unused_filters in CI.
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
       # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
@@ -259,7 +262,10 @@ defmodule Ysc.MixProject do
       # => ...}) and generate_and_sign/3; we do not use peek or JWK signers.
       {:joken, "~> 2.7"},
       # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
-      # DSL and authorize/4 return values are unchanged.
+      # 3.0.4: literal allow/deny true|false eval via Spek so Elixir 1.20 does not
+      # warn about dead authorize?/4 branches; missing-rule warnings put policy
+      # and check modules in the message instead of Logger metadata. DSL and
+      # authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
       # 0.10.0: gettext on put_toast/send_toast messages is gone; connection-notice
       # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix

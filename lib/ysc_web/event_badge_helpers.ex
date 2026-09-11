@@ -58,10 +58,12 @@ defmodule YscWeb.EventBadgeHelpers do
   """
   @spec hero_badge_kinds(map()) :: [badge_kind()]
   def hero_badge_kinds(event) when is_map(event) do
+    sold_out = EventHelpers.event_sold_out?(event)
+
     []
     |> maybe_append(:save_the_date, get_field(event, :tickets_tbd))
-    |> maybe_append(:sold_out, EventHelpers.event_sold_out?(event))
-    |> maybe_append(:going_fast, get_field(event, :selling_fast))
+    |> maybe_append(:sold_out, sold_out)
+    |> maybe_append(:going_fast, !sold_out && get_field(event, :selling_fast))
     |> maybe_append(
       :cancelled,
       get_field(event, :state) in [:cancelled, "cancelled"]
@@ -124,45 +126,55 @@ defmodule YscWeb.EventBadgeHelpers do
     end
   end
 
-  defp card_badge(:cancelled),
-    do: %{text: "Cancelled", class: "bg-red-500 text-white", icon: nil}
+  # Canonical color + icon per badge kind. Every kind gets its own color so a
+  # label reads the same way everywhere it appears (card, hero, TV poster).
+  @badge_styles %{
+    cancelled: {"bg-zinc-700", "hero-x-circle-solid"},
+    sold_out: {"bg-red-600", "hero-no-symbol"},
+    save_the_date: {"bg-blue-600", "hero-ticket"},
+    just_added: {"bg-violet-600", "hero-sparkles-solid"},
+    today: {"bg-rose-600 animate-pulse", "hero-bolt-solid"},
+    tomorrow: {"bg-orange-600", "hero-calendar-solid"},
+    days_left: {"bg-sky-600", "hero-clock"},
+    going_fast: {"bg-emerald-600", "hero-fire-solid"}
+  }
 
-  defp card_badge(:sold_out),
-    do: %{text: "Sold Out", class: "bg-red-500 text-white", icon: nil}
+  defp badge_style(:cancelled), do: Map.fetch!(@badge_styles, :cancelled)
+  defp badge_style(:sold_out), do: Map.fetch!(@badge_styles, :sold_out)
+
+  defp badge_style(:save_the_date),
+    do: Map.fetch!(@badge_styles, :save_the_date)
+
+  defp badge_style(:just_added), do: Map.fetch!(@badge_styles, :just_added)
+  defp badge_style(:today), do: Map.fetch!(@badge_styles, :today)
+  defp badge_style(:tomorrow), do: Map.fetch!(@badge_styles, :tomorrow)
+  defp badge_style({:days_left, _}), do: Map.fetch!(@badge_styles, :days_left)
+  defp badge_style(:going_fast), do: Map.fetch!(@badge_styles, :going_fast)
+
+  defp card_badge(:cancelled),
+    do: card_badge_from_style(:cancelled, "Cancelled")
+
+  defp card_badge(:sold_out), do: card_badge_from_style(:sold_out, "Sold Out")
 
   defp card_badge(:save_the_date),
-    do: %{
-      text: "Save the Date",
-      class: "bg-blue-500 text-white",
-      icon: "hero-ticket"
-    }
+    do: card_badge_from_style(:save_the_date, "Save the Date")
 
   defp card_badge(:just_added),
-    do: %{text: "Just Added", class: "bg-zinc-600 text-white", icon: nil}
+    do: card_badge_from_style(:just_added, "Just Added")
 
-  defp card_badge(:today),
-    do: %{
-      text: "Today",
-      class: "bg-red-600 text-white animate-pulse",
-      icon: "hero-bolt-solid"
-    }
+  defp card_badge(:today), do: card_badge_from_style(:today, "Today")
+  defp card_badge(:tomorrow), do: card_badge_from_style(:tomorrow, "Tomorrow")
 
-  defp card_badge(:tomorrow),
-    do: %{text: "Tomorrow", class: "bg-orange-500 text-white", icon: nil}
-
-  defp card_badge({:days_left, days}),
-    do: %{
-      text: "#{days} days left",
-      class: "bg-sky-500 text-white",
-      icon: nil
-    }
+  defp card_badge({:days_left, days} = kind),
+    do: card_badge_from_style(kind, "#{days} days left")
 
   defp card_badge(:going_fast),
-    do: %{
-      text: "Going Fast!",
-      class: "bg-emerald-600 text-white",
-      icon: "hero-bolt-solid"
-    }
+    do: card_badge_from_style(:going_fast, "Going Fast!")
+
+  defp card_badge_from_style(kind, text) do
+    {bg_class, icon} = badge_style(kind)
+    %{text: text, class: "#{bg_class} text-white", icon: icon}
+  end
 
   defp core_badge(:cancelled), do: {"red", "Cancelled"}
   defp core_badge(:sold_out), do: {"red", "Sold Out"}
@@ -177,16 +189,20 @@ defmodule YscWeb.EventBadgeHelpers do
   defp core_badge(:going_fast), do: {"yellow", "Going Fast!"}
 
   defp hero_badge(:save_the_date),
-    do: %{text: "Save the Date", icon: "hero-ticket", class: "bg-blue-600"}
+    do: hero_badge_from_style(:save_the_date, "Save the Date")
 
-  defp hero_badge(:sold_out),
-    do: %{text: "Sold Out", icon: "hero-ticket", class: "bg-red-600"}
+  defp hero_badge(:sold_out), do: hero_badge_from_style(:sold_out, "Sold Out")
 
   defp hero_badge(:going_fast),
-    do: %{text: "Going Fast!", icon: "hero-fire", class: "bg-emerald-600"}
+    do: hero_badge_from_style(:going_fast, "Going Fast!")
 
   defp hero_badge(:cancelled),
-    do: %{text: "Cancelled", icon: "hero-x-circle", class: "bg-zinc-600"}
+    do: hero_badge_from_style(:cancelled, "Cancelled")
+
+  defp hero_badge_from_style(kind, text) do
+    {bg_class, icon} = badge_style(kind)
+    %{text: text, icon: icon, class: bg_class}
+  end
 
   defp just_added?(published_at) do
     DateTime.diff(DateTime.utc_now(), published_at, :hour) <= 48

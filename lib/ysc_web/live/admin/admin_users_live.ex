@@ -1000,7 +1000,7 @@ defmodule YscWeb.AdminUsersLive do
             YscWeb.Emails.Notifier.schedule_email(
               user.email,
               "#{user.id}",
-              "Velkommen! You're officially a Young Scandinavian 🎉",
+              YscWeb.Emails.ApplicationApprovedFamilyLinked.get_subject(),
               "application_approved_family_linked",
               %{first_name: user.first_name},
               """
@@ -1014,7 +1014,7 @@ defmodule YscWeb.AdminUsersLive do
 
               If you have any questions, please don't hesitate to contact the Membership Coordinator or reach out to us at memberships@ysc.org.
 
-              Velkommen!
+              Velkommen! (Welcome!)
 
               Young Scandinavians Club
 

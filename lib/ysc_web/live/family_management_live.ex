@@ -1038,8 +1038,11 @@ defmodule YscWeb.FamilyManagementLive do
       Enum.map(family_members, fn member ->
         subtitle =
           case member.birth_date do
-            %Date{} = date -> "DOB: #{DateDisplay.format_date_long(date)}"
-            _ -> "Details saved"
+            %Date{} = date ->
+              "Date of birth: #{DateDisplay.format_date_long(date)}"
+
+            _ ->
+              "Details saved"
           end
 
         %{

@@ -195,9 +195,14 @@ defmodule YscWeb.BookingUserMessagesTest do
   end
 
   test "checkout hold expired messages" do
-    assert BookingUserMessages.checkout_hold_expired() =~ "hold on these dates"
+    assert BookingUserMessages.checkout_hold_expired() =~ "no longer reserved"
     assert BookingUserMessages.checkout_hold_expired() =~ "start a new booking"
+    refute BookingUserMessages.checkout_hold_expired() =~ "hold on these dates"
+    refute BookingUserMessages.checkout_hold_expired() =~ "released"
     assert BookingUserMessages.checkout_hold_expired_toast() =~ "cabin page"
+
+    refute BookingUserMessages.checkout_hold_expired_toast() =~
+             "hold on these dates"
   end
 
   test "checkout error messages include contact email" do
@@ -246,11 +251,17 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.cancel_refund_error({:payment_not_found, nil}) =~
              "confirmation number"
 
+    refute BookingUserMessages.cancel_refund_error({:payment_not_found, nil}) =~
+             "process a refund"
+
+    refute BookingUserMessages.cancel_refund_error({:refund_failed, nil}) =~
+             "processed automatically"
+
     assert BookingUserMessages.cancel_refund_error({:calculation_failed, nil}) =~
              "couldn't calculate your refund"
 
     assert BookingUserMessages.cancel_refund_error({:refund_failed, nil}) =~
-             "refund couldn't be processed automatically"
+             "couldn't send your refund automatically"
 
     assert BookingUserMessages.cancel_refund_error(
              {:pending_refund_failed, nil}

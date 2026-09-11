@@ -178,7 +178,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 <strong>
                   {MoneyHelper.format_money!(@refund_data.total_refunded)}
                 </strong>
-                has been processed.
+                is on the way.
               <% else %>
                 Refund information is shown in the payment summary on the right.
               <% end %>
@@ -674,7 +674,7 @@ defmodule YscWeb.OrderConfirmationLive do
                           )
                         ]}>
                           {if refund.status == :completed,
-                            do: "Processed",
+                            do: "Complete",
                             else: String.capitalize(Atom.to_string(refund.status))}
                         </span>
                       </div>

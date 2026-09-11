@@ -9,6 +9,7 @@ defmodule Ysc.Events.TicketTierHelpers do
   alias Ysc.Events.TicketTier
 
   @donation_types [:donation, "donation"]
+  @free_types [:free, "free"]
 
   @doc """
   Returns true when the tier or type represents a donation tier.
@@ -24,6 +25,33 @@ defmodule Ysc.Events.TicketTierHelpers do
   """
   def donation_ticket?(%{ticket_tier: tier}), do: donation_tier?(tier)
   def donation_ticket?(_), do: false
+
+  @doc """
+  Returns true when the tier or type represents a free / RSVP tier.
+  """
+  def free_tier?(type) when type in @free_types, do: true
+  def free_tier?(%TicketTier{type: type}), do: free_tier?(type)
+  def free_tier?(%{type: type}), do: free_tier?(type)
+  def free_tier?(%{"type" => type}), do: free_tier?(type)
+  def free_tier?(_), do: false
+
+  @doc """
+  Returns true when selecting this tier would produce a $0 order total
+  (free RSVP tiers, or paid tiers priced at $0).
+  """
+  def complimentary_tier?(tier) do
+    free_tier?(tier) or zero_price_tier?(tier)
+  end
+
+  defp zero_price_tier?(%TicketTier{price: %Money{} = price}),
+    do: Money.zero?(price)
+
+  defp zero_price_tier?(%{price: %Money{} = price}), do: Money.zero?(price)
+
+  defp zero_price_tier?(%{"price" => %Money{} = price}),
+    do: Money.zero?(price)
+
+  defp zero_price_tier?(_), do: false
 
   @doc """
   Returns true when the tier sale has started (ignores end date).

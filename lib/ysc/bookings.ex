@@ -2626,6 +2626,41 @@ defmodule Ysc.Bookings do
   def blackout_occupied_nights(_), do: []
 
   @doc """
+  Whether existing blackouts already occupy every night of `[start_date, end_date]`.
+
+  Calendar overlap is not enough: a blackout that *touches* the range (for
+  example ending on `start_date`) does not occupy the same nights. Event publish
+  uses this so a leftover adjacent/partial blackout cannot skip creating a
+  blackout for uncovered event nights.
+
+  Multiple blackouts may jointly cover the range. An empty occupied-night set
+  (reversed or missing dates) is treated as covered — there is nothing to block.
+  """
+  def blackout_range_fully_covered?(property, start_date, end_date)
+      when is_atom(property) do
+    needed =
+      %{start_date: start_date, end_date: end_date}
+      |> blackout_occupied_nights()
+      |> MapSet.new()
+
+    if MapSet.size(needed) == 0 do
+      true
+    else
+      covered =
+        property
+        |> get_overlapping_blackouts(start_date, end_date)
+        |> Enum.reduce(MapSet.new(), fn blackout, acc ->
+          blackout
+          |> blackout_occupied_nights()
+          |> MapSet.new()
+          |> MapSet.union(acc)
+        end)
+
+      MapSet.subset?(needed, covered)
+    end
+  end
+
+  @doc """
   Dates that cannot be used as check-in because the first overnight would fall
   on a blackout-occupied night. Same set as `blackout_occupied_nights/1`.
   """

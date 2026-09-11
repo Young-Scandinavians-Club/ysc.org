@@ -1953,6 +1953,123 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert [%{reason: "Existing hold"}] =
                Bookings.list_blackouts_from_db(:clear_lake)
     end
+
+    test "prompt still opens when an overlapping blackout misses event nights",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = cabin_event(admin)
+
+      # Ends on the event start date: calendar overlap, but occupies no event
+      # nights (same-day turnaround). Event Jul 5–7 needs nights Jul 5 and 6.
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          "property" => :clear_lake,
+          "reason" => "Previous weekend",
+          "start_date" => ~D[2030-07-01],
+          "end_date" => ~D[2030-07-05]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html =
+        view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert html =~ "Block the booking calendar?"
+      assert has_element?(view, "#event-blackout-prompt-modal")
+      assert has_element?(view, "button[phx-click=confirm-blackout]")
+      assert Repo.get!(Event, event.id).state == :draft
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=confirm-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+
+      reasons =
+        :clear_lake
+        |> Bookings.list_blackouts_from_db()
+        |> Enum.map(& &1.reason)
+        |> Enum.sort()
+
+      assert "Previous weekend" in reasons
+      assert Enum.any?(reasons, &(&1 =~ "Cabin Retreat"))
+
+      assert Bookings.has_blackout?(:clear_lake, ~D[2030-07-04], ~D[2030-07-05])
+      assert Bookings.has_blackout?(:clear_lake, ~D[2030-07-05], ~D[2030-07-06])
+      assert Bookings.has_blackout?(:clear_lake, ~D[2030-07-06], ~D[2030-07-07])
+      refute Bookings.has_blackout?(:clear_lake, ~D[2030-07-07], ~D[2030-07-08])
+    end
+
+    test "prompt still opens when a blackout covers only the first event night",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = cabin_event(admin)
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          "property" => :clear_lake,
+          "reason" => "First night only",
+          "start_date" => ~D[2030-07-05],
+          "end_date" => ~D[2030-07-06]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html =
+        view |> element("button[phx-click=publish-event]") |> render_click()
+
+      assert html =~ "Block the booking calendar?"
+      assert has_element?(view, "button[phx-click=confirm-blackout]")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=confirm-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+      assert Bookings.has_blackout?(:clear_lake, ~D[2030-07-06], ~D[2030-07-07])
+    end
+
+    test "confirm still adds a blackout when a concurrent one only partially covers",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view |> element("button[phx-click=publish-event]") |> render_click()
+      assert has_element?(view, "#event-blackout-prompt-modal")
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          "property" => :clear_lake,
+          "reason" => "Partial overlap",
+          "start_date" => ~D[2030-07-05],
+          "end_date" => ~D[2030-07-06]
+        })
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               view
+               |> element("button[phx-click=confirm-blackout]")
+               |> render_click()
+
+      assert Repo.get!(Event, event.id).state == :published
+
+      reasons =
+        :clear_lake
+        |> Bookings.list_blackouts_from_db()
+        |> Enum.map(& &1.reason)
+
+      assert "Partial overlap" in reasons
+      assert Enum.any?(reasons, &(&1 =~ "Cabin Retreat"))
+      assert Bookings.has_blackout?(:clear_lake, ~D[2030-07-06], ~D[2030-07-07])
+    end
   end
 
   describe "publish - existing cabin booking warning" do

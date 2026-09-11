@@ -144,6 +144,8 @@ defmodule YscWeb.FamilyManagementLiveTest do
       refute has_element?(view, "#family-member-modal")
       assert html =~ "Casey Lee"
       assert html =~ "No account yet"
+      assert html =~ "Date of birth: June 01, 2012"
+      refute html =~ "DOB:"
       assert has_element?(view, "#active-family-members-table")
     end
 

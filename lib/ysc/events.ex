@@ -785,20 +785,30 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Delete an event from the database.
+  Soft-deletes a draft or scheduled event.
+
+  Published and cancelled events must be cancelled / left cancelled rather than
+  deleted, so ticket holders keep a public status page. Matches the admin help
+  copy and the events-list delete affordance.
   """
   def delete_event(%Event{} = event) do
-    event
-    |> Event.changeset(%{state: :deleted, published_at: nil})
-    |> Repo.update()
-    |> case do
-      {:ok, event} ->
-        invalidate_event_caches()
-        broadcast(%Ysc.MessagePassingEvents.EventDeleted{event: event})
-        {:ok, event}
+    # Finding 59: refuse published/cancelled deletes so volunteers cannot wipe
+    # another organizer's live event (and sold tickets) via the editor menu.
+    if event.state in [:draft, :scheduled] do
+      event
+      |> Event.changeset(%{state: :deleted, published_at: nil})
+      |> Repo.update()
+      |> case do
+        {:ok, event} ->
+          invalidate_event_caches()
+          broadcast(%Ysc.MessagePassingEvents.EventDeleted{event: event})
+          {:ok, event}
 
-      {:error, changeset} ->
-        {:error, changeset}
+        {:error, changeset} ->
+          {:error, changeset}
+      end
+    else
+      {:error, :invalid_state}
     end
   end
 

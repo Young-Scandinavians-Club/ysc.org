@@ -2427,6 +2427,95 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_dashboard_link_card
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Clickable summary card chrome used on the admin dashboard.
+
+  Volunteer shortcuts, the memberships tile, occupancy snapshots, and ghost
+  previews all share this border, hover ring, and footer CTA. Pass `navigate`
+  for a LiveView link; omit it for a static (non-clickable) preview card.
+
+  ## Examples
+
+      <.admin_dashboard_link_card
+        id="volunteer-events-card"
+        navigate={~p"/admin/events"}
+        action="Manage events →"
+      >
+        <p class="text-3xl font-black text-zinc-900">3</p>
+      </.admin_dashboard_link_card>
+  """
+  attr :id, :string, default: nil
+
+  attr :navigate, :any,
+    default: nil,
+    doc: "LiveView path. Omit for a static card."
+
+  attr :action, :string,
+    required: true,
+    doc: "Footer CTA label, e.g. `Manage events →`"
+
+  attr :accent, :atom,
+    default: :default,
+    values: [:default, :warning],
+    doc:
+      "`:warning` uses the amber pending-applications treatment; `:default` is zinc"
+
+  slot :inner_block, required: true
+
+  def admin_dashboard_link_card(assigns) do
+    interactive? = not is_nil(assigns.navigate)
+
+    assigns =
+      assign(
+        assigns,
+        :class,
+        dashboard_link_card_class(assigns.accent, interactive?)
+      )
+
+    ~H"""
+    <%= if @navigate do %>
+      <.link id={@id} navigate={@navigate} class={@class}>
+        {render_slot(@inner_block)}
+        <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
+          {@action}
+        </p>
+      </.link>
+    <% else %>
+      <div id={@id} class={@class}>
+        {render_slot(@inner_block)}
+        <p class="text-xs text-blue-600 font-medium mt-3">
+          {@action}
+        </p>
+      </div>
+    <% end %>
+    """
+  end
+
+  defp dashboard_link_card_class(accent, interactive?) do
+    [
+      "p-5 rounded border flex flex-col justify-between transition-all",
+      interactive? && "group",
+      dashboard_link_card_accent_class(accent, interactive?)
+    ]
+  end
+
+  defp dashboard_link_card_accent_class(:warning, true),
+    do:
+      "bg-white border-amber-300 shadow-sm shadow-amber-50 hover:ring-2 hover:ring-amber-200"
+
+  defp dashboard_link_card_accent_class(:warning, false),
+    do: "bg-white border-amber-300 shadow-sm shadow-amber-50"
+
+  defp dashboard_link_card_accent_class(:default, true),
+    do: "bg-white border-zinc-200 hover:ring-2 hover:ring-zinc-300"
+
+  defp dashboard_link_card_accent_class(:default, false),
+    do: "bg-white border-zinc-200"
+
+  # ---------------------------------------------------------------------------
   # admin_property_occupancy_card
   # ---------------------------------------------------------------------------
 
@@ -2478,11 +2567,7 @@ defmodule YscWeb.AdminComponents do
       )
 
     ~H"""
-    <.link
-      id={@id}
-      navigate={@navigate}
-      class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
-    >
+    <.admin_dashboard_link_card id={@id} navigate={@navigate} action={@view_label}>
       <div>
         <div class="flex items-center justify-between mb-2">
           <p class={[
@@ -2559,10 +2644,7 @@ defmodule YscWeb.AdminComponents do
           </p>
         </div>
       </div>
-      <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-        {@view_label}
-      </p>
-    </.link>
+    </.admin_dashboard_link_card>
     """
   end
 

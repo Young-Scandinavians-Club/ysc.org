@@ -45,15 +45,19 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 48 (MEDIUM)   App ticket PaymentIntent treated donation map values as cents while documenting quantity
   Finding 49 (HIGH)     Already-authenticated mobile handoff minted a PKCE-bound code on GET from attacker-supplied challenge
   Finding 50 (HIGH)     Volunteers could reserve tickets with up to 100% discount, bypassing Finding 46 grant gates
+  Finding 51 (HIGH)     Volunteers could grant $0 tickets and out-of-band memberships via the mobile app API
   Finding 52 (HIGH)     App membership subscribe reused a stale Stripe PaymentMethod without Terminal / member present
   Finding 53 (MEDIUM)   Volunteers could cancel ticket reservations (discounted holds) after Finding 46/50 grant gates
   Finding 54 (HIGH)     Volunteers could add/edit ticket tiers (including Free / $0), then check out complimentary tickets
   Finding 55 (HIGH)     Volunteers could copy events including Free / $0 / donation ticket tiers, minting complimentary inventory
   Finding 56 (MEDIUM)   Public newsletter unsubscribe LiveView treated an email URL param as a token, then unsubscribed by email
   Finding 57 (MEDIUM)   Leftover event editor save created events via Event.changeset, allowing organizer/state mass assignment
+  Finding 58 (HIGH)     App ticket PaymentIntent accepted free / $0 tiers, leaving pending comps completable via web confirm-free
+  Finding 59 (HIGH)     Volunteers could soft-delete any published event (including others') via the event editor
   Finding 60 (HIGH)     Expense reports accepted client-supplied receipt/proof S3 paths, enabling cross-member receipt download
   Finding 61 (HIGH)     Purchase expense lines had no upper bound; submit creates a QuickBooks Bill with no approval gate
   Finding 62 (HIGH)     Volunteers could soft-delete published posts via the post editor (list only allowed drafts)
+  Finding 69 (HIGH)     Volunteers could unpublish then delete live posts via restore-post (Finding 62 bypass)
   Finding 63 (MEDIUM)   Public post comments trusted client post_id, allowing comments on draft/other posts
   Finding 64 (MEDIUM)   Event agenda delete/move did not verify event ownership (cross-event agenda IDOR)
   Finding 65 (MEDIUM)   Trix upload post_id auto-set cover image on any post without ownership binding
@@ -64,10 +68,6 @@ defmodule YscWeb.SecurityAuditTest do
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
   or explicitly out of scope per the fix plan.
-
-  Finding 59 (volunteer soft-delete of published events) is covered by open PR #1251
-  (bundled with Finding 58 despite that PR's title).
-  Findings 51 / 54 / 58 are covered by open PRs #1190 / #1210 / #1251.
   """
   use YscWeb.ConnCase, async: true
 
@@ -1348,7 +1348,7 @@ defmodule YscWeb.SecurityAuditTest do
     end
 
     test "update_event_editor cannot resurrect a deleted event via forged publish params" do
-      event = event_fixture(%{state: :published})
+      event = event_fixture(%{state: :draft})
       {:ok, deleted} = Events.delete_event(event)
 
       assert deleted.state == :deleted
@@ -2739,6 +2739,107 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Finding 58 (HIGH): App PaymentIntent must reject free / $0 tiers
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 58: app tickets reject free and $0 tiers" do
+    import Ysc.EventsFixtures
+
+    test "volunteer cannot create a pending free-tier order via payment_intent" do
+      volunteer = user_fixture(%{role: :volunteer})
+      token = Accounts.generate_user_mobile_token(volunteer)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      _paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 58",
+          type: :paid,
+          price: Money.new(40, :USD)
+        })
+
+      free =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Free RSVP Finding 58",
+          type: :free,
+          price: Money.new(0, :USD)
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{free.id => 2}
+        })
+
+      assert %{
+               "error" =>
+                 "free or $0 ticket tiers cannot be charged via the in-person app; use the website free checkout or an admin offline sale"
+             } = json_response(conn, 422)
+
+      orders =
+        from(to in Ysc.Tickets.TicketOrder,
+          where: to.user_id == ^member.id and to.event_id == ^event.id
+        )
+        |> Repo.all()
+
+      assert orders == []
+    end
+
+    test "$0 paid tiers are refused the same way as free tiers" do
+      admin = user_fixture(%{role: :admin})
+      token = Accounts.generate_user_mobile_token(admin)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      zero_paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Zero GA Finding 58",
+          type: :paid,
+          price: Money.new(0, :USD)
+        })
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{zero_paid.id => 1}
+        })
+
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "free or $0 ticket tiers"
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 49 (HIGH): Already-authenticated mobile handoff must not mint on GET
   # ---------------------------------------------------------------------------
 
@@ -2903,6 +3004,57 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert Ysc.Events.list_all_ticket_reservations_for_user(volunteer.id) ==
                []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 51 (HIGH): Volunteers cannot grant unpaid tickets/memberships via app API
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 51: volunteers cannot grant unpaid tickets or memberships via the app API" do
+    import Ysc.EventsFixtures
+
+    test "volunteer cannot grant complimentary tickets via offline_order, including to themselves",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      member = user_fixture()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        conn
+        |> volunteer_app_conn(volunteer)
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => volunteer.id,
+          "tiers" => %{tier.id => 1},
+          "payment_method" => "cash"
+        })
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(response, 403)
+
+      assert Ysc.Events.list_tickets_for_user(volunteer.id) == []
+      assert Ysc.Events.list_tickets_for_user(member.id) == []
+    end
+
+    test "volunteer cannot create an out-of-band membership via subscribe_offline",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+      recipient = user_fixture()
+
+      response =
+        conn
+        |> volunteer_app_conn(volunteer)
+        |> post(~p"/api/v1/app/memberships/subscribe_offline", %{
+          "member_id" => recipient.id,
+          "plan" => "single",
+          "payment_method" => "cash"
+        })
+
+      assert %{"error" => "this action requires a full admin"} =
+               json_response(response, 403)
+
+      refute Accounts.has_active_membership?(Accounts.get_user!(recipient.id))
     end
   end
 
@@ -3202,6 +3354,58 @@ defmodule YscWeb.SecurityAuditTest do
         Newsletter.get_subscriber_by_email("finding56.victim@gmail.com")
 
       assert subscriber.subscribed
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 59 (HIGH): Volunteers must not soft-delete published events
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 59: volunteers cannot delete published events" do
+    import Ysc.EventsFixtures
+
+    test "volunteer delete-event on another organizer's published event is refused" do
+      organizer = user_fixture(%{role: :member})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 59 Victim Event #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      refute has_element?(view, "#delete-event-btn")
+
+      render_click(view, "delete-event", %{})
+
+      reloaded = Ysc.Events.get_event!(event.id)
+      assert reloaded.state == :published
+      assert reloaded.organizer_id == organizer.id
+    end
+
+    test "volunteer can still delete their own draft from the editor" do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :draft,
+          title: "Finding 59 Draft #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#delete-event-btn")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               render_click(view, "delete-event", %{})
+
+      assert Ysc.Events.get_event!(event.id).state == :deleted
     end
   end
 
@@ -3531,6 +3735,120 @@ defmodule YscWeb.SecurityAuditTest do
 
       refute has_element?(view, "#delete-post-#{post.id}")
 
+      render_click(view, "delete-post")
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 69 (HIGH): Volunteers must not unpublish live posts via restore-post
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 69: volunteers cannot restore published posts" do
+    test "restore_post refuses published posts" do
+      author = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Published #{System.unique_integer([:positive])}",
+          raw_body: "<p>Live article</p>",
+          url_name: "f69-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert {:error, :invalid_state} =
+               Ysc.Posts.restore_post(post, volunteer)
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+      assert reloaded.published_on
+    end
+
+    test "restore_post allows deleted posts" do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Deleted #{System.unique_integer([:positive])}",
+          raw_body: "<p>Deleted draft</p>",
+          url_name: "f69-deleted-#{System.unique_integer([:positive])}",
+          state: :deleted,
+          deleted_on: DateTime.utc_now(),
+          user_id: volunteer.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      assert {:ok, restored} = Ysc.Posts.restore_post(post, volunteer)
+      assert restored.state == :draft
+      assert is_nil(restored.deleted_on)
+    end
+
+    test "volunteer restore-post event on a published post is refused", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Editor #{System.unique_integer([:positive])}",
+          raw_body: "<p>Live Club News</p>",
+          url_name: "f69-editor-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: volunteer.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/posts/#{post.id}")
+
+      refute has_element?(view, "button[phx-click=restore-post]")
+
+      render_click(view, "restore-post")
+
+      reloaded = Ysc.Posts.get_post(post.id)
+      assert reloaded.state == :published
+      assert reloaded.published_on
+    end
+
+    test "volunteer restore-post then delete-post cannot wipe a published post",
+         %{conn: conn} do
+      author = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      {:ok, post} =
+        %Ysc.Posts.Post{}
+        |> Ysc.Posts.Post.new_post_changeset(%{
+          title: "Finding 69 Chain #{System.unique_integer([:positive])}",
+          raw_body: "<p>Victim article</p>",
+          url_name: "f69-chain-#{System.unique_integer([:positive])}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          comment_count: 0
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/posts/#{post.id}")
+
+      render_click(view, "restore-post")
       render_click(view, "delete-post")
 
       reloaded = Ysc.Posts.get_post(post.id)
@@ -3918,6 +4236,14 @@ defmodule YscWeb.SecurityAuditTest do
       assert Repo.get!(Ysc.Events.Event, event.id).state == :published
       assert Ysc.Bookings.list_blackouts_from_db(:clear_lake) == []
     end
+  end
+
+  defp volunteer_app_conn(conn, volunteer) do
+    token = Accounts.generate_user_mobile_token(volunteer)
+
+    conn
+    |> put_req_header("accept", "application/json")
+    |> put_req_header("authorization", "Bearer #{token}")
   end
 
   defp impersonate_as_admin(conn, admin, target) do

@@ -321,7 +321,7 @@ defmodule YscWeb.UserSettingsLive do
                       phx-click="delete-payment-method"
                       phx-value-payment_method_id={payment_method.id}
                       disabled={busy?}
-                      data-confirm="Remove this payment method? It will be detached from your account and can no longer be used for membership payments."
+                      data-confirm="Remove this payment method? It will be removed from your account and can no longer be used for membership payments."
                       aria-label="Remove payment method"
                       class="flex-shrink-0 p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -5805,7 +5805,7 @@ defmodule YscWeb.UserSettingsLive do
         <strong>Booking Cancelled:</strong>
         This booking has been cancelled. {if @payment_info.payment do
           if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
-            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} has been processed."
+            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} is on the way."
           else
             " Refund information is available in the booking details."
           end
@@ -5818,7 +5818,7 @@ defmodule YscWeb.UserSettingsLive do
         <strong>Tickets cancelled:</strong>
         These tickets have been cancelled. {if @payment_info.payment do
           if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
-            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} has been processed."
+            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} is on the way."
           else
             " Refund information is available in the order details."
           end

@@ -6,7 +6,7 @@ defmodule Ysc.Tickets do
   - Creating ticket orders with multiple tickets
   - Validating booking capacity and preventing overbooking
   - Processing payments with Stripe integration
-  - Managing 15-minute payment timeouts
+  - Managing 5-minute payment timeouts
   - Handling ticket order lifecycle
   """
 
@@ -31,7 +31,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Bookings
   alias Ysc.Ledgers
 
-  @payment_timeout_minutes 15
+  @payment_timeout_minutes 5
 
   ## Ticket Order Management
 
