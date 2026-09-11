@@ -139,13 +139,18 @@ jobs:
       # GHA service containers do not pass `server /data` to the MinIO image, so the
       # container exits immediately (help text only) and the health check never passes.
       # Start MinIO explicitly on the runner (same image as etc/docker/docker-compose).
+      #
+      # MinIO stopped publishing minio/minio and minio/mc to Docker Hub (archived the
+      # project Feb 2026); those images now return "pull access denied" for every tag,
+      # including old pinned digests. Using Chainguard's maintained rebuild instead —
+      # https://www.chainguard.dev/unchained/secure-and-free-minio-chainguard-containers
       - name: Start MinIO and create buckets
         run: |
           docker rm -f minio_ci 2>/dev/null || true
           docker run -d --name minio_ci -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:RELEASE.2025-03-12T18-04-18Z@sha256:46b3009bf7041eefbd90bd0d2b38c6ddc24d20a35d609551a1802c558c1c958f \
+            cgr.dev/chainguard/minio:latest@sha256:039800e64ec7247d2fde7cff3697e964f6fe20b6d7d2c46aa7d82cc63355d512 \
             server /data --console-address ":9001"
           for i in $(seq 1 60); do
             curl -sf http://127.0.0.1:9000/minio/health/live && break
@@ -153,7 +158,7 @@ jobs:
           done
           curl -sf http://127.0.0.1:9000/minio/health/live
           docker run --rm --network host --entrypoint /bin/sh \
-            minio/mc:RELEASE.2025-03-12T17-29-24Z@sha256:470f5546b596e16c7816b9c3fa7a78ce4076bb73c2c73f7faeec0c8043923123 \
+            cgr.dev/chainguard/minio-client:latest-dev@sha256:021ac36a006a29aea480d7f7acc5976021d93f5740f9486c7c3d5673103d2d38 \
             -c "
               mc alias set local http://127.0.0.1:9000 minioadmin minioadmin &&
               mc mb local/media --ignore-existing &&

@@ -14,8 +14,14 @@ services:
       timeout: 5s
       retries: 5
 
+  # MinIO stopped publishing minio/minio and minio/mc to Docker Hub (archived the
+  # project Feb 2026); those images now return "pull access denied" for every tag,
+  # including old pinned digests. Using Chainguard's maintained rebuild instead —
+  # https://www.chainguard.dev/unchained/secure-and-free-minio-chainguard-containers
+  # `-dev` variant is used (not the minimal default) because it ships wget/sh, which
+  # this service's own healthcheck and the minio-init script below need.
   minio:
-    image: minio/minio:RELEASE.2025-03-12T18-04-18Z@sha256:46b3009bf7041eefbd90bd0d2b38c6ddc24d20a35d609551a1802c558c1c958f
+    image: cgr.dev/chainguard/minio:latest-dev@sha256:25ba8c00148194630f699ef6d93d0274c5c015c5558b5acb406e0ea70ec9b11f
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
@@ -24,13 +30,13 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   minio-init:
-    image: minio/mc:RELEASE.2025-03-12T17-29-24Z@sha256:470f5546b596e16c7816b9c3fa7a78ce4076bb73c2c73f7faeec0c8043923123
+    image: cgr.dev/chainguard/minio-client:latest-dev@sha256:021ac36a006a29aea480d7f7acc5976021d93f5740f9486c7c3d5673103d2d38
     depends_on:
       minio:
         condition: service_healthy
