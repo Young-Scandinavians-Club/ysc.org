@@ -103,7 +103,7 @@ defmodule YscWeb.Emails.TicketOrderRefund do
       refund: %{
         reference_id: refund.reference_id,
         amount: refund_amount,
-        reason: refund.reason || "Refund processed",
+        reason: refund.reason || "Refund issued",
         refund_date: refund_date
       },
       refund_date: refund_date,

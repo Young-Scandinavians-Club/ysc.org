@@ -41,7 +41,8 @@ defmodule YscWeb.Emails.ApplicationApprovedTest do
       assert ApplicationApprovedFamilyLinked.get_template_name() ==
                "application_approved_family_linked"
 
-      assert ApplicationApprovedFamilyLinked.get_subject() =~ "Velkommen"
+      assert ApplicationApprovedFamilyLinked.get_subject() ==
+               "Velkommen! (Welcome!) You're officially a Young Scandinavian 🎉"
     end
 
     test "upcoming_events_url/0 and home_url/0 include paths" do

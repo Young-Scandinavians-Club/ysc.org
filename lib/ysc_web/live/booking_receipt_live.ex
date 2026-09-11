@@ -116,9 +116,9 @@ defmodule YscWeb.BookingReceiptLive do
           refund_message =
             if Money.positive?(refund_amount) do
               if is_pending_refund do
-                "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} needs a quick club review before it's sent (this is normal for some cancellation amounts). We'll email you when it's processed - you don't need to do anything else."
+                "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} needs a quick club review before it's sent (this is normal for some cancellation amounts). We'll email you when the money is on the way — you don't need to do anything else."
               else
-                "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
+                "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} is on the way."
               end
             else
               "Booking cancelled. No refund is available based on the cancellation policy."
@@ -213,7 +213,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <strong>
                     {MoneyHelper.format_money!(@refund_data.total_refunded)}
                   </strong>
-                  has been processed.
+                  is on the way.
                 <% end %>
               <% else %>
                 No refund is available based on the cancellation policy.
@@ -1025,7 +1025,7 @@ defmodule YscWeb.BookingReceiptLive do
                           />
                           <p class="text-xs text-amber-800">
                             <strong>Refund under review:</strong>
-                            Your refund needs a quick club review before it's sent (this is normal). We'll email you when it's processed - you don't need to do anything else.
+                            Your refund needs a quick club review before it's sent (this is normal). We'll email you when the money is on the way — you don't need to do anything else.
                           </p>
                         </div>
                       </div>
@@ -1058,7 +1058,7 @@ defmodule YscWeb.BookingReceiptLive do
                               )
                             ]}>
                               {if refund.status == :completed,
-                                do: "Processed",
+                                do: "Complete",
                                 else:
                                   String.capitalize(Atom.to_string(refund.status))}
                             </span>

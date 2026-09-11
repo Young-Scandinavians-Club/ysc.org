@@ -18,6 +18,8 @@ defmodule YscWeb.ViolationFormLiveTest do
       refute html =~ "Violation Summary"
       assert html =~ "kept private"
       refute html =~ "confidentiality protocols"
+      assert html =~ "if your report is about a current board member"
+      refute html =~ "if your violation involves"
     end
   end
 

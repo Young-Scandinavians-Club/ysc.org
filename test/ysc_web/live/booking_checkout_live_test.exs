@@ -757,7 +757,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       send(view.pid, :check_booking_expiration)
       html = render(view)
 
-      assert html =~ "expired"
+      assert html =~ "Time ran out for these dates"
       refute html =~ "Pay "
     end
 
@@ -814,7 +814,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       send(view.pid, :check_booking_expiration)
       html = render(view)
-      assert html =~ "expired" or html =~ "Complete Your Booking"
+
+      assert html =~ "Time ran out for these dates" or
+               html =~ "Complete Your Booking"
     end
 
     test "buyout with full entitlement discount skips Stripe and confirms from checkout",

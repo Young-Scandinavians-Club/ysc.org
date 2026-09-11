@@ -97,7 +97,7 @@ defmodule YscWeb.ConductViolationReportLive do
                     Is your report about a board member?
                   </p>
                   <p class="text-sm text-amber-800">
-                    Since reports are reviewed by the board, if your violation involves a current board member, we recommend reaching out directly to another board member you trust, or contacting the club president through a private channel to ensure your report is handled impartially.
+                    Since reports are reviewed by the board, if your report is about a current board member, we recommend reaching out directly to another board member you trust, or contacting the club president through a private channel to ensure your report is handled impartially.
                   </p>
                 </div>
               </div>

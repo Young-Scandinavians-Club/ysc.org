@@ -1815,7 +1815,7 @@ defmodule YscWeb.ExpenseReportLive do
               Submitted
             </h2>
             <ul class="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white overflow-hidden">
-              <li :for={report <- @submitted}>
+              <li :for={report <- @submitted} id={"expense-report-row-#{report.id}"}>
                 <.link
                   navigate={~p"/expensereport/#{report.id}/success"}
                   class="flex items-center gap-3 p-3 sm:p-4 hover:bg-zinc-50 transition-colors"

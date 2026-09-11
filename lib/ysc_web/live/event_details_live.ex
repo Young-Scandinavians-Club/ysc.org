@@ -5,7 +5,7 @@ defmodule YscWeb.EventDetailsLive do
 
   @attendees_preview_count 10
   @availability_refresh_debounce_ms 300
-  @ticket_checkout_timeout_message "Your ticket checkout timed out and your selected tickets were released. Choose your tickets again if any are still available. If you see a charge on your card, email info@ysc.org with the date and amount."
+  @ticket_checkout_timeout_message "Your ticket checkout timed out. Choose your tickets again if any are still available. If you see a charge on your card, email info@ysc.org with the date and amount."
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -2061,7 +2061,7 @@ defmodule YscWeb.EventDetailsLive do
               Time ran out
             </h2>
             <p class="text-zinc-600 max-w-md">
-              You have 5 minutes to complete your purchase. Time ran out, so your ticket selection was released and may no longer be available.
+              You have 5 minutes to complete your purchase. Time ran out, so those tickets may no longer be available.
               Please select your tickets again to continue.
             </p>
           </div>
@@ -2096,7 +2096,7 @@ defmodule YscWeb.EventDetailsLive do
                 Payment failed
               </h2>
               <p class="text-zinc-600 max-w-md">
-                Your payment did not go through. Your ticket selection was released — please select tickets again and try a different payment method if needed.
+                Your payment did not go through. Please select tickets again and try a different payment method if needed.
               </p>
             </div>
 

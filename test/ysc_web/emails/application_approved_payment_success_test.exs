@@ -11,8 +11,8 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
     assert ApplicationApprovedPaymentSuccess.get_template_name() ==
              "application_approved_payment_success"
 
-    assert ApplicationApprovedPaymentSuccess.get_subject() =~
-             "Membership is Active"
+    assert ApplicationApprovedPaymentSuccess.get_subject() ==
+             "Velkommen! (Welcome!) Your YSC Membership is Active! 🎉"
   end
 
   test "render/1 produces HTML email body for card payment" do

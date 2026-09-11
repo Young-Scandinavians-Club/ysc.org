@@ -77,6 +77,8 @@ defmodule YscWeb.UserTicketsLiveTest do
       assert has_element?(view, "#ticket-orders-list")
       assert html =~ data.event.title
       assert has_element?(view, "button", "Cancel checkout")
+      assert html =~ "will go back on sale"
+      refute html =~ "will be released"
     end
 
     test "cancel-order event shows error when order not found", %{conn: conn} do
