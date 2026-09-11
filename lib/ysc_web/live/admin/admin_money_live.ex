@@ -3435,7 +3435,7 @@ defmodule YscWeb.AdminMoneyLive do
             phx-window-keydown="expense_attachment_next"
             phx-key="ArrowDown"
           ></span>
-          <div class="flex h-full min-h-0 w-[min(34%,30rem)] min-w-[22rem] shrink-0 flex-col border-r border-zinc-200">
+          <div class="flex h-full min-h-0 w-[min(46%,40rem)] min-w-[28rem] shrink-0 flex-col border-r border-zinc-200">
             <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
