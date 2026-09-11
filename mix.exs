@@ -204,6 +204,9 @@ defmodule Ysc.MixProject do
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
+      # 1.4.8: OTP 28 warnings :exact_compare / :opaque_compare / :opaque_union;
+      # line-and-column locations match line-specific ignore entries. We use
+      # @dialyzer attributes (no ignore file) and list_unused_filters in CI.
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
       # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
