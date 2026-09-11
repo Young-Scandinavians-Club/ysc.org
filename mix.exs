@@ -259,7 +259,10 @@ defmodule Ysc.MixProject do
       # => ...}) and generate_and_sign/3; we do not use peek or JWK signers.
       {:joken, "~> 2.7"},
       # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
-      # DSL and authorize/4 return values are unchanged.
+      # 3.0.4: literal allow/deny true|false eval via Spek so Elixir 1.20 does not
+      # warn about dead authorize?/4 branches; missing-rule warnings put policy
+      # and check modules in the message instead of Logger metadata. DSL and
+      # authorize/4 return values are unchanged.
       {:let_me, "~> 3.0"},
       # 0.10.0: gettext on put_toast/send_toast messages is gone; connection-notice
       # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix
