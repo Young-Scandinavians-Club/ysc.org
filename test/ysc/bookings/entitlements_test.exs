@@ -1152,6 +1152,32 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
       assert bio_cols == 0
     end
+
+    test "includes outstanding entitlements whose issuer was nilified", %{
+      user: user
+    } do
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: nil,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 15)
+                 },
+                 send_notification: false
+               )
+
+      outstanding = Entitlements.list_outstanding()
+      ids = Enum.map(outstanding, & &1.id)
+
+      assert entitlement.id in ids
+
+      listed = Enum.find(outstanding, &(&1.id == entitlement.id))
+      assert listed.user.id == user.id
+      assert listed.user.email == user.email
+      assert is_nil(listed.issued_by_user)
+      assert is_nil(listed.issued_by_user_id)
+    end
   end
 
   describe "list_all_for_user/1" do

@@ -368,6 +368,41 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert Ysc.Tickets.list_user_ticket_orders(member.id) == []
     end
 
+    test "rejects a mixed complimentary and paid selection before creating a pending order",
+         %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA",
+          type: :paid,
+          price: Money.new(25, :USD)
+        })
+
+      free =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Free RSVP",
+          type: :free,
+          price: Money.new(0, :USD)
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{paid.id => 1, free.id => 1}
+        })
+
+      assert %{
+               "error" =>
+                 "free or $0 ticket tiers cannot be charged via the in-person app; use the website free checkout or an admin offline sale"
+             } = json_response(response, 422)
+
+      assert Ysc.Tickets.list_user_ticket_orders(member.id) == []
+    end
+
     test "returns 404 for an unknown event", %{conn: conn} do
       member = member_with_active_membership()
 
