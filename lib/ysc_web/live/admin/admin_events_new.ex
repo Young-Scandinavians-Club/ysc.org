@@ -143,8 +143,12 @@ defmodule YscWeb.AdminEventsNewLive do
                   </.button>
                 </div>
 
-                <div :if={@event.state in [:published]} class="hidden sm:block">
+                <div
+                  :if={@event.state in [:published] && @admin_role == :admin}
+                  class="hidden sm:block"
+                >
                   <.button
+                    id="unpublish-event-btn"
                     class="whitespace-nowrap"
                     color="red"
                     phx-click="unpublish-event"
@@ -231,11 +235,12 @@ defmodule YscWeb.AdminEventsNewLive do
                       </li>
 
                       <li
-                        :if={@event.state == :published}
+                        :if={@event.state == :published && @admin_role == :admin}
                         class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100 sm:hidden"
                       >
                         <button
                           type="button"
+                          id="unpublish-event-btn-mobile"
                           class="w-full text-left px-1"
                           phx-click="unpublish-event"
                         >
@@ -247,11 +252,12 @@ defmodule YscWeb.AdminEventsNewLive do
                       </li>
 
                       <li
-                        :if={@event.state == :published}
+                        :if={@event.state == :published && @admin_role == :admin}
                         class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100"
                       >
                         <button
                           type="button"
+                          id="cancel-event-btn"
                           class="w-full text-left px-1"
                           phx-click="cancel-event"
                         >
@@ -368,8 +374,9 @@ defmodule YscWeb.AdminEventsNewLive do
                     ) <> " anyway"}
               </.button>
               <.button
-                :if={@blackout_prompt.blackout_needed?}
+                :if={@blackout_prompt.blackout_needed? && @admin_role == :admin}
                 type="button"
+                id="confirm-blackout-btn"
                 color="blue"
                 phx-click="confirm-blackout"
                 phx-disable-with="Working..."
@@ -1974,15 +1981,22 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("confirm-blackout", _, socket) do
-    case socket.assigns[:blackout_prompt] do
-      nil ->
-        {:noreply, socket}
+    # Finding 68: volunteers must not mint cabin blackouts (LetMe
+    # `:blackout_create` is admin-only; /admin/bookings is full-admin so they
+    # also could not undo one).
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Blackout")}
+    else
+      case socket.assigns[:blackout_prompt] do
+        nil ->
+          {:noreply, socket}
 
-      prompt ->
-        socket
-        |> maybe_create_blackout(prompt)
-        |> assign(:blackout_prompt, nil)
-        |> run_blackout_pending(prompt.pending)
+        prompt ->
+          socket
+          |> maybe_create_blackout(prompt)
+          |> assign(:blackout_prompt, nil)
+          |> run_blackout_pending(prompt.pending)
+      end
     end
   end
 
@@ -2011,24 +2025,58 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("unpublish-event", _, socket) do
-    Events.unpublish_event(socket.assigns.event)
+    # Finding 67: volunteers must not take live events off the site.
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Event")}
+    else
+      case Events.unpublish_event(socket.assigns.event,
+             acting_role: socket.assigns.admin_role
+           ) do
+        {:ok, _event} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.",
+             title: "Event"
+           )
+           |> push_patch(to: "/admin/events/#{socket.assigns.event.id}/edit")}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.",
-       title: "Event"
-     )
-     |> push_patch(to: "/admin/events/#{socket.assigns.event.id}/edit")}
+        {:error, _} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to unpublish event.",
+             title: "Event"
+           )}
+      end
+    end
   end
 
   @impl true
   def handle_event("cancel-event", _, socket) do
-    Events.cancel_event(socket.assigns.event)
+    # Finding 67: volunteers must not cancel live events.
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Event")}
+    else
+      case Events.cancel_event(socket.assigns.event,
+             acting_role: socket.assigns.admin_role
+           ) do
+        {:ok, _event} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "Event cancelled.", title: "Event")
+           |> push_navigate(to: "/admin/events")}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Event cancelled.", title: "Event")
-     |> push_navigate(to: "/admin/events")}
+        {:error, _} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to cancel event.",
+             title: "Event"
+           )}
+      end
+    end
   end
 
   @impl true
@@ -2661,6 +2709,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
   defp maybe_create_blackout(socket, prompt) do
     cond do
+      socket.assigns[:admin_role] != :admin ->
+        deny_full_admin(socket, "Blackout")
+
       # Re-check right before creating: another admin may have added a blackout
       # that now occupies every event night while this modal was open.
       blackout_already_covers?(prompt.attrs) ->
@@ -2693,6 +2744,15 @@ defmodule YscWeb.AdminEventsNewLive do
             )
         end
     end
+  end
+
+  defp deny_full_admin(socket, title) do
+    YscWeb.Flash.put_toast(
+      socket,
+      :error,
+      "You do not have permission to perform this action.",
+      title: title
+    )
   end
 
   defp do_schedule_event(socket, publish_at_string) do

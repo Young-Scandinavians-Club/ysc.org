@@ -705,7 +705,7 @@ defmodule YscWeb.CoreComponentsTest do
         """)
 
       assert html =~ ~s(id="submitting-as")
-      assert html =~ "Submitting as"
+      assert html =~ "Sending from your account"
       assert html =~ "Ada Lovelace"
       assert html =~ "ada@example.com"
     end

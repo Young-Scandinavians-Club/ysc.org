@@ -678,7 +678,7 @@ defmodule YscWeb.UserSecurityLive do
                                 <.icon
                                   name="hero-exclamation-triangle"
                                   class="w-3 h-3 me-1"
-                                /> Flagged
+                                /> Unfamiliar sign-in
                               </span>
                             <% end %>
                           </div>

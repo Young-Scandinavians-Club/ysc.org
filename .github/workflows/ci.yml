@@ -139,35 +139,9 @@ jobs:
       # GHA service containers do not pass `server /data` to the MinIO image, so the
       # container exits immediately (help text only) and the health check never passes.
       # Start MinIO explicitly on the runner (same image as etc/docker/docker-compose).
-      #
-      # MinIO stopped publishing minio/minio and minio/mc to Docker Hub (archived the
-      # project Feb 2026); those images now return "pull access denied" for every tag,
-      # including old pinned digests. Using Chainguard's maintained rebuild instead —
-      # https://www.chainguard.dev/unchained/secure-and-free-minio-chainguard-containers
+      # Pulls from quay.io first: Docker Hub denied minio/minio on GHA (run 34650037512).
       - name: Start MinIO and create buckets
-        run: |
-          docker rm -f minio_ci 2>/dev/null || true
-          docker run -d --name minio_ci -p 9000:9000 \
-            -e MINIO_ROOT_USER=minioadmin \
-            -e MINIO_ROOT_PASSWORD=minioadmin \
-            cgr.dev/chainguard/minio:latest@sha256:039800e64ec7247d2fde7cff3697e964f6fe20b6d7d2c46aa7d82cc63355d512 \
-            server /data --console-address ":9001"
-          for i in $(seq 1 60); do
-            curl -sf http://127.0.0.1:9000/minio/health/live && break
-            sleep 1
-          done
-          curl -sf http://127.0.0.1:9000/minio/health/live
-          docker run --rm --network host --entrypoint /bin/sh \
-            cgr.dev/chainguard/minio-client:latest-dev@sha256:021ac36a006a29aea480d7f7acc5976021d93f5740f9486c7c3d5673103d2d38 \
-            -c "
-              mc alias set local http://127.0.0.1:9000 minioadmin minioadmin &&
-              mc mb local/media --ignore-existing &&
-              mc mb local/expense-reports --ignore-existing &&
-              mc mb local/app-resources --ignore-existing &&
-              mc mb local/avatars --ignore-existing &&
-              mc anonymous set public local/media &&
-              mc anonymous set public local/avatars
-            "
+        run: ./etc/scripts/ci/start_minio.sh
 
       # GitHub-hosted runners have ~7GiB RAM. mix coveralls.lcov on this suite
       # can OOM and drop the runner heartbeat (run 34416092041, 2026-09-09).
@@ -237,6 +211,9 @@ jobs:
 
       - name: run_coveralls_lcov self-test
         run: ./etc/scripts/ci/run_coveralls_lcov.sh --self-test
+
+      - name: start_minio self-test
+        run: ./etc/scripts/ci/start_minio.sh --self-test
 
       - name: dprint (format check)
         run: dprint check
