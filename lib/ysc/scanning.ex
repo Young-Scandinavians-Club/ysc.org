@@ -14,6 +14,7 @@ defmodule Ysc.Scanning do
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.User
+  alias Ysc.Events.Event
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketTier
@@ -45,6 +46,8 @@ defmodule Ysc.Scanning do
   ]
   @checkin_ticket_tier_fields [:id, :name]
   @checkin_ticket_order_fields [:id, :reference_id]
+  # Scanner session lists only render event title and creator name.
+  @session_event_fields [:id, :title]
 
   # --- Session Management ---
 
@@ -80,7 +83,7 @@ defmodule Ysc.Scanning do
   def get_session!(id) do
     ScanSession
     |> Repo.get!(id)
-    |> Repo.preload([:event, :created_by])
+    |> preload_session_assocs()
   end
 
   @doc """
@@ -117,8 +120,7 @@ defmodule Ysc.Scanning do
   Combines authorization and preload in a single database round-trip.
   """
   def fetch_membership_checkin_session(session_id, user_id) do
-    case Repo.get(ScanSession, session_id)
-         |> Repo.preload([:event, :created_by]) do
+    case Repo.get(ScanSession, session_id) |> preload_session_assocs() do
       %ScanSession{} = session ->
         case authorize_membership_checkin_session(session, user_id) do
           :ok -> {:ok, session}
@@ -145,12 +147,8 @@ defmodule Ysc.Scanning do
     do: {:error, :unauthorized}
 
   def list_sessions(opts \\ []) do
-    type_filter = Keyword.get(opts, :type)
-
-    ScanSession
-    |> maybe_filter_session_type(type_filter)
-    |> order_by([s], desc: s.inserted_at)
-    |> preload([:event, :created_by])
+    opts
+    |> list_sessions_query()
     |> Repo.all()
   end
 
@@ -161,7 +159,7 @@ defmodule Ysc.Scanning do
     ScanSession
     |> where([s], s.created_by_id == ^user_id and is_nil(s.closed_at))
     |> order_by([s], desc: s.inserted_at)
-    |> preload([:event, :created_by])
+    |> preload(^session_assoc_preloads())
     |> Repo.all()
   end
 
@@ -174,8 +172,35 @@ defmodule Ysc.Scanning do
     ScanSession
     |> where([s], s.type == :event_membership and is_nil(s.closed_at))
     |> order_by([s], desc: s.inserted_at)
-    |> preload([:event, :created_by])
+    |> preload(^session_assoc_preloads())
     |> Repo.all()
+  end
+
+  defp list_sessions_query(opts) do
+    type_filter = Keyword.get(opts, :type)
+
+    ScanSession
+    |> maybe_filter_session_type(type_filter)
+    |> order_by([s], desc: s.inserted_at)
+    |> preload(^session_assoc_preloads())
+  end
+
+  defp preload_session_assocs(nil), do: nil
+
+  defp preload_session_assocs(session) do
+    Repo.preload(session, session_assoc_preloads())
+  end
+
+  defp session_assoc_preloads do
+    [event: session_event_query(), created_by: session_user_query()]
+  end
+
+  defp session_event_query do
+    from(e in Event, select: struct(e, ^@session_event_fields))
+  end
+
+  defp session_user_query do
+    from(u in User, select: struct(u, ^@checkin_user_fields))
   end
 
   @event_check_in_session_types [:event, :event_membership]
@@ -1464,5 +1489,10 @@ defmodule Ysc.Scanning do
       Ysc.Ci.QueryExplain.Fixtures.ulid(),
       "Ada"
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_sessions_query do
+    list_sessions_query([])
   end
 end

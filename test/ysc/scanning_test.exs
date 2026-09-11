@@ -317,6 +317,67 @@ defmodule Ysc.ScanningTest do
       assert membership_session.id in ids
       refute event_session.id in ids
     end
+
+    test "does not SELECT password hashes, bios, or event body HTML" do
+      admin =
+        user_fixture(%{
+          role: "admin",
+          first_name: "ScanSlim",
+          last_name: "Admin"
+        })
+
+      event =
+        event_fixture(%{
+          title: "Scan Slim Event XYZ",
+          organizer_id: admin.id,
+          raw_details: "<p>toast body that session list must not load</p>",
+          rendered_details: "<p>toast body that session list must not load</p>"
+        })
+
+      {:ok, session} =
+        Scanning.create_session(%{
+          name: "Event desk",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {sessions, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_sessions() end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(sessions, &(&1.id == session.id))
+      assert listed.event.title == event.title
+      assert listed.created_by.first_name == "ScanSlim"
+      assert is_nil(listed.event.raw_details)
+      assert is_nil(listed.created_by.hashed_password)
+      assert password_cols == 0
+
+      {_sessions, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_sessions() end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_sessions, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_sessions() end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      loaded = Scanning.get_session!(session.id)
+      assert loaded.event.title == event.title
+      assert is_nil(loaded.event.raw_details)
+      assert is_nil(loaded.created_by.hashed_password)
+
+      assert html_cols == 0
+      assert bio_cols == 0
+    end
   end
 
   describe "get_open_membership_sessions/0" do
@@ -2228,6 +2289,10 @@ defmodule Ysc.ScanningTest do
   describe "ci_query_explain_query/0" do
     test "returns a valid Ecto query" do
       assert %Ecto.Query{} = Scanning.ci_query_explain_query()
+    end
+
+    test "ci_query_explain_list_sessions_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = Scanning.ci_query_explain_list_sessions_query()
     end
   end
 end

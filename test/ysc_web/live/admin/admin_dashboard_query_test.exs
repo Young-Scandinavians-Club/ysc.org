@@ -7,6 +7,7 @@ defmodule YscWeb.AdminDashboardQueryTest do
   import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
 
   alias Ysc.Accounts
   alias Ysc.Accounts.User
@@ -148,6 +149,69 @@ defmodule YscWeb.AdminDashboardQueryTest do
       # One period-totals aggregate plus one daily sparkline aggregate.
       assert grouped_count == 2
       assert row_count == 0
+    end
+  end
+
+  describe "admin magic search queries" do
+    setup %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      %{conn: log_in_user(conn, admin), admin: admin}
+    end
+
+    test "typing in magic search does not SELECT password hashes or event HTML",
+         %{conn: conn} do
+      organizer =
+        user_fixture(%{first_name: "MagicOrg", last_name: "Host"})
+
+      event =
+        event_fixture(%{
+          title: "MagicSearchToastEvent XYZ",
+          organizer_id: organizer.id,
+          raw_details: "<p>toast body that dashboard search must not load</p>",
+          rendered_details:
+            "<p>toast body that dashboard search must not load</p>"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            view
+            |> form("#admin-search-admin-search-form", %{
+              "query" => "MagicSearchToastEvent"
+            })
+            |> render_change()
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      {_html, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            view
+            |> form("#admin-search-admin-search-form", %{
+              "query" => "MagicSearchToastEvent"
+            })
+            |> render_change()
+          end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      html =
+        view
+        |> form("#admin-search-admin-search-form", %{
+          "query" => "MagicSearchToastEvent"
+        })
+        |> render_change()
+
+      assert html =~ event.title
+      assert html =~ "MagicOrg Host"
+      refute html =~ "toast body that dashboard search must not load"
+      assert password_cols == 0
+      assert html_cols == 0
     end
   end
 end
