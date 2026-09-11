@@ -1173,7 +1173,7 @@ defmodule Ysc.Tickets.BookingLocker do
          total_amount,
          discount_amount
        ) do
-    expires_at = DateTime.add(DateTime.utc_now(), 30, :minute)
+    expires_at = DateTime.add(DateTime.utc_now(), 5, :minute)
 
     attrs = %{
       user_id: user_id,

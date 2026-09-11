@@ -1101,7 +1101,7 @@ defmodule Ysc.TicketsTest do
   describe "get_order_expiration_time/0" do
     test "returns expiration datetime" do
       expiration_time = Tickets.get_order_expiration_time()
-      # The function returns a DateTime 15 minutes in the future
+      # The function returns a DateTime 5 minutes in the future
       assert %DateTime{} = expiration_time
       assert DateTime.compare(expiration_time, DateTime.utc_now()) == :gt
     end
