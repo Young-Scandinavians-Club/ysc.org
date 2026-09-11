@@ -193,7 +193,7 @@ defmodule Ysc.Tickets.BookingValidator do
           tier.event_id != event_id ->
             {:error, :tier_not_for_event}
 
-          not TicketTierHelpers.tier_sale_started?(tier) ->
+          not TicketTierHelpers.tier_on_sale?(tier) ->
             {:error, :tier_not_on_sale}
 
           quantity <= 0 ->
@@ -331,7 +331,7 @@ defmodule Ysc.Tickets.BookingValidator do
       total_quantity: quantity,
       available: available,
       sold: sold_count,
-      on_sale: TicketTierHelpers.tier_sale_started?(tier_map),
+      on_sale: TicketTierHelpers.tier_on_sale?(tier_map),
       start_date:
         Map.get(tier_map, :start_date) || Map.get(tier_map, "start_date"),
       end_date: Map.get(tier_map, :end_date) || Map.get(tier_map, "end_date")

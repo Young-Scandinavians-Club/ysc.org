@@ -3903,6 +3903,22 @@ defmodule Ysc.EventsTest do
       assert cancelled.state == :cancelled
     end
 
+    test "unpublish_event and cancel_event refuse volunteer acting_role", %{
+      event: event
+    } do
+      assert {:ok, published} = Events.publish_event(event)
+
+      assert {:error, :unauthorized} =
+               Events.unpublish_event(published, acting_role: :volunteer)
+
+      assert Repo.get!(Event, published.id).state == :published
+
+      assert {:error, :unauthorized} =
+               Events.cancel_event(published, acting_role: :volunteer)
+
+      assert Repo.get!(Event, published.id).state == :published
+    end
+
     test "publish_event schedules the notification and photo-reminder jobs independently",
          %{event: event} do
       Oban.Testing.with_testing_mode(:manual, fn ->
