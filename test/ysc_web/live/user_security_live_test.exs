@@ -624,7 +624,9 @@ defmodule YscWeb.UserSecurityLiveTest do
       assert html =~ "10.0.xxx.xxx"
     end
 
-    test "shows unfamiliar sign-in badge for suspicious sign-in event", %{conn: conn} do
+    test "shows unfamiliar sign-in badge for suspicious sign-in event", %{
+      conn: conn
+    } do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
