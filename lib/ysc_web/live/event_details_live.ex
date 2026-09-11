@@ -137,7 +137,7 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   <span
                     :if={event_day_label == :today}
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400 animate-pulse"
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-rose-600 sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-pulse"
                   >
                     <.icon
                       name="hero-bolt-solid"
@@ -173,7 +173,7 @@ defmodule YscWeb.EventDetailsLive do
                     class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
                   >
                     <.icon
-                      name="hero-ticket"
+                      name="hero-no-symbol"
                       class="w-3.5 h-3.5 inline me-0.5 relative z-10"
                     />
                     <span class="relative z-10">Sold Out</span>
@@ -190,10 +190,10 @@ defmodule YscWeb.EventDetailsLive do
                   <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
                     {format_start_date(@event.start_date)}
                   </p>
-                  <%= if @event_selling_fast do %>
+                  <%= if @event_selling_fast && !@event_sold_out_for_user do %>
                     <span class="h-3 w-px bg-zinc-200"></span>
-                    <span class="text-xs font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded uppercase tracking-widest">
-                      Going Fast!
+                    <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-widest">
+                      <.icon name="hero-fire-solid" class="w-3 h-3" /> Going Fast!
                     </span>
                   <% end %>
                 </div>
@@ -1219,13 +1219,14 @@ defmodule YscWeb.EventDetailsLive do
                           {@event.pricing_info.display_text}
                         </p>
                         <%= if @event_selling_fast && !@event_sold_out_for_user do %>
-                          <span class="text-xs font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded">
+                          <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded">
+                            <.icon name="hero-fire-solid" class="w-3 h-3" />
                             Going Fast
                           </span>
                         <% else %>
                           <%= if event_live?(@event) do %>
-                            <span class="text-xs font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded">
-                              Live
+                            <span class="inline-flex items-center gap-1 text-xs font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-1.5 py-0.5 rounded">
+                              <.icon name="hero-signal" class="w-3 h-3" /> Live
                             </span>
                           <% end %>
                         <% end %>
