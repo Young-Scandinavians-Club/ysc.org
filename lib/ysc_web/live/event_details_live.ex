@@ -2061,7 +2061,7 @@ defmodule YscWeb.EventDetailsLive do
               Time ran out
             </h2>
             <p class="text-zinc-600 max-w-md">
-              You have 30 minutes to complete your purchase. Time ran out, so those tickets may no longer be available.
+              You have 5 minutes to complete your purchase. Time ran out, so those tickets may no longer be available.
               Please select your tickets again to continue.
             </p>
           </div>

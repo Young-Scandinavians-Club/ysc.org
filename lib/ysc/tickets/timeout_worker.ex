@@ -3,7 +3,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
   Background worker for handling ticket order timeouts.
 
   This worker runs periodically to:
-  - Find ticket orders that have exceeded the 30-minute payment timeout
+  - Find ticket orders that have exceeded the 5-minute payment timeout
   - Expire those orders and release the reserved tickets
   - Clean up expired orders
   """
