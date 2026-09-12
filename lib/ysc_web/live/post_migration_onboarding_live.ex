@@ -1114,7 +1114,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               not sms_supported? ->
             YscWeb.Flash.send_toast(
               :info,
-              "Phone number saved. SMS verification isn't available for this number, so we've skipped that step.",
+              "Phone number saved. We can't send a verification text to this number, so we've skipped that step.",
               title: "Phone"
             )
 
@@ -2689,7 +2689,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           %{
             ok: false,
             message:
-              "#{email} (#{name}) already has an account. You can link them from Account settings → Family."
+              "#{email} (#{name}) already has an account. You can link them from Family in Account settings."
           }
 
         {:error, :max_sub_accounts_reached} ->
@@ -2728,7 +2728,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           %{
             ok: false,
             message:
-              "Could not send invite to #{email} (#{name}). Please try again from Account settings → Family."
+              "Could not send invite to #{email} (#{name}). Please try again from Family in Account settings."
           }
       end
     end
@@ -2748,13 +2748,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     message =
       cond do
         sent > 0 and failed > 0 ->
-          "Saved your family members. Sent #{sent} invite(s); #{failed} could not be sent — you can retry from Account settings → Family."
+          "Saved your family members. Sent #{sent} invite(s); #{failed} could not be sent — you can retry from Family in Account settings."
 
         sent > 0 ->
           "Saved your family members and sent #{sent} invite(s)."
 
         failed > 0 ->
-          "Saved your family members, but #{failed} invite(s) could not be sent — you can retry from Account settings → Family."
+          "Saved your family members, but #{failed} invite(s) could not be sent — you can retry from Family in Account settings."
 
         true ->
           nil

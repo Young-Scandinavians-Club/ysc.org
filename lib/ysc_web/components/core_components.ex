@@ -4344,7 +4344,9 @@ defmodule YscWeb.CoreComponents do
       <div class="flex items-center gap-3">
         <.user_avatar_image user={@user} class="w-10 h-10 shrink-0" />
         <div>
-          <p class="text-sm font-semibold text-blue-900">Submitting as</p>
+          <p class="text-sm font-semibold text-blue-900">
+            Sending from your account
+          </p>
           <p class="text-sm text-blue-700">
             {UserDisplay.full_name(@user)} ({@user.email})
           </p>

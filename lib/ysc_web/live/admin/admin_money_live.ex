@@ -165,6 +165,7 @@ defmodule YscWeb.AdminMoneyLive do
     |> assign(:payment_refunds, [])
     |> assign(:payment_ledger_entries, [])
     |> assign(:payment_related_entity, nil)
+    |> clear_expense_report_modal()
   end
 
   defp apply_action(socket, :view_payment, %{"id" => payment_id}) do
@@ -280,6 +281,22 @@ defmodule YscWeb.AdminMoneyLive do
     else
       socket
       |> YscWeb.Flash.put_toast(:error, "Payout not found", title: "Payout")
+      |> push_patch(to: build_money_path(socket))
+    end
+  end
+
+  defp apply_action(socket, :view_expense_report, %{"id" => expense_report_id}) do
+    expense_report = ExpenseReports.get_for_admin_review(expense_report_id)
+
+    if expense_report do
+      socket
+      |> assign(:page_title, "Expense Report")
+      |> assign_expense_report_modal(expense_report)
+    else
+      socket
+      |> YscWeb.Flash.put_toast(:error, "Expense report not found",
+        title: "Expense report"
+      )
       |> push_patch(to: build_money_path(socket))
     end
   end
@@ -1069,22 +1086,13 @@ defmodule YscWeb.AdminMoneyLive do
         %{"expense_report_id" => expense_report_id},
         socket
       ) do
-    expense_report = ExpenseReports.get_for_admin_review(expense_report_id)
-
-    if expense_report do
-      {:noreply, assign_expense_report_modal(socket, expense_report)}
-    else
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(:error, "Expense report not found",
-         title: "Expense report"
-       )}
-    end
+    path = build_money_path(socket, "/expense-reports/#{expense_report_id}")
+    {:noreply, push_patch(socket, to: path)}
   end
 
   @impl true
   def handle_event("close_expense_report_modal", _params, socket) do
-    {:noreply, clear_expense_report_modal(socket)}
+    {:noreply, push_patch(socket, to: build_money_path(socket))}
   end
 
   @impl true
@@ -3435,7 +3443,7 @@ defmodule YscWeb.AdminMoneyLive do
             phx-window-keydown="expense_attachment_next"
             phx-key="ArrowDown"
           ></span>
-          <div class="flex h-full min-h-0 w-[min(34%,30rem)] min-w-[22rem] shrink-0 flex-col border-r border-zinc-200">
+          <div class="flex h-full min-h-0 w-[min(46%,40rem)] min-w-0 shrink-0 flex-col border-r border-zinc-200 lg:min-w-[28rem]">
             <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
@@ -4156,9 +4164,9 @@ defmodule YscWeb.AdminMoneyLive do
              "Expense report status updated successfully",
              title: "Expense report"
            )
-           |> clear_expense_report_modal()
            |> load_expense_reports_inbox()
-           |> maybe_refresh_expense_reports_list()}
+           |> maybe_refresh_expense_reports_list()
+           |> push_patch(to: build_money_path(socket))}
 
         {:error, changeset} ->
           error_message =
@@ -4183,7 +4191,7 @@ defmodule YscWeb.AdminMoneyLive do
        |> YscWeb.Flash.put_toast(:error, "Expense report not found",
          title: "Expense report"
        )
-       |> clear_expense_report_modal()}
+       |> push_patch(to: build_money_path(socket))}
     end
   end
 
@@ -4203,7 +4211,7 @@ defmodule YscWeb.AdminMoneyLive do
          |> YscWeb.Flash.put_toast(:error, "Expense report not found",
            title: "Expense report"
          )
-         |> clear_expense_report_modal()}
+         |> push_patch(to: build_money_path(socket))}
 
       note == "" ->
         {:noreply,
@@ -4237,9 +4245,9 @@ defmodule YscWeb.AdminMoneyLive do
                "Expense report rejected. The member has been emailed the note.",
                title: "Expense report"
              )
-             |> clear_expense_report_modal()
              |> load_expense_reports_inbox()
-             |> maybe_refresh_expense_reports_list()}
+             |> maybe_refresh_expense_reports_list()
+             |> push_patch(to: build_money_path(socket))}
 
           {:error, changeset} ->
             {:noreply,

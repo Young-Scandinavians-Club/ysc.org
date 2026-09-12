@@ -309,7 +309,7 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Add Your Phone Number (Optional)
             <:subtitle>
-              Providing your phone number allows us to send you SMS notifications for important account updates and event reminders.
+              Providing your phone number allows us to send you text messages for important account updates and event reminders.
             </:subtitle>
           </.header>
 
@@ -326,7 +326,7 @@ defmodule YscWeb.AccountSetupLive do
             />
             <.input
               type="checkbox"
-              label="I would like to receive SMS notifications for account security, event reminders, and booking updates"
+              label="I would like to receive text messages for account security, event reminders, and booking updates"
               field={@phone_form[:sms_opt_in]}
             />
             <p class="text-xs text-zinc-600 mt-1">
@@ -1398,7 +1398,7 @@ defmodule YscWeb.AccountSetupLive do
           else
             YscWeb.Flash.send_toast(
               :info,
-              "Phone number saved. SMS verification isn't available for this number, so we've skipped that step.",
+              "Phone number saved. We can't send a verification text to this number, so we've skipped that step.",
               title: "Account setup"
             )
           end

@@ -119,6 +119,20 @@ defmodule Ysc.Tickets.BookingLockerTest do
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
     end
 
+    test "holds inventory for about 5 minutes", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      now = DateTime.utc_now()
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+
+      hold_seconds = DateTime.diff(order.expires_at, now, :second)
+      assert hold_seconds in 240..330
+    end
+
     test "returns event_not_available for draft events", %{
       user: user,
       event: event,
@@ -229,6 +243,39 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert %{available: :unlimited} =
                Enum.find(tiers, &(&1.tier_id == zero_tier.id))
     end
+
+    test "marks a tier with a past end_date as not on sale", %{
+      event: event,
+      tier: open_tier
+    } do
+      past_end =
+        DateTime.add(DateTime.utc_now(), -3600, :second)
+        |> DateTime.truncate(:second)
+
+      past_start =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, ended_tier} =
+        Events.create_ticket_tier(%{
+          name: "Closed Window",
+          type: :paid,
+          price: Money.new(20, :USD),
+          quantity: 10,
+          event_id: event.id,
+          start_date: past_start,
+          end_date: past_end
+        })
+
+      assert {:ok, %{tiers: tiers}} =
+               BookingLocker.check_availability_with_lock(event.id)
+
+      assert %{on_sale: false} =
+               Enum.find(tiers, &(&1.tier_id == ended_tier.id))
+
+      assert %{on_sale: true} =
+               Enum.find(tiers, &(&1.tier_id == open_tier.id))
+    end
   end
 
   describe "atomic_booking/3 tier and capacity validation" do
@@ -250,6 +297,29 @@ defmodule Ysc.Tickets.BookingLockerTest do
         DateTime.add(DateTime.utc_now(), 2, :day) |> DateTime.truncate(:second)
 
       {:ok, _} = Events.update_ticket_tier(tier, %{start_date: future})
+
+      assert {:error, :tier_validation_failed} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+    end
+
+    test "returns tier_validation_failed when tier sale window has ended", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      past_end =
+        DateTime.add(DateTime.utc_now(), -3600, :second)
+        |> DateTime.truncate(:second)
+
+      past_start =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Events.update_ticket_tier(tier, %{
+          start_date: past_start,
+          end_date: past_end
+        })
 
       assert {:error, :tier_validation_failed} =
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
@@ -1040,6 +1110,31 @@ defmodule Ysc.Tickets.BookingLockerTest do
         DateTime.add(DateTime.utc_now(), 2, :day) |> DateTime.truncate(:second)
 
       {:ok, _} = Events.update_ticket_tier(tier, %{start_date: future})
+
+      assert {:ok, _order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+                 bypass_guards: true
+               )
+    end
+
+    test "succeeds for a tier whose sale window has already ended", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      past_end =
+        DateTime.add(DateTime.utc_now(), -3600, :second)
+        |> DateTime.truncate(:second)
+
+      past_start =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Events.update_ticket_tier(tier, %{
+          start_date: past_start,
+          end_date: past_end
+        })
 
       assert {:ok, _order} =
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},

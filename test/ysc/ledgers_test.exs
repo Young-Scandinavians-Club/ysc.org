@@ -6736,6 +6736,229 @@ defmodule Ysc.LedgersTest do
       assert row.description == "Membership Payment - Single"
     end
   end
+
+  describe "list_user_payments_paginated/3 slim association loads" do
+    @event_toast "<p>toast body that payment history must not load</p>"
+    @tier_description "tier copy that payment history must not load"
+    @room_description "room copy that payment history must not load"
+    @pm_payload %{"stripe" => "secret-blob-payment-history-must-not-load"}
+
+    setup do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      import Mox
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_default"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
+        {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params ->
+        {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
+      end)
+
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      event =
+        event_fixture(%{
+          title: "History Gala XYZ",
+          raw_details: @event_toast,
+          rendered_details: @event_toast
+        })
+
+      {:ok, tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "VIP",
+          description: @tier_description,
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 20,
+          event_id: event.id
+        })
+
+      {:ok, ticket_order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 2})
+
+      {:ok, pm} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_history_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_history_#{System.unique_integer([:positive])}",
+          type: :card,
+          provider_type: "card",
+          last_four: "4242",
+          display_brand: "visa",
+          is_default: true,
+          payload: @pm_payload
+        })
+
+      assert {:ok, {payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: Money.new(10_000, :USD),
+                 entity_type: :event,
+                 entity_id: event.id,
+                 external_payment_id:
+                   "pi_history_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(320, :USD),
+                 description: "Event tickets",
+                 property: nil,
+                 payment_method_id: pm.id
+               })
+
+      ticket_order
+      |> Ecto.Changeset.change(payment_id: payment.id, status: :completed)
+      |> Repo.update!()
+
+      {:ok, room} =
+        %Ysc.Bookings.Room{}
+        |> Ysc.Bookings.Room.changeset(%{
+          name: "History Cabin A",
+          description: @room_description,
+          property: :tahoe,
+          capacity_max: 4,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          rooms: [room],
+          status: :complete
+        })
+
+      assert {:ok, {_booking_payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: Money.new(20_000, :USD),
+                 entity_type: :booking,
+                 entity_id: booking.id,
+                 external_payment_id:
+                   "pi_history_bk_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(640, :USD),
+                 description: "Cabin booking",
+                 property: :tahoe,
+                 payment_method_id: nil
+               })
+
+      _free_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      %{
+        user: user,
+        event: event,
+        payment: payment,
+        payment_method: pm,
+        booking: booking,
+        room: room
+      }
+    end
+
+    test "does not SELECT event HTML, payment-method payload, or room categories",
+         %{
+           user: user,
+           event: event,
+           payment: payment,
+           payment_method: pm,
+           room: room
+         } do
+      {{items, _total}, event_html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.list_user_payments_paginated(user.id, 1, 50) end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      ticket_row =
+        Enum.find(items, fn row ->
+          row.payment && row.payment.id == payment.id
+        end)
+
+      assert ticket_row
+      assert ticket_row.event.title == event.title
+      assert is_nil(ticket_row.event.raw_details)
+      assert is_nil(ticket_row.event.rendered_details)
+      assert ticket_row.payment.payment_method.id == pm.id
+
+      assert is_nil(ticket_row.payment.payment_method.payload) or
+               ticket_row.payment.payment_method.payload == %{}
+
+      tickets = ticket_row.ticket_order.tickets
+      assert tickets != []
+      assert hd(tickets).ticket_tier.name == "VIP"
+      assert is_nil(hd(tickets).ticket_tier.description)
+
+      booking_row =
+        Enum.find(items, fn row ->
+          row.type == :booking && row.booking &&
+            Enum.any?(row.booking.rooms, &(&1.id == room.id))
+        end)
+
+      assert booking_row
+      assert Enum.any?(booking_row.booking.rooms, &(&1.name == room.name))
+      assert Enum.all?(booking_row.booking.rooms, &is_nil(&1.description))
+
+      free_row =
+        Enum.find(items, fn row ->
+          row.type == :ticket && is_nil(row.payment)
+        end)
+
+      assert free_row
+      assert free_row.event.title == event.title
+      assert is_nil(free_row.event.raw_details)
+
+      {_items, payload_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.list_user_payments_paginated(user.id, 1, 50) end,
+          pattern: ~r/"payload"/i,
+          caller_pids: [self()]
+        )
+
+      {_items, room_category_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.list_user_payments_paginated(user.id, 1, 50) end,
+          pattern: ~r/FROM ["']?room_categories["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert event_html_cols == 0
+      assert payload_cols == 0
+      assert room_category_queries == 0
+    end
+  end
 end
 
 defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
@@ -7333,6 +7556,17 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
     test "returns a well-formed Ecto query for CI query-plan checks" do
       query = Ledgers.ci_query_explain_query()
       assert %Ecto.Query{} = query
+    end
+
+    test "payment-history explain builders return Ecto queries" do
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_user_payment_history_ticket_orders_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_user_payment_history_bookings_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_user_payment_history_free_orders_query()
     end
   end
 end

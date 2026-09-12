@@ -14,9 +14,12 @@ defmodule Ysc.Ledgers do
 
   alias Ysc.Repo
   alias Ysc.Bookings.PropertyDisplay
+  alias Ysc.Bookings.{Booking, Room}
+  alias Ysc.Events.{Event, Ticket, TicketTier}
+  alias Ysc.Payments.PaymentMethod
+  alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
   alias Ysc.Tickets.Display, as: TicketDisplay
-
-  alias Ysc.Bookings.Booking
+  alias Ysc.Tickets.TicketOrder
 
   alias Ysc.Ledgers.{
     LedgerAccount,
@@ -34,6 +37,53 @@ defmodule Ysc.Ledgers do
     :events,
     :donations,
     :membership
+  ]
+
+  # Member payment-history display fields. Omits event body HTML, Stripe
+  # payment-method `payload` JSON, unused room categories, unused ledger
+  # account rows, and ticket-tier descriptions — the settings tab only
+  # renders titles, tier names, room names, and plan labels.
+  @history_event_fields [:id, :title]
+  @history_ticket_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :payment_id,
+    :event_id,
+    :inserted_at
+  ]
+  @history_ticket_fields [:id, :status, :ticket_tier_id, :ticket_order_id]
+  @history_ticket_tier_fields [:id, :name]
+  @history_booking_fields [
+    :id,
+    :property,
+    :status,
+    :reference_id,
+    :checkin_date,
+    :checkout_date,
+    :guests_count
+  ]
+  @history_room_fields [:id, :name]
+  @history_subscription_fields [:id]
+  @history_subscription_item_fields [
+    :id,
+    :subscription_id,
+    :stripe_price_id
+  ]
+  @history_payment_method_fields [
+    :id,
+    :last_four,
+    :display_brand,
+    :type,
+    :provider_type,
+    :is_default
+  ]
+  @history_revenue_entry_fields [
+    :id,
+    :payment_id,
+    :related_entity_type,
+    :related_entity_id,
+    :description
   ]
 
   @admin_dashboard_revenue_account_names [
@@ -2468,6 +2518,9 @@ defmodule Ysc.Ledgers do
   Returns items ordered by inserted_at (created date) descending.
 
   Optimized to batch load all related data to avoid N+1 queries.
+  Related rows are slim `select: struct` loads (event title, ticket-tier
+  name, room name, plan price id). Do not SELECT event body HTML, Stripe
+  payment-method `payload`, or unused room categories.
 
   ## Options
 
@@ -2481,8 +2534,6 @@ defmodule Ysc.Ledgers do
         per_page \\ 20,
         opts \\ []
       ) do
-    alias Ysc.Tickets.TicketOrder
-
     filter = normalize_payment_tab_filter(Keyword.get(opts, :filter, :all))
 
     total_count = count_user_payments_tab_total(user_id, filter)
@@ -2505,14 +2556,8 @@ defmodule Ysc.Ledgers do
     # Get free ticket orders (only mixed into :all and :events tabs)
     free_ticket_orders =
       if include_free_ticket_orders_in_tab?(filter) do
-        from(to in TicketOrder,
-          where: to.user_id == ^user_id,
-          where: to.status == :completed,
-          where: is_nil(to.payment_id),
-          preload: [:event, tickets: :ticket_tier],
-          order_by: [desc: to.inserted_at],
-          limit: ^fetch_limit
-        )
+        user_id
+        |> history_free_ticket_orders_query(fetch_limit)
         |> Repo.all()
       else
         []
@@ -2682,9 +2727,8 @@ defmodule Ysc.Ledgers do
 
     payment_methods_map =
       if payment_method_ids != [] do
-        from(pm in Ysc.Payments.PaymentMethod,
-          where: pm.id in ^payment_method_ids
-        )
+        payment_method_ids
+        |> history_payment_methods_query()
         |> Repo.all()
         |> Enum.map(fn pm -> {pm.id, pm} end)
         |> Map.new()
@@ -2703,16 +2747,12 @@ defmodule Ysc.Ledgers do
         %{payment | payment_method: payment_method}
       end)
 
-    # Batch load all revenue entries for all payments
+    # Batch load all revenue entries for all payments (no account preload —
+    # the join already filters to revenue credits; the UI never renders
+    # the account row).
     revenue_entries_map =
-      from(e in LedgerEntry,
-        join: a in LedgerAccount,
-        on: e.account_id == a.id,
-        where: e.payment_id in ^payment_ids,
-        where: a.account_type == ^"revenue",
-        where: e.debit_credit == ^:credit,
-        preload: [:account]
-      )
+      payment_ids
+      |> history_revenue_entries_query()
       |> Repo.all()
       |> Enum.group_by(& &1.payment_id)
       |> Enum.map(fn {payment_id, entries} ->
@@ -2742,13 +2782,12 @@ defmodule Ysc.Ledgers do
       end)
       |> Enum.map(fn {id, _entry} -> id end)
 
-    # Batch load ticket orders for event payments
+    # Batch load ticket orders for event payments (event title + ticket
+    # status/tier name only — no event body HTML or tier descriptions).
     ticket_orders_map =
       if event_payment_ids != [] do
-        from(to in Ysc.Tickets.TicketOrder,
-          where: to.payment_id in ^event_payment_ids,
-          preload: [:event, tickets: :ticket_tier]
-        )
+        event_payment_ids
+        |> history_ticket_orders_for_payments_query()
         |> Repo.all()
         |> Enum.group_by(& &1.payment_id)
         |> Enum.map(fn {payment_id, orders} ->
@@ -2770,10 +2809,8 @@ defmodule Ysc.Ledgers do
           |> Enum.map(fn {_id, entry} -> entry.related_entity_id end)
 
         if booking_entity_ids != [] do
-          from(b in Ysc.Bookings.Booking,
-            where: b.id in ^booking_entity_ids,
-            preload: [rooms: :room_category]
-          )
+          booking_entity_ids
+          |> history_bookings_query()
           |> Repo.all()
           |> Enum.map(fn booking -> {booking.id, booking} end)
           |> Map.new()
@@ -2806,10 +2843,8 @@ defmodule Ysc.Ledgers do
           |> Enum.map(fn {_id, entry} -> entry.related_entity_id end)
 
         if subscription_ids != [] do
-          from(s in Ysc.Subscriptions.Subscription,
-            where: s.id in ^subscription_ids,
-            preload: [:subscription_items]
-          )
+          subscription_ids
+          |> history_subscriptions_query()
           |> Repo.all()
           |> Enum.map(fn subscription -> {subscription.id, subscription} end)
           |> Map.new()
@@ -2989,8 +3024,7 @@ defmodule Ysc.Ledgers do
   defp determine_payment_type(_), do: :unknown
 
   defp enrich_free_ticket_order(ticket_order) do
-    # Preload event if not already loaded
-    ticket_order = Repo.preload(ticket_order, [:event, tickets: :ticket_tier])
+    ticket_order = Repo.preload(ticket_order, history_ticket_order_preloads())
 
     description = build_ticket_order_description(ticket_order)
 
@@ -4243,6 +4277,102 @@ defmodule Ysc.Ledgers do
   defp decimal_or_zero(nil), do: Decimal.new(0)
   defp decimal_or_zero(%Decimal{} = decimal), do: decimal
 
+  defp history_event_query do
+    from(e in Event, select: struct(e, ^@history_event_fields))
+  end
+
+  defp history_ticket_tier_query do
+    from(tt in TicketTier, select: struct(tt, ^@history_ticket_tier_fields))
+  end
+
+  defp history_ticket_query do
+    tier_query = history_ticket_tier_query()
+
+    from(t in Ticket,
+      select: struct(t, ^@history_ticket_fields),
+      preload: [ticket_tier: ^tier_query]
+    )
+  end
+
+  defp history_ticket_order_preloads do
+    event_query = history_event_query()
+    ticket_query = history_ticket_query()
+
+    [event: event_query, tickets: ticket_query]
+  end
+
+  defp history_room_query do
+    from(r in Room, select: struct(r, ^@history_room_fields))
+  end
+
+  defp history_subscription_item_query do
+    from(si in SubscriptionItem,
+      select: struct(si, ^@history_subscription_item_fields)
+    )
+  end
+
+  defp history_free_ticket_orders_query(user_id, limit) do
+    preloads = history_ticket_order_preloads()
+
+    from(to in TicketOrder,
+      where: to.user_id == ^user_id,
+      where: to.status == :completed,
+      where: is_nil(to.payment_id),
+      select: struct(to, ^@history_ticket_order_fields),
+      preload: ^preloads,
+      order_by: [desc: to.inserted_at],
+      limit: ^limit
+    )
+  end
+
+  defp history_ticket_orders_for_payments_query(payment_ids) do
+    preloads = history_ticket_order_preloads()
+
+    from(to in TicketOrder,
+      where: to.payment_id in ^payment_ids,
+      select: struct(to, ^@history_ticket_order_fields),
+      preload: ^preloads
+    )
+  end
+
+  defp history_bookings_query(booking_ids) do
+    room_query = history_room_query()
+
+    from(b in Booking,
+      where: b.id in ^booking_ids,
+      select: struct(b, ^@history_booking_fields),
+      preload: [rooms: ^room_query]
+    )
+  end
+
+  defp history_subscriptions_query(subscription_ids) do
+    item_query = history_subscription_item_query()
+
+    from(s in Subscription,
+      where: s.id in ^subscription_ids,
+      select: struct(s, ^@history_subscription_fields),
+      preload: [subscription_items: ^item_query]
+    )
+  end
+
+  defp history_payment_methods_query(payment_method_ids) do
+    from(pm in PaymentMethod,
+      where: pm.id in ^payment_method_ids,
+      select: struct(pm, ^@history_payment_method_fields)
+    )
+  end
+
+  defp history_revenue_entries_query(payment_ids) do
+    from(e in LedgerEntry,
+      join: a in LedgerAccount,
+      on: e.account_id == a.id,
+      where: e.payment_id in ^payment_ids,
+      where: a.account_type == ^"revenue",
+      where: e.debit_credit == ^:credit,
+      select: struct(e, ^@history_revenue_entry_fields)
+    )
+  end
+
   @doc false
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
@@ -4273,5 +4403,22 @@ defmodule Ysc.Ledgers do
     admin_dashboard_revenue_sparkline_query(bounds, [
       Ysc.Ci.QueryExplain.Fixtures.ulid()
     ])
+  end
+
+  @doc false
+  def ci_query_explain_user_payment_history_ticket_orders_query do
+    history_ticket_orders_for_payments_query([
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    ])
+  end
+
+  @doc false
+  def ci_query_explain_user_payment_history_bookings_query do
+    history_bookings_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_user_payment_history_free_orders_query do
+    history_free_ticket_orders_query(Ysc.Ci.QueryExplain.Fixtures.ulid(), 30)
   end
 end

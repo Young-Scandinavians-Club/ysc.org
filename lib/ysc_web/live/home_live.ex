@@ -1663,7 +1663,7 @@ defmodule YscWeb.HomeLive do
                         <%= if @current_membership == nil do %>
                           You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
                         <% else %>
-                          Your membership has expired. Renew now to continue enjoying all YSC benefits including cabin access and exclusive events.
+                          Your membership has expired. Renew now to continue enjoying all YSC benefits, including cabin stays and exclusive events.
                         <% end %>
                     <% end %>
                   </p>
