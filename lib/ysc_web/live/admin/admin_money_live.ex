@@ -10,6 +10,7 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.Webhooks
   alias Ysc.Bookings.BookingLocker
   alias Ysc.Tickets
+  alias Ysc.Events
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReportItem
   alias Ysc.Repo
@@ -79,6 +80,9 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:selected_attachment_index, 0)
       |> assign(:expense_item_flags, %{})
       |> assign(:expense_report_totals, nil)
+      |> assign(:editing_expense_item, nil)
+      |> assign(:expense_report_events, [])
+      |> assign(:expense_report_event_form, to_form(%{"event_id" => ""}))
       |> assign(
         :expense_report_status_form,
         to_form(%{}, as: :expense_report_status)
@@ -1120,6 +1124,38 @@ defmodule YscWeb.AdminMoneyLive do
         socket
       ) do
     reject_expense_report_flow(socket, note)
+  end
+
+  @impl true
+  def handle_event(
+        "edit_expense_item_amount",
+        %{"item_id" => item_id, "kind" => kind},
+        socket
+      ) do
+    {:noreply, assign(socket, :editing_expense_item, {kind, item_id})}
+  end
+
+  @impl true
+  def handle_event("cancel_edit_expense_item_amount", _params, socket) do
+    {:noreply, assign(socket, :editing_expense_item, nil)}
+  end
+
+  @impl true
+  def handle_event(
+        "save_expense_item_amount",
+        %{"item_id" => item_id, "kind" => kind, "amount" => amount},
+        socket
+      ) do
+    save_expense_item_amount(socket, kind, item_id, amount)
+  end
+
+  @impl true
+  def handle_event(
+        "change_expense_report_event",
+        %{"event_id" => event_id},
+        socket
+      ) do
+    save_expense_report_event(socket, event_id)
   end
 
   @impl true
@@ -3465,25 +3501,36 @@ defmodule YscWeb.AdminMoneyLive do
                     <% end %>
                     <span class="text-zinc-400">·</span>
                     <span title={submitted_absolute}>{submitted_phrase}</span>
-                    <%= if Ecto.assoc_loaded?(report.event) && report.event do %>
-                      <span class="text-zinc-400">·</span>
-                      <span>Event: {report.event.title}</span>
-                    <% end %>
                   </p>
-                  <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <span
-                      class="font-mono text-xs text-zinc-500"
-                      title={to_string(report.id)}
-                    >
-                      {truncate_id(to_string(report.id))}
-                    </span>
-                    <.admin_clipboard_button
-                      id={"copy-expense-report-id-#{report.id}"}
-                      variant={:icon}
-                      copy={to_string(report.id)}
-                      title="Copy expense report ID"
-                      aria_label="Copy expense report ID"
-                    />
+                  <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span class="font-medium text-zinc-700">Event:</span>
+                    <%= if report.status != "paid" do %>
+                      <.form
+                        for={@expense_report_event_form}
+                        id="expense-report-event-form"
+                        phx-change="change_expense_report_event"
+                      >
+                        <.input
+                          field={@expense_report_event_form[:event_id]}
+                          type="select"
+                          id="expense-report-event-select"
+                          label=""
+                          class="rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          options={
+                            [{"No event", ""}] ++
+                              Enum.map(@expense_report_events, fn event ->
+                                {"#{event.title} - #{DateDisplay.format_date_long(event.start_date)}",
+                                 event.id}
+                              end)
+                          }
+                        />
+                      </.form>
+                    <% else %>
+                      <span class="text-zinc-900">
+                        {(Ecto.assoc_loaded?(report.event) && report.event &&
+                            report.event.title) || "No event"}
+                      </span>
+                    <% end %>
                   </div>
                 </div>
                 <div class="flex flex-col items-end gap-1">
@@ -3546,6 +3593,15 @@ defmodule YscWeb.AdminMoneyLive do
                 </p>
               </div>
 
+              <p
+                :if={report.quickbooks_bill_id && report.status != "paid"}
+                id="expense-report-qb-edit-warning"
+                class="text-xs text-zinc-500"
+              >
+                This report already has a QuickBooks bill. Editing an item amount here
+                does not update the QuickBooks bill automatically.
+              </p>
+
               <.line_items_table
                 id="expense-report-expense-items"
                 title={"Expense items (#{length(expense_rows)})"}
@@ -3555,6 +3611,8 @@ defmodule YscWeb.AdminMoneyLive do
                 id_prefix="expense-report-item"
                 empty_copy="No expense items"
                 subtotal={sum_attachment_amounts(expense_rows)}
+                editable={report.status != "paid"}
+                editing_item={@editing_expense_item}
               />
 
               <.line_items_table
@@ -3566,6 +3624,8 @@ defmodule YscWeb.AdminMoneyLive do
                 flags={@expense_item_flags}
                 id_prefix="income-report-item"
                 empty_copy="No income items"
+                editable={report.status != "paid"}
+                editing_item={@editing_expense_item}
                 subtotal={sum_attachment_amounts(income_rows)}
               />
 
@@ -4002,6 +4062,8 @@ defmodule YscWeb.AdminMoneyLive do
   attr :id_prefix, :string, required: true
   attr :empty_copy, :string, required: true
   attr :subtotal, :any, required: true
+  attr :editable, :boolean, default: false
+  attr :editing_item, :any, default: nil
 
   defp line_items_table(assigns) do
     ~H"""
@@ -4089,7 +4151,53 @@ defmodule YscWeb.AdminMoneyLive do
                   id={"#{@id_prefix}-#{row.item_id}-amount"}
                   class="whitespace-nowrap px-2 py-2 text-right font-medium tabular-nums"
                 >
-                  {Money.to_string!(row.amount)}
+                  <%= if @editing_item == {to_string(row.kind), row.item_id} do %>
+                    <form
+                      id={"#{@id_prefix}-#{row.item_id}-amount-form"}
+                      phx-submit="save_expense_item_amount"
+                      class="flex items-center justify-end gap-1"
+                    >
+                      <input type="hidden" name="item_id" value={row.item_id} />
+                      <input type="hidden" name="kind" value={to_string(row.kind)} />
+                      <input
+                        type="text"
+                        name="amount"
+                        value={money_input_value(row.amount)}
+                        autofocus
+                        class="w-20 rounded border border-zinc-300 px-1.5 py-0.5 text-right text-sm tabular-nums focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        type="submit"
+                        class="rounded p-0.5 text-green-600 hover:bg-green-50 hover:text-green-800"
+                        aria-label={"Save amount for #{row.label}"}
+                      >
+                        <.icon name="hero-check" class="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        phx-click="cancel_edit_expense_item_amount"
+                        class="rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                        aria-label="Cancel editing amount"
+                      >
+                        <.icon name="hero-x-mark" class="h-4 w-4" />
+                      </button>
+                    </form>
+                  <% else %>
+                    <div class="flex items-center justify-end gap-1">
+                      <span>{Money.to_string!(row.amount)}</span>
+                      <button
+                        :if={@editable && row.expense_type != "mileage"}
+                        type="button"
+                        phx-click="edit_expense_item_amount"
+                        phx-value-item_id={row.item_id}
+                        phx-value-kind={to_string(row.kind)}
+                        class="rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-blue-600"
+                        aria-label={"Edit amount for #{row.label}"}
+                      >
+                        <.icon name="hero-pencil-square" class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  <% end %>
                 </td>
                 <td
                   id={"#{@id_prefix}-#{row.item_id}-receipt"}
@@ -4137,6 +4245,124 @@ defmodule YscWeb.AdminMoneyLive do
       <% end %>
     </div>
     """
+  end
+
+  defp save_expense_item_amount(socket, kind, item_id, amount) do
+    report = socket.assigns.selected_expense_report
+
+    item =
+      case kind do
+        "expense" -> Enum.find(report.expense_items, &(&1.id == item_id))
+        "income" -> Enum.find(report.income_items, &(&1.id == item_id))
+        _ -> nil
+      end
+
+    case update_expense_item_amount(kind, item, amount) do
+      {:ok, _updated_item} ->
+        refreshed = ExpenseReports.get_for_admin_review(report.id)
+
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(refreshed)
+         |> YscWeb.Flash.put_toast(:info, "Amount updated",
+           title: "Expense report"
+         )}
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> assign(:editing_expense_item, nil)
+         |> YscWeb.Flash.put_toast(:error, "Item not found",
+           title: "Expense report"
+         )}
+
+      {:error, :mileage_amount_not_editable} ->
+        {:noreply,
+         socket
+         |> assign(:editing_expense_item, nil)
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Mileage amounts are calculated from miles driven and can't be edited directly",
+           title: "Expense report"
+         )}
+
+      {:error, :report_paid} ->
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(
+           ExpenseReports.get_for_admin_review(report.id)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This report is already paid and can no longer be edited",
+           title: "Expense report"
+         )}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, amount_error_message(changeset),
+           title: "Expense report"
+         )}
+    end
+  end
+
+  defp update_expense_item_amount(_kind, nil, _amount), do: {:error, :not_found}
+
+  defp update_expense_item_amount("expense", item, amount),
+    do: ExpenseReports.update_expense_item_amount(item, amount)
+
+  defp update_expense_item_amount("income", item, amount),
+    do: ExpenseReports.update_income_item_amount(item, amount)
+
+  defp amount_error_message(%Ecto.Changeset{} = changeset) do
+    case changeset.errors[:amount] do
+      {message, _opts} -> "Invalid amount: #{message}"
+      nil -> "Failed to update amount"
+    end
+  end
+
+  defp save_expense_report_event(socket, event_id) do
+    report = socket.assigns.selected_expense_report
+
+    case ExpenseReports.update_expense_report_event(report, event_id) do
+      {:ok, _updated_report} ->
+        refreshed = ExpenseReports.get_for_admin_review(report.id)
+
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(refreshed)
+         |> YscWeb.Flash.put_toast(:info, "Event updated",
+           title: "Expense report"
+         )}
+
+      {:error, :report_paid} ->
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(
+           ExpenseReports.get_for_admin_review(report.id)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This report is already paid and can no longer be edited",
+           title: "Expense report"
+         )}
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Expense report not found",
+           title: "Expense report"
+         )
+         |> push_patch(to: build_money_path(socket))}
+
+      {:error, %Ecto.Changeset{}} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Failed to update event",
+           title: "Expense report"
+         )}
+    end
   end
 
   # Rejecting requires a treasurer note and emails the member, so it always
@@ -4292,6 +4518,69 @@ defmodule YscWeb.AdminMoneyLive do
       :expense_report_reject_form,
       to_form(%{"rejection_note" => ""}, as: :reject)
     )
+    |> assign(:editing_expense_item, nil)
+    |> assign(
+      :expense_report_events,
+      expense_report_event_options(expense_report)
+    )
+    |> assign(
+      :expense_report_event_form,
+      expense_report_event_form(expense_report)
+    )
+  end
+
+  # Re-derives attachments/flags/totals after an in-modal edit (e.g. an amount
+  # correction) without resetting the currently-selected receipt like
+  # `assign_expense_report_modal/2` does, so the viewer doesn't jump.
+  defp refresh_expense_report_modal(socket, expense_report) do
+    attachments = build_expense_attachments(expense_report)
+    flags = compute_item_flags(expense_report)
+
+    clamped_index =
+      socket.assigns.selected_attachment_index
+      |> min(max(length(attachments) - 1, 0))
+      |> max(0)
+
+    socket
+    |> assign(:selected_expense_report, expense_report)
+    |> assign(:expense_attachments, attachments)
+    |> assign(:selected_attachment_index, clamped_index)
+    |> assign(:expense_item_flags, flags)
+    |> assign(
+      :expense_report_totals,
+      ExpenseReports.calculate_totals(expense_report)
+    )
+    |> assign(:editing_expense_item, nil)
+    |> assign(
+      :expense_report_events,
+      expense_report_event_options(expense_report)
+    )
+    |> assign(
+      :expense_report_event_form,
+      expense_report_event_form(expense_report)
+    )
+  end
+
+  # Backs the event `<select>` with a plain (unprefixed) form so its
+  # `phx-change` payload stays a flat `%{"event_id" => ...}`.
+  defp expense_report_event_form(expense_report) do
+    to_form(%{"event_id" => expense_report.event_id || ""})
+  end
+
+  # Events for the review modal's event picker: the usual recent/upcoming
+  # list, plus the report's currently-associated event if it isn't already in
+  # that window (e.g. an older event) — otherwise the <select> would silently
+  # show no match even though the report is still associated with it.
+  defp expense_report_event_options(expense_report) do
+    events = Events.list_recent_and_upcoming_events()
+
+    current = Ecto.assoc_loaded?(expense_report.event) && expense_report.event
+
+    if current && not Enum.any?(events, &(&1.id == current.id)) do
+      [current | events]
+    else
+      events
+    end
   end
 
   defp clear_expense_report_modal(socket) do
@@ -4302,6 +4591,9 @@ defmodule YscWeb.AdminMoneyLive do
     |> assign(:selected_attachment_index, 0)
     |> assign(:expense_item_flags, %{})
     |> assign(:expense_report_totals, nil)
+    |> assign(:editing_expense_item, nil)
+    |> assign(:expense_report_events, [])
+    |> assign(:expense_report_event_form, to_form(%{"event_id" => ""}))
     |> assign(
       :expense_report_status_form,
       to_form(%{}, as: :expense_report_status)
@@ -4820,6 +5112,14 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp parse_amount_string(_), do: {:error, :invalid_format}
+
+  # Plain decimal string ("25.50", no "$" or thousands separator) for
+  # pre-filling the inline amount edit input.
+  defp money_input_value(%Money{} = money) do
+    money
+    |> Money.to_decimal()
+    |> Decimal.to_string(:normal)
+  end
 
   defp expense_report_status_changeset(params) do
     types = %{

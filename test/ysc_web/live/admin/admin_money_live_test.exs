@@ -1606,6 +1606,259 @@ defmodule YscWeb.AdminMoneyLiveTest do
     end
   end
 
+  describe "expense report review amount editing" do
+    setup [:create_admin]
+
+    test "treasurer can correct a purchase item's amount", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-amount",
+               "$12.50"
+             )
+
+      view
+      |> element(
+        "#expense-report-item-#{purchase.id}-amount button[aria-label='Edit amount for Costco']"
+      )
+      |> render_click()
+
+      view
+      |> form("#expense-report-item-#{purchase.id}-amount-form", %{
+        "amount" => "18.75"
+      })
+      |> render_submit()
+
+      assert Money.to_string!(Repo.reload!(purchase).amount) == "$18.75"
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-amount",
+               "$18.75"
+             )
+
+      refute has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-amount-form"
+             )
+    end
+
+    test "an invalid amount is rejected and leaves the item unchanged", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      view
+      |> element(
+        "#expense-report-item-#{purchase.id}-amount button[aria-label='Edit amount for Costco']"
+      )
+      |> render_click()
+
+      html =
+        view
+        |> form("#expense-report-item-#{purchase.id}-amount-form", %{
+          "amount" => "not-a-number"
+        })
+        |> render_submit()
+
+      assert html =~ "Invalid amount"
+      assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
+    end
+
+    test "mileage item amounts are not editable", %{conn: conn} do
+      member = user_fixture()
+
+      {report, mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      refute has_element?(
+               view,
+               "#expense-report-item-#{mileage.id}-amount button"
+             )
+    end
+
+    test "amounts are not editable once the report is paid", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      report
+      |> Ecto.Changeset.change(%{status: "paid"})
+      |> Repo.update!()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/expense-reports/#{report.id}")
+
+      refute has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-amount button"
+             )
+    end
+
+    test "a crafted amount-update event is rejected once the report is paid, even though the UI hides it",
+         %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      # The report becomes paid mid-session (e.g. a QuickBooks webhook)
+      # while the treasurer's modal is still open on the stale "submitted"
+      # state — the pencil icon is no longer rendered, but a crafted
+      # `save_expense_item_amount` event bypassing it must still be refused
+      # by the mutation layer itself, not just hidden in the UI.
+      report
+      |> Ecto.Changeset.change(%{status: "paid"})
+      |> Repo.update!()
+
+      render_submit(view, "save_expense_item_amount", %{
+        "item_id" => purchase.id,
+        "kind" => "expense",
+        "amount" => "999.99"
+      })
+
+      assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
+    end
+  end
+
+  describe "expense report review event editing" do
+    setup [:create_admin]
+
+    test "treasurer can associate an event with the report", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      event = event_fixture(%{title: "Summer Gala"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      assert is_nil(report.event_id)
+
+      view
+      |> element("#expense-report-event-form")
+      |> render_change(%{"event_id" => event.id})
+
+      assert Repo.reload!(report).event_id == event.id
+
+      assert has_element?(
+               view,
+               "#expense-report-event-select option[selected]",
+               "Summer Gala"
+             )
+    end
+
+    test "treasurer can clear a report's event", %{conn: conn} do
+      member = user_fixture()
+      event = event_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      report
+      |> Ecto.Changeset.change(%{event_id: event.id})
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      view
+      |> element("#expense-report-event-form")
+      |> render_change(%{"event_id" => ""})
+
+      assert is_nil(Repo.reload!(report).event_id)
+
+      assert has_element?(
+               view,
+               "#expense-report-event-select option[selected]",
+               "No event"
+             )
+    end
+
+    test "the event picker is hidden once the report is paid", %{conn: conn} do
+      member = user_fixture()
+      event = event_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      report
+      |> Ecto.Changeset.change(%{status: "paid", event_id: event.id})
+      |> Repo.update!()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/expense-reports/#{report.id}")
+
+      refute has_element?(view, "#expense-report-event-form")
+      assert has_element?(view, "#expense-report-modal", event.title)
+    end
+
+    test "a crafted event-association change is rejected once the report is paid, even though the UI hides it",
+         %{conn: conn} do
+      member = user_fixture()
+      event = event_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      report
+      |> Ecto.Changeset.change(%{status: "paid"})
+      |> Repo.update!()
+
+      render_change(view, "change_expense_report_event", %{
+        "event_id" => event.id
+      })
+
+      assert is_nil(Repo.reload!(report).event_id)
+    end
+  end
+
   defp submitted_mileage_and_purchase_report!(user) do
     {:ok, bank_account} =
       ExpenseReports.create_bank_account(
