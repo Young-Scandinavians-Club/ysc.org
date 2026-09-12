@@ -585,7 +585,7 @@ defmodule YscWeb.BookingChangeLive do
                 <.input
                   field={@form[:guests_count]}
                   type="number"
-                  label="Number of guests"
+                  label={guest_count_field_label(@booking)}
                   min="1"
                   max={max_adults_for_modification(@booking, @form)}
                   required
@@ -594,7 +594,7 @@ defmodule YscWeb.BookingChangeLive do
                   <.input
                     field={@form[:children_count]}
                     type="number"
-                    label="Number of children"
+                    label="Number of children (ages 5-17)"
                     min="0"
                     max={max_children_for_modification(@booking, @form)}
                   />
@@ -1821,6 +1821,11 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp max_children_for_modification(_booking, _form), do: nil
+
+  defp guest_count_field_label(%Booking{booking_mode: :room}),
+    do: "Number of adults"
+
+  defp guest_count_field_label(_booking), do: "Number of guests"
 
   defp checkout_tooltips_for_params(socket, params) do
     checkin =

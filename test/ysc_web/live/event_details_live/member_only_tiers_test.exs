@@ -178,6 +178,18 @@ defmodule YscWeb.EventDetailsLive.MemberOnlyTiersTest do
       assert html =~ "reached that limit"
     end
 
+    test "non-members see a plain-language members-only explanation", %{
+      conn: conn
+    } do
+      ctx = event_with_member_only_and_regular_tiers()
+      conn = log_in_user(conn, user_fixture())
+
+      {_view, html} = open_tickets_modal(conn, ctx.event)
+
+      assert html =~ "Choose a regular ticket type instead"
+      refute html =~ "Pick a regular tier instead"
+    end
+
     test "lifetime member is not blocked after adding one member-only ticket",
          %{conn: conn} do
       ctx = event_with_member_only_and_regular_tiers()

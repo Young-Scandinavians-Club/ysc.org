@@ -114,9 +114,7 @@ defmodule YscWeb.UserTicketsLive do
                     <div class="flex items-center gap-2 mb-4 text-sm text-amber-600">
                       <.icon name="hero-clock" class="w-4 h-4" />
                       <span class="font-semibold">
-                        Complete payment within {format_time_remaining(
-                          ticket_order.expires_at
-                        )}
+                        {payment_deadline_copy(ticket_order.expires_at)}
                       </span>
                     </div>
                     <div class="flex gap-2">
@@ -207,13 +205,13 @@ defmodule YscWeb.UserTicketsLive do
                         class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-zinc-100 bg-zinc-900 hover:bg-zinc-800 rounded transition-colors"
                       >
                         <.icon name="hero-qr-code" class="w-4 h-4" />
-                        Show event tickets
+                        Show tickets for check-in
                       </.link>
                       <.link
                         navigate={~p"/orders/#{ticket_order.id}/confirmation"}
                         class="px-4 py-2.5 bg-white border border-zinc-200 text-zinc-700 text-sm font-semibold rounded hover:bg-zinc-50 transition"
                       >
-                        View ticket details
+                        View order & receipt
                       </.link>
                     </div>
                   </div>
@@ -472,27 +470,28 @@ defmodule YscWeb.UserTicketsLive do
 
   defp format_price(_), do: "$0.00"
 
-  defp format_time_remaining(expires_at) do
+  defp payment_deadline_copy(expires_at) do
     now = DateTime.utc_now()
 
     if DateTime.compare(now, expires_at) == :gt do
-      "Expired"
+      "This checkout has expired. Start again if tickets are still available."
     else
-      diff_seconds = DateTime.diff(expires_at, now)
-
-      cond do
-        diff_seconds < 60 ->
-          "in #{diff_seconds} seconds"
-
-        diff_seconds < 3600 ->
-          minutes = div(diff_seconds, 60)
-          "in #{minutes} minute#{if minutes == 1, do: "", else: "s"}"
-
-        true ->
-          hours = div(diff_seconds, 3600)
-          "in #{hours} hour#{if hours == 1, do: "", else: "s"}"
-      end
+      "Complete payment in #{format_duration_remaining(DateTime.diff(expires_at, now))}"
     end
+  end
+
+  defp format_duration_remaining(diff_seconds) when diff_seconds < 60 do
+    "#{diff_seconds} second#{if diff_seconds == 1, do: "", else: "s"}"
+  end
+
+  defp format_duration_remaining(diff_seconds) when diff_seconds < 3600 do
+    minutes = div(diff_seconds, 60)
+    "#{minutes} minute#{if minutes == 1, do: "", else: "s"}"
+  end
+
+  defp format_duration_remaining(diff_seconds) do
+    hours = div(diff_seconds, 3600)
+    "#{hours} hour#{if hours == 1, do: "", else: "s"}"
   end
 
   defp memory_gallery_items(user_id) do

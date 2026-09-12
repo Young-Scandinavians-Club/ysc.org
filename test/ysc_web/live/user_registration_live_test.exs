@@ -75,6 +75,8 @@ defmodule YscWeb.UserRegistrationLiveTest do
                "Tell us about your connection to Scandinavia (answer at least one)"
 
       assert html =~ "Tell us about your connection to Scandinavia/the Nordics"
+      assert html =~ "Country of birth"
+      refute html =~ "Place of Birth"
     end
 
     test "completes full registration process successfully", %{conn: conn} do

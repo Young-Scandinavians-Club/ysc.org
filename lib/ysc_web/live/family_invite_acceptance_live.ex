@@ -163,7 +163,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "This invitation is for a family member, not for your own account.",
+           "You can't accept this invitation because you sent it. Ask your family member to open the invite email and create their own account.",
            title: "Invitation"
          )}
     end
