@@ -827,6 +827,91 @@ defmodule Ysc.ExpenseReports do
   end
 
   @doc """
+  Treasurer correction of the event an expense report is associated with —
+  e.g. the member picked the wrong event, or it should be cleared entirely.
+  Pass `nil` (or `""`) for `event_id` to disassociate.
+
+  Refuses once the report is `"paid"` (see `update_unless_report_paid/2`).
+  """
+  def update_expense_report_event(%ExpenseReport{id: id}, event_id) do
+    update_unless_report_paid(id, fn report ->
+      ExpenseReport.event_changeset(report, %{"event_id" => event_id})
+    end)
+  end
+
+  @doc """
+  Treasurer correction of a single expense line item's amount, e.g. fixing a
+  member's typo before approving. Runs the item's normal `changeset/2`, so the
+  corrected amount still passes the usual money and per-line cap validations.
+
+  Mileage items derive their amount from `:miles_driven` (see
+  `ExpenseReportItem.apply_mileage_fields/1`), so they aren't editable this way.
+  Refuses once the parent report is `"paid"` (see `update_unless_report_paid/2`).
+  """
+  def update_expense_item_amount(
+        %ExpenseReportItem{expense_type: "mileage"},
+        _amount
+      ) do
+    {:error, :mileage_amount_not_editable}
+  end
+
+  def update_expense_item_amount(
+        %ExpenseReportItem{expense_report_id: report_id} = item,
+        amount
+      ) do
+    update_unless_report_paid(report_id, fn _report ->
+      ExpenseReportItem.changeset(item, %{"amount" => amount})
+    end)
+  end
+
+  @doc """
+  Treasurer correction of a single income line item's amount. Refuses once
+  the parent report is `"paid"` (see `update_unless_report_paid/2`).
+  """
+  def update_income_item_amount(
+        %ExpenseReportIncomeItem{expense_report_id: report_id} = item,
+        amount
+      ) do
+    update_unless_report_paid(report_id, fn _report ->
+      ExpenseReportIncomeItem.changeset(item, %{"amount" => amount})
+    end)
+  end
+
+  # Locks the parent expense report row and refuses the write with
+  # `{:error, :report_paid}` if it's already "paid" — closes the race where a
+  # treasurer's stale modal (or a QuickBooks-driven "paid" webhook landing
+  # mid-edit) could otherwise mutate a reimbursed report's numbers after the
+  # fact. The lock is held for the duration of the write, so a concurrent
+  # "paid" transition blocks behind it rather than racing it.
+  #
+  # Uses `Repo.transaction/1` rather than `Ecto.Multi` so Dialyzer does not
+  # flag the opaque Multi constructor (`call_without_opaque`).
+  defp update_unless_report_paid(report_id, build_changeset) do
+    Repo.transaction(fn ->
+      case Repo.one(lock_expense_report_for_update_query(report_id)) do
+        nil ->
+          Repo.rollback(:not_found)
+
+        %ExpenseReport{status: "paid"} ->
+          Repo.rollback(:report_paid)
+
+        report ->
+          case Repo.update(build_changeset.(report)) do
+            {:ok, record} -> record
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+      end
+    end)
+  end
+
+  defp lock_expense_report_for_update_query(report_id) do
+    from(er in ExpenseReport,
+      where: er.id == ^report_id,
+      lock: "FOR UPDATE"
+    )
+  end
+
+  @doc """
   Rejects an expense report with a required treasurer note.
 
   The note (enforced by `ExpenseReport.rejection_changeset/2`) explains what the
@@ -2030,6 +2115,11 @@ defmodule Ysc.ExpenseReports do
       "proofs/example.pdf",
       Ysc.Ci.QueryExplain.Fixtures.ulid()
     )
+  end
+
+  @doc false
+  def ci_query_explain_lock_expense_report_for_update_query do
+    lock_expense_report_for_update_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   defp validate_and_send_expense_report_emails(loaded_report) do
