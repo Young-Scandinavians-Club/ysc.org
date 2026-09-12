@@ -148,7 +148,7 @@ defmodule Ysc.MoxUpgradeTest do
 
                       :unexpected_ok
                     rescue
-                      %Mox.UnexpectedCallError{} -> :unexpected_call
+                      error in [Mox.UnexpectedCallError] -> :unexpected_call
                       error -> {:other, error.__struct__}
                     end
 
