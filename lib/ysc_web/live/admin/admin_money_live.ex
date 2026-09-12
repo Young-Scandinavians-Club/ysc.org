@@ -1191,16 +1191,10 @@ defmodule YscWeb.AdminMoneyLive do
     offset = (page - 1) * per_page
 
     recent_payments =
-      from(p in Ysc.Ledgers.Payment,
-        preload: [:user, :payment_method],
-        where: p.payment_date >= ^start_date,
-        where: p.payment_date <= ^end_date,
-        order_by: [desc: p.payment_date],
-        limit: ^per_page,
-        offset: ^offset
+      Ledgers.list_payments_for_admin(start_date, end_date,
+        limit: per_page,
+        offset: offset
       )
-      |> Repo.all()
-      |> Ledgers.add_payment_type_info_batch()
 
     socket
     |> stream(:payments, recent_payments, reset: true)
