@@ -15,6 +15,13 @@ defmodule YscWeb.Api.AppTicketsController do
   **cents**. Accepting donations here would undercharge (e.g. `50` → $0.50)
   or overcharge when a client follows the quantity contract.
 
+  Free / $0 tiers are also rejected on the card-present path (Finding 58).
+  `create_payment_intent` builds a pending order *before* calling Stripe; a
+  $0 total leaves that order in place when Stripe refuses `amount: 0`, and
+  the buyer can then finish it via web `confirm-free-tickets` — which does
+  not re-check capacity or sale windows. Door comps belong on
+  `offline_order` (full-admin only after Finding 51).
+
   Both sale paths below bypass the web checkout's "event already started"
   and tier-sale-window guards, and allow exceeding tier/event capacity
   instead of rejecting the sale — this app is for selling in person *while*
@@ -35,6 +42,7 @@ defmodule YscWeb.Api.AppTicketsController do
   alias Ysc.Tickets
   alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.StripeService
+  alias YscWeb.Plugs.MobileUserAuth
 
   import Ecto.Query, warn: false
 
@@ -51,6 +59,7 @@ defmodule YscWeb.Api.AppTicketsController do
          {:ok, selections} <- parse_ticket_selections(tiers),
          {:ok, selected_tiers} <- load_selected_tiers(event.id, selections),
          :ok <- reject_donation_tiers(selected_tiers),
+         :ok <- reject_complimentary_tiers(selected_tiers),
          warnings <-
            BookingLocker.capacity_warnings(event.id, selections,
              event: event,
@@ -101,6 +110,10 @@ defmodule YscWeb.Api.AppTicketsController do
   reconciliation; `admin_grant_notes` carries only the human-readable note.
   Event revenue reports are unaffected.
 
+  Full admins only (Finding 51). Volunteers may still collect card-present
+  payment via `create_payment_intent/2`. This path is the same complimentary
+  grant primitive the web Tickets tab already hides from volunteers.
+
   Capacity and sale-window guards are bypassed here the same way as
   `create_payment_intent/2` — see this module's moduledoc. Donation tiers
   are rejected, matching `create_payment_intent/2`.
@@ -111,7 +124,8 @@ defmodule YscWeb.Api.AppTicketsController do
           params
       )
       when is_map(tiers) and map_size(tiers) > 0 do
-    with {:ok, event} <- fetch_event(event_id),
+    with :ok <- MobileUserAuth.require_full_admin(conn),
+         {:ok, event} <- fetch_event(event_id),
          {:ok, member} <- fetch_member(member_id),
          :ok <- require_active_membership(member),
          {:ok, selections} <- parse_ticket_selections(tiers),
@@ -207,6 +221,16 @@ defmodule YscWeb.Api.AppTicketsController do
   defp reject_donation_tiers(tiers) when is_list(tiers) do
     if Enum.any?(tiers, &TicketTierHelpers.donation_tier?/1) do
       {:error, :donation_tier_not_supported_in_app}
+    else
+      :ok
+    end
+  end
+
+  # Finding 58: free / $0 selections must not create a pending order that the
+  # buyer can complete via web confirm-free after Stripe rejects amount 0.
+  defp reject_complimentary_tiers(tiers) when is_list(tiers) do
+    if Enum.any?(tiers, &TicketTierHelpers.complimentary_tier?/1) do
+      {:error, :complimentary_tier_not_supported_in_app}
     else
       :ok
     end

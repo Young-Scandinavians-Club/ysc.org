@@ -998,7 +998,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
         |> Repo.update()
 
       data = BookingRefundProcessed.prepare_email_data(refund, booking, payment)
-      assert data.refund.reason == "Refund processed"
+      assert data.refund.reason == "Refund issued"
     end
 
     test "formats refund date as N/A when inserted_at is nil", %{

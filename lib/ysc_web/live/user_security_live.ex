@@ -295,7 +295,7 @@ defmodule YscWeb.UserSecurityLive do
         |> push_patch(to: ~p"/users/settings/security")
         |> YscWeb.Flash.put_toast(
           :info,
-          "Identity verified. Please submit your new password again to finish.",
+          "We've confirmed it's you. Enter your new password and click Change Password to finish.",
           title: "Verification"
         )
       else
@@ -678,7 +678,7 @@ defmodule YscWeb.UserSecurityLive do
                                 <.icon
                                   name="hero-exclamation-triangle"
                                   class="w-3 h-3 me-1"
-                                /> Flagged
+                                /> Unfamiliar sign-in
                               </span>
                             <% end %>
                           </div>

@@ -143,8 +143,12 @@ defmodule YscWeb.AdminEventsNewLive do
                   </.button>
                 </div>
 
-                <div :if={@event.state in [:published]} class="hidden sm:block">
+                <div
+                  :if={@event.state in [:published] && @admin_role == :admin}
+                  class="hidden sm:block"
+                >
                   <.button
+                    id="unpublish-event-btn"
                     class="whitespace-nowrap"
                     color="red"
                     phx-click="unpublish-event"
@@ -231,11 +235,12 @@ defmodule YscWeb.AdminEventsNewLive do
                       </li>
 
                       <li
-                        :if={@event.state == :published}
+                        :if={@event.state == :published && @admin_role == :admin}
                         class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100 sm:hidden"
                       >
                         <button
                           type="button"
+                          id="unpublish-event-btn-mobile"
                           class="w-full text-left px-1"
                           phx-click="unpublish-event"
                         >
@@ -247,11 +252,12 @@ defmodule YscWeb.AdminEventsNewLive do
                       </li>
 
                       <li
-                        :if={@event.state == :published}
+                        :if={@event.state == :published && @admin_role == :admin}
                         class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100"
                       >
                         <button
                           type="button"
+                          id="cancel-event-btn"
                           class="w-full text-left px-1"
                           phx-click="cancel-event"
                         >
@@ -262,11 +268,16 @@ defmodule YscWeb.AdminEventsNewLive do
                         </button>
                       </li>
 
-                      <li class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100">
+                      <li
+                        :if={@event.state in [:draft, :scheduled]}
+                        class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100"
+                      >
                         <button
                           type="button"
+                          id="delete-event-btn"
                           class="w-full text-left px-1"
                           phx-click="delete-event"
+                          data-confirm="Delete this event? This cannot be undone."
                         >
                           <.icon name="hero-trash" class="w-5 h-5" /> Delete Event
                         </button>
@@ -363,8 +374,9 @@ defmodule YscWeb.AdminEventsNewLive do
                     ) <> " anyway"}
               </.button>
               <.button
-                :if={@blackout_prompt.blackout_needed?}
+                :if={@blackout_prompt.blackout_needed? && @admin_role == :admin}
                 type="button"
+                id="confirm-blackout-btn"
                 color="blue"
                 phx-click="confirm-blackout"
                 phx-disable-with="Working..."
@@ -1925,12 +1937,31 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("delete-event", _, socket) do
-    Events.delete_event(socket.assigns.event)
+    case Events.delete_event(socket.assigns.event) do
+      {:ok, _event} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "Event deleted.", title: "Event")
+         |> push_navigate(to: "/admin/events")}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Event deleted.", title: "Event")
-     |> push_navigate(to: "/admin/events")}
+      {:error, :invalid_state} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Published and cancelled events cannot be deleted. Cancel the event instead.",
+           title: "Event"
+         )}
+
+      {:error, _reason} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Failed to delete event. Please try again.",
+           title: "Event"
+         )}
+    end
   end
 
   @impl true
@@ -1950,15 +1981,22 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("confirm-blackout", _, socket) do
-    case socket.assigns[:blackout_prompt] do
-      nil ->
-        {:noreply, socket}
+    # Finding 68: volunteers must not mint cabin blackouts (LetMe
+    # `:blackout_create` is admin-only; /admin/bookings is full-admin so they
+    # also could not undo one).
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Blackout")}
+    else
+      case socket.assigns[:blackout_prompt] do
+        nil ->
+          {:noreply, socket}
 
-      prompt ->
-        socket
-        |> maybe_create_blackout(prompt)
-        |> assign(:blackout_prompt, nil)
-        |> run_blackout_pending(prompt.pending)
+        prompt ->
+          socket
+          |> maybe_create_blackout(prompt)
+          |> assign(:blackout_prompt, nil)
+          |> run_blackout_pending(prompt.pending)
+      end
     end
   end
 
@@ -1987,24 +2025,58 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("unpublish-event", _, socket) do
-    Events.unpublish_event(socket.assigns.event)
+    # Finding 67: volunteers must not take live events off the site.
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Event")}
+    else
+      case Events.unpublish_event(socket.assigns.event,
+             acting_role: socket.assigns.admin_role
+           ) do
+        {:ok, _event} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.",
+             title: "Event"
+           )
+           |> push_patch(to: "/admin/events/#{socket.assigns.event.id}/edit")}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Event moved back to draft.",
-       title: "Event"
-     )
-     |> push_patch(to: "/admin/events/#{socket.assigns.event.id}/edit")}
+        {:error, _} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to unpublish event.",
+             title: "Event"
+           )}
+      end
+    end
   end
 
   @impl true
   def handle_event("cancel-event", _, socket) do
-    Events.cancel_event(socket.assigns.event)
+    # Finding 67: volunteers must not cancel live events.
+    if socket.assigns[:admin_role] != :admin do
+      {:noreply, deny_full_admin(socket, "Event")}
+    else
+      case Events.cancel_event(socket.assigns.event,
+             acting_role: socket.assigns.admin_role
+           ) do
+        {:ok, _event} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "Event cancelled.", title: "Event")
+           |> push_navigate(to: "/admin/events")}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Event cancelled.", title: "Event")
-     |> push_navigate(to: "/admin/events")}
+        {:error, _} ->
+          {:noreply,
+           YscWeb.Flash.put_toast(
+             socket,
+             :error,
+             "Failed to cancel event.",
+             title: "Event"
+           )}
+      end
+    end
   end
 
   @impl true
@@ -2632,14 +2704,17 @@ defmodule YscWeb.AdminEventsNewLive do
   defp run_blackout_pending(socket, {:schedule, publish_at}),
     do: do_schedule_event(socket, publish_at)
 
-  # No blackout to add (one already covers the dates); nothing to create.
+  # No blackout to add (occupied nights already covered); nothing to create.
   defp maybe_create_blackout(socket, %{blackout_needed?: false}), do: socket
 
   defp maybe_create_blackout(socket, prompt) do
     cond do
-      # Re-check right before creating: another admin may have added an
-      # overlapping blackout while this modal was open.
-      existing_blackout_overlap(prompt.attrs) != [] ->
+      socket.assigns[:admin_role] != :admin ->
+        deny_full_admin(socket, "Blackout")
+
+      # Re-check right before creating: another admin may have added a blackout
+      # that now occupies every event night while this modal was open.
+      blackout_already_covers?(prompt.attrs) ->
         YscWeb.Flash.put_toast(
           socket,
           :info,
@@ -2669,6 +2744,15 @@ defmodule YscWeb.AdminEventsNewLive do
             )
         end
     end
+  end
+
+  defp deny_full_admin(socket, title) do
+    YscWeb.Flash.put_toast(
+      socket,
+      :error,
+      "You do not have permission to perform this action.",
+      title: title
+    )
   end
 
   defp do_schedule_event(socket, publish_at_string) do
@@ -3464,10 +3548,15 @@ defmodule YscWeb.AdminEventsNewLive do
 
   # Builds the cabin prompt shown before publishing/scheduling an event held at
   # the Tahoe or Clear Lake cabin. Returns `nil` for non-cabin events, and for
-  # cabin events that already have a covering blackout and no conflicting
-  # booking (nothing to ask). Otherwise returns a map describing what to warn
-  # about: `blackout_needed?` (offer to add one) and `booking_conflict?`
-  # (an existing hold/complete booking overlaps — warn but never block).
+  # cabin events whose occupied nights are already blacked out and that have no
+  # conflicting booking (nothing to ask). Otherwise returns a map describing
+  # what to warn about: `blackout_needed?` (offer to add one) and
+  # `booking_conflict?` (an existing hold/complete booking overlaps — warn but
+  # never block).
+  #
+  # `blackout_needed?` requires every occupied night to already be covered, not
+  # merely calendar overlap. A blackout that ends on the event start date (same
+  # day turnaround) does not occupy the event's nights.
   defp cabin_publish_prompt(event) do
     with {:ok, attrs} <- CabinBlackout.blackout_attrs(event),
          %{
@@ -3475,7 +3564,7 @@ defmodule YscWeb.AdminEventsNewLive do
            "start_date" => start_date,
            "end_date" => end_date
          } <- attrs do
-      blackout_needed? = existing_blackout_overlap(attrs) == []
+      blackout_needed? = not blackout_already_covers?(attrs)
 
       booking_conflict? =
         Bookings.has_conflicting_bookings?(property, start_date, end_date)
@@ -3495,13 +3584,14 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
-  # Blackouts already on the calendar that overlap the event's date range.
-  defp existing_blackout_overlap(%{
+  # True when existing blackouts occupy every night of the proposed event block.
+  # Calendar overlap alone is not enough (see `Bookings.blackout_range_fully_covered?/3`).
+  defp blackout_already_covers?(%{
          "property" => property,
          "start_date" => start_date,
          "end_date" => end_date
        }) do
-    Bookings.get_overlapping_blackouts(property, start_date, end_date)
+    Bookings.blackout_range_fully_covered?(property, start_date, end_date)
   end
 
   defp blackout_pending_verb(:publish), do: "publish"

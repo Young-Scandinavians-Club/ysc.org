@@ -70,16 +70,11 @@ defmodule YscWeb.AdminDashboardLive do
         id="admin-stats-row"
         class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
       >
-        <.link
+        <.admin_dashboard_link_card
+          id="dashboard-applications-card"
           navigate={applications_queue_url()}
-          class={[
-            "p-5 rounded border flex flex-col justify-between transition-all group",
-            if(@pending_reviews_count > 0,
-              do:
-                "bg-white border-amber-300 shadow-sm shadow-amber-50 hover:ring-2 hover:ring-amber-200",
-              else: "bg-white border-zinc-200 hover:ring-2 hover:ring-zinc-300"
-            )
-          ]}
+          action="Review applications →"
+          accent={if(@pending_reviews_count > 0, do: :warning, else: :default)}
         >
           <div>
             <p class="flex items-center gap-1.5 text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -157,14 +152,11 @@ defmodule YscWeb.AdminDashboardLive do
               </p>
             </div>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            Review applications →
-          </p>
-        </.link>
-        <.link
+        </.admin_dashboard_link_card>
+        <.admin_dashboard_link_card
           id="dashboard-memberships-card"
           navigate={~p"/admin/memberships"}
-          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          action="View all memberships →"
         >
           <div>
             <p class="flex items-center gap-1.5 text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -287,10 +279,7 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
             </div>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            View all memberships →
-          </p>
-        </.link>
+        </.admin_dashboard_link_card>
         <div
           id="dashboard-pending-refunds"
           class={[
@@ -378,9 +367,10 @@ defmodule YscWeb.AdminDashboardLive do
         id="volunteer-stats-row"
         class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
       >
-        <.link
+        <.admin_dashboard_link_card
+          id="volunteer-events-card"
           navigate={~p"/admin/events"}
-          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          action="Manage events →"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -400,13 +390,11 @@ defmodule YscWeb.AdminDashboardLive do
               <p class="text-xs text-zinc-400 mt-2">No upcoming events</p>
             <% end %>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            Manage events →
-          </p>
-        </.link>
-        <.link
+        </.admin_dashboard_link_card>
+        <.admin_dashboard_link_card
+          id="volunteer-posts-card"
           navigate={~p"/admin/posts"}
-          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          action="Manage posts →"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -428,13 +416,11 @@ defmodule YscWeb.AdminDashboardLive do
               </span>
             </p>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            Manage posts →
-          </p>
-        </.link>
-        <.link
+        </.admin_dashboard_link_card>
+        <.admin_dashboard_link_card
+          id="volunteer-newsletters-card"
           navigate={~p"/admin/newsletters"}
-          class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between hover:ring-2 hover:ring-zinc-300 transition-all group"
+          action="Manage newsletters →"
         >
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
@@ -456,10 +442,7 @@ defmodule YscWeb.AdminDashboardLive do
               </span>
             </p>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3 group-hover:underline">
-            Manage newsletters →
-          </p>
-        </.link>
+        </.admin_dashboard_link_card>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 pb-8">

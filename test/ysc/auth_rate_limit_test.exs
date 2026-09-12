@@ -14,7 +14,13 @@ defmodule Ysc.AuthRateLimitTest do
   end
 
   defp unique_test_ip do
-    "127.0.#{rem(System.unique_integer([:positive]), 254) + 1}.#{rem(System.unique_integer([:positive]), 254) + 1}"
+    # One unique integer split across 10.a.b.c. Using rem/2 independently on
+    # two integers collided in CI (first check_ip already rate-limited).
+    n = System.unique_integer([:positive])
+    a = rem(div(n, 256 * 256), 254) + 1
+    b = rem(div(n, 256), 256)
+    c = rem(n, 256)
+    "10.#{a}.#{b}.#{c}"
   end
 
   describe "check_ip/1" do
@@ -39,10 +45,10 @@ defmodule Ysc.AuthRateLimitTest do
     test "accepts tuple IP (e.g. from conn.remote_ip)" do
       ip_string = unique_test_ip()
 
-      [127, 0, b, c] =
+      [a, b, c, d] =
         String.split(ip_string, ".") |> Enum.map(&String.to_integer/1)
 
-      ip = {127, 0, b, c}
+      ip = {a, b, c, d}
       assert :ok = AuthRateLimit.check_ip(ip)
       assert :ok = AuthRateLimit.check_ip(ip)
       assert {:error, :rate_limited, _} = AuthRateLimit.check_ip(ip)
@@ -51,6 +57,7 @@ defmodule Ysc.AuthRateLimitTest do
     test "different IPs have separate limits" do
       ip_a = unique_test_ip()
       ip_b = unique_test_ip()
+      assert ip_a != ip_b
 
       assert :ok = AuthRateLimit.check_ip(ip_a)
       assert :ok = AuthRateLimit.check_ip(ip_a)

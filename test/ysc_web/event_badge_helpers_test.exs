@@ -144,11 +144,29 @@ defmodule YscWeb.EventBadgeHelpersTest do
                :cancelled
              ]
     end
+
+    test "sold out suppresses the going fast badge" do
+      event =
+        base_event(%{
+          selling_fast: true,
+          ticket_tiers: [
+            %{
+              type: :paid,
+              quantity: 10,
+              sold_tickets_count: 10,
+              start_date: DateTime.add(DateTime.utc_now(), -1, :day),
+              end_date: DateTime.add(DateTime.utc_now(), 1, :day)
+            }
+          ]
+        })
+
+      assert EventBadgeHelpers.hero_badge_kinds(event) == [:sold_out]
+    end
   end
 
   describe "formatters" do
     test "to_card_badges/1 maps kinds to card badge maps" do
-      assert [%{text: "Today", class: "bg-red-600 text-white animate-pulse"}] =
+      assert [%{text: "Today", class: "bg-rose-600 animate-pulse text-white"}] =
                EventBadgeHelpers.to_card_badges([:today])
     end
 
@@ -161,7 +179,7 @@ defmodule YscWeb.EventBadgeHelpersTest do
     end
 
     test "to_hero_badges/1 maps kinds to hero badge maps" do
-      assert [%{text: "Going Fast!", icon: "hero-fire"}] =
+      assert [%{text: "Going Fast!", icon: "hero-fire-solid"}] =
                EventBadgeHelpers.to_hero_badges([:going_fast])
     end
   end

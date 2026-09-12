@@ -6,6 +6,14 @@
 // element. The overlay carries `phx-update="ignore"` so this hook fully owns its
 // visibility; navigating between attachments swaps in a fresh overlay + element
 // because their ids include the attachment index.
+//
+// The overlay's markup carries a static `flex` class (to center the spinner).
+// The `[hidden]` attribute selector and `.flex` utility class have equal CSS
+// specificity, and Tailwind's utilities layer loads after preflight, so `.flex`
+// wins the cascade and the `hidden` attribute alone would NOT actually hide the
+// element — it would stay laid out (just faded via opacity) and keep swallowing
+// clicks/scroll over the preview underneath. `classList.remove("flex")` here
+// removes that competing rule so `[hidden]` can take effect.
 const FADE_MS = 200;
 
 const MediaLoadState = {
@@ -20,10 +28,10 @@ const MediaLoadState = {
 
         overlay.dataset.state = "hidden";
         overlay.classList.add("opacity-0");
-        this.fadeTimer = window.setTimeout(
-            () => overlay.setAttribute("hidden", ""),
-            FADE_MS,
-        );
+        this.fadeTimer = window.setTimeout(() => {
+            overlay.setAttribute("hidden", "");
+            overlay.classList.remove("flex");
+        }, FADE_MS);
     },
 
     showError() {
@@ -33,6 +41,7 @@ const MediaLoadState = {
         window.clearTimeout(this.fadeTimer);
         overlay.dataset.state = "error";
         overlay.removeAttribute("hidden");
+        overlay.classList.add("flex");
         overlay.classList.remove("opacity-0");
 
         const spinner = overlay.querySelector("[data-load-spinner]");

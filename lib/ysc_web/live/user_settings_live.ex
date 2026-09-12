@@ -321,7 +321,7 @@ defmodule YscWeb.UserSettingsLive do
                       phx-click="delete-payment-method"
                       phx-value-payment_method_id={payment_method.id}
                       disabled={busy?}
-                      data-confirm="Remove this payment method? It will be detached from your account and can no longer be used for membership payments."
+                      data-confirm="Remove this payment method? It will be removed from your account and can no longer be used for membership payments."
                       aria-label="Remove payment method"
                       class="flex-shrink-0 p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -1164,7 +1164,7 @@ defmodule YscWeb.UserSettingsLive do
                   Get Your YSC Membership
                 </h2>
                 <p class="text-zinc-500 mt-1">
-                  Access exclusive events, cabin access, and all membership benefits.
+                  Enjoy exclusive events, cabin stays, and all membership benefits.
                 </p>
               </div>
 
@@ -1918,12 +1918,12 @@ defmodule YscWeb.UserSettingsLive do
                 Notification Preferences
               </h2>
               <p class="text-sm text-zinc-600">
-                Manage how you receive notifications from the YSC. You can control which types of notifications you receive via email or SMS.
+                Manage how you receive notifications from the YSC. You can control which types of notifications you receive by email or text message.
               </p>
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                 <p class="text-sm text-blue-900">
                   <strong>SMS Consent:</strong>
-                  By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club (YSC). Message and data rates may apply. You can opt out at any time by unchecking the SMS options below or sending a STOP message to the number you receive messages from. See our
+                  By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club (YSC). Message and data rates may apply. You can opt out at any time by unchecking the Text options below or sending a STOP message to the number you receive messages from. See our
                   <.link
                     navigate={~p"/privacy-policy"}
                     class="text-blue-700 hover:underline font-semibold"
@@ -1993,7 +1993,7 @@ defmodule YscWeb.UserSettingsLive do
                             scope="col"
                             class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
                           >
-                            SMS
+                            Text
                           </th>
                         </tr>
                       </thead>
@@ -4840,7 +4840,7 @@ defmodule YscWeb.UserSettingsLive do
         |> push_patch(to: ~p"/users/settings")
         |> YscWeb.Flash.put_toast(
           :info,
-          "Phone number updated. SMS verification isn't available for this number, so we've skipped that step.",
+          "Phone number updated. We can't send a verification text to this number, so we've skipped that step.",
           title: "Phone",
           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
         )
@@ -5805,7 +5805,7 @@ defmodule YscWeb.UserSettingsLive do
         <strong>Booking Cancelled:</strong>
         This booking has been cancelled. {if @payment_info.payment do
           if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
-            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} has been processed."
+            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} is on the way."
           else
             " Refund information is available in the booking details."
           end
@@ -5818,7 +5818,7 @@ defmodule YscWeb.UserSettingsLive do
         <strong>Tickets cancelled:</strong>
         These tickets have been cancelled. {if @payment_info.payment do
           if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
-            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} has been processed."
+            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} is on the way."
           else
             " Refund information is available in the order details."
           end

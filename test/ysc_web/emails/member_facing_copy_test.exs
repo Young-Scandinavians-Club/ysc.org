@@ -11,6 +11,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
   alias YscWeb.Emails.{
     ApplicationApproved,
+    ApplicationApprovedFamilyLinked,
+    ApplicationApprovedPaymentSuccess,
+    BookingCancellationConfirmation,
     BookingCheckinReminder,
     BookingCheckoutReminder,
     BookingConfirmation,
@@ -49,6 +52,27 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "You're officially a Young Scandinavian"
       refute text =~ "Pay Your Membership"
       refute text =~ "completing your membership payment"
+    end
+
+    test "family-linked approval subject glosses Velkommen" do
+      assert ApplicationApprovedFamilyLinked.get_subject() ==
+               "Velkommen! (Welcome!) You're officially a Young Scandinavian 🎉"
+    end
+
+    test "payment-success approval heading glosses Velkommen" do
+      html =
+        ApplicationApprovedPaymentSuccess.render(%{
+          first_name: "Jane",
+          bank_payment: false
+        })
+
+      text = html_text(html)
+
+      assert ApplicationApprovedPaymentSuccess.get_subject() ==
+               "Velkommen! (Welcome!) Your YSC Membership is Active! 🎉"
+
+      assert text =~ "Velkommen! (Welcome!) Your Membership is Active"
+      refute text =~ "Velkommen! Your Membership is Active"
     end
 
     test "payment confirmation tells members they can book a stay at the cabins" do
@@ -545,6 +569,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Your tickets are confirmed"
       assert text =~ "See event details"
       assert text =~ "show the tickets on your phone"
+      assert text =~ "Payment Reference:"
+      refute text =~ "Transaction ID:"
       refute text =~ "Ticket Purchase Confirmation"
       refute text =~ "View Event Details"
     end
@@ -674,6 +700,56 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "money is on the way"
       refute text =~ "refund request"
       refute text =~ "approved and processed"
+    end
+
+    test "booking cancellation confirmation says the money is on the way" do
+      pending_html =
+        BookingCancellationConfirmation.render(%{
+          first_name: "Jane",
+          booking: %{
+            reference_id: "BK-123",
+            property: "Tahoe",
+            checkin_date: "December 1, 2026",
+            checkout_date: "December 3, 2026"
+          },
+          cancellation: %{
+            date: "Nov 2, 2026",
+            reason: "Change of plans"
+          },
+          payment: %{reference_id: "PMT-123", amount: "$200.00"},
+          refund: %{amount: "$100.00", is_pending: true},
+          booking_url: "https://example.com/bookings/preview"
+        })
+
+      pending_text = html_text(pending_html)
+
+      assert pending_text =~ "money is on the way"
+      refute pending_text =~ "approved and processed"
+      refute pending_text =~ "will be processed"
+
+      completed_html =
+        BookingCancellationConfirmation.render(%{
+          first_name: "Jane",
+          booking: %{
+            reference_id: "BK-123",
+            property: "Tahoe",
+            checkin_date: "December 1, 2026",
+            checkout_date: "December 3, 2026"
+          },
+          cancellation: %{
+            date: "Nov 2, 2026",
+            reason: "Change of plans"
+          },
+          payment: %{reference_id: "PMT-123", amount: "$200.00"},
+          refund: %{amount: "$200.00", is_pending: false},
+          booking_url: "https://example.com/bookings/preview"
+        })
+
+      completed_text = html_text(completed_html)
+
+      assert completed_text =~ "go back to your original payment method"
+      refute completed_text =~ "will be processed"
+      refute completed_text =~ "processed and credited"
     end
   end
 

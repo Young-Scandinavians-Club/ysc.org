@@ -129,10 +129,22 @@ defmodule YscWeb.Components.Events.EventTvPoster do
   defp poster_badges(event, sold_out, selling_fast) do
     cond do
       cancelled?(event) ->
-        [%{text: "Cancelled", class: "bg-red-600 text-white", icon: nil}]
+        [
+          %{
+            text: "Cancelled",
+            class: "bg-zinc-700 text-white",
+            icon: "hero-x-circle-solid"
+          }
+        ]
 
       sold_out ->
-        [%{text: "Sold Out", class: "bg-red-600 text-white", icon: nil}]
+        [
+          %{
+            text: "Sold Out",
+            class: "bg-red-600 text-white",
+            icon: "hero-no-symbol"
+          }
+        ]
 
       true ->
         []
@@ -149,7 +161,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
           %{
             text: "Going Fast!",
             class: "bg-emerald-600 text-white",
-            icon: "hero-bolt-solid"
+            icon: "hero-fire-solid"
           }
         )
     end

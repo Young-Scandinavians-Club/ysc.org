@@ -420,6 +420,20 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         phx-target={@myself}
       />
       <button
+        id={"tickets-tbd-toggle-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="toggle-tickets-tbd"
+        phx-target={@myself}
+      />
+      <button
+        id={"tickets-tbd-set-event-#{@event_id}"}
+        type="button"
+        class="hidden"
+        phx-click="set-tickets-tbd"
+        phx-target={@myself}
+      />
+      <button
         id={"ticket-tier-edit-event-#{@event_id}"}
         type="button"
         class="hidden"
@@ -787,64 +801,17 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("toggle-tickets-tbd", _params, socket) do
-    new_value = !socket.assigns.event.tickets_tbd
-
-    case Events.set_tickets_tbd(socket.assigns.event, new_value) do
-      {:ok, updated_event} ->
-        message =
-          if new_value,
-            do: "Event marked as 'Tickets TBD'",
-            else: "Tickets TBD flag cleared"
-
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:info, message, title: "Tickets")
-         |> assign(:event, updated_event)}
-
-      {:error, _} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to update event",
-           title: "Event"
-         )}
-    end
+    apply_tickets_tbd(socket, !socket.assigns.event.tickets_tbd)
   end
 
   @impl true
   def handle_event("set-tickets-tbd", _params, socket) do
-    case Events.set_tickets_tbd(socket.assigns.event, true) do
-      {:ok, updated_event} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:info, "Event marked as 'Tickets TBD'",
-           title: "Tickets"
-         )
-         |> assign(:event, updated_event)}
-
-      {:error, _} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to update event",
-           title: "Event"
-         )}
-    end
+    apply_tickets_tbd(socket, true)
   end
 
   @impl true
   def handle_event("clear-tickets-tbd", _params, socket) do
-    case Events.set_tickets_tbd(socket.assigns.event, false) do
-      {:ok, updated_event} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:info, "Tickets TBD flag cleared",
-           title: "Tickets"
-         )
-         |> assign(:event, updated_event)}
-
-      {:error, _} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Failed to update event",
-           title: "Event"
-         )}
-    end
+    apply_tickets_tbd(socket, false)
   end
 
   @impl true
@@ -1176,6 +1143,36 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       "You do not have permission to perform this action.",
       title: title
     )
+  end
+
+  defp apply_tickets_tbd(socket, tbd) do
+    case Events.set_tickets_tbd(socket.assigns.event, tbd) do
+      {:ok, updated_event} ->
+        message =
+          if tbd,
+            do: "Event marked as 'Tickets TBD'",
+            else: "Tickets TBD flag cleared"
+
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, message, title: "Tickets")
+         |> assign(:event, updated_event)}
+
+      {:error, :ticket_tiers_exist} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Tickets TBD can only be enabled before ticket tiers are added.",
+           title: "Tickets"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Failed to update event",
+           title: "Event"
+         )}
+    end
   end
 
   defp delete_ticket_tier_as_admin(socket, id) do

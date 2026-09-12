@@ -202,7 +202,7 @@ defmodule YscWeb.AdminGhostComponents do
         id="volunteer-stats-row"
         class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
       >
-        <div class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between">
+        <.admin_dashboard_link_card action="Manage events →">
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
               Upcoming Events
@@ -215,9 +215,8 @@ defmodule YscWeb.AdminGhostComponents do
               Sat, Jun 21 · 5:00 PM
             </p>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3">Manage events →</p>
-        </div>
-        <div class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between">
+        </.admin_dashboard_link_card>
+        <.admin_dashboard_link_card action="Manage posts →">
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
               News &amp; Posts
@@ -228,9 +227,8 @@ defmodule YscWeb.AdminGhostComponents do
               <span class="text-amber-600 font-bold ml-1">· 2 drafts</span>
             </p>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3">Manage posts →</p>
-        </div>
-        <div class="bg-white p-5 rounded border border-zinc-200 flex flex-col justify-between">
+        </.admin_dashboard_link_card>
+        <.admin_dashboard_link_card action="Manage newsletters →">
           <div>
             <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
               Newsletters
@@ -241,8 +239,7 @@ defmodule YscWeb.AdminGhostComponents do
               <span class="text-amber-600 font-bold ml-1">· 1 draft</span>
             </p>
           </div>
-          <p class="text-xs text-blue-600 font-medium mt-3">Manage newsletters →</p>
-        </div>
+        </.admin_dashboard_link_card>
       </div>
 
       <div

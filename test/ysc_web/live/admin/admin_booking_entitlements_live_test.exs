@@ -157,6 +157,43 @@ defmodule YscWeb.AdminBookingEntitlementsLiveTest do
       assert Money.equal?(ent.amount_off, Money.new(:USD, "40.00"))
     end
 
+    test "lists a benefit with no issuer and still allows revoke", %{
+      conn: conn
+    } do
+      member = user_fixture(%{first_name: "Orphan", last_name: "Issuer"})
+
+      {:ok, ent} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: member.id,
+            issued_by_user_id: nil,
+            benefit_kind: :fixed_amount_off,
+            amount_off: Money.new(:USD, 15)
+          },
+          send_notification: false
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/bookings/entitlements")
+      render(view)
+
+      assert has_element?(view, "#revoke-entitlement-org-#{ent.id}")
+      assert has_element?(view, "#entitlement-issuer-#{ent.id}", "—")
+      html = render(view)
+      assert html =~ "Orphan Issuer"
+      refute html =~ "Loading entitlements…"
+
+      view
+      |> element("#revoke-entitlement-org-#{ent.id}")
+      |> render_click()
+
+      html = render(view)
+
+      refute has_element?(view, "#revoke-entitlement-org-#{ent.id}")
+      refute html =~ "Orphan Issuer"
+      assert Entitlements.list_outstanding() == []
+      assert Entitlements.get_entitlement!(ent.id).status == :revoked
+    end
+
     test "revokes an outstanding benefit from the table", %{
       conn: conn,
       admin: admin

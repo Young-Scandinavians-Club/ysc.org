@@ -562,7 +562,7 @@ defmodule YscWeb.BookingCheckoutLive do
               class="p-6 bg-red-50 border border-red-200 rounded-lg"
             >
               <p class="text-sm font-semibold text-red-800 mb-2">
-                Your hold on these dates expired
+                Time ran out for these dates
               </p>
               <p class="text-sm text-red-700 mb-4">
                 {BookingUserMessages.checkout_hold_expired()}

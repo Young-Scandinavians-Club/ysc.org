@@ -453,6 +453,54 @@ defmodule Ysc.PostsTest do
     end
   end
 
+  describe "restore_post/2" do
+    test "restores a deleted post to draft", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Restore me",
+            "body" => "Body",
+            "url_name" => "restore-me-#{System.unique_integer([:positive])}",
+            "state" => "draft"
+          },
+          author
+        )
+
+      assert {:ok, deleted} = Posts.soft_delete_post(post, author)
+      assert deleted.state == :deleted
+
+      assert {:ok, restored} = Posts.restore_post(deleted, author)
+      assert restored.state == :draft
+      assert is_nil(restored.deleted_on)
+      assert is_nil(restored.published_on)
+    end
+
+    test "refuses published posts", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Live restore",
+            "body" => "Body",
+            "url_name" => "live-restore-#{System.unique_integer([:positive])}",
+            "state" => "draft"
+          },
+          author
+        )
+
+      published_on = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      assert {:ok, published} =
+               Posts.update_post(
+                 post,
+                 %{state: :published, published_on: published_on},
+                 author
+               )
+
+      assert {:error, :invalid_state} = Posts.restore_post(published, author)
+      assert Posts.get_post(published.id).state == :published
+    end
+  end
+
   describe "update_post_editor/4" do
     test "updates editorial fields and sets updated_by_id", %{author: author} do
       editor = user_fixture(%{role: "admin"})

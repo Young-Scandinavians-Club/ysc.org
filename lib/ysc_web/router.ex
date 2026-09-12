@@ -637,6 +637,10 @@ defmodule YscWeb.Router do
       live "/money/payments/:id/refund", AdminMoneyLive, :refund_payment
       live "/money/payouts/:id", AdminMoneyLive, :view_payout
 
+      live "/money/expense-reports/:id",
+           AdminMoneyLive,
+           :view_expense_report
+
       # Events
       live "/events", AdminEventsLive, :index
       live "/events/new", AdminEventsNewLive, :new

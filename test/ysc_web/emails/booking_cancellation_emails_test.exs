@@ -70,6 +70,8 @@ defmodule YscWeb.Emails.BookingCancellationEmailsTest do
       assert html =~ "Refund Amount"
       refute html =~ "Refund Pending Review"
       assert html =~ "Payment Details"
+      assert html =~ "go back to your original payment method"
+      refute html =~ "will be processed"
     end
 
     test "prepare_email_data and render: pending refund copy" do
@@ -87,6 +89,8 @@ defmodule YscWeb.Emails.BookingCancellationEmailsTest do
       html = BookingCancellationConfirmation.render(data)
       assert html =~ "Refund under review"
       assert html =~ "No action is needed on your side"
+      assert html =~ "money is on the way"
+      refute html =~ "approved and processed"
     end
 
     test "get_subject/0 and booking_url/1" do

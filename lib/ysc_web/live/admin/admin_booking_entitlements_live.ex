@@ -334,7 +334,10 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
                     —
                   <% end %>
                 </td>
-                <td class="px-4 py-3 text-zinc-600">
+                <td
+                  id={"entitlement-issuer-#{ent.id}"}
+                  class="px-4 py-3 text-zinc-600"
+                >
                   <%= if ent.issued_by_user do %>
                     {ent.issued_by_user.email}
                   <% else %>

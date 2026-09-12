@@ -84,4 +84,21 @@ defmodule YscWeb.Plugs.MobileUserAuthTest do
       assert conn.status == 401
     end
   end
+
+  describe "require_full_admin/1" do
+    test "returns :ok for an admin", %{conn: conn} do
+      user = user_fixture(%{role: :admin})
+      conn = Plug.Conn.assign(conn, :current_user, user)
+
+      assert MobileUserAuth.require_full_admin(conn) == :ok
+    end
+
+    test "returns :full_admin_required for a volunteer", %{conn: conn} do
+      user = user_fixture(%{role: :volunteer})
+      conn = Plug.Conn.assign(conn, :current_user, user)
+
+      assert MobileUserAuth.require_full_admin(conn) ==
+               {:error, :full_admin_required}
+    end
+  end
 end

@@ -785,20 +785,30 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Delete an event from the database.
+  Soft-deletes a draft or scheduled event.
+
+  Published and cancelled events must be cancelled / left cancelled rather than
+  deleted, so ticket holders keep a public status page. Matches the admin help
+  copy and the events-list delete affordance.
   """
   def delete_event(%Event{} = event) do
-    event
-    |> Event.changeset(%{state: :deleted, published_at: nil})
-    |> Repo.update()
-    |> case do
-      {:ok, event} ->
-        invalidate_event_caches()
-        broadcast(%Ysc.MessagePassingEvents.EventDeleted{event: event})
-        {:ok, event}
+    # Finding 59: refuse published/cancelled deletes so volunteers cannot wipe
+    # another organizer's live event (and sold tickets) via the editor menu.
+    if event.state in [:draft, :scheduled] do
+      event
+      |> Event.changeset(%{state: :deleted, published_at: nil})
+      |> Repo.update()
+      |> case do
+        {:ok, event} ->
+          invalidate_event_caches()
+          broadcast(%Ysc.MessagePassingEvents.EventDeleted{event: event})
+          {:ok, event}
 
-      {:error, changeset} ->
-        {:error, changeset}
+        {:error, changeset} ->
+          {:error, changeset}
+      end
+    else
+      {:error, :invalid_state}
     end
   end
 
@@ -1573,35 +1583,42 @@ defmodule Ysc.Events do
 
   defp maybe_reschedule_event_notification(_event), do: :ok
 
-  def unpublish_event(%Event{} = event) do
-    event
-    |> Event.changeset(%{state: "draft", published_at: nil})
-    |> Repo.update()
-    |> case do
-      {:ok, event} ->
-        invalidate_event_caches()
-        broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
-        {:ok, event}
-
-      {:error, changeset} ->
-        {:error, changeset}
+  # Finding 67: volunteers must not unpublish or cancel live events (sibling of
+  # Finding 59's published-event delete gate). Pass `acting_role:` from the
+  # editor; omitted role stays admin-compatible for existing callers.
+  def unpublish_event(%Event{} = event, opts \\ []) do
+    with :ok <- require_full_admin_lifecycle(opts) do
+      event
+      |> Event.changeset(%{state: "draft", published_at: nil})
+      |> Repo.update()
+      |> finalize_lifecycle_broadcast()
     end
   end
 
-  def cancel_event(%Event{} = event) do
-    event
-    |> Event.changeset(%{state: "cancelled"})
-    |> Repo.update()
-    |> case do
-      {:ok, event} ->
-        invalidate_event_caches()
-        broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
-        {:ok, event}
-
-      {:error, changeset} ->
-        {:error, changeset}
+  def cancel_event(%Event{} = event, opts \\ []) do
+    with :ok <- require_full_admin_lifecycle(opts) do
+      event
+      |> Event.changeset(%{state: "cancelled"})
+      |> Repo.update()
+      |> finalize_lifecycle_broadcast()
     end
   end
+
+  defp require_full_admin_lifecycle(opts) when is_list(opts) do
+    case Keyword.get(opts, :acting_role, :admin) do
+      role when role in [:admin, "admin"] -> :ok
+      _ -> {:error, :unauthorized}
+    end
+  end
+
+  defp finalize_lifecycle_broadcast({:ok, event}) do
+    invalidate_event_caches()
+    broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
+    {:ok, event}
+  end
+
+  defp finalize_lifecycle_broadcast({:error, changeset}),
+    do: {:error, changeset}
 
   def schedule_event(%Event{} = event, publish_at) when is_binary(publish_at) do
     # Try to parse as full ISO8601 first, then fall back to datetime-local format
@@ -1847,8 +1864,26 @@ defmodule Ysc.Events do
   Set or clear the tickets_tbd flag on an event.
   When true, the event shows "Tickets Coming Soon" until the first tier is added.
   When cleared (false), schedules save-the-date notifications for all subscribers.
+
+  Finding 70: enabling TBD is refused once any ticket tier exists. The Tickets tab
+  only shows the toggle when the event has zero tiers; this context gate closes the
+  LiveView / editor-param bypass that hid checkout on live ticketed events.
   """
-  def set_tickets_tbd(%Event{} = event, tbd \\ true) do
+  def set_tickets_tbd(event, tbd \\ true)
+
+  def set_tickets_tbd(%Event{} = event, true) do
+    if count_ticket_tiers_for_event(event.id) > 0 do
+      {:error, :ticket_tiers_exist}
+    else
+      persist_tickets_tbd(event, true)
+    end
+  end
+
+  def set_tickets_tbd(%Event{} = event, false) do
+    persist_tickets_tbd(event, false)
+  end
+
+  defp persist_tickets_tbd(%Event{} = event, tbd) do
     was_tbd = event.tickets_tbd
 
     event

@@ -473,7 +473,7 @@ defmodule Ysc.Tickets.BookingLocker do
             {:error, :tier_not_for_event}
 
           not skip_sale_guards? and
-              not TicketTierHelpers.tier_sale_started?(tier) ->
+              not TicketTierHelpers.tier_on_sale?(tier) ->
             {:error, :tier_not_on_sale}
 
           quantity <= 0 ->
@@ -933,7 +933,7 @@ defmodule Ysc.Tickets.BookingLocker do
       total_quantity: tier.quantity,
       available: available,
       sold: Map.get(counts.sold, tier.id, 0),
-      on_sale: TicketTierHelpers.tier_sale_started?(tier),
+      on_sale: TicketTierHelpers.tier_on_sale?(tier),
       start_date: tier.start_date,
       end_date: tier.end_date
     }
@@ -1173,7 +1173,7 @@ defmodule Ysc.Tickets.BookingLocker do
          total_amount,
          discount_amount
        ) do
-    expires_at = DateTime.add(DateTime.utc_now(), 30, :minute)
+    expires_at = DateTime.add(DateTime.utc_now(), 5, :minute)
 
     attrs = %{
       user_id: user_id,
