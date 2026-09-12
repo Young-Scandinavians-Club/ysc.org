@@ -4,7 +4,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
   synced to QuickBooks yet.
 
   This worker:
-  1. Finds all expense reports with status="submitted" and quickbooks_sync_status="pending" (or nil)
+  1. Finds all expense reports with status="approved" and quickbooks_sync_status="pending" (or nil)
   2. Checks if there's already an Oban job enqueued for each report
   3. Enqueues sync jobs for any reports that don't have jobs already
 
@@ -39,12 +39,12 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
     # Use a transaction with row-level locking to prevent duplicate processing
     # FOR UPDATE SKIP LOCKED will skip any reports currently being processed by another worker
     Repo.transaction(fn ->
-      # Find and lock expense reports that are submitted but not synced
+      # Find and lock expense reports that are approved but not synced
       # FOR UPDATE SKIP LOCKED ensures we only process reports that aren't currently locked
       # Include "failed" status to allow retries
       unsynced_reports =
         from(er in ExpenseReport,
-          where: er.status == "submitted",
+          where: er.status == "approved",
           where:
             is_nil(er.quickbooks_sync_status) or
               er.quickbooks_sync_status == "pending" or

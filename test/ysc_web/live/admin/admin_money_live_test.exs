@@ -74,6 +74,14 @@ defmodule YscWeb.AdminMoneyLiveTest do
       {:ok, "qb_class_test"}
     end)
 
+    stub(Ysc.Quickbooks.ClientMock, :get_or_create_vendor, fn _name, _params ->
+      {:ok, "qb_vendor_test"}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :create_bill, fn _params, _opts ->
+      {:ok, %{"Id" => "qb_bill_test"}}
+    end)
+
     :ok
   end
 
@@ -1302,7 +1310,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
   end
 
   describe "expense report review actions and flags" do
-    setup [:create_admin]
+    setup [:create_admin, :setup_qb_mocks]
 
     test "opening the modal patches the URL so a reload keeps it open", %{
       conn: conn
@@ -1362,6 +1370,30 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       assert Repo.reload!(report).status == "approved"
       refute has_element?(view, "#expense-report-modal")
+    end
+
+    test "approving a submitted report syncs it to QuickBooks", %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      view
+      |> element("#expense-report-approve")
+      |> render_click()
+
+      # Oban runs inline in tests, so by the time render_click/1 returns the
+      # QuickBooks sync job (enqueued by ExpenseReports.update_expense_report/2
+      # on approval) has already run and created the Bill.
+      updated = Repo.reload!(report)
+      assert updated.quickbooks_bill_id == "qb_bill_test"
+      assert updated.quickbooks_sync_status == "synced"
     end
 
     test "rejecting requires a note, stores it, and closes the modal", %{

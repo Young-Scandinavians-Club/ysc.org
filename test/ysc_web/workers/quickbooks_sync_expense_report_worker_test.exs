@@ -80,13 +80,40 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorkerTest do
       assert :ok = result
     end
 
+    test "skips expense reports that are not approved yet", %{user: user} do
+      # A "submitted" report with no bill_id must not be exported, even if
+      # something enqueued a sync job for it (e.g. a stale job from before
+      # this report was un-approved, or a leftover admin action).
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Not yet approved",
+          status: "submitted",
+          quickbooks_sync_status: "pending",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"expense_report_id" => expense_report.id},
+        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = QuickbooksSyncExpenseReportWorker.perform(job)
+      assert Repo.reload!(expense_report).quickbooks_bill_id == nil
+    end
+
     test "handles pending sync expense reports", %{user: user} do
       # Insert expense report with pending sync status
       expense_report =
         %ExpenseReport{
           user_id: user.id,
           purpose: "Test expense report",
-          status: "submitted",
+          status: "approved",
           quickbooks_sync_status: "pending",
           reimbursement_method: "check"
         }
