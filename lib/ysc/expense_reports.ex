@@ -830,11 +830,13 @@ defmodule Ysc.ExpenseReports do
   Treasurer correction of the event an expense report is associated with —
   e.g. the member picked the wrong event, or it should be cleared entirely.
   Pass `nil` (or `""`) for `event_id` to disassociate.
+
+  Refuses once the report is `"paid"` (see `update_unless_report_paid/2`).
   """
-  def update_expense_report_event(%ExpenseReport{} = expense_report, event_id) do
-    expense_report
-    |> ExpenseReport.event_changeset(%{"event_id" => event_id})
-    |> Repo.update()
+  def update_expense_report_event(%ExpenseReport{id: id}, event_id) do
+    update_unless_report_paid(id, fn report ->
+      ExpenseReport.event_changeset(report, %{"event_id" => event_id})
+    end)
   end
 
   @doc """
@@ -844,6 +846,7 @@ defmodule Ysc.ExpenseReports do
 
   Mileage items derive their amount from `:miles_driven` (see
   `ExpenseReportItem.apply_mileage_fields/1`), so they aren't editable this way.
+  Refuses once the parent report is `"paid"` (see `update_unless_report_paid/2`).
   """
   def update_expense_item_amount(
         %ExpenseReportItem{expense_type: "mileage"},
@@ -852,19 +855,58 @@ defmodule Ysc.ExpenseReports do
     {:error, :mileage_amount_not_editable}
   end
 
-  def update_expense_item_amount(%ExpenseReportItem{} = item, amount) do
-    item
-    |> ExpenseReportItem.changeset(%{"amount" => amount})
-    |> Repo.update()
+  def update_expense_item_amount(
+        %ExpenseReportItem{expense_report_id: report_id} = item,
+        amount
+      ) do
+    update_unless_report_paid(report_id, fn _report ->
+      ExpenseReportItem.changeset(item, %{"amount" => amount})
+    end)
   end
 
   @doc """
-  Treasurer correction of a single income line item's amount.
+  Treasurer correction of a single income line item's amount. Refuses once
+  the parent report is `"paid"` (see `update_unless_report_paid/2`).
   """
-  def update_income_item_amount(%ExpenseReportIncomeItem{} = item, amount) do
-    item
-    |> ExpenseReportIncomeItem.changeset(%{"amount" => amount})
-    |> Repo.update()
+  def update_income_item_amount(
+        %ExpenseReportIncomeItem{expense_report_id: report_id} = item,
+        amount
+      ) do
+    update_unless_report_paid(report_id, fn _report ->
+      ExpenseReportIncomeItem.changeset(item, %{"amount" => amount})
+    end)
+  end
+
+  # Locks the parent expense report row and refuses the write with
+  # `{:error, :report_paid}` if it's already "paid" — closes the race where a
+  # treasurer's stale modal (or a QuickBooks-driven "paid" webhook landing
+  # mid-edit) could otherwise mutate a reimbursed report's numbers after the
+  # fact. The lock is held for the duration of the write, so a concurrent
+  # "paid" transition blocks behind it rather than racing it.
+  defp update_unless_report_paid(report_id, build_changeset) do
+    Ecto.Multi.new()
+    |> Ecto.Multi.run(:report, fn repo, _changes ->
+      query =
+        from(er in ExpenseReport,
+          where: er.id == ^report_id,
+          lock: "FOR UPDATE"
+        )
+
+      case repo.one(query) do
+        nil -> {:error, :not_found}
+        %ExpenseReport{status: "paid"} -> {:error, :report_paid}
+        report -> {:ok, report}
+      end
+    end)
+    |> Ecto.Multi.update(:record, fn %{report: report} ->
+      build_changeset.(report)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{record: record}} -> {:ok, record}
+      {:error, :report, reason, _changes} -> {:error, reason}
+      {:error, :record, changeset, _changes} -> {:error, changeset}
+    end
   end
 
   @doc """

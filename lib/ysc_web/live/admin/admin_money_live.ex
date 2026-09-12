@@ -82,6 +82,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:expense_report_totals, nil)
       |> assign(:editing_expense_item, nil)
       |> assign(:expense_report_events, [])
+      |> assign(:expense_report_event_form, to_form(%{"event_id" => ""}))
       |> assign(
         :expense_report_status_form,
         to_form(%{}, as: :expense_report_status)
@@ -3504,29 +3505,26 @@ defmodule YscWeb.AdminMoneyLive do
                   <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
                     <span class="font-medium text-zinc-700">Event:</span>
                     <%= if report.status != "paid" do %>
-                      <form
+                      <.form
+                        for={@expense_report_event_form}
                         id="expense-report-event-form"
                         phx-change="change_expense_report_event"
                       >
-                        <select
+                        <.input
+                          field={@expense_report_event_form[:event_id]}
+                          type="select"
                           id="expense-report-event-select"
-                          name="event_id"
+                          label=""
                           class="rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          <option value="" selected={is_nil(report.event_id)}>
-                            No event
-                          </option>
-                          <option
-                            :for={event <- @expense_report_events}
-                            value={event.id}
-                            selected={report.event_id == event.id}
-                          >
-                            {event.title} - {DateDisplay.format_date_long(
-                              event.start_date
-                            )}
-                          </option>
-                        </select>
-                      </form>
+                          options={
+                            [{"No event", ""}] ++
+                              Enum.map(@expense_report_events, fn event ->
+                                {"#{event.title} - #{DateDisplay.format_date_long(event.start_date)}",
+                                 event.id}
+                              end)
+                          }
+                        />
+                      </.form>
                     <% else %>
                       <span class="text-zinc-900">
                         {(Ecto.assoc_loaded?(report.event) && report.event &&
@@ -4288,6 +4286,18 @@ defmodule YscWeb.AdminMoneyLive do
            title: "Expense report"
          )}
 
+      {:error, :report_paid} ->
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(
+           ExpenseReports.get_for_admin_review(report.id)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This report is already paid and can no longer be edited",
+           title: "Expense report"
+         )}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
          socket
@@ -4325,6 +4335,26 @@ defmodule YscWeb.AdminMoneyLive do
          |> YscWeb.Flash.put_toast(:info, "Event updated",
            title: "Expense report"
          )}
+
+      {:error, :report_paid} ->
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(
+           ExpenseReports.get_for_admin_review(report.id)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This report is already paid and can no longer be edited",
+           title: "Expense report"
+         )}
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "Expense report not found",
+           title: "Expense report"
+         )
+         |> push_patch(to: build_money_path(socket))}
 
       {:error, %Ecto.Changeset{}} ->
         {:noreply,
@@ -4493,6 +4523,10 @@ defmodule YscWeb.AdminMoneyLive do
       :expense_report_events,
       expense_report_event_options(expense_report)
     )
+    |> assign(
+      :expense_report_event_form,
+      expense_report_event_form(expense_report)
+    )
   end
 
   # Re-derives attachments/flags/totals after an in-modal edit (e.g. an amount
@@ -4521,6 +4555,16 @@ defmodule YscWeb.AdminMoneyLive do
       :expense_report_events,
       expense_report_event_options(expense_report)
     )
+    |> assign(
+      :expense_report_event_form,
+      expense_report_event_form(expense_report)
+    )
+  end
+
+  # Backs the event `<select>` with a plain (unprefixed) form so its
+  # `phx-change` payload stays a flat `%{"event_id" => ...}`.
+  defp expense_report_event_form(expense_report) do
+    to_form(%{"event_id" => expense_report.event_id || ""})
   end
 
   # Events for the review modal's event picker: the usual recent/upcoming
@@ -4549,6 +4593,7 @@ defmodule YscWeb.AdminMoneyLive do
     |> assign(:expense_report_totals, nil)
     |> assign(:editing_expense_item, nil)
     |> assign(:expense_report_events, [])
+    |> assign(:expense_report_event_form, to_form(%{"event_id" => ""}))
     |> assign(
       :expense_report_status_form,
       to_form(%{}, as: :expense_report_status)

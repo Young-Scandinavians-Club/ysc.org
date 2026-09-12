@@ -1720,6 +1720,37 @@ defmodule YscWeb.AdminMoneyLiveTest do
                "#expense-report-item-#{purchase.id}-amount button"
              )
     end
+
+    test "a crafted amount-update event is rejected once the report is paid, even though the UI hides it",
+         %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      # The report becomes paid mid-session (e.g. a QuickBooks webhook)
+      # while the treasurer's modal is still open on the stale "submitted"
+      # state — the pencil icon is no longer rendered, but a crafted
+      # `save_expense_item_amount` event bypassing it must still be refused
+      # by the mutation layer itself, not just hidden in the UI.
+      report
+      |> Ecto.Changeset.change(%{status: "paid"})
+      |> Repo.update!()
+
+      render_submit(view, "save_expense_item_amount", %{
+        "item_id" => purchase.id,
+        "kind" => "expense",
+        "amount" => "999.99"
+      })
+
+      assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
+    end
   end
 
   describe "expense report review event editing" do
@@ -1800,6 +1831,31 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       refute has_element?(view, "#expense-report-event-form")
       assert has_element?(view, "#expense-report-modal", event.title)
+    end
+
+    test "a crafted event-association change is rejected once the report is paid, even though the UI hides it",
+         %{conn: conn} do
+      member = user_fixture()
+      event = event_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      report
+      |> Ecto.Changeset.change(%{status: "paid"})
+      |> Repo.update!()
+
+      render_change(view, "change_expense_report_event", %{
+        "event_id" => event.id
+      })
+
+      assert is_nil(Repo.reload!(report).event_id)
     end
   end
 
