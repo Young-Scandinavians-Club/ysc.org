@@ -173,7 +173,7 @@ defmodule YscWeb.ContactLive do
     changeset =
       %Ysc.Forms.ContactForm{}
       |> Ysc.Forms.ContactForm.changeset(params)
-      |> Ysc.Forms.ContactForm.put_submitter(socket.assigns[:current_user])
+      |> Ysc.Forms.put_submitter(socket.assigns[:current_user])
 
     {:noreply, assign_form(socket, changeset)}
   end
@@ -185,7 +185,7 @@ defmodule YscWeb.ContactLive do
     changeset =
       %Ysc.Forms.ContactForm{}
       |> Ysc.Forms.ContactForm.changeset(params)
-      |> Ysc.Forms.ContactForm.put_submitter(socket.assigns[:current_user])
+      |> Ysc.Forms.put_submitter(socket.assigns[:current_user])
 
     case YscWeb.GuestTurnstile.verify(socket, values, title: "Contact") do
       :ok ->

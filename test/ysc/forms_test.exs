@@ -3,6 +3,7 @@ defmodule Ysc.FormsTest do
   Tests for Forms module.
 
   These tests verify:
+  - Shared put_submitter/2
   - Volunteer form creation
   - Conduct violation report creation
   - Email scheduling
@@ -12,11 +13,70 @@ defmodule Ysc.FormsTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Forms
+  alias Ysc.Forms.ContactForm
+  alias Ysc.Forms.ConductViolationReport
   alias Ysc.Forms.Volunteer
 
   setup do
     user = user_fixture()
     %{user: user}
+  end
+
+  describe "put_submitter/2" do
+    test "sets user_id on contact, volunteer, and conduct-violation changesets",
+         %{
+           user: user
+         } do
+      contact =
+        %ContactForm{}
+        |> ContactForm.changeset(%{
+          name: "Jane Doe",
+          email: "jane@example.com",
+          subject: "Hello",
+          message: "This is a test message."
+        })
+        |> Forms.put_submitter(user)
+
+      volunteer =
+        %Volunteer{}
+        |> Volunteer.changeset(%{name: "Jane Doe", email: "jane@example.com"})
+        |> Forms.put_submitter(user)
+
+      report =
+        %ConductViolationReport{}
+        |> ConductViolationReport.changeset(%{
+          first_name: "Jane",
+          last_name: "Doe",
+          email: "jane@example.com",
+          phone: "555-0100",
+          summary: "Shared submitter helper should bind the reporter."
+        })
+        |> Forms.put_submitter(user)
+
+      assert Ecto.Changeset.get_field(contact, :user_id) == user.id
+      assert Ecto.Changeset.get_field(volunteer, :user_id) == user.id
+      assert Ecto.Changeset.get_field(report, :user_id) == user.id
+    end
+
+    test "leaves user_id unset for guests and non-user values" do
+      volunteer_changeset =
+        Volunteer.changeset(%Volunteer{}, %{
+          name: "Guest Volunteer",
+          email: "guest@example.com"
+        })
+
+      refute Map.has_key?(volunteer_changeset.changes, :user_id)
+
+      refute Map.has_key?(
+               Forms.put_submitter(volunteer_changeset, nil).changes,
+               :user_id
+             )
+
+      refute Map.has_key?(
+               Forms.put_submitter(volunteer_changeset, %{id: "not-a-user"}).changes,
+               :user_id
+             )
+    end
   end
 
   describe "create_volunteer/1" do
