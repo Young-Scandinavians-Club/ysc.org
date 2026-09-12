@@ -678,15 +678,14 @@ defmodule Ysc.ExpenseReports do
   defp after_expense_report_insert({:ok, expense_report} = result) do
     if expense_report.status == "submitted" do
       Ysc.Logging.debug(
-        "Expense report created with submitted status, enqueueing QuickBooks sync",
+        "Expense report created with submitted status, sending emails",
         expense_report_id: expense_report.id
       )
 
-      enqueue_quickbooks_sync(expense_report)
       send_expense_report_emails(expense_report)
     else
       Ysc.Logging.debug(
-        "Expense report created with status: #{expense_report.status}, skipping QuickBooks sync and emails",
+        "Expense report created with status: #{expense_report.status}, skipping emails",
         expense_report_id: expense_report.id
       )
     end
@@ -821,9 +820,28 @@ defmodule Ysc.ExpenseReports do
   end
 
   def update_expense_report(%ExpenseReport{} = expense_report, attrs) do
-    expense_report
-    |> ExpenseReport.status_changeset(attrs)
-    |> Repo.update()
+    was_approved = expense_report.status == "approved"
+
+    result =
+      expense_report
+      |> ExpenseReport.status_changeset(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, %ExpenseReport{status: "approved"} = updated_report}
+      when not was_approved ->
+        Ysc.Logging.debug(
+          "Expense report approved, enqueueing QuickBooks sync",
+          expense_report_id: updated_report.id
+        )
+
+        enqueue_quickbooks_sync(updated_report)
+
+      _ ->
+        :ok
+    end
+
+    result
   end
 
   @doc """
@@ -984,20 +1002,9 @@ defmodule Ysc.ExpenseReports do
   end
 
   def submit_expense_report(%ExpenseReport{} = expense_report) do
-    result =
-      expense_report
-      |> ExpenseReport.changeset(%{status: "submitted"})
-      |> Repo.update()
-
-    # Enqueue QuickBooks sync job if submission was successful
-    case result do
-      {:ok, updated_report} ->
-        enqueue_quickbooks_sync(updated_report)
-        result
-
-      error ->
-        error
-    end
+    expense_report
+    |> ExpenseReport.changeset(%{status: "submitted"})
+    |> Repo.update()
   end
 
   defp enqueue_quickbooks_sync(%ExpenseReport{} = expense_report) do
@@ -1006,10 +1013,11 @@ defmodule Ysc.ExpenseReports do
       current_status: expense_report.quickbooks_sync_status
     )
 
-    # Mark as pending sync
+    # Mark as pending sync. A bare changeset (no cast_assoc/validations) so
+    # this doesn't require the caller to have preloaded expense/income items.
     update_result =
       expense_report
-      |> ExpenseReport.changeset(%{quickbooks_sync_status: "pending"})
+      |> Ecto.Changeset.change(%{quickbooks_sync_status: "pending"})
       |> Repo.update()
 
     case update_result do
