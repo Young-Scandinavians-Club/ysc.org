@@ -1864,8 +1864,26 @@ defmodule Ysc.Events do
   Set or clear the tickets_tbd flag on an event.
   When true, the event shows "Tickets Coming Soon" until the first tier is added.
   When cleared (false), schedules save-the-date notifications for all subscribers.
+
+  Finding 70: enabling TBD is refused once any ticket tier exists. The Tickets tab
+  only shows the toggle when the event has zero tiers; this context gate closes the
+  LiveView / editor-param bypass that hid checkout on live ticketed events.
   """
-  def set_tickets_tbd(%Event{} = event, tbd \\ true) do
+  def set_tickets_tbd(event, tbd \\ true)
+
+  def set_tickets_tbd(%Event{} = event, true) do
+    if count_ticket_tiers_for_event(event.id) > 0 do
+      {:error, :ticket_tiers_exist}
+    else
+      persist_tickets_tbd(event, true)
+    end
+  end
+
+  def set_tickets_tbd(%Event{} = event, false) do
+    persist_tickets_tbd(event, false)
+  end
+
+  defp persist_tickets_tbd(%Event{} = event, tbd) do
     was_tbd = event.tickets_tbd
 
     event
