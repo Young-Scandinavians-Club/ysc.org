@@ -1304,6 +1304,46 @@ defmodule YscWeb.AdminMoneyLiveTest do
   describe "expense report review actions and flags" do
     setup [:create_admin]
 
+    test "opening the modal patches the URL so a reload keeps it open", %{
+      conn: conn
+    } do
+      member = user_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      year = DateTime.now!("America/Los_Angeles").year
+
+      expected_open_path =
+        "/admin/money/expense-reports/#{report.id}?end_date=#{year}-12-31&start_date=#{year}-01-01&tab=overview"
+
+      assert_patch(view, expected_open_path)
+
+      # A fresh mount at the patched URL (simulating a page reload) reopens
+      # the modal instead of landing on the plain inbox.
+      {:ok, reloaded_view, html} = live(conn, expected_open_path)
+
+      assert html =~ report.purpose
+      assert has_element?(reloaded_view, "#expense-report-modal")
+
+      reloaded_view
+      |> element("#expense-report-modal button", "Close")
+      |> render_click()
+
+      assert_patch(
+        reloaded_view,
+        "/admin/money?end_date=#{year}-12-31&start_date=#{year}-01-01&tab=overview"
+      )
+
+      refute has_element?(reloaded_view, "#expense-report-modal")
+    end
+
     test "approving a submitted report updates its status", %{conn: conn} do
       member = user_fixture()
 
