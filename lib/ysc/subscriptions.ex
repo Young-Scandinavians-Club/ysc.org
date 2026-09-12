@@ -50,6 +50,49 @@ defmodule Ysc.Subscriptions do
     from(s in Subscription, where: s.user_id == ^user_id)
   end
 
+  # Stripe still retries or will resume charging these statuses. Canceled /
+  # incomplete_expired rows and `migrated_*` placeholders are not real Stripe
+  # subscriptions and must not block payment-method changes.
+  @chargeable_stripe_statuses ~w(active trialing past_due unpaid paused incomplete)
+
+  @doc """
+  True when the user has a local subscription row Stripe can still charge.
+
+  Broader than `get_active_subscription/1` / `active?/1`: `past_due`, `unpaid`,
+  `paused`, and `incomplete` still have an open Stripe subscription. Deleting
+  the only payment method (or detaching the card pinned on that subscription)
+  would leave renewals and dunning with nothing to charge.
+  """
+  def has_chargeable_stripe_subscription?(%Ysc.Accounts.User{} = user) do
+    list_chargeable_stripe_subscription_ids(user) != []
+  end
+
+  @doc """
+  Stripe subscription ids (`sub_…`) for rows Stripe can still charge.
+
+  Skips `migrated_*` placeholders so we never send those ids to the Stripe API.
+  """
+  def list_chargeable_stripe_subscription_ids(%Ysc.Accounts.User{} = user) do
+    user.id
+    |> chargeable_stripe_subscriptions_query()
+    |> select([s], s.stripe_id)
+    |> Repo.all()
+    |> Enum.filter(&real_stripe_subscription_id?/1)
+  end
+
+  defp chargeable_stripe_subscriptions_query(user_id) do
+    from(s in Subscription,
+      where: s.user_id == ^user_id,
+      where: s.stripe_status in ^@chargeable_stripe_statuses,
+      where: not is_nil(s.stripe_id)
+    )
+  end
+
+  defp real_stripe_subscription_id?(stripe_id) when is_binary(stripe_id),
+    do: String.starts_with?(stripe_id, "sub_")
+
+  defp real_stripe_subscription_id?(_), do: false
+
   @doc """
   Gets a single subscription by Stripe ID.
 
@@ -2395,5 +2438,10 @@ defmodule Ysc.Subscriptions do
   @doc false
   def ci_query_explain_has_any_subscription_query do
     has_any_subscription_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_chargeable_stripe_subscriptions_query do
+    chargeable_stripe_subscriptions_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

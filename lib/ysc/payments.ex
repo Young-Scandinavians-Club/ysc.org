@@ -116,25 +116,34 @@ defmodule Ysc.Payments do
   Removes a payment method a user no longer wants: detaches it from Stripe so it
   can never be charged again, then deletes the local record.
 
-  If the removed method was the default and others remain, `delete_payment_method/1`
-  promotes the oldest remaining one; we then push that new default to Stripe so
-  automatic charges (renewals, retries) follow what the app shows.
+  Membership subscriptions are created with `default_payment_method` pinned on
+  the Stripe Subscription (not only on the Customer). Re-point the Customer
+  *and* any still-chargeable Subscriptions to a remaining card **before**
+  detach — otherwise renewals keep targeting the detached PaymentMethod.
 
-  Best-effort on the Stripe side: a payment method Stripe already lost track of
-  (`resource_missing`) is treated as detached so the stale local row still goes
+  If this is the only payment method and Stripe can still charge a membership
+  (`Ysc.Subscriptions.has_chargeable_stripe_subscription?/1`), refuse so we
+  never leave dunning/renewals with nothing on file.
+
+  Best-effort on a PaymentMethod Stripe already lost track of
+  (`resource_missing`): treat it as detached so the stale local row still goes
   away. Any other Stripe failure aborts before the local record is touched.
   """
   def detach_payment_method(%PaymentMethod{} = payment_method) do
     user = Ysc.Accounts.get_user!(payment_method.user_id)
+    remaining = remaining_payment_methods(user, payment_method)
 
-    with :ok <- detach_payment_method_from_stripe(payment_method),
-         {:ok, deleted} <- delete_payment_method(payment_method) do
-      case get_default_payment_method(user) do
-        nil -> :ok
-        new_default -> push_default_payment_method_to_stripe(user, new_default)
+    if remaining == [] and
+         Ysc.Subscriptions.has_chargeable_stripe_subscription?(user) do
+      {:error, :last_method_with_active_membership}
+    else
+      successor =
+        successor_default_payment_method(user, payment_method, remaining)
+
+      with :ok <- maybe_sync_successor_before_detach(user, successor),
+           :ok <- detach_payment_method_from_stripe(payment_method) do
+        delete_payment_method(payment_method)
       end
-
-      {:ok, deleted}
     end
   end
 
@@ -328,47 +337,46 @@ defmodule Ysc.Payments do
   end
 
   @doc """
-  Pushes a user's local default payment method to Stripe so the Customer's
-  `invoice_settings.default_payment_method` matches what we show in the app.
+  Pushes a user's local default payment method to Stripe so automatic charges
+  follow what the app shows.
 
-  Call this whenever a payment method is set as default from a user action
-  (e.g. adding a card during checkout, or picking one in account settings).
-  Without this, Stripe keeps using whatever payment method was on file when
-  a subscription was originally created — including a card that has since
-  been declined — so future automatic charges (renewals, retries) silently
-  keep hitting the old, dead payment method even though the app shows a new
-  default. This is best-effort: failures are logged, not raised, since the
-  local default is already the source of truth for the app's own UI.
+  Membership checkout pins `default_payment_method` on the Stripe Subscription
+  at create. Customer `invoice_settings.default_payment_method` is ignored for
+  that subscription until the pin is updated, so this updates both.
+
+  Best-effort: failures are logged, not raised, since the local default is
+  already the source of truth for the app's own UI. Callers that must not
+  proceed on Stripe failure (detaching a card, choosing a default in settings)
+  should use `sync_stripe_default_payment_method/2`.
   """
   def push_default_payment_method_to_stripe(user, payment_method) do
-    if user.stripe_id do
-      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             stripe_customer_module().update(
-               user.stripe_id,
-               %{
-                 invoice_settings: %{
-                   default_payment_method: payment_method.provider_id
-                 }
-               },
-               []
-             )
-           end) do
-        {:ok, _customer} ->
-          :ok
+    case sync_stripe_default_payment_method(user, payment_method) do
+      :ok ->
+        :ok
 
-        {:error, error} ->
-          Ysc.Logging.error(
-            "Failed to push default payment method to Stripe customer",
-            user_id: user.id,
-            payment_method_id: payment_method.id,
-            stripe_customer_id: user.stripe_id,
-            error: inspect(error)
-          )
+      {:error, error} ->
+        Ysc.Logging.error(
+          "Failed to push default payment method to Stripe",
+          user_id: user.id,
+          payment_method_id: payment_method.id,
+          stripe_customer_id: user.stripe_id,
+          error: inspect(error)
+        )
 
-          :ok
-      end
-    else
-      :ok
+        :ok
+    end
+  end
+
+  @doc """
+  Updates the Stripe Customer's invoice default and every still-chargeable
+  Subscription's pinned `default_payment_method`.
+
+  Returns `{:error, stripe_error}` if any Stripe call fails so callers can
+  abort before detaching the previous card.
+  """
+  def sync_stripe_default_payment_method(user, payment_method) do
+    with :ok <- put_customer_invoice_default(user, payment_method) do
+      put_subscription_defaults(user, payment_method)
     end
   end
 
@@ -801,6 +809,105 @@ defmodule Ysc.Payments do
 
   defp convert_to_map(value), do: value
 
+  defp remaining_payment_methods(user, payment_method) do
+    user
+    |> list_payment_methods()
+    |> Enum.reject(&(&1.id == payment_method.id))
+  end
+
+  defp successor_default_payment_method(_user, _payment_method, []), do: nil
+
+  defp successor_default_payment_method(user, payment_method, remaining) do
+    if payment_method.is_default do
+      Enum.min_by(remaining, & &1.inserted_at)
+    else
+      case get_default_payment_method(user) do
+        %{id: id} = default when id != payment_method.id ->
+          default
+
+        _ ->
+          Enum.min_by(remaining, & &1.inserted_at)
+      end
+    end
+  end
+
+  defp maybe_sync_successor_before_detach(_user, nil), do: :ok
+
+  defp maybe_sync_successor_before_detach(user, successor) do
+    case sync_stripe_default_payment_method(user, successor) do
+      :ok -> :ok
+      {:error, _reason} -> {:error, :stripe_error}
+    end
+  end
+
+  defp put_customer_invoice_default(user, payment_method) do
+    if user.stripe_id do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_customer_module().update(
+               user.stripe_id,
+               %{
+                 invoice_settings: %{
+                   default_payment_method: payment_method.provider_id
+                 }
+               },
+               []
+             )
+           end) do
+        {:ok, _customer} ->
+          :ok
+
+        {:error, error} ->
+          Ysc.Logging.error(
+            "Failed to push default payment method to Stripe customer",
+            user_id: user.id,
+            payment_method_id: payment_method.id,
+            stripe_customer_id: user.stripe_id,
+            error: inspect(error)
+          )
+
+          {:error, error}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp put_subscription_defaults(user, payment_method) do
+    user
+    |> Ysc.Subscriptions.list_chargeable_stripe_subscription_ids()
+    |> Enum.reduce_while(:ok, fn stripe_id, :ok ->
+      case put_subscription_default(user, stripe_id, payment_method) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp put_subscription_default(user, stripe_id, payment_method) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           stripe_subscription_module().update(stripe_id, %{
+             default_payment_method: payment_method.provider_id
+           })
+         end) do
+      {:ok, _subscription} ->
+        :ok
+
+      {:error, %Stripe.Error{code: :resource_missing}} ->
+        :ok
+
+      {:error, error} ->
+        Ysc.Logging.error(
+          "Failed to push default payment method to Stripe subscription",
+          user_id: user.id,
+          payment_method_id: payment_method.id,
+          stripe_subscription_id: stripe_id,
+          error: inspect(error)
+        )
+
+        {:error, error}
+    end
+  end
+
   defp stripe_payment_method_module do
     Application.get_env(
       :ysc,
@@ -811,6 +918,10 @@ defmodule Ysc.Payments do
 
   defp stripe_customer_module do
     Application.get_env(:ysc, :stripe_customer_module, Stripe.Customer)
+  end
+
+  defp stripe_subscription_module do
+    Application.get_env(:ysc, :stripe_subscription_module, Stripe.Subscription)
   end
 
   @doc false

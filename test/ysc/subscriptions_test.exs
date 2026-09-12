@@ -1852,6 +1852,49 @@ defmodule Ysc.SubscriptionsTest do
     end
   end
 
+  describe "has_chargeable_stripe_subscription?/1" do
+    test "is true for past_due Stripe subscriptions", %{user: user} do
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_chargeable_pastdue",
+          stripe_status: "past_due",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 5, :day)
+        })
+
+      assert Subscriptions.has_chargeable_stripe_subscription?(user)
+
+      assert Subscriptions.list_chargeable_stripe_subscription_ids(user) ==
+               ["sub_chargeable_pastdue"]
+    end
+
+    test "is false for canceled subscriptions and migrated placeholders", %{
+      user: user
+    } do
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_canceled_chargeable",
+          stripe_status: "canceled",
+          name: "Old",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "active",
+          name: "Imported",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      refute Subscriptions.has_chargeable_stripe_subscription?(user)
+      assert Subscriptions.list_chargeable_stripe_subscription_ids(user) == []
+    end
+  end
+
   describe "scheduled_for_cancellation?/1 and get_scheduled_downgrade_info/1 for lifetime" do
     test "scheduled_for_cancellation? returns false for lifetime map" do
       refute Subscriptions.scheduled_for_cancellation?(%{type: :lifetime})

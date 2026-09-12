@@ -5038,13 +5038,13 @@ defmodule YscWeb.UserSettingsLive do
       else: :ok
   end
 
-  # Removing the only payment method while a membership is auto-renewing would
-  # leave Stripe with nothing to charge at the next renewal. Make the member add
-  # a replacement (or cancel the membership) first.
+  # Removing the only payment method while Stripe can still charge a membership
+  # (active, past_due, etc.) would leave renewals/dunning with nothing on file.
+  # Make the member add a replacement (or cancel the membership) first.
   defp validate_can_remove_payment_method(socket, user) do
     last_one? = length(socket.assigns.all_payment_methods) <= 1
 
-    if last_one? && Subscriptions.get_active_subscription(user) do
+    if last_one? && Subscriptions.has_chargeable_stripe_subscription?(user) do
       {:error, :last_method_with_active_membership}
     else
       :ok
@@ -5077,6 +5077,16 @@ defmodule YscWeb.UserSettingsLive do
          |> YscWeb.Flash.put_toast(:info, "Payment method removed.",
            title: "Payment",
            icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
+         )}
+
+      {:error, :last_method_with_active_membership} ->
+        {:noreply,
+         socket
+         |> assign(:deleting_payment_method_id, nil)
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This is the only payment method on file for your active membership. Add another payment method first, or cancel your membership, before removing it.",
+           title: "Payment"
          )}
 
       {:error, reason} ->
@@ -5193,26 +5203,19 @@ defmodule YscWeb.UserSettingsLive do
   defp update_stripe_default(user, selected_payment_method) do
     require Ysc.Logging
 
-    Ysc.Logging.info("Updating Stripe customer default payment method",
+    Ysc.Logging.info("Updating Stripe default payment method",
       user_id: user.id,
       stripe_customer_id: user.stripe_id,
       default_payment_method_id: selected_payment_method.provider_id
     )
 
-    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           stripe_customer_module().update(
-             user.stripe_id,
-             %{
-               invoice_settings: %{
-                 default_payment_method: selected_payment_method.provider_id
-               }
-             },
-             []
-           )
-         end) do
-      {:ok, _stripe_customer} ->
+    case Ysc.Payments.sync_stripe_default_payment_method(
+           user,
+           selected_payment_method
+         ) do
+      :ok ->
         Ysc.Logging.info(
-          "Successfully updated Stripe customer default payment method",
+          "Successfully updated Stripe default payment method",
           user_id: user.id,
           stripe_customer_id: user.stripe_id
         )
