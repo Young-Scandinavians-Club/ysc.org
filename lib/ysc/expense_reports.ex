@@ -883,30 +883,32 @@ defmodule Ysc.ExpenseReports do
   # mid-edit) could otherwise mutate a reimbursed report's numbers after the
   # fact. The lock is held for the duration of the write, so a concurrent
   # "paid" transition blocks behind it rather than racing it.
+  #
+  # Uses `Repo.transaction/1` rather than `Ecto.Multi` so Dialyzer does not
+  # flag the opaque Multi constructor (`call_without_opaque`).
   defp update_unless_report_paid(report_id, build_changeset) do
-    Ecto.Multi.new()
-    |> Ecto.Multi.run(:report, fn repo, _changes ->
-      query =
-        from(er in ExpenseReport,
-          where: er.id == ^report_id,
-          lock: "FOR UPDATE"
-        )
+    Repo.transaction(fn ->
+      case Repo.one(lock_expense_report_for_update_query(report_id)) do
+        nil ->
+          Repo.rollback(:not_found)
 
-      case repo.one(query) do
-        nil -> {:error, :not_found}
-        %ExpenseReport{status: "paid"} -> {:error, :report_paid}
-        report -> {:ok, report}
+        %ExpenseReport{status: "paid"} ->
+          Repo.rollback(:report_paid)
+
+        report ->
+          case Repo.update(build_changeset.(report)) do
+            {:ok, record} -> record
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
       end
     end)
-    |> Ecto.Multi.update(:record, fn %{report: report} ->
-      build_changeset.(report)
-    end)
-    |> Repo.transaction()
-    |> case do
-      {:ok, %{record: record}} -> {:ok, record}
-      {:error, :report, reason, _changes} -> {:error, reason}
-      {:error, :record, changeset, _changes} -> {:error, changeset}
-    end
+  end
+
+  defp lock_expense_report_for_update_query(report_id) do
+    from(er in ExpenseReport,
+      where: er.id == ^report_id,
+      lock: "FOR UPDATE"
+    )
   end
 
   @doc """
@@ -2113,6 +2115,11 @@ defmodule Ysc.ExpenseReports do
       "proofs/example.pdf",
       Ysc.Ci.QueryExplain.Fixtures.ulid()
     )
+  end
+
+  @doc false
+  def ci_query_explain_lock_expense_report_for_update_query do
+    lock_expense_report_for_update_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   defp validate_and_send_expense_report_emails(loaded_report) do
