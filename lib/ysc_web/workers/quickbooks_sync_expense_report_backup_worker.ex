@@ -22,6 +22,15 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
   alias YscWeb.Workers.QuickbooksSyncExpenseReportWorker
   import Ecto.Query
 
+  # QuickbooksSyncExpenseReportWorker claims a report by setting
+  # quickbooks_sync_status to "processing" before it starts exporting. If the
+  # owning job dies without reaching an error handler (e.g. a BEAM crash) and
+  # every retry is exhausted, the report is stuck "processing" forever unless
+  # something widens its net past pending/failed. This mirrors the Oban
+  # Lifeline `rescue_after` window (see config/config.exs) so a claim isn't
+  # considered abandoned while it could still legitimately be in flight.
+  @stale_claim_after_seconds 3 * 60 * 60
+
   @impl Oban.Worker
   def perform(%Oban.Job{args: _args}) do
     Ysc.Logging.info("Starting QuickBooks expense report backup sync job")
@@ -41,14 +50,21 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker do
     Repo.transaction(fn ->
       # Find and lock expense reports that are approved but not synced
       # FOR UPDATE SKIP LOCKED ensures we only process reports that aren't currently locked
-      # Include "failed" status to allow retries
+      # Include "failed" status to allow retries, and stale "processing" claims
+      # abandoned by a worker that died before it could mark them failed
+      stale_claim_before =
+        DateTime.add(DateTime.utc_now(), -@stale_claim_after_seconds, :second)
+
       unsynced_reports =
         from(er in ExpenseReport,
           where: er.status == "approved",
           where:
             is_nil(er.quickbooks_sync_status) or
               er.quickbooks_sync_status == "pending" or
-              er.quickbooks_sync_status == "failed",
+              er.quickbooks_sync_status == "failed" or
+              (er.quickbooks_sync_status == "processing" and
+                 (is_nil(er.quickbooks_last_sync_attempt_at) or
+                    er.quickbooks_last_sync_attempt_at < ^stale_claim_before)),
           where: is_nil(er.quickbooks_bill_id),
           lock: "FOR UPDATE SKIP LOCKED",
           select: er.id,

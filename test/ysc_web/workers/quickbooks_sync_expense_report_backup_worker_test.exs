@@ -32,6 +32,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
   alias Ysc.Repo
   alias Ysc.ExpenseReports.ExpenseReport
   alias YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker
+  alias YscWeb.Workers.QuickbooksSyncExpenseReportWorker
 
   setup do
     user = user_fixture()
@@ -60,28 +61,57 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
 
   describe "query filtering - status field" do
     test "ignores expense reports with status != approved", %{user: user} do
-      %ExpenseReport{
-        user_id: user.id,
-        purpose: "Draft report",
-        status: "draft",
-        quickbooks_sync_status: "pending",
-        reimbursement_method: "check"
-      }
-      |> Repo.insert!()
+      draft_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Draft report",
+          status: "draft",
+          quickbooks_sync_status: "pending",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
 
-      %ExpenseReport{
-        user_id: user.id,
-        purpose: "Submitted but not yet approved",
-        status: "submitted",
-        quickbooks_sync_status: "pending",
-        reimbursement_method: "check"
-      }
-      |> Repo.insert!()
+      submitted_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Submitted but not yet approved",
+          status: "submitted",
+          quickbooks_sync_status: "pending",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
 
-      assert :ok =
-               QuickbooksSyncExpenseReportBackupWorker.perform(
-                 maintenance_job()
-               )
+      approved_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Approved report",
+          status: "approved",
+          quickbooks_sync_status: "pending",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 QuickbooksSyncExpenseReportBackupWorker.perform(
+                   maintenance_job()
+                 )
+
+        assert_enqueued(
+          worker: QuickbooksSyncExpenseReportWorker,
+          args: %{"expense_report_id" => to_string(approved_report.id)}
+        )
+
+        refute_enqueued(
+          worker: QuickbooksSyncExpenseReportWorker,
+          args: %{"expense_report_id" => to_string(draft_report.id)}
+        )
+
+        refute_enqueued(
+          worker: QuickbooksSyncExpenseReportWorker,
+          args: %{"expense_report_id" => to_string(submitted_report.id)}
+        )
+      end)
     end
   end
 

@@ -4136,4 +4136,90 @@ defmodule Ysc.ExpenseReportsTest do
       assert updated_report.event_id == event.id
     end
   end
+
+  describe "update_expense_item_amount/2, update_income_item_amount/2 and update_expense_report_event/2 — refused while claimed for QuickBooks export" do
+    setup %{user: user} do
+      event = event_fixture()
+
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Syncing check",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "Costco",
+                "description" => "Snacks",
+                "amount" => "12.50",
+                "receipt_s3_path" => "receipts/a.pdf"
+              }
+            ],
+            "income_items" => [
+              %{
+                "date" => "2024-01-15",
+                "description" => "Refund",
+                "amount" => "5.00"
+              }
+            ]
+          },
+          user
+        )
+
+      # Simulate QuickbooksSyncExpenseReportWorker having claimed this report
+      # for export: approved, with quickbooks_sync_status flipped to
+      # "processing" the way the worker's atomic claim does, between its
+      # row-lock preload and the actual Bill creation. Written directly
+      # (bypassing ExpenseReports.update_expense_report/2) so this setup
+      # doesn't itself trigger a real QuickBooks sync job under Oban's
+      # `:inline` test mode.
+      report =
+        report
+        |> Ecto.Changeset.change(
+          status: "approved",
+          quickbooks_sync_status: "processing"
+        )
+        |> Repo.update!()
+        |> Repo.preload([:expense_items, :income_items])
+
+      %{report: report, event: event}
+    end
+
+    test "update_expense_item_amount/2 refuses a report claimed for QuickBooks export",
+         %{report: report} do
+      [item] = report.expense_items
+
+      assert ExpenseReports.update_expense_item_amount(item, "999.00") ==
+               {:error, :report_syncing}
+
+      assert Money.to_string!(Repo.reload!(item).amount) == "$12.50"
+    end
+
+    test "update_income_item_amount/2 refuses a report claimed for QuickBooks export",
+         %{report: report} do
+      [item] = report.income_items
+
+      assert ExpenseReports.update_income_item_amount(item, "999.00") ==
+               {:error, :report_syncing}
+
+      assert Money.to_string!(Repo.reload!(item).amount) == "$5.00"
+    end
+
+    test "update_expense_report_event/2 refuses a report claimed for QuickBooks export",
+         %{report: report, event: event} do
+      assert ExpenseReports.update_expense_report_event(report, event.id) ==
+               {:error, :report_syncing}
+
+      assert is_nil(Repo.reload!(report).event_id)
+    end
+  end
 end

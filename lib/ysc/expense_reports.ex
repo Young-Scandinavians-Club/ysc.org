@@ -902,6 +902,13 @@ defmodule Ysc.ExpenseReports do
   # fact. The lock is held for the duration of the write, so a concurrent
   # "paid" transition blocks behind it rather than racing it.
   #
+  # Also refuses with `{:error, :report_syncing}` while
+  # `quickbooks_sync_status == "processing"` — that's
+  # YscWeb.Workers.QuickbooksSyncExpenseReportWorker's claim marker for a
+  # report it has locked and is actively exporting to QuickBooks. Without
+  # this guard, a correction landing between the worker's claim and its Bill
+  # creation would be silently overwritten by data QuickBooks never saw.
+  #
   # Uses `Repo.transaction/1` rather than `Ecto.Multi` so Dialyzer does not
   # flag the opaque Multi constructor (`call_without_opaque`).
   defp update_unless_report_paid(report_id, build_changeset) do
@@ -912,6 +919,9 @@ defmodule Ysc.ExpenseReports do
 
         %ExpenseReport{status: "paid"} ->
           Repo.rollback(:report_paid)
+
+        %ExpenseReport{quickbooks_sync_status: "processing"} ->
+          Repo.rollback(:report_syncing)
 
         report ->
           case Repo.update(build_changeset.(report)) do

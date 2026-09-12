@@ -9,6 +9,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
   use Oban.Worker, queue: :default, max_attempts: 3
 
   alias Ysc.ExpenseReports
+  alias Ysc.ExpenseReports.ExpenseReport
   alias Ysc.ExpenseReports.QuickbooksSync
   alias Ysc.Repo
   import Ecto.Query
@@ -26,49 +27,17 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
         _ -> expense_report_id
       end
 
-    # Lock the expense report record to prevent concurrent processing
-    # Preload associations needed for sync within the transaction
-    case Repo.transaction(fn ->
-           from(er in ExpenseReports.ExpenseReport,
-             where: er.id == ^expense_report_id_ulid,
-             lock: "FOR UPDATE NOWAIT"
-           )
-           |> Repo.one()
-           |> case do
-             nil ->
-               nil
-
-             expense_report ->
-               preloaded =
-                 expense_report
-                 |> Repo.preload([
-                   :expense_items,
-                   :income_items,
-                   :address,
-                   :bank_account,
-                   :event
-                 ])
-                 |> Repo.preload(user: :billing_address)
-
-               Ysc.Logging.debug("Preloaded expense report associations",
-                 expense_report_id: preloaded.id,
-                 user_loaded: Ecto.assoc_loaded?(preloaded.user),
-                 expense_items_count:
-                   if(Ecto.assoc_loaded?(preloaded.expense_items),
-                     do: length(preloaded.expense_items),
-                     else: :not_loaded
-                   ),
-                 income_items_count:
-                   if(Ecto.assoc_loaded?(preloaded.income_items),
-                     do: length(preloaded.income_items),
-                     else: :not_loaded
-                   )
-               )
-
-               preloaded
-           end
-         end) do
-      {:ok, nil} ->
+    # Lock the row and, still holding the lock, atomically claim it (flip
+    # quickbooks_sync_status to "processing") if it's eligible. Claiming
+    # inside the same transaction as the lock closes the race where a
+    # concurrent correction (ExpenseReports.update_expense_report/2,
+    # update_expense_item_amount/2, etc.) changes the report between the
+    # eligibility check and the actual QuickBooks export: any such write now
+    # blocks on this row lock until the claim commits, and once claimed, the
+    # "processing" guard in ExpenseReports.update_unless_report_paid/2
+    # refuses corrections until the export finishes.
+    case Repo.transaction(fn -> claim_for_sync(expense_report_id_ulid) end) do
+      {:ok, :not_found} ->
         Ysc.Logging.warning("Expense report not found for QuickBooks sync",
           expense_report_id: expense_report_id
         )
@@ -76,83 +45,37 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
         # Not found is expected sometimes (e.g. stale job); don't retry.
         {:discard, :expense_report_not_found}
 
-      {:ok, expense_report} ->
-        # Idempotency check: If bill_id exists, don't sync again (prevents duplicate bills)
-        # This check happens after acquiring the lock to ensure we have the latest data
-        if expense_report.quickbooks_bill_id do
-          Ysc.Logging.info(
-            "Expense report already has QuickBooks bill ID, skipping sync (idempotency)",
-            expense_report_id: expense_report_id,
-            bill_id: expense_report.quickbooks_bill_id,
-            sync_status: expense_report.quickbooks_sync_status
+      {:ok, {:skip, reason, details}} ->
+        Ysc.Logging.info(
+          "Skipping QuickBooks sync for expense report",
+          Keyword.merge(
+            [expense_report_id: expense_report_id, reason: reason],
+            details
           )
+        )
 
-          :ok
-        else
-          # Check if already synced (double-check after acquiring lock)
-          # This prevents duplicate exports if the report was synced between job creation and execution
-          cond do
-            expense_report.status != "approved" ->
-              Ysc.Logging.info(
-                "Expense report is not approved, skipping QuickBooks sync",
-                expense_report_id: expense_report_id,
-                status: expense_report.status
-              )
+        :ok
 
-              :ok
+      {:ok, {:claimed, expense_report}} ->
+        case QuickbooksSync.sync_expense_report(expense_report) do
+          {:ok, bill} ->
+            Ysc.Logging.info(
+              "Successfully synced expense report to QuickBooks",
+              expense_report_id: expense_report_id,
+              bill_id: Map.get(bill, "Id")
+            )
 
-            expense_report.quickbooks_sync_status == "synced" ->
-              Ysc.Logging.info(
-                "Expense report already synced to QuickBooks (checked after lock)",
-                expense_report_id: expense_report_id,
-                sync_status: expense_report.quickbooks_sync_status
-              )
+            :ok
 
-              :ok
+          {:error, reason} ->
+            Ysc.Logging.warning(
+              "Failed to sync expense report to QuickBooks",
+              expense_report_id: expense_report_id,
+              error: inspect(reason)
+            )
 
-            # Allow retry for "failed" status, but skip other unexpected statuses
-            expense_report.quickbooks_sync_status != "pending" &&
-              expense_report.quickbooks_sync_status != "failed" &&
-                expense_report.quickbooks_sync_status != nil ->
-              Ysc.Logging.warning(
-                "Expense report has unexpected sync status, skipping",
-                expense_report_id: expense_report_id,
-                sync_status: expense_report.quickbooks_sync_status
-              )
-
-              :ok
-
-            true ->
-              # If status is "failed", log that we're retrying
-              if expense_report.quickbooks_sync_status == "failed" do
-                Ysc.Logging.info(
-                  "Retrying QuickBooks sync for previously failed expense report",
-                  expense_report_id: expense_report_id,
-                  previous_error: expense_report.quickbooks_sync_error
-                )
-              end
-
-              case QuickbooksSync.sync_expense_report(expense_report) do
-                {:ok, bill} ->
-                  Ysc.Logging.info(
-                    "Successfully synced expense report to QuickBooks",
-                    expense_report_id: expense_report_id,
-                    bill_id: Map.get(bill, "Id")
-                  )
-
-                  :ok
-
-                {:error, reason} ->
-                  Ysc.Logging.warning(
-                    "Failed to sync expense report to QuickBooks",
-                    expense_report_id: expense_report_id,
-                    error: inspect(reason)
-                  )
-
-                  # Oban will retry based on max_attempts
-                  {:error, reason}
-              end
-          end
+            # Oban will retry based on max_attempts
+            {:error, reason}
         end
 
       {:error, %Postgrex.Error{postgres: %{code: :lock_not_available}}} ->
@@ -170,6 +93,84 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
         )
 
         {:error, reason}
+    end
+  end
+
+  # Locks the row, then -- still holding the lock -- decides whether the
+  # report is eligible for export and, if so, durably claims it by flipping
+  # quickbooks_sync_status to "processing" before the lock is released.
+  # "processing" stays eligible for reclaim (alongside "pending"/"failed") so
+  # this same job can pick back up its own claim on retry after a crash that
+  # never reached the error handler in QuickbooksSync.sync_expense_report/1.
+  defp claim_for_sync(expense_report_id) do
+    from(er in ExpenseReports.ExpenseReport,
+      where: er.id == ^expense_report_id,
+      lock: "FOR UPDATE NOWAIT"
+    )
+    |> Repo.one()
+    |> case do
+      nil ->
+        :not_found
+
+      %ExpenseReport{quickbooks_bill_id: bill_id} = report
+      when not is_nil(bill_id) ->
+        {:skip, :already_has_bill_id,
+         bill_id: bill_id, sync_status: report.quickbooks_sync_status}
+
+      %ExpenseReport{status: status} when status != "approved" ->
+        {:skip, :not_approved, status: status}
+
+      %ExpenseReport{quickbooks_sync_status: "synced"} = report ->
+        {:skip, :already_synced, sync_status: report.quickbooks_sync_status}
+
+      %ExpenseReport{quickbooks_sync_status: sync_status}
+      when sync_status not in [nil, "pending", "failed", "processing"] ->
+        {:skip, :unexpected_sync_status, sync_status: sync_status}
+
+      report ->
+        if report.quickbooks_sync_status == "failed" do
+          Ysc.Logging.info(
+            "Retrying QuickBooks sync for previously failed expense report",
+            expense_report_id: report.id,
+            previous_error: report.quickbooks_sync_error
+          )
+        end
+
+        # `Ecto.Changeset.change/2` rather than `ExpenseReport.changeset/2`:
+        # this record isn't preloaded yet, and the full changeset's
+        # `cast_assoc(:expense_items, ...)` / receipt validation raise on an
+        # unloaded association. A plain field flip needs none of that.
+        {:ok, claimed} =
+          report
+          |> Ecto.Changeset.change(quickbooks_sync_status: "processing")
+          |> Repo.update()
+
+        preloaded =
+          claimed
+          |> Repo.preload([
+            :expense_items,
+            :income_items,
+            :address,
+            :bank_account,
+            :event
+          ])
+          |> Repo.preload(user: :billing_address)
+
+        Ysc.Logging.debug("Claimed expense report for QuickBooks sync",
+          expense_report_id: preloaded.id,
+          expense_items_count:
+            if(Ecto.assoc_loaded?(preloaded.expense_items),
+              do: length(preloaded.expense_items),
+              else: :not_loaded
+            ),
+          income_items_count:
+            if(Ecto.assoc_loaded?(preloaded.income_items),
+              do: length(preloaded.income_items),
+              else: :not_loaded
+            )
+        )
+
+        {:claimed, preloaded}
     end
   end
 end
