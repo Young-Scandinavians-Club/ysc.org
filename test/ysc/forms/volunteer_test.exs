@@ -47,7 +47,7 @@ defmodule Ysc.Forms.VolunteerTest do
       changeset =
         %Volunteer{}
         |> Volunteer.changeset(attrs)
-        |> Volunteer.put_submitter(user)
+        |> Ysc.Forms.put_submitter(user)
 
       assert changeset.valid?
       assert changeset.changes.email == "volunteer@example.com"
@@ -213,7 +213,7 @@ defmodule Ysc.Forms.VolunteerTest do
       changeset =
         %Volunteer{}
         |> Volunteer.changeset(attrs)
-        |> Volunteer.put_submitter(user)
+        |> Ysc.Forms.put_submitter(user)
 
       {:ok, volunteer} = Repo.insert(changeset)
 

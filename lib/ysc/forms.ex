@@ -2,10 +2,12 @@ defmodule Ysc.Forms do
   @moduledoc """
   Context module for managing form submissions.
 
-  Handles creation and processing of volunteer applications and conduct violation reports.
+  Handles creation and processing of volunteer applications, contact forms,
+  and conduct violation reports.
   """
   require Ysc.Logging
   import Ecto.Query, warn: false
+  alias Ysc.Accounts.User
   alias Ysc.Forms.ContactForm
   alias Ysc.Repo
 
@@ -45,6 +47,24 @@ defmodule Ysc.Forms do
         {:error, changeset}
     end
   end
+
+  @doc """
+  Applies the submitting user's id after public params are validated.
+
+  `user_id` is never taken from client params. Shared by contact, volunteer,
+  and conduct-violation forms.
+
+  ## Examples
+
+      changeset
+      |> ContactForm.changeset(params)
+      |> Forms.put_submitter(socket.assigns[:current_user])
+  """
+  def put_submitter(changeset, %User{id: user_id}) do
+    Ecto.Changeset.put_change(changeset, :user_id, user_id)
+  end
+
+  def put_submitter(changeset, _), do: changeset
 
   defp format_datetime_for_email(datetime) do
     # Convert UTC datetime to PST timezone

@@ -1150,7 +1150,7 @@ defmodule YscWeb.SecurityAuditTest do
           "phone" => "555-0101",
           "summary" => "Logged-in reporter submission."
         })
-        |> Ysc.Forms.ConductViolationReport.put_submitter(reporter)
+        |> Ysc.Forms.put_submitter(reporter)
 
       assert Ecto.Changeset.get_field(changeset, :user_id) == reporter.id
     end
@@ -1165,7 +1165,7 @@ defmodule YscWeb.SecurityAuditTest do
           "phone" => "555-0102",
           "summary" => "Anonymous reporter submission."
         })
-        |> Ysc.Forms.ConductViolationReport.put_submitter(nil)
+        |> Ysc.Forms.put_submitter(nil)
 
       assert Ecto.Changeset.get_field(changeset, :user_id) == nil
     end
@@ -1185,7 +1185,7 @@ defmodule YscWeb.SecurityAuditTest do
           "status" => "reviewed",
           "user_id" => victim.id
         })
-        |> Ysc.Forms.ConductViolationReport.put_submitter(reporter)
+        |> Ysc.Forms.put_submitter(reporter)
 
       assert {:ok, report} =
                Ysc.Forms.create_conduct_violation_report(changeset)

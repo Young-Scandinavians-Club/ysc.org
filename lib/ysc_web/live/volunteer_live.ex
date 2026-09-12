@@ -171,7 +171,7 @@ defmodule YscWeb.VolunteerLive do
     changeset =
       %Ysc.Forms.Volunteer{}
       |> Ysc.Forms.Volunteer.changeset(volunteer_params)
-      |> Ysc.Forms.Volunteer.put_submitter(socket.assigns[:current_user])
+      |> Ysc.Forms.put_submitter(socket.assigns[:current_user])
 
     {:noreply, assign_form(socket, changeset)}
   end
@@ -181,7 +181,7 @@ defmodule YscWeb.VolunteerLive do
     changeset =
       %Ysc.Forms.Volunteer{}
       |> Ysc.Forms.Volunteer.changeset(volunteer_params)
-      |> Ysc.Forms.Volunteer.put_submitter(socket.assigns[:current_user])
+      |> Ysc.Forms.put_submitter(socket.assigns[:current_user])
 
     case YscWeb.GuestTurnstile.verify(socket, values, title: "Volunteer") do
       :ok ->
