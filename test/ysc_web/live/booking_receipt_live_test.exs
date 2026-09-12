@@ -3112,7 +3112,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       html = render(view)
 
       assert html =~ "Shared cabin stay"
-      assert html =~ "2 adults"
+      assert html =~ "2 guests"
+      refute html =~ "2 adults"
       assert html =~ "2 nights"
     end
 

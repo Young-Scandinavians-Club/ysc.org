@@ -244,7 +244,7 @@ defmodule YscWeb.TicketQrLive do
                           </div>
                           <div class="shrink-0 text-right">
                             <p class="text-zinc-400 text-xs font-bold uppercase tracking-widest mb-1">
-                              Reference
+                              Ticket number
                             </p>
                             <p class="text-zinc-700 text-sm font-mono font-bold">
                               {ticket.reference_id}
@@ -306,14 +306,14 @@ defmodule YscWeb.TicketQrLive do
             <div class="mt-8 text-center px-4">
               <%= if @order_id do %>
                 <p class="text-sm text-zinc-300">
-                  Reference&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
+                  Order number&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
                 </p>
                 <.link
                   id="confirmation-link"
                   navigate={~p"/orders/#{@order_id}/confirmation"}
                   class="mt-2 inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
                 >
-                  View ticket details
+                  View order & receipt
                   <.icon name="hero-arrow-right" class="w-4 h-4" />
                 </.link>
               <% else %>

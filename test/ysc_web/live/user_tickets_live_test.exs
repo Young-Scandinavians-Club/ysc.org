@@ -79,6 +79,8 @@ defmodule YscWeb.UserTicketsLiveTest do
       assert has_element?(view, "button", "Cancel checkout")
       assert html =~ "will go back on sale"
       refute html =~ "will be released"
+      assert html =~ "Complete payment in"
+      refute html =~ "Complete payment within"
     end
 
     test "cancel-order event shows error when order not found", %{conn: conn} do

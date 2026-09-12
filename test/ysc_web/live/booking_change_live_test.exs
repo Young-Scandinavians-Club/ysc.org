@@ -291,6 +291,11 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     {view, _html} = live_change(conn, booking)
 
+    html = render(view)
+    assert html =~ "Number of adults"
+    assert html =~ "Number of children (ages 5-17)"
+    refute html =~ "Number of guests"
+
     checkin_str = date_to_datetime_string(booking.checkin_date)
     checkout_str = date_to_datetime_string(booking.checkout_date)
 

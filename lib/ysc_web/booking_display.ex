@@ -167,6 +167,24 @@ defmodule YscWeb.BookingDisplay do
   end
 
   @doc """
+  Guest-count copy for booking summaries.
+
+  Shared cabin stays (`:day`, Clear Lake) count everyone age 6+ as guests.
+  Tahoe room and buyout stays list adults and children (ages 5–17) separately.
+  """
+  def guest_headcount_label(%{booking_mode: :day, guests_count: guests}) do
+    people_label(guests)
+  end
+
+  def guest_headcount_label(%{guests_count: guests, children_count: children}) do
+    guests_label(guests, children)
+  end
+
+  def guest_headcount_label(%{guests_count: guests}) do
+    people_label(guests)
+  end
+
+  @doc """
   12-hour clock label for cabin check-in (e.g. `"3:00 PM"`).
 
   Derived from `Ysc.Bookings.checkin_time/0` so display copy stays in sync

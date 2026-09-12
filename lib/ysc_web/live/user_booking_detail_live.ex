@@ -325,10 +325,7 @@ defmodule YscWeb.UserBookingDetailLive do
               <div>
                 <div class="text-sm text-zinc-600">Guests</div>
                 <div class="font-medium text-zinc-900">
-                  {@booking.guests_count}
-                  <%= if @booking.children_count > 0 do %>
-                    ({@booking.children_count} children)
-                  <% end %>
+                  {BookingDisplay.guest_headcount_label(@booking)}
                 </div>
               </div>
 

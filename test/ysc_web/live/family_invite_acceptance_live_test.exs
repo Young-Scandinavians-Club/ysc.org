@@ -485,7 +485,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
         |> element("button", "Join Family Membership")
         |> render_click()
 
-      assert html =~ "family member, not for your own account"
+      assert html =~ "because you sent it"
+      assert html =~ "Ask your family member"
     end
 
     test "shows error when the logged-in user is already on a family membership" do

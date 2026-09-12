@@ -1268,7 +1268,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             (@price_breakdown && @price_breakdown[:segments]) || [] %>
                           <%= if length(segments) > 1 do %>
                             <div class="text-xs text-zinc-500 mb-1">
-                              Shared cabin stay ({BookingDisplay.adults_label(
+                              Shared cabin stay ({BookingDisplay.people_label(
                                 @guests_count
                               )} × {BookingDisplay.nights_label(nights)}) · rate varies by season
                             </div>
@@ -1315,7 +1315,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                 |> elem(1) %>
                             <div class="flex justify-between items-center text-zinc-600">
                               <span>
-                                Shared cabin stay ({BookingDisplay.adults_label(
+                                Shared cabin stay ({BookingDisplay.people_label(
                                   @guests_count
                                 )} × {BookingDisplay.nights_label(nights)})
                               </span>

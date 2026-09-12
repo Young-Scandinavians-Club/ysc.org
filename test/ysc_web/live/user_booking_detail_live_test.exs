@@ -73,7 +73,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert html =~ "Booking Details"
       assert html =~ booking.reference_id
       assert html =~ "Lake Tahoe Cabin"
-      assert html =~ "children"
+      assert html =~ "2 adults, 1 child"
     end
 
     test "static HTML shows loading shell before websocket connects", %{
