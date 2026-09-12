@@ -827,6 +827,44 @@ defmodule Ysc.ExpenseReports do
   end
 
   @doc """
+  Treasurer correction of the event an expense report is associated with —
+  e.g. the member picked the wrong event, or it should be cleared entirely.
+  Pass `nil` (or `""`) for `event_id` to disassociate.
+  """
+  def update_expense_report_event(%ExpenseReport{} = expense_report, event_id) do
+    expense_report
+    |> ExpenseReport.event_changeset(%{"event_id" => event_id})
+    |> Repo.update()
+  end
+
+  @doc """
+  Treasurer correction of a single expense line item's amount, e.g. fixing a
+  member's typo before approving. Runs the item's normal `changeset/2`, so the
+  corrected amount still passes the usual money and per-line cap validations.
+
+  Mileage items derive their amount from `:miles_driven` (see
+  `ExpenseReportItem.apply_mileage_fields/1`), so they aren't editable this way.
+  """
+  def update_expense_item_amount(%ExpenseReportItem{expense_type: "mileage"}, _amount) do
+    {:error, :mileage_amount_not_editable}
+  end
+
+  def update_expense_item_amount(%ExpenseReportItem{} = item, amount) do
+    item
+    |> ExpenseReportItem.changeset(%{"amount" => amount})
+    |> Repo.update()
+  end
+
+  @doc """
+  Treasurer correction of a single income line item's amount.
+  """
+  def update_income_item_amount(%ExpenseReportIncomeItem{} = item, amount) do
+    item
+    |> ExpenseReportIncomeItem.changeset(%{"amount" => amount})
+    |> Repo.update()
+  end
+
+  @doc """
   Rejects an expense report with a required treasurer note.
 
   The note (enforced by `ExpenseReport.rejection_changeset/2`) explains what the

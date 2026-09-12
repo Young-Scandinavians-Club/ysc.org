@@ -158,6 +158,20 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
   end
 
   @doc """
+  Changeset for a treasurer associating (or clearing) an expense report's
+  event during review — e.g. the member picked the wrong event, or none at
+  all. Only casts `:event_id`, independent of the submission validations in
+  `changeset/3`.
+  """
+  def event_changeset(expense_report, attrs) do
+    attrs = normalize_event_id_in_attrs(attrs)
+
+    expense_report
+    |> cast(attrs, [:event_id])
+    |> foreign_key_constraint(:event_id)
+  end
+
+  @doc """
   Changeset for an admin rejecting a submitted report.
 
   Requires a non-blank `:rejection_note`. The member is shown this text in-app
