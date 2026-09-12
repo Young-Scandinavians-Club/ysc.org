@@ -509,15 +509,7 @@ defmodule YscWeb.BookingReceiptLive do
                     )
                   ]}
                 >
-                  {@booking.guests_count} {if @booking.guests_count == 1,
-                    do: "Adult",
-                    else: "Adults"}
-                  <%= if @booking.children_count > 0 do %>
-                    , {@booking.children_count} {if @booking.children_count ==
-                                                      1,
-                                                    do: "Child",
-                                                    else: "Children"}
-                  <% end %>
+                  {BookingDisplay.guest_headcount_label(@booking)}
                 </p>
               </div>
             </div>
@@ -790,7 +782,7 @@ defmodule YscWeb.BookingReceiptLive do
                             )
                           }>
                             Shared cabin stay
-                            ({BookingDisplay.adults_label(
+                            ({BookingDisplay.people_label(
                               @price_breakdown.guests_count
                             )} × {BookingDisplay.nights_label(
                               @price_breakdown.nights

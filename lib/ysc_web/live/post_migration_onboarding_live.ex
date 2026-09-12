@@ -1109,7 +1109,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :info,
-              "A verification code was sent to #{updated_user.phone_number}",
+              "A verification code was sent to #{formatted_phone_number(updated_user.phone_number)}",
               title: "Phone Verification"
             )
 
@@ -1419,9 +1419,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:ok, %{disabled_until: disabled_until, reused?: reused?}} ->
         message =
           if reused? do
-            "Your code was sent again to #{user.phone_number}"
+            "Your code was sent again to #{formatted_phone_number(user.phone_number)}"
           else
-            "A new code was sent to #{user.phone_number}"
+            "A new code was sent to #{formatted_phone_number(user.phone_number)}"
           end
 
         YscWeb.Flash.send_toast(
@@ -2842,6 +2842,11 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {"Sweden", "SE"},
       {"Other", "other"}
     ]
+  end
+
+  defp formatted_phone_number(phone_number) do
+    Ysc.Extensions.PhoneNumber.format_for_display(phone_number) ||
+      phone_number
   end
 
   defp membership_plan_price_footer(plans, plan_id) do

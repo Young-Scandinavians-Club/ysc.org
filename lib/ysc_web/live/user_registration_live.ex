@@ -322,7 +322,7 @@ defmodule YscWeb.UserRegistrationLive do
                   prompt="Select country"
                   type="country-select"
                   field={rf[:place_of_birth]}
-                  label="Place of Birth*"
+                  label="Country of birth*"
                   required
                 />
                 <.input

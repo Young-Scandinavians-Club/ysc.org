@@ -1468,7 +1468,7 @@ defmodule YscWeb.HomeLive do
                               class="!py-1.5 whitespace-nowrap"
                             >
                               <.icon name="hero-qr-code" class="w-4 h-4" />
-                              Show event tickets
+                              Show tickets for check-in
                             </.button>
                             <%= if length(order_ids) == 1 do %>
                               <.link
@@ -1477,7 +1477,7 @@ defmodule YscWeb.HomeLive do
                                 }
                                 class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                               >
-                                View ticket details
+                                View order & receipt
                               </.link>
                             <% else %>
                               <%= if length(order_ids) > 1 do %>

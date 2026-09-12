@@ -139,6 +139,29 @@ defmodule YscWeb.BookingDisplayTest do
     end
   end
 
+  describe "guest_headcount_label/1" do
+    test "labels shared-cabin stays as guests, not adults" do
+      assert BookingDisplay.guest_headcount_label(%{
+               booking_mode: :day,
+               guests_count: 4,
+               children_count: 0
+             }) == "4 guests"
+    end
+
+    test "lists Tahoe adults and children separately" do
+      assert BookingDisplay.guest_headcount_label(%{
+               booking_mode: :room,
+               guests_count: 2,
+               children_count: 1
+             }) == "2 adults, 1 child"
+    end
+
+    test "falls back to guest count when children_count is missing" do
+      assert BookingDisplay.guest_headcount_label(%{guests_count: 3}) ==
+               "3 guests"
+    end
+  end
+
   describe "guests_total_label/2" do
     test "formats combined headcount as a Total prefix" do
       assert BookingDisplay.guests_total_label(1, 0) == "Total: 1 guest"

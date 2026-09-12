@@ -411,7 +411,7 @@ defmodule YscWeb.EventDetailsLive do
                           )
                         ]}
                       >
-                        View ticket details
+                        View order & receipt
                       </.link>
                     </div>
                   <% end %>
@@ -3839,7 +3839,7 @@ defmodule YscWeb.EventDetailsLive do
   defp member_only_block_message(limit, member_only_selected, owned) do
     cond do
       not MemberOnlyTickets.eligible?(limit) ->
-        "Members-only tickets require a Single, Family, or Lifetime membership. Pick a regular tier instead."
+        "Members-only tickets need a Single, Family, or Lifetime membership. Choose a regular ticket type instead."
 
       is_integer(limit) and owned + member_only_selected >= limit ->
         word = if limit == 1, do: "ticket", else: "tickets"

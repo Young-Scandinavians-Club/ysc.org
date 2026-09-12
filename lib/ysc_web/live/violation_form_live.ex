@@ -280,10 +280,10 @@ defmodule YscWeb.ConductViolationReportLive do
                   </div>
                   <div class="flex-1">
                     <p class="text-sm font-semibold text-zinc-900 mb-2">
-                      I wish to remain anonymous to the parties involved
+                      Keep my name private from the people this report is about
                     </p>
                     <p class="text-xs text-zinc-600">
-                      Your name will still be visible to the YSC board for follow-up purposes, but will not be shared with the parties involved in the incident.
+                      Your name will still be visible to the YSC board for follow-up, but will not be shared with the people involved in what happened.
                     </p>
                   </div>
                 </div>
