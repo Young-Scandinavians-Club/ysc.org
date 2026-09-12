@@ -225,6 +225,59 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     end
   end
 
+  describe "Finding 66: proceed-to-checkout after sale window ends" do
+    test "does not create a pending order when the selected tier's sale ended",
+         %{
+           conn: conn,
+           user: user
+         } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      past_start =
+        DateTime.utc_now()
+        |> DateTime.add(-86_400, :second)
+        |> DateTime.truncate(:second)
+
+      future_end =
+        DateTime.utc_now()
+        |> DateTime.add(86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Events.update_ticket_tier(tier, %{
+          start_date: past_start,
+          end_date: future_end
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      view = wait_for_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+
+      # Close the window in the DB without a PubSub update so this session still
+      # holds the selection — the original Finding 66 race (stale tab / clock).
+      past_end =
+        DateTime.utc_now()
+        |> DateTime.add(-3600, :second)
+        |> DateTime.truncate(:second)
+
+      tier
+      |> Ecto.Changeset.change(%{end_date: past_end})
+      |> Repo.update!()
+
+      render_click(view, "proceed-to-checkout")
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "couldn't finish your ticket purchase"
+      refute has_element?(view, "#payment-modal")
+      assert Tickets.list_user_ticket_orders(user.id) == []
+    end
+  end
+
   describe "duplicate checkout while payment is in flight" do
     test "proceed-to-checkout shows processing toast when another payment is in flight" do
       order = ticket_order_fixture()
