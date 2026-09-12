@@ -172,6 +172,11 @@ defmodule Ysc.Events.Event do
 
   @publish_control_fields [:state, :published_at, :publish_at, :organizer_id]
 
+  # Finding 70: tickets_tbd is a dedicated lifecycle flag (`Events.set_tickets_tbd/2`),
+  # not an editorial auto-save field. Keep it on `changeset/2` so create/copy and
+  # the TBD setter can persist it; omit it from `editor_changeset/2`.
+  @tickets_tbd_fields [:tickets_tbd]
+
   @editor_fields [
     :reference_id,
     :title,
@@ -188,7 +193,6 @@ defmodule Ysc.Events.Event do
     :longitude,
     :place_id,
     :partiful_link,
-    :tickets_tbd,
     :start_date,
     :start_time,
     :end_date,
@@ -201,7 +205,10 @@ defmodule Ysc.Events.Event do
   """
   def changeset(event, attrs) do
     event
-    |> cast(attrs, @editor_fields ++ @publish_control_fields)
+    |> cast(
+      attrs,
+      @editor_fields ++ @publish_control_fields ++ @tickets_tbd_fields
+    )
     |> validate_required([
       :state,
       :organizer_id,
@@ -213,8 +220,9 @@ defmodule Ysc.Events.Event do
   @doc """
   Changeset for admin editor auto-save and validate events.
 
-  Publishing state, schedule, and organizer must use dedicated context functions
-  (`publish_event/1`, `delete_event/1`, etc.), not LiveView form params.
+  Publishing state, schedule, organizer, and tickets_tbd must use dedicated
+  context functions (`publish_event/1`, `set_tickets_tbd/2`, etc.), not
+  LiveView form params.
   """
   def editor_changeset(event, attrs) do
     event

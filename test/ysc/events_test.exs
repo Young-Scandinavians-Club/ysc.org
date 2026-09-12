@@ -764,6 +764,36 @@ defmodule Ysc.EventsTest do
       assert updated.tickets_tbd == true
     end
 
+    test "set_tickets_tbd/2 refuses to enable TBD when ticket tiers exist", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event with tiers",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, _tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      event = Events.get_event!(event.id)
+
+      assert {:error, :ticket_tiers_exist} =
+               Events.set_tickets_tbd(event, true)
+
+      assert Events.get_event!(event.id).tickets_tbd == false
+    end
+
     test "set_tickets_tbd/2 sets flag to false", %{user: user} do
       {:ok, event} =
         Events.create_event(%{
@@ -5252,6 +5282,20 @@ defmodule Ysc.EventsTest do
 
       assert updated.title == "Still draft"
       assert updated.state == :draft
+    end
+
+    test "ignores mass-assigned tickets_tbd" do
+      {:ok, event} = create_event_fixture()
+      refute event.tickets_tbd
+
+      assert {:ok, updated} =
+               Events.update_event_editor(event, %{
+                 "title" => event.title,
+                 "tickets_tbd" => "true",
+                 "lock_version" => event.lock_version
+               })
+
+      refute updated.tickets_tbd
     end
 
     test "sets updated_by_id when the opt is given" do

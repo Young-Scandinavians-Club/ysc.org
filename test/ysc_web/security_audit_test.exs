@@ -64,6 +64,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 66 (MEDIUM)   Ticket checkout ignored tier sale end_date (early-bird price after window)
   Finding 67 (HIGH)     Volunteers could unpublish or cancel any published event
   Finding 68 (HIGH)     Volunteers could create irreversible cabin booking blackouts via event publish
+  Finding 70 (MEDIUM)   Volunteers could force tickets_tbd on events that already have live ticket tiers
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1328,7 +1329,7 @@ defmodule YscWeb.SecurityAuditTest do
 
     import Ysc.EventsFixtures
 
-    test "editor_changeset ignores forged state, published_at, and organizer_id" do
+    test "editor_changeset ignores forged state, published_at, organizer_id, and tickets_tbd" do
       organizer = user_fixture()
       other = user_fixture()
       event = event_fixture(%{state: :draft, organizer_id: organizer.id})
@@ -1338,13 +1339,15 @@ defmodule YscWeb.SecurityAuditTest do
           "title" => "Updated title",
           "state" => "published",
           "published_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
-          "organizer_id" => other.id
+          "organizer_id" => other.id,
+          "tickets_tbd" => "true"
         })
 
       assert Ecto.Changeset.get_change(changeset, :title) == "Updated title"
       refute Map.has_key?(changeset.changes, :state)
       refute Map.has_key?(changeset.changes, :published_at)
       refute Map.has_key?(changeset.changes, :organizer_id)
+      refute Map.has_key?(changeset.changes, :tickets_tbd)
     end
 
     test "update_event_editor cannot resurrect a deleted event via forged publish params" do
@@ -4235,6 +4238,155 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert Repo.get!(Ysc.Events.Event, event.id).state == :published
       assert Ysc.Bookings.list_blackouts_from_db(:clear_lake) == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 70 (MEDIUM): Volunteers must not force Tickets TBD after tiers exist
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 70: volunteers cannot enable tickets_tbd once tiers exist" do
+    import Ysc.EventsFixtures
+
+    test "set_tickets_tbd refuses when the event already has ticket tiers" do
+      organizer = user_fixture(%{role: :admin})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 70 Tiers #{System.unique_integer([:positive])}"
+        })
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "GA Finding 70",
+        type: :paid,
+        price: Money.new(50, :USD),
+        quantity: 20
+      })
+
+      assert {:error, :ticket_tiers_exist} =
+               Ysc.Events.set_tickets_tbd(event, true)
+
+      refute Repo.get!(Ysc.Events.Event, event.id).tickets_tbd
+    end
+
+    test "set_tickets_tbd still enables TBD when the event has no ticket tiers" do
+      organizer = user_fixture(%{role: :admin})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 70 Empty #{System.unique_integer([:positive])}"
+        })
+
+      assert {:ok, updated} = Ysc.Events.set_tickets_tbd(event, true)
+      assert updated.tickets_tbd
+    end
+
+    test "update_event_editor ignores forged tickets_tbd" do
+      organizer = user_fixture(%{role: :admin})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 70 Editor #{System.unique_integer([:positive])}"
+        })
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "GA Finding 70 Editor",
+        type: :paid,
+        price: Money.new(40, :USD),
+        quantity: 10
+      })
+
+      assert {:ok, updated} =
+               Ysc.Events.update_event_editor(event, %{
+                 "title" => event.title,
+                 "tickets_tbd" => "true",
+                 "lock_version" => event.lock_version
+               })
+
+      refute updated.tickets_tbd
+    end
+
+    test "volunteer tickets tab hides TBD toggle and refuses toggle/set events",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :published,
+          title: "Finding 70 Live #{System.unique_integer([:positive])}"
+        })
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "GA Finding 70 Live",
+        type: :paid,
+        price: Money.new(50, :USD),
+        quantity: 20
+      })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#tickets-tbd-toggle")
+
+      view
+      |> element("#tickets-tbd-toggle-event-#{event.id}")
+      |> render_click()
+
+      refute Repo.get!(Ysc.Events.Event, event.id).tickets_tbd
+
+      view
+      |> element("#tickets-tbd-set-event-#{event.id}")
+      |> render_click()
+
+      refute Repo.get!(Ysc.Events.Event, event.id).tickets_tbd
+    end
+
+    test "volunteer event editor validate cannot mass-assign tickets_tbd", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          state: :published,
+          title: "Finding 70 Validate #{System.unique_integer([:positive])}"
+        })
+
+      ticket_tier_fixture(%{
+        event_id: event.id,
+        name: "GA Finding 70 Validate",
+        type: :paid,
+        price: Money.new(25, :USD),
+        quantity: 15
+      })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/edit")
+
+      render_change(view, "validate", %{
+        "event" => %{
+          "title" => event.title,
+          "tickets_tbd" => "true",
+          "lock_version" => event.lock_version
+        }
+      })
+
+      refute Repo.get!(Ysc.Events.Event, event.id).tickets_tbd
     end
   end
 
