@@ -4005,4 +4005,135 @@ defmodule Ysc.ExpenseReportsTest do
                |> Enum.map(& &1.vendor)
     end
   end
+
+  describe "update_expense_item_amount/2, update_income_item_amount/2 and update_expense_report_event/2 — paid-report immutability" do
+    setup %{user: user} do
+      event = event_fixture()
+
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Immutability check",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "Costco",
+                "description" => "Snacks",
+                "amount" => "12.50",
+                "receipt_s3_path" => "receipts/a.pdf"
+              }
+            ],
+            "income_items" => [
+              %{
+                "date" => "2024-01-15",
+                "description" => "Refund",
+                "amount" => "5.00"
+              }
+            ]
+          },
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.update_expense_report(report, %{status: "paid"})
+
+      report = Repo.preload(report, [:expense_items, :income_items])
+
+      %{report: report, event: event}
+    end
+
+    test "update_expense_item_amount/2 refuses a paid report at the write layer",
+         %{report: report} do
+      [item] = report.expense_items
+
+      assert ExpenseReports.update_expense_item_amount(item, "999.00") ==
+               {:error, :report_paid}
+
+      assert Money.to_string!(Repo.reload!(item).amount) == "$12.50"
+    end
+
+    test "update_income_item_amount/2 refuses a paid report at the write layer",
+         %{report: report} do
+      [item] = report.income_items
+
+      assert ExpenseReports.update_income_item_amount(item, "999.00") ==
+               {:error, :report_paid}
+
+      assert Money.to_string!(Repo.reload!(item).amount) == "$5.00"
+    end
+
+    test "update_expense_report_event/2 refuses a paid report at the write layer",
+         %{report: report, event: event} do
+      assert ExpenseReports.update_expense_report_event(report, event.id) ==
+               {:error, :report_paid}
+
+      assert is_nil(Repo.reload!(report).event_id)
+    end
+
+    test "the same three writes succeed while the report is not yet paid",
+         %{user: user, event: event} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      {:ok, editable} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Still editable",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "Costco",
+                "description" => "Snacks",
+                "amount" => "12.50",
+                "receipt_s3_path" => "receipts/a.pdf"
+              }
+            ],
+            "income_items" => [
+              %{
+                "date" => "2024-01-15",
+                "description" => "Refund",
+                "amount" => "5.00"
+              }
+            ]
+          },
+          user
+        )
+
+      editable = Repo.preload(editable, [:expense_items, :income_items])
+      [expense_item] = editable.expense_items
+      [income_item] = editable.income_items
+
+      assert {:ok, updated_expense_item} =
+               ExpenseReports.update_expense_item_amount(expense_item, "18.75")
+
+      assert Money.to_string!(updated_expense_item.amount) == "$18.75"
+
+      assert {:ok, updated_income_item} =
+               ExpenseReports.update_income_item_amount(income_item, "9.25")
+
+      assert Money.to_string!(updated_income_item.amount) == "$9.25"
+
+      assert {:ok, updated_report} =
+               ExpenseReports.update_expense_report_event(editable, event.id)
+
+      assert updated_report.event_id == event.id
+    end
+  end
 end
