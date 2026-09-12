@@ -49,7 +49,7 @@ defmodule Ysc.Forms.ContactFormTest do
       changeset =
         %ContactForm{}
         |> ContactForm.changeset(attrs)
-        |> ContactForm.put_submitter(user)
+        |> Ysc.Forms.put_submitter(user)
 
       assert changeset.valid?
       assert changeset.changes.user_id == user.id
@@ -246,7 +246,7 @@ defmodule Ysc.Forms.ContactFormTest do
       changeset =
         %ContactForm{}
         |> ContactForm.changeset(attrs)
-        |> ContactForm.put_submitter(user)
+        |> Ysc.Forms.put_submitter(user)
 
       {:ok, contact_form} = Repo.insert(changeset)
 

@@ -47,13 +47,4 @@ defmodule Ysc.Forms.ConductViolationReport do
     |> validate_format(:email, ~r/@/)
     |> put_change(:status, :submitted)
   end
-
-  @doc """
-  Applies the submitting user's id after public params are validated.
-  """
-  def put_submitter(changeset, %User{id: user_id}) do
-    put_change(changeset, :user_id, user_id)
-  end
-
-  def put_submitter(changeset, _), do: changeset
 end

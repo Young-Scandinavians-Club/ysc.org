@@ -55,15 +55,4 @@ defmodule Ysc.Forms.ContactForm do
     |> validate_format(:email, ~r/@/)
     |> validate_length(:message, min: 10)
   end
-
-  @doc """
-  Applies the submitting user's id after public params are validated.
-
-  `user_id` is never taken from client params.
-  """
-  def put_submitter(changeset, %User{id: user_id}) do
-    put_change(changeset, :user_id, user_id)
-  end
-
-  def put_submitter(changeset, _), do: changeset
 end
