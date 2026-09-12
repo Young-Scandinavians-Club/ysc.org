@@ -678,15 +678,14 @@ defmodule Ysc.ExpenseReports do
   defp after_expense_report_insert({:ok, expense_report} = result) do
     if expense_report.status == "submitted" do
       Ysc.Logging.debug(
-        "Expense report created with submitted status, enqueueing QuickBooks sync",
+        "Expense report created with submitted status, sending emails",
         expense_report_id: expense_report.id
       )
 
-      enqueue_quickbooks_sync(expense_report)
       send_expense_report_emails(expense_report)
     else
       Ysc.Logging.debug(
-        "Expense report created with status: #{expense_report.status}, skipping QuickBooks sync and emails",
+        "Expense report created with status: #{expense_report.status}, skipping emails",
         expense_report_id: expense_report.id
       )
     end
@@ -821,9 +820,113 @@ defmodule Ysc.ExpenseReports do
   end
 
   def update_expense_report(%ExpenseReport{} = expense_report, attrs) do
-    expense_report
-    |> ExpenseReport.status_changeset(attrs)
-    |> Repo.update()
+    was_approved = expense_report.status == "approved"
+
+    result =
+      expense_report
+      |> ExpenseReport.status_changeset(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, %ExpenseReport{status: "approved"} = updated_report}
+      when not was_approved ->
+        Ysc.Logging.debug(
+          "Expense report approved, enqueueing QuickBooks sync",
+          expense_report_id: updated_report.id
+        )
+
+        enqueue_quickbooks_sync(updated_report)
+
+      _ ->
+        :ok
+    end
+
+    result
+  end
+
+  @doc """
+  Treasurer correction of the event an expense report is associated with —
+  e.g. the member picked the wrong event, or it should be cleared entirely.
+  Pass `nil` (or `""`) for `event_id` to disassociate.
+
+  Refuses once the report is `"paid"` (see `update_unless_report_paid/2`).
+  """
+  def update_expense_report_event(%ExpenseReport{id: id}, event_id) do
+    update_unless_report_paid(id, fn report ->
+      ExpenseReport.event_changeset(report, %{"event_id" => event_id})
+    end)
+  end
+
+  @doc """
+  Treasurer correction of a single expense line item's amount, e.g. fixing a
+  member's typo before approving. Runs the item's normal `changeset/2`, so the
+  corrected amount still passes the usual money and per-line cap validations.
+
+  Mileage items derive their amount from `:miles_driven` (see
+  `ExpenseReportItem.apply_mileage_fields/1`), so they aren't editable this way.
+  Refuses once the parent report is `"paid"` (see `update_unless_report_paid/2`).
+  """
+  def update_expense_item_amount(
+        %ExpenseReportItem{expense_type: "mileage"},
+        _amount
+      ) do
+    {:error, :mileage_amount_not_editable}
+  end
+
+  def update_expense_item_amount(
+        %ExpenseReportItem{expense_report_id: report_id} = item,
+        amount
+      ) do
+    update_unless_report_paid(report_id, fn _report ->
+      ExpenseReportItem.changeset(item, %{"amount" => amount})
+    end)
+  end
+
+  @doc """
+  Treasurer correction of a single income line item's amount. Refuses once
+  the parent report is `"paid"` (see `update_unless_report_paid/2`).
+  """
+  def update_income_item_amount(
+        %ExpenseReportIncomeItem{expense_report_id: report_id} = item,
+        amount
+      ) do
+    update_unless_report_paid(report_id, fn _report ->
+      ExpenseReportIncomeItem.changeset(item, %{"amount" => amount})
+    end)
+  end
+
+  # Locks the parent expense report row and refuses the write with
+  # `{:error, :report_paid}` if it's already "paid" — closes the race where a
+  # treasurer's stale modal (or a QuickBooks-driven "paid" webhook landing
+  # mid-edit) could otherwise mutate a reimbursed report's numbers after the
+  # fact. The lock is held for the duration of the write, so a concurrent
+  # "paid" transition blocks behind it rather than racing it.
+  #
+  # Uses `Repo.transaction/1` rather than `Ecto.Multi` so Dialyzer does not
+  # flag the opaque Multi constructor (`call_without_opaque`).
+  defp update_unless_report_paid(report_id, build_changeset) do
+    Repo.transaction(fn ->
+      case Repo.one(lock_expense_report_for_update_query(report_id)) do
+        nil ->
+          Repo.rollback(:not_found)
+
+        %ExpenseReport{status: "paid"} ->
+          Repo.rollback(:report_paid)
+
+        report ->
+          case Repo.update(build_changeset.(report)) do
+            {:ok, record} -> record
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+      end
+    end)
+  end
+
+  defp lock_expense_report_for_update_query(report_id) do
+    from(er in ExpenseReport,
+      where: er.id == ^report_id,
+      lock: "FOR UPDATE"
+    )
   end
 
   @doc """
@@ -1028,20 +1131,9 @@ defmodule Ysc.ExpenseReports do
   end
 
   def submit_expense_report(%ExpenseReport{} = expense_report) do
-    result =
-      expense_report
-      |> ExpenseReport.changeset(%{status: "submitted"})
-      |> Repo.update()
-
-    # Enqueue QuickBooks sync job if submission was successful
-    case result do
-      {:ok, updated_report} ->
-        enqueue_quickbooks_sync(updated_report)
-        result
-
-      error ->
-        error
-    end
+    expense_report
+    |> ExpenseReport.changeset(%{status: "submitted"})
+    |> Repo.update()
   end
 
   defp enqueue_quickbooks_sync(%ExpenseReport{} = expense_report) do
@@ -1050,10 +1142,11 @@ defmodule Ysc.ExpenseReports do
       current_status: expense_report.quickbooks_sync_status
     )
 
-    # Mark as pending sync
+    # Mark as pending sync. A bare changeset (no cast_assoc/validations) so
+    # this doesn't require the caller to have preloaded expense/income items.
     update_result =
       expense_report
-      |> ExpenseReport.changeset(%{quickbooks_sync_status: "pending"})
+      |> Ecto.Changeset.change(%{quickbooks_sync_status: "pending"})
       |> Repo.update()
 
     case update_result do

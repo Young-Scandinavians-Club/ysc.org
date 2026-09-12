@@ -59,7 +59,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
   end
 
   describe "query filtering - status field" do
-    test "ignores expense reports with status != submitted", %{user: user} do
+    test "ignores expense reports with status != approved", %{user: user} do
       %ExpenseReport{
         user_id: user.id,
         purpose: "Draft report",
@@ -71,8 +71,8 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
 
       %ExpenseReport{
         user_id: user.id,
-        purpose: "Approved report",
-        status: "approved",
+        purpose: "Submitted but not yet approved",
+        status: "submitted",
         quickbooks_sync_status: "pending",
         reimbursement_method: "check"
       }
@@ -90,7 +90,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
       %ExpenseReport{
         user_id: user.id,
         purpose: "Already synced",
-        status: "submitted",
+        status: "approved",
         quickbooks_sync_status: "synced",
         quickbooks_bill_id: "bill_123",
         reimbursement_method: "check"
@@ -111,7 +111,7 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
       %ExpenseReport{
         user_id: user.id,
         purpose: "Has bill ID",
-        status: "submitted",
+        status: "approved",
         quickbooks_sync_status: "pending",
         quickbooks_bill_id: "bill_456",
         reimbursement_method: "check"

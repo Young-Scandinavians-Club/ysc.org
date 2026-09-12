@@ -1107,7 +1107,7 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
   @doc false
   def ci_query_explain_query do
     from(er in ExpenseReport,
-      where: er.status == "submitted",
+      where: er.status == "approved",
       where: er.quickbooks_sync_status in ["pending", "failed"],
       order_by: [asc: er.inserted_at],
       limit: 50

@@ -92,6 +92,15 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
           # Check if already synced (double-check after acquiring lock)
           # This prevents duplicate exports if the report was synced between job creation and execution
           cond do
+            expense_report.status != "approved" ->
+              Ysc.Logging.info(
+                "Expense report is not approved, skipping QuickBooks sync",
+                expense_report_id: expense_report_id,
+                status: expense_report.status
+              )
+
+              :ok
+
             expense_report.quickbooks_sync_status == "synced" ->
               Ysc.Logging.info(
                 "Expense report already synced to QuickBooks (checked after lock)",

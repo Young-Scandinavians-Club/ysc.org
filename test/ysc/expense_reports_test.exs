@@ -1102,12 +1102,109 @@ defmodule Ysc.ExpenseReportsTest do
       # Preload expense_items association before updating to avoid changeset error
       report = Ysc.Repo.preload(report, :expense_items)
 
-      assert {:ok, updated} =
-               ExpenseReports.update_expense_report(report, %{
-                 status: "approved"
-               })
+      # Manual mode: approving enqueues a QuickBooks sync job that we don't
+      # need to run for this test.
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, updated} =
+                 ExpenseReports.update_expense_report(report, %{
+                   status: "approved"
+                 })
 
-      assert updated.status == "approved"
+        assert updated.status == "approved"
+      end)
+    end
+
+    test "approving an expense report enqueues a QuickBooks sync job", %{
+      user: user
+    } do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Approval sync",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      report = Ysc.Repo.preload(report, :expense_items)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, updated} =
+                 ExpenseReports.update_expense_report(report, %{
+                   status: "approved"
+                 })
+
+        assert updated.quickbooks_sync_status == "pending"
+
+        assert_enqueued(
+          worker: YscWeb.Workers.QuickbooksSyncExpenseReportWorker,
+          args: %{"expense_report_id" => report.id}
+        )
+      end)
+    end
+
+    test "re-saving an already-approved report does not enqueue a second QuickBooks sync job",
+         %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Already approved",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      report = Ysc.Repo.preload(report, :expense_items)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, approved} =
+          ExpenseReports.update_expense_report(report, %{status: "approved"})
+
+        # Mark synced, as the real sync worker would, so a second enqueue
+        # attempt would be an observable duplicate.
+        {:ok, approved} =
+          approved
+          |> Ecto.Changeset.change(%{
+            quickbooks_bill_id: "bill_1",
+            quickbooks_sync_status: "synced"
+          })
+          |> Repo.update()
+
+        assert {:ok, _still_approved} =
+                 ExpenseReports.update_expense_report(approved, %{
+                   status: "approved"
+                 })
+
+        jobs =
+          all_enqueued(worker: YscWeb.Workers.QuickbooksSyncExpenseReportWorker)
+          |> Enum.filter(&(&1.args["expense_report_id"] == report.id))
+
+        assert length(jobs) == 1
+      end)
     end
 
     test "update_expense_report returns error for invalid status", %{user: user} do
@@ -1313,7 +1410,7 @@ defmodule Ysc.ExpenseReportsTest do
       assert Keyword.has_key?(cs.errors, :certification_accepted)
     end
 
-    test "submit_expense_report updates status to submitted and enqueues QuickBooks sync",
+    test "submit_expense_report updates status to submitted and does not enqueue QuickBooks sync",
          %{
            user: user
          } do
@@ -1363,13 +1460,13 @@ defmodule Ysc.ExpenseReportsTest do
         |> Repo.update!()
         |> Repo.preload(:expense_items)
 
-      # Use manual mode so QuickBooks sync job is enqueued but not run (avoids needing QB mocks)
+      # QuickBooks export only happens once a treasurer approves the report
+      # (see ExpenseReports.update_expense_report/2), not on submission.
       Oban.Testing.with_testing_mode(:manual, fn ->
         assert {:ok, updated} = ExpenseReports.submit_expense_report(report)
         assert updated.status == "submitted"
-        assert updated.quickbooks_sync_status == "pending"
 
-        assert_enqueued(
+        refute_enqueued(
           worker: YscWeb.Workers.QuickbooksSyncExpenseReportWorker,
           args: %{"expense_report_id" => report.id}
         )
@@ -1412,7 +1509,7 @@ defmodule Ysc.ExpenseReportsTest do
 
         assert report.status == "submitted"
 
-        assert_enqueued(
+        refute_enqueued(
           worker: YscWeb.Workers.QuickbooksSyncExpenseReportWorker,
           args: %{"expense_report_id" => report.id}
         )
@@ -2205,12 +2302,14 @@ defmodule Ysc.ExpenseReportsTest do
 
       refute changeset.valid?
 
-      assert {:ok, updated} =
-               ExpenseReports.update_expense_report(report, %{
-                 "status" => "approved"
-               })
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, updated} =
+                 ExpenseReports.update_expense_report(report, %{
+                   "status" => "approved"
+                 })
 
-      assert updated.status == "approved"
+        assert updated.status == "approved"
+      end)
     end
 
     test "delete_expense_report removes draft report", %{user: user} do
@@ -2406,7 +2505,7 @@ defmodule Ysc.ExpenseReportsTest do
   end
 
   describe "submit_expense_report/1 vs expense report email jobs" do
-    test "submit_expense_report enqueues QuickBooks sync but does not schedule expense report emails",
+    test "submit_expense_report does not enqueue QuickBooks sync or schedule expense report emails",
          %{
            user: user
          } do
@@ -2448,7 +2547,7 @@ defmodule Ysc.ExpenseReportsTest do
         assert {:ok, submitted} = ExpenseReports.submit_expense_report(report)
         assert submitted.status == "submitted"
 
-        assert_enqueued(
+        refute_enqueued(
           worker: YscWeb.Workers.QuickbooksSyncExpenseReportWorker,
           args: %{"expense_report_id" => report.id}
         )
@@ -2803,39 +2902,41 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      for i <- 1..3 do
-        {:ok, report} =
-          ExpenseReports.create_expense_report(
-            %{
-              "user_id" => user.id,
-              "event_id" => event.id,
-              "status" => "draft",
-              "purpose" => "Batch #{i}",
-              "reimbursement_method" => "bank_transfer",
-              "bank_account_id" => bank_account.id,
-              "expense_items" => [
-                %{
-                  "date" => "2024-01-15",
-                  "vendor" => "Vendor",
-                  "description" => "Item",
-                  "amount" => "25.00",
-                  "receipt_s3_path" => "receipts/batch-#{i}.pdf"
-                }
-              ],
-              "income_items" => [
-                %{
-                  "date" => "2024-01-15",
-                  "description" => "Cash",
-                  "amount" => "5.00"
-                }
-              ]
-            },
-            user
-          )
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        for i <- 1..3 do
+          {:ok, report} =
+            ExpenseReports.create_expense_report(
+              %{
+                "user_id" => user.id,
+                "event_id" => event.id,
+                "status" => "draft",
+                "purpose" => "Batch #{i}",
+                "reimbursement_method" => "bank_transfer",
+                "bank_account_id" => bank_account.id,
+                "expense_items" => [
+                  %{
+                    "date" => "2024-01-15",
+                    "vendor" => "Vendor",
+                    "description" => "Item",
+                    "amount" => "25.00",
+                    "receipt_s3_path" => "receipts/batch-#{i}.pdf"
+                  }
+                ],
+                "income_items" => [
+                  %{
+                    "date" => "2024-01-15",
+                    "description" => "Cash",
+                    "amount" => "5.00"
+                  }
+                ]
+              },
+              user
+            )
 
-        {:ok, _} =
-          ExpenseReports.update_expense_report(report, %{status: "approved"})
-      end
+          {:ok, _} =
+            ExpenseReports.update_expense_report(report, %{status: "approved"})
+        end
+      end)
 
       {results, receipt_cols} =
         Ysc.QueryCounter.with_query_counter(
@@ -3149,8 +3250,10 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      {:ok, _approved} =
-        ExpenseReports.update_expense_report(approved, %{status: "approved"})
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _approved} =
+          ExpenseReports.update_expense_report(approved, %{status: "approved"})
+      end)
 
       {:ok, _still_draft} =
         ExpenseReports.create_expense_report(
@@ -3250,31 +3353,33 @@ defmodule Ysc.ExpenseReportsTest do
 
       event = event_fixture()
 
-      for i <- 1..3 do
-        {:ok, report} =
-          ExpenseReports.create_expense_report(
-            %{
-              "user_id" => user.id,
-              "event_id" => event.id,
-              "status" => "draft",
-              "purpose" => "Batch #{i}",
-              "reimbursement_method" => "bank_transfer",
-              "bank_account_id" => bank_account.id,
-              "expense_items" => [
-                %{
-                  "date" => "2024-01-15",
-                  "vendor" => "Vendor",
-                  "description" => "Item",
-                  "amount" => "10.00"
-                }
-              ]
-            },
-            user
-          )
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        for i <- 1..3 do
+          {:ok, report} =
+            ExpenseReports.create_expense_report(
+              %{
+                "user_id" => user.id,
+                "event_id" => event.id,
+                "status" => "draft",
+                "purpose" => "Batch #{i}",
+                "reimbursement_method" => "bank_transfer",
+                "bank_account_id" => bank_account.id,
+                "expense_items" => [
+                  %{
+                    "date" => "2024-01-15",
+                    "vendor" => "Vendor",
+                    "description" => "Item",
+                    "amount" => "10.00"
+                  }
+                ]
+              },
+              user
+            )
 
-        {:ok, _} =
-          ExpenseReports.update_expense_report(report, %{status: "approved"})
-      end
+          {:ok, _} =
+            ExpenseReports.update_expense_report(report, %{status: "approved"})
+        end
+      end)
 
       {totals, user_lookups} =
         Ysc.QueryCounter.with_query_counter(
