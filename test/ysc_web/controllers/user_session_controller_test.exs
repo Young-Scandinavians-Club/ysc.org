@@ -66,6 +66,7 @@ defmodule YscWeb.UserSessionControllerTest do
       conn = get(recycle(conn), ~p"/users/log-in/mobile-handoff")
       html = html_response(conn, 200)
       assert html =~ ~s(id="mobile-handoff-form")
+      assert html =~ ~s(id="mobile-handoff-home-logo")
       assert html =~ "Open the YSC Admin app"
     end
 

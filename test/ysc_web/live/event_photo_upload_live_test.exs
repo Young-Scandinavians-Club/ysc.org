@@ -65,6 +65,7 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
     assert html =~ "up to 30 files per batch"
     assert has_element?(view, "#event-photo-upload-form")
     assert has_element?(view, "#photo-drop-zone")
+    assert has_element?(view, "#focus-home-logo")
   end
 
   test "redirects unauthorized users", %{collection: collection} do

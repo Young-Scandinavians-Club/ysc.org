@@ -229,6 +229,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} = live(conn, account_setup_path(user))
 
       assert has_element?(view, "#email_form")
+      assert has_element?(view, "#account-setup-home-logo")
     end
 
     test "stepper is hidden during email verification", %{conn: conn} do

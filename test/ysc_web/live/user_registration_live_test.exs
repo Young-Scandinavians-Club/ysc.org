@@ -22,10 +22,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
   describe "Registration flow" do
     test "shows clarified eligibility step copy", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/register")
+      {:ok, lv, html} = live(conn, ~p"/users/register")
 
       assert html =~ "Check all that describe you"
       assert html =~ "you only need to meet one to qualify"
+      assert has_element?(lv, "#registration-home-logo")
     end
 
     test "falls back to Pacific time instead of crashing on an invalid browser timezone",

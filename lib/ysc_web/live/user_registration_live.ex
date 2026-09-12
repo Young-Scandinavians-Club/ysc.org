@@ -17,14 +17,7 @@ defmodule YscWeb.UserRegistrationLive do
   def render(assigns) do
     ~H"""
     <div id="registration-wrapper" class="max-w-xl mx-auto py-4 px-4">
-      <div class="flex w-full mx-auto items-center text-center justify-center">
-        <.link
-          navigate={~p"/"}
-          class="p-8 hover:opacity-80 transition duration-200 ease-in-out"
-        >
-          <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
-        </.link>
-      </div>
+      <.home_logo_link id="registration-home-logo" class="w-full p-8" />
       <div class="w-full px-2">
         <.stepper
           active_step={@current_step}
