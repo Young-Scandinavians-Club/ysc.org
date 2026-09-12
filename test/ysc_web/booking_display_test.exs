@@ -155,6 +155,11 @@ defmodule YscWeb.BookingDisplayTest do
                children_count: 1
              }) == "2 adults, 1 child"
     end
+
+    test "falls back to guest count when children_count is missing" do
+      assert BookingDisplay.guest_headcount_label(%{guests_count: 3}) ==
+               "3 guests"
+    end
   end
 
   describe "guests_total_label/2" do
