@@ -1,11 +1,14 @@
 defmodule Ysc.MoxUpgradeTest do
   @moduledoc """
-  Guards the mox 1.2.0 → 1.3.1 upgrade.
+  Guards the mox 1.3.1 → 1.3.2 upgrade.
 
   1.3.0 is a minor: Elixir 1.15 floor, `Process.info(pid, :parent)` for
   allowances when `$callers` is missing, and clearer error messages.
   1.3.1 is a patch: shared-mode dispatch keeps expectation metadata as a
   map after an unexpected call so `verify!/0` does not crash.
+  1.3.2 is a patch: `recursive_parents/1` matches `nil` from
+  `Process.info/2` when an ancestor has already exited, instead of
+  raising `CaseClauseError`.
 
   We use `defmock`, `expect`, `stub`, `stub_with`, `verify!`,
   `set_mox_global` (`mox_global_first` on LiveView cases),
@@ -23,9 +26,9 @@ defmodule Ysc.MoxUpgradeTest do
     :ok
   end
 
-  describe "1.3.1 Hex lock and public APIs" do
-    test "locks the Hex package to 1.3.1" do
-      assert to_string(Application.spec(:mox, :vsn)) == "1.3.1"
+  describe "1.3.2 Hex lock and public APIs" do
+    test "locks the Hex package to 1.3.2" do
+      assert to_string(Application.spec(:mox, :vsn)) == "1.3.2"
     end
 
     test "expect, stub, stub_with, verify, allow, and mode helpers still exist" do
@@ -113,6 +116,60 @@ defmodule Ysc.MoxUpgradeTest do
                "# In shared mode, fetch_owner_from_callers/2 returns the shared owner even when the"
 
       assert source =~ "{:no_expectation, %{}}"
+    end
+  end
+
+  describe "1.3.2 dead-ancestor parent walk" do
+    test "recursive_parents matches nil from Process.info/2" do
+      source = File.read!(@mox)
+      assert source =~ "defp recursive_parents(pid) when is_pid(pid) do"
+      assert source =~ "Process.info(pid, :parent)"
+      assert source =~ "{:parent, parent_pid} ->"
+      assert source =~ "nil ->"
+    end
+
+    test "a mock call from a grandchild does not crash when the parent already exited" do
+      test_pid = self()
+      ref = make_ref()
+
+      ancestor =
+        spawn(fn ->
+          child =
+            spawn(fn ->
+              receive do
+                :call ->
+                  result =
+                    try do
+                      DiscordHttpMock.send_webhook(
+                        "https://example.test/dead-ancestor",
+                        "{}",
+                        []
+                      )
+
+                      :unexpected_ok
+                    rescue
+                      _error in [Mox.UnexpectedCallError] -> :unexpected_call
+                      error -> {:other, error.__struct__}
+                    end
+
+                  send(test_pid, {ref, result})
+              end
+            end)
+
+          send(test_pid, {:child, child})
+
+          receive do
+            :stop -> :ok
+          end
+        end)
+
+      assert_receive {:child, child}, 1_000
+      Process.exit(ancestor, :kill)
+      refute Process.alive?(ancestor)
+
+      send(child, :call)
+
+      assert_receive {^ref, :unexpected_call}, 1_000
     end
   end
 

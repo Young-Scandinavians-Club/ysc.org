@@ -279,6 +279,8 @@ defmodule Ysc.MixProject do
       # 1.3.0: Elixir 1.15 floor; Process.info parent for allowances when
       # `$callers` is missing. 1.3.1: shared-mode verify after an unexpected
       # call no longer crashes (empty expectation map instead of nil).
+      # 1.3.2: walking parent PIDs returns [] when Process.info/2 is nil
+      # (an ancestor already exited) instead of raising CaseClauseError.
       {:mox, "~> 1.3", only: :test},
       # 2.24.1: ack only while the job is still executing (prevents a later
       # execution from overwriting completed/snoozed); notifier listeners live
