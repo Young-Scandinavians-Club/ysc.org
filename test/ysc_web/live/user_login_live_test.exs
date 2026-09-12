@@ -11,6 +11,7 @@ defmodule YscWeb.UserLoginLiveTest do
       assert html =~ "Sign in to your YSC account"
       assert html =~ "Apply for membership"
       assert html =~ "Forgot your password?"
+      assert has_element?(lv, "#login-home-logo")
       assert has_element?(lv, "a[href='/users/reset-password']")
     end
 
