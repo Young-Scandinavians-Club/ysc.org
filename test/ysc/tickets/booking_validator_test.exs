@@ -214,6 +214,39 @@ defmodule Ysc.Tickets.BookingValidatorTest do
                )
     end
 
+    test "returns error when tier sale window has ended", %{
+      user: user,
+      event: event
+    } do
+      past_end =
+        DateTime.add(DateTime.utc_now(), -3600, :second)
+        |> DateTime.truncate(:second)
+
+      past_start =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, ended_tier} =
+        Events.create_ticket_tier(%{
+          name: "Ended Early Bird",
+          type: :paid,
+          price: Money.new(30, :USD),
+          quantity: 50,
+          event_id: event.id,
+          start_date: past_start,
+          end_date: past_end
+        })
+
+      ticket_selections = %{ended_tier.id => 1}
+
+      assert {:error, :invalid_tier_selection} =
+               BookingValidator.validate_booking(
+                 user.id,
+                 event.id,
+                 ticket_selections
+               )
+    end
+
     test "returns error when quantity is invalid", %{
       user: user,
       event: event,
@@ -691,6 +724,38 @@ defmodule Ysc.Tickets.BookingValidatorTest do
       assert tier1_info != nil
       assert tier1_info.available == 40
       assert tier1_info.sold == 10
+    end
+
+    test "marks a tier with a past end_date as not on sale", %{
+      event: event,
+      tier1: open_tier
+    } do
+      past_end =
+        DateTime.add(DateTime.utc_now(), -3600, :second)
+        |> DateTime.truncate(:second)
+
+      past_start =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, ended_tier} =
+        Events.create_ticket_tier(%{
+          name: "Closed Window",
+          type: :paid,
+          price: Money.new(20, :USD),
+          quantity: 10,
+          event_id: event.id,
+          start_date: past_start,
+          end_date: past_end
+        })
+
+      availability = BookingValidator.get_event_availability(event.id)
+
+      ended_info = Enum.find(availability.tiers, &(&1.tier_id == ended_tier.id))
+      open_info = Enum.find(availability.tiers, &(&1.tier_id == open_tier.id))
+
+      assert ended_info.on_sale == false
+      assert open_info.on_sale == true
     end
   end
 end

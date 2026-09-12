@@ -1099,11 +1099,14 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "get_order_expiration_time/0" do
-    test "returns expiration datetime" do
+    test "returns expiration datetime about 5 minutes from now" do
+      now = DateTime.utc_now()
       expiration_time = Tickets.get_order_expiration_time()
-      # The function returns a DateTime 5 minutes in the future
+
       assert %DateTime{} = expiration_time
-      assert DateTime.compare(expiration_time, DateTime.utc_now()) == :gt
+
+      hold_seconds = DateTime.diff(expiration_time, now, :second)
+      assert hold_seconds in 240..330
     end
   end
 
