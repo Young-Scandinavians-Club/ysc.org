@@ -845,7 +845,10 @@ defmodule Ysc.ExpenseReports do
   Mileage items derive their amount from `:miles_driven` (see
   `ExpenseReportItem.apply_mileage_fields/1`), so they aren't editable this way.
   """
-  def update_expense_item_amount(%ExpenseReportItem{expense_type: "mileage"}, _amount) do
+  def update_expense_item_amount(
+        %ExpenseReportItem{expense_type: "mileage"},
+        _amount
+      ) do
     {:error, :mileage_amount_not_editable}
   end
 

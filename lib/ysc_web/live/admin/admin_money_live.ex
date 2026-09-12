@@ -4266,13 +4266,17 @@ defmodule YscWeb.AdminMoneyLive do
         {:noreply,
          socket
          |> refresh_expense_report_modal(refreshed)
-         |> YscWeb.Flash.put_toast(:info, "Amount updated", title: "Expense report")}
+         |> YscWeb.Flash.put_toast(:info, "Amount updated",
+           title: "Expense report"
+         )}
 
       {:error, :not_found} ->
         {:noreply,
          socket
          |> assign(:editing_expense_item, nil)
-         |> YscWeb.Flash.put_toast(:error, "Item not found", title: "Expense report")}
+         |> YscWeb.Flash.put_toast(:error, "Item not found",
+           title: "Expense report"
+         )}
 
       {:error, :mileage_amount_not_editable} ->
         {:noreply,
@@ -4318,7 +4322,9 @@ defmodule YscWeb.AdminMoneyLive do
         {:noreply,
          socket
          |> refresh_expense_report_modal(refreshed)
-         |> YscWeb.Flash.put_toast(:info, "Event updated", title: "Expense report")}
+         |> YscWeb.Flash.put_toast(:info, "Event updated",
+           title: "Expense report"
+         )}
 
       {:error, %Ecto.Changeset{}} ->
         {:noreply,
@@ -4483,7 +4489,10 @@ defmodule YscWeb.AdminMoneyLive do
       to_form(%{"rejection_note" => ""}, as: :reject)
     )
     |> assign(:editing_expense_item, nil)
-    |> assign(:expense_report_events, expense_report_event_options(expense_report))
+    |> assign(
+      :expense_report_events,
+      expense_report_event_options(expense_report)
+    )
   end
 
   # Re-derives attachments/flags/totals after an in-modal edit (e.g. an amount
@@ -4508,7 +4517,10 @@ defmodule YscWeb.AdminMoneyLive do
       ExpenseReports.calculate_totals(expense_report)
     )
     |> assign(:editing_expense_item, nil)
-    |> assign(:expense_report_events, expense_report_event_options(expense_report))
+    |> assign(
+      :expense_report_events,
+      expense_report_event_options(expense_report)
+    )
   end
 
   # Events for the review modal's event picker: the usual recent/upcoming

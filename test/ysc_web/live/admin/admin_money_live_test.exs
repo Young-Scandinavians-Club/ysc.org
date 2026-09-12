@@ -1621,7 +1621,11 @@ defmodule YscWeb.AdminMoneyLiveTest do
       |> element("#expense-inbox-review-#{report.id}")
       |> render_click()
 
-      assert has_element?(view, "#expense-report-item-#{purchase.id}-amount", "$12.50")
+      assert has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-amount",
+               "$12.50"
+             )
 
       view
       |> element(
@@ -1630,11 +1634,18 @@ defmodule YscWeb.AdminMoneyLiveTest do
       |> render_click()
 
       view
-      |> form("#expense-report-item-#{purchase.id}-amount-form", %{"amount" => "18.75"})
+      |> form("#expense-report-item-#{purchase.id}-amount-form", %{
+        "amount" => "18.75"
+      })
       |> render_submit()
 
       assert Money.to_string!(Repo.reload!(purchase).amount) == "$18.75"
-      assert has_element?(view, "#expense-report-item-#{purchase.id}-amount", "$18.75")
+
+      assert has_element?(
+               view,
+               "#expense-report-item-#{purchase.id}-amount",
+               "$18.75"
+             )
 
       refute has_element?(
                view,
@@ -1701,7 +1712,8 @@ defmodule YscWeb.AdminMoneyLiveTest do
       |> Ecto.Changeset.change(%{status: "paid"})
       |> Repo.update!()
 
-      {:ok, view, _html} = live(conn, ~p"/admin/money/expense-reports/#{report.id}")
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/expense-reports/#{report.id}")
 
       refute has_element?(
                view,
@@ -1783,7 +1795,8 @@ defmodule YscWeb.AdminMoneyLiveTest do
       |> Ecto.Changeset.change(%{status: "paid", event_id: event.id})
       |> Repo.update!()
 
-      {:ok, view, _html} = live(conn, ~p"/admin/money/expense-reports/#{report.id}")
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/expense-reports/#{report.id}")
 
       refute has_element?(view, "#expense-report-event-form")
       assert has_element?(view, "#expense-report-modal", event.title)
