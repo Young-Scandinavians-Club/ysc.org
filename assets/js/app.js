@@ -24,7 +24,7 @@ import "phoenix_html";
 import { Socket } from "phoenix";
 import { LiveSocket } from "phoenix_live_view";
 import topbar from "../vendor/topbar";
-import "../vendor/add-to-calendar-button@2.js";
+import "../vendor/add-to-calendar-button@3.js";
 import LivePhone from "./live_phone";
 import StickyNavbar, { syncNavHeight } from "./sticky_navbar";
 import { releaseStaleBodyScrollLock, shouldReleaseScrollLockOnNavigation } from "./body_scroll_lock";
