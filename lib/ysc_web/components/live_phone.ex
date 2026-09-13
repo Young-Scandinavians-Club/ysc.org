@@ -321,7 +321,7 @@ defmodule LivePhone do
 
     ~H"""
     <div
-      class={"live_phone-country align-middle text-center hover:bg-zinc-100 transition duration-150 ease-in-out justify-center cursor-pointer flex px-3 py-2 rounded-l border border-l border-t border-b border-zinc-300 #{if @opened?, do: "border-zinc-400 bg-zinc-100"}"}
+      class={"live_phone-country align-middle text-center hover:bg-zinc-100 transition duration-150 ease-in-out justify-center cursor-pointer flex px-3 py-2 rounded-l border-l border-t border-b border-zinc-300 #{if @opened?, do: "border-zinc-400 bg-zinc-100"}"}
       tabindex={@tabindex}
       phx-target={@target}
       phx-click="toggle"
@@ -360,7 +360,7 @@ defmodule LivePhone do
 
     ~H"""
     <ul
-      class="live_phone-country-list overflow-auto absolute text-left list-none top-full w-72 max-h-80 bg-white rounded-sm shadow-sm px-2 m-0 z-10"
+      class="live_phone-country-list overflow-auto absolute text-left list-none top-full mt-1 w-72 max-h-80 bg-white rounded-sm shadow-sm px-2 m-0 z-10"
       id={"live_phone-country-list-#{@id}"}
       role="listbox"
     >
