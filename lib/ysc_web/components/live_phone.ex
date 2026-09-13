@@ -68,7 +68,7 @@ defmodule LivePhone do
         type="tel"
         id={"live_phone-tel-#{@id}"}
         class={[
-          "live_phone-input text-zinc-900 border rounded-r w-full focus:ring-0 focus:border-zinc-400 sm:text-sm sm:leading-6 bg-none flex-1",
+          "live_phone-input text-zinc-900 border rounded-r w-full sm:text-sm sm:leading-6 bg-none flex-1",
           @class
         ]}
         value={assigns[:value]}
