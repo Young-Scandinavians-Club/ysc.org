@@ -51,7 +51,13 @@ defmodule YscWeb.Endpoint do
       at: "/",
       from: :ysc,
       gzip: false,
-      only: YscWeb.static_paths()
+      only: YscWeb.static_paths(),
+      # Without an explicit Cache-Control, only an ETag is sent, and browsers
+      # apply heuristic freshness (RFC 7234) and can skip revalidation on a
+      # plain reload — serving a stale asset until a hard reload forces one.
+      # no-cache forces a conditional request on every load, so a normal
+      # refresh always picks up rebuilt CSS/JS.
+      cache_control_for_etags: "no-cache"
   else
     plug Plug.Static,
       at: "/",
