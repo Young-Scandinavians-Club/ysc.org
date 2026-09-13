@@ -4292,6 +4292,18 @@ defmodule YscWeb.AdminMoneyLive do
            title: "Expense report"
          )}
 
+      {:error, :report_syncing} ->
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(
+           ExpenseReports.get_for_admin_review(report.id)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This report is currently being exported to QuickBooks and can't be edited yet",
+           title: "Expense report"
+         )}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
          socket
@@ -4339,6 +4351,18 @@ defmodule YscWeb.AdminMoneyLive do
          |> YscWeb.Flash.put_toast(
            :error,
            "This report is already paid and can no longer be edited",
+           title: "Expense report"
+         )}
+
+      {:error, :report_syncing} ->
+        {:noreply,
+         socket
+         |> refresh_expense_report_modal(
+           ExpenseReports.get_for_admin_review(report.id)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This report is currently being exported to QuickBooks and can't be edited yet",
            title: "Expense report"
          )}
 

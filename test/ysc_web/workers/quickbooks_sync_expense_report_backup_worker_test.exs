@@ -115,6 +115,98 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
     end
   end
 
+  describe "query filtering - processing claims" do
+    test "does not enqueue an in-flight processing claim", %{user: user} do
+      in_flight =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Export still in flight",
+          status: "approved",
+          quickbooks_sync_status: "processing",
+          quickbooks_last_sync_attempt_at:
+            DateTime.utc_now() |> DateTime.truncate(:second),
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 QuickbooksSyncExpenseReportBackupWorker.perform(
+                   maintenance_job()
+                 )
+
+        refute_enqueued(
+          worker: QuickbooksSyncExpenseReportWorker,
+          args: %{"expense_report_id" => to_string(in_flight.id)}
+        )
+      end)
+
+      assert Repo.reload!(in_flight).quickbooks_sync_status == "processing"
+    end
+
+    test "enqueues a stale processing claim abandoned past the lifeline window",
+         %{user: user} do
+      stale_at =
+        DateTime.utc_now()
+        |> DateTime.add(-4 * 60 * 60, :second)
+        |> DateTime.truncate(:second)
+
+      stale =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Abandoned processing claim",
+          status: "approved",
+          quickbooks_sync_status: "processing",
+          quickbooks_last_sync_attempt_at: stale_at,
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 QuickbooksSyncExpenseReportBackupWorker.perform(
+                   maintenance_job()
+                 )
+
+        assert_enqueued(
+          worker: QuickbooksSyncExpenseReportWorker,
+          args: %{"expense_report_id" => to_string(stale.id)}
+        )
+      end)
+
+      assert Repo.reload!(stale).quickbooks_sync_status == "pending"
+    end
+
+    test "enqueues a processing claim that never recorded a sync attempt", %{
+      user: user
+    } do
+      abandoned =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Claimed but never reached QuickBooks",
+          status: "approved",
+          quickbooks_sync_status: "processing",
+          quickbooks_last_sync_attempt_at: nil,
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 QuickbooksSyncExpenseReportBackupWorker.perform(
+                   maintenance_job()
+                 )
+
+        assert_enqueued(
+          worker: QuickbooksSyncExpenseReportWorker,
+          args: %{"expense_report_id" => to_string(abandoned.id)}
+        )
+      end)
+
+      assert Repo.reload!(abandoned).quickbooks_sync_status == "pending"
+    end
+  end
+
   describe "query filtering - sync_status field" do
     test "ignores expense reports with sync_status=synced", %{user: user} do
       %ExpenseReport{
