@@ -1,11 +1,16 @@
 defmodule YscWeb.LiveToastUpgradeTest do
   @moduledoc """
-  Guards the live_toast 0.9.0 → 0.10.2 upgrade.
+  Guards the live_toast 0.10.2 → 0.11.0 upgrade.
 
-  0.10.0 stops calling gettext on `put_toast`/`send_toast` copy; connection-notice
-  translation is opt-in via `:gettext_backend`. 0.10.1/0.10.2 fix custom Phoenix
-  flash rerenders. We pass English strings through `YscWeb.Flash` and do not
-  configure `:gettext_backend` or `toast_component_fn`.
+  0.11.0 is a minor: default toast styles work with Tailwind 3.4 and 4.x
+  (`z-[100]`, stacked arbitrary variants, explicit `border-gray-200`), and
+  connection notices remove the HTML `hidden` attribute before showing so
+  Tailwind 4 does not keep them `display: none`. `createLiveToastHook/2`,
+  `put_toast`, `send_toast`, and `toast_group` are unchanged.
+
+  We stay on Tailwind 3.3.2, do not pass `toast_class_fn`, and keep
+  `transform` on our custom `group_class_fn` so center corners still
+  translate under Tailwind 3. We still do not configure `:gettext_backend`.
   """
   use YscWeb.ConnCase, async: true
 
@@ -26,6 +31,10 @@ defmodule YscWeb.LiveToastUpgradeTest do
              "../../deps/live_toast/lib/live_toast/utility.ex",
              __DIR__
            )
+  @components Path.expand(
+                "../../deps/live_toast/lib/live_toast/components.ex",
+                __DIR__
+              )
   @flash Path.expand("../../lib/ysc_web/flash.ex", __DIR__)
   @layouts Path.expand("../../lib/ysc_web/components/layouts.ex", __DIR__)
   @app_js Path.expand("../../assets/js/app.js", __DIR__)
@@ -47,9 +56,16 @@ defmodule YscWeb.LiveToastUpgradeTest do
     |> fetch_flash()
   end
 
-  describe "0.10.2 Hex lock and public APIs" do
-    test "locks the Hex package to 0.10.2" do
-      assert to_string(Application.spec(:live_toast, :vsn)) == "0.10.2"
+  defp class_string(assigns) do
+    assigns
+    |> LiveToast.toast_class_fn()
+    |> Enum.filter(&is_binary/1)
+    |> Enum.join(" ")
+  end
+
+  describe "0.11.0 Hex lock and public APIs" do
+    test "locks the Hex package to 0.11.0" do
+      assert to_string(Application.spec(:live_toast, :vsn)) == "0.11.0"
     end
 
     test "APIs we call still exist" do
@@ -59,6 +75,7 @@ defmodule YscWeb.LiveToastUpgradeTest do
       assert function_exported?(LiveToast, :send_toast, 3)
       assert function_exported?(LiveToast, :toast_group, 1)
       assert function_exported?(LiveToast, :group_class_fn, 1)
+      assert function_exported?(LiveToast, :toast_class_fn, 1)
     end
 
     test "package elixir requirement is 1.15 which we satisfy" do
@@ -70,7 +87,60 @@ defmodule YscWeb.LiveToastUpgradeTest do
     end
   end
 
-  describe "0.10.0 gettext breaking change" do
+  describe "0.11.0 Tailwind 3/4 default styles" do
+    test "default toast_class_fn uses z-[100] and explicit gray border" do
+      classes = class_string(%{kind: :info, rest: %{}})
+
+      assert classes =~ "z-[100]"
+      assert classes =~ "border-gray-200"
+      refute classes =~ ~r/(^|\s)z-100(\s|$)/
+    end
+
+    test "default toast_class_fn uses stacked arbitrary variants for scripting" do
+      classes = class_string(%{kind: :info, rest: %{}})
+
+      assert classes =~
+               "[@media(scripting:enabled)]:[[data-phx-main]_&]:opacity-100"
+
+      refute classes =~ "[@media(scripting:enabled){[data-phx-main]_&}]"
+    end
+
+    test "error toasts force the red border against Tailwind 4 border defaults" do
+      classes = class_string(%{kind: :error, rest: %{}})
+      assert classes =~ "!border-red-200"
+      assert classes =~ "!bg-red-100"
+    end
+
+    test "close button uses Tailwind 3/4 compatible focus outline utilities" do
+      source = File.read!(@components)
+      assert source =~ "cursor-pointer"
+      assert source =~ "focus:[outline:2px_solid_transparent]"
+      assert source =~ "focus:ring-black/20"
+    end
+  end
+
+  describe "0.11.0 hidden-attribute connection notices" do
+    test "Utility.show/2 removes hidden before JS.show display flex" do
+      source = File.read!(@utility)
+      assert source =~ ~s[JS.remove_attribute("hidden", to: selector)]
+      assert source =~ "display: \"flex\""
+
+      js = LiveToast.Utility.show("#client-error")
+      ops = inspect(js.ops)
+      assert ops =~ "remove_attr"
+      assert ops =~ "hidden"
+      assert ops =~ "show"
+      assert ops =~ "flex"
+    end
+
+    test "vendored hook removes the hidden attribute before showing" do
+      vendor = File.read!(@vendor_js)
+      assert vendor =~ ~s[this.el.removeAttribute("hidden")]
+      assert vendor =~ "this.el.style.display = \"flex\""
+    end
+  end
+
+  describe "0.10.0 gettext breaking change still holds" do
     test "does not configure gettext_backend so connection notices stay English" do
       assert Application.get_env(:live_toast, :gettext_backend) == nil
     end
@@ -103,7 +173,7 @@ defmodule YscWeb.LiveToastUpgradeTest do
     end
   end
 
-  describe "call sites still match 0.10 APIs" do
+  describe "call sites still match 0.11 APIs" do
     test "Flash.put_toast still stores Conn title separately because LiveToast ignores Conn opts" do
       source = File.read!(@live_toast)
       assert source =~ "def put_toast(%Plug.Conn{} = conn, kind, msg, _options)"
@@ -128,7 +198,33 @@ defmodule YscWeb.LiveToastUpgradeTest do
       assert source =~ "toasts_sync={@toasts_sync}"
       assert source =~ "group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}"
       refute source =~ "toast_component_fn"
+      refute source =~ "toast_class_fn"
       refute source =~ "gettext_backend"
+    end
+
+    test "custom group_class_fn keeps Tailwind 3 transform on center corners" do
+      bottom = Layouts.toast_group_class_fn(%{corner: :bottom_center})
+      top = Layouts.toast_group_class_fn(%{corner: :top_center})
+
+      assert Enum.any?(bottom, fn
+               class when is_binary(class) ->
+                 class =~ "transform -translate-x-1/2"
+
+               _ ->
+                 false
+             end)
+
+      assert Enum.any?(top, fn
+               class when is_binary(class) ->
+                 class =~ "transform -translate-x-1/2"
+
+               _ ->
+                 false
+             end)
+
+      default = LiveToast.group_class_fn(%{corner: :top_center})
+      joined = default |> Enum.filter(&is_binary/1) |> Enum.join(" ")
+      refute joined =~ "transform"
     end
 
     test "app.js still initializes the hook with duration and max items" do
@@ -137,7 +233,7 @@ defmodule YscWeb.LiveToastUpgradeTest do
       assert source =~ "createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS)"
     end
 
-    test "vendored ESM matches the 0.10.2 package bundle and exports the hook" do
+    test "vendored ESM matches the 0.11.0 package bundle and exports the hook" do
       vendor = File.read!(@vendor_js)
       package = File.read!(@package_js)
       assert vendor == package

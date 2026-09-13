@@ -270,7 +270,12 @@ defmodule Ysc.MixProject do
       # 0.10.0: gettext on put_toast/send_toast messages is gone; connection-notice
       # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix
       # flash components rerender on same-kind replacement and LiveView navigation.
-      {:live_toast, "~> 0.10"},
+      # 0.11.0: default toast styles work with Tailwind 3.4 and 4.x (z-[100],
+      # stacked arbitrary variants, explicit border-gray-200). JS and Utility.show/2
+      # remove the hidden attribute before showing connection notices so Tailwind 4
+      # does not keep them display:none. We stay on Tailwind 3.3.2 and keep
+      # `transform` on our custom group_class_fn for center positioning.
+      {:live_toast, "~> 0.11"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.

@@ -132,6 +132,27 @@ defmodule YscWeb.LayoutsTest do
         assert Enum.any?(classes, &is_binary/1)
       end
     end
+
+    test "center corners keep Tailwind 3 transform with translate" do
+      bottom = Layouts.toast_group_class_fn(%{corner: :bottom_center})
+      top = Layouts.toast_group_class_fn(%{corner: :top_center})
+
+      assert Enum.any?(bottom, fn
+               class when is_binary(class) ->
+                 class =~ "transform -translate-x-1/2"
+
+               _ ->
+                 false
+             end)
+
+      assert Enum.any?(top, fn
+               class when is_binary(class) ->
+                 class =~ "transform -translate-x-1/2"
+
+               _ ->
+                 false
+             end)
+    end
   end
 
   describe "fullscreen?/1" do

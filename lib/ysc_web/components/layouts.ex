@@ -165,6 +165,7 @@ defmodule YscWeb.Layouts do
       "fixed toast-container-above-all max-h-screen w-full p-4 md:max-w-[420px] pointer-events-none grid origin-center",
       assigns[:corner] == :bottom_left &&
         "items-end bottom-0 left-0 flex-col-reverse sm:top-auto",
+      # Keep `transform` for Tailwind 3.3; live_toast 0.11 dropped it for Tailwind 4.
       assigns[:corner] == :bottom_center &&
         "items-end bottom-0 left-1/2 transform -translate-x-1/2 flex-col-reverse sm:top-auto",
       assigns[:corner] == :bottom_right &&
