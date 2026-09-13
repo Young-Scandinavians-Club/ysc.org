@@ -23,6 +23,20 @@
   }
 }
 
+/*
+  Tailwind CSS v4 dropped Preflight's default `cursor: pointer` on buttons in
+  favor of the native browser default (`cursor: default`). Almost every
+  button across the app relied on that v3 default instead of an explicit
+  cursor-pointer utility, so this restores it globally rather than touching
+  every button call site.
+*/
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 /* This file is for your main application CSS */
 
 /* Hide scrollbar for Chrome, Safari and Opera */
