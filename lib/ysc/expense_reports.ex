@@ -1061,59 +1061,97 @@ defmodule Ysc.ExpenseReports do
     |> Repo.update()
   end
 
-  defp enqueue_quickbooks_sync(%ExpenseReport{} = expense_report) do
+  defp enqueue_quickbooks_sync(%ExpenseReport{id: id} = expense_report) do
     Ysc.Logging.debug("Starting enqueue_quickbooks_sync",
-      expense_report_id: expense_report.id,
+      expense_report_id: id,
       current_status: expense_report.quickbooks_sync_status
     )
 
-    # Mark as pending sync. A bare changeset (no cast_assoc/validations) so
-    # this doesn't require the caller to have preloaded expense/income items.
-    update_result =
-      expense_report
-      |> Ecto.Changeset.change(%{quickbooks_sync_status: "pending"})
-      |> Repo.update()
+    # Lock the row before flipping pending / inserting the job. Without this,
+    # Approve → Revert → Approve while QuickbooksSyncExpenseReportWorker has
+    # already claimed (`quickbooks_sync_status == "processing"`) would:
+    #   1. overwrite "processing" back to "pending" (lifting the correction
+    #      guard so amounts can change under an in-flight Bill create), and
+    #   2. insert a second Oban job that reclaims "processing" and creates a
+    #      duplicate QuickBooks Bill.
+    case Repo.transaction(fn ->
+           case Repo.one(lock_expense_report_for_update_query(id)) do
+             nil ->
+               Repo.rollback(:not_found)
 
-    case update_result do
-      {:ok, updated_report} ->
-        Ysc.Logging.debug("Marked expense report as pending sync",
-          expense_report_id: updated_report.id
+             %ExpenseReport{quickbooks_bill_id: bill_id} = report
+             when not is_nil(bill_id) ->
+               {:skip, :already_has_bill_id, report}
+
+             %ExpenseReport{quickbooks_sync_status: status} = report
+             when status in ["processing", "synced"] ->
+               {:skip, :already_claimed_or_synced, report}
+
+             report ->
+               case report
+                    |> Ecto.Changeset.change(%{
+                      quickbooks_sync_status: "pending"
+                    })
+                    |> Repo.update() do
+                 {:ok, updated} -> {:enqueue, updated}
+                 {:error, changeset} -> Repo.rollback(changeset)
+               end
+           end
+         end) do
+      {:ok, {:enqueue, updated_report}} ->
+        insert_quickbooks_sync_job(updated_report)
+
+      {:ok, {:skip, reason, report}} ->
+        Ysc.Logging.info(
+          "Skipping QuickBooks sync enqueue for expense report",
+          expense_report_id: report.id,
+          reason: reason,
+          sync_status: report.quickbooks_sync_status,
+          bill_id: report.quickbooks_bill_id
         )
 
-        # Enqueue Oban job
-        job_result =
-          %{"expense_report_id" => expense_report.id}
-          |> YscWeb.Workers.QuickbooksSyncExpenseReportWorker.new()
-          |> Oban.insert()
-
-        case job_result do
-          {:ok, job} ->
-            Ysc.Logging.info("Enqueued QuickBooks sync for expense report",
-              expense_report_id: expense_report.id,
-              job_id: job.id,
-              queue: job.queue,
-              scheduled_at: job.scheduled_at
-            )
-
-          {:error, reason} ->
-            Ysc.Logging.error(
-              "Failed to enqueue QuickBooks sync for expense report",
-              expense_report_id: expense_report.id,
-              error: inspect(reason),
-              extra: %{
-                expense_report_id: expense_report.id,
-                error: inspect(reason)
-              },
-              tags: %{
-                quickbooks_operation: "enqueue_expense_report_sync"
-              }
-            )
-        end
-
-      {:error, changeset} ->
+      {:error, reason} ->
         Ysc.Logging.error("Failed to mark expense report as pending sync",
+          expense_report_id: id,
+          error: inspect(reason)
+        )
+    end
+  end
+
+  defp insert_quickbooks_sync_job(%ExpenseReport{} = expense_report) do
+    job_result =
+      %{"expense_report_id" => expense_report.id}
+      |> YscWeb.Workers.QuickbooksSyncExpenseReportWorker.new()
+      |> Oban.insert()
+
+    case job_result do
+      {:ok, %Oban.Job{conflict?: true} = job} ->
+        Ysc.Logging.info(
+          "QuickBooks sync job already queued for expense report",
           expense_report_id: expense_report.id,
-          errors: inspect(changeset.errors)
+          job_id: job.id
+        )
+
+      {:ok, job} ->
+        Ysc.Logging.info("Enqueued QuickBooks sync for expense report",
+          expense_report_id: expense_report.id,
+          job_id: job.id,
+          queue: job.queue,
+          scheduled_at: job.scheduled_at
+        )
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Failed to enqueue QuickBooks sync for expense report",
+          expense_report_id: expense_report.id,
+          error: inspect(reason),
+          extra: %{
+            expense_report_id: expense_report.id,
+            error: inspect(reason)
+          },
+          tags: %{
+            quickbooks_operation: "enqueue_expense_report_sync"
+          }
         )
     end
   end

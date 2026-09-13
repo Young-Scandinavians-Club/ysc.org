@@ -3,10 +3,26 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
   Oban worker for syncing ExpenseReport records to QuickBooks.
 
   This worker processes expense reports asynchronously and creates Bills in QuickBooks.
+
+  Jobs are unique per `expense_report_id` while incomplete so a treasurer
+  reverting and re-approving (or a backup enqueue racing the original job)
+  cannot start a second export of the same report. `period: :infinity` keeps
+  that uniqueness for as long as the job is still running — receipt uploads
+  can outlast a short unique window, and this worker releases its row lock
+  before calling QuickBooks.
   """
 
   require Ysc.Logging
-  use Oban.Worker, queue: :default, max_attempts: 3
+
+  use Oban.Worker,
+    queue: :default,
+    max_attempts: 3,
+    unique: [
+      period: :infinity,
+      fields: [:args],
+      keys: [:expense_report_id],
+      states: :incomplete
+    ]
 
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReport
@@ -140,9 +156,19 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
         # this record isn't preloaded yet, and the full changeset's
         # `cast_assoc(:expense_items, ...)` / receipt validation raise on an
         # unloaded association. A plain field flip needs none of that.
+        #
+        # Stamp `quickbooks_last_sync_attempt_at` here — not later in
+        # `QuickbooksSync.sync_expense_report/1` — so the backup worker's
+        # stale-claim query does not treat a just-claimed report as abandoned
+        # (`is_nil(last_sync_attempt_at)`).
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
         {:ok, claimed} =
           report
-          |> Ecto.Changeset.change(quickbooks_sync_status: "processing")
+          |> Ecto.Changeset.change(%{
+            quickbooks_sync_status: "processing",
+            quickbooks_last_sync_attempt_at: now
+          })
           |> Repo.update()
 
         preloaded =

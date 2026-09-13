@@ -141,6 +141,35 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorkerTest do
 
       # Should return :ok, {:error, _}, or catch the QuickBooks config error
       assert result == :ok or match?({:error, _}, result)
+
+      reloaded = Repo.reload!(expense_report)
+      assert reloaded.quickbooks_last_sync_attempt_at
+    end
+  end
+
+  describe "unique jobs" do
+    test "does not enqueue a second incomplete job for the same expense report" do
+      expense_report_id = Ecto.ULID.generate()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        args = %{"expense_report_id" => expense_report_id}
+
+        assert {:ok, _job} =
+                 args
+                 |> QuickbooksSyncExpenseReportWorker.new()
+                 |> Oban.insert()
+
+        assert {:ok, _job} =
+                 args
+                 |> QuickbooksSyncExpenseReportWorker.new()
+                 |> Oban.insert()
+
+        jobs =
+          all_enqueued(worker: QuickbooksSyncExpenseReportWorker)
+          |> Enum.filter(&(&1.args["expense_report_id"] == expense_report_id))
+
+        assert length(jobs) == 1
+      end)
     end
   end
 end

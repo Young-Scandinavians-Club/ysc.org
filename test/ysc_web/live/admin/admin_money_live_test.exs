@@ -1783,6 +1783,38 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
     end
+
+    test "a crafted amount-update event while QuickBooks export is in flight does not crash the LiveView",
+         %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      report
+      |> Ecto.Changeset.change(%{
+        status: "approved",
+        quickbooks_sync_status: "processing"
+      })
+      |> Repo.update!()
+
+      html =
+        render_submit(view, "save_expense_item_amount", %{
+          "item_id" => purchase.id,
+          "kind" => "expense",
+          "amount" => "999.99"
+        })
+
+      assert html =~ "being exported to QuickBooks"
+      assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
+      assert has_element?(view, "#expense-report-modal")
+    end
   end
 
   describe "expense report review event editing" do
@@ -1888,6 +1920,37 @@ defmodule YscWeb.AdminMoneyLiveTest do
       })
 
       assert is_nil(Repo.reload!(report).event_id)
+    end
+
+    test "a crafted event-association change while QuickBooks export is in flight does not crash the LiveView",
+         %{conn: conn} do
+      member = user_fixture()
+      event = event_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      report
+      |> Ecto.Changeset.change(%{
+        status: "approved",
+        quickbooks_sync_status: "processing"
+      })
+      |> Repo.update!()
+
+      html =
+        render_change(view, "change_expense_report_event", %{
+          "event_id" => event.id
+        })
+
+      assert html =~ "being exported to QuickBooks"
+      assert is_nil(Repo.reload!(report).event_id)
+      assert has_element?(view, "#expense-report-modal")
     end
   end
 

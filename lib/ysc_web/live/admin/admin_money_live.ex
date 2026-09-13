@@ -4292,6 +4292,9 @@ defmodule YscWeb.AdminMoneyLive do
            title: "Expense report"
          )}
 
+      {:error, :report_syncing} ->
+        {:noreply, report_export_in_progress_socket(socket, report)}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply,
          socket
@@ -4314,6 +4317,18 @@ defmodule YscWeb.AdminMoneyLive do
       {message, _opts} -> "Invalid amount: #{message}"
       nil -> "Failed to update amount"
     end
+  end
+
+  defp report_export_in_progress_socket(socket, report) do
+    socket
+    |> refresh_expense_report_modal(
+      ExpenseReports.get_for_admin_review(report.id)
+    )
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "This report is being exported to QuickBooks and can't be edited until that finishes",
+      title: "Expense report"
+    )
   end
 
   defp save_expense_report_event(socket, event_id) do
@@ -4341,6 +4356,9 @@ defmodule YscWeb.AdminMoneyLive do
            "This report is already paid and can no longer be edited",
            title: "Expense report"
          )}
+
+      {:error, :report_syncing} ->
+        {:noreply, report_export_in_progress_socket(socket, report)}
 
       {:error, :not_found} ->
         {:noreply,
