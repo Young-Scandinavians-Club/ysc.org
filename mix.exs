@@ -270,7 +270,7 @@ defmodule Ysc.MixProject do
       # 0.10.0: gettext on put_toast/send_toast messages is gone; connection-notice
       # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix
       # flash components rerender on same-kind replacement and LiveView navigation.
-      {:live_toast, "~> 0.10"},
+      {:live_toast, "~> 0.11"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.
