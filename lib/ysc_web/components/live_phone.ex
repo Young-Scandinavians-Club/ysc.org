@@ -52,7 +52,7 @@ defmodule LivePhone do
   def render(assigns) do
     ~H"""
     <div
-      class={"live_phone relative flex rounded-sm bg-white border mt-2 border-zinc-300 #{if @valid?, do: "live_phone-valid"}"}
+      class={"live_phone relative flex rounded-sm bg-white mt-2 #{if @valid?, do: "live_phone-valid"}"}
       id={"live_phone-#{@id}"}
       phx-hook="LivePhone"
     >
@@ -389,10 +389,10 @@ defmodule LivePhone do
     assigns = assign(assigns, :selected?, selected?)
 
     class = [
-      "live_phone-country-item flex text-sm cursor-pointer m-0 px-1 py-1 hover:bg-white"
+      "live_phone-country-item flex text-sm cursor-pointer m-0 px-1 py-1 rounded-sm hover:bg-zinc-100"
     ]
 
-    class = if assigns[:selected?], do: ["bg-white" | class], else: class
+    class = if assigns[:selected?], do: ["bg-blue-50" | class], else: class
 
     class =
       if assigns[:country].preferred, do: ["preferred" | class], else: class
