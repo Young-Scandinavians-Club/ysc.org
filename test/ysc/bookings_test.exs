@@ -610,6 +610,275 @@ defmodule Ysc.BookingsTest do
       refute Ecto.assoc_loaded?(found.rooms)
     end
 
+    test "list_bookings_for_admin_calendar/3 slims user, avatar, room, and booking columns" do
+      user =
+        user_fixture(%{first_name: "Cal", last_name: "Guest"})
+        |> Ecto.Changeset.change(%{
+          board_bio: "admin calendar must not load this bio",
+          most_connected_country: "NO"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, avatar} =
+        Ysc.Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "avatars/original-calendar-must-not-load.webp",
+          source_url: "https://example.com/calendar-must-not-load"
+        })
+
+      avatar =
+        avatar
+        |> Ecto.Changeset.change(%{
+          processing_state: :completed,
+          thumb_path: "/avatars/calendar-thumb.webp",
+          profile_path: "/avatars/calendar-profile.webp",
+          large_path: "/avatars/calendar-large.webp"
+        })
+        |> Ysc.Repo.update!()
+
+      user =
+        user
+        |> Ecto.Changeset.change(%{current_avatar_id: avatar.id})
+        |> Repo.update!()
+
+      {:ok, room} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Calendar Slim Room",
+          description: "room description the calendar grid must not load",
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      checkin = ~D[2031-06-10]
+      checkout = ~D[2031-06-12]
+
+      booking =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            children_count: 1,
+            property: :tahoe,
+            booking_mode: :room,
+            user_id: user.id,
+            status: :complete,
+            total_price: Money.new(200, :USD),
+            pricing_items: %{"secret" => "calendar must not load this json"},
+            modification_hold_attrs: %{"hold" => "calendar must not load"}
+          },
+          skip_validation: true,
+          rooms: [room]
+        )
+        |> Repo.insert!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_bookings_for_admin_calendar(
+              :tahoe,
+              ~D[2031-06-09],
+              ~D[2031-06-13]
+            )
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.user.first_name == "Cal"
+      assert found.user.last_name == "Guest"
+      assert found.user.email == user.email
+      assert found.user.most_connected_country == "NO"
+
+      assert found.user.current_avatar.thumb_path ==
+               "/avatars/calendar-thumb.webp"
+
+      assert found.guests_count == 2
+      assert found.children_count == 1
+      assert Enum.map(found.rooms, & &1.id) == [room.id]
+      assert is_nil(found.user.hashed_password)
+      assert is_nil(found.user.board_bio)
+      assert is_nil(found.pricing_items)
+      assert is_nil(found.modification_hold_attrs)
+      assert is_nil(hd(found.rooms).description)
+      assert is_nil(found.user.current_avatar.original_path)
+      assert password_cols == 0
+
+      {_loaded, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_bookings_for_admin_calendar(
+              :tahoe,
+              ~D[2031-06-09],
+              ~D[2031-06-13]
+            )
+          end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, json_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_bookings_for_admin_calendar(
+              :tahoe,
+              ~D[2031-06-09],
+              ~D[2031-06-13]
+            )
+          end,
+          pattern: ~r/pricing_items|modification_hold_attrs/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, room_copy_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_bookings_for_admin_calendar(
+              :tahoe,
+              ~D[2031-06-09],
+              ~D[2031-06-13]
+            )
+          end,
+          pattern: ~r/r0\."description"|rooms.*description/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+      assert json_cols == 0
+      assert room_copy_cols == 0
+    end
+
+    test "list_occupancy_bookings/4 slims booking JSON and room copy" do
+      {:ok, room} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Occupancy Slim Room",
+          description: "occupancy queries must not load this description",
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      checkin = ~D[2031-07-10]
+      checkout = ~D[2031-07-12]
+
+      booking =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 3,
+            property: :tahoe,
+            booking_mode: :room,
+            user_id: user_fixture().id,
+            status: :complete,
+            total_price: Money.new(200, :USD),
+            pricing_items: %{"secret" => "occupancy must not load this json"}
+          },
+          skip_validation: true,
+          rooms: [room]
+        )
+        |> Repo.insert!()
+
+      {loaded, json_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_occupancy_bookings(
+              :tahoe,
+              ~D[2031-07-09],
+              ~D[2031-07-13],
+              statuses: [:hold, :complete]
+            )
+          end,
+          pattern: ~r/pricing_items|modification_hold_attrs/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.checkin_date == checkin
+      assert found.checkout_date == checkout
+      assert found.guests_count == 3
+      assert found.status == :complete
+      assert Enum.map(found.rooms, & &1.id) == [room.id]
+      assert is_nil(found.pricing_items)
+      refute Ecto.assoc_loaded?(found.user)
+      assert is_nil(hd(found.rooms).description)
+      assert json_cols == 0
+
+      {_loaded, user_table_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_occupancy_bookings(
+              :tahoe,
+              ~D[2031-07-09],
+              ~D[2031-07-13],
+              statuses: [:hold, :complete]
+            )
+          end,
+          pattern: ~r/FROM ["']?users["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert user_table_cols == 0
+    end
+
+    test "list_guests_staying_on_date_for_admin/2 slims user password hashes" do
+      user =
+        user_fixture(%{first_name: "Day", last_name: "Guest"})
+        |> Ecto.Changeset.change(%{
+          board_bio: "day guests modal must not load this bio"
+        })
+        |> Ysc.Repo.update!()
+
+      checkin = ~D[2031-08-10]
+      checkout = ~D[2031-08-12]
+
+      _booking =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            checkin_date: checkin,
+            checkout_date: checkout,
+            guests_count: 2,
+            property: :clear_lake,
+            booking_mode: :day,
+            user_id: user.id,
+            status: :complete,
+            total_price: Money.new(80, :USD)
+          },
+          skip_validation: true
+        )
+        |> Repo.insert!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_guests_staying_on_date_for_admin(
+              :clear_lake,
+              checkin
+            )
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.user_id == user.id))
+      assert found
+      assert found.user.first_name == "Day"
+      assert is_nil(found.user.hashed_password)
+      assert is_nil(found.user.board_bio)
+      assert password_cols == 0
+    end
+
     test "create_booking/1 with valid data creates a booking" do
       user = user_fixture()
       {checkin, checkout} = tahoe_booking_dates(7)

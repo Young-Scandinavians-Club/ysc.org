@@ -7591,8 +7591,7 @@ defmodule YscWeb.TahoeBookingLive do
 
     # Get all bookings in the range (preload rooms for availability checking)
     bookings =
-      Bookings.list_bookings(property, start_range, end_range,
-        preload: [:rooms],
+      Bookings.list_occupancy_bookings(property, start_range, end_range,
         statuses: [:hold, :complete]
       )
 
@@ -7947,8 +7946,10 @@ defmodule YscWeb.TahoeBookingLive do
         :unknown
       else
         bookings =
-          Bookings.list_bookings(:tahoe, checkin_date, checkout_date,
-            preload: [:rooms],
+          Bookings.list_occupancy_bookings(
+            :tahoe,
+            checkin_date,
+            checkout_date,
             statuses: [:hold, :complete]
           )
 
