@@ -80,6 +80,35 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorkerTest do
       assert :ok = result
     end
 
+    test "skips unexpected sync statuses without claiming the report", %{
+      user: user
+    } do
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Skipped status must not be claimed",
+          status: "approved",
+          quickbooks_sync_status: "skipped",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"expense_report_id" => expense_report.id},
+        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = QuickbooksSyncExpenseReportWorker.perform(job)
+
+      reloaded = Repo.reload!(expense_report)
+      assert reloaded.quickbooks_sync_status == "skipped"
+      assert is_nil(reloaded.quickbooks_bill_id)
+    end
+
     test "skips expense reports that are not approved yet", %{user: user} do
       # A "submitted" report with no bill_id must not be exported, even if
       # something enqueued a sync job for it (e.g. a stale job from before

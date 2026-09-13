@@ -1783,6 +1783,43 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
     end
+
+    test "a crafted amount-update event is rejected while the report is claimed for QuickBooks export",
+         %{conn: conn} do
+      member = user_fixture()
+
+      {report, _mileage, purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      # The export worker claims the row (approved + processing) while the
+      # treasurer's modal is still open. Edit pencils stay visible because
+      # the UI only hides them once paid — the mutation must still refuse.
+      report
+      |> Ecto.Changeset.change(%{
+        status: "approved",
+        quickbooks_sync_status: "processing"
+      })
+      |> Repo.update!()
+
+      render_submit(view, "save_expense_item_amount", %{
+        "item_id" => purchase.id,
+        "kind" => "expense",
+        "amount" => "999.99"
+      })
+
+      assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :error) =~
+               "currently being exported to QuickBooks"
+    end
   end
 
   describe "expense report review event editing" do
@@ -1888,6 +1925,39 @@ defmodule YscWeb.AdminMoneyLiveTest do
       })
 
       assert is_nil(Repo.reload!(report).event_id)
+    end
+
+    test "a crafted event-association change is rejected while the report is claimed for QuickBooks export",
+         %{conn: conn} do
+      member = user_fixture()
+      event = event_fixture()
+
+      {report, _mileage, _purchase} =
+        submitted_mileage_and_purchase_report!(member)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      view
+      |> element("#expense-inbox-review-#{report.id}")
+      |> render_click()
+
+      report
+      |> Ecto.Changeset.change(%{
+        status: "approved",
+        quickbooks_sync_status: "processing"
+      })
+      |> Repo.update!()
+
+      render_change(view, "change_expense_report_event", %{
+        "event_id" => event.id
+      })
+
+      assert is_nil(Repo.reload!(report).event_id)
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :error) =~
+               "currently being exported to QuickBooks"
     end
   end
 
