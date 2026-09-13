@@ -221,29 +221,29 @@ defmodule YscWeb.AdminComponents do
   end
 
   defp kbd_class_list(:compact, :default, extra),
-    do: kbd_base(:default) ++ ["min-w-[1.375rem] px-1 py-0.5", extra]
+    do: kbd_base(:default) ++ ["min-w-5.5 px-1 py-0.5", extra]
 
   defp kbd_class_list(:inline, :default, extra),
     do: kbd_base(:default) ++ ["px-1.5 py-0.5", extra]
 
   defp kbd_class_list(:compact, :muted, extra),
-    do: kbd_base(:muted) ++ ["min-w-[1.375rem] px-1 py-0.5", extra]
+    do: kbd_base(:muted) ++ ["min-w-5.5 px-1 py-0.5", extra]
 
   defp kbd_class_list(:inline, :muted, extra),
     do: kbd_base(:muted) ++ ["px-1.5 py-0.5", extra]
 
   defp kbd_base(:default),
     do: [
-      "inline-flex justify-center items-center min-h-[1.375rem]",
-      "bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded",
-      "shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+      "inline-flex justify-center items-center min-h-5.5",
+      "bg-white border border-zinc-300 font-mono text-[10px] text-zinc-500 rounded-sm",
+      "shadow-[0_2px_0_0_var(--color-zinc-300)]"
     ]
 
   defp kbd_base(:muted),
     do: [
-      "inline-flex justify-center items-center min-h-[1.375rem]",
-      "bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded",
-      "shadow-[0_2px_0_0_theme(colors.zinc.300)]"
+      "inline-flex justify-center items-center min-h-5.5",
+      "bg-white border border-zinc-300 font-mono text-[10px] text-zinc-400 rounded-sm",
+      "shadow-[0_2px_0_0_var(--color-zinc-300)]"
     ]
 
   # ---------------------------------------------------------------------------
@@ -428,7 +428,7 @@ defmodule YscWeb.AdminComponents do
   attr :class, :any, default: nil
 
   attr :flag_class, :string,
-    default: "h-4 w-6 rounded inline-block align-middle"
+    default: "h-4 w-6 rounded-sm inline-block align-middle"
 
   def admin_country_with_flag(assigns) do
     country =
@@ -605,7 +605,7 @@ defmodule YscWeb.AdminComponents do
     values: [:padded, :table]
 
   attr :class, :any,
-    default: "mb-8 bg-white rounded border",
+    default: "mb-8 bg-white rounded-sm border",
     doc: "Classes on the outer bordered container"
 
   slot :inner_block, required: true
@@ -792,7 +792,7 @@ defmodule YscWeb.AdminComponents do
       field={@form[:internal_note]}
       type="textarea"
       label="Internal note (optional)"
-      class="mt-3 w-full min-h-[4rem] border border-zinc-300 rounded-md px-3 py-2 text-sm"
+      class="mt-3 w-full min-h-16 border border-zinc-300 rounded-md px-3 py-2 text-sm"
     />
     """
   end
@@ -1174,7 +1174,7 @@ defmodule YscWeb.AdminComponents do
         phx-click="check-in-order"
         phx-value-order-id={@order_id}
         data-checkin-all-btn
-        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-1 transition-colors whitespace-nowrap"
+        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-sm px-2 py-1 transition-colors whitespace-nowrap"
       >
         <.icon name="hero-check-circle" class="w-3.5 h-3.5 shrink-0" /> Check in all
       </button>
@@ -1192,7 +1192,7 @@ defmodule YscWeb.AdminComponents do
       <span
         :if={@variant == :desktop}
         id={@id}
-        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 whitespace-nowrap"
+        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-sm px-2 py-1 whitespace-nowrap"
       >
         <.icon name="hero-check-circle" class="w-3.5 h-3.5 shrink-0" /> Check in all
       </span>
@@ -1250,13 +1250,13 @@ defmodule YscWeb.AdminComponents do
                   phx-click="toggle-check-in"
                   phx-value-ticket-id={@ticket_id}
                   data-checkin-btn
-                  class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
+                  class="w-5 h-5 rounded-sm border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
                   aria-label="Mark as checked in"
                 ></button>
               </span>
             <% else %>
               <span
-                class="w-5 h-5 rounded border-2 border-zinc-300 flex items-center justify-center"
+                class="w-5 h-5 rounded-sm border-2 border-zinc-300 flex items-center justify-center"
                 aria-hidden="true"
               ></span>
             <% end %>
@@ -1309,7 +1309,7 @@ defmodule YscWeb.AdminComponents do
             phx-click="toggle-check-in"
             phx-value-ticket-id={@ticket_id}
             data-checkin-btn
-            class="shrink-0 border border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-400 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
+            class="shrink-0 border border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-400 transition-colors rounded-sm px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
             aria-label="Mark as checked in"
           >
             <.icon name="hero-check" class="w-3.5 h-3.5" /> Check in
@@ -1357,7 +1357,7 @@ defmodule YscWeb.AdminComponents do
                 <button
                   phx-click="toggle-check-in"
                   phx-value-ticket-id={@ticket_id}
-                  class="w-5 h-5 rounded border-2 border-emerald-500 bg-emerald-500 hover:bg-red-500 hover:border-red-500 transition-colors flex items-center justify-center group"
+                  class="w-5 h-5 rounded-sm border-2 border-emerald-500 bg-emerald-500 hover:bg-red-500 hover:border-red-500 transition-colors flex items-center justify-center group"
                   aria-label="Undo check-in"
                 >
                   <.icon
@@ -1372,7 +1372,7 @@ defmodule YscWeb.AdminComponents do
               </.tooltip>
             <% else %>
               <span
-                class="w-5 h-5 rounded border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center"
+                class="w-5 h-5 rounded-sm border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center"
                 aria-hidden="true"
               >
                 <.icon name="hero-check" class="w-3 h-3 text-white" />
@@ -1416,7 +1416,7 @@ defmodule YscWeb.AdminComponents do
       <% :mobile -> %>
         <div
           id={@id}
-          class="bg-white rounded border border-zinc-200 overflow-hidden"
+          class="bg-white rounded-sm border border-zinc-200 overflow-hidden"
         >
           <div class="flex items-center justify-between px-4 py-3">
             <div class="min-w-0 flex-1 mr-3">
@@ -1432,7 +1432,7 @@ defmodule YscWeb.AdminComponents do
             <button
               phx-click="toggle-check-in"
               phx-value-ticket-id={@ticket_id}
-              class="shrink-0 border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
+              class="shrink-0 border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors rounded-sm px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
               aria-label="Undo check-in"
             >
               <.icon name="hero-check" class="w-3.5 h-3.5" /> Undo
@@ -1625,7 +1625,7 @@ defmodule YscWeb.AdminComponents do
           data-copy={@copy}
           data-copy-target={@copy_target}
           class={[
-            "inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors flex-shrink-0",
+            "inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded-sm transition-colors shrink-0",
             @class
           ]}
           title={@title}
@@ -1642,7 +1642,7 @@ defmodule YscWeb.AdminComponents do
           data-copy-target={@copy_target}
           data-copy-feedback={@feedback_id}
           class={[
-            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors",
+            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded-sm transition-colors",
             @class
           ]}
           title={@title}
@@ -1698,7 +1698,7 @@ defmodule YscWeb.AdminComponents do
   def admin_readonly_copy_field(assigns) do
     input_class =
       assigns.input_class ||
-        "flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+        "flex-1 rounded-sm border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
 
     assigns = assign(assigns, :input_class, input_class)
 
@@ -1947,7 +1947,7 @@ defmodule YscWeb.AdminComponents do
           :if={@clear_event}
           id={@clear_id}
           type="button"
-          class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
+          class="rounded-sm mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
           phx-click={@clear_event}
           phx-disable-with="Clearing..."
         >
@@ -2209,7 +2209,7 @@ defmodule YscWeb.AdminComponents do
 
   defp icon_empty_state_container_class(:success, extra),
     do: [
-      "bg-white rounded border border-zinc-200 py-12 text-center text-zinc-500",
+      "bg-white rounded-sm border border-zinc-200 py-12 text-center text-zinc-500",
       extra
     ]
 
@@ -2409,7 +2409,7 @@ defmodule YscWeb.AdminComponents do
     <div
       id={@id}
       class={[
-        "bg-white p-6 rounded-lg shadow-sm border border-zinc-100",
+        "bg-white p-6 rounded-lg shadow-xs border border-zinc-100",
         @class
       ]}
     >
@@ -2496,7 +2496,7 @@ defmodule YscWeb.AdminComponents do
 
   defp dashboard_link_card_class(accent, interactive?) do
     [
-      "p-5 rounded border flex flex-col justify-between transition-all",
+      "p-5 rounded-sm border flex flex-col justify-between transition-all",
       interactive? && "group",
       dashboard_link_card_accent_class(accent, interactive?)
     ]
@@ -2504,10 +2504,10 @@ defmodule YscWeb.AdminComponents do
 
   defp dashboard_link_card_accent_class(:warning, true),
     do:
-      "bg-white border-amber-300 shadow-sm shadow-amber-50 hover:ring-2 hover:ring-amber-200"
+      "bg-white border-amber-300 shadow-xs shadow-amber-50 hover:ring-2 hover:ring-amber-200"
 
   defp dashboard_link_card_accent_class(:warning, false),
-    do: "bg-white border-amber-300 shadow-sm shadow-amber-50"
+    do: "bg-white border-amber-300 shadow-xs shadow-amber-50"
 
   defp dashboard_link_card_accent_class(:default, true),
     do: "bg-white border-zinc-200 hover:ring-2 hover:ring-zinc-300"
@@ -2738,7 +2738,7 @@ defmodule YscWeb.AdminComponents do
     ]
   end
 
-  defp admin_toggle_pill_shape(:rounded), do: "rounded"
+  defp admin_toggle_pill_shape(:rounded), do: "rounded-sm"
   defp admin_toggle_pill_shape(:pill), do: "rounded-full"
 
   defp admin_toggle_pill_size(:default), do: "px-3 py-1.5 text-sm"
@@ -2840,7 +2840,7 @@ defmodule YscWeb.AdminComponents do
             phx-click="select-image"
             phx-target={@target}
             phx-value-image-id={image.id}
-            class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none transition p-0"
+            class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-hidden transition p-0"
           >
             <img
               src={media_library_thumbnail_url(image)}
@@ -2850,7 +2850,7 @@ defmodule YscWeb.AdminComponents do
             />
             <div
               :if={image.title}
-              class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
+              class="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
             >
               <p class="text-xs text-white truncate">{image.title}</p>
             </div>
@@ -2951,7 +2951,7 @@ defmodule YscWeb.AdminComponents do
 
     ~H"""
     <button
-      class="inline-flex items-center mb-2 p-2 mt-2 ms-3 text-sm text-zinc-500 rounded :hidden hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-200"
+      class="inline-flex items-center mb-2 p-2 mt-2 ms-3 text-sm text-zinc-500 rounded-sm :hidden hover:bg-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-zinc-200"
       aria-controls="sidebar navigation"
       type="button"
       phx-click={show_sidebar("#admin-navigation")}
@@ -2968,13 +2968,13 @@ defmodule YscWeb.AdminComponents do
     >
       <div class="h-full flex flex-col bg-zinc-900">
         <%!-- Fixed top: logo always visible --%>
-        <div id="admin-nav-header" class="flex-shrink-0 px-5 pt-8 pb-4 relative">
+        <div id="admin-nav-header" class="shrink-0 px-5 pt-8 pb-4 relative">
           <%!-- Expanded logo --%>
           <div id="admin-nav-logo-expanded">
             <.link navigate="/" class="items-center group ps-2.5 inline-block">
               <div class="flex items-center gap-2">
                 <.ysc_logo class="h-20 me-3" width={80} height={80} />
-                <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded">
+                <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded-sm">
                   ADMIN
                 </span>
               </div>
@@ -2997,7 +2997,7 @@ defmodule YscWeb.AdminComponents do
           <%!-- Collapse toggle button (desktop only) — placed after logos so it flows below in collapsed mode --%>
           <button
             type="button"
-            class="hidden lg:flex absolute right-3 top-3 items-center justify-center w-7 h-7 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded transition-colors"
+            class="hidden lg:flex absolute right-3 top-3 items-center justify-center w-7 h-7 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-sm transition-colors"
             phx-click={toggle_sidebar_collapse()}
             aria-label="Toggle sidebar width"
           >
@@ -3023,10 +3023,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin"
                     title="Overview"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :dashboard,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3056,10 +3056,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/posts"
                     title="Posts"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :news,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3089,10 +3089,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/events"
                     title="Events"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :events,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3122,10 +3122,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/newsletters"
                     title="Newsletters"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :newsletters,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3155,10 +3155,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/bookings"
                     title="Bookings"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :bookings,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3188,10 +3188,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/users"
                     title="Users"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :members,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3221,10 +3221,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/memberships"
                     title="Memberships"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :memberships,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3254,10 +3254,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/money"
                     title="Money"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :money,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3287,10 +3287,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/media"
                     title="Media"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :media,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3320,10 +3320,10 @@ defmodule YscWeb.AdminComponents do
                     navigate="/admin/help"
                     title="Help"
                     class={[
-                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
                       if(@active_page == :help,
                         do:
-                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
                         else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
                       )
                     ]}
@@ -3361,7 +3361,7 @@ defmodule YscWeb.AdminComponents do
                     target="_blank"
                     rel="noopener noreferrer"
                     title={"Opens #{@query_console_host} in a new tab"}
-                    class="admin-nav-link flex items-center px-3 py-4 rounded group transition-colors text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                    class="admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors text-zinc-300 hover:bg-zinc-800 hover:text-white"
                   >
                     <.icon
                       name="hero-circle-stack"
@@ -3381,7 +3381,7 @@ defmodule YscWeb.AdminComponents do
           </div>
           <div
             data-scroll-indicator
-            class="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-zinc-900 to-transparent opacity-0 transition-opacity duration-200"
+            class="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-linear-to-t from-zinc-900 to-transparent opacity-0 transition-opacity duration-200"
             aria-hidden="true"
           >
           </div>
@@ -3390,7 +3390,7 @@ defmodule YscWeb.AdminComponents do
         <%!-- Fixed bottom user card (expanded) --%>
         <div
           id="admin-nav-user-full"
-          class="flex-shrink-0 px-5 py-4 border-t border-zinc-800 bg-zinc-900"
+          class="shrink-0 px-5 py-4 border-t border-zinc-800 bg-zinc-900"
         >
           <.user_card
             user={@user}
@@ -3406,7 +3406,7 @@ defmodule YscWeb.AdminComponents do
         <%!-- Fixed bottom user avatar (collapsed, hidden by default) --%>
         <div
           id="admin-nav-user-collapsed"
-          class="hidden flex-shrink-0 py-4 border-t border-zinc-700 bg-zinc-900 items-center justify-center"
+          class="hidden shrink-0 py-4 border-t border-zinc-700 bg-zinc-900 items-center justify-center"
         >
           <.user_avatar_image
             user={@user}
@@ -3496,7 +3496,7 @@ defmodule YscWeb.AdminComponents do
         :if={@show_badge}
         class={[
           "absolute z-10 inline-flex items-center justify-center w-6 h-6 text-xs font-bold",
-          "border-2 rounded-full -top-2 -end-2",
+          "border-2 rounded-full -top-2 -inset-e-2",
           @badge_class
         ]}
       >
@@ -3545,9 +3545,9 @@ defmodule YscWeb.AdminComponents do
   @spec progress_bar(map()) :: Phoenix.LiveView.Rendered.t()
   def progress_bar(assigns) do
     ~H"""
-    <div class="w-full bg-zinc-200 rounded h-2">
+    <div class="w-full bg-zinc-200 rounded-sm h-2">
       <div
-        class="animate-pulse transition duration-100 ease-in-out bg-blue-600 h-2 rounded "
+        class="animate-pulse transition duration-100 ease-in-out bg-blue-600 h-2 rounded-sm "
         style={"width: #{@progress}%"}
       >
       </div>
@@ -3786,23 +3786,23 @@ defmodule YscWeb.AdminComponents do
       page_list_item_attrs={[class: "list-none"]}
       page_link_attrs={[
         class:
-          "flex items-center justify-center w-9 h-9 text-sm font-medium text-zinc-600 rounded hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+          "flex items-center justify-center w-9 h-9 text-sm font-medium text-zinc-600 rounded-sm hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
       ]}
       current_page_link_attrs={[
         class:
-          "flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-zinc-800 rounded pointer-events-none"
+          "flex items-center justify-center w-9 h-9 text-sm font-semibold text-white bg-zinc-800 rounded-sm pointer-events-none"
       ]}
       page_links={@page_links_count}
     >
       <:previous attrs={[
         class:
-          "order-1 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
+          "order-1 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded-sm hover:bg-zinc-100 transition-colors"
       ]}>
         <.icon name="hero-chevron-left" class="w-4 h-4" />
       </:previous>
       <:next attrs={[
         class:
-          "order-3 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded hover:bg-zinc-100 transition-colors"
+          "order-3 flex justify-center items-center w-9 h-9 text-sm font-semibold text-zinc-500 hover:text-zinc-800 rounded-sm hover:bg-zinc-100 transition-colors"
       ]}>
         <.icon name="hero-chevron-right" class="w-4 h-4" />
       </:next>
@@ -3895,7 +3895,7 @@ defmodule YscWeb.AdminComponents do
     <.link
       data-result-item
       navigate={@navigate}
-      class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
+      class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded-sm"
     >
       {render_slot(@inner_block)}
     </.link>
@@ -3934,7 +3934,7 @@ defmodule YscWeb.AdminComponents do
       class="relative"
       {@rest}
     >
-      <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
+      <div class="absolute inset-y-0 rtl:inset-r-0 inset-s-0 flex items-center ps-3 pointer-events-none">
         <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
       </div>
       <input
@@ -3950,14 +3950,14 @@ defmodule YscWeb.AdminComponents do
         value={@value}
         tabindex="0"
         phx-debounce={@debounce}
-        class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
+        class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded-sm w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
       />
       <button
         :if={@clear_event && @value != ""}
         type="button"
         phx-click={@clear_event}
         phx-value-input-id={@input_id}
-        class="absolute inset-y-0 end-0 flex items-center pe-3 text-zinc-400 hover:text-zinc-600"
+        class="absolute inset-y-0 inset-e-0 flex items-center pe-3 text-zinc-400 hover:text-zinc-600"
         aria-label="Clear search"
       >
         <.icon name="hero-x-mark" class="w-4 h-4" />
@@ -4090,16 +4090,16 @@ defmodule YscWeb.AdminComponents do
 
   def phone_mockup(assigns) do
     ~H"""
-    <div class={"relative mx-auto border-zinc-800 bg-zinc-800 border-[14px] rounded-xl h-[600px] w-[300px] shadow-xl #{@class}"}>
-      <div class="w-[148px] h-[18px] bg-zinc-800 top-0 rounded-b-[1rem] left-1/2 -translate-x-1/2 absolute">
+    <div class={"relative mx-auto border-zinc-800 bg-zinc-800 border-14 rounded-xl h-[600px] w-[300px] shadow-xl #{@class}"}>
+      <div class="w-[148px] h-[18px] bg-zinc-800 top-0 rounded-b-2xl left-1/2 -translate-x-1/2 absolute">
       </div>
-      <div class="h-[32px] w-[3px] bg-zinc-800 absolute -start-[17px] top-[72px] rounded-s-lg">
+      <div class="h-[32px] w-[3px] bg-zinc-800 absolute inset-s-[-17px] top-[72px] rounded-s-lg">
       </div>
-      <div class="h-[46px] w-[3px] bg-zinc-800 absolute -start-[17px] top-[124px] rounded-s-lg">
+      <div class="h-[46px] w-[3px] bg-zinc-800 absolute inset-s-[-17px] top-[124px] rounded-s-lg">
       </div>
-      <div class="h-[46px] w-[3px] bg-zinc-800 absolute -start-[17px] top-[178px] rounded-s-lg">
+      <div class="h-[46px] w-[3px] bg-zinc-800 absolute inset-s-[-17px] top-[178px] rounded-s-lg">
       </div>
-      <div class="h-[64px] w-[3px] bg-zinc-800 absolute -end-[17px] top-[142px] rounded-e-lg">
+      <div class="h-[64px] w-[3px] bg-zinc-800 absolute inset-e-[-17px] top-[142px] rounded-e-lg">
       </div>
       <div class="rounded-xl overflow-y-auto w-[272px] h-[572px] bg-white">
         {render_slot(@inner_block)}
@@ -4117,16 +4117,16 @@ defmodule YscWeb.AdminComponents do
 
   def tablet_mockup(assigns) do
     ~H"""
-    <div class={"relative mx-auto border-zinc-800 bg-zinc-800 border-[14px] rounded-[2.5rem] h-[454px] max-w-[341px] md:h-[682px] md:max-w-[512px] #{@class}"}>
-      <div class="h-[32px] w-[3px] bg-zinc-800 absolute -start-[17px] top-[72px] rounded-s-lg">
+    <div class={"relative mx-auto border-zinc-800 bg-zinc-800 border-14 rounded-[2.5rem] h-[454px] max-w-[341px] md:h-[682px] md:max-w-[512px] #{@class}"}>
+      <div class="h-[32px] w-[3px] bg-zinc-800 absolute inset-s-[-17px] top-[72px] rounded-s-lg">
       </div>
-      <div class="h-[46px] w-[3px] bg-zinc-800 absolute -start-[17px] top-[124px] rounded-s-lg">
+      <div class="h-[46px] w-[3px] bg-zinc-800 absolute inset-s-[-17px] top-[124px] rounded-s-lg">
       </div>
-      <div class="h-[46px] w-[3px] bg-zinc-800 absolute -start-[17px] top-[178px] rounded-s-lg">
+      <div class="h-[46px] w-[3px] bg-zinc-800 absolute inset-s-[-17px] top-[178px] rounded-s-lg">
       </div>
-      <div class="h-[64px] w-[3px] bg-zinc-800 absolute -end-[17px] top-[142px] rounded-e-lg">
+      <div class="h-[64px] w-[3px] bg-zinc-800 absolute inset-e-[-17px] top-[142px] rounded-e-lg">
       </div>
-      <div class="rounded-[2rem] overflow-y-auto h-[426px] md:h-[654px] bg-white">
+      <div class="rounded-4xl overflow-y-auto h-[426px] md:h-[654px] bg-white">
         {render_slot(@inner_block)}
       </div>
     </div>

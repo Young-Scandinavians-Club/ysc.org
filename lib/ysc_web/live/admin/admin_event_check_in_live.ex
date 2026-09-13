@@ -26,7 +26,7 @@ defmodule YscWeb.AdminEventCheckInLive do
             <%= if @event do %>
               {@event.title}
             <% else %>
-              <.skeleton_block class="h-5 w-48 max-w-full rounded" />
+              <.skeleton_block class="h-5 w-48 max-w-full rounded-sm" />
             <% end %>
           </h1>
           <.admin_help_link
@@ -104,7 +104,7 @@ defmodule YscWeb.AdminEventCheckInLive do
             <%!-- Desktop: table with order grouping --%>
             <div
               :if={@total_count - @checked_in_count > 0}
-              class="hidden md:block bg-white rounded border border-zinc-200"
+              class="hidden md:block bg-white rounded-sm border border-zinc-200"
             >
               <.admin_event_check_in_table_header />
 
@@ -150,7 +150,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                   :for={{dom_id, group} <- @streams.pending_groups}
                   id={"mobile-#{dom_id}"}
                   data-checkin-order-group
-                  class="bg-white rounded border border-zinc-200 overflow-hidden"
+                  class="bg-white rounded-sm border border-zinc-200 overflow-hidden"
                 >
                   <.admin_event_check_in_order_group_header
                     variant={:mobile}
@@ -184,7 +184,7 @@ defmodule YscWeb.AdminEventCheckInLive do
             </div>
 
             <%!-- Desktop --%>
-            <div class="hidden md:block bg-white rounded border border-zinc-200">
+            <div class="hidden md:block bg-white rounded-sm border border-zinc-200">
               <div id="checked-in-tickets" phx-update="stream">
                 <.admin_event_check_in_checked_in_row
                   :for={{dom_id, ticket} <- @streams.checked_in_tickets}

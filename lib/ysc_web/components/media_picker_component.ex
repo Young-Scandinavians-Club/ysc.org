@@ -119,7 +119,7 @@ defmodule YscWeb.MediaPickerComponent do
                         </div>
                         <.live_img_preview
                           entry={entry}
-                          class="group-hover:blur h-60 w-full rounded-lg"
+                          class="group-hover:blur-sm h-60 w-full rounded-lg"
                         />
                       </button>
                     </figure>

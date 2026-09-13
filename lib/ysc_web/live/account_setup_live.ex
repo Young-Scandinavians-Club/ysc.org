@@ -51,9 +51,9 @@ defmodule YscWeb.AccountSetupLive do
           aria-live="polite"
         >
           <span class="sr-only">Loading account setup…</span>
-          <.skeleton_block class="h-8 w-2/3 rounded" />
-          <.skeleton_block class="h-4 w-full rounded" />
-          <.skeleton_block class="h-4 w-5/6 rounded" />
+          <.skeleton_block class="h-8 w-2/3 rounded-sm" />
+          <.skeleton_block class="h-4 w-full rounded-sm" />
+          <.skeleton_block class="h-4 w-5/6 rounded-sm" />
           <.skeleton_block class="h-12 w-full rounded-lg" />
           <.skeleton_block class="h-11 w-1/3 rounded-lg" />
         </div>
@@ -342,7 +342,7 @@ defmodule YscWeb.AccountSetupLive do
 
             <:actions>
               <.button
-                class="bg-transparent text-zinc-400 hover:text-zinc-600 hover:underline font-medium text-sm leading-6 py-2 px-3 rounded transition duration-150 ease-in-out"
+                class="bg-transparent text-zinc-400 hover:text-zinc-600 hover:underline font-medium text-sm leading-6 py-2 px-3 rounded-sm transition duration-150 ease-in-out"
                 phx-click="skip_phone"
               >
                 Skip for now
@@ -378,10 +378,10 @@ defmodule YscWeb.AccountSetupLive do
           >
             <p
               :if={dev_or_sandbox?()}
-              class="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded border border-amber-200"
+              class="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded-sm border border-amber-200"
             >
               <strong>Dev Mode:</strong>
-              You can use <code class="bg-amber-100 px-1 rounded">000000</code>
+              You can use <code class="bg-amber-100 px-1 rounded-sm">000000</code>
               as the verification code.
             </p>
             <.input

@@ -31,7 +31,7 @@ defmodule YscWeb.Components.GalleryComponent do
             ></canvas>
 
             <img
-              class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover group-hover:opacity-100"
+              class="absolute inset-0 z-1 opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover group-hover:opacity-100"
               id={"image-#{image.id}"}
               src={get_image_path(image)}
               loading="lazy"
@@ -41,7 +41,7 @@ defmodule YscWeb.Components.GalleryComponent do
 
             <div
               :if={image.title != nil or image.alt_text != nil}
-              class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
+              class="absolute z-2 hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-linear-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
             >
               <p
                 :if={image.title != nil}

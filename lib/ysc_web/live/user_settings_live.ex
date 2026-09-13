@@ -32,7 +32,7 @@ defmodule YscWeb.UserSettingsLive do
   def render(assigns) do
     ~H"""
     <div
-      class="max-w-screen-xl px-4 mx-auto py-8 lg:py-10"
+      class="max-w-(--breakpoint-xl) px-4 mx-auto py-8 lg:py-10"
       id="user-settings-page"
       phx-hook="ConfirmCloseModal"
     >
@@ -74,10 +74,10 @@ defmodule YscWeb.UserSettingsLive do
 
             <p
               :if={dev_or_sandbox?()}
-              class="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded border border-amber-200"
+              class="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded-sm border border-amber-200"
             >
               <strong>Dev Mode:</strong>
-              You can use <code class="bg-amber-100 px-1 rounded">000000</code>
+              You can use <code class="bg-amber-100 px-1 rounded-sm">000000</code>
               as the verification code.
             </p>
             <.input
@@ -278,7 +278,7 @@ defmodule YscWeb.UserSettingsLive do
                           expiry_class="text-zinc-500 text-xs mt-0.5"
                         />
                       </div>
-                      <div class="flex-shrink-0">
+                      <div class="shrink-0">
                         <div
                           :if={
                             @default_payment_method &&
@@ -323,7 +323,7 @@ defmodule YscWeb.UserSettingsLive do
                       disabled={busy?}
                       data-confirm="Remove this payment method? It will be removed from your account and can no longer be used for membership payments."
                       aria-label="Remove payment method"
-                      class="flex-shrink-0 p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="shrink-0 p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <.icon
                         :if={!deleting_this?}
@@ -445,10 +445,10 @@ defmodule YscWeb.UserSettingsLive do
           }
         />
 
-        <div class="text-medium px-2 text-zinc-500 rounded w-full md:border-l md:border-1 md:border-zinc-100 md:pl-16">
+        <div class="text-medium px-2 text-zinc-500 rounded-sm w-full md:border-l md:border md:border-zinc-100 md:pl-16">
           <div :if={@live_action == :edit} class="space-y-8">
             <!-- Profile Picture Section -->
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Profile Picture</h2>
               <p class="text-sm text-zinc-500">
                 Adding a profile picture helps other members recognize you at events and makes the community feel more personal.
@@ -617,7 +617,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%!-- Avatar library: avoid tall skeleton that collapses when empty (CLS) --%>
                   <div
                     :if={@loading_avatars}
-                    class="pt-2 min-h-[1.25rem]"
+                    class="pt-2 min-h-5"
                     aria-hidden="true"
                   >
                   </div>
@@ -682,7 +682,7 @@ defmodule YscWeb.UserSettingsLive do
                             data-confirm="Delete this photo? This cannot be undone."
                             disabled={@deleting_avatar_id == avatar.id}
                             aria-label="Delete photo"
-                            class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-zinc-700 text-white flex items-center justify-center shadow hover:bg-red-600 disabled:opacity-50"
+                            class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-zinc-700 text-white flex items-center justify-center shadow-sm hover:bg-red-600 disabled:opacity-50"
                           >
                             <svg
                               class="w-3 h-3"
@@ -702,7 +702,7 @@ defmodule YscWeb.UserSettingsLive do
                           <%!-- Source badge for OAuth-synced avatars --%>
                           <%= cond do %>
                             <% avatar.source == :google -> %>
-                              <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white shadow flex items-center justify-center pointer-events-none">
+                              <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white shadow-sm flex items-center justify-center pointer-events-none">
                                 <img
                                   src={~p"/images/google/google_g_logo.svg"}
                                   alt="Google"
@@ -710,7 +710,7 @@ defmodule YscWeb.UserSettingsLive do
                                 />
                               </span>
                             <% avatar.source == :facebook -> %>
-                              <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white shadow flex items-center justify-center pointer-events-none">
+                              <span class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-white shadow-sm flex items-center justify-center pointer-events-none">
                                 <img
                                   src={~p"/images/fb/facebook_f_logo.svg"}
                                   alt="Facebook"
@@ -727,7 +727,7 @@ defmodule YscWeb.UserSettingsLive do
               </div>
             </div>
             <!-- Personal Information Section -->
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Personal Information</h2>
 
               <.simple_form
@@ -794,7 +794,7 @@ defmodule YscWeb.UserSettingsLive do
               </.simple_form>
             </div>
             <!-- Billing Address Section -->
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Billing Address</h2>
 
               <.simple_form
@@ -845,7 +845,7 @@ defmodule YscWeb.UserSettingsLive do
               </.simple_form>
             </div>
             <!-- Email Change Section -->
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Email</h2>
 
               <%= if @pending_email do %>
@@ -912,14 +912,14 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Sub-account: read-only view --%>
             <div
               :if={@is_sub_account}
-              class="rounded border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 space-y-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div class="flex gap-3">
                   <.icon
                     name="hero-user-group"
-                    class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+                    class="h-5 w-5 text-blue-500 shrink-0 mt-0.5"
                   />
                   <div>
                     <h3 class="text-sm font-semibold text-blue-800">
@@ -976,7 +976,7 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="flex gap-3">
                   <.icon
                     name="hero-arrow-trending-down"
-                    class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5"
+                    class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
                   />
                   <div class="flex-1">
                     <h3 class="text-sm font-semibold text-amber-800">
@@ -1034,7 +1034,7 @@ defmodule YscWeb.UserSettingsLive do
                 </p>
                 <div class="mt-3 space-y-2">
                   <%= for invite <- @pending_family_invites do %>
-                    <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <div class="flex items-center justify-between rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-2">
                       <div class="text-sm">
                         <p class="font-medium text-zinc-900">
                           Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
@@ -1060,7 +1060,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Lifetime membership: special case --%>
             <div
               :if={@active_plan_type == :lifetime && !@is_sub_account}
-              class="rounded border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 space-y-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <.membership_status
@@ -1077,7 +1077,7 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="flex gap-3">
                   <.icon
                     name="hero-arrow-trending-down"
-                    class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5"
+                    class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
                   />
                   <div class="flex-1">
                     <h3 class="text-sm font-semibold text-amber-800">
@@ -1131,7 +1131,7 @@ defmodule YscWeb.UserSettingsLive do
                 </p>
                 <div class="mt-3 space-y-2">
                   <%= for invite <- @pending_family_invites do %>
-                    <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <div class="flex items-center justify-between rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-2">
                       <div class="text-sm">
                         <p class="font-medium text-zinc-900">
                           Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
@@ -1177,7 +1177,7 @@ defmodule YscWeb.UserSettingsLive do
                 </p>
                 <div class="mt-3 space-y-2">
                   <%= for invite <- @pending_family_invites do %>
-                    <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <div class="flex items-center justify-between rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-2">
                       <div class="text-sm">
                         <p class="font-medium text-zinc-900">
                           Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
@@ -1206,7 +1206,7 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="flex gap-3">
                   <.icon
                     name="hero-exclamation-triangle"
-                    class="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5"
+                    class="h-5 w-5 text-yellow-500 shrink-0 mt-0.5"
                   />
                   <div>
                     <h3 class="text-sm font-semibold text-yellow-800">
@@ -1232,13 +1232,13 @@ defmodule YscWeb.UserSettingsLive do
                 phx-change="validate_membership"
               >
                 <div class={[
-                  "bg-white border border-zinc-100 rounded overflow-hidden",
+                  "bg-white border border-zinc-100 rounded-sm overflow-hidden",
                   !@user_is_active && "opacity-50 pointer-events-none"
                 ]}>
                   <%!-- Step 1: Choose Plan --%>
                   <div class="p-6 border-b border-zinc-100">
                     <div class="flex items-start gap-3 mb-5">
-                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0 mt-0.5">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0 mt-0.5">
                         1
                       </span>
                       <div>
@@ -1275,7 +1275,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%!-- Step 2: Payment Method --%>
                   <div class="p-6 bg-zinc-50/50 border-b border-zinc-100">
                     <div class="flex items-start gap-3 mb-5">
-                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0 mt-0.5">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0 mt-0.5">
                         2
                       </span>
                       <div>
@@ -1338,7 +1338,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%!-- Step 3: Summary & Pay --%>
                   <div class="p-6">
                     <div class="flex items-center gap-3 mb-5">
-                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0">
                         3
                       </span>
                       <h3 class="text-lg font-semibold text-zinc-900">
@@ -1428,7 +1428,7 @@ defmodule YscWeb.UserSettingsLive do
               class="space-y-6"
             >
               <%!-- Current status card --%>
-              <div class="rounded border border-zinc-100 p-6 space-y-4">
+              <div class="rounded-sm border border-zinc-100 p-6 space-y-4">
                 <h2 class="text-zinc-900 font-bold text-xl">Current Membership</h2>
 
                 <.board_pause_notice
@@ -1455,7 +1455,7 @@ defmodule YscWeb.UserSettingsLive do
                   </p>
                   <div class="mt-3 space-y-2">
                     <%= for invite <- @pending_family_invites do %>
-                      <div class="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 px-3 py-2">
+                      <div class="flex items-center justify-between rounded-sm border border-zinc-200 bg-zinc-50 px-3 py-2">
                         <div class="text-sm">
                           <p class="font-medium text-zinc-900">
                             Invite from {invite.primary_user.first_name} {invite.primary_user.last_name}
@@ -1485,7 +1485,7 @@ defmodule YscWeb.UserSettingsLive do
                   <div class="flex gap-3">
                     <.icon
                       name="hero-arrow-trending-down"
-                      class="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5"
+                      class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
                     />
                     <div class="flex-1">
                       <h3 class="text-sm font-semibold text-amber-800">
@@ -1572,7 +1572,7 @@ defmodule YscWeb.UserSettingsLive do
               <%!-- Change plan card (only when we know the plan type) --%>
               <div
                 :if={@active_plan_type != nil}
-                class="rounded border border-zinc-100 overflow-hidden"
+                class="rounded-sm border border-zinc-100 overflow-hidden"
               >
                 <div class="p-6 border-b border-zinc-100">
                   <h2 class="text-zinc-900 font-bold text-xl">Change Plan</h2>
@@ -1588,7 +1588,7 @@ defmodule YscWeb.UserSettingsLive do
                   <div class="flex gap-3">
                     <.icon
                       name="hero-exclamation-triangle"
-                      class="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5"
+                      class="h-5 w-5 text-yellow-500 shrink-0 mt-0.5"
                     />
                     <div>
                       <h3 class="text-sm font-semibold text-yellow-800">
@@ -1610,7 +1610,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%!-- Step 1: Plan selection --%>
                   <div class="p-6 border-b border-zinc-100">
                     <div class="flex items-center gap-3 mb-4">
-                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0">
                         1
                       </span>
                       <h3 class="text-lg font-semibold text-zinc-900">
@@ -1659,7 +1659,7 @@ defmodule YscWeb.UserSettingsLive do
                           )
                         }
                         class={[
-                          "h-5 w-5 flex-shrink-0 mt-0.5",
+                          "h-5 w-5 shrink-0 mt-0.5",
                           if(@membership_change_info.direction == :upgrade,
                             do: "text-blue-500",
                             else: "text-amber-500"
@@ -1722,7 +1722,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%!-- Step 2: Payment Method --%>
                   <div class="p-6 bg-zinc-50/50 border-t border-zinc-100 mt-4">
                     <div class="flex items-start gap-3 mb-4">
-                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white flex-shrink-0 mt-0.5">
+                      <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0 mt-0.5">
                         2
                       </span>
                       <div>
@@ -1913,7 +1913,7 @@ defmodule YscWeb.UserSettingsLive do
           </.modal>
 
           <div :if={@live_action == :notifications} class="space-y-6">
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">
                 Notification Preferences
               </h2>
@@ -1937,34 +1937,34 @@ defmodule YscWeb.UserSettingsLive do
               <div
                 :if={@loading_notification_preferences}
                 id="notification-preferences-loading"
-                class="overflow-x-auto rounded-lg border border-zinc-200 min-h-[22rem]"
+                class="overflow-x-auto rounded-lg border border-zinc-200 min-h-88"
                 role="status"
                 aria-live="polite"
               >
                 <span class="sr-only">Loading notification preferences…</span>
                 <div class="bg-zinc-50 px-6 py-3 border-b border-zinc-200 flex gap-4">
-                  <.skeleton_block class="h-3 w-20 rounded" />
-                  <.skeleton_block class="h-3 w-12 rounded ml-auto" />
-                  <.skeleton_block class="h-3 w-10 rounded" />
+                  <.skeleton_block class="h-3 w-20 rounded-sm" />
+                  <.skeleton_block class="h-3 w-12 rounded-sm ml-auto" />
+                  <.skeleton_block class="h-3 w-10 rounded-sm" />
                 </div>
                 <div class="divide-y divide-zinc-100">
                   <div :for={_ <- 1..3} class="flex items-center gap-4 px-6 py-4">
                     <div class="flex-1 space-y-2">
-                      <.skeleton_block class="h-4 w-40 rounded" />
-                      <.skeleton_block class="h-3 w-64 max-w-full rounded" />
+                      <.skeleton_block class="h-4 w-40 rounded-sm" />
+                      <.skeleton_block class="h-3 w-64 max-w-full rounded-sm" />
                     </div>
-                    <.skeleton_block class="h-4 w-4 rounded shrink-0" />
-                    <.skeleton_block class="h-4 w-4 rounded shrink-0" />
+                    <.skeleton_block class="h-4 w-4 rounded-sm shrink-0" />
+                    <.skeleton_block class="h-4 w-4 rounded-sm shrink-0" />
                   </div>
                 </div>
                 <div class="px-6 py-4">
-                  <.skeleton_block class="h-10 w-40 rounded" />
+                  <.skeleton_block class="h-10 w-40 rounded-sm" />
                 </div>
               </div>
 
               <div
                 :if={!@loading_notification_preferences}
-                class="min-h-[22rem]"
+                class="min-h-88"
               >
                 <.simple_form
                   for={@notification_form}
@@ -2021,7 +2021,7 @@ defmodule YscWeb.UserSettingsLive do
                             <.input
                               field={@notification_form[:newsletter_notifications]}
                               type="checkbox"
-                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded-sm"
                             />
                           </td>
                           <td class="px-6 py-4">
@@ -2049,7 +2049,7 @@ defmodule YscWeb.UserSettingsLive do
                             <.input
                               field={@notification_form[:event_notifications]}
                               type="checkbox"
-                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded-sm"
                             />
                           </td>
                           <td class="px-6 py-4">
@@ -2063,7 +2063,7 @@ defmodule YscWeb.UserSettingsLive do
                             <.input
                               field={@notification_form[:event_notifications_sms]}
                               type="checkbox"
-                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded-sm"
                             />
                           </td>
                         </tr>
@@ -2092,7 +2092,7 @@ defmodule YscWeb.UserSettingsLive do
                               value="true"
                               checked={true}
                               disabled
-                              class="h-4 w-4 text-zinc-600 focus:ring-blue-500 border-zinc-300 rounded opacity-50 cursor-not-allowed"
+                              class="h-4 w-4 text-zinc-600 focus:ring-blue-500 border-zinc-300 rounded-sm opacity-50 cursor-not-allowed"
                             />
                           </td>
                           <td class="px-6 py-4">
@@ -2106,7 +2106,7 @@ defmodule YscWeb.UserSettingsLive do
                             <.input
                               field={@notification_form[:account_notifications_sms]}
                               type="checkbox"
-                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded-sm"
                             />
                           </td>
                         </tr>
@@ -2127,7 +2127,7 @@ defmodule YscWeb.UserSettingsLive do
               <div
                 :if={@booking_entitlements_count > 0}
                 id="member-booking-entitlements-section"
-                class="rounded border border-zinc-200 bg-white py-6 px-4 sm:px-6"
+                class="rounded-sm border border-zinc-200 bg-white py-6 px-4 sm:px-6"
               >
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
@@ -2151,7 +2151,7 @@ defmodule YscWeb.UserSettingsLive do
                     class="flex flex-col rounded-lg border border-zinc-200 bg-zinc-50/50 p-5 transition-colors hover:border-zinc-300"
                   >
                     <div class="flex items-start justify-between gap-3 mb-3">
-                      <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-sm">
+                      <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-xs">
                         <.icon
                           name="hero-sparkles"
                           class="w-3.5 h-3.5 text-blue-600"
@@ -2161,7 +2161,7 @@ defmodule YscWeb.UserSettingsLive do
                         Since {Calendar.strftime(ent.inserted_at, "%b %Y")}
                       </span>
                     </div>
-                    <div class="mb-4 flex-grow">
+                    <div class="mb-4 grow">
                       <p class="text-base font-bold text-zinc-900">
                         {member_entitlement_coupon_headline(ent)}
                       </p>
@@ -2170,14 +2170,14 @@ defmodule YscWeb.UserSettingsLive do
                       </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-xs">
-                      <span class="inline-flex items-center rounded bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
+                      <span class="inline-flex items-center rounded-sm bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
                         <.icon
                           name="hero-map-pin"
                           class="w-3.5 h-3.5 me-1 text-zinc-500"
                         />
                         {member_entitlement_property_label(ent.property)}
                       </span>
-                      <span class="inline-flex items-center rounded bg-emerald-50 px-2 py-1 font-medium text-emerald-800 border border-emerald-100">
+                      <span class="inline-flex items-center rounded-sm bg-emerald-50 px-2 py-1 font-medium text-emerald-800 border border-emerald-100">
                         <.icon
                           name="hero-clock"
                           class="w-3.5 h-3.5 me-1 text-emerald-600"
@@ -2192,7 +2192,7 @@ defmodule YscWeb.UserSettingsLive do
               <div
                 :if={@ticket_reservations_count > 0}
                 id="member-ticket-reservations-section"
-                class="rounded border border-zinc-200 bg-white py-6 px-4 sm:px-6"
+                class="rounded-sm border border-zinc-200 bg-white py-6 px-4 sm:px-6"
               >
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
@@ -2219,7 +2219,7 @@ defmodule YscWeb.UserSettingsLive do
                     class="flex flex-col rounded-lg border border-zinc-200 bg-zinc-50/50 p-5 transition-colors hover:border-zinc-300"
                   >
                     <div class="flex items-start justify-between gap-3 mb-3">
-                      <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-sm">
+                      <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-xs">
                         <.icon name="hero-bolt" class="w-3.5 h-3.5 text-blue-600" />
                         Reserved for you
                       </span>
@@ -2229,7 +2229,7 @@ defmodule YscWeb.UserSettingsLive do
                           else: "#{res.quantity} tickets"}
                       </span>
                     </div>
-                    <div class="mb-4 flex-grow">
+                    <div class="mb-4 grow">
                       <p class="text-base font-bold text-zinc-900">
                         <%= if res.ticket_tier && res.ticket_tier.event do %>
                           {res.ticket_tier.event.title}
@@ -2242,7 +2242,7 @@ defmodule YscWeb.UserSettingsLive do
                       </p>
                       <p
                         :if={ticket_reservation_discount_phrase(res)}
-                        class="mt-2 inline-flex items-center gap-1.5 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800 border border-blue-100"
+                        class="mt-2 inline-flex items-center gap-1.5 rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800 border border-blue-100"
                       >
                         <.icon
                           name="hero-receipt-percent"
@@ -2252,7 +2252,7 @@ defmodule YscWeb.UserSettingsLive do
                       </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-xs mb-4">
-                      <span class="inline-flex items-center rounded bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
+                      <span class="inline-flex items-center rounded-sm bg-zinc-100 px-2 py-1 font-medium text-zinc-700">
                         <.icon
                           name="hero-clock"
                           class="w-3.5 h-3.5 me-1 text-zinc-500"
@@ -2284,7 +2284,7 @@ defmodule YscWeb.UserSettingsLive do
               </div>
             </div>
 
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-6">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-6">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                   <h2 class="text-zinc-900 font-bold text-xl">
@@ -5752,14 +5752,14 @@ defmodule YscWeb.UserSettingsLive do
         phx-click={@row_navigate}
         aria-label={@row_navigate_label}
         class={[
-          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white cursor-pointer w-full text-left font-normal",
+          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition-all bg-white cursor-pointer w-full text-left font-normal",
           "appearance-none m-0"
         ]}
       >
         {render_payment_card_body(assigns)}
       </button>
     <% else %>
-      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all bg-white">
+      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition-all bg-white">
         {render_payment_card_body(assigns)}
       </div>
     <% end %>
@@ -5804,7 +5804,7 @@ defmodule YscWeb.UserSettingsLive do
     </div>
 
     <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
-      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-sm text-xs text-red-800">
         <strong>Booking Cancelled:</strong>
         This booking has been cancelled. {if @payment_info.payment do
           if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
@@ -5817,7 +5817,7 @@ defmodule YscWeb.UserSettingsLive do
     <% end %>
 
     <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
-      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
+      <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-sm text-xs text-red-800">
         <strong>Tickets cancelled:</strong>
         These tickets have been cancelled. {if @payment_info.payment do
           if @payment_info.refund_data && @payment_info.refund_data.total_refunded do

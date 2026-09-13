@@ -1389,7 +1389,7 @@ defmodule YscWeb.ExpenseReportLive do
       id="expense-report-success"
       phx-hook="Confetti"
       data-show-confetti={if @show_confetti, do: "true", else: "false"}
-      class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4"
+      class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
     >
       <div class="max-w-xl mx-auto">
         <!-- Success Header -->
@@ -1408,7 +1408,7 @@ defmodule YscWeb.ExpenseReportLive do
         <%= if @expense_report do %>
           <.timeline_section expense_report={@expense_report} />
           <!-- Expense Report Summary Card -->
-          <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
+          <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6">
             <div class="px-6 py-4 border-b border-zinc-200">
               <h2 class="text-lg font-semibold text-zinc-900">
                 Expense Report Summary
@@ -1443,7 +1443,7 @@ defmodule YscWeb.ExpenseReportLive do
                     type="button"
                     phx-click="copy-report-id"
                     phx-value-id={@expense_report.id}
-                    class="px-1.5 py-0.5 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded transition-colors flex-shrink-0"
+                    class="px-1.5 py-0.5 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-sm transition-colors shrink-0"
                     title="Copy reference number"
                   >
                     <.icon name="hero-clipboard" class="w-4 h-4 -mt-1.5" />
@@ -1471,7 +1471,7 @@ defmodule YscWeb.ExpenseReportLive do
             </div>
           </div>
           <!-- Expense Items Card -->
-          <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
+          <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6">
             <div class="px-6 py-4 border-b border-zinc-200">
               <h2 class="text-lg font-semibold text-zinc-900">Expense Items</h2>
             </div>
@@ -1550,7 +1550,7 @@ defmodule YscWeb.ExpenseReportLive do
           </div>
           <!-- Income Items Card -->
           <%= if not Enum.empty?(@expense_report.income_items) do %>
-            <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
+            <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6">
               <div class="px-6 py-4 border-b border-zinc-200">
                 <h2 class="text-lg font-semibold text-zinc-900">Income Items</h2>
               </div>
@@ -1610,7 +1610,7 @@ defmodule YscWeb.ExpenseReportLive do
             </div>
           <% end %>
           <!-- Totals Card -->
-          <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6 print-no-break">
+          <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6 print-no-break">
             <div class="px-6 py-4 border-b border-zinc-200">
               <h2 class="text-lg font-semibold text-zinc-900">Totals</h2>
             </div>
@@ -1642,7 +1642,7 @@ defmodule YscWeb.ExpenseReportLive do
           <!-- Confirmation Email Notice -->
           <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div class="flex">
-              <div class="flex-shrink-0">
+              <div class="shrink-0">
                 <.icon name="hero-envelope" class="w-5 h-5 text-blue-600" />
               </div>
               <div class="ml-3">
@@ -1768,7 +1768,7 @@ defmodule YscWeb.ExpenseReportLive do
               >
                 <.icon
                   name="hero-pencil-square"
-                  class="w-5 h-5 text-amber-500 flex-shrink-0"
+                  class="w-5 h-5 text-amber-500 shrink-0"
                 />
                 <div class="min-w-0 flex-1">
                   <p class="font-medium text-zinc-900 truncate">
@@ -1788,7 +1788,7 @@ defmodule YscWeb.ExpenseReportLive do
                 <.link
                   id={"expense-report-draft-continue-#{report.id}"}
                   navigate={~p"/expensereport"}
-                  class="flex-shrink-0 inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
+                  class="shrink-0 inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
                 >
                   Continue
                 </.link>
@@ -1798,7 +1798,7 @@ defmodule YscWeb.ExpenseReportLive do
                   phx-click="discard-draft"
                   phx-value-id={report.id}
                   data-confirm="Delete this draft? This can't be undone."
-                  class="flex-shrink-0 p-1.5 text-zinc-400 hover:text-red-600 transition-colors"
+                  class="shrink-0 p-1.5 text-zinc-400 hover:text-red-600 transition-colors"
                   title="Delete draft"
                 >
                   <.icon name="hero-trash" class="w-4 h-4" />
@@ -1836,7 +1836,7 @@ defmodule YscWeb.ExpenseReportLive do
                       <% end %>
                     </p>
                   </div>
-                  <div class="flex-shrink-0 text-right">
+                  <div class="shrink-0 text-right">
                     <p class="text-[11px] uppercase tracking-wide text-zinc-400">
                       Reimburse
                     </p>
@@ -1846,7 +1846,7 @@ defmodule YscWeb.ExpenseReportLive do
                   </div>
                   <.icon
                     name="hero-chevron-right"
-                    class="w-4 h-4 text-zinc-300 flex-shrink-0"
+                    class="w-4 h-4 text-zinc-300 shrink-0"
                   />
                 </.link>
               </li>
@@ -1891,7 +1891,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp render_form(assigns) do
     ~H"""
     <div id="expense-report-form-page" class="bg-zinc-50">
-      <div class="max-w-screen-xl mx-auto px-4 py-8 lg:py-10">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 py-8 lg:py-10">
         <div
           :if={@loading_expense_form_data}
           id="expense-form-loading"
@@ -1901,21 +1901,21 @@ defmodule YscWeb.ExpenseReportLive do
         >
           <span class="sr-only">Loading expense report form…</span>
           <div class="lg:col-span-2 space-y-6">
-            <.skeleton_block class="h-9 w-64 rounded" />
-            <div class="bg-white border border-zinc-100 rounded-xl shadow-sm p-6 space-y-3">
-              <.skeleton_block class="h-5 w-40 rounded" />
+            <.skeleton_block class="h-9 w-64 rounded-sm" />
+            <div class="bg-white border border-zinc-100 rounded-xl shadow-xs p-6 space-y-3">
+              <.skeleton_block class="h-5 w-40 rounded-sm" />
               <.skeleton_block class="h-11 w-full rounded-lg" />
               <.skeleton_block class="h-11 w-full rounded-lg" />
             </div>
-            <div class="bg-white border border-zinc-100 rounded-xl shadow-sm p-6 space-y-3">
-              <.skeleton_block class="h-5 w-32 rounded" />
+            <div class="bg-white border border-zinc-100 rounded-xl shadow-xs p-6 space-y-3">
+              <.skeleton_block class="h-5 w-32 rounded-sm" />
               <.skeleton_block class="h-24 w-full rounded-lg" />
             </div>
           </div>
           <aside class="space-y-3">
-            <div class="bg-white border border-zinc-100 rounded-xl shadow-sm p-6 space-y-3">
-              <.skeleton_block class="h-5 w-28 rounded" />
-              <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded" />
+            <div class="bg-white border border-zinc-100 rounded-xl shadow-xs p-6 space-y-3">
+              <.skeleton_block class="h-5 w-28 rounded-sm" />
+              <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded-sm" />
             </div>
           </aside>
         </div>
@@ -1930,7 +1930,7 @@ defmodule YscWeb.ExpenseReportLive do
                 navigate={~p"/expensereports"}
                 variant="outline"
                 color="zinc"
-                class="flex-shrink-0 bg-white hover:bg-zinc-100"
+                class="shrink-0 bg-white hover:bg-zinc-100"
               >
                 <.icon name="hero-document-text" class="w-5 h-5" /> View My Reports
               </.button>
@@ -1939,7 +1939,7 @@ defmodule YscWeb.ExpenseReportLive do
               <div class="flex gap-3">
                 <.icon
                   name="hero-information-circle"
-                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
+                  class="w-6 h-6 text-blue-600 shrink-0 mt-0.5"
                 />
                 <div class="space-y-2 text-sm text-zinc-700">
                   <p>
@@ -1971,7 +1971,7 @@ defmodule YscWeb.ExpenseReportLive do
             <div class="flex items-start gap-3 text-sm text-amber-900">
               <.icon
                 name="hero-pencil-square"
-                class="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600"
+                class="w-5 h-5 shrink-0 mt-0.5 text-amber-600"
               />
               <p>
                 We saved this as a draft{if @draft_updated_at,
@@ -1985,7 +1985,7 @@ defmodule YscWeb.ExpenseReportLive do
               type="button"
               phx-click="discard-draft"
               data-confirm="Discard this draft and start over? This can't be undone."
-              class="flex-shrink-0 text-sm font-semibold text-amber-800 hover:text-amber-900 underline"
+              class="shrink-0 text-sm font-semibold text-amber-800 hover:text-amber-900 underline"
             >
               Discard draft
             </button>
@@ -2109,7 +2109,7 @@ defmodule YscWeb.ExpenseReportLive do
                         >
                           <.icon
                             name="hero-information-circle"
-                            class="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5"
+                            class="w-4 h-4 text-blue-600 shrink-0 mt-0.5"
                           />
                           <span>
                             No receipt is needed for mileage. Enter the date, where you drove from and to, why you made the trip, and how many miles.
@@ -2367,7 +2367,7 @@ defmodule YscWeb.ExpenseReportLive do
                             id={"receipt-preview-#{expense_f.index}"}
                           >
                             <div class="flex items-start gap-4">
-                              <div class="flex-shrink-0">
+                              <div class="shrink-0">
                                 <%= if pdf?(expense_f[:receipt_s3_path].value) do %>
                                   <a
                                     href={
@@ -2412,7 +2412,7 @@ defmodule YscWeb.ExpenseReportLive do
                                 <div class="flex items-center gap-2 mb-2">
                                   <.icon
                                     name="hero-check-circle"
-                                    class="w-5 h-5 text-green-600 flex-shrink-0"
+                                    class="w-5 h-5 text-green-600 shrink-0"
                                   />
                                   <span class="text-sm font-medium text-green-800">
                                     Receipt attached
@@ -2508,7 +2508,7 @@ defmodule YscWeb.ExpenseReportLive do
                                 <%= if entry.client_name do %>
                                   <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                     <div class="flex items-start gap-4">
-                                      <div class="flex-shrink-0">
+                                      <div class="shrink-0">
                                         <%= if pdf?(entry.client_name) do %>
                                           <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
                                             <.icon
@@ -2529,7 +2529,7 @@ defmodule YscWeb.ExpenseReportLive do
                                         <div class="flex items-center gap-2 mb-2">
                                           <.icon
                                             name="hero-arrow-up-tray"
-                                            class="w-5 h-5 text-blue-600 flex-shrink-0"
+                                            class="w-5 h-5 text-blue-600 shrink-0"
                                           />
                                           <span class="text-sm font-medium text-blue-800">
                                             File selected: {entry.client_name}
@@ -2758,7 +2758,7 @@ defmodule YscWeb.ExpenseReportLive do
                           id={"proof-preview-#{income_f.index}"}
                         >
                           <div class="flex items-start gap-4">
-                            <div class="flex-shrink-0">
+                            <div class="shrink-0">
                               <%= if pdf?(income_f[:proof_s3_path].value) do %>
                                 <a
                                   href={
@@ -2803,7 +2803,7 @@ defmodule YscWeb.ExpenseReportLive do
                               <div class="flex items-center gap-2 mb-2">
                                 <.icon
                                   name="hero-check-circle"
-                                  class="w-5 h-5 text-green-600 flex-shrink-0"
+                                  class="w-5 h-5 text-green-600 shrink-0"
                                 />
                                 <span class="text-sm font-medium text-green-800">
                                   Proof document attached
@@ -2890,7 +2890,7 @@ defmodule YscWeb.ExpenseReportLive do
                               <%= if entry.client_name do %>
                                 <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                   <div class="flex items-start gap-4">
-                                    <div class="flex-shrink-0">
+                                    <div class="shrink-0">
                                       <%= if pdf?(entry.client_name) do %>
                                         <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
                                           <.icon
@@ -2911,7 +2911,7 @@ defmodule YscWeb.ExpenseReportLive do
                                       <div class="flex items-center gap-2 mb-2">
                                         <.icon
                                           name="hero-arrow-up-tray"
-                                          class="w-5 h-5 text-blue-600 flex-shrink-0"
+                                          class="w-5 h-5 text-blue-600 shrink-0"
                                         />
                                         <span class="text-sm font-medium text-blue-800">
                                           File selected: {entry.client_name}
@@ -3139,10 +3139,10 @@ defmodule YscWeb.ExpenseReportLive do
                 </.expense_form_section>
 
                 <:actions>
-                  <div class="space-y-4 bg-white rounded-xl border border-zinc-100 shadow-sm p-6">
+                  <div class="space-y-4 bg-white rounded-xl border border-zinc-100 shadow-xs p-6">
                     <p class="text-sm font-medium text-zinc-500">Review & submit</p>
                     <!-- Certification checkbox -->
-                    <div class="p-4 bg-white ring-1 ring-zinc-100 shadow-sm rounded-lg">
+                    <div class="p-4 bg-white ring-1 ring-zinc-100 shadow-xs rounded-lg">
                       <.input
                         field={@form[:certification_accepted]}
                         type="checkbox"
@@ -3206,8 +3206,8 @@ defmodule YscWeb.ExpenseReportLive do
             <div class="lg:col-span-1">
               <div class="lg:sticky lg:top-24">
                 <!-- Mobile: Fixed bottom summary -->
-                <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-zinc-200 shadow-lg z-40 p-4">
-                  <div class="max-w-screen-xl mx-auto">
+                <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xs border-t border-zinc-200 shadow-lg z-40 p-4">
+                  <div class="max-w-(--breakpoint-xl) mx-auto">
                     <div class="flex items-center justify-between mb-2">
                       <span class="text-sm font-semibold text-zinc-900">
                         Amount we will reimburse
@@ -3252,7 +3252,7 @@ defmodule YscWeb.ExpenseReportLive do
                   </div>
                 </div>
                 <!-- Desktop: Sticky sidebar -->
-                <div class="hidden lg:block bg-white rounded-xl border border-zinc-100 p-6 shadow-sm">
+                <div class="hidden lg:block bg-white rounded-xl border border-zinc-100 p-6 shadow-xs">
                   <h3 class="text-lg font-semibold text-zinc-900 mb-4">Summary</h3>
                   <div class="space-y-3">
                     <div class="flex justify-between items-center">
@@ -3327,7 +3327,7 @@ defmodule YscWeb.ExpenseReportLive do
                             <% :completed -> %>
                               <.icon
                                 name="hero-check-circle"
-                                class="w-5 h-5 text-green-600 flex-shrink-0"
+                                class="w-5 h-5 text-green-600 shrink-0"
                               />
                               <span class="text-sm text-green-700 line-through">
                                 {label}
@@ -3335,13 +3335,13 @@ defmodule YscWeb.ExpenseReportLive do
                             <% :error -> %>
                               <.icon
                                 name="hero-exclamation-circle"
-                                class="w-5 h-5 text-red-600 flex-shrink-0"
+                                class="w-5 h-5 text-red-600 shrink-0"
                               />
                               <span class="text-sm text-red-600">{label}</span>
                             <% :pending -> %>
                               <.icon
                                 name="hero-minus-circle"
-                                class="w-5 h-5 text-zinc-300 flex-shrink-0"
+                                class="w-5 h-5 text-zinc-300 shrink-0"
                               />
                               <span class="text-sm text-zinc-600">{label}</span>
                           <% end %>
@@ -3364,7 +3364,7 @@ defmodule YscWeb.ExpenseReportLive do
         </div>
         <!-- Bank Account Modal -->
         <%= if @bank_account_form do %>
-          <div class="fixed inset-0 z-[200] overflow-y-auto" id="modal-backdrop">
+          <div class="fixed inset-0 z-200 overflow-y-auto" id="modal-backdrop">
             <div
               class="fixed inset-0 transition-opacity bg-zinc-500 bg-opacity-75"
               phx-click="close-bank-account-modal"
@@ -3489,20 +3489,20 @@ defmodule YscWeb.ExpenseReportLive do
                           </div>
                         </div>
                         <!-- Number line at bottom of check -->
-                        <div class="mt-4 pt-3 border-t-2 border-zinc-400 bg-zinc-50 rounded px-3 py-2">
+                        <div class="mt-4 pt-3 border-t-2 border-zinc-400 bg-zinc-50 rounded-sm px-3 py-2">
                           <div class="text-xs text-zinc-500 mb-2 font-medium">
                             Bottom of check (number line):
                           </div>
                           <div class="flex items-center gap-2 font-mono text-sm">
                             <!-- Routing Number -->
                             <div class="flex items-center gap-1">
-                              <div class="px-2 py-1 bg-blue-100 border-2 border-blue-400 border-dashed rounded">
+                              <div class="px-2 py-1 bg-blue-100 border-2 border-blue-400 border-dashed rounded-sm">
                                 <div class="text-xs text-blue-600 font-semibold">
                                   021000021
                                 </div>
                               </div>
                               <svg
-                                class="w-4 h-4 text-blue-600 flex-shrink-0"
+                                class="w-4 h-4 text-blue-600 shrink-0"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -3519,13 +3519,13 @@ defmodule YscWeb.ExpenseReportLive do
                             <span class="text-zinc-400">⦁</span>
                             <!-- Account Number -->
                             <div class="flex items-center gap-1">
-                              <div class="px-2 py-1 bg-blue-100 border-2 border-blue-400 border-dashed rounded">
+                              <div class="px-2 py-1 bg-blue-100 border-2 border-blue-400 border-dashed rounded-sm">
                                 <div class="text-xs text-blue-600 font-semibold">
                                   1234567890
                                 </div>
                               </div>
                               <svg
-                                class="w-4 h-4 text-blue-600 flex-shrink-0"
+                                class="w-4 h-4 text-blue-600 shrink-0"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -3602,7 +3602,7 @@ defmodule YscWeb.ExpenseReportLive do
         <% end %>
       </div>
       <%!-- Fade from form background to white footer --%>
-      <div class="h-32 bg-gradient-to-b from-transparent to-white"></div>
+      <div class="h-32 bg-linear-to-b from-transparent to-white"></div>
     </div>
     """
   end
@@ -4002,7 +4002,7 @@ defmodule YscWeb.ExpenseReportLive do
   # Timeline component for expense report status
   defp timeline_section(assigns) do
     ~H"""
-    <div class="reimbursement-timeline bg-white rounded-lg shadow-sm border border-zinc-200 mb-6 p-6">
+    <div class="reimbursement-timeline bg-white rounded-lg shadow-xs border border-zinc-200 mb-6 p-6">
       <h2 class="text-lg font-semibold text-zinc-900 mb-4">
         Reimbursement Timeline
       </h2>
@@ -4098,7 +4098,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp timeline_step(assigns) do
     ~H"""
     <div class="flex items-start gap-4">
-      <div class="flex-shrink-0">
+      <div class="shrink-0">
         <%= case @status do %>
           <% :completed -> %>
             <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
@@ -4137,7 +4137,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp timeline_connector(assigns) do
     ~H"""
     <div class="flex items-start gap-4">
-      <div class="flex-shrink-0">
+      <div class="shrink-0">
         <div class="w-8 h-8 flex items-center justify-center">
           <div class={[
             "w-0.5 h-8",
@@ -4447,7 +4447,7 @@ defmodule YscWeb.ExpenseReportLive do
     <div
       id={@id}
       class={[
-        "bg-white rounded-xl border border-zinc-100 shadow-sm p-6 mb-8",
+        "bg-white rounded-xl border border-zinc-100 shadow-xs p-6 mb-8",
         @class
       ]}
     >

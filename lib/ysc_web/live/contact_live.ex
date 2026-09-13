@@ -6,7 +6,7 @@ defmodule YscWeb.ContactLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+    <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         <%!-- Left Column: Contact Form --%>
         <div class="prose prose-zinc prose-a:text-blue-600 max-w-xl mx-auto lg:mx-0">
@@ -105,7 +105,7 @@ defmodule YscWeb.ContactLive do
               <div class="flex items-start gap-4">
                 <.icon
                   name="hero-map-pin"
-                  class="w-6 h-6 text-zinc-400 flex-shrink-0 mt-0.5"
+                  class="w-6 h-6 text-zinc-400 shrink-0 mt-0.5"
                 />
                 <div>
                   <p class="font-semibold text-zinc-900 mb-1">Mailing Address</p>

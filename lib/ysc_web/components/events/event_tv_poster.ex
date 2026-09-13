@@ -38,7 +38,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
           alt={event_image_alt(@event)}
           class="absolute inset-0 h-full w-full object-cover"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/95 via-zinc-900/55 to-zinc-900/20">
+        <div class="absolute inset-0 bg-linear-to-t from-zinc-900/95 via-zinc-900/55 to-zinc-900/20">
         </div>
       </div>
 
@@ -49,7 +49,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
         <div class="bg-white p-4 rounded-2xl shadow-xl">
           <.qr_code data={@event_url} size={168} />
         </div>
-        <span class="text-sm font-bold uppercase tracking-[0.2em] text-white/90 drop-shadow">
+        <span class="text-sm font-bold uppercase tracking-[0.2em] text-white/90 drop-shadow-sm">
           Scan for details
         </span>
       </div>
@@ -57,7 +57,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
       <div class="absolute top-12 left-12 z-10 flex flex-wrap gap-3 max-w-[calc(100%-280px)]">
         <%= for badge <- @badges do %>
           <span class={[
-            "px-4 py-2 rounded text-sm font-black uppercase tracking-widest",
+            "px-4 py-2 rounded-sm text-sm font-black uppercase tracking-widest",
             badge.class
           ]}>
             <.icon :if={badge.icon} name={badge.icon} class="w-4 h-4 inline me-1" />
@@ -69,7 +69,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
       <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end p-12 lg:p-16">
         <div class="max-w-[1400px]">
           <div class="flex flex-wrap items-center gap-4 mb-6">
-            <span class="text-lg font-black px-4 py-2 rounded bg-white/15 backdrop-blur-sm uppercase tracking-[0.2em]">
+            <span class="text-lg font-black px-4 py-2 rounded-sm bg-white/15 backdrop-blur-xs uppercase tracking-[0.2em]">
               {DateTimeFormatter.format_event_start(@event, separator: " · ")}
             </span>
             <span
@@ -87,14 +87,14 @@ defmodule YscWeb.Components.Events.EventTvPoster do
 
           <p
             :if={@event.description}
-            class="text-2xl leading-relaxed text-zinc-200 line-clamp-3 mb-10 max-w-5xl drop-shadow"
+            class="text-2xl leading-relaxed text-zinc-200 line-clamp-3 mb-10 max-w-5xl drop-shadow-sm"
           >
             {@event.description}
           </p>
 
           <div class="flex items-center gap-6 pt-8 border-t border-white/25">
             <span class={[
-              "text-xl font-black rounded border border-white/35 px-5 py-2.5 backdrop-blur-sm",
+              "text-xl font-black rounded-sm border border-white/35 px-5 py-2.5 backdrop-blur-xs",
               @sold_out && "line-through opacity-70"
             ]}>
               {pricing_display(@event)}

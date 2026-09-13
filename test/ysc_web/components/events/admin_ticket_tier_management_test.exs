@@ -87,7 +87,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
           current_user: user
         })
 
-      assert html =~ "$25" or html =~ "25"
+      assert html =~ "$2,500.00"
     end
 
     test "displays free tier indicator" do

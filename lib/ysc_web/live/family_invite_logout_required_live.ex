@@ -73,7 +73,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
     ~H"""
     <div class="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-zinc-50">
       <div class="max-w-lg w-full">
-        <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-8">
+        <div class="bg-white rounded-xl shadow-xs border border-zinc-200 p-8">
           <h1 class="text-2xl font-semibold text-zinc-900 mb-4">
             Sign out to accept this invitation
           </h1>
@@ -116,7 +116,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
             <input type="hidden" name="redirect_to" value={@redirect_to} />
             <button
               type="submit"
-              class="w-full flex justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              class="w-full flex justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white hover:bg-blue-500 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
               <%= if @existing_user do %>
                 Sign out and sign in with {@invite.email}

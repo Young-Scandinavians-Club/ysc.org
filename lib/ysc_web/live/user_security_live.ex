@@ -393,7 +393,7 @@ defmodule YscWeb.UserSecurityLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-screen-xl px-4 mx-auto py-8 lg:py-10">
+    <div class="max-w-(--breakpoint-xl) px-4 mx-auto py-8 lg:py-10">
       <.live_component
         :if={@show_reauth_modal}
         module={YscWeb.ReauthComponent}
@@ -422,10 +422,10 @@ defmodule YscWeb.UserSecurityLive do
           }
         />
 
-        <div class="text-medium px-2 text-zinc-500 rounded w-full md:border-l md:border-1 md:border-zinc-100 md:pl-16">
+        <div class="text-medium px-2 text-zinc-500 rounded-sm w-full md:border-l md:border md:border-zinc-100 md:pl-16">
           <div class="space-y-8">
             <!-- Passkeys Section -->
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Passkeys</h2>
               <p class="text-zinc-600 text-sm">
                 A passkey is a passwordless way to sign in using your device’s built-in security (fingerprint, face, or PIN). It’s tied to your device and this site, so it can’t be phished or leaked like a password.
@@ -451,7 +451,7 @@ defmodule YscWeb.UserSecurityLive do
               <div
                 :if={@passkeys_loading}
                 id="user-security-passkeys-loading"
-                class="space-y-3 min-h-[12rem]"
+                class="space-y-3 min-h-48"
                 role="status"
                 aria-live="polite"
               >
@@ -460,17 +460,17 @@ defmodule YscWeb.UserSecurityLive do
                   :for={_ <- 1..2}
                   class="flex items-center justify-between p-4 border border-zinc-200 rounded-lg"
                   lines={[
-                    "h-4 w-40 rounded",
-                    "h-3 w-32 rounded",
-                    "h-3 w-28 rounded"
+                    "h-4 w-40 rounded-sm",
+                    "h-3 w-32 rounded-sm",
+                    "h-3 w-28 rounded-sm"
                   ]}
-                  trailing_class="h-8 w-20 rounded"
+                  trailing_class="h-8 w-20 rounded-sm"
                 />
               </div>
 
               <div
                 :if={@passkeys_loaded && @passkeys == []}
-                class="text-center py-8 min-h-[12rem] flex flex-col items-center justify-center"
+                class="text-center py-8 min-h-48 flex flex-col items-center justify-center"
               >
                 <p class="text-zinc-600 text-sm mb-4">
                   You don't have any passkeys yet.
@@ -482,7 +482,7 @@ defmodule YscWeb.UserSecurityLive do
 
               <div
                 :if={@passkeys_loaded && @passkeys != []}
-                class="space-y-4 min-h-[12rem]"
+                class="space-y-4 min-h-48"
               >
                 <.button navigate={~p"/users/settings/passkeys/new"} class="mb-4">
                   <.icon name="hero-plus" class="w-5 h-5" /> Add Passkey
@@ -534,7 +534,7 @@ defmodule YscWeb.UserSecurityLive do
               </div>
             </div>
             <!-- Password Change Section -->
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">
                 {if @user_has_password,
                   do: "Change Password",
@@ -588,7 +588,7 @@ defmodule YscWeb.UserSecurityLive do
               </.simple_form>
             </div>
             <!-- Recent Activity Section -->
-            <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Recent Activity</h2>
               <p class="text-zinc-600 text-sm">
                 Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out on your other devices.
@@ -607,8 +607,8 @@ defmodule YscWeb.UserSecurityLive do
                   class="p-4 border border-zinc-200 rounded-lg space-y-2"
                 >
                   <.skeleton_block class="h-3 w-24 rounded-md" />
-                  <.skeleton_block class="h-4 w-48 rounded" />
-                  <.skeleton_block class="h-3 w-36 rounded" />
+                  <.skeleton_block class="h-4 w-48 rounded-sm" />
+                  <.skeleton_block class="h-3 w-36 rounded-sm" />
                 </div>
               </div>
 

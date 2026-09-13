@@ -13,7 +13,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       >
         <.icon
           name="hero-information-circle"
-          class="w-5 h-5 text-blue-600 flex-shrink-0"
+          class="w-5 h-5 text-blue-600 shrink-0"
         />
         <p class="text-sm text-blue-800">
           This event also has a
@@ -29,7 +29,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         </p>
       </div>
       <%!-- Ticket Tiers List --%>
-      <div class="border border-zinc-200 rounded p-4 sm:p-6">
+      <div class="border border-zinc-200 rounded-sm p-4 sm:p-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">
           <h3 class="text-lg font-semibold">Ticket Tiers</h3>
           <div class="flex items-center">
@@ -49,7 +49,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <div class="flex items-center gap-2 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <.icon
               name="hero-information-circle"
-              class="w-5 h-5 text-amber-600 flex-shrink-0"
+              class="w-5 h-5 text-amber-600 shrink-0"
             />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-amber-900">
@@ -66,7 +66,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
               label={if @event.tickets_tbd, do: "TBD Enabled", else: "Set as TBD"}
               phx-click="toggle-tickets-tbd"
               phx-target={@myself}
-              class="flex-shrink-0"
+              class="shrink-0"
             />
           </div>
         <% end %>
@@ -85,7 +85,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <%= for ticket_tier <- @ticket_tiers do %>
             <% is_donation =
               ticket_tier.type == "donation" || ticket_tier.type == :donation %>
-            <div class="group border border-zinc-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all bg-white">
+            <div class="group border border-zinc-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-xs transition-all bg-white">
               <div class="flex flex-col lg:flex-row lg:items-center gap-4">
                 <div class="flex-1">
                   <div class="flex items-center gap-3 mb-1">
@@ -108,7 +108,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                   </div>
                   <p
                     :if={ticket_tier.description}
-                    class="text-zinc-500 text-sm mb-3 min-h-[2.5rem] lg:min-h-[1.25rem]"
+                    class="text-zinc-500 text-sm mb-3 min-h-10 lg:min-h-5"
                   >
                     {ticket_tier.description}
                     <span class="text-zinc-400 italic text-xs">
@@ -117,7 +117,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                   </p>
                   <p
                     :if={!ticket_tier.description}
-                    class="text-zinc-400 text-sm italic mb-3 min-h-[2.5rem] lg:min-h-[1.25rem]"
+                    class="text-zinc-400 text-sm italic mb-3 min-h-10 lg:min-h-5"
                   >
                     {String.capitalize(to_string(ticket_tier.type))} Tier
                   </p>
@@ -318,7 +318,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                             phx-target={@myself}
                             phx-disable-with="Cancelling..."
                             data-confirm="Are you sure you want to cancel this reservation?"
-                            class="shrink-0 p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            class="shrink-0 p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 rounded-sm transition-colors"
                           >
                             <.icon name="hero-x-mark" class="w-4 h-4" />
                           </button>
@@ -370,7 +370,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                             phx-target={@myself}
                             phx-disable-with="Cancelling..."
                             data-confirm="Are you sure you want to cancel this reservation?"
-                            class="shrink-0 p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            class="shrink-0 p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-sm transition-colors"
                           >
                             <.icon name="hero-x-mark" class="w-4 h-4" />
                           </button>

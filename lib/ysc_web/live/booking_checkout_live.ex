@@ -351,7 +351,7 @@ defmodule YscWeb.BookingCheckoutLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+    <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
       <div class="prose prose-zinc mb-8">
         <h1>Complete Your Booking</h1>
       </div>
@@ -368,21 +368,21 @@ defmodule YscWeb.BookingCheckoutLive do
           <div class="flex items-center gap-6 p-6 bg-zinc-50 rounded-lg border border-zinc-200">
             <.skeleton_block class="h-20 w-20 rounded-lg shrink-0" />
             <div class="flex-1 space-y-2">
-              <.skeleton_block class="h-6 w-1/2 rounded" />
-              <.skeleton_block class="h-4 w-2/3 rounded" />
-              <.skeleton_block class="h-4 w-1/3 rounded" />
+              <.skeleton_block class="h-6 w-1/2 rounded-sm" />
+              <.skeleton_block class="h-4 w-2/3 rounded-sm" />
+              <.skeleton_block class="h-4 w-1/3 rounded-sm" />
             </div>
           </div>
           <div class="bg-white rounded-lg border border-zinc-200 p-8 space-y-4">
-            <.skeleton_block class="h-6 w-40 rounded" />
+            <.skeleton_block class="h-6 w-40 rounded-sm" />
             <.payment_element_loading />
           </div>
         </div>
         <aside class="space-y-6">
           <.skeleton_block class="h-20 w-full rounded-lg" />
           <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
-            <.skeleton_block class="h-4 w-1/3 rounded" />
-            <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded" />
+            <.skeleton_block class="h-4 w-1/3 rounded-sm" />
+            <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded-sm" />
           </div>
         </aside>
       </div>
@@ -395,7 +395,7 @@ defmodule YscWeb.BookingCheckoutLive do
         <div class="lg:col-span-2 space-y-6">
           <!-- Visual Booking Summary -->
           <div class="flex items-center gap-6 p-6 bg-zinc-50 rounded-lg border border-zinc-200">
-            <div class="h-20 w-20 bg-zinc-200 rounded-lg overflow-hidden flex-shrink-0">
+            <div class="h-20 w-20 bg-zinc-200 rounded-lg overflow-hidden shrink-0">
               <img
                 src={PropertyDisplay.thumbnail_path(@booking.property)}
                 alt={titleize(@booking.property) <> " Cabin"}
@@ -461,7 +461,7 @@ defmodule YscWeb.BookingCheckoutLive do
           <!-- Payment Section -->
           <div
             :if={@checkout_step == :payment}
-            class="bg-white rounded-lg border border-zinc-200 p-8 shadow-sm"
+            class="bg-white rounded-lg border border-zinc-200 p-8 shadow-xs"
           >
             <h2 class="text-xl font-bold mb-6">
               <%= if @complimentary_checkout do %>
@@ -525,7 +525,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 <div
                   id="payment-element"
                   phx-update="ignore"
-                  class="mb-6 min-h-[12rem]"
+                  class="mb-6 min-h-48"
                 >
                 </div>
                 <div id="payment-message" class="hidden mt-4"></div>
@@ -714,7 +714,7 @@ defmodule YscWeb.BookingCheckoutLive do
         :if={@checkout_step == :guest_info}
         class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 shadow-lg z-50 p-4"
       >
-        <div class="max-w-screen-xl mx-auto flex items-center justify-between gap-4">
+        <div class="max-w-(--breakpoint-xl) mx-auto flex items-center justify-between gap-4">
           <div>
             <p class="text-xs text-zinc-500 uppercase tracking-wide">Total</p>
             <p class="text-2xl font-black text-blue-600">

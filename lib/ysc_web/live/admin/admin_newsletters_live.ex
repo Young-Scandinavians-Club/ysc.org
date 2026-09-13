@@ -398,7 +398,7 @@ defmodule YscWeb.AdminNewslettersLive do
                 phx-submit="search"
               />
             </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="flex items-center gap-2 shrink-0">
               <div id="admin-newsletter-filters">
                 <.admin_filter_dropdown
                   id="filter-newsletters-dropdown"
@@ -686,7 +686,7 @@ defmodule YscWeb.AdminNewslettersLive do
                 phx-submit="search-subscribers"
               />
             </div>
-            <div class="flex items-center gap-2 flex-shrink-0 flex-wrap">
+            <div class="flex items-center gap-2 shrink-0 flex-wrap">
               <span class="text-sm font-medium text-zinc-600 sr-only sm:not-sr-only">
                 Status:
               </span>

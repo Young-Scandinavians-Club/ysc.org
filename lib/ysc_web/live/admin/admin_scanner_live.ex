@@ -25,7 +25,7 @@ defmodule YscWeb.AdminScannerLive do
           <h1 class="text-2xl font-semibold text-zinc-800">Check-in Sessions</h1>
           <.link
             navigate={~p"/admin/scanner"}
-            class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:scale-[0.98] transition duration-150 ease-in-out"
+            class="inline-flex items-center rounded-sm py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:scale-[0.98] transition duration-150 ease-in-out"
           >
             <.icon name="hero-qr-code" class="w-4 h-4 -mt-0.5 me-1" />
             New Check-in Session
@@ -45,10 +45,10 @@ defmodule YscWeb.AdminScannerLive do
             class="bg-white border border-zinc-200 rounded-lg p-4 space-y-2"
           >
             <div class="flex items-center justify-between">
-              <.skeleton_block class="h-4 w-40 rounded" />
+              <.skeleton_block class="h-4 w-40 rounded-sm" />
               <.skeleton_block class="h-5 w-16 rounded-full" />
             </div>
-            <.skeleton_block class="h-3 w-24 rounded" />
+            <.skeleton_block class="h-3 w-24 rounded-sm" />
           </div>
         </div>
 
@@ -62,7 +62,7 @@ defmodule YscWeb.AdminScannerLive do
         <div :if={@data_loaded? && @sessions != []} class="space-y-3">
           <div
             :for={session <- @sessions}
-            class="bg-white border border-zinc-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+            class="bg-white border border-zinc-200 rounded-lg p-4 hover:shadow-xs transition-shadow"
           >
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
@@ -173,15 +173,15 @@ defmodule YscWeb.AdminScannerLive do
         >
           <span class="sr-only">Loading session…</span>
           <div class="flex items-center gap-2 mb-6">
-            <.skeleton_block class="h-5 w-5 rounded shrink-0" />
-            <.skeleton_block class="h-7 w-64 rounded" />
+            <.skeleton_block class="h-5 w-5 rounded-sm shrink-0" />
+            <.skeleton_block class="h-7 w-64 rounded-sm" />
           </div>
-          <.skeleton_block class="h-4 w-80 rounded mb-6" />
+          <.skeleton_block class="h-4 w-80 rounded-sm mb-6" />
           <div class="divide-y divide-zinc-100 border-t border-zinc-100">
             <.skeleton_list_row
               :for={_ <- 1..5}
               class="py-4"
-              lines={["h-4 w-1/3 rounded", "h-3 w-1/2 rounded"]}
+              lines={["h-4 w-1/3 rounded-sm", "h-3 w-1/2 rounded-sm"]}
             />
           </div>
         </div>
@@ -431,7 +431,7 @@ defmodule YscWeb.AdminScannerLive do
           </.admin_page_title>
           <.link
             navigate={~p"/admin/scanner/sessions"}
-            class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold leading-6 border border-zinc-200 hover:bg-zinc-50 text-zinc-700 bg-transparent transition duration-150 ease-in-out"
+            class="inline-flex items-center rounded-sm py-2 px-3 text-sm font-semibold leading-6 border border-zinc-200 hover:bg-zinc-50 text-zinc-700 bg-transparent transition duration-150 ease-in-out"
           >
             <.icon name="hero-clock" class="w-4 h-4 -mt-0.5 me-1" /> Past Sessions
           </.link>
@@ -442,7 +442,7 @@ defmodule YscWeb.AdminScannerLive do
           <%!-- Resume own open sessions --%>
           <div
             :if={@open_sessions != []}
-            class="bg-white rounded-xl border border-green-200 p-4 shadow-sm"
+            class="bg-white rounded-xl border border-green-200 p-4 shadow-xs"
           >
             <h2 class="text-sm font-semibold text-green-800 mb-3 flex items-center gap-1.5">
               <.icon name="hero-arrow-path" class="w-4 h-4" />
@@ -483,7 +483,7 @@ defmodule YscWeb.AdminScannerLive do
                 <%= if session.type == :event_membership do %>
                   <.link
                     navigate={~p"/admin/membership-check-in/#{session.id}"}
-                    class="ml-3 shrink-0 inline-flex items-center rounded px-3 py-1.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+                    class="ml-3 shrink-0 inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors"
                   >
                     Open Desk
                   </.link>
@@ -504,7 +504,7 @@ defmodule YscWeb.AdminScannerLive do
           <%!-- Join open event_membership sessions from other admins --%>
           <div
             :if={@joinable_sessions != []}
-            class="bg-white rounded-xl border border-violet-200 p-4 shadow-sm"
+            class="bg-white rounded-xl border border-violet-200 p-4 shadow-xs"
           >
             <h2 class="text-sm font-semibold text-violet-800 mb-3 flex items-center gap-1.5">
               <.icon name="hero-user-group" class="w-4 h-4" />
@@ -544,7 +544,7 @@ defmodule YscWeb.AdminScannerLive do
                 </div>
                 <.link
                   navigate={~p"/admin/membership-check-in/#{session.id}"}
-                  class="ml-3 shrink-0 inline-flex items-center rounded px-3 py-1.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+                  class="ml-3 shrink-0 inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors"
                 >
                   Join
                 </.link>
@@ -552,7 +552,7 @@ defmodule YscWeb.AdminScannerLive do
             </div>
           </div>
 
-          <div class="bg-white rounded-xl border border-zinc-200 p-6 shadow-sm">
+          <div class="bg-white rounded-xl border border-zinc-200 p-6 shadow-xs">
             <h2 class="text-lg font-semibold text-zinc-800 mb-4">
               Start a Check-in Session
             </h2>
@@ -764,7 +764,7 @@ defmodule YscWeb.AdminScannerLive do
           <%!-- Top gradient header --%>
           <div class={[
             "absolute top-0 inset-x-0 z-20 px-4 pt-4 pb-16",
-            "bg-gradient-to-b",
+            "bg-linear-to-b",
             cond do
               @active_session.type == :membership ->
                 "from-emerald-950/95 to-transparent"
@@ -971,7 +971,7 @@ defmodule YscWeb.AdminScannerLive do
                 <p class="text-xs text-zinc-400 mb-1">Already checked in:</p>
                 <div
                   :for={ticket <- @group_prompt.checked_tickets}
-                  class="flex items-center bg-zinc-100 rounded px-3 py-1.5 mb-1 text-sm text-zinc-400"
+                  class="flex items-center bg-zinc-100 rounded-sm px-3 py-1.5 mb-1 text-sm text-zinc-400"
                 >
                   <.icon
                     name="hero-check-circle"
@@ -1003,7 +1003,7 @@ defmodule YscWeb.AdminScannerLive do
           <%!-- Bottom controls: manual entry --%>
           <div class="absolute bottom-0 inset-x-0 z-20 pointer-events-none">
             <div class={[
-              "px-4 pb-8 pt-32 bg-gradient-to-t from-black/75 to-transparent",
+              "px-4 pb-8 pt-32 bg-linear-to-t from-black/75 to-transparent",
               "flex items-end justify-center",
               @scan_result && "opacity-0"
             ]}>
@@ -1015,7 +1015,7 @@ defmodule YscWeb.AdminScannerLive do
                     class="w-3 h-3 transition-transform group-open:rotate-180"
                   />
                 </summary>
-                <div class="mt-3 bg-zinc-900/95 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+                <div class="mt-3 bg-zinc-900/95 backdrop-blur-xs border border-white/10 rounded-xl p-4">
                   <.form
                     for={@manual_form}
                     id="manual-entry-form"
@@ -1034,7 +1034,7 @@ defmodule YscWeb.AdminScannerLive do
                             else: "Enter Order ID (e.g. ORD-XXXX)"
                           )
                         }
-                        class="w-full bg-white/10 border border-white/20 text-white placeholder-white/35 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white/30"
+                        class="w-full bg-white/10 border border-white/20 text-white placeholder-white/35 rounded-lg px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-white/30"
                       />
                     </div>
                     <button

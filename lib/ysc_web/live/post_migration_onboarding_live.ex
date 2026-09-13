@@ -131,8 +131,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mb-8 flex items-center justify-center gap-2">
             <.skeleton_block :for={_ <- 1..6} class="h-2 flex-1 rounded-full" />
           </div>
-          <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8 space-y-4">
-            <.skeleton_block class="h-6 w-1/2 rounded" />
+          <div class="bg-white rounded-xl shadow-xs border border-zinc-200 p-6 md:p-8 space-y-4">
+            <.skeleton_block class="h-6 w-1/2 rounded-sm" />
             <.skeleton_block :for={_ <- 1..3} class="h-11 w-full rounded-lg" />
             <.skeleton_block class="h-11 w-1/3 rounded-lg" />
           </div>
@@ -148,7 +148,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </div>
 
           <%!-- Step content --%>
-          <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8">
+          <div class="bg-white rounded-xl shadow-xs border border-zinc-200 p-6 md:p-8">
             <%= if @current_step == 1 do %>
               <.step_profile
                 form={@profile_form}
@@ -366,7 +366,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </div>
 
             <div :if={@loading_avatars} class="pt-2">
-              <div class="h-4 w-20 bg-zinc-200 rounded animate-pulse mb-2"></div>
+              <div class="h-4 w-20 bg-zinc-200 rounded-sm animate-pulse mb-2"></div>
               <div class="flex flex-wrap gap-2">
                 <%= for _i <- 1..3 do %>
                   <div class="w-12 h-12 rounded-full bg-zinc-200 animate-pulse">
@@ -533,7 +533,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <div class="flex gap-3">
           <.icon
             name="hero-user-group"
-            class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+            class="h-5 w-5 text-blue-500 shrink-0 mt-0.5"
           />
           <div>
             <h3 class="text-sm font-semibold text-blue-800">
@@ -1041,7 +1041,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       </p>
       <.link
         navigate={~p"/"}
-        class="inline-flex items-center gap-2 phx-submit-loading:opacity-75 rounded py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition duration-150 ease-in-out"
+        class="inline-flex items-center gap-2 phx-submit-loading:opacity-75 rounded-sm py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition duration-150 ease-in-out"
       >
         <.icon name="hero-home" class="w-4 h-4" /> Go to Home
       </.link>

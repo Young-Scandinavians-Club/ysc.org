@@ -283,9 +283,9 @@ defmodule YscWeb.AdminDashboardLive do
         <div
           id="dashboard-pending-refunds"
           class={[
-            "p-5 rounded border flex flex-col justify-between transition-all",
+            "p-5 rounded-sm border flex flex-col justify-between transition-all",
             if(@pending_refunds_summary.total > 0,
-              do: "bg-rose-50 border-rose-300 shadow-sm shadow-rose-100",
+              do: "bg-rose-50 border-rose-300 shadow-xs shadow-rose-100",
               else: "bg-white border-zinc-200"
             )
           ]}
@@ -452,7 +452,7 @@ defmodule YscWeb.AdminDashboardLive do
         ]}>
           <div
             id="dashboard-events-timeline"
-            class="bg-white rounded border border-zinc-200 p-5 sm:p-6 shadow-sm"
+            class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs"
           >
             <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-3">
               <h2 class="text-lg font-black text-zinc-900 tracking-tight">
@@ -478,7 +478,7 @@ defmodule YscWeb.AdminDashboardLive do
                 :for={_ <- 1..3}
                 class="flex items-start gap-3"
                 leading_class="h-3 w-3 rounded-full mt-1.5 shrink-0"
-                lines={["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]}
+                lines={["h-4 w-2/3 rounded-sm", "h-3 w-1/3 rounded-sm"]}
               />
             </div>
 
@@ -499,7 +499,7 @@ defmodule YscWeb.AdminDashboardLive do
                 class="relative pl-6 sm:pl-8 pb-8 last:pb-0 group"
               >
                 <span class={[
-                  "absolute -left-[7px] sm:-left-[9px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10",
+                  "absolute left-[-7px] sm:left-[-9px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-xs z-10",
                   "bg-blue-600 group-hover:scale-110 transition-transform"
                 ]}></span>
                 <div class={[
@@ -575,7 +575,7 @@ defmodule YscWeb.AdminDashboardLive do
                       <div class="w-full bg-zinc-200/80 h-2 rounded-full overflow-hidden">
                         <div
                           id={"dashboard-event-#{event.id}-tier-#{tier.id}-progress"}
-                          class="bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full transition-all duration-700 max-w-full"
+                          class="bg-linear-to-r from-blue-600 to-indigo-600 h-full rounded-full transition-all duration-700 max-w-full"
                           style={"width: #{calculate_progress_percentage(tier, event, tiers)}%"}
                         >
                         </div>
@@ -594,7 +594,7 @@ defmodule YscWeb.AdminDashboardLive do
         >
           <div
             id="dashboard-financials"
-            class="bg-white rounded border border-zinc-200 p-5 shadow-sm space-y-5"
+            class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs space-y-5"
           >
             <h2 class="text-sm font-black text-zinc-900 uppercase tracking-widest border-b border-zinc-100 pb-2">
               Financials
@@ -686,7 +686,7 @@ defmodule YscWeb.AdminDashboardLive do
               <div class="space-y-1.5 text-xs">
                 <div class="flex items-center justify-between">
                   <span class="flex items-center gap-1.5 text-zinc-500">
-                    <span class="inline-block w-2 h-2 rounded-sm bg-blue-600 shrink-0"></span>
+                    <span class="inline-block w-2 h-2 rounded-xs bg-blue-600 shrink-0"></span>
                     Bookings
                   </span>
                   <span class="font-bold font-mono text-zinc-800">
@@ -695,7 +695,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="flex items-center gap-1.5 text-zinc-500">
-                    <span class="inline-block w-2 h-2 rounded-sm bg-purple-500 shrink-0"></span>
+                    <span class="inline-block w-2 h-2 rounded-xs bg-purple-500 shrink-0"></span>
                     Events
                   </span>
                   <span class="font-bold font-mono text-zinc-800">
@@ -704,7 +704,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="flex items-center gap-1.5 text-zinc-500">
-                    <span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 shrink-0"></span>
+                    <span class="inline-block w-2 h-2 rounded-xs bg-emerald-500 shrink-0"></span>
                     Membership
                   </span>
                   <span class="font-bold font-mono text-zinc-800">
@@ -745,7 +745,7 @@ defmodule YscWeb.AdminDashboardLive do
 
           <div
             id="dashboard-newsletters"
-            class="bg-white rounded border border-zinc-200 p-5 shadow-sm"
+            class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs"
           >
             <div class="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
               <div>
@@ -828,7 +828,7 @@ defmodule YscWeb.AdminDashboardLive do
       <div
         :if={@admin_role == :admin}
         id="review-applications-section"
-        class="bg-white rounded border border-zinc-200 p-5 sm:p-6 shadow-sm mb-6"
+        class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs mb-6"
       >
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4 border-b border-zinc-100 pb-3">
           <div class="flex items-center gap-2">
@@ -887,10 +887,10 @@ defmodule YscWeb.AdminDashboardLive do
               get_status_pillar_color(user)
             ]}>
             </div>
-            <div class="relative flex-shrink-0 pl-1">
+            <div class="relative shrink-0 pl-1">
               <.user_avatar_image
                 user={user}
-                class="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow-sm"
+                class="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow-xs"
               />
             </div>
             <div class="flex-1 min-w-0 pl-1">
@@ -930,7 +930,7 @@ defmodule YscWeb.AdminDashboardLive do
 
       <div
         id="dashboard-recent-discussions"
-        class="bg-white rounded border border-zinc-200 p-5 shadow-sm mb-8"
+        class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs mb-8"
       >
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-black text-zinc-900 uppercase tracking-widest">
@@ -955,8 +955,8 @@ defmodule YscWeb.AdminDashboardLive do
             :for={_ <- 1..3}
             class="space-y-2 border-b border-zinc-100 pb-3 last:border-0 last:pb-0"
           >
-            <.skeleton_block class="h-3 w-1/3 rounded" />
-            <.skeleton_block class="h-4 w-full rounded" />
+            <.skeleton_block class="h-3 w-1/3 rounded-sm" />
+            <.skeleton_block class="h-4 w-full rounded-sm" />
           </div>
         </div>
         <p

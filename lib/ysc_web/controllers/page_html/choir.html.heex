@@ -1,4 +1,4 @@
-<div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+<div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
   <%!-- Intro Section --%>
   <div class="prose prose-zinc prose-a:text-blue-600 max-w-3xl mb-10">
     <h1 class="mt-0">YSC Choir</h1>
@@ -22,7 +22,7 @@
     <%!-- Left: Practice Schedule --%>
     <div class="not-prose space-y-6">
       <div class="flex items-center gap-3 mb-2">
-        <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 flex-shrink-0">
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 shrink-0">
           <.icon name="hero-calendar-days" class="w-5 h-5" />
         </span>
         <h2 class="text-xl font-black text-zinc-900 tracking-tight">
@@ -32,8 +32,8 @@
 
       <div class="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
         <div class="flex items-start gap-4 p-5 bg-white hover:bg-zinc-50 transition-colors duration-150">
-          <div class="w-36 flex-shrink-0">
-            <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded uppercase tracking-widest whitespace-nowrap">
+          <div class="w-36 shrink-0">
+            <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm uppercase tracking-widest whitespace-nowrap">
               Every Sunday
             </span>
           </div>
@@ -45,8 +45,8 @@
           </div>
         </div>
         <div class="flex items-start gap-4 p-5 bg-white hover:bg-zinc-50 transition-colors duration-150">
-          <div class="w-36 flex-shrink-0">
-            <span class="text-xs font-black text-zinc-500 bg-zinc-100 px-2.5 py-1 rounded uppercase tracking-widest whitespace-nowrap">
+          <div class="w-36 shrink-0">
+            <span class="text-xs font-black text-zinc-500 bg-zinc-100 px-2.5 py-1 rounded-sm uppercase tracking-widest whitespace-nowrap">
               Seasonal
             </span>
           </div>
@@ -63,7 +63,7 @@
 
       <div class="p-5 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200">
         <div class="flex items-start gap-4">
-          <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 flex-shrink-0 mt-0.5">
+          <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 shrink-0 mt-0.5">
             <.icon name="hero-map-pin" class="w-5 h-5" />
           </span>
           <div>
@@ -81,7 +81,7 @@
     <div class="not-prose">
       <div class="p-8 bg-blue-50 rounded-3xl border border-blue-100 h-fit sticky top-8">
         <div class="flex items-center gap-3 mb-5">
-          <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex-shrink-0">
+          <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-100 text-blue-600 shrink-0">
             <.icon name="hero-chat-bubble-left-ellipsis" class="w-5 h-5" />
           </span>
           <h2 class="text-xl font-black text-zinc-900 tracking-tight">
@@ -111,7 +111,7 @@
 
         <div class="space-y-4 mb-6">
           <div class="flex items-center gap-3">
-            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white text-zinc-500 flex-shrink-0 border border-zinc-200">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white text-zinc-500 shrink-0 border border-zinc-200">
               <.icon name="hero-envelope" class="w-4 h-4" />
             </span>
             <div>
@@ -144,7 +144,7 @@
   <%!-- Google Calendar --%>
   <div class="border-t border-zinc-100 py-12 mb-2">
     <div class="flex items-center gap-3 mb-6">
-      <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 flex-shrink-0">
+      <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 shrink-0">
         <.icon name="hero-calendar" class="w-5 h-5" />
       </span>
       <h2 class="text-xl font-black text-zinc-900 tracking-tight">

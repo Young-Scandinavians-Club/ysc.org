@@ -27,7 +27,7 @@ defmodule YscWeb.NewsletterArchiveLive do
   def render(%{live_action: :index} = assigns) do
     ~H"""
     <div class="py-6 md:py-12">
-      <div class="max-w-screen-xl mx-auto px-4 mb-12">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-12">
         <.page_masthead
           size={:large}
           title="Newsletters"
@@ -36,7 +36,7 @@ defmodule YscWeb.NewsletterArchiveLive do
       </div>
 
       <%!-- Subscription widget --%>
-      <div class="max-w-screen-lg mx-auto px-4 mb-12">
+      <div class="max-w-(--breakpoint-lg) mx-auto px-4 mb-12">
         <%= if @current_user do %>
           <%= if @async_data_loaded do %>
             <.newsletter_member_status
@@ -65,17 +65,17 @@ defmodule YscWeb.NewsletterArchiveLive do
         <% end %>
       </div>
 
-      <div class="max-w-screen-lg mx-auto px-4">
+      <div class="max-w-(--breakpoint-lg) mx-auto px-4">
         <%!-- Loading skeletons --%>
         <div :if={!@async_data_loaded} class="divide-y divide-zinc-100">
           <div :for={_ <- 1..5} class="py-8 animate-pulse">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div class="flex-1 space-y-3">
-                <div class="h-3 w-24 bg-zinc-200 rounded"></div>
-                <div class="h-5 w-2/3 bg-zinc-200 rounded"></div>
-                <div class="h-4 w-full bg-zinc-100 rounded"></div>
+                <div class="h-3 w-24 bg-zinc-200 rounded-sm"></div>
+                <div class="h-5 w-2/3 bg-zinc-200 rounded-sm"></div>
+                <div class="h-4 w-full bg-zinc-100 rounded-sm"></div>
               </div>
-              <div class="h-4 w-12 bg-zinc-200 rounded shrink-0 mt-1"></div>
+              <div class="h-4 w-12 bg-zinc-200 rounded-sm shrink-0 mt-1"></div>
             </div>
           </div>
         </div>
@@ -134,7 +134,7 @@ defmodule YscWeb.NewsletterArchiveLive do
   def render(%{live_action: :show} = assigns) do
     ~H"""
     <div class="py-6 md:py-10">
-      <div class="max-w-screen-lg mx-auto px-4 mb-6">
+      <div class="max-w-(--breakpoint-lg) mx-auto px-4 mb-6">
         <div class="flex items-center justify-between">
           <.link
             navigate={~p"/newsletters"}
@@ -150,7 +150,7 @@ defmodule YscWeb.NewsletterArchiveLive do
             phx-click={JS.dispatch("newsletter:print", to: "#newsletter-frame")}
             variant="outline"
             color="zinc"
-            class="!min-h-0 !border-0 !bg-transparent !shadow-none px-3 py-2 text-sm font-medium !text-zinc-600 hover:!bg-zinc-100 hover:!text-zinc-900 transition-colors"
+            class="min-h-0! border-0! bg-transparent! shadow-none! px-3 py-2 text-sm font-medium text-zinc-600! hover:bg-zinc-100! hover:text-zinc-900! transition-colors"
             title="Print or save as PDF"
           >
             <.icon name="hero-printer" class="w-4 h-4 shrink-0" /> Save as PDF
@@ -159,8 +159,8 @@ defmodule YscWeb.NewsletterArchiveLive do
 
         <%!-- Title skeleton --%>
         <div :if={!@async_data_loaded} class="mt-6 mb-2 animate-pulse space-y-3">
-          <div class="h-3 w-28 bg-zinc-200 rounded"></div>
-          <div class="h-8 w-3/4 bg-zinc-200 rounded"></div>
+          <div class="h-3 w-28 bg-zinc-200 rounded-sm"></div>
+          <div class="h-8 w-3/4 bg-zinc-200 rounded-sm"></div>
         </div>
 
         <div :if={@async_data_loaded && @edition} class="mt-6 mb-2">
@@ -174,7 +174,7 @@ defmodule YscWeb.NewsletterArchiveLive do
       </div>
 
       <%!-- Newsletter iframe skeleton --%>
-      <div :if={!@async_data_loaded} class="max-w-screen-lg mx-auto px-4">
+      <div :if={!@async_data_loaded} class="max-w-(--breakpoint-lg) mx-auto px-4">
         <div
           class="rounded-xl border border-zinc-200 bg-zinc-50 animate-pulse"
           style="min-height:600px"
@@ -185,9 +185,9 @@ defmodule YscWeb.NewsletterArchiveLive do
       <%!-- Archived HTML via srcdoc so the email renders faithfully in isolation --%>
       <div
         :if={@async_data_loaded && @edition && @edition.archived_html}
-        class="max-w-screen-lg mx-auto px-4"
+        class="max-w-(--breakpoint-lg) mx-auto px-4"
       >
-        <div class="rounded-xl border border-zinc-200 shadow-sm">
+        <div class="rounded-xl border border-zinc-200 shadow-xs">
           <iframe
             id="newsletter-frame"
             srcdoc={@edition.archived_html}
@@ -203,7 +203,7 @@ defmodule YscWeb.NewsletterArchiveLive do
 
       <div
         :if={@async_data_loaded && @edition && !@edition.archived_html}
-        class="max-w-screen-lg mx-auto px-4"
+        class="max-w-(--breakpoint-lg) mx-auto px-4"
       >
         <div class="rounded-xl border border-zinc-200 p-12 text-center text-zinc-400">
           <.icon name="hero-envelope" class="w-10 h-10 mx-auto mb-4 text-zinc-300" />
@@ -226,10 +226,10 @@ defmodule YscWeb.NewsletterArchiveLive do
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-full bg-zinc-200 shrink-0"></div>
         <div class="space-y-2 flex-1">
-          <div class="h-4 w-32 bg-zinc-200 rounded"></div>
-          <div class="h-3 w-56 bg-zinc-100 rounded"></div>
+          <div class="h-4 w-32 bg-zinc-200 rounded-sm"></div>
+          <div class="h-3 w-56 bg-zinc-100 rounded-sm"></div>
         </div>
-        <div class="h-9 w-24 bg-zinc-200 rounded shrink-0"></div>
+        <div class="h-9 w-24 bg-zinc-200 rounded-sm shrink-0"></div>
       </div>
     </div>
     """

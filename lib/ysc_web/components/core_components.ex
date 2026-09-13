@@ -48,12 +48,12 @@ defmodule YscWeb.CoreComponents do
   attr :fill_viewport, :boolean, default: false
   attr :max_width, :string, default: "max-w-3xl"
   attr :on_cancel, JS, default: %JS{}
-  attr :z_index, :string, default: "z-[200]"
+  attr :z_index, :string, default: "z-200"
   attr :panel_class, :any, default: nil
   slot :inner_block, required: true
 
   def modal(assigns) do
-    assigns = assign_new(assigns, :z_index, fn -> "z-[200]" end)
+    assigns = assign_new(assigns, :z_index, fn -> "z-200" end)
 
     ~H"""
     <div
@@ -102,7 +102,7 @@ defmodule YscWeb.CoreComponents do
                 if(@fill_viewport,
                   do:
                     "h-full min-h-0 max-h-full overflow-hidden p-0 sm:rounded-none",
-                  else: "p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded"
+                  else: "p-6 sm:p-8 min-h-screen sm:min-h-fit sm:rounded-sm"
                 ),
                 @panel_class
               ]}
@@ -111,7 +111,7 @@ defmodule YscWeb.CoreComponents do
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
-                  class="group inline-flex flex-none items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 transition-all duration-200 ease-out hover:scale-110"
+                  class="group inline-flex flex-none items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-xs shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 transition-all duration-200 ease-out hover:scale-110"
                   aria-label={gettext("close")}
                 >
                   <.icon
@@ -213,7 +213,7 @@ defmodule YscWeb.CoreComponents do
       }
       role="alert"
       class={[
-        "fixed top-2 right-2 w-80 sm:w-96 z-[110] rounded-xl p-3 ring-1",
+        "fixed top-2 right-2 w-80 sm:w-96 z-110 rounded-xl p-3 ring-1",
         @class,
         @kind == :info &&
           "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
@@ -454,11 +454,11 @@ defmodule YscWeb.CoreComponents do
     base_classes =
       [
         "group relative inline-flex items-center justify-center gap-2 whitespace-nowrap",
-        "rounded py-2 px-3 min-h-[44px] transition duration-150 ease-in-out",
+        "rounded-sm py-2 px-3 min-h-[44px] transition duration-150 ease-in-out",
         "text-sm font-semibold leading-6",
         "disabled:cursor-not-allowed disabled:opacity-80",
         "phx-click-loading:pointer-events-none phx-submit-loading:pointer-events-none phx-change-loading:pointer-events-none",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+        "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
       ]
 
     variant_classes =
@@ -681,7 +681,7 @@ defmodule YscWeb.CoreComponents do
       </span>
       <span
         class={[
-          "inline-flex items-center flex-shrink-0 w-14 h-8 p-1 rounded-full",
+          "inline-flex items-center shrink-0 w-14 h-8 p-1 rounded-full",
           if(@checked, do: "bg-green-500", else: "bg-zinc-300")
         ]}
         style="transition: background-color 0.3s ease-in-out;"
@@ -788,7 +788,7 @@ defmodule YscWeb.CoreComponents do
           name={@name}
           value="true"
           checked={@checked}
-          class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+          class="rounded-sm border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 shrink-0"
           {@rest}
         />
         <span class="flex-1">{@label}</span>
@@ -808,7 +808,7 @@ defmodule YscWeb.CoreComponents do
         name={@name}
         value={@value}
         checked={@checked}
-        class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
+        class="rounded-sm border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
         {@rest}
       />
       <.error :for={msg <- @errors}>{msg}</.error>
@@ -830,7 +830,7 @@ defmodule YscWeb.CoreComponents do
     />
     <label
       for={@id}
-      class="inline-flex items-center transition duration-150 ease-in-out justify-between w-full p-5 bg-white border rounded cursor-pointer text-zinc-500 border-zinc-200 peer-checked:border-blue-600 peer-checked:text-blue-600 hover:text-zinc-600 hover:bg-zinc-100 h-full"
+      class="inline-flex items-center transition duration-150 ease-in-out justify-between w-full p-5 bg-white border rounded-sm cursor-pointer text-zinc-500 border-zinc-200 peer-checked:border-blue-600 peer-checked:text-blue-600 hover:text-zinc-600 hover:bg-zinc-100 h-full"
     >
       <div class="flex flex-row">
         <div class="text-center items-center flex mr-4">
@@ -858,7 +858,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "block w-full h-10 min-w-30 bg-white border rounded shadow-sm border-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm",
+          "block w-full h-10 min-w-30 bg-white border rounded-sm shadow-xs border-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm",
           if(@label != "", do: "mt-2", else: "")
         ]}
         multiple={@multiple}
@@ -879,7 +879,7 @@ defmodule YscWeb.CoreComponents do
       <select
         id={@id}
         name={@name}
-        class="block w-full mt-2 h-11 bg-white border rounded shadow-sm border-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm text-zinc-800"
+        class="block w-full mt-2 h-11 bg-white border rounded-sm shadow-xs border-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm text-zinc-800"
         multiple={@multiple}
         {@rest}
       >
@@ -907,7 +907,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "mt-2 block w-full rounded text-zinc-800 focus:ring-1 sm:text-sm sm:leading-6 min-h-[6rem]",
+          "mt-2 block w-full rounded-sm text-zinc-800 focus:ring-1 sm:text-sm sm:leading-6 min-h-24",
           @errors == [] &&
             "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
           @errors != [] && "border-rose-400 focus:border-rose-400"
@@ -925,7 +925,7 @@ defmodule YscWeb.CoreComponents do
       <legend class="block text-sm font-semibold leading-6 text-zinc-700">
         {@label}
       </legend>
-      <div class="w-full bg-white rounded text-left cursor-default focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+      <div class="w-full bg-white rounded-sm text-left cursor-default focus:outline-hidden focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
         <div class="grid grid-cols-1 gap-1 text-sm items-baseline">
           <div :for={{label, value} <- @options} class="flex items-center">
             <label for={"#{@name}-#{value}"} class="font-medium text-zinc-700 py-1">
@@ -938,7 +938,7 @@ defmodule YscWeb.CoreComponents do
                   @value &&
                     Enum.any?(@value, fn v -> to_string(v) == to_string(value) end)
                 }
-                class="mr-2 h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-400 transition duration-150 ease-in-out"
+                class="mr-2 h-4 w-4 rounded-sm border-zinc-300 text-blue-600 focus:ring-blue-400 transition duration-150 ease-in-out"
                 {@rest}
               />
               {label}
@@ -987,7 +987,7 @@ defmodule YscWeb.CoreComponents do
           id={@id}
           value={Phoenix.HTML.Form.normalize_value("date", @value)}
           class={[
-            "mt-2 block w-full rounded text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
+            "mt-2 block w-full rounded-sm text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
             @errors == [] &&
               "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
             @errors != [] && "border-rose-400 focus:border-rose-400"
@@ -1027,7 +1027,7 @@ defmodule YscWeb.CoreComponents do
       <.label for={@id}>{@label}</.label>
 
       <div class="relative">
-        <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+        <div class="absolute inset-y-0 inset-s-0 flex items-center ps-3 pointer-events-none">
           {render_slot(@inner_block)}
         </div>
         <input
@@ -1036,7 +1036,7 @@ defmodule YscWeb.CoreComponents do
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
-            "mt-2 block w-full ps-7 rounded text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
+            "mt-2 block w-full ps-7 rounded-sm text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
             @errors == [] &&
               "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
             @errors != [] && "border-rose-400 focus:border-rose-400"
@@ -1076,7 +1076,7 @@ defmodule YscWeb.CoreComponents do
             pattern="[0-9]*"
             maxlength="1"
             autocomplete={if i == 0, do: "one-time-code", else: "off"}
-            class="block w-12 h-12 text-center border-zinc-200 rounded sm:text-sm focus:scale-110 focus:border-blue-600 focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none"
+            class="block w-12 h-12 text-center border-zinc-200 rounded-sm sm:text-sm focus:scale-110 focus:border-blue-600 focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none"
             data-otp-input-item=""
             {@rest}
           />
@@ -1139,7 +1139,7 @@ defmodule YscWeb.CoreComponents do
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           autocomplete={@is_password_toggle && "current-password"}
           class={[
-            "mt-2 block w-full rounded text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
+            "mt-2 block w-full rounded-sm text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
             @is_password_toggle && "pr-10",
             @errors == [] &&
               "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
@@ -1451,8 +1451,8 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <div class={"border-l-4 p-4 #{@base_classes}"}>
-      <div class={"flex items-start max-w-screen-xl mx-auto md:px-4 #{if @action_label, do: "", else: "items-center"}"}>
-        <div class="flex-shrink-0 pt-1">
+      <div class={"flex items-start max-w-(--breakpoint-xl) mx-auto md:px-4 #{if @action_label, do: "", else: "items-center"}"}>
+        <div class="shrink-0 pt-1">
           <.icon name={@icon} class={"h-8 w-8 #{@icon_color}"} />
         </div>
         <div class="px-4 flex-1">
@@ -1464,7 +1464,7 @@ defmodule YscWeb.CoreComponents do
             <.link
               navigate={@action_path}
               class={[
-                "inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200",
+                "inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-md focus:outline-hidden focus:ring-2 focus:ring-offset-2 transition-colors duration-200",
                 @button_color,
                 @action_class
               ]}
@@ -1661,7 +1661,7 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <div class="px-4 overflow-y-auto sm:overflow-visible sm:px-0">
-      <table class="w-[40rem] mt-11 sm:w-full">
+      <table class="w-160 mt-11 sm:w-full">
         <thead class="text-sm leading-6 text-left text-zinc-500">
           <tr>
             <th :for={col <- @col} class="p-0 pb-4 pr-6 font-normal">
@@ -1877,7 +1877,7 @@ defmodule YscWeb.CoreComponents do
     <div>
       <.link
         navigate={@navigate}
-        class="text-sm font-semibold leading-6 text-zinc-600 hover:text-zinc-800 rounded hover:bg-zinc-100 p-2"
+        class="text-sm font-semibold leading-6 text-zinc-600 hover:text-zinc-800 rounded-sm hover:bg-zinc-100 p-2"
       >
         <.icon name="hero-arrow-left-solid" class="w-3 h-3 -mt-0.5" />
         {render_slot(@inner_block)}
@@ -1921,7 +1921,7 @@ defmodule YscWeb.CoreComponents do
 
   def flash_toast_icon(%{name: "hero-" <> _} = assigns) do
     ~H"""
-    <.icon name={@name} class={["w-5 h-5 flex-shrink-0 me-1", @class]} />
+    <.icon name={@name} class={["w-5 h-5 shrink-0 me-1", @class]} />
     """
   end
 
@@ -1993,11 +1993,11 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div
       :if={@impersonating?}
-      class="fixed bottom-0 left-0 right-0 z-[9999] bg-red-600 text-white shadow-lg"
+      class="fixed bottom-0 left-0 right-0 z-9999 bg-red-600 text-white shadow-lg"
     >
       <div class="container mx-auto px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <.icon name="hero-exclamation-triangle" class="w-6 h-6 flex-shrink-0" />
+          <.icon name="hero-exclamation-triangle" class="w-6 h-6 shrink-0" />
           <div>
             <p class="font-bold text-sm">IMPERSONATING USER</p>
             <p class="text-xs">
@@ -2014,7 +2014,7 @@ defmodule YscWeb.CoreComponents do
           <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
           <button
             type="submit"
-            class="bg-white text-red-600 px-4 py-2 rounded font-semibold hover:bg-red-50 transition-colors"
+            class="bg-white text-red-600 px-4 py-2 rounded-sm font-semibold hover:bg-red-50 transition-colors"
           >
             Stop Impersonating
           </button>
@@ -2051,7 +2051,7 @@ defmodule YscWeb.CoreComponents do
         id={"#{@id}Link"}
         data-dropdown-toggle={@id}
         aria-expanded="false"
-        class={"group flex items-center justify-between w-full px-3 py-2 font-bold transition duration-200 ease-in-out rounded lg:w-auto #{@class}"}
+        class={"group flex items-center justify-between w-full px-3 py-2 font-bold transition duration-200 ease-in-out rounded-sm lg:w-auto #{@class}"}
         phx-click={toggle_dropdown("##{@id}")}
       >
         {render_slot(@button_block)}
@@ -2060,13 +2060,13 @@ defmodule YscWeb.CoreComponents do
       <div
         id={@id}
         class={[
-          "z-[110] hidden font-normal bg-white divide-y rounded divide-zinc-100 shadow w-52 wide:w-72",
+          "z-110 hidden font-normal bg-white divide-y rounded-sm divide-zinc-100 shadow-sm w-52 wide:w-72",
           @drop_up && "bottom-full mb-1",
           !@drop_up && "mt-1",
           @right && "right-0",
           !@right && "left-0",
-          @mobile && "block lg:absolute shadow-none lg:shadow",
-          !@mobile && "absolute shadow",
+          @mobile && "block lg:absolute shadow-none lg:shadow-sm",
+          !@mobile && "absolute shadow-sm",
           @wide && "wide"
         ]}
       >
@@ -2115,7 +2115,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         right={true}
         drop_up={@drop_up}
-        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+        class="min-w-0 w-auto! shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
       >
         <:button_block>
           <span class="sr-only">{@label}</span>
@@ -2403,7 +2403,7 @@ defmodule YscWeb.CoreComponents do
         data-dropdown-toggle="avatar-menu"
         id="avatar-menuLink"
         aria-expanded="false"
-        class="flex flex-row items-center h-10 rounded hover:bg-zinc-100 pl-3"
+        class="flex flex-row items-center h-10 rounded-sm hover:bg-zinc-100 pl-3"
         phx-click={toggle_dropdown("#avatar-menu")}
       >
         <.user_card
@@ -2421,7 +2421,7 @@ defmodule YscWeb.CoreComponents do
       <!-- Dropdown menu -->
       <div
         id="avatar-menu"
-        class="absolute z-[110] hidden w-60 mt-0 font-normal bg-white divide-y rounded shadow divide-zinc-100 right-4 mt-1"
+        class="absolute z-110 hidden w-60 mt-0 font-normal bg-white divide-y rounded-sm shadow-sm divide-zinc-100 right-4 mt-1"
       >
         {render_slot(@inner_block)}
       </div>
@@ -2441,7 +2441,7 @@ defmodule YscWeb.CoreComponents do
       <%!-- Mobile: Hamburger button --%>
       <button
         type="button"
-        class="hamburger-btn nav-link inline-flex items-center justify-center h-10 p-2 transition ease-in-out rounded lg:hidden focus:outline-none duration-400 text-zinc-900 hover:bg-zinc-200"
+        class="hamburger-btn nav-link inline-flex items-center justify-center h-10 p-2 transition ease-in-out rounded-sm lg:hidden focus:outline-hidden duration-400 text-zinc-900 hover:bg-zinc-200"
         aria-controls={@toggle_id}
         aria-expanded="false"
         phx-click={show_mobile_menu(@toggle_id)}
@@ -2471,7 +2471,7 @@ defmodule YscWeb.CoreComponents do
     <%!-- Mobile: Slide-in menu overlay --%>
     <div
       id={"#{@toggle_id}-overlay"}
-      class="mobile-menu-overlay fixed inset-0 bg-black/50 z-[9998] hidden lg:hidden"
+      class="mobile-menu-overlay fixed inset-0 bg-black/50 z-9998 hidden lg:hidden"
       phx-click={hide_mobile_menu(@toggle_id)}
       aria-hidden="true"
     />
@@ -2479,7 +2479,7 @@ defmodule YscWeb.CoreComponents do
     <%!-- Mobile: Slide-in menu panel --%>
     <div
       id={@toggle_id}
-      class="mobile-menu-panel fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-[9999] transform -translate-x-full transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto shadow-2xl"
+      class="mobile-menu-panel fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-9999 transform -translate-x-full transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto shadow-2xl"
     >
       <%!-- Menu header with logo and close button --%>
       <div class="flex items-center justify-between p-4 border-b border-zinc-200">
@@ -2680,7 +2680,7 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <span class={[
-      "inline-block text-xs font-medium me-2 px-2 py-1 rounded whitespace-nowrap #{@class}",
+      "inline-block text-xs font-medium me-2 px-2 py-1 rounded-sm whitespace-nowrap #{@class}",
       @type == "sky" && "bg-sky-100 text-sky-800",
       @type == "green" && "bg-green-100 text-green-800",
       @type == "yellow" && "bg-yellow-100 text-yellow-800",
@@ -2719,7 +2719,7 @@ defmodule YscWeb.CoreComponents do
         <span
           role="tooltip"
           class={[
-            "absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-md shadow-sm px-4 py-2 block tooltip group-hover:opacity-100 group-hover:pointer-events-auto whitespace-normal",
+            "absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-md shadow-xs px-4 py-2 block tooltip group-hover:opacity-100 group-hover:pointer-events-auto whitespace-normal",
             @max_width,
             @text_align
           ]}
@@ -2741,7 +2741,7 @@ defmodule YscWeb.CoreComponents do
       {render_slot(@inner_block)}
       <span
         role="tooltip"
-        class="absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 w-80 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-md shadow-sm px-3 py-2 inline-block text-left tooltip group-hover:opacity-100 group-hover:pointer-events-auto"
+        class="absolute transition-opacity mt-10 top-0 left-1/2 transform -translate-x-1/2 w-80 duration-200 opacity-0 pointer-events-none z-50 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-md shadow-xs px-3 py-2 inline-block text-left tooltip group-hover:opacity-100 group-hover:pointer-events-auto"
       >
         {render_slot(@tooltip_body)}
       </span>
@@ -2932,7 +2932,7 @@ defmodule YscWeb.CoreComponents do
       id={@id}
       aria-label="Progress"
       class={[
-        "rounded-xl border border-zinc-200 bg-white px-4 py-3.5 shadow-sm sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none",
+        "rounded-xl border border-zinc-200 bg-white px-4 py-3.5 shadow-xs sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none",
         @class
       ]}
     >
@@ -2954,7 +2954,7 @@ defmodule YscWeb.CoreComponents do
             aria-current={if(idx == @active_step, do: "step")}
             aria-label={"Step #{idx + 1}: #{label}"}
             title={"Step #{idx + 1}: #{label}"}
-            class="group block w-full cursor-pointer rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            class="group block w-full cursor-pointer rounded-sm text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
           >
             <span class={[
               "block h-1.5 rounded-full transition-colors duration-200",
@@ -3180,7 +3180,7 @@ defmodule YscWeb.CoreComponents do
             alt="User avatar"
           />
           <span
-            class="avatar-identity-badge absolute -bottom-0.5 -right-0.5 w-[30%] min-w-[0.65rem] aspect-square rounded-full overflow-hidden ring-2 ring-white shadow-sm"
+            class="avatar-identity-badge absolute -bottom-0.5 -right-0.5 w-[30%] min-w-[0.65rem] aspect-square rounded-full overflow-hidden ring-2 ring-white shadow-xs"
             aria-hidden="true"
           >
             <img
@@ -3198,7 +3198,7 @@ defmodule YscWeb.CoreComponents do
           >
             <img class="h-full w-full object-cover" src={@flag_path} alt="" />
           </div>
-          <div class="absolute inset-0 right-[12%] rounded-xl overflow-hidden shadow-sm ring-1 ring-white/80">
+          <div class="absolute inset-0 right-[12%] rounded-xl overflow-hidden shadow-xs ring-1 ring-white/80">
             <img
               class="w-full h-full object-cover"
               src={@full_path}
@@ -3308,7 +3308,7 @@ defmodule YscWeb.CoreComponents do
   def alert_box(assigns) do
     ~H"""
     <div
-      class={"flex p-4 mb-4 text-sm text-#{@color}-800 rounded bg-#{@color}-50 border border-#{@color}-100"}
+      class={"flex p-4 mb-4 text-sm text-#{@color}-800 rounded-sm bg-#{@color}-50 border border-#{@color}-100"}
       role="alert"
     >
       {render_slot(@inner_block)}
@@ -3477,10 +3477,10 @@ defmodule YscWeb.CoreComponents do
 
   ## Examples
 
-      <.skeleton_block class="h-4 w-1/3 rounded" />
+      <.skeleton_block class="h-4 w-1/3 rounded-sm" />
       <.skeleton_block class="h-20 w-20 rounded-lg bg-zinc-700" />
   """
-  attr :class, :any, default: "h-4 rounded"
+  attr :class, :any, default: "h-4 rounded-sm"
 
   def skeleton_block(assigns) do
     ~H"""
@@ -3509,12 +3509,12 @@ defmodule YscWeb.CoreComponents do
       <span :if={@announce?} class="sr-only">Loading ticket order…</span>
       <div class="flex justify-between items-start mb-6">
         <.skeleton_block class="h-5 w-20 rounded-full" />
-        <.skeleton_block class="h-3 w-24 rounded" />
+        <.skeleton_block class="h-3 w-24 rounded-sm" />
       </div>
-      <.skeleton_block class="h-7 w-3/4 rounded mb-3" />
+      <.skeleton_block class="h-7 w-3/4 rounded-sm mb-3" />
       <div class="flex gap-4">
-        <.skeleton_block class="h-4 w-32 rounded" />
-        <.skeleton_block class="h-4 w-24 rounded" />
+        <.skeleton_block class="h-4 w-32 rounded-sm" />
+        <.skeleton_block class="h-4 w-24 rounded-sm" />
       </div>
     </div>
     """
@@ -3562,14 +3562,14 @@ defmodule YscWeb.CoreComponents do
       <div class="hidden md:block w-full">
         <div class="flex items-center gap-6 px-6 py-3 bg-zinc-50">
           <div :for={_col <- 1..@columns} class="flex-1 min-w-0">
-            <.skeleton_block class="h-3 w-16 rounded" />
+            <.skeleton_block class="h-3 w-16 rounded-sm" />
           </div>
         </div>
         <div
           :for={_row <- 1..@rows}
           class="flex items-center gap-6 px-6 py-3 border-b border-zinc-100"
         >
-          <.skeleton_block :for={_col <- 1..@columns} class="h-4 flex-1 rounded" />
+          <.skeleton_block :for={_col <- 1..@columns} class="h-4 flex-1 rounded-sm" />
         </div>
       </div>
       <%!-- Mobile: bordered cards matching the stacked list layout --%>
@@ -3578,8 +3578,8 @@ defmodule YscWeb.CoreComponents do
           :for={_row <- 1..min(@rows, 4)}
           class="bg-white rounded-lg border border-zinc-200 p-4 space-y-3"
         >
-          <.skeleton_block class="h-4 w-2/3 rounded" />
-          <.skeleton_block class="h-3 w-1/3 rounded" />
+          <.skeleton_block class="h-4 w-2/3 rounded-sm" />
+          <.skeleton_block class="h-3 w-1/3 rounded-sm" />
           <div class="flex items-center gap-2 pt-1">
             <.skeleton_block class="h-5 w-16 rounded-full" />
             <.skeleton_block class="h-5 w-20 rounded-full" />
@@ -3609,19 +3609,19 @@ defmodule YscWeb.CoreComponents do
       aria-label={@announce? && "Loading payment summary"}
     >
       <span :if={@announce?} class="sr-only">Loading payment summary…</span>
-      <.skeleton_block class="h-3 w-32 rounded mb-6 bg-zinc-700" />
+      <.skeleton_block class="h-3 w-32 rounded-sm mb-6 bg-zinc-700" />
       <div class="space-y-4">
         <div class="flex justify-between">
-          <.skeleton_block class="h-4 w-24 rounded bg-zinc-700" />
-          <.skeleton_block class="h-4 w-16 rounded bg-zinc-700" />
+          <.skeleton_block class="h-4 w-24 rounded-sm bg-zinc-700" />
+          <.skeleton_block class="h-4 w-16 rounded-sm bg-zinc-700" />
         </div>
         <div class="border-t border-zinc-700 pt-4 flex justify-between">
-          <.skeleton_block class="h-4 w-20 rounded bg-zinc-700" />
-          <.skeleton_block class="h-6 w-24 rounded bg-zinc-700" />
+          <.skeleton_block class="h-4 w-20 rounded-sm bg-zinc-700" />
+          <.skeleton_block class="h-6 w-24 rounded-sm bg-zinc-700" />
         </div>
         <div class="border-t border-zinc-700 pt-4 space-y-2">
-          <.skeleton_block class="h-3 w-28 rounded bg-zinc-700" />
-          <.skeleton_block class="h-3 w-40 rounded bg-zinc-700" />
+          <.skeleton_block class="h-3 w-28 rounded-sm bg-zinc-700" />
+          <.skeleton_block class="h-3 w-40 rounded-sm bg-zinc-700" />
         </div>
       </div>
     </div>
@@ -3638,18 +3638,18 @@ defmodule YscWeb.CoreComponents do
 
       <.skeleton_list_row
         leading_class="h-3 w-3 rounded-full mt-1.5 shrink-0"
-        lines={["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]}
+        lines={["h-4 w-2/3 rounded-sm", "h-3 w-1/3 rounded-sm"]}
       />
 
       <.skeleton_list_row
         class="flex items-center justify-between p-4 border border-zinc-200 rounded-lg"
-        lines={["h-4 w-40 rounded", "h-3 w-32 rounded", "h-3 w-28 rounded"]}
-        trailing_class="h-8 w-20 rounded"
+        lines={["h-4 w-40 rounded-sm", "h-3 w-32 rounded-sm", "h-3 w-28 rounded-sm"]}
+        trailing_class="h-8 w-20 rounded-sm"
       />
   """
   attr :class, :any, default: nil
   attr :leading_class, :any, default: nil
-  attr :lines, :list, default: ["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]
+  attr :lines, :list, default: ["h-4 w-2/3 rounded-sm", "h-3 w-1/3 rounded-sm"]
   attr :trailing_class, :any, default: nil
 
   def skeleton_list_row(assigns) do
@@ -3683,19 +3683,19 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div
       id={@id}
-      class={[@class, "min-h-[4.5rem]"]}
+      class={[@class, "min-h-18"]}
       role="status"
       aria-live="polite"
     >
       <span class="sr-only">Loading payment methods…</span>
       <div class="flex items-center gap-3">
-        <.skeleton_block class="h-8 w-12 rounded" />
+        <.skeleton_block class="h-8 w-12 rounded-sm" />
         <div class="space-y-1.5">
-          <.skeleton_block class="h-4 w-32 rounded" />
-          <.skeleton_block class="h-3 w-20 rounded" />
+          <.skeleton_block class="h-4 w-32 rounded-sm" />
+          <.skeleton_block class="h-3 w-20 rounded-sm" />
         </div>
       </div>
-      <.skeleton_block class="h-4 w-16 rounded" />
+      <.skeleton_block class="h-4 w-16 rounded-sm" />
     </div>
     """
   end
@@ -3745,7 +3745,7 @@ defmodule YscWeb.CoreComponents do
     <tr :for={i <- 1..@rows}>
       <td class={@padding_class} colspan={@colspan}>
         <span :if={i == 1} class="sr-only">{@label}</span>
-        <.skeleton_block class="h-4 w-full rounded" />
+        <.skeleton_block class="h-4 w-full rounded-sm" />
       </td>
     </tr>
     """
@@ -3837,7 +3837,7 @@ defmodule YscWeb.CoreComponents do
     <.link
       navigate={@navigate}
       class={[
-        "inline-flex items-center px-4 py-3 rounded w-full whitespace-nowrap",
+        "inline-flex items-center px-4 py-3 rounded-sm w-full whitespace-nowrap",
         @active? && "bg-blue-600 active text-zinc-100",
         !@active? && "hover:bg-zinc-100 hover:text-zinc-900"
       ]}
@@ -4048,7 +4048,7 @@ defmodule YscWeb.CoreComponents do
   def at_glance_stat(assigns) do
     ~H"""
     <div class={[
-      "bg-white border border-zinc-200 rounded-xl p-5 shadow-sm transition-colors",
+      "bg-white border border-zinc-200 rounded-xl p-5 shadow-xs transition-colors",
       at_glance_hover_border(@accent),
       @class
     ]}>
@@ -4178,7 +4178,7 @@ defmodule YscWeb.CoreComponents do
     <div
       id={@id}
       class={[
-        "bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm",
+        "bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs",
         @class
       ]}
     >
@@ -4391,7 +4391,7 @@ defmodule YscWeb.CoreComponents do
       <div class="flex items-start gap-3">
         <.icon
           name={@icon}
-          class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
+          class="w-6 h-6 text-blue-600 shrink-0 mt-0.5"
         />
         <div>
           <h3 class="font-bold text-zinc-900 mb-1">{@title}</h3>
@@ -4451,7 +4451,7 @@ defmodule YscWeb.CoreComponents do
     <label
       for={@id}
       class={[
-        "relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all border-zinc-200 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:scale-[1.02] group",
+        "relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all border-zinc-200 has-checked:border-blue-600 has-checked:bg-blue-50/50 has-checked:scale-[1.02] group",
         @hover_class
       ]}
     >
@@ -4463,12 +4463,12 @@ defmodule YscWeb.CoreComponents do
         value="true"
         checked={@checked}
         aria-label={@aria_label}
-        class="absolute top-4 right-4 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
+        class="absolute top-4 right-4 w-5 h-5 rounded-sm border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-0"
         {@rest}
       />
       <.icon
         name={@icon}
-        class="w-8 h-8 text-zinc-400 group-has-[:checked]:text-blue-600 mb-3 transition-all duration-200 group-has-[:checked]:animate-bounce"
+        class="w-8 h-8 text-zinc-400 group-has-checked:text-blue-600 mb-3 transition-all duration-200 group-has-checked:animate-bounce"
       />
       <span class="font-bold text-zinc-900 leading-tight mb-1">
         {@label}
@@ -4502,10 +4502,10 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div
       id={@id}
-      class={["bg-amber-50 border border-amber-200 rounded p-4", @class]}
+      class={["bg-amber-50 border border-amber-200 rounded-sm p-4", @class]}
     >
       <div class="flex items-start">
-        <div class="flex-shrink-0">
+        <div class="shrink-0">
           <.icon
             name="hero-exclamation-triangle-solid"
             class="h-5 w-5 text-amber-600"
@@ -4601,7 +4601,7 @@ defmodule YscWeb.CoreComponents do
             user_id={@author_id}
             country={@author_most_connected}
             avatar_url={@author_avatar_url}
-            class="w-8 h-8 rounded-full ring-2 ring-white shadow-sm"
+            class="w-8 h-8 rounded-full ring-2 ring-white shadow-xs"
           />
           <div>
             <p class="text-sm font-black text-zinc-900 leading-none">
@@ -4626,7 +4626,7 @@ defmodule YscWeb.CoreComponents do
         <button
           phx-click={JS.show(to: "#reply-to-#{@id}")}
           type="button"
-          class="flex items-center text-sm text-zinc-600 hover:text-zinc-800 hover:bg-zinc-100 rounded font-medium px-2 py-1"
+          class="flex items-center text-sm text-zinc-600 hover:text-zinc-800 hover:bg-zinc-100 rounded-sm font-medium px-2 py-1"
         >
           <.icon
             name="hero-chat-bubble-bottom-center-text"
@@ -4642,7 +4642,7 @@ defmodule YscWeb.CoreComponents do
             type="textarea"
             id={"reply-comment-#{@id}"}
             rows="4"
-            class="px-0 w-full text-sm text-zinc-900 border-0 focus:ring-0 focus:outline-none"
+            class="px-0 w-full text-sm text-zinc-900 border-0 focus:ring-0 focus:outline-hidden"
             placeholder="Write a nice reply..."
             required
           >
@@ -4655,7 +4655,7 @@ defmodule YscWeb.CoreComponents do
           />
           <button
             type="submit"
-            class="inline-flex items-center py-2.5 px-4 text-sm font-bold text-center text-zinc-100 bg-blue-700 rounded focus:ring-4 focus:ring-blue-200 hover:bg-blue-800 mt-4"
+            class="inline-flex items-center py-2.5 px-4 text-sm font-bold text-center text-zinc-100 bg-blue-700 rounded-sm focus:ring-4 focus:ring-blue-200 hover:bg-blue-800 mt-4"
             phx-click={
               JS.dispatch("submit", to: "reply-form-#{@post_id}-#{@id}")
               |> JS.hide(to: "#reply-to-#{@id}")
@@ -4666,7 +4666,7 @@ defmodule YscWeb.CoreComponents do
           <button
             type="button"
             phx-click={JS.hide(to: "#reply-to-#{@id}")}
-            class="inline-flex items-center py-2.5 px-4 text-sm font-bold text-center text-zinc-600 rounded focus:ring-4 hover:bg-zinc-100 mt-4"
+            class="inline-flex items-center py-2.5 px-4 text-sm font-bold text-center text-zinc-600 rounded-sm focus:ring-4 hover:bg-zinc-100 mt-4"
           >
             Cancel
           </button>
@@ -4682,7 +4682,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div
       id={@id}
-      class="max-w-0 sm:min-h-0 md:min-h-0 min-h-0 border-1 border-orange-500 hover:border-orange-500 transition-all duration-300"
+      class="max-w-0 sm:min-h-0 md:min-h-0 min-h-0 border border-orange-500 hover:border-orange-500 transition-all duration-300"
     >
       <p>Dummy component</p>
     </div>
@@ -4890,7 +4890,7 @@ defmodule YscWeb.CoreComponents do
       <div class="flex gap-3">
         <.icon
           name="hero-shield-check"
-          class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+          class="h-5 w-5 text-blue-500 shrink-0 mt-0.5"
         />
         <div class="text-sm text-blue-800 space-y-1">
           <p class="font-semibold">Membership billing paused — board volunteer</p>
@@ -5102,7 +5102,7 @@ defmodule YscWeb.CoreComponents do
     >
       <div class="flex items-center justify-between p-4 bg-red-50 rounded-xl border border-red-200">
         <div class="flex items-center">
-          <div class="flex-shrink-0">
+          <div class="shrink-0">
             <.icon name="hero-exclamation-triangle" class="w-8 h-8 text-red-600" />
           </div>
           <div class="ml-3">
@@ -5401,7 +5401,7 @@ defmodule YscWeb.CoreComponents do
 
           <div
             :if={@overlay}
-            class={["absolute inset-0 z-[1]", @overlay_opacity]}
+            class={["absolute inset-0 z-1", @overlay_opacity]}
             aria-hidden="true"
           />
 
@@ -5414,12 +5414,12 @@ defmodule YscWeb.CoreComponents do
               type="button"
               data-hero-video-toggle
               aria-label="Pause video"
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+              class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-hidden focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
             >
-              <span class="pause-icon inline-flex [.paused_&]:hidden">
+              <span class="pause-icon inline-flex in-[.paused]:hidden">
                 <.icon name="hero-pause" class="w-6 h-6" />
               </span>
-              <span class="play-icon hidden [.paused_&]:!inline-flex">
+              <span class="play-icon hidden in-[.paused]:inline-flex!">
                 <.icon name="hero-play" class="w-6 h-6" />
               </span>
             </button>
@@ -5427,7 +5427,7 @@ defmodule YscWeb.CoreComponents do
         </div>
       </div>
 
-      <div class="relative z-10 w-full min-w-0 max-w-screen-lg mx-auto px-5 sm:px-6 py-12 sm:py-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
+      <div class="relative z-10 w-full min-w-0 max-w-(--breakpoint-lg) mx-auto px-5 sm:px-6 py-12 sm:py-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
         <h1
           :if={@title != []}
           class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-lg"
@@ -5693,7 +5693,7 @@ defmodule YscWeb.CoreComponents do
       aria-busy="true"
       aria-label="Loading secure payment form"
       class={[
-        "mb-6 min-h-[12rem] rounded-lg border border-zinc-200 bg-white p-4 space-y-4",
+        "mb-6 min-h-48 rounded-lg border border-zinc-200 bg-white p-4 space-y-4",
         @class
       ]}
     >
@@ -5703,17 +5703,17 @@ defmodule YscWeb.CoreComponents do
       </div>
 
       <div class="space-y-2">
-        <div class="skeleton-shimmer h-3 w-24 rounded bg-zinc-100" />
+        <div class="skeleton-shimmer h-3 w-24 rounded-sm bg-zinc-100" />
         <div class="skeleton-shimmer h-11 w-full rounded-md bg-zinc-100" />
       </div>
 
       <div class="grid grid-cols-2 gap-3">
         <div class="space-y-2">
-          <div class="skeleton-shimmer h-3 w-16 rounded bg-zinc-100" />
+          <div class="skeleton-shimmer h-3 w-16 rounded-sm bg-zinc-100" />
           <div class="skeleton-shimmer h-11 w-full rounded-md bg-zinc-100" />
         </div>
         <div class="space-y-2">
-          <div class="skeleton-shimmer h-3 w-10 rounded bg-zinc-100" />
+          <div class="skeleton-shimmer h-3 w-10 rounded-sm bg-zinc-100" />
           <div class="skeleton-shimmer h-11 w-full rounded-md bg-zinc-100" />
         </div>
       </div>

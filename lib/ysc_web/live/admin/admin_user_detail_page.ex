@@ -55,13 +55,13 @@ defmodule YscWeb.AdminUserDetailsLive do
       >
         <span class="sr-only">Loading user details…</span>
         <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
-        <.skeleton_block class="h-9 w-56 rounded" />
+        <.skeleton_block class="h-9 w-56 rounded-sm" />
         <.skeleton_block class="h-24 w-24 rounded-full" />
         <div class="flex flex-wrap gap-2">
           <.skeleton_block :for={_ <- 1..8} class="h-9 w-24 rounded-full" />
         </div>
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded" />
+          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded-sm" />
         </div>
       </div>
       <div :if={!@loading_user_detail?} class="flex flex-col justify-between py-6">
@@ -109,7 +109,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 id="account-activity"
                 class="grid grid-cols-[max-content_1fr] items-start gap-x-4 gap-y-3 text-sm mt-4"
               >
-                <span class="text-zinc-500 pt-[1px]">Last login</span>
+                <span class="text-zinc-500 pt-px">Last login</span>
                 <div id="last-login-at" class="min-w-0">
                   <%= if @last_login_at do %>
                     <div class="text-zinc-900 font-medium">
@@ -122,7 +122,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <span class="text-zinc-900 font-medium">N/A</span>
                   <% end %>
                 </div>
-                <span class="text-zinc-500 pt-[1px]">Last activity</span>
+                <span class="text-zinc-500 pt-px">Last activity</span>
                 <div id="last-activity-at" class="min-w-0">
                   <%= if @last_activity_at do %>
                     <div class="text-zinc-900 font-medium">
@@ -446,23 +446,23 @@ defmodule YscWeb.AdminUserDetailsLive do
               <:col :let={{_, order}} label="Status" field={:status}>
                 <%= case order.status do %>
                   <% :pending -> %>
-                    <.badge type="yellow" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="yellow" class="whitespace-nowrap shrink-0">
                       Pending
                     </.badge>
                   <% :completed -> %>
-                    <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="green" class="whitespace-nowrap shrink-0">
                       Completed
                     </.badge>
                   <% :cancelled -> %>
-                    <.badge type="red" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="red" class="whitespace-nowrap shrink-0">
                       Cancelled
                     </.badge>
                   <% :expired -> %>
-                    <.badge type="dark" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="dark" class="whitespace-nowrap shrink-0">
                       Expired
                     </.badge>
                   <% _ -> %>
-                    <.badge type="dark" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="dark" class="whitespace-nowrap shrink-0">
                       —
                     </.badge>
                 <% end %>
@@ -504,7 +504,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             >
               <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                 <.badge type="default" class="whitespace-nowrap">
-                  <span class="font-mono text-xs flex-shrink-0 whitespace-nowrap">
+                  <span class="font-mono text-xs shrink-0 whitespace-nowrap">
                     {booking.reference_id}
                   </span>
                 </.badge>
@@ -558,7 +558,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <% end %>
                   </div>
                 <% else %>
-                  <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                  <.badge type="green" class="whitespace-nowrap shrink-0">
                     Full Buyout
                   </.badge>
                 <% end %>
@@ -566,27 +566,27 @@ defmodule YscWeb.AdminUserDetailsLive do
               <:col :let={{_, booking}} label="Status" field={:status}>
                 <%= case booking.status do %>
                   <% :draft -> %>
-                    <.badge type="dark" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="dark" class="whitespace-nowrap shrink-0">
                       Draft
                     </.badge>
                   <% :hold -> %>
-                    <.badge type="yellow" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="yellow" class="whitespace-nowrap shrink-0">
                       Hold
                     </.badge>
                   <% :complete -> %>
-                    <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="green" class="whitespace-nowrap shrink-0">
                       Complete
                     </.badge>
                   <% :refunded -> %>
-                    <.badge type="sky" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="sky" class="whitespace-nowrap shrink-0">
                       Refunded
                     </.badge>
                   <% :canceled -> %>
-                    <.badge type="red" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="red" class="whitespace-nowrap shrink-0">
                       Canceled
                     </.badge>
                   <% _ -> %>
-                    <.badge type="dark" class="whitespace-nowrap flex-shrink-0">
+                    <.badge type="dark" class="whitespace-nowrap shrink-0">
                       —
                     </.badge>
                 <% end %>
@@ -634,7 +634,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     do: "hero-chevron-up",
                     else: "hero-chevron-down"
                 }
-                class="w-5 h-5 text-zinc-400 flex-shrink-0"
+                class="w-5 h-5 text-zinc-400 shrink-0"
               />
             </button>
 
@@ -737,7 +737,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           color="red"
                           phx-click="revoke_booking_entitlement"
                           phx-value-id={ent.id}
-                          class="!min-h-0 !text-xs !px-2 !py-1"
+                          class="min-h-0! text-xs! px-2! py-1!"
                         >
                           Revoke
                         </.button>
@@ -889,7 +889,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <dd class="mt-1 text-sm text-zinc-900">
                     <ul class="space-y-1 list-disc list-inside">
                       <li :for={family_member <- @selected_user.family_members}>
-                        <span class="text-xs font-medium me-2 px-2.5 py-1 rounded bg-blue-100 text-blue-800">
+                        <span class="text-xs font-medium me-2 px-2.5 py-1 rounded-sm bg-blue-100 text-blue-800">
                           {String.capitalize("#{family_member.type}")}
                         </span>
                         {"#{family_member.first_name} #{family_member.last_name} (#{UserDisplay.birth_date_label(family_member.birth_date)})"}
@@ -980,7 +980,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <p class="text-sm font-semibold text-zinc-600 mb-1">
                     Link to Scandinavia
                   </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.link_to_scandinavia}
                   </div>
                 </div>
@@ -988,7 +988,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <p class="text-sm font-semibold text-zinc-600 mb-1">
                     Lived in Scandinavia
                   </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.lived_in_scandinavia}
                   </div>
                 </div>
@@ -996,7 +996,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <p class="text-sm font-semibold text-zinc-600 mb-1">
                     Spoken languages
                   </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.spoken_languages}
                   </div>
                 </div>
@@ -1004,7 +1004,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <p class="text-sm font-semibold text-zinc-600 mb-1">
                     How did you hear about the club?
                   </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.hear_about_the_club}
                   </div>
                 </div>
@@ -1174,7 +1174,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               <%= if @scheduled_downgrade_info do %>
                 <div class="bg-amber-50 border border-amber-200 rounded-md p-4">
                   <div class="flex">
-                    <div class="flex-shrink-0">
+                    <div class="shrink-0">
                       <.icon
                         name="hero-arrow-trending-down"
                         class="h-5 w-5 text-amber-500"
@@ -1252,13 +1252,13 @@ defmodule YscWeb.AdminUserDetailsLive do
                         href={"https://dashboard.stripe.com/subscriptions/#{@active_subscription.stripe_id}"}
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="text-xs bg-zinc-100 px-2 py-1 rounded font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
+                        class="text-xs bg-zinc-100 px-2 py-1 rounded-sm font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
                         title="View in Stripe Dashboard"
                       >
                         {@active_subscription.stripe_id}
                       </a>
                     <% else %>
-                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
+                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded-sm">
                         {@active_subscription.stripe_id}
                       </code>
                     <% end %>
@@ -1269,7 +1269,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       href={"https://dashboard.stripe.com/customers/#{@selected_user.stripe_id}"}
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="text-xs bg-zinc-100 px-2 py-1 rounded font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
+                      class="text-xs bg-zinc-100 px-2 py-1 rounded-sm font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
                       title="View customer in Stripe Dashboard"
                     >
                       {@selected_user.stripe_id}
@@ -1415,7 +1415,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           </.badge>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
-                          <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
+                          <code class="text-xs bg-zinc-100 px-2 py-1 rounded-sm">
                             {if payment.external_payment_id do
                               String.slice(payment.external_payment_id, 0..20) <>
                                 if(String.length(payment.external_payment_id) > 20,
@@ -1537,7 +1537,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
                           Routing Number
                         </p>
-                        <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded">
+                        <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
                           {@unsealed_account.routing_number}
                         </p>
                       </div>
@@ -1545,7 +1545,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
                           Account Number
                         </p>
-                        <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded">
+                        <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
                           {@unsealed_account.account_number}
                         </p>
                       </div>
@@ -1583,7 +1583,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
               <.icon
                 name="hero-chevron-down"
-                class="w-5 h-5 text-zinc-400 flex-shrink-0 transition-transform duration-200 group-open:-rotate-180"
+                class="w-5 h-5 text-zinc-400 shrink-0 transition-transform duration-200 group-open:-rotate-180"
               />
             </summary>
             <div class="px-4 pt-2 pb-6 border-t border-zinc-200">
@@ -1651,7 +1651,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                                   @notification_form[:newsletter_notifications].value
                                 )
                               }
-                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                              class="rounded-sm border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 shrink-0"
                             />
                           </div>
                         </td>
@@ -1688,7 +1688,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                                   @notification_form[:event_notifications].value
                                 )
                               }
-                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                              class="rounded-sm border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 shrink-0"
                             />
                           </div>
                         </td>
@@ -1714,7 +1714,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                                   @notification_form[:event_notifications_sms].value
                                 )
                               }
-                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                              class="rounded-sm border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 shrink-0"
                             />
                           </div>
                         </td>
@@ -1744,7 +1744,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                               value="true"
                               checked={true}
                               disabled
-                              class="rounded border-zinc-300 text-zinc-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0 opacity-50 cursor-not-allowed"
+                              class="rounded-sm border-zinc-300 text-zinc-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 shrink-0 opacity-50 cursor-not-allowed"
                             />
                           </div>
                         </td>
@@ -1770,7 +1770,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                                   @notification_form[:account_notifications_sms].value
                                 )
                               }
-                              class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+                              class="rounded-sm border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 shrink-0"
                             />
                           </div>
                         </td>
@@ -1866,7 +1866,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           />
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
-                          <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
+                          <code class="text-xs bg-zinc-100 px-2 py-1 rounded-sm">
                             {notification.message_template}
                           </code>
                         </td>
@@ -1901,7 +1901,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               <div
                 id="panel-resizer-left-edge"
                 phx-update="ignore"
-                class="flex-shrink-0 w-6 cursor-ew-resize z-10 flex items-center justify-center pointer-events-auto"
+                class="shrink-0 w-6 cursor-ew-resize z-10 flex items-center justify-center pointer-events-auto"
               >
                 <.icon
                   name="hero-arrows-right-left"
@@ -1954,7 +1954,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       Template
                     </p>
                     <p class="text-sm text-zinc-800">
-                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
+                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded-sm">
                         {@selected_notification.message_template}
                       </code>
                     </p>
@@ -2102,7 +2102,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         phx-value-user_id={sub_account.id}
                         phx-disable-with="Removing..."
                         data-confirm="Remove this user from the family membership? They will lose access to membership benefits and receive an email notification."
-                        class="!min-h-0 !text-sm !px-3 !py-1.5"
+                        class="min-h-0! text-sm! px-3! py-1.5!"
                       >
                         Remove
                       </.button>
@@ -2142,7 +2142,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         phx-value-invite_id={invite.id}
                         phx-disable-with="Cancelling..."
                         data-confirm="Cancel this invite? The invitee will receive an email notification."
-                        class="!min-h-0 !text-sm !px-3 !py-1.5 shrink-0"
+                        class="min-h-0! text-sm! px-3! py-1.5! shrink-0"
                       >
                         Cancel invite
                       </.button>
@@ -2174,7 +2174,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       value={@add_family_user_search}
                       placeholder="Search by email..."
                       autocomplete="off"
-                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-0"
+                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-xs focus:border-zinc-400 focus:outline-hidden focus:ring-0"
                     />
                     <div
                       :if={@add_family_user_search != ""}
@@ -2237,7 +2237,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     </label>
                     <select
                       name="relationship"
-                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-400 focus:outline-none focus:ring-0"
+                      class="block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-xs focus:border-zinc-400 focus:outline-hidden focus:ring-0"
                     >
                       <option
                         value="child"
@@ -2355,7 +2355,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <div class="space-y-6">
                   <%= for note <- @user_notes do %>
                     <div class="relative flex gap-4">
-                      <div class="flex-shrink-0">
+                      <div class="shrink-0">
                         <div class="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center relative z-10">
                           <.icon
                             name="hero-document-text"
@@ -2419,7 +2419,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     >
       <div class="space-y-4">
         <div class="flex items-start gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+          <div class="shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
             <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-amber-600" />
           </div>
           <div>
@@ -2474,7 +2474,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     >
       <div class="space-y-4">
         <div class="flex items-start gap-3">
-          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+          <div class="shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
             <.icon name="hero-exclamation-triangle" class="w-5 h-5 text-red-600" />
           </div>
           <div>

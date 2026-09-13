@@ -38,10 +38,10 @@ defmodule YscWeb.DevAvatarShowcaseLive do
             Nordic avatar identity showcase
           </h1>
           <p class="mt-2 text-sm text-zinc-600 leading-relaxed max-w-3xl">
-            Dev-only page (<code class="text-xs bg-zinc-100 px-1 rounded">/dev/avatar-showcase</code>).
-            Compare three treatments driven by <code class="text-xs bg-zinc-100 px-1 rounded">most_connected_country</code>.
+            Dev-only page (<code class="text-xs bg-zinc-100 px-1 rounded-sm">/dev/avatar-showcase</code>).
+            Compare three treatments driven by <code class="text-xs bg-zinc-100 px-1 rounded-sm">most_connected_country</code>.
             Production uses the <strong>corner badge</strong>
-            via <code class="text-xs bg-zinc-100 px-1 rounded">&lt;.user_avatar_image&gt;</code>.
+            via <code class="text-xs bg-zinc-100 px-1 rounded-sm">&lt;.user_avatar_image&gt;</code>.
           </p>
         </div>
 
@@ -123,7 +123,7 @@ defmodule YscWeb.DevAvatarShowcaseLive do
                 <p class="text-sm font-semibold text-zinc-900">
                   {country} · {UserDisplay.country_label(country)}
                 </p>
-                <div class="flex h-8 rounded overflow-hidden ring-1 ring-zinc-200">
+                <div class="flex h-8 rounded-sm overflow-hidden ring-1 ring-zinc-200">
                   <%= for color <- country_flag_colors(country) do %>
                     <span class="flex-1" style={"background-color: #{color};"} />
                   <% end %>

@@ -1,4 +1,4 @@
-<div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+<div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
   <%!-- Intro Section --%>
   <div class="prose prose-zinc prose-a:text-blue-600 max-w-3xl mb-12">
     <h1>Board of Directors</h1>
@@ -117,7 +117,7 @@
                     navigate={
                       ~p"/contact?subject=Board of Directors&message=#{URI.encode("Hi, I'm interested in the #{titleize(position)} position on the YSC Board of Directors. I'd love to learn more about the role and how I can contribute.")}"
                     }
-                    class="text-sm font-bold text-blue-600 hover:text-blue-600 hover:underline whitespace-nowrap flex-shrink-0 ml-4 transition-colors duration-150"
+                    class="text-sm font-bold text-blue-600 hover:text-blue-600 hover:underline whitespace-nowrap shrink-0 ml-4 transition-colors duration-150"
                   >
                     Inquire<.icon
                       name="hero-arrow-right-solid"

@@ -300,14 +300,14 @@ defmodule YscWeb.VolunteerLiveTest do
       {:ok, _view, html} = live(conn, ~p"/volunteer")
 
       # Cards change appearance when checked
-      assert html =~ "has-[:checked]:border-blue-600"
-      assert html =~ "has-[:checked]:bg-blue-50"
+      assert html =~ "has-checked:border-blue-600"
+      assert html =~ "has-checked:bg-blue-50"
     end
 
     test "icons animate when checkboxes are selected", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/volunteer")
 
-      assert html =~ "group-has-[:checked]:animate-bounce"
+      assert html =~ "group-has-checked:animate-bounce"
     end
 
     test "submit button shows loading state", %{conn: conn} do
@@ -329,7 +329,7 @@ defmodule YscWeb.VolunteerLiveTest do
     test "cards scale when checked", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/volunteer")
 
-      assert html =~ "has-[:checked]:scale-[1.02]"
+      assert html =~ "has-checked:scale-[1.02]"
     end
   end
 

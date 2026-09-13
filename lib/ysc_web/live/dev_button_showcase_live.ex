@@ -33,14 +33,14 @@ defmodule YscWeb.DevButtonShowcaseLive do
             Button component showcase
           </h1>
           <p class="mt-2 text-sm text-zinc-600 leading-relaxed">
-            Dev-only page (<code class="text-xs bg-zinc-100 px-1 rounded">/dev/button-showcase</code>).
+            Dev-only page (<code class="text-xs bg-zinc-100 px-1 rounded-sm">/dev/button-showcase</code>).
             <strong>Interactive</strong>
             uses a slow handler so LiveView applies real loading classes.
             <strong>Forced</strong>
             adds a static
-            <code class="text-xs bg-zinc-100 px-1 rounded">phx-click-loading</code>
+            <code class="text-xs bg-zinc-100 px-1 rounded-sm">phx-click-loading</code>
             or
-            <code class="text-xs bg-zinc-100 px-1 rounded">phx-submit-loading</code>
+            <code class="text-xs bg-zinc-100 px-1 rounded-sm">phx-submit-loading</code>
             class for a frozen snapshot.
           </p>
         </div>
@@ -268,10 +268,10 @@ defmodule YscWeb.DevButtonShowcaseLive do
           </h2>
           <p class="text-sm text-zinc-600">
             Plain
-            <code class="text-xs bg-zinc-100 px-1 rounded">
+            <code class="text-xs bg-zinc-100 px-1 rounded-sm">
               {"type=\"button\""}
             </code>
-            with no <code class="text-xs bg-zinc-100 px-1 rounded">phx-*</code>
+            with no <code class="text-xs bg-zinc-100 px-1 rounded-sm">phx-*</code>
             — default label is not injected; markup stays a single label span.
           </p>
           <.button type="button" id="showcase-plain">

@@ -376,7 +376,7 @@ defmodule YscWeb.FamilyManagementLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-screen-xl px-4 mx-auto py-8 lg:py-10">
+    <div class="max-w-(--breakpoint-xl) px-4 mx-auto py-8 lg:py-10">
       <div class="md:flex md:flex-row md:flex-auto md:grow container mx-auto">
         <.account_settings_nav
           current={:family}
@@ -396,15 +396,15 @@ defmodule YscWeb.FamilyManagementLive do
             aria-live="polite"
           >
             <span class="sr-only">Loading family settings…</span>
-            <.skeleton_block class="h-6 w-48 rounded" />
+            <.skeleton_block class="h-6 w-48 rounded-sm" />
             <.skeleton_list_row
               :for={_ <- 1..2}
               class="flex items-center gap-3 p-4 border border-zinc-200 rounded-lg"
               leading_class="h-10 w-10 rounded-full shrink-0"
-              lines={["h-4 w-40 rounded", "h-3 w-28 rounded"]}
+              lines={["h-4 w-40 rounded-sm", "h-3 w-28 rounded-sm"]}
             />
             <div class="space-y-2">
-              <.skeleton_block class="h-4 w-32 rounded" />
+              <.skeleton_block class="h-4 w-32 rounded-sm" />
               <.skeleton_block class="h-11 w-full rounded-lg" />
             </div>
           </div>
@@ -489,7 +489,7 @@ defmodule YscWeb.FamilyManagementLive do
       </div>
     <% end %>
 
-    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-zinc-900 font-bold text-xl">
           Family Members
@@ -572,7 +572,7 @@ defmodule YscWeb.FamilyManagementLive do
       <% end %>
     </section>
 
-    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 font-bold text-xl">
         Pending Invitations
         <span class="text-zinc-400 font-normal text-sm ml-2">
@@ -807,7 +807,7 @@ defmodule YscWeb.FamilyManagementLive do
       </p>
     </header>
 
-    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 font-bold text-xl">Family membership manager</h2>
       <%= if @primary_user do %>
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -827,7 +827,7 @@ defmodule YscWeb.FamilyManagementLive do
       <% end %>
     </section>
 
-    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 font-bold text-xl">
         Other Family Members
         <span class="text-zinc-400 font-normal text-sm ml-2">
@@ -872,7 +872,7 @@ defmodule YscWeb.FamilyManagementLive do
       <% end %>
     </section>
 
-    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 font-bold text-xl">Leave Family Membership</h2>
       <p class="text-sm text-zinc-600">
         You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
@@ -906,7 +906,7 @@ defmodule YscWeb.FamilyManagementLive do
         id={"invite-family-member-button-#{@row.id}"}
         phx-click="open_invite_modal"
         phx-value-id={@row.id}
-        class="!min-h-0 py-1.5 px-2.5 text-xs"
+        class="min-h-0! py-1.5 px-2.5 text-xs"
       >
         <.icon name="hero-envelope" class="w-4 h-4" /> Send Invite
       </.button>
