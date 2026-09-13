@@ -209,7 +209,7 @@ defmodule YscWeb.OrderConfirmationLive do
         </div>
         <div class="text-left md:text-right">
           <p class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
-            Order Reference
+            Order number
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
             {@ticket_order.reference_id}
@@ -398,7 +398,7 @@ defmodule YscWeb.OrderConfirmationLive do
                               else: "text-zinc-500"
                             )
                           ]}>
-                            Reference {ticket.reference_id}
+                            Donation number {ticket.reference_id}
                           </p>
                         <% else %>
                           <p class={[
@@ -408,7 +408,7 @@ defmodule YscWeb.OrderConfirmationLive do
                               else: "text-zinc-500"
                             )
                           ]}>
-                            Ticket #{ticket.reference_id}
+                            Ticket number {ticket.reference_id}
                           </p>
                         <% end %>
                       </div>

@@ -2823,7 +2823,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       html = render(view)
 
-      assert html =~ "Active Bookings"
+      assert html =~ "Your bookings"
+      refute html =~ "Family Active Bookings"
       assert html =~ booking.reference_id
     end
 

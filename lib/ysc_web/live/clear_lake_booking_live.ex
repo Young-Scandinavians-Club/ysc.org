@@ -626,11 +626,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
             <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
-              <%= if Accounts.sub_account?(@user) || Accounts.primary_user?(@user) do %>
-                Family Active Bookings
-              <% else %>
-                Your Active Bookings
-              <% end %>
+              Your bookings
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <%= for booking <- @active_bookings do %>

@@ -6760,7 +6760,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "One or more of the tickets you picked are members-only and need a Single, Family, or Lifetime membership. Please choose from the regular tiers.",
+           "One or more of the tickets you picked are members-only and need a Single, Family, or Lifetime membership. Please choose a regular ticket type instead.",
            title: "Members-only tickets"
          )
          |> assign(:show_ticket_modal, false)}

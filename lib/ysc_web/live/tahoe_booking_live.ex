@@ -1243,9 +1243,9 @@ defmodule YscWeb.TahoeBookingLive do
           <div :if={length(@active_bookings) > 0} class="space-y-4">
             <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
               <%= if Accounts.sub_account?(@user) || Accounts.primary_user?(@user) do %>
-                Family Active Bookings
+                Your family's bookings
               <% else %>
-                Your Active Bookings
+                Your bookings
               <% end %>
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

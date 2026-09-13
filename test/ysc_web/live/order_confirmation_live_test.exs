@@ -284,8 +284,9 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      # Check for Order Reference text and the reference ID pattern (ORD-)
-      assert html =~ "Order Reference"
+      # Check for Order number text and the reference ID pattern (ORD-)
+      assert html =~ "Order number"
+      refute html =~ "Order Reference"
       assert html =~ "ORD-"
     end
 
@@ -499,7 +500,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       # Check that ticket information is displayed
       assert html =~ "General Admission"
-      assert html =~ "Ticket #"
+      assert html =~ "Ticket number"
     end
 
     test "displays free tickets correctly", %{conn: conn} do
