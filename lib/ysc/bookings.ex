@@ -20,6 +20,8 @@ defmodule Ysc.Bookings do
   require Ysc.Logging
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.User
+  alias Ysc.Avatars.Avatar
   alias Ysc.Repo
   alias Stripe
   alias Ysc.Ledgers
@@ -480,6 +482,139 @@ defmodule Ysc.Bookings do
     Repo.all(query)
   end
 
+  # Admin calendar bars need guest name/email, default-avatar country, thumb
+  # path, room ids, dates, and guest counts. Skip password hashes, bios,
+  # booking JSON (`pricing_items`, `modification_hold_attrs`), and room copy.
+  @admin_calendar_booking_fields [
+    :id,
+    :checkin_date,
+    :checkout_date,
+    :guests_count,
+    :children_count,
+    :booking_mode,
+    :status,
+    :property,
+    :user_id
+  ]
+
+  @admin_calendar_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :most_connected_country,
+    :current_avatar_id
+  ]
+
+  @admin_calendar_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+
+  @occupancy_booking_fields [
+    :id,
+    :checkin_date,
+    :checkout_date,
+    :status,
+    :booking_mode,
+    :guests_count,
+    :property
+  ]
+
+  @occupancy_room_fields [:id]
+
+  @doc """
+  Bookings for the admin calendar grid.
+
+  Member is a slim `select: struct` preload (name/email/country + avatar
+  thumb). Rooms are id-only — the grid already has the room catalog from
+  `list_rooms/1`. Booking JSON (`pricing_items`, `modification_hold_attrs`)
+  is not selected.
+
+  Day/spot bookings are omitted; the Clear Lake day row uses
+  `get_clear_lake_daily_availability/2` instead.
+  """
+  def list_bookings_for_admin_calendar(property, start_date, end_date) do
+    property
+    |> list_bookings_for_admin_calendar_query(start_date, end_date)
+    |> Repo.all()
+  end
+
+  defp list_bookings_for_admin_calendar_query(property, start_date, end_date) do
+    from(b in overlapping_bookings_query(property, start_date, end_date),
+      select: struct(b, ^@admin_calendar_booking_fields),
+      where: b.status not in [:canceled, :refunded],
+      where: b.booking_mode not in [:day],
+      preload: [
+        rooms: ^occupancy_room_preload_query(),
+        user: ^admin_calendar_user_preload_query()
+      ]
+    )
+  end
+
+  @doc """
+  Overnight occupancy rows for date pickers and daily availability maps.
+
+  Only stay dates, status, mode, guest count, and room ids are loaded —
+  not users, room descriptions, or booking JSON. Pass `:statuses` to
+  restrict (e.g. `[:hold, :complete]` for Tahoe availability).
+  """
+  def list_occupancy_bookings(property, start_date, end_date, opts \\ []) do
+    property
+    |> occupancy_bookings_query(start_date, end_date, opts)
+    |> Repo.all()
+  end
+
+  defp occupancy_bookings_query(property, start_date, end_date, opts) do
+    statuses = Keyword.get(opts, :statuses)
+
+    query =
+      from(b in overlapping_bookings_query(property, start_date, end_date),
+        select: struct(b, ^@occupancy_booking_fields),
+        preload: [rooms: ^occupancy_room_preload_query()]
+      )
+
+    if is_list(statuses) do
+      from(b in query, where: b.status in ^statuses)
+    else
+      query
+    end
+  end
+
+  defp overlapping_bookings_query(property, start_date, end_date) do
+    from(b in Booking,
+      where: b.property == ^property,
+      where:
+        fragment(
+          "(? <= ? AND ? >= ?)",
+          b.checkin_date,
+          ^end_date,
+          b.checkout_date,
+          ^start_date
+        ),
+      order_by: [asc: b.checkin_date]
+    )
+  end
+
+  defp occupancy_room_preload_query do
+    from(r in Room, select: struct(r, ^@occupancy_room_fields))
+  end
+
+  defp admin_calendar_user_preload_query do
+    from(u in User,
+      select: struct(u, ^@admin_calendar_user_fields),
+      preload: [current_avatar: ^admin_calendar_avatar_preload_query()]
+    )
+  end
+
+  defp admin_calendar_avatar_preload_query do
+    from(a in Avatar, select: struct(a, ^@admin_calendar_avatar_fields))
+  end
+
   @doc """
   Lists bookings with guests staying overnight on the given date.
 
@@ -525,6 +660,17 @@ defmodule Ysc.Bookings do
       end
 
     Repo.all(query)
+  end
+
+  @doc """
+  Overnight guests for the admin calendar day-guests modal.
+
+  Same slim member/avatar preload as `list_bookings_for_admin_calendar/3`.
+  """
+  def list_guests_staying_on_date_for_admin(property, date) do
+    list_guests_staying_on_date(property, date,
+      preload: [user: admin_calendar_user_preload_query()]
+    )
   end
 
   @doc """
@@ -4517,8 +4663,7 @@ defmodule Ysc.Bookings do
     expanded_end = Date.add(end_date, 1)
 
     all_bookings =
-      list_bookings(:clear_lake, expanded_start, expanded_end,
-        preload: [:rooms],
+      list_occupancy_bookings(:clear_lake, expanded_start, expanded_end,
         statuses: [:complete]
       )
 
@@ -4725,8 +4870,7 @@ defmodule Ysc.Bookings do
     expanded_end = Date.add(end_date, 1)
 
     all_bookings =
-      list_bookings(:tahoe, expanded_start, expanded_end,
-        preload: [:rooms],
+      list_occupancy_bookings(:tahoe, expanded_start, expanded_end,
         statuses: [:hold, :complete]
       )
 
@@ -6181,6 +6325,29 @@ defmodule Ysc.Bookings do
       where: b.status not in [:canceled, :refunded],
       order_by: [asc: b.checkin_date],
       limit: 50
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_bookings_for_admin_calendar_query do
+    today = Ysc.Ci.QueryExplain.Fixtures.today()
+
+    list_bookings_for_admin_calendar_query(
+      :tahoe,
+      today,
+      Date.add(today, 30)
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_occupancy_bookings_query do
+    today = Ysc.Ci.QueryExplain.Fixtures.today()
+
+    occupancy_bookings_query(
+      :tahoe,
+      today,
+      Date.add(today, 30),
+      statuses: [:hold, :complete]
     )
   end
 end
