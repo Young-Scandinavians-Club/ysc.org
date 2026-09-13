@@ -197,7 +197,7 @@ defmodule YscWeb.AdminPostsLive do
                       {post.title}
                       <span
                         :if={post.comment_count > 0}
-                        class="relative text-zinc-600 ml-2 rounded px-2 py-1 text-sm"
+                        class="relative text-zinc-600 ml-2 rounded-sm px-2 py-1 text-sm"
                       >
                         <.icon
                           name="hero-chat-bubble-oval-left"

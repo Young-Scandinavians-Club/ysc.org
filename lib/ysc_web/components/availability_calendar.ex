@@ -41,7 +41,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
               phx-click="today"
               disabled={showing_current_month?(@current.date, @today)}
               class={[
-                "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                 if(showing_current_month?(@current.date, @today),
                   do:
                     "text-zinc-400 bg-zinc-50 border-zinc-200 cursor-not-allowed opacity-60",
@@ -116,7 +116,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         >
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-green-50 border border-dashed border-green-700 rounded flex items-center justify-center text-[9px] font-bold text-green-900"
+              class="w-8 h-5 bg-green-50 border border-dashed border-green-700 rounded-sm flex items-center justify-center text-[9px] font-bold text-green-900"
               aria-hidden="true"
             >
               OK
@@ -125,7 +125,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-blue-500 rounded ring-2 ring-blue-200 flex items-center justify-center text-[9px] font-bold text-white"
+              class="w-8 h-5 bg-blue-500 rounded-sm ring-2 ring-blue-200 flex items-center justify-center text-[9px] font-bold text-white"
               aria-hidden="true"
             >
               Sel
@@ -134,7 +134,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-red-800 border border-red-900 rounded flex items-center justify-center text-[9px] font-bold text-red-100"
+              class="w-8 h-5 bg-red-800 border border-red-900 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-100"
               aria-hidden="true"
             >
               X
@@ -143,7 +143,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-red-200 border border-red-400 rounded flex items-center justify-center text-[9px] font-bold text-red-900 line-through"
+              class="w-8 h-5 bg-red-200 border border-red-400 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-900 line-through"
               aria-hidden="true"
             >
               --
@@ -152,7 +152,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-gradient-to-r from-red-200 to-green-50 border border-zinc-400 rounded flex items-center justify-center text-[8px] font-bold text-zinc-800"
+              class="w-8 h-5 bg-linear-to-r from-red-200 to-green-50 border border-zinc-400 rounded-sm flex items-center justify-center text-[8px] font-bold text-zinc-800"
               aria-hidden="true"
             >
               In
@@ -161,7 +161,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-gradient-to-r from-green-50 to-red-200 border border-zinc-400 rounded flex items-center justify-center text-[8px] font-bold text-zinc-800"
+              class="w-8 h-5 bg-linear-to-r from-green-50 to-red-200 border border-zinc-400 rounded-sm flex items-center justify-center text-[8px] font-bold text-zinc-800"
               aria-hidden="true"
             >
               Out
@@ -562,7 +562,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           id={@tooltip_id}
           role="tooltip"
           class={[
-            "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
+            "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-100 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded-sm tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
             "min-w-[200px] max-w-[400px]",
             "text-left"
           ]}
@@ -870,7 +870,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
   defp day_classes(day, assigns) do
     base =
-      "calendar-day overflow-hidden py-2 h-16 rounded w-full focus:z-10 transition duration-300 flex flex-col items-center justify-center relative"
+      "calendar-day overflow-hidden py-2 h-16 rounded-sm w-full focus:z-10 transition duration-300 flex flex-col items-center justify-center relative"
 
     # 1. Check if other month (lowest priority)
     is_other_month = other_month?(day, assigns.current.date)
@@ -899,10 +899,10 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
       cond do
         is_start ->
-          "#{base} bg-gradient-to-br from-blue-600 to-blue-700 text-white font-bold shadow-lg ring-4 ring-blue-200 ring-offset-2 transform scale-105 z-30"
+          "#{base} bg-linear-to-br from-blue-600 to-blue-700 text-white font-bold shadow-lg ring-4 ring-blue-200 ring-offset-2 transform scale-105 z-30"
 
         is_end || hover_end ->
-          "#{base} bg-gradient-to-br from-blue-600 to-blue-700 text-white font-bold shadow-lg ring-4 ring-blue-200 ring-offset-2 transform scale-105 z-30"
+          "#{base} bg-linear-to-br from-blue-600 to-blue-700 text-white font-bold shadow-lg ring-4 ring-blue-200 ring-offset-2 transform scale-105 z-30"
 
         is_range || is_hover_range ->
           "#{base} bg-blue-400 text-white hover:bg-blue-500"
@@ -960,10 +960,10 @@ defmodule YscWeb.Components.AvailabilityCalendar do
                       "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
 
                     :blackout ->
-                      "bg-gradient-to-r from-red-800 to-green-50 text-zinc-900 border border-zinc-300"
+                      "bg-linear-to-r from-red-800 to-green-50 text-zinc-900 border border-zinc-300"
 
                     :booked ->
-                      "bg-gradient-to-r from-red-200 to-green-50 text-zinc-900 border border-zinc-300"
+                      "bg-linear-to-r from-red-200 to-green-50 text-zinc-900 border border-zinc-300"
 
                     _ ->
                       "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
@@ -973,16 +973,16 @@ defmodule YscWeb.Components.AvailabilityCalendar do
                   # Check-in day (Available -> Blocked)
                   case afternoon_style do
                     :gray ->
-                      "bg-gradient-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
+                      "bg-linear-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
 
                     :blackout ->
-                      "bg-gradient-to-r from-green-50 to-red-800 text-zinc-900 border border-zinc-300"
+                      "bg-linear-to-r from-green-50 to-red-800 text-zinc-900 border border-zinc-300"
 
                     :booked ->
-                      "bg-gradient-to-r from-green-50 to-red-200 text-zinc-900 border border-zinc-300"
+                      "bg-linear-to-r from-green-50 to-red-200 text-zinc-900 border border-zinc-300"
 
                     _ ->
-                      "bg-gradient-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
+                      "bg-linear-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
                   end
               end
             end

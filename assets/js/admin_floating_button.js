@@ -1,7 +1,7 @@
 const STORAGE_KEY = "ysc_admin_button_corner";
 const DRAG_THRESHOLD_PX = 5;
 const BASE_CLASSES =
-  "fixed z-[110] group print:hidden cursor-grab active:cursor-grabbing transition-[left,right,top,bottom] duration-300 ease-out";
+  "fixed z-110 group print:hidden cursor-grab active:cursor-grabbing transition-[left,right,top,bottom] duration-300 ease-out";
 
 const CORNER_CLASSES = {
   "top-left": "admin-floating-top-left",

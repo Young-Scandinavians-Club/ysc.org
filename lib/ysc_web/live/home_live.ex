@@ -327,7 +327,7 @@ defmodule YscWeb.HomeLive do
         poster_srcset={@hero_poster_srcset}
         captions={@hero_captions}
         height="85vh"
-        overlay_opacity="bg-gradient-to-b from-black/30 via-black/40 to-black/60"
+        overlay_opacity="bg-linear-to-b from-black/30 via-black/40 to-black/60"
       >
         <div class="mt-12 w-full max-w-4xl flex flex-col items-center">
           <span class={[
@@ -349,7 +349,7 @@ defmodule YscWeb.HomeLive do
         <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md sm:max-w-none">
           <.link
             navigate={~p"/users/register"}
-            class="group flex items-center justify-center px-8 py-4 text-base font-semibold text-zinc-900 bg-white rounded hover:bg-zinc-100 transition-all duration-200 w-full sm:w-auto shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            class="group flex items-center justify-center px-8 py-4 text-base font-semibold text-zinc-900 bg-white rounded-sm hover:bg-zinc-100 transition-all duration-200 w-full sm:w-auto shadow-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             Apply for Membership
             <.icon
@@ -359,7 +359,7 @@ defmodule YscWeb.HomeLive do
           </.link>
           <.link
             navigate={~p"/events"}
-            class="flex items-center justify-center px-8 py-4 text-base font-medium text-white border border-white/60 rounded hover:bg-white/10 hover:border-white transition-all duration-200 backdrop-blur-sm w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            class="flex items-center justify-center px-8 py-4 text-base font-medium text-white border border-white/60 rounded-sm hover:bg-white/10 hover:border-white transition-all duration-200 backdrop-blur-xs w-full sm:w-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             Explore Our Events
           </.link>
@@ -372,7 +372,7 @@ defmodule YscWeb.HomeLive do
       :if={@current_user == nil}
       class="py-12 sm:py-16 lg:py-32 bg-white overflow-hidden"
     >
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-20 items-center">
           <div class="lg:col-span-5 min-w-0">
             <span
@@ -381,18 +381,18 @@ defmodule YscWeb.HomeLive do
             >
               Velkommen (Welcome)
             </span>
-            <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight leading-[1.05] break-words">
+            <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight leading-[1.05] wrap-break-word">
               A home for Nordic spirits in the Bay.
             </h2>
             <p class="mt-6 sm:mt-8 text-base sm:text-lg text-zinc-600 leading-relaxed pr-0 sm:pr-4">
               The Young Scandinavians Club (YSC) is a welcoming community for Scandinavians and Scandinavian-Americans of all ages in the San Francisco Bay Area. We host a wide range of events across Northern California, offering members access to our scenic cabins in Clear Lake and Lake Tahoe.
             </p>
             <div class="mt-6 flex items-center gap-3 flex-wrap">
-              <.flag country="fi-dk" class="h-8 w-12 rounded shadow-sm" />
-              <.flag country="fi-fi" class="h-8 w-12 rounded shadow-sm" />
-              <.flag country="fi-is" class="h-8 w-12 rounded shadow-sm" />
-              <.flag country="fi-no" class="h-8 w-12 rounded shadow-sm" />
-              <.flag country="fi-se" class="h-8 w-12 rounded shadow-sm" />
+              <.flag country="fi-dk" class="h-8 w-12 rounded-sm shadow-xs" />
+              <.flag country="fi-fi" class="h-8 w-12 rounded-sm shadow-xs" />
+              <.flag country="fi-is" class="h-8 w-12 rounded-sm shadow-xs" />
+              <.flag country="fi-no" class="h-8 w-12 rounded-sm shadow-xs" />
+              <.flag country="fi-se" class="h-8 w-12 rounded-sm shadow-xs" />
             </div>
             <p class="mt-4 sm:mt-6 text-zinc-600 text-base">
               Those with <strong class="text-zinc-900">Danish</strong>, <strong class="text-zinc-900">Finnish</strong>, <strong class="text-zinc-900">Icelandic</strong>, <strong class="text-zinc-900">Norwegian</strong>, or
@@ -406,7 +406,7 @@ defmodule YscWeb.HomeLive do
             <div class="mt-6 sm:mt-8">
               <.link
                 navigate={~p"/users/register"}
-                class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 text-base font-bold text-white bg-blue-700 rounded hover:bg-blue-800 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
+                class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 text-base font-bold text-white bg-blue-700 rounded-sm hover:bg-blue-800 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
               >
                 Apply for Membership
                 <.icon name="hero-arrow-right" class="ml-2 w-5 h-5" />
@@ -441,12 +441,12 @@ defmodule YscWeb.HomeLive do
 
     <%!-- Nordic Living Bento Grid Section --%>
     <section :if={@current_user == nil} class="py-12 sm:py-16 lg:py-24 bg-zinc-50">
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
           <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
             Nordic Living
           </span>
-          <h2 class="mt-3 text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 break-words leading-snug">
+          <h2 class="mt-3 text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 wrap-break-word leading-snug">
             Don't Let the Name Fool You – YSC is for Everyone!
           </h2>
           <p class="mt-4 text-base sm:text-lg text-zinc-600">
@@ -463,7 +463,7 @@ defmodule YscWeb.HomeLive do
                 alt="Midsummer at Clear Lake"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
+              <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
                 <h3 class="text-xl sm:text-2xl font-bold text-white mb-1.5 sm:mb-2">
                   All Ages Welcome
                 </h3>
@@ -476,13 +476,13 @@ defmodule YscWeb.HomeLive do
 
           <%!-- Events card --%>
           <div class="md:col-span-2 bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group">
-            <div class="relative aspect-[16/9]">
+            <div class="relative aspect-video">
               <img
                 src={~p"/images/ysc_bonfire_2024.webp"}
                 alt="YSC Bonfire 2024"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
+              <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
                 <h3 class="text-lg sm:text-xl font-bold text-white mb-1.5 sm:mb-2">
                   Events Year-Round
                 </h3>
@@ -501,7 +501,7 @@ defmodule YscWeb.HomeLive do
                 alt="Nordic country flags"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-3 sm:p-4">
+              <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-3 sm:p-4">
                 <h3 class="text-base sm:text-lg font-bold text-white mb-1">
                   Cultural Connection
                 </h3>
@@ -538,13 +538,13 @@ defmodule YscWeb.HomeLive do
       :if={@current_user == nil}
       class="py-12 sm:py-16 lg:py-32 bg-white overflow-hidden"
     >
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20">
           <div class="max-w-2xl min-w-0">
             <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
               Exclusive Retreats
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight break-words leading-tight">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight wrap-break-word leading-tight">
               The Cabin Legacy.
             </h2>
           </div>
@@ -572,14 +572,14 @@ defmodule YscWeb.HomeLive do
                 <li class="flex items-start gap-3 text-zinc-700 text-sm">
                   <.icon
                     name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 flex-shrink-0"
+                    class="w-5 h-5 text-teal-500 shrink-0"
                   />
                   <span>Minutes from world-class ski resorts & hiking trails</span>
                 </li>
                 <li class="flex items-start gap-3 text-zinc-700 text-sm">
                   <.icon
                     name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 flex-shrink-0"
+                    class="w-5 h-5 text-teal-500 shrink-0"
                   />
                   <span>
                     Member-only rates: <strong>$45.00 / night</strong>
@@ -588,7 +588,7 @@ defmodule YscWeb.HomeLive do
               </ul>
               <.link
                 navigate={~p"/bookings/tahoe"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded font-bold hover:bg-blue-700 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold hover:bg-blue-700 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
               >
                 Learn More About Tahoe
               </.link>
@@ -598,9 +598,9 @@ defmodule YscWeb.HomeLive do
                 <img
                   src={~p"/images/tahoe/tahoe_cabin_main.webp"}
                   alt="Lake Tahoe Cabin"
-                  class="w-full aspect-[4/3] object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                  class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent">
+                <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
                 </div>
               </div>
             </div>
@@ -613,9 +613,9 @@ defmodule YscWeb.HomeLive do
                 <img
                   src={~p"/images/clear_lake/clear_lake_dock.webp"}
                   alt="Clear Lake Cabin"
-                  class="w-full aspect-[4/3] object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                  class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent">
+                <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
                 </div>
               </div>
             </div>
@@ -633,14 +633,14 @@ defmodule YscWeb.HomeLive do
                 <li class="flex items-start gap-3 text-zinc-700 text-sm">
                   <.icon
                     name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 flex-shrink-0"
+                    class="w-5 h-5 text-teal-500 shrink-0"
                   />
                   <span>Private dock access for swimming & boating</span>
                 </li>
                 <li class="flex items-start gap-3 text-zinc-700 text-sm">
                   <.icon
                     name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 flex-shrink-0"
+                    class="w-5 h-5 text-teal-500 shrink-0"
                   />
                   <span>
                     Member-only rates: <strong>$25.00 / night</strong>
@@ -649,7 +649,7 @@ defmodule YscWeb.HomeLive do
               </ul>
               <.link
                 navigate={~p"/bookings/clear-lake"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded font-bold hover:bg-emerald-700 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold hover:bg-emerald-700 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
               >
                 Learn More About Clear Lake
               </.link>
@@ -667,7 +667,7 @@ defmodule YscWeb.HomeLive do
       id="happening-soon-bar"
       class="bg-blue-900 text-white py-4 border-b border-blue-800/30 overflow-hidden"
     >
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div class="flex items-center gap-3 flex-wrap">
             <div class="flex items-center gap-2">
@@ -704,13 +704,13 @@ defmodule YscWeb.HomeLive do
       }
       class="py-16 sm:py-20 lg:py-32 bg-zinc-900 relative overflow-hidden"
     >
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6 relative z-10">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 relative z-10">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-10 sm:mb-16">
           <div class="min-w-0">
             <span class="text-blue-300 font-semibold text-sm uppercase tracking-widest">
               Upcoming Events
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-white tracking-tight leading-none break-words">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-white tracking-tight leading-none wrap-break-word">
               The Pulse of the Club.
             </h2>
           </div>
@@ -732,13 +732,13 @@ defmodule YscWeb.HomeLive do
           class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
         >
           <%= for _i <- 1..3 do %>
-            <div class="flex flex-col bg-white/5 backdrop-blur-sm rounded-2xl sm:rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)] animate-pulse">
-              <div class="aspect-[16/11] bg-zinc-700"></div>
+            <div class="flex flex-col bg-white/5 backdrop-blur-xs rounded-2xl sm:rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)] animate-pulse">
+              <div class="aspect-16/11 bg-zinc-700"></div>
               <div class="p-8 space-y-4">
-                <div class="h-4 bg-zinc-700 rounded w-1/3"></div>
-                <div class="h-8 bg-zinc-700 rounded w-3/4"></div>
-                <div class="h-4 bg-zinc-700 rounded w-full"></div>
-                <div class="h-4 bg-zinc-700 rounded w-2/3"></div>
+                <div class="h-4 bg-zinc-700 rounded-sm w-1/3"></div>
+                <div class="h-8 bg-zinc-700 rounded-sm w-3/4"></div>
+                <div class="h-4 bg-zinc-700 rounded-sm w-full"></div>
+                <div class="h-4 bg-zinc-700 rounded-sm w-2/3"></div>
               </div>
             </div>
           <% end %>
@@ -749,10 +749,10 @@ defmodule YscWeb.HomeLive do
           class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
         >
           <%= for event <- @upcoming_events do %>
-            <div class="group flex flex-col bg-white/5 backdrop-blur-sm rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition-all duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
+            <div class="group flex flex-col bg-white/5 backdrop-blur-xs rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition-all duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
               <.link
                 navigate={~p"/events/#{event.id}"}
-                class="block relative aspect-[16/11] overflow-hidden"
+                class="block relative aspect-16/11 overflow-hidden"
               >
                 <.live_component
                   id={"home-event-image-#{event.id}"}
@@ -761,24 +761,24 @@ defmodule YscWeb.HomeLive do
                   aspect_class="h-full"
                   preferred_type={:optimized}
                 />
-                <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap">
+                <div class="absolute top-6 left-6 flex gap-2 z-2 flex-wrap">
                   <%= if days_since_inserted(event.inserted_at) <= 7 do %>
-                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-bold uppercase tracking-widest rounded shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-bold uppercase tracking-widest rounded-sm shadow-lg">
                       Just Added
                     </span>
                   <% end %>
                   <%= if EventHelpers.event_sold_out?(event) do %>
-                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-bold uppercase tracking-widest rounded shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-bold uppercase tracking-widest rounded-sm shadow-lg">
                       Sold Out
                     </span>
                   <% end %>
                 </div>
-                <div class="absolute bottom-4 right-4 z-[2]">
+                <div class="absolute bottom-4 right-4 z-2">
                   <span class="bg-zinc-900/80 backdrop-blur-md px-4 py-2 rounded-xl text-white text-xs font-semibold ring-1 ring-white/10 tracking-widest">
                     {event.pricing_info.display_text}
                   </span>
                 </div>
-                <div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60">
+                <div class="absolute inset-0 bg-linear-to-t from-zinc-900 via-transparent to-transparent opacity-60">
                 </div>
               </.link>
 
@@ -834,13 +834,13 @@ defmodule YscWeb.HomeLive do
       }
       class="py-16 sm:py-24 lg:py-32 bg-zinc-50 overflow-hidden"
     >
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20 border-b border-zinc-200 pb-8 sm:pb-10">
           <div class="max-w-2xl min-w-0">
             <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
               Club News
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight break-words">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight wrap-break-word">
               Stay Informed.
             </h2>
           </div>
@@ -861,9 +861,9 @@ defmodule YscWeb.HomeLive do
             ]}>
               <div class="rounded-2xl sm:rounded-[2.5rem] mb-6 sm:mb-8 aspect-square bg-zinc-200">
               </div>
-              <div class="h-3 bg-zinc-200 rounded w-1/4 mb-4"></div>
-              <div class="h-6 bg-zinc-200 rounded w-3/4 mb-2"></div>
-              <div class="h-4 bg-zinc-200 rounded w-full"></div>
+              <div class="h-3 bg-zinc-200 rounded-sm w-1/4 mb-4"></div>
+              <div class="h-6 bg-zinc-200 rounded-sm w-3/4 mb-2"></div>
+              <div class="h-4 bg-zinc-200 rounded-sm w-full"></div>
             </div>
           <% end %>
         </div>
@@ -914,10 +914,10 @@ defmodule YscWeb.HomeLive do
       id="membership-section"
       class="relative py-16 sm:py-24 bg-blue-900 overflow-hidden isolate"
     >
-      <div class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-700/30 via-blue-900 to-gray-900">
+      <div class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-blue-700/30 via-blue-900 to-gray-900">
       </div>
 
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 lg:px-8">
         <div class="max-w-2xl mx-auto text-center">
           <h2
             id="membership-heading"
@@ -966,7 +966,7 @@ defmodule YscWeb.HomeLive do
           <.link
             id="membership-apply-link"
             navigate={~p"/users/register"}
-            class="group inline-flex items-center justify-center min-h-[48px] px-8 py-3.5 text-base font-bold text-blue-900 bg-white rounded hover:bg-blue-50 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900"
+            class="group inline-flex items-center justify-center min-h-[48px] px-8 py-3.5 text-base font-bold text-blue-900 bg-white rounded-sm hover:bg-blue-50 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900"
           >
             Check Eligibility & Apply
             <.icon
@@ -983,11 +983,11 @@ defmodule YscWeb.HomeLive do
       :if={@current_user == nil}
       class="flex justify-center gap-6 py-10 opacity-30 grayscale hover:grayscale-0 transition-all"
     >
-      <.flag country="fi-dk" class="h-8 w-12 rounded-sm" />
-      <.flag country="fi-fi" class="h-8 w-12 rounded-sm" />
-      <.flag country="fi-is" class="h-8 w-12 rounded-sm" />
-      <.flag country="fi-no" class="h-8 w-12 rounded-sm" />
-      <.flag country="fi-se" class="h-8 w-12 rounded-sm" />
+      <.flag country="fi-dk" class="h-8 w-12 rounded-xs" />
+      <.flag country="fi-fi" class="h-8 w-12 rounded-xs" />
+      <.flag country="fi-is" class="h-8 w-12 rounded-xs" />
+      <.flag country="fi-no" class="h-8 w-12 rounded-xs" />
+      <.flag country="fi-se" class="h-8 w-12 rounded-xs" />
     </div>
 
     <%!-- Newsletter Section --%>
@@ -995,11 +995,11 @@ defmodule YscWeb.HomeLive do
       :if={@current_user == nil}
       class="py-12 sm:py-16 lg:py-24 overflow-hidden"
     >
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="max-w-2xl mx-auto text-center">
           <h2
             id="newsletter-heading"
-            class="text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 break-words"
+            class="text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 wrap-break-word"
           >
             Stay in the Loop
           </h2>
@@ -1047,7 +1047,7 @@ defmodule YscWeb.HomeLive do
       <div
         :if={@show_passkey_prompt}
         id="passkey-prompt-banner"
-        class="bg-blue-50 border-b border-blue-100 shadow-sm min-h-[4.75rem] sm:min-h-[5.25rem]"
+        class="bg-blue-50 border-b border-blue-100 shadow-xs min-h-19 sm:min-h-21"
         phx-mounted={
           JS.transition(
             {"transition ease-out duration-300", "opacity-0", "opacity-100"}
@@ -1059,10 +1059,10 @@ defmodule YscWeb.HomeLive do
           )
         }
       >
-        <div class="max-w-screen-xl mx-auto px-4 py-3 sm:py-3.5">
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4 py-3 sm:py-3.5">
           <div class="flex items-start sm:items-center justify-between gap-x-4">
             <div class="flex items-start sm:items-center gap-4 flex-1">
-              <div class="hidden sm:flex flex-shrink-0 h-10 w-10 items-center justify-center rounded-full bg-blue-100 ring-4 ring-blue-50">
+              <div class="hidden sm:flex shrink-0 h-10 w-10 items-center justify-center rounded-full bg-blue-100 ring-4 ring-blue-50">
                 <.icon name="hero-bolt" class="h-6 w-6 text-blue-600" />
               </div>
 
@@ -1079,7 +1079,7 @@ defmodule YscWeb.HomeLive do
             <div class="flex items-center gap-2 sm:gap-4">
               <.button
                 phx-click="setup_passkey"
-                class="!py-1.5 !px-4 whitespace-nowrap shadow-sm"
+                class="py-1.5! px-4! whitespace-nowrap shadow-xs"
               >
                 Set up passkey
               </.button>
@@ -1090,7 +1090,7 @@ defmodule YscWeb.HomeLive do
                 phx-click="dismiss_passkey_prompt"
                 variant="outline"
                 color="blue"
-                class="hidden md:block min-h-0 !border-0 !bg-transparent !shadow-none px-0 py-0 whitespace-nowrap text-sm font-medium !text-blue-600 hover:!bg-transparent hover:!text-blue-700 transition-colors duration-150 focus-visible:!ring-1 focus-visible:!ring-blue-400 focus-visible:!ring-offset-0"
+                class="hidden md:block min-h-0 border-0! bg-transparent! shadow-none! px-0 py-0 whitespace-nowrap text-sm font-medium text-blue-600! hover:bg-transparent! hover:text-blue-700! transition-colors duration-150 focus-visible:ring-1! focus-visible:ring-blue-400! focus-visible:ring-offset-0!"
               >
                 Maybe later
               </.button>
@@ -1110,13 +1110,13 @@ defmodule YscWeb.HomeLive do
 
       <%!-- Welcome Header with Soft Background --%>
       <div class="bg-white border-b border-zinc-100 overflow-hidden">
-        <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-10 lg:py-16">
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 py-10 lg:py-16">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div class="space-y-1 min-w-0">
               <p class="text-blue-600 text-xs font-bold uppercase tracking-[0.2em]">
                 Member Dashboard
               </p>
-              <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-zinc-900 tracking-tight break-words">
+              <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-zinc-900 tracking-tight wrap-break-word">
                 {greeting_for_country(@current_user.most_connected_country)}, {String.capitalize(
                   @current_user.first_name
                 )}
@@ -1127,7 +1127,7 @@ defmodule YscWeb.HomeLive do
       </div>
 
       <%!-- Dashboard Content --%>
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6 -mt-8 pb-20">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 -mt-8 pb-20">
         <div class="flex flex-col">
           <%!-- Quick Actions --%>
           <div
@@ -1138,7 +1138,7 @@ defmodule YscWeb.HomeLive do
             <.link
               id="home-quick-action-tahoe"
               navigate={~p"/bookings/tahoe"}
-              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
               <div class="w-8 h-8 lg:w-10 lg:h-10 bg-blue-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
                 <.icon name="hero-home" class="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
@@ -1149,7 +1149,7 @@ defmodule YscWeb.HomeLive do
             <.link
               id="home-quick-action-clear-lake"
               navigate={~p"/bookings/clear-lake"}
-              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
               <div class="w-8 h-8 lg:w-10 lg:h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
                 <.icon
@@ -1163,7 +1163,7 @@ defmodule YscWeb.HomeLive do
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
               <.link
                 navigate={~p"/expensereports"}
-                class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+                class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
               >
                 <div class="w-8 h-8 lg:w-10 lg:h-10 bg-orange-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
                   <.icon
@@ -1177,7 +1177,7 @@ defmodule YscWeb.HomeLive do
             <% else %>
               <.link
                 navigate={~p"/events"}
-                class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+                class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
               >
                 <div class="w-8 h-8 lg:w-10 lg:h-10 bg-purple-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
                   <.icon
@@ -1191,7 +1191,7 @@ defmodule YscWeb.HomeLive do
             <% end %>
             <.link
               navigate={~p"/users/settings"}
-              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
               <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
                 <.icon
@@ -1224,23 +1224,23 @@ defmodule YscWeb.HomeLive do
                 <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
                 <div
                   :if={!@async_data_loaded}
-                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center min-h-[17.5rem] animate-pulse"
+                  class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-70 animate-pulse"
                 >
                   <div class="w-14 h-14 bg-zinc-200 rounded-full mx-auto mb-4">
                   </div>
-                  <div class="h-4 bg-zinc-200 rounded w-48 mx-auto mb-2"></div>
-                  <div class="h-3 bg-zinc-200 rounded w-56 mx-auto mb-6"></div>
+                  <div class="h-4 bg-zinc-200 rounded-sm w-48 mx-auto mb-2"></div>
+                  <div class="h-3 bg-zinc-200 rounded-sm w-56 mx-auto mb-6"></div>
                   <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                    <div class="h-10 w-36 bg-zinc-200 rounded mx-auto sm:mx-0">
+                    <div class="h-10 w-36 bg-zinc-200 rounded-sm mx-auto sm:mx-0">
                     </div>
-                    <div class="h-10 w-36 bg-zinc-200 rounded mx-auto sm:mx-0">
+                    <div class="h-10 w-36 bg-zinc-200 rounded-sm mx-auto sm:mx-0">
                     </div>
                   </div>
                 </div>
 
                 <div
                   :if={@async_data_loaded && Enum.empty?(@future_bookings)}
-                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center min-h-[17.5rem]"
+                  class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-70"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
@@ -1286,11 +1286,11 @@ defmodule YscWeb.HomeLive do
                       ]}
                     >
                       <div class={[
-                        "md:w-1.5 flex-shrink-0",
+                        "md:w-1.5 shrink-0",
                         if booking.property == :tahoe do
-                          "bg-gradient-to-b from-blue-500 to-blue-700"
+                          "bg-linear-to-b from-blue-500 to-blue-700"
                         else
-                          "bg-gradient-to-b from-emerald-500 to-emerald-700"
+                          "bg-linear-to-b from-emerald-500 to-emerald-700"
                         end
                       ]}>
                       </div>
@@ -1316,7 +1316,7 @@ defmodule YscWeb.HomeLive do
                             )}
                           </p>
                           <span class={[
-                            "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded uppercase tracking-tighter",
+                            "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded-sm uppercase tracking-tighter",
                             case days_until_this_booking do
                               :started ->
                                 "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
@@ -1342,13 +1342,13 @@ defmodule YscWeb.HomeLive do
                             end}
                           </span>
                           <%= if booking.booking_mode == :buyout do %>
-                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded uppercase tracking-tighter">
+                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded-sm uppercase tracking-tighter">
                               {BookingModeDisplay.stay_type_label(:buyout)}
                             </span>
                           <% end %>
                         </div>
                         <div class="flex justify-end">
-                          <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded group-hover:bg-blue-600 transition-colors duration-150">
+                          <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded-sm group-hover:bg-blue-600 transition-colors duration-150">
                             View Details
                           </span>
                         </div>
@@ -1376,19 +1376,19 @@ defmodule YscWeb.HomeLive do
                 <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
                 <div
                   :if={!@async_data_loaded}
-                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center min-h-[16rem] animate-pulse"
+                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-xs p-12 text-center min-h-64 animate-pulse"
                 >
                   <div class="w-14 h-14 bg-zinc-200 rounded-full mx-auto mb-4">
                   </div>
-                  <div class="h-4 bg-zinc-200 rounded w-56 mx-auto mb-2"></div>
-                  <div class="h-3 bg-zinc-200 rounded w-64 max-w-full mx-auto mb-6">
+                  <div class="h-4 bg-zinc-200 rounded-sm w-56 mx-auto mb-2"></div>
+                  <div class="h-3 bg-zinc-200 rounded-sm w-64 max-w-full mx-auto mb-6">
                   </div>
-                  <div class="h-10 w-36 bg-zinc-200 rounded mx-auto"></div>
+                  <div class="h-10 w-36 bg-zinc-200 rounded-sm mx-auto"></div>
                 </div>
 
                 <div
                   :if={@async_data_loaded && Enum.empty?(@upcoming_tickets)}
-                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center min-h-[16rem]"
+                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-xs p-12 text-center min-h-64"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
@@ -1422,7 +1422,7 @@ defmodule YscWeb.HomeLive do
                     <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8">
                       <div class="flex justify-between items-start mb-4">
                         <span class={[
-                          "px-2 py-1 text-xs font-bold rounded",
+                          "px-2 py-1 text-xs font-bold rounded-sm",
                           case days_until_this_event do
                             0 -> "bg-amber-50 text-amber-700"
                             1 -> "bg-blue-50 text-blue-700"
@@ -1465,7 +1465,7 @@ defmodule YscWeb.HomeLive do
                                 ~p"/events/#{event.id}/tickets/qr?return_to=/"
                               }
                               color="zinc"
-                              class="!py-1.5 whitespace-nowrap"
+                              class="py-1.5! whitespace-nowrap"
                             >
                               <.icon name="hero-qr-code" class="w-4 h-4" />
                               Show tickets for check-in
@@ -1515,15 +1515,15 @@ defmodule YscWeb.HomeLive do
                 <%!-- Loading skeleton: two cards (~one grid row) balances empty vs loaded CLS --%>
                 <div
                   :if={!@async_data_loaded}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-[22rem]"
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-88"
                 >
                   <%= for _i <- 1..2 do %>
-                    <div class="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
+                    <div class="bg-white rounded-xl shadow-xs border border-zinc-200 overflow-hidden animate-pulse">
                       <div class="h-48 bg-zinc-200"></div>
                       <div class="p-6 space-y-3">
-                        <div class="h-4 bg-zinc-200 rounded w-1/4"></div>
-                        <div class="h-6 bg-zinc-200 rounded w-3/4"></div>
-                        <div class="h-4 bg-zinc-200 rounded w-1/2"></div>
+                        <div class="h-4 bg-zinc-200 rounded-sm w-1/4"></div>
+                        <div class="h-6 bg-zinc-200 rounded-sm w-3/4"></div>
+                        <div class="h-4 bg-zinc-200 rounded-sm w-1/2"></div>
                       </div>
                     </div>
                   <% end %>
@@ -1531,7 +1531,7 @@ defmodule YscWeb.HomeLive do
 
                 <div
                   :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
-                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center min-h-[22rem] flex flex-col items-center justify-center"
+                  class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-88 flex flex-col items-center justify-center"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
@@ -1549,7 +1549,7 @@ defmodule YscWeb.HomeLive do
 
                 <div
                   :if={@async_data_loaded && !Enum.empty?(@upcoming_events)}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-[22rem]"
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-88"
                 >
                   <%= for event <- @upcoming_events do %>
                     <.event_card
@@ -1566,16 +1566,16 @@ defmodule YscWeb.HomeLive do
             <aside class="space-y-10">
               <%!-- Membership Status Card --%>
               <div class={[
-                "relative overflow-hidden rounded-xl p-5 lg:p-8 shadow-sm",
+                "relative overflow-hidden rounded-xl p-5 lg:p-8 shadow-xs",
                 cond do
                   @active_membership? ->
-                    "bg-gradient-to-br from-blue-50 via-white to-blue-50/80 border border-blue-200 text-zinc-900"
+                    "bg-linear-to-br from-blue-50 via-white to-blue-50/80 border border-blue-200 text-zinc-900"
 
                   @current_user.state == :pending_approval ->
-                    "bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950 text-white"
+                    "bg-linear-to-br from-sky-950 via-blue-950 to-indigo-950 text-white"
 
                   true ->
-                    "bg-gradient-to-br from-amber-900 via-orange-900 to-red-900 text-white"
+                    "bg-linear-to-br from-amber-900 via-orange-900 to-red-900 text-white"
                 end
               ]}>
                 <div
@@ -1584,18 +1584,18 @@ defmodule YscWeb.HomeLive do
                 >
                   <%= cond do %>
                     <% @current_user.state == :pending_approval -> %>
-                      <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-sky-500 blur-[80px]">
+                      <div class="absolute top-[-20%] left-[-10%] h-[80%] w-[80%] rounded-full bg-sky-500 blur-[80px]">
                       </div>
-                      <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
+                      <div class="absolute top-[20%] right-[-10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
                       </div>
-                      <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-700 blur-[80px]">
+                      <div class="absolute bottom-[-20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-700 blur-[80px]">
                       </div>
                     <% true -> %>
-                      <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-amber-500 blur-[80px]">
+                      <div class="absolute top-[-20%] left-[-10%] h-[80%] w-[80%] rounded-full bg-amber-500 blur-[80px]">
                       </div>
-                      <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-orange-600 blur-[80px]">
+                      <div class="absolute top-[20%] right-[-10%] h-[70%] w-[70%] rounded-full bg-orange-600 blur-[80px]">
                       </div>
-                      <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-red-800 blur-[80px]">
+                      <div class="absolute bottom-[-20%] left-[20%] h-[60%] w-[60%] rounded-full bg-red-800 blur-[80px]">
                       </div>
                   <% end %>
                 </div>
@@ -1670,7 +1670,7 @@ defmodule YscWeb.HomeLive do
 
                   <%= cond do %>
                     <% @current_user.state == :pending_approval -> %>
-                      <div class="flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 bg-white/10 text-sky-100 border border-white/20 backdrop-blur-md">
+                      <div class="flex w-full items-center justify-center rounded-sm px-6 py-4 text-sm font-semibold leading-6 bg-white/10 text-sky-100 border border-white/20 backdrop-blur-md">
                         <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
                         Awaiting board review
                       </div>
@@ -1678,7 +1678,7 @@ defmodule YscWeb.HomeLive do
                       <.link
                         navigate={~p"/users/membership"}
                         class={[
-                          "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
+                          "flex w-full items-center justify-center rounded-sm px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
                           if(@active_membership?,
                             do: "bg-blue-700 text-white hover:bg-blue-800",
                             else:
@@ -1754,7 +1754,7 @@ defmodule YscWeb.HomeLive do
                   <.qr_code
                     data={@membership_qr_token}
                     size={250}
-                    class="mx-auto p-2 rounded-lg border border-1"
+                    class="mx-auto p-2 rounded-lg border border"
                   />
                   <%= if @apple_wallet_membership_enabled? &&
                       @wallet_platform in [:apple_only, :both] do %>
@@ -1845,8 +1845,8 @@ defmodule YscWeb.HomeLive do
                 >
                   <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
                   <div class="space-y-2 flex-1">
-                    <div class="h-3.5 w-28 bg-zinc-200 rounded"></div>
-                    <div class="h-3 w-36 bg-zinc-100 rounded"></div>
+                    <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
+                    <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
                   </div>
                 </div>
 
@@ -1909,11 +1909,11 @@ defmodule YscWeb.HomeLive do
                 <div :if={!@async_data_loaded} class="space-y-6">
                   <%= for _i <- 1..3 do %>
                     <div class="flex gap-4 animate-pulse">
-                      <div class="w-16 h-16 rounded-md bg-zinc-200 flex-shrink-0">
+                      <div class="w-16 h-16 rounded-md bg-zinc-200 shrink-0">
                       </div>
                       <div class="flex-1 space-y-2 pt-1">
-                        <div class="h-3 bg-zinc-200 rounded w-1/4"></div>
-                        <div class="h-4 bg-zinc-200 rounded w-3/4"></div>
+                        <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
+                        <div class="h-4 bg-zinc-200 rounded-sm w-3/4"></div>
                       </div>
                     </div>
                   <% end %>
@@ -1925,7 +1925,7 @@ defmodule YscWeb.HomeLive do
                       navigate={~p"/posts/#{post.url_name}"}
                       class="flex gap-4 group"
                     >
-                      <div class="w-16 h-16 rounded-md bg-zinc-200 overflow-hidden flex-shrink-0">
+                      <div class="w-16 h-16 rounded-md bg-zinc-200 overflow-hidden shrink-0">
                         <.live_component
                           id={"sidebar-news-image-#{post.id}"}
                           module={YscWeb.Components.Image}
@@ -1955,7 +1955,7 @@ defmodule YscWeb.HomeLive do
       </div>
 
       <%!-- Fade from dashboard background to white footer --%>
-      <div class="h-32 bg-gradient-to-b from-transparent to-white"></div>
+      <div class="h-32 bg-linear-to-b from-transparent to-white"></div>
     </main>
     """
   end

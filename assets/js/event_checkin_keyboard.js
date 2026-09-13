@@ -37,7 +37,7 @@ const FOCUSED_CLASS = "keyboard-focused";
 const MAX_SHORTCUTS = 8;
 
 const KBD_CLASS =
-    "inline-flex justify-center items-center bg-white border border-zinc-300 font-mono text-zinc-400 rounded leading-none";
+    "inline-flex justify-center items-center bg-white border border-zinc-300 font-mono text-zinc-400 rounded-sm leading-none";
 // Inline styles only — this markup is injected at runtime, so Tailwind's JIT
 // never sees it. box-shadow uses zinc-300.
 const KBD_STYLE =

@@ -29,8 +29,8 @@ defmodule YscWeb.TicketQrLive do
         <div class="min-w-0">
           <%= cond do %>
             <% @loading -> %>
-              <div class="h-6 w-48 bg-white/10 rounded animate-pulse"></div>
-              <div class="h-4 w-24 bg-white/10 rounded animate-pulse mt-1.5"></div>
+              <div class="h-6 w-48 bg-white/10 rounded-sm animate-pulse"></div>
+              <div class="h-4 w-24 bg-white/10 rounded-sm animate-pulse mt-1.5"></div>
             <% @load_error -> %>
               <p
                 id="event-title"
@@ -55,14 +55,14 @@ defmodule YscWeb.TicketQrLive do
       <%!-- Event details strip --%>
       <%= cond do %>
         <% @loading -> %>
-          <div class="px-5 py-4 flex flex-col gap-2 border-b border-white/10 min-h-[5.5rem]">
-            <div class="h-4 w-56 bg-white/10 rounded animate-pulse"></div>
-            <div class="h-4 w-40 bg-white/10 rounded animate-pulse"></div>
+          <div class="px-5 py-4 flex flex-col gap-2 border-b border-white/10 min-h-22">
+            <div class="h-4 w-56 bg-white/10 rounded-sm animate-pulse"></div>
+            <div class="h-4 w-40 bg-white/10 rounded-sm animate-pulse"></div>
           </div>
         <% @load_error -> %>
           <%!-- no strip on error --%>
         <% true -> %>
-          <div class="px-5 py-4 flex items-start justify-between gap-4 border-b border-white/10 min-h-[5.5rem]">
+          <div class="px-5 py-4 flex items-start justify-between gap-4 border-b border-white/10 min-h-22">
             <div class="flex flex-col gap-2">
               <span
                 :if={@event.start_date}
@@ -90,7 +90,7 @@ defmodule YscWeb.TicketQrLive do
               </span>
             </div>
             <%!-- Fixed slot so add-to-calendar web component cannot expand the strip --%>
-            <div class="shrink-0 min-h-[2.5rem] min-w-[2.5rem] flex items-start justify-end">
+            <div class="shrink-0 min-h-10 min-w-10 flex items-start justify-end">
               <add-to-calendar-button
                 :if={@event.start_date}
                 name={@event.title}
@@ -109,7 +109,7 @@ defmodule YscWeb.TicketQrLive do
       <% end %>
 
       <%!-- Main content area: fixed min-height avoids skeleton→ticket CLS --%>
-      <div class="flex-1 flex flex-col justify-center py-8 min-h-[36rem]">
+      <div class="flex-1 flex flex-col justify-center py-8 min-h-144">
         <%= cond do %>
           <% @loading -> %>
             <%!-- Loading skeleton --%>
@@ -120,7 +120,7 @@ defmodule YscWeb.TicketQrLive do
                 <div class="bg-white/10 px-6 pt-6 pb-4 flex flex-col items-center gap-4">
                   <div class="w-[230px] h-[230px] bg-white/5 rounded-xl animate-pulse">
                   </div>
-                  <div class="h-3 w-28 bg-white/10 rounded animate-pulse"></div>
+                  <div class="h-3 w-28 bg-white/10 rounded-sm animate-pulse"></div>
                   <%!-- Reserved wallet action row (matches loaded ticket) --%>
                   <div class="h-12 w-40 bg-white/5 rounded-lg animate-pulse mt-2">
                   </div>
@@ -177,7 +177,7 @@ defmodule YscWeb.TicketQrLive do
                             <p class="text-white/70 text-xs font-black uppercase tracking-[0.2em] mb-0.5">
                               Event Ticket
                             </p>
-                            <p class="text-white font-black text-lg leading-tight drop-shadow">
+                            <p class="text-white font-black text-lg leading-tight drop-shadow-sm">
                               {ticket.tier_name}
                             </p>
                           </div>
@@ -203,7 +203,7 @@ defmodule YscWeb.TicketQrLive do
                           Scan to check in
                         </p>
                         <%!-- Fixed-height wallet row: platform detection must not expand the card --%>
-                        <div class="flex flex-col items-center justify-center gap-2 mt-4 min-h-[3.5rem]">
+                        <div class="flex flex-col items-center justify-center gap-2 mt-4 min-h-14">
                           <%= if @apple_wallet_enabled? && @wallet_platform in [:apple_only, :both] do %>
                             <.add_to_wallet_button href={
                               ~p"/wallet/tickets/#{ticket.id}"

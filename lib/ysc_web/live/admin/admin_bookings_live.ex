@@ -429,7 +429,7 @@ defmodule YscWeb.AdminBookingsLive do
           id="approve-refund-form"
           phx-submit="approve-refund-custom"
         >
-          <div class="mb-4 p-4 bg-zinc-50 rounded border border-zinc-200">
+          <div class="mb-4 p-4 bg-zinc-50 rounded-sm border border-zinc-200">
             <p class="text-sm text-zinc-600 mb-2">
               <span class="font-medium">Total Amount Paid:</span>
               {MoneyHelper.format_money!(@selected_pending_refund.payment.amount)}
@@ -504,7 +504,7 @@ defmodule YscWeb.AdminBookingsLive do
           id="reject-refund-form"
           phx-submit="reject-refund"
         >
-          <div class="mb-4 p-4 bg-red-50 rounded border border-red-200">
+          <div class="mb-4 p-4 bg-red-50 rounded-sm border border-red-200">
             <p class="text-sm text-red-800 mb-2">
               <span class="font-medium">Policy Refund Amount:</span>
               {MoneyHelper.format_money!(
@@ -584,7 +584,7 @@ defmodule YscWeb.AdminBookingsLive do
                 >
                   <.user_avatar_image
                     user={@booking.user}
-                    class="w-10 h-10 rounded-full flex-shrink-0"
+                    class="w-10 h-10 rounded-full shrink-0"
                   />
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-blue-600 group-hover:underline truncate">
@@ -606,7 +606,7 @@ defmodule YscWeb.AdminBookingsLive do
                 <div class="flex items-center gap-3">
                   <.user_avatar_image
                     user={nil}
-                    class="w-10 h-10 rounded-full flex-shrink-0"
+                    class="w-10 h-10 rounded-full shrink-0"
                   />
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-zinc-900 truncate">
@@ -648,7 +648,7 @@ defmodule YscWeb.AdminBookingsLive do
                 <div class="space-y-1.5">
                   <%= for guest <- Enum.sort_by(@booking.booking_guests, & &1.order_index) do %>
                     <div class="flex items-center gap-2 text-xs">
-                      <div class="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center font-medium text-xs">
+                      <div class="shrink-0 w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center font-medium text-xs">
                         {"#{String.first(guest.first_name)}#{String.first(guest.last_name)}"}
                       </div>
                       <%= if guest.is_booking_user && @booking.user do %>
@@ -745,7 +745,7 @@ defmodule YscWeb.AdminBookingsLive do
                     </span>
                     <span
                       :if={room.room_category}
-                      class="text-xs text-zinc-600 flex-shrink-0"
+                      class="text-xs text-zinc-600 shrink-0"
                     >
                       {titleize(room.room_category.name)}
                     </span>
@@ -766,7 +766,7 @@ defmodule YscWeb.AdminBookingsLive do
                         <span class="text-sm font-medium text-zinc-900 font-mono break-all min-w-0">
                           {payment.reference_id}
                         </span>
-                        <span class="flex items-center gap-1 flex-shrink-0">
+                        <span class="flex items-center gap-1 shrink-0">
                           <.admin_clipboard_button
                             id={"copy-payment-ref-#{payment.id}"}
                             variant={:icon}
@@ -837,7 +837,7 @@ defmodule YscWeb.AdminBookingsLive do
                         <span class="text-sm font-medium text-zinc-900 font-mono break-all min-w-0">
                           {refund.reference_id}
                         </span>
-                        <span class="flex items-center gap-1 flex-shrink-0">
+                        <span class="flex items-center gap-1 shrink-0">
                           <.admin_clipboard_button
                             id={"copy-refund-ref-#{refund.id}"}
                             variant={:icon}
@@ -859,7 +859,7 @@ defmodule YscWeb.AdminBookingsLive do
                       </p>
                       <p
                         :if={refund.reason}
-                        class="text-xs text-zinc-600 break-words"
+                        class="text-xs text-zinc-600 wrap-break-word"
                       >
                         Reason: {refund.reason}
                       </p>
@@ -1027,7 +1027,7 @@ defmodule YscWeb.AdminBookingsLive do
         show
         on_cancel={JS.push("close-booking-refund-modal")}
         max_width="max-w-md"
-        z_index="z-[60]"
+        z_index="z-60"
       >
         <.header>
           Process Refund
@@ -1141,7 +1141,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <%= if booking.user do %>
                       <.link
                         navigate={~p"/admin/users/#{booking.user.id}/details"}
-                        class="flex-shrink-0"
+                        class="shrink-0"
                       >
                         <.user_avatar_image
                           user={booking.user}
@@ -1151,7 +1151,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <% else %>
                       <.user_avatar_image
                         user={nil}
-                        class="w-9 h-9 rounded-full flex-shrink-0"
+                        class="w-9 h-9 rounded-full shrink-0"
                       />
                     <% end %>
                     <div class="min-w-0">
@@ -1195,7 +1195,7 @@ defmodule YscWeb.AdminBookingsLive do
                       </div>
                     </div>
                   </div>
-                  <div class="flex items-center gap-3 flex-shrink-0">
+                  <div class="flex items-center gap-3 shrink-0">
                     <.badge type={
                       AdminBadgeHelpers.booking_status_badge_type(booking.status)
                     }>
@@ -1208,7 +1208,7 @@ defmodule YscWeb.AdminBookingsLive do
                       phx-click="view-booking"
                       phx-value-booking-id={booking.id}
                       phx-disable-with="Opening..."
-                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
+                      class="min-h-9! py-1! px-2.5! text-sm whitespace-nowrap"
                     >
                       View
                     </.button>
@@ -1357,7 +1357,7 @@ defmodule YscWeb.AdminBookingsLive do
         </.header>
 
         <div :if={@refund_policy} class="space-y-4">
-          <div class="bg-blue-50 rounded border border-blue-200 p-4 mb-4">
+          <div class="bg-blue-50 rounded-sm border border-blue-200 p-4 mb-4">
             <p class="text-sm font-semibold text-zinc-700 mb-1">
               {@refund_policy.name}
             </p>
@@ -1379,7 +1379,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div :if={@refund_policy_rules != []} class="space-y-2">
               <div
                 :for={rule <- @refund_policy_rules}
-                class="flex items-center justify-between p-3 bg-zinc-50 rounded border border-zinc-200"
+                class="flex items-center justify-between p-3 bg-zinc-50 rounded-sm border border-zinc-200"
               >
                 <div class="flex-1">
                   <p class="text-sm font-semibold text-zinc-800">
@@ -1400,7 +1400,7 @@ defmodule YscWeb.AdminBookingsLive do
                   phx-value-rule-id={rule.id}
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this rule?"
-                  class="!min-h-9 !p-2"
+                  class="min-h-9! p-2!"
                   aria-label="Delete rule"
                 >
                   <.icon name="hero-trash" class="w-4 h-4" />
@@ -1523,7 +1523,7 @@ defmodule YscWeb.AdminBookingsLive do
 
         <div
           :if={@live_action == :edit_booking && @booking}
-          class="mb-4 p-3 bg-blue-50 rounded border border-blue-200"
+          class="mb-4 p-3 bg-blue-50 rounded-sm border border-blue-200"
         >
           <p class="text-sm text-blue-800">
             <span class="font-semibold">Reference:</span> {@booking.reference_id}
@@ -1962,7 +1962,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.admin_tabs>
       <!-- Calendar View -->
       <div :if={@current_section == :calendar} class="space-y-6 pb-16">
-        <div class="bg-white rounded border p-3 sm:p-6">
+        <div class="bg-white rounded-sm border p-3 sm:p-6">
           <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-4 sm:mb-6 gap-4">
             <div>
               <h2 class="text-base sm:text-lg font-semibold text-zinc-800">
@@ -2038,7 +2038,7 @@ defmodule YscWeb.AdminBookingsLive do
             <% total_days = length(@calendar_dates)
             total_cols = total_days * 2 %>
             <!-- Fixed Left Column: Row Titles -->
-            <div class="flex-shrink-0 w-[120px] sm:w-[180px] lg:w-[220px] border-r border-zinc-200 bg-white">
+            <div class="shrink-0 w-[120px] sm:w-[180px] lg:w-[220px] border-r border-zinc-200 bg-white">
               <!-- Header: Room label -->
               <div class="border-b border-zinc-200 px-2 sm:px-3 py-2.5 text-left font-semibold text-zinc-700 bg-white text-sm">
                 Room
@@ -2046,7 +2046,7 @@ defmodule YscWeb.AdminBookingsLive do
               <!-- Bookings Row Title (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
-                  <div class="h-2 w-2 rounded-full bg-purple-500 flex-shrink-0">
+                  <div class="h-2 w-2 rounded-full bg-purple-500 shrink-0">
                   </div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                     Guests
@@ -2055,14 +2055,14 @@ defmodule YscWeb.AdminBookingsLive do
               <% end %>
               <!-- Blackouts Row Title -->
               <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
-                <div class="h-2 w-2 rounded-full bg-red-500 flex-shrink-0"></div>
+                <div class="h-2 w-2 rounded-full bg-red-500 shrink-0"></div>
                 <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                   Blackouts
                 </div>
               </div>
               <!-- Full Buyout Row Title -->
               <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
-                <div class="h-2 w-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                <div class="h-2 w-2 rounded-full bg-green-500 shrink-0"></div>
                 <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                   Full Buyout
                 </div>
@@ -2070,7 +2070,7 @@ defmodule YscWeb.AdminBookingsLive do
               <!-- Room Row Titles -->
               <%= for room <- @filtered_rooms do %>
                 <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
-                  <div class="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></div>
+                  <div class="h-2 w-2 rounded-full bg-blue-500 shrink-0"></div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                     {room.name}
                     <span
@@ -2214,7 +2214,7 @@ defmodule YscWeb.AdminBookingsLive do
                         phx-click="show-day-guests"
                         phx-value-date={Date.to_string(date)}
                         phx-disable-with="Loading..."
-                        class="!min-h-9 !py-1 !px-2 text-sm relative z-10"
+                        class="min-h-9! py-1! px-2! text-sm relative z-10"
                       >
                         {guest_count} guests
                       </.button>
@@ -2407,7 +2407,7 @@ defmodule YscWeb.AdminBookingsLive do
       </div>
       <!-- Reservations View -->
       <div :if={@current_section == :reservations} class="space-y-6 pb-16">
-        <div class="bg-white rounded border p-3 sm:p-6">
+        <div class="bg-white rounded-sm border p-3 sm:p-6">
           <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-4 sm:mb-6 gap-4">
             <div>
               <h2 class="text-base sm:text-lg font-semibold text-zinc-800">
@@ -2459,7 +2459,7 @@ defmodule YscWeb.AdminBookingsLive do
               >
                 <:col :let={{_, booking}} label="Reference" field={:reference_id}>
                   <.badge type="default" class="whitespace-nowrap">
-                    <span class="font-mono text-xs flex-shrink-0 whitespace-nowrap">
+                    <span class="font-mono text-xs shrink-0 whitespace-nowrap">
                       {booking.reference_id}
                     </span>
                   </.badge>
@@ -2532,11 +2532,11 @@ defmodule YscWeb.AdminBookingsLive do
                     </div>
                   <% else %>
                     <%= if booking.booking_mode == :day do %>
-                      <.badge type="sky" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="sky" class="whitespace-nowrap shrink-0">
                         Day
                       </.badge>
                     <% else %>
-                      <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="green" class="whitespace-nowrap shrink-0">
                         Full Buyout
                       </.badge>
                     <% end %>
@@ -2545,27 +2545,27 @@ defmodule YscWeb.AdminBookingsLive do
                 <:col :let={{_, booking}} label="Status" field={:status}>
                   <%= case booking.status do %>
                     <% :draft -> %>
-                      <.badge type="dark" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="dark" class="whitespace-nowrap shrink-0">
                         Draft
                       </.badge>
                     <% :hold -> %>
-                      <.badge type="yellow" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="yellow" class="whitespace-nowrap shrink-0">
                         Hold
                       </.badge>
                     <% :complete -> %>
-                      <.badge type="green" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="green" class="whitespace-nowrap shrink-0">
                         Complete
                       </.badge>
                     <% :refunded -> %>
-                      <.badge type="sky" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="sky" class="whitespace-nowrap shrink-0">
                         Refunded
                       </.badge>
                     <% :canceled -> %>
-                      <.badge type="red" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="red" class="whitespace-nowrap shrink-0">
                         Canceled
                       </.badge>
                     <% _ -> %>
-                      <.badge type="dark" class="whitespace-nowrap flex-shrink-0">
+                      <.badge type="dark" class="whitespace-nowrap shrink-0">
                         —
                       </.badge>
                   <% end %>
@@ -2781,9 +2781,9 @@ defmodule YscWeb.AdminBookingsLive do
         </div>
       </div>
 
-      <div :if={@current_section == :config} class="space-y-8 pb-16 max-w-screen-lg">
+      <div :if={@current_section == :config} class="space-y-8 pb-16 max-w-(--breakpoint-lg)">
         <!-- Door Codes Section -->
-        <div class="bg-white rounded border p-6">
+        <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Door Codes</h2>
@@ -2793,7 +2793,7 @@ defmodule YscWeb.AdminBookingsLive do
             </div>
           </div>
           <!-- Active Door Code -->
-          <div class="mb-6 p-4 bg-blue-50 rounded border border-blue-200">
+          <div class="mb-6 p-4 bg-blue-50 rounded-sm border border-blue-200">
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm font-semibold text-zinc-700 mb-1">
@@ -2856,12 +2856,12 @@ defmodule YscWeb.AdminBookingsLive do
             <!-- Warning if code matches recent codes -->
             <div
               :if={@door_code_warning}
-              class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800"
+              class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-sm text-sm text-yellow-800"
             >
               <div class="flex items-start">
                 <.icon
                   name="hero-exclamation-triangle"
-                  class="w-5 h-5 mr-2 flex-shrink-0 mt-0.5"
+                  class="w-5 h-5 mr-2 shrink-0 mt-0.5"
                 />
                 <div>
                   <p class="font-semibold mb-1">Warning: Code Reuse Detected</p>
@@ -2926,7 +2926,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
         </div>
         <!-- Seasons Table -->
-        <div class="bg-white rounded border p-6">
+        <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Seasons</h2>
@@ -3006,7 +3006,7 @@ defmodule YscWeb.AdminBookingsLive do
                       phx-disable-with="Loading..."
                       variant="outline"
                       color="blue"
-                      class="!min-h-9 !py-1 !px-2.5 text-sm"
+                      class="min-h-9! py-1! px-2.5! text-sm"
                     >
                       Edit
                     </.button>
@@ -3017,7 +3017,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
         </div>
         <!-- Pricing Rules Table -->
-        <div class="bg-white rounded border p-6">
+        <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Pricing Rules</h2>
@@ -3107,7 +3107,7 @@ defmodule YscWeb.AdminBookingsLive do
                       phx-disable-with="Loading..."
                       variant="outline"
                       color="blue"
-                      class="!min-h-9 !py-1 !px-2.5 text-sm"
+                      class="min-h-9! py-1! px-2.5! text-sm"
                     >
                       Edit
                     </.button>
@@ -3118,7 +3118,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
         </div>
         <!-- Refund Policies Table -->
-        <div class="bg-white rounded border p-6">
+        <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Refund Policies</h2>
@@ -3196,7 +3196,7 @@ defmodule YscWeb.AdminBookingsLive do
                         phx-disable-with="Loading..."
                         variant="outline"
                         color="blue"
-                        class="!min-h-9 !py-1 !px-2.5 text-sm"
+                        class="min-h-9! py-1! px-2.5! text-sm"
                       >
                         Edit
                       </.button>
@@ -3207,7 +3207,7 @@ defmodule YscWeb.AdminBookingsLive do
                         phx-disable-with="Loading..."
                         variant="outline"
                         color="blue"
-                        class="!min-h-9 !py-1 !px-2.5 text-sm"
+                        class="min-h-9! py-1! px-2.5! text-sm"
                       >
                         Rules
                       </.button>
@@ -3225,7 +3225,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
         </div>
         <!-- Rooms Table -->
-        <div class="bg-white rounded border p-6">
+        <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
               <h2 class="text-lg font-semibold text-zinc-800">Rooms</h2>
@@ -3261,7 +3261,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <td class="py-3 pr-6">
                     <div
                       :if={room.image}
-                      class="w-16 h-16 rounded overflow-hidden border border-zinc-200"
+                      class="w-16 h-16 rounded-sm overflow-hidden border border-zinc-200"
                     >
                       <img
                         src={
@@ -3275,7 +3275,7 @@ defmodule YscWeb.AdminBookingsLive do
                     </div>
                     <div
                       :if={!room.image}
-                      class="w-16 h-16 rounded bg-zinc-100 border border-zinc-200 flex items-center justify-center"
+                      class="w-16 h-16 rounded-sm bg-zinc-100 border border-zinc-200 flex items-center justify-center"
                     >
                       <span class="text-xs text-zinc-400">No image</span>
                     </div>
@@ -3356,7 +3356,7 @@ defmodule YscWeb.AdminBookingsLive do
                       phx-disable-with="Loading..."
                       variant="outline"
                       color="blue"
-                      class="!min-h-9 !py-1 !px-2.5 text-sm"
+                      class="min-h-9! py-1! px-2.5! text-sm"
                     >
                       Edit
                     </.button>
@@ -7407,7 +7407,7 @@ defmodule YscWeb.AdminBookingsLive do
         extends_before && extends_after -> "rounded-none"
         extends_before -> "rounded-r"
         extends_after -> "rounded-l"
-        true -> "rounded"
+        true -> "rounded-sm"
       end
 
     [
@@ -7478,7 +7478,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     """
     <div
-      class="h-12 shadow-sm border text-xs font-medium flex flex-col items-stretch justify-center overflow-hidden bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{continuation_classes}"
+      class="h-12 shadow-xs border text-xs font-medium flex flex-col items-stretch justify-center overflow-hidden bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{continuation_classes}"
       style="#{style_val}"
       title="#{escaped_title_str}"
       phx-click="view-blackout"
@@ -7486,7 +7486,7 @@ defmodule YscWeb.AdminBookingsLive do
       phx-disable-with="Opening..."
     >
       #{left_edge}
-      <div class="min-w-0 px-2 font-semibold leading-tight line-clamp-2 break-words">#{escaped_reason_str}</div>
+      <div class="min-w-0 px-2 font-semibold leading-tight line-clamp-2 wrap-break-word">#{escaped_reason_str}</div>
       #{right_edge}
     </div>
     """
@@ -7555,7 +7555,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Add checkmark if checked in (to the right of the name)
     checked_in_indicator =
       if booking.checked_in do
-        "<svg class=\"w-3.5 h-3.5 text-green-600 flex-shrink-0 mt-0.5\" fill=\"currentColor\" viewBox=\"0 0 20 20\">
+        "<svg class=\"w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5\" fill=\"currentColor\" viewBox=\"0 0 20 20\">
           <path fill-rule=\"evenodd\" d=\"M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z\" clip-rule=\"evenodd\" />
         </svg>"
       else
@@ -7564,7 +7564,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     """
     <div
-      class="h-12 shadow-sm border text-xs font-medium flex flex-row items-center gap-1.5 px-1.5 #{bg_color} #{border_color} #{text_color} cursor-pointer #{hover_color} transition-colors duration-200 relative #{continuation_classes}"
+      class="h-12 shadow-xs border text-xs font-medium flex flex-row items-center gap-1.5 px-1.5 #{bg_color} #{border_color} #{text_color} cursor-pointer #{hover_color} transition-colors duration-200 relative #{continuation_classes}"
       style="#{style_val}"
       title="#{escaped_title_str}"
       phx-click="view-booking"
@@ -7575,7 +7575,7 @@ defmodule YscWeb.AdminBookingsLive do
       <img
         src="#{escaped_avatar_src}"
         alt=""
-        class="w-8 h-8 rounded-full object-cover ring-2 ring-white/80 flex-shrink-0"
+        class="w-8 h-8 rounded-full object-cover ring-2 ring-white/80 shrink-0"
         loading="lazy"
       />
       <div class="flex flex-col min-w-0 flex-1 justify-center gap-0.5">

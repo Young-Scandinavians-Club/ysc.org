@@ -38,7 +38,7 @@ defmodule YscWeb.AdminUsersLive do
         >
           <span class="sr-only">Loading user…</span>
           <.skeleton_block class="w-32 h-32 rounded-full" />
-          <.skeleton_block :for={_ <- 1..5} class="h-10 w-full rounded" />
+          <.skeleton_block :for={_ <- 1..5} class="h-10 w-full rounded-sm" />
         </div>
 
         <div :if={!@loading_user_modal?}>
@@ -120,8 +120,8 @@ defmodule YscWeb.AdminUsersLive do
           aria-live="polite"
         >
           <span class="sr-only">Loading application…</span>
-          <.skeleton_block class="h-8 w-64 rounded" />
-          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded" />
+          <.skeleton_block class="h-8 w-64 rounded-sm" />
+          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded-sm" />
         </div>
 
         <div :if={!@loading_user_modal?} class="max-w-2xl mx-auto">
@@ -199,7 +199,7 @@ defmodule YscWeb.AdminUsersLive do
                   <dd class="mt-1 text-sm text-zinc-900">
                     <ul class="space-y-1 list-disc list-inside">
                       <li :for={family_member <- @selected_user.family_members}>
-                        <span class="text-xs font-medium me-2 px-2.5 py-1 rounded bg-blue-100 text-blue-800">
+                        <span class="text-xs font-medium me-2 px-2.5 py-1 rounded-sm bg-blue-100 text-blue-800">
                           {String.capitalize("#{family_member.type}")}
                         </span>
                         {"#{family_member.first_name} #{family_member.last_name} (#{UserDisplay.birth_date_label(family_member.birth_date)})"}
@@ -290,7 +290,7 @@ defmodule YscWeb.AdminUsersLive do
                   <p class="text-sm font-semibold text-zinc-600 mb-1">
                     Link to Scandinavia
                   </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.link_to_scandinavia}
                   </div>
                 </div>
@@ -298,7 +298,7 @@ defmodule YscWeb.AdminUsersLive do
                   <p class="text-sm font-semibold text-zinc-600 mb-1">
                     Lived in Scandinavia
                   </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.lived_in_scandinavia}
                   </div>
                 </div>
@@ -306,7 +306,7 @@ defmodule YscWeb.AdminUsersLive do
                   <p class="text-sm font-semibold text-zinc-600 mb-1">
                     Spoken languages
                   </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-[2.5rem]">
+                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.spoken_languages}
                   </div>
                 </div>
@@ -342,7 +342,7 @@ defmodule YscWeb.AdminUsersLive do
                       field={@rejection_form[:note]}
                       type="textarea"
                       label="Rejection note (optional)"
-                      class="mt-1 block w-full rounded border-zinc-300 text-zinc-900 sm:text-sm"
+                      class="mt-1 block w-full rounded-sm border-zinc-300 text-zinc-900 sm:text-sm"
                       rows="3"
                     />
                     <button
@@ -350,7 +350,7 @@ defmodule YscWeb.AdminUsersLive do
                       id="confirm-reject-application-button"
                       phx-disable-with="Rejecting..."
                       data-confirm="You are about to reject this application. Are you sure?"
-                      class="phx-submit-loading:opacity-75 rounded bg-red-600 hover:bg-red-700 py-2 px-3 text-sm font-semibold text-white transition-colors"
+                      class="phx-submit-loading:opacity-75 rounded-sm bg-red-600 hover:bg-red-700 py-2 px-3 text-sm font-semibold text-white transition-colors"
                     >
                       <.icon name="hero-no-symbol" class="w-4 h-4 inline me-1" />
                       Confirm Reject

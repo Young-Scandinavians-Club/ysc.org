@@ -72,7 +72,7 @@ defmodule YscWeb.EventDetailsLive do
         kind={:event}
       />
       <%!-- Split-Header: Event Cover Image with Floating Card --%>
-      <div class="max-w-screen-xl mx-auto px-4 pt-8">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 pt-8">
         <div class="relative mb-4 lg:mb-24">
           <%!-- Image with rounded corners and gradient overlay --%>
           <div class={[
@@ -90,7 +90,7 @@ defmodule YscWeb.EventDetailsLive do
               fetchpriority="high"
             />
             <%!-- Gradient overlay for better text readability --%>
-            <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/90 via-zinc-900/40 to-transparent pointer-events-none">
+            <div class="absolute inset-0 bg-linear-to-t from-zinc-900/90 via-zinc-900/40 to-transparent pointer-events-none">
             </div>
             <%!-- Additional red overlay for cancelled events --%>
             <%= if @event.state == :cancelled do %>
@@ -137,7 +137,7 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   <span
                     :if={event_day_label == :today}
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-rose-600 sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-pulse"
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-rose-600 sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-pulse"
                   >
                     <.icon
                       name="hero-bolt-solid"
@@ -147,7 +147,7 @@ defmodule YscWeb.EventDetailsLive do
                   </span>
                   <span
                     :if={event_day_label == :tomorrow}
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-orange-600 sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400"
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-orange-600 sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400"
                   >
                     <.icon
                       name="hero-calendar-solid"
@@ -157,7 +157,7 @@ defmodule YscWeb.EventDetailsLive do
                   </span>
                   <span
                     :if={@event.tickets_tbd && @event.state != :cancelled}
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-blue-600 sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-blue-600 sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
                   >
                     <.icon
                       name="hero-ticket"
@@ -170,7 +170,7 @@ defmodule YscWeb.EventDetailsLive do
                       @event.state != :cancelled && @async_data_loaded &&
                         @event_sold_out_for_user && !@event.tickets_tbd
                     }
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
                   >
                     <.icon
                       name="hero-no-symbol"
@@ -192,7 +192,7 @@ defmodule YscWeb.EventDetailsLive do
                   </p>
                   <%= if @event_selling_fast && !@event_sold_out_for_user do %>
                     <span class="h-3 w-px bg-zinc-200"></span>
-                    <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase tracking-widest">
+                    <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-sm uppercase tracking-widest">
                       <.icon name="hero-fire-solid" class="w-3 h-3" /> Going Fast!
                     </span>
                   <% end %>
@@ -219,7 +219,7 @@ defmodule YscWeb.EventDetailsLive do
 
       <%!-- Main Content Grid --%>
       <div class={[
-        "max-w-screen-xl mx-auto px-4 pt-8 pb-12 lg:py-16",
+        "max-w-(--breakpoint-xl) mx-auto px-4 pt-8 pb-12 lg:py-16",
         if(@event.state == :cancelled, do: "opacity-50 pointer-events-none")
       ]}>
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-16">
@@ -243,11 +243,11 @@ defmodule YscWeb.EventDetailsLive do
 
                   acc + confirmed
                 end) %>
-              <div class="rounded-xl overflow-hidden border border-white/5 bg-zinc-900 shadow-sm">
+              <div class="rounded-xl overflow-hidden border border-white/5 bg-zinc-900 shadow-xs">
                 <%!-- Card Header --%>
                 <div class="px-8 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5">
                   <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/40 flex items-center justify-center flex-shrink-0">
+                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 ring-1 ring-emerald-500/40 flex items-center justify-center shrink-0">
                       <.icon
                         name="hero-ticket-solid"
                         class="w-5 h-5 text-emerald-400"
@@ -273,7 +273,7 @@ defmodule YscWeb.EventDetailsLive do
                         ~p"/events/#{@event.id}/tickets/qr" <>
                           "?return_to=/events/#{@event.id}"
                       }
-                      class="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-black uppercase tracking-widest transition-all"
+                      class="shrink-0 flex items-center gap-2 px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-black uppercase tracking-widest transition-all"
                     >
                       <.icon name="hero-qr-code" class="w-4 h-4" />
                       View tickets for check-in
@@ -337,7 +337,7 @@ defmodule YscWeb.EventDetailsLive do
                     ]}>
                       <div class="flex items-start gap-3 min-w-0">
                         <div class={[
-                          "mt-1.5 w-2 h-2 rounded-full flex-shrink-0",
+                          "mt-1.5 w-2 h-2 rounded-full shrink-0",
                           dot_class
                         ]} />
                         <div class="min-w-0">
@@ -352,11 +352,11 @@ defmodule YscWeb.EventDetailsLive do
                             <% end %>
                             <%= cond do %>
                               <% all_refunded -> %>
-                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-xs font-bold uppercase tracking-wider rounded border border-red-500/30">
+                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-xs font-bold uppercase tracking-wider rounded-sm border border-red-500/30">
                                   Refunded
                                 </span>
                               <% partial_refund -> %>
-                                <span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-bold uppercase tracking-wider rounded border border-amber-500/30">
+                                <span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-bold uppercase tracking-wider rounded-sm border border-amber-500/30">
                                   Partial Refund
                                 </span>
                               <% true -> %>
@@ -402,7 +402,7 @@ defmodule YscWeb.EventDetailsLive do
                       <.link
                         navigate={~p"/orders/#{order_id}/confirmation"}
                         class={[
-                          "flex-shrink-0 px-4 py-1.5 rounded text-xs font-black uppercase tracking-widest transition-all border",
+                          "shrink-0 px-4 py-1.5 rounded-sm text-xs font-black uppercase tracking-widest transition-all border",
                           if(all_refunded,
                             do:
                               "bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/20",
@@ -531,7 +531,7 @@ defmodule YscWeb.EventDetailsLive do
             >
               <div class="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
                 <div class="flex items-start gap-3 flex-1 min-w-0">
-                  <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                     <.icon name="hero-bolt" class="w-4 h-4 text-blue-600" />
                   </div>
                   <div class="min-w-0">
@@ -546,7 +546,7 @@ defmodule YscWeb.EventDetailsLive do
                 <.partiful_rsvp_button
                   id="partiful-rsvp-spotlight"
                   href={@event.partiful_link}
-                  class="flex-shrink-0 w-full sm:w-auto px-6 py-3.5"
+                  class="shrink-0 w-full sm:w-auto px-6 py-3.5"
                   icon_class="w-4 h-4"
                 />
               </div>
@@ -617,7 +617,7 @@ defmodule YscWeb.EventDetailsLive do
                     latitude={@event.latitude}
                     longitude={@event.longitude}
                     locked={true}
-                    class="max-w-screen-lg"
+                    class="max-w-(--breakpoint-lg)"
                   />
 
                   <div class="p-3">
@@ -644,7 +644,7 @@ defmodule YscWeb.EventDetailsLive do
                         phx-click="set-active-agenda"
                         phx-value-id={agenda.id}
                         class={[
-                          "inline-flex items-center px-4 py-2 rounded transition-colors",
+                          "inline-flex items-center px-4 py-2 rounded-sm transition-colors",
                           agenda.id == @active_agenda && "text-white bg-blue-600",
                           agenda.id != @active_agenda &&
                             "text-zinc-600 bg-zinc-100 hover:bg-zinc-200 hover:text-zinc-800"
@@ -670,7 +670,7 @@ defmodule YscWeb.EventDetailsLive do
                     <% is_current = agenda_item_current?(agenda_item, @event) %>
                     <div class="relative group">
                       <div class={[
-                        "absolute -left-[25px] w-4 h-4 rounded-full border-4 border-white transition-all shadow-sm z-10 mt-1.5",
+                        "absolute left-[-25px] w-4 h-4 rounded-full border-4 border-white transition-all shadow-xs z-10 mt-1.5",
                         if is_current do
                           "bg-blue-600 animate-pulse"
                         else
@@ -679,8 +679,8 @@ defmodule YscWeb.EventDetailsLive do
                       ]}>
                       </div>
                       <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
-                        <div class="w-36 flex-shrink-0">
-                          <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded uppercase tracking-widest whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <div class="w-36 shrink-0">
+                          <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm uppercase tracking-widest whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors">
                             {format_start_end(
                               agenda_item.start_time,
                               agenda_item.end_time
@@ -785,7 +785,7 @@ defmodule YscWeb.EventDetailsLive do
                         />
                         <%= if ticket_count > 1 do %>
                           <span
-                            class="absolute -top-0.5 -right-0.5 z-10 w-[30%] min-w-[0.65rem] aspect-square rounded-full bg-zinc-900 text-white text-[8px] font-black leading-none flex items-center justify-center ring-2 ring-white shadow-sm"
+                            class="absolute -top-0.5 -right-0.5 z-10 w-[30%] min-w-[0.65rem] aspect-square rounded-full bg-zinc-900 text-white text-[8px] font-black leading-none flex items-center justify-center ring-2 ring-white shadow-xs"
                             aria-label={"#{ticket_count} tickets"}
                           >
                             {ticket_count}
@@ -848,14 +848,14 @@ defmodule YscWeb.EventDetailsLive do
             >
               <div class="flex items-center gap-3">
                 <div class="w-8 h-px bg-zinc-200"></div>
-                <div class="w-28 h-6 bg-zinc-200 rounded"></div>
+                <div class="w-28 h-6 bg-zinc-200 rounded-sm"></div>
               </div>
               <div class="flex flex-wrap gap-5">
                 <%= for _i <- 1..5 do %>
                   <div class="flex flex-col items-center gap-2 w-16">
                     <div class="w-14 h-14 rounded-full bg-zinc-200"></div>
-                    <div class="w-12 h-2.5 bg-zinc-200 rounded"></div>
-                    <div class="w-8 h-2 bg-zinc-200 rounded"></div>
+                    <div class="w-12 h-2.5 bg-zinc-200 rounded-sm"></div>
+                    <div class="w-8 h-2 bg-zinc-200 rounded-sm"></div>
                   </div>
                 <% end %>
               </div>
@@ -924,7 +924,7 @@ defmodule YscWeb.EventDetailsLive do
                       <% sold_percentage = @sold_percentage %>
                       <div class="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-3">
                         <div class="flex items-center gap-3">
-                          <div class="flex-shrink-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                          <div class="shrink-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
                             <.icon
                               name="hero-fire-solid"
                               class="w-4 h-4 text-white"
@@ -1016,8 +1016,8 @@ defmodule YscWeb.EventDetailsLive do
                             :if={!@async_data_loaded}
                             class="flex items-center gap-3 text-sm text-zinc-400 font-medium animate-pulse"
                           >
-                            <div class="w-5 h-5 bg-zinc-200 rounded"></div>
-                            <div class="h-4 bg-zinc-200 rounded w-32"></div>
+                            <div class="w-5 h-5 bg-zinc-200 rounded-sm"></div>
+                            <div class="h-4 bg-zinc-200 rounded-sm w-32"></div>
                           </div>
                           <div
                             :if={
@@ -1164,7 +1164,7 @@ defmodule YscWeb.EventDetailsLive do
               :if={@event.state != :cancelled}
               class="lg:hidden fixed bottom-0 left-0 right-0 z-50"
             >
-              <div class="h-8 bg-gradient-to-t from-white to-transparent"></div>
+              <div class="h-8 bg-linear-to-t from-white to-transparent"></div>
 
               <div class="bg-white/95 backdrop-blur-md border-t border-zinc-100 px-6 py-5">
                 <p
@@ -1172,7 +1172,7 @@ defmodule YscWeb.EventDetailsLive do
                     @current_user == nil && @has_ticket_tiers &&
                       !ticket_sales_closed?(@event)
                   }
-                  class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
+                  class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
                 >
                   Sign in with your YSC account to buy tickets. An active, paid membership is required.
                 </p>
@@ -1182,7 +1182,7 @@ defmodule YscWeb.EventDetailsLive do
                       @has_ticket_tiers &&
                       !ticket_sales_closed?(@event)
                   }
-                  class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
+                  class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
                 >
                   <%= cond do %>
                     <% @current_user.state == :pending_approval -> %>
@@ -1193,7 +1193,7 @@ defmodule YscWeb.EventDetailsLive do
                       Member tickets require an active, paid membership. Activate or renew your membership to buy tickets.
                   <% end %>
                 </p>
-                <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
+                <div class="max-w-(--breakpoint-md) mx-auto flex items-center justify-between gap-6">
                   <%= if ticket_sales_closed?(@event) do %>
                     <div class="flex-1 text-center">
                       <div class="text-red-700 font-black text-base">
@@ -1219,13 +1219,13 @@ defmodule YscWeb.EventDetailsLive do
                           {@event.pricing_info.display_text}
                         </p>
                         <%= if @event_selling_fast && !@event_sold_out_for_user do %>
-                          <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded">
+                          <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-sm">
                             <.icon name="hero-fire-solid" class="w-3 h-3" />
                             Going Fast
                           </span>
                         <% else %>
                           <%= if event_live?(@event) do %>
-                            <span class="inline-flex items-center gap-1 text-xs font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-1.5 py-0.5 rounded">
+                            <span class="inline-flex items-center gap-1 text-xs font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-1.5 py-0.5 rounded-sm">
                               <.icon name="hero-signal" class="w-3 h-3" /> Live
                             </span>
                           <% end %>
@@ -1269,13 +1269,13 @@ defmodule YscWeb.EventDetailsLive do
                       <.partiful_rsvp_button
                         id="partiful-rsvp-mobile-bar"
                         href={@event.partiful_link}
-                        class="flex-shrink-0 px-8 py-3.5"
+                        class="shrink-0 px-8 py-3.5"
                         icon_class="w-4 h-4"
                       />
                     <% else %>
                       <%= if @current_user == nil && @has_ticket_tiers do %>
                         <.button
-                          class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                          class="shrink-0 px-8 py-3.5 uppercase tracking-widest"
                           navigate={
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
@@ -1291,7 +1291,7 @@ defmodule YscWeb.EventDetailsLive do
                           <% else %>
                             <%= if @active_membership? do %>
                               <.button
-                                class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                                class="shrink-0 px-8 py-3.5 uppercase tracking-widest"
                                 phx-click="open-ticket-modal"
                               >
                                 <.icon
@@ -1301,7 +1301,7 @@ defmodule YscWeb.EventDetailsLive do
                               </.button>
                             <% else %>
                               <.button
-                                class="flex-shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                                class="shrink-0 px-8 py-3.5 uppercase tracking-widest"
                                 navigate={~p"/users/membership"}
                               >
                                 <.icon
@@ -1325,7 +1325,7 @@ defmodule YscWeb.EventDetailsLive do
                                 navigate={
                                   ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                                 }
-                                class="flex-shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 underline underline-offset-2"
+                                class="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-700 underline underline-offset-2"
                               >
                                 Sign in to get notified
                               </.link>
@@ -1334,13 +1334,13 @@ defmodule YscWeb.EventDetailsLive do
                                 <div class="flex items-center gap-1.5 text-xs font-semibold text-green-800 bg-green-100 border border-green-300 rounded-lg px-3 py-2">
                                   <.icon
                                     name="hero-check-circle"
-                                    class="w-4 h-4 flex-shrink-0"
+                                    class="w-4 h-4 shrink-0"
                                   /> You'll be notified
                                 </div>
                               <% else %>
                                 <button
                                   phx-click="subscribe-save-the-date"
-                                  class="flex-shrink-0 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                                  class="shrink-0 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
                                 >
                                   Notify me when tickets open
                                 </button>
@@ -1622,7 +1622,7 @@ defmodule YscWeb.EventDetailsLive do
                           <label class="text font-semibold text-zinc-700 whitespace-nowrap">
                             Donation Amount:
                           </label>
-                          <div class="flex items-center border border-zinc-300 rounded px-3 py-1 flex-1 sm:flex-initial bg-white">
+                          <div class="flex items-center border border-zinc-300 rounded-sm px-3 py-1 flex-1 sm:flex-initial bg-white">
                             <span class="text-zinc-800">$</span>
                             <input
                               type="text"
@@ -2455,7 +2455,7 @@ defmodule YscWeb.EventDetailsLive do
                                   "other"
                               end
                             }
-                            class="block w-full rounded-md border-zinc-300 py-2.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            class="block w-full rounded-md border-zinc-300 py-2.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-hidden focus:ring-blue-500"
                           >
                             <option
                               value="me"
@@ -2521,7 +2521,7 @@ defmodule YscWeb.EventDetailsLive do
                                   phx-value-ticket-id={ticket.id}
                                   phx-value-field="first_name"
                                   enterkeyhint="next"
-                                  class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                                  class="mt-2 block w-full rounded-sm text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
                                 />
                               </div>
                               <div>
@@ -2543,7 +2543,7 @@ defmodule YscWeb.EventDetailsLive do
                                   phx-value-ticket-id={ticket.id}
                                   phx-value-field="last_name"
                                   enterkeyhint="next"
-                                  class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                                  class="mt-2 block w-full rounded-sm text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
                                 />
                               </div>
                             </div>
@@ -2565,7 +2565,7 @@ defmodule YscWeb.EventDetailsLive do
                                 enterkeyhint="done"
                                 phx-value-ticket-id={ticket.id}
                                 phx-value-field="email"
-                                class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                                class="mt-2 block w-full rounded-sm text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
                               />
                             </div>
                           </div>
@@ -3181,7 +3181,7 @@ defmodule YscWeb.EventDetailsLive do
                             "other"
                         end
                       }
-                      class="block w-full rounded-md border-zinc-300 py-2.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                      class="block w-full rounded-md border-zinc-300 py-2.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-hidden focus:ring-blue-500"
                     >
                       <option
                         value="me"
@@ -3244,7 +3244,7 @@ defmodule YscWeb.EventDetailsLive do
                             disabled={is_for_me || has_selected_family_member}
                             phx-value-ticket-id={ticket.id}
                             phx-value-field="first_name"
-                            class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                            class="mt-2 block w-full rounded-sm text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
                           />
                         </div>
                         <div>
@@ -3263,7 +3263,7 @@ defmodule YscWeb.EventDetailsLive do
                             disabled={is_for_me || has_selected_family_member}
                             phx-value-ticket-id={ticket.id}
                             phx-value-field="last_name"
-                            class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                            class="mt-2 block w-full rounded-sm text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
                           />
                         </div>
                       </div>
@@ -3284,7 +3284,7 @@ defmodule YscWeb.EventDetailsLive do
                           autocomplete="email"
                           phx-value-ticket-id={ticket.id}
                           phx-value-field="email"
-                          class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                          class="mt-2 block w-full rounded-sm text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
                         />
                       </div>
                     </div>
@@ -3382,7 +3382,7 @@ defmodule YscWeb.EventDetailsLive do
                 ticket.discount_amount || Money.new(0, :USD) %>
               <% has_discount = Money.positive?(ticket_discount_amount) %>
               <div class="space-y-1">
-                <div class="flex justify-between items-center p-3 bg-zinc-50 rounded">
+                <div class="flex justify-between items-center p-3 bg-zinc-50 rounded-sm">
                   <div>
                     <p class="font-medium text-zinc-900">
                       {ticket.ticket_tier.name}
@@ -3582,7 +3582,7 @@ defmodule YscWeb.EventDetailsLive do
                   )
                 ]}
               >
-                <div class="relative flex-shrink-0">
+                <div class="relative shrink-0">
                   <.user_avatar_image
                     user={attendee}
                     class={"h-10 w-10 rounded-full#{if is_host, do: " ring-2 ring-amber-400", else: ""}"}

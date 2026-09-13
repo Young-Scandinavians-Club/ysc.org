@@ -84,7 +84,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
         </div>
       </header>
       <div class="p-6 space-y-6">
-        <.admin_ghost_image class="rounded-xl" ratio="aspect-[21/9]" />
+        <.admin_ghost_image class="rounded-xl" ratio="aspect-21/9" />
         <div class="grid md:grid-cols-3 gap-4">
           <div
             :for={_ <- 1..3}
@@ -203,7 +203,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
         </div>
       </div>
       <div class="max-w-2xl mx-auto bg-white rounded-xl border border-zinc-200 overflow-hidden">
-        <.admin_ghost_image ratio="aspect-[2/1]" />
+        <.admin_ghost_image ratio="aspect-2/1" />
         <div class="p-6 space-y-3">
           <.admin_ghost_bar width="w-3/4" height="h-5" />
           <.admin_ghost_bar width="w-1/4" height="h-3" />
@@ -357,18 +357,18 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           </div>
           <div
             id="ghost-subscribers-filters"
-            class="flex items-center gap-2 flex-shrink-0 flex-wrap"
+            class="flex items-center gap-2 shrink-0 flex-wrap"
           >
             <span class="text-sm font-medium text-zinc-600 sr-only sm:not-sr-only">
               Status:
             </span>
-            <span class="rounded px-3 py-1.5 text-sm font-medium bg-zinc-200 text-zinc-800">
+            <span class="rounded-sm px-3 py-1.5 text-sm font-medium bg-zinc-200 text-zinc-800">
               All
             </span>
-            <span class="rounded px-3 py-1.5 text-sm font-medium bg-zinc-100 text-zinc-600">
+            <span class="rounded-sm px-3 py-1.5 text-sm font-medium bg-zinc-100 text-zinc-600">
               Active
             </span>
-            <span class="rounded px-3 py-1.5 text-sm font-medium bg-zinc-100 text-zinc-600">
+            <span class="rounded-sm px-3 py-1.5 text-sm font-medium bg-zinc-100 text-zinc-600">
               Inactive
             </span>
             <.button id="ghost-add-subscriber" class="ms-0 sm:ms-2 text-sm">
@@ -482,7 +482,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           <h3 class="text-base font-medium text-zinc-800 pt-2">Location</h3>
           <.admin_ghost_bar width="w-full" height="h-10" rounded="rounded-lg" />
           <.admin_ghost_bar width="w-full" height="h-10" rounded="rounded-lg" />
-          <.admin_ghost_image ratio="aspect-[2/1]" class="rounded-lg" />
+          <.admin_ghost_image ratio="aspect-2/1" class="rounded-lg" />
           <p class="text-sm text-zinc-600">
             Click on the map to set marker location.
           </p>
@@ -541,7 +541,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           <label class="flex items-center gap-2 text-sm text-zinc-700">
             <input
               type="checkbox"
-              class="rounded border-zinc-300 text-blue-600"
+              class="rounded-sm border-zinc-300 text-blue-600"
               disabled
             /> Unlimited capacity
           </label>
@@ -627,7 +627,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
                 <input
                   type="checkbox"
                   checked
-                  class="rounded border-zinc-300 text-blue-600"
+                  class="rounded-sm border-zinc-300 text-blue-600"
                   disabled
                 /> Also show this update on the public event page
               </label>
@@ -741,7 +741,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
         readonly
         tabindex="-1"
         placeholder={@placeholder}
-        class="block w-full pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded bg-zinc-50 pointer-events-none"
+        class="block w-full pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded-sm bg-zinc-50 pointer-events-none"
       />
     </div>
     """

@@ -4,7 +4,7 @@ defmodule YscWeb.VolunteerLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+    <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
       <%!-- Split Header Section --%>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
         <div class="prose prose-zinc prose-a:text-blue-600">
@@ -112,7 +112,7 @@ defmodule YscWeb.VolunteerLive do
               <div class="flex items-start gap-4">
                 <.icon
                   name="hero-check-circle"
-                  class="text-green-600 w-8 h-8 flex-shrink-0 mt-0.5"
+                  class="text-green-600 w-8 h-8 shrink-0 mt-0.5"
                 />
                 <div>
                   <p class="text-green-800 font-bold text-lg mb-2">

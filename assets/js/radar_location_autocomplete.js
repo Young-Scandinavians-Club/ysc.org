@@ -9,7 +9,7 @@ const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 200;
 
 const INPUT_CLASS =
-    "block w-full pl-10 rounded-md text-zinc-900 border border-zinc-300 shadow-sm focus:border-zinc-400 focus:ring-0 sm:text-sm";
+    "block w-full pl-10 rounded-md text-zinc-900 border border-zinc-300 shadow-xs focus:border-zinc-400 focus:ring-0 sm:text-sm";
 
 function radarPublicKey() {
     if (!window.radarPublicKey) {
@@ -120,7 +120,7 @@ export default RadarLocationAutocomplete = {
             </div>
             <ul
                 id="event-location-search-results"
-                class="hidden absolute z-20 mt-1 w-full bg-white border border-zinc-200 rounded shadow-lg max-h-60 overflow-auto pt-2"
+                class="hidden absolute z-20 mt-1 w-full bg-white border border-zinc-200 rounded-sm shadow-lg max-h-60 overflow-auto pt-2"
                 role="listbox"
             ></ul>
         `;
@@ -252,7 +252,7 @@ export default RadarLocationAutocomplete = {
 
             button.type = "button";
             button.className =
-                "w-full text-left px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-none";
+                "w-full text-left px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 focus:bg-zinc-50 focus:outline-hidden";
             button.setAttribute("role", "option");
             button.dataset.index = String(currentIndex);
 

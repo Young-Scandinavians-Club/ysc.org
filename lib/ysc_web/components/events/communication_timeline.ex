@@ -17,7 +17,7 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
     ~H"""
     <div
       id="communication-timeline"
-      class="rounded p-6 border border-zinc-200"
+      class="rounded-sm p-6 border border-zinc-200"
     >
       <h2 class="text-lg font-bold text-zinc-800 mb-6">Communication History</h2>
 
@@ -35,8 +35,8 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
           class="relative pl-10 pb-8 last:pb-0"
         >
           <span class={[
-            "absolute -left-[17px] -top-1 z-10 flex items-center justify-center",
-            "w-8 h-8 rounded-full border-2 border-zinc-50 shadow-sm",
+            "absolute left-[-17px] -top-1 z-10 flex items-center justify-center",
+            "w-8 h-8 rounded-full border-2 border-zinc-50 shadow-xs",
             entry_icon_bg(entry)
           ]}>
             <.icon name={entry.icon} class={["w-4 h-4", entry_icon_color(entry)]} />
@@ -335,14 +335,14 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
   defp entry_icon_color(%{type: :photo_reminder}), do: "text-zinc-600"
 
   defp badge_class("Scheduled"),
-    do: "bg-zinc-100 text-zinc-700 text-xs font-medium px-2.5 py-0.5 rounded"
+    do: "bg-zinc-100 text-zinc-700 text-xs font-medium px-2.5 py-0.5 rounded-sm"
 
   defp badge_class("Event Page"),
-    do: "bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded"
+    do: "bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-sm"
 
   defp badge_class("Email"),
-    do: "bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded"
+    do: "bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-sm"
 
   defp badge_class(_),
-    do: "bg-zinc-100 text-zinc-800 text-xs font-medium px-2.5 py-0.5 rounded"
+    do: "bg-zinc-100 text-zinc-800 text-xs font-medium px-2.5 py-0.5 rounded-sm"
 end

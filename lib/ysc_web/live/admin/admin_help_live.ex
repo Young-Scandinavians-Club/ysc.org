@@ -120,7 +120,7 @@ defmodule YscWeb.AdminHelpLive do
                 :for={guide_mod <- guides}
                 navigate={~p"/admin/help/#{guide_mod.slug()}"}
                 id={"admin-help-card-#{slug_id(guide_mod.slug())}"}
-                class="block rounded-xl border border-zinc-200 bg-white p-5 shadow-sm hover:border-blue-300 hover:shadow-md transition-all"
+                class="block rounded-xl border border-zinc-200 bg-white p-5 shadow-xs hover:border-blue-300 hover:shadow-md transition-all"
               >
                 <h3 class="font-semibold text-zinc-900">{guide_mod.title()}</h3>
                 <p class="mt-1 text-sm text-zinc-600 line-clamp-2">

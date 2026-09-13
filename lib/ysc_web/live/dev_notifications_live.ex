@@ -53,7 +53,7 @@ defmodule YscWeb.DevNotificationsLive do
           <h1 class="text-lg font-semibold text-zinc-900">Notification previews</h1>
           <p class="text-xs text-zinc-500 mt-0.5">
             Dev-only · sample data from
-            <code class="bg-zinc-100 px-1 rounded">{NotificationSamples.samples_path()}</code>
+            <code class="bg-zinc-100 px-1 rounded-sm">{NotificationSamples.samples_path()}</code>
           </p>
         </div>
         <div class="flex items-center gap-3 text-sm">
@@ -91,7 +91,7 @@ defmodule YscWeb.DevNotificationsLive do
                 patch="/dev/notifications?type=email"
                 class={[
                   "flex-1 text-center rounded-md px-2 py-1.5 transition",
-                  @tab == :email && "bg-white shadow text-zinc-900",
+                  @tab == :email && "bg-white shadow-sm text-zinc-900",
                   @tab != :email && "text-zinc-600 hover:text-zinc-900"
                 ]}
               >
@@ -101,7 +101,7 @@ defmodule YscWeb.DevNotificationsLive do
                 patch="/dev/notifications?type=sms"
                 class={[
                   "flex-1 text-center rounded-md px-2 py-1.5 transition",
-                  @tab == :sms && "bg-white shadow text-zinc-900",
+                  @tab == :sms && "bg-white shadow-sm text-zinc-900",
                   @tab != :sms && "text-zinc-600 hover:text-zinc-900"
                 ]}
               >
@@ -114,7 +114,7 @@ defmodule YscWeb.DevNotificationsLive do
                 name="q"
                 value={@filter}
                 placeholder="Filter templates…"
-                class="w-full rounded-md border border-zinc-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full rounded-md border border-zinc-200 px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 id="notification-filter"
               />
             </form>
@@ -220,10 +220,10 @@ defmodule YscWeb.DevNotificationsLive do
               </div>
               <div class="flex-1 overflow-y-auto p-8 flex justify-center items-start">
                 <div
-                  class="w-full max-w-sm rounded-[2rem] border-8 border-zinc-800 bg-zinc-800 shadow-xl p-3"
+                  class="w-full max-w-sm rounded-4xl border-8 border-zinc-800 bg-zinc-800 shadow-xl p-3"
                   id="sms-preview-phone"
                 >
-                  <div class="rounded-2xl bg-zinc-100 px-4 py-3 min-h-[8rem]">
+                  <div class="rounded-2xl bg-zinc-100 px-4 py-3 min-h-32">
                     <p class="text-[15px] leading-relaxed text-zinc-900 whitespace-pre-wrap">
                       {@selected_sms_body}
                     </p>

@@ -25,7 +25,7 @@ defmodule YscWeb.AgendasLive.FormComponent do
           phx-blur={
             JS.dispatch("submit", to: "##{"agenda-title-form-#{@agenda_id}"}")
           }
-          class="block w-full text-sm font-bold text-zinc-800 bg-transparent border-none p-1 focus:ring-2 focus:ring-blue-500 rounded transition-all placeholder:text-zinc-400"
+          class="block w-full text-sm font-bold text-zinc-800 bg-transparent border-none p-1 focus:ring-2 focus:ring-blue-500 rounded-sm transition-all placeholder:text-zinc-400"
           placeholder="e.g. Day 1, Main Stage..."
         />
       </.form>

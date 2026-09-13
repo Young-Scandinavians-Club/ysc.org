@@ -17,7 +17,7 @@ defmodule YscWeb.PostLive do
     <%!-- Reading Progress Bar --%>
     <div
       id="reading-progress-container"
-      class="fixed top-0 left-0 w-full h-1 z-[110] pointer-events-none"
+      class="fixed top-0 left-0 w-full h-1 z-110 pointer-events-none"
       phx-hook="ReadingProgress"
     >
       <div
@@ -44,7 +44,7 @@ defmodule YscWeb.PostLive do
       </div>
 
       <%!-- The "Journalist" Header Section --%>
-      <div :if={@post != nil} class="max-w-screen-lg mx-auto px-4">
+      <div :if={@post != nil} class="max-w-(--breakpoint-lg) mx-auto px-4">
         <div class="max-w-3xl mx-auto text-center mb-12">
           <div class="flex items-center justify-center gap-3 mb-6">
             <span class="text-xs font-black text-blue-600 uppercase tracking-[0.3em]">
@@ -99,11 +99,11 @@ defmodule YscWeb.PostLive do
       </div>
 
       <%!-- Typography Palate Cleanser with Drop Cap --%>
-      <div :if={@post != nil} class="max-w-screen-lg mx-auto px-4">
+      <div :if={@post != nil} class="max-w-(--breakpoint-lg) mx-auto px-4">
         <article class="prose prose-zinc prose-lg lg:prose-xl prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-3xl mx-auto py-12 bg-zinc-50/50 rounded-xl px-8 md:px-12">
           <div
             id="article-body"
-            class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-normal border-l border-zinc-100 ml-[-2rem] pl-8"
+            class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-normal border-l border-zinc-100 -ml-8 pl-8"
             phx-hook="GLightboxHook"
             phx-update="ignore"
           >
@@ -115,10 +115,10 @@ defmodule YscWeb.PostLive do
       <%!-- Interactive "Discussion" Area --%>
       <div
         :if={@post != nil && @current_user != nil}
-        class="max-w-screen-lg mx-auto px-4 mt-16"
+        class="max-w-(--breakpoint-lg) mx-auto px-4 mt-16"
       >
         <section class="max-w-2xl mx-auto">
-          <div class="bg-white border border-zinc-200 rounded-xl p-10 shadow-sm">
+          <div class="bg-white border border-zinc-200 rounded-xl p-10 shadow-xs">
             <div class="flex items-center gap-3 mb-8">
               <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
               <h2 class="text-2xl font-black text-zinc-900 tracking-tight">
@@ -159,12 +159,12 @@ defmodule YscWeb.PostLive do
             <div :if={!@comments_loaded && @n_comments > 0} class="space-y-4">
               <%= for _i <- 1..min(@n_comments, 3) do %>
                 <div class="flex gap-4 p-4 bg-zinc-50 rounded-lg animate-pulse">
-                  <div class="w-10 h-10 bg-zinc-200 rounded-full flex-shrink-0">
+                  <div class="w-10 h-10 bg-zinc-200 rounded-full shrink-0">
                   </div>
                   <div class="flex-1 space-y-2">
-                    <div class="h-3 bg-zinc-200 rounded w-1/4"></div>
-                    <div class="h-4 bg-zinc-200 rounded w-full"></div>
-                    <div class="h-4 bg-zinc-200 rounded w-3/4"></div>
+                    <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
+                    <div class="h-4 bg-zinc-200 rounded-sm w-full"></div>
+                    <div class="h-4 bg-zinc-200 rounded-sm w-3/4"></div>
                   </div>
                 </div>
               <% end %>

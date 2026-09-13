@@ -116,7 +116,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
               <div
                 :if={@search_results != []}
-                class="bg-white rounded border border-zinc-200 divide-y divide-zinc-100"
+                class="bg-white rounded-sm border border-zinc-200 divide-y divide-zinc-100"
                 id="search-results-list"
               >
                 <div
@@ -151,7 +151,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             <div
               id="checked-in-members"
               phx-update="stream"
-              class="bg-white rounded border border-zinc-200 divide-y divide-zinc-100"
+              class="bg-white rounded-sm border border-zinc-200 divide-y divide-zinc-100"
             >
               <.admin_icon_empty_state
                 id="checked-in-members-empty"
@@ -199,7 +199,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                 <button
                   phx-click="undo-check-in"
                   phx-value-user-id={check_in.user.id}
-                  class="shrink-0 text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded transition-colors"
+                  class="shrink-0 text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded-sm transition-colors"
                   data-confirm="Remove this member's check-in?"
                 >
                   Undo
@@ -279,7 +279,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               phx-click="undo-check-in"
               phx-value-user-id={@result.user.id}
               data-checkin-btn
-              class="text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded transition-colors"
+              class="text-xs font-medium text-zinc-400 hover:text-red-600 border border-zinc-200 hover:border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded-sm transition-colors"
               data-confirm="Remove this member's check-in?"
             >
               Undo
@@ -289,14 +289,14 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               phx-click="check-in-member"
               phx-value-user-id={@result.user.id}
               data-checkin-btn
-              class="text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded transition-colors"
+              class="text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-sm transition-colors"
             >
               Check In
             </button>
           <% true -> %>
             <button
               disabled
-              class="text-sm font-semibold text-zinc-400 bg-zinc-100 px-4 py-2 rounded cursor-not-allowed"
+              class="text-sm font-semibold text-zinc-400 bg-zinc-100 px-4 py-2 rounded-sm cursor-not-allowed"
               title="User does not have an active membership"
             >
               No Membership

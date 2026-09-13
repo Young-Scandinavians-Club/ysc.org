@@ -47,13 +47,13 @@ defmodule YscWeb.AdminEventsNewLive do
           aria-live="polite"
         >
           <span class="sr-only">Loading event…</span>
-          <.skeleton_block class="h-9 w-64 rounded" />
-          <.skeleton_block class="h-5 w-40 rounded" />
+          <.skeleton_block class="h-9 w-64 rounded-sm" />
+          <.skeleton_block class="h-5 w-40 rounded-sm" />
           <div class="flex flex-wrap gap-2">
             <.skeleton_block :for={_ <- 1..5} class="h-9 w-24 rounded-full" />
           </div>
           <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-            <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded" />
+            <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
           </div>
         </div>
 
@@ -62,7 +62,7 @@ defmodule YscWeb.AdminEventsNewLive do
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0 flex flex-1 flex-col space-y-1">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <h1 class="event-header-title break-words text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl">
+                  <h1 class="event-header-title wrap-break-word text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl">
                     {@event_title}
                   </h1>
 
@@ -115,7 +115,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 />
               </div>
 
-              <div class="flex flex-shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
+              <div class="flex shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
                 <div :if={@event.state in [:draft, :scheduled]}>
                   <.tooltip
                     :if={!@can_publish}
@@ -291,7 +291,7 @@ defmodule YscWeb.AdminEventsNewLive do
             <.admin_tabs
               id="event-detail-tabs"
               aria_label="Event sections"
-              class="event-header-tabs pt-3 text-sm font-medium text-zinc-500 !mb-0"
+              class="event-header-tabs pt-3 text-sm font-medium text-zinc-500 mb-0!"
             >
               <.admin_tab
                 active={@live_action == :edit}
@@ -335,7 +335,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
             <div
               :if={@blackout_prompt.booking_conflict?}
-              class="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+              class="mb-4 rounded-sm border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
             >
               <p class="font-semibold">
                 There's already a held or confirmed booking for the {@blackout_prompt.property_label} that overlaps {@blackout_prompt.date_label}.
@@ -387,7 +387,7 @@ defmodule YscWeb.AdminEventsNewLive do
           </.modal>
 
           <div :if={@live_action == :edit} class="relative py-8">
-            <div class="border max-w-3xl rounded border-zinc-200 py-6 px-4 space-y-4">
+            <div class="border max-w-3xl rounded-sm border-zinc-200 py-6 px-4 space-y-4">
               <h2 class="text-xl font-bold">Cover Image</h2>
 
               <.live_component
@@ -411,7 +411,7 @@ defmodule YscWeb.AdminEventsNewLive do
               />
               <.input type="hidden" field={@form[:image_id]} />
 
-              <div class="border rounded border-zinc-200 py-6 px-4 space-y-4">
+              <div class="border rounded-sm border-zinc-200 py-6 px-4 space-y-4">
                 <div>
                   <h2 class="text-xl font-bold">Basics</h2>
                   <p class="text-zinc-600 text-sm">
@@ -447,7 +447,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </p>
               </div>
 
-              <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+              <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                 <h2 class="text-xl font-bold mb-2">Date and Location</h2>
 
                 <h3 class="text-lg font-medium">Date and Time</h3>
@@ -500,7 +500,7 @@ defmodule YscWeb.AdminEventsNewLive do
                         phx-value-id={preset.id}
                         class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition"
                       >
-                        <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
+                        <.icon name="hero-map-pin" class="w-4 h-4 shrink-0" />
                         {preset.label}
                       </button>
                     </div>
@@ -558,7 +558,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-2">
                       <.icon
                         name="hero-information-circle"
-                        class="w-4 h-4 flex-shrink-0"
+                        class="w-4 h-4 shrink-0"
                       />
                       Double-check the pin on the map. You can click anywhere on the map to manually adjust it.
                     </p>
@@ -566,7 +566,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </div>
               </div>
 
-              <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+              <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                 <div>
                   <h2 class="text-xl font-bold">Overview</h2>
                   <p class="text-zinc-600 text-sm">
@@ -587,7 +587,7 @@ defmodule YscWeb.AdminEventsNewLive do
             </.form>
 
             <div id="hosts-section" class="max-w-3xl mt-6">
-              <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+              <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                 <div>
                   <h2 class="text-xl font-bold">Hosts</h2>
                   <p class="text-zinc-600 text-sm">
@@ -609,7 +609,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     >
                       <.user_avatar_image
                         user={host}
-                        class="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                        class="w-7 h-7 rounded-full object-cover shrink-0"
                       />
                       <span class="text-sm font-medium text-zinc-800">
                         {host.first_name} {host.last_name}
@@ -647,7 +647,7 @@ defmodule YscWeb.AdminEventsNewLive do
                         phx-debounce="250"
                         name="host_search"
                         autocomplete="off"
-                        class="block w-full h-10 rounded border border-zinc-300 bg-white shadow-sm pl-9 pr-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-0"
+                        class="block w-full h-10 rounded-sm border border-zinc-300 bg-white shadow-xs pl-9 pr-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-hidden focus:ring-0"
                       />
                     </div>
 
@@ -655,7 +655,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     <div
                       :if={@host_search_results != [] && @host_search_query != ""}
                       id="host-search-results"
-                      class="absolute z-10 mt-1 w-full rounded border border-zinc-200 bg-white shadow-lg overflow-hidden"
+                      class="absolute z-10 mt-1 w-full rounded-sm border border-zinc-200 bg-white shadow-lg overflow-hidden"
                     >
                       <ul class="max-h-56 overflow-y-auto py-1 divide-y divide-zinc-50">
                         <li
@@ -671,7 +671,7 @@ defmodule YscWeb.AdminEventsNewLive do
                           >
                             <.user_avatar_image
                               user={user}
-                              class="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                              class="w-8 h-8 rounded-full object-cover shrink-0"
                             />
                             <div class="min-w-0 flex-1">
                               <p class="text-sm font-medium text-zinc-900 truncate">
@@ -684,12 +684,12 @@ defmodule YscWeb.AdminEventsNewLive do
                             <.icon
                               :if={MapSet.member?(@host_ids, user.id)}
                               name="hero-check-circle"
-                              class="host-status-icon w-4 h-4 text-green-500 flex-shrink-0"
+                              class="host-status-icon w-4 h-4 text-green-500 shrink-0"
                             />
                             <.icon
                               :if={!MapSet.member?(@host_ids, user.id)}
                               name="hero-plus-circle"
-                              class="host-status-icon w-4 h-4 text-blue-400 flex-shrink-0"
+                              class="host-status-icon w-4 h-4 text-blue-400 shrink-0"
                             />
                           </button>
                         </li>
@@ -708,7 +708,7 @@ defmodule YscWeb.AdminEventsNewLive do
             </div>
 
             <div class="max-w-3xl mt-6">
-              <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-zinc-200 rounded p-6 bg-white">
+              <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-zinc-200 rounded-sm p-6 bg-white">
                 <div>
                   <h2 class="text-xl font-bold">Agenda</h2>
                   <p class="text-zinc-600 text-sm mt-1">
@@ -760,7 +760,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       :for={{id, agenda} <- @streams.agendas}
                       id={id}
                       data-id={agenda.id}
-                      class="group/agenda flex-shrink-0 w-[450px] sm:w-[500px] snap-start flex flex-col bg-white border border-zinc-200 shadow-sm rounded overflow-hidden drag-item:scale-[1.02] drag-item:shadow-xl drag-item:z-10 drag-ghost:opacity-100 drag-ghost:bg-blue-50 drag-ghost:border-2 drag-ghost:border-dashed drag-ghost:border-blue-400"
+                      class="group/agenda shrink-0 w-[450px] sm:w-[500px] snap-start flex flex-col bg-white border border-zinc-200 shadow-xs rounded-sm overflow-hidden drag-item:scale-[1.02] drag-item:shadow-xl drag-item:z-10 drag-ghost:opacity-100 drag-ghost:bg-blue-50 drag-ghost:border-2 drag-ghost:border-dashed drag-ghost:border-blue-400"
                     >
                       <div class="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 drag-ghost:opacity-0">
                         <div class="flex items-center gap-2 flex-1">
@@ -814,7 +814,7 @@ defmodule YscWeb.AdminEventsNewLive do
           <div :if={@live_action == :tickets} class="relative py-8">
             <div class="max-w-3xl">
               <div class="mb-6">
-                <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+                <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                   <div>
                     <h2 class="text-xl font-bold">Event Capacity</h2>
                     <p class="text-zinc-600 text-sm">
@@ -881,7 +881,7 @@ defmodule YscWeb.AdminEventsNewLive do
                   :if={
                     @event.state in [:published, "published"] and @photo_upload_url
                   }
-                  class="border border-zinc-200 rounded py-6 px-4 space-y-4"
+                  class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4"
                   id="event-photo-upload-link-card"
                 >
                   <div>
@@ -929,7 +929,7 @@ defmodule YscWeb.AdminEventsNewLive do
                   </div>
                 </div>
 
-                <div class="bg-white border border-zinc-200 rounded py-6 px-4 space-y-4">
+                <div class="bg-white border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                   <div>
                     <h2 class="text-xl font-bold">Send Update to Attendees</h2>
                     <p class="text-zinc-600 text-sm">
@@ -977,7 +977,7 @@ defmodule YscWeb.AdminEventsNewLive do
                         labelledby="update-message-label"
                         phx-debounce={200}
                         placeholder="Write the update message to send to all attendees..."
-                        editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
+                        editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded-sm text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
                       />
                     </div>
 
@@ -1000,7 +1000,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     <div
                       :if={sms_checked?(@update_form) and @sms_preview}
                       id="event-update-sms-preview"
-                      class="rounded border border-zinc-200 bg-zinc-50 p-4 space-y-2"
+                      class="rounded-sm border border-zinc-200 bg-zinc-50 p-4 space-y-2"
                     >
                       <div class="flex flex-wrap items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold text-zinc-800">
@@ -1014,7 +1014,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       </div>
                       <pre
                         id="event-update-sms-preview-body"
-                        class="whitespace-pre-wrap break-words text-sm font-mono text-zinc-800 bg-white border border-zinc-200 rounded p-3"
+                        class="whitespace-pre-wrap wrap-break-word text-sm font-mono text-zinc-800 bg-white border border-zinc-200 rounded-sm p-3"
                       >{@sms_preview.body}</pre>
                       <p
                         :if={@sms_preview.multi_segment?}
@@ -1093,7 +1093,7 @@ defmodule YscWeb.AdminEventsNewLive do
               <iframe
                 id="event-update-preview-iframe"
                 phx-hook="EmailPreview"
-                class="w-full border border-zinc-200 rounded min-h-[400px]"
+                class="w-full border border-zinc-200 rounded-sm min-h-[400px]"
               />
             </.modal>
           </div>
@@ -1175,7 +1175,7 @@ defmodule YscWeb.AdminEventsNewLive do
               <div
                 :if={Money.positive?(@donations_total)}
                 id="stat-donations"
-                class="bg-purple-50 shadow-sm border border-purple-100 rounded-lg p-6"
+                class="bg-purple-50 shadow-xs border border-purple-100 rounded-lg p-6"
               >
                 <p class="text-xs font-black text-purple-400 uppercase tracking-[0.2em] mb-3">
                   Donations Collected
@@ -1188,7 +1188,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </p>
               </div>
 
-              <div class="bg-white shadow-sm border border-zinc-100 rounded-lg p-6 space-y-4">
+              <div class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div>
                   <h2 class="text-xl font-bold">Sales Over Time</h2>
                   <p class="text-zinc-600 text-sm">
@@ -1254,7 +1254,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </div>
               </div>
 
-              <div class="bg-white shadow-sm border border-zinc-100 rounded-lg p-6 space-y-4">
+              <div class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div>
                   <h2 class="text-xl font-bold">Sales by Ticket Tier</h2>
                   <p class="text-zinc-600 text-sm">
@@ -1297,7 +1297,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 </table>
               </div>
 
-              <div class="bg-white shadow-sm border border-zinc-100 rounded-lg p-6 space-y-4">
+              <div class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <h2 class="text-xl font-bold">Expense Reports</h2>

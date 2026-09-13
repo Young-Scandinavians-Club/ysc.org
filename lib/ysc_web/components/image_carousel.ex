@@ -59,7 +59,7 @@ defmodule YscWeb.Components.ImageCarousel do
   attr :images, :list, required: true, doc: "See image_carousel/1"
 
   attr :overlay_class, :string,
-    default: "absolute inset-0 z-[5] bg-black/40 pointer-events-none",
+    default: "absolute inset-0 z-5 bg-black/40 pointer-events-none",
     doc: "Overrides the default dark overlay classes"
 
   attr :flag_grid_id, :string,

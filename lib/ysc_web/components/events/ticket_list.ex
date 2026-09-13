@@ -24,7 +24,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
     ~H"""
     <div
       id={"ticket-list-#{@event_id}"}
-      class="border border-zinc-200 rounded p-4 sm:p-6"
+      class="border border-zinc-200 rounded-sm p-4 sm:p-6"
     >
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div class="flex items-center gap-3">
@@ -41,7 +41,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
             type="button"
             phx-click="toggle-order-sort"
             phx-target={@myself}
-            class="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded px-2.5 py-2"
+            class="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-sm px-2.5 py-2"
           >
             Purchased
             <.icon

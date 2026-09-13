@@ -108,7 +108,7 @@ defmodule YscWeb.OrderConfirmationLive do
     <div
       :if={@loading_order_confirmation}
       id="order-confirmation-loading"
-      class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4"
+      class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
       role="status"
       aria-live="polite"
     >
@@ -116,13 +116,13 @@ defmodule YscWeb.OrderConfirmationLive do
       <!-- Header skeleton -->
       <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-100 pb-8">
         <div class="space-y-3">
-          <.skeleton_block class="h-3 w-32 rounded" />
-          <.skeleton_block class="h-9 w-80 rounded" />
-          <.skeleton_block class="h-4 w-64 rounded" />
+          <.skeleton_block class="h-3 w-32 rounded-sm" />
+          <.skeleton_block class="h-9 w-80 rounded-sm" />
+          <.skeleton_block class="h-4 w-64 rounded-sm" />
         </div>
         <div class="space-y-2 md:text-right">
-          <.skeleton_block class="h-3 w-28 rounded md:ml-auto" />
-          <.skeleton_block class="h-5 w-24 rounded md:ml-auto" />
+          <.skeleton_block class="h-3 w-28 rounded-sm md:ml-auto" />
+          <.skeleton_block class="h-5 w-24 rounded-sm md:ml-auto" />
         </div>
       </div>
 
@@ -133,8 +133,8 @@ defmodule YscWeb.OrderConfirmationLive do
             <.skeleton_block class="h-48 w-full rounded-none" />
             <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
               <div :for={_ <- 1..3} class="space-y-2">
-                <.skeleton_block class="h-3 w-16 rounded" />
-                <.skeleton_block class="h-5 w-24 rounded" />
+                <.skeleton_block class="h-3 w-16 rounded-sm" />
+                <.skeleton_block class="h-5 w-24 rounded-sm" />
               </div>
             </div>
           </div>
@@ -155,7 +155,7 @@ defmodule YscWeb.OrderConfirmationLive do
       id="order-confirmation"
       phx-hook="Confetti"
       data-show-confetti={if @show_confetti, do: "true", else: "false"}
-      class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4"
+      class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
     >
       <!-- Header -->
       <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-100 pb-8">
@@ -234,7 +234,7 @@ defmodule YscWeb.OrderConfirmationLive do
                   class="w-full h-full object-cover relative z-0"
                 />
               <% else %>
-                <div class="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center relative z-0">
+                <div class="w-full h-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center relative z-0">
                   <div class="text-center text-white">
                     <.icon
                       name="hero-calendar"
@@ -244,7 +244,7 @@ defmodule YscWeb.OrderConfirmationLive do
                   </div>
                 </div>
               <% end %>
-              <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-6 z-10">
+              <div class="absolute inset-0 bg-linear-to-t from-black/40 to-transparent flex items-end p-6 z-10">
                 <div class="flex items-center justify-between w-full">
                   <h2 class="text-white text-xl font-bold flex items-center gap-2">
                     <.icon name="hero-information-circle" class="w-8 h-8" />
@@ -329,7 +329,7 @@ defmodule YscWeb.OrderConfirmationLive do
               <%= if @ticket_order.status != :cancelled do %>
                 <.link
                   navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
-                  class="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded transition-colors shrink-0"
+                  class="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-sm transition-colors shrink-0"
                 >
                   <.icon name="hero-qr-code" class="w-4 h-4" />
                   View tickets for check-in
@@ -367,13 +367,13 @@ defmodule YscWeb.OrderConfirmationLive do
                           <%= if is_donation do %>
                             <span
                               id={"donation-badge-#{ticket.id}"}
-                              class="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded"
+                              class="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-sm"
                             >
                               Donation
                             </span>
                           <% end %>
                           <%= if is_refunded do %>
-                            <span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded">
+                            <span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-sm">
                               Refunded
                             </span>
                           <% end %>
@@ -516,7 +516,7 @@ defmodule YscWeb.OrderConfirmationLive do
               <div class="px-6 pb-6">
                 <.link
                   navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
-                  class="inline-flex items-center justify-center w-full rounded py-3 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] transition duration-150 ease-in-out text-sm font-semibold leading-6"
+                  class="inline-flex items-center justify-center w-full rounded-sm py-3 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] transition duration-150 ease-in-out text-sm font-semibold leading-6"
                 >
                   <.icon name="hero-qr-code" class="w-5 h-5" />Open tickets for check-in
                 </.link>
@@ -737,7 +737,7 @@ defmodule YscWeb.OrderConfirmationLive do
                     <img
                       src={@payment_method_logo}
                       alt=""
-                      class="h-5 w-auto max-w-[3rem] object-contain shrink-0"
+                      class="h-5 w-auto max-w-12 object-contain shrink-0"
                       loading="lazy"
                       decoding="async"
                     />

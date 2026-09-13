@@ -172,13 +172,13 @@ defmodule YscWeb.UserLoginLive do
         <button
           type="button"
           phx-click="dismiss_banner"
-          class="absolute top-2 right-2 p-1 rounded hover:bg-amber-100 opacity-60 hover:opacity-100 transition-opacity"
+          class="absolute top-2 right-2 p-1 rounded-sm hover:bg-amber-100 opacity-60 hover:opacity-100 transition-opacity"
           aria-label="Dismiss"
         >
           <.icon name="hero-x-mark" class="w-5 h-5 text-amber-600" />
         </button>
         <div class="flex items-start pr-6">
-          <div class="flex-shrink-0">
+          <div class="shrink-0">
             <.icon name="hero-exclamation-triangle" class="h-5 w-5 text-amber-600" />
           </div>
           <div class="ml-3 flex-1">

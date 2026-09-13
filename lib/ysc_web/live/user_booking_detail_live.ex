@@ -135,21 +135,21 @@ defmodule YscWeb.UserBookingDetailLive do
     <div
       :if={@loading_booking?}
       id="booking-detail-loading"
-      class="py-8 lg:py-10 max-w-screen-lg mx-auto px-4"
+      class="py-8 lg:py-10 max-w-(--breakpoint-lg) mx-auto px-4"
       role="status"
       aria-live="polite"
     >
       <span class="sr-only">Loading booking details…</span>
       <div class="max-w-xl mx-auto lg:mx-0 space-y-6">
-        <.skeleton_block class="h-9 w-56 rounded" />
+        <.skeleton_block class="h-9 w-56 rounded-sm" />
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded" />
+          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
         </div>
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
-          <.skeleton_block class="h-5 w-40 rounded mb-2" />
+          <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
           <div :for={_ <- 1..3} class="flex justify-between">
-            <.skeleton_block class="h-4 w-28 rounded" />
-            <.skeleton_block class="h-4 w-20 rounded" />
+            <.skeleton_block class="h-4 w-28 rounded-sm" />
+            <.skeleton_block class="h-4 w-20 rounded-sm" />
           </div>
         </div>
       </div>
@@ -157,7 +157,7 @@ defmodule YscWeb.UserBookingDetailLive do
     <div
       :if={!@loading_booking?}
       id="booking-detail"
-      class="py-8 lg:py-10 max-w-screen-lg mx-auto px-4"
+      class="py-8 lg:py-10 max-w-(--breakpoint-lg) mx-auto px-4"
     >
       <div class="max-w-xl mx-auto lg:mx-0">
         <div class="prose prose-zinc mb-6">
@@ -356,14 +356,14 @@ defmodule YscWeb.UserBookingDetailLive do
             aria-live="polite"
           >
             <span class="sr-only">Loading payment details…</span>
-            <.skeleton_block class="h-5 w-40 rounded mb-2" />
+            <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
             <div :for={_ <- 1..3} class="flex justify-between">
-              <.skeleton_block class="h-4 w-28 rounded" />
-              <.skeleton_block class="h-4 w-20 rounded" />
+              <.skeleton_block class="h-4 w-28 rounded-sm" />
+              <.skeleton_block class="h-4 w-20 rounded-sm" />
             </div>
             <div class="border-t border-zinc-200 pt-3 flex justify-between items-center">
-              <.skeleton_block class="h-5 w-24 rounded" />
-              <.skeleton_block class="h-7 w-28 rounded" />
+              <.skeleton_block class="h-5 w-24 rounded-sm" />
+              <.skeleton_block class="h-7 w-28 rounded-sm" />
             </div>
           </div>
           <!-- Payment Summary -->

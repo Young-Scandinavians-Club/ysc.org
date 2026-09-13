@@ -10,7 +10,7 @@ defmodule YscWeb.Components.MapComponent do
     ~H"""
     <div
       style="overflow: hidden"
-      class="border border-zinc-300 rounded w-full h-80"
+      class="border border-zinc-300 rounded-sm w-full h-80"
       phx-update="ignore"
       id={"#{@id}-container"}
     >

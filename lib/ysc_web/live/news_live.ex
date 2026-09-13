@@ -16,25 +16,25 @@ defmodule YscWeb.NewsLive do
     ~H"""
     <div class="py-6 md:py-12">
       <%!-- The "Masthead" Header --%>
-      <div class="max-w-screen-xl mx-auto px-4 mb-16">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-16">
         <.page_masthead size={:large} title="Club News" />
       </div>
 
       <%!-- Loading skeleton for featured post --%>
-      <div :if={!@async_data_loaded} class="max-w-screen-xl mx-auto px-4 mb-16">
+      <div :if={!@async_data_loaded} class="max-w-(--breakpoint-xl) mx-auto px-4 mb-16">
         <div class="animate-pulse">
-          <div class="relative aspect-[16/10] rounded-xl overflow-hidden bg-zinc-200">
+          <div class="relative aspect-16/10 rounded-xl overflow-hidden bg-zinc-200">
             <div class="absolute inset-0 flex flex-col justify-end p-8 lg:p-12">
               <div class="max-w-3xl space-y-4">
-                <div class="w-24 h-6 bg-zinc-300 rounded"></div>
-                <div class="w-32 h-4 bg-zinc-300 rounded"></div>
-                <div class="w-3/4 h-12 bg-zinc-300 rounded"></div>
-                <div class="w-full h-6 bg-zinc-300 rounded"></div>
+                <div class="w-24 h-6 bg-zinc-300 rounded-sm"></div>
+                <div class="w-32 h-4 bg-zinc-300 rounded-sm"></div>
+                <div class="w-3/4 h-12 bg-zinc-300 rounded-sm"></div>
+                <div class="w-full h-6 bg-zinc-300 rounded-sm"></div>
                 <div class="flex items-center gap-3 pt-4">
                   <div class="w-10 h-10 bg-zinc-300 rounded-full"></div>
                   <div class="space-y-2">
-                    <div class="w-24 h-3 bg-zinc-300 rounded"></div>
-                    <div class="w-16 h-2 bg-zinc-300 rounded"></div>
+                    <div class="w-24 h-3 bg-zinc-300 rounded-sm"></div>
+                    <div class="w-16 h-2 bg-zinc-300 rounded-sm"></div>
                   </div>
                 </div>
               </div>
@@ -46,16 +46,16 @@ defmodule YscWeb.NewsLive do
       <%!-- Modernized Featured Post - Impact Hero --%>
       <div
         :if={@async_data_loaded && @featured != nil}
-        class="max-w-screen-xl mx-auto px-4 mb-16"
+        class="max-w-(--breakpoint-xl) mx-auto px-4 mb-16"
       >
         <div id="featured" class="group">
           <.link
             navigate={~p"/posts/#{@featured.url_name}"}
             class="block overflow-hidden rounded-xl border border-zinc-100 bg-white transition-all duration-300 sm:border-0 sm:bg-transparent sm:rounded-xl hover:ring-2 hover:ring-blue-500"
           >
-            <div class="relative flex flex-col sm:block sm:aspect-[16/10] sm:rounded-xl sm:overflow-hidden">
+            <div class="relative flex flex-col sm:block sm:aspect-16/10 sm:rounded-xl sm:overflow-hidden">
               <%!-- Image container --%>
-              <div class="relative aspect-[16/9] w-full overflow-hidden sm:absolute sm:inset-0 sm:aspect-auto sm:h-full">
+              <div class="relative aspect-video w-full overflow-hidden sm:absolute sm:inset-0 sm:aspect-auto sm:h-full">
                 <canvas
                   id={"blur-hash-image-#{@featured.id}"}
                   src={Image.blur_hash_for_display(@featured.featured_image)}
@@ -68,7 +68,7 @@ defmodule YscWeb.NewsLive do
                   sizes="(max-width: 1280px) 100vw, 1280px"
                   id={"image-#{@featured.id}"}
                   phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
+                  class="absolute inset-0 z-1 opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
                   loading="eager"
                   decoding="async"
                   fetchpriority="high"
@@ -83,21 +83,21 @@ defmodule YscWeb.NewsLive do
                 />
 
                 <%!-- Overlay gradient for text readability (hidden on mobile, shown on sm+) --%>
-                <div class="hidden sm:block absolute inset-0 z-[2] bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent">
+                <div class="hidden sm:block absolute inset-0 z-2 bg-linear-to-t from-zinc-900 via-zinc-900/40 to-transparent">
                 </div>
               </div>
 
               <%!-- Content (stacked on mobile, overlaid on sm+) --%>
-              <div class="relative z-[3] flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-300">
+              <div class="relative z-3 flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-300">
                 <div class="max-w-3xl">
                   <div class="flex items-center gap-2 mb-4">
-                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded shadow-sm sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
+                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded-sm shadow-xs sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
                       <.icon name="hero-star-solid" class="w-3 h-3 inline me-1" />Pinned News
                     </span>
                   </div>
 
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
-                    <span class="text-sm font-black uppercase tracking-[0.1em]">
+                    <span class="text-sm font-black uppercase tracking-widest">
                       {DateDisplay.format_date_short_in_zone(
                         @featured.published_on,
                         @timezone
@@ -144,30 +144,30 @@ defmodule YscWeb.NewsLive do
       </div>
 
       <%!-- Balanced Masonry Grid --%>
-      <div class="max-w-screen-xl mx-auto px-4">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4">
         <%!-- Loading skeleton for posts grid --%>
         <div
           :if={!@async_data_loaded}
           class="grid grid-cols-1 md:grid-cols-2 py-4 gap-8"
         >
           <%= for _i <- 1..4 do %>
-            <div class="flex flex-col bg-white rounded-xl p-2 ring-1 ring-zinc-100 shadow-sm animate-pulse">
-              <div class="aspect-video sm:aspect-[16/10] rounded-lg mb-4 bg-zinc-200">
+            <div class="flex flex-col bg-white rounded-xl p-2 ring-1 ring-zinc-100 shadow-xs animate-pulse">
+              <div class="aspect-video sm:aspect-16/10 rounded-lg mb-4 bg-zinc-200">
               </div>
               <div class="px-4 pb-4 space-y-4">
                 <div class="flex items-center gap-3">
-                  <div class="w-16 h-3 bg-zinc-200 rounded"></div>
+                  <div class="w-16 h-3 bg-zinc-200 rounded-sm"></div>
                   <div class="w-px h-3 bg-zinc-200"></div>
-                  <div class="w-20 h-3 bg-zinc-200 rounded"></div>
+                  <div class="w-20 h-3 bg-zinc-200 rounded-sm"></div>
                 </div>
-                <div class="w-3/4 h-8 bg-zinc-200 rounded"></div>
-                <div class="w-full h-4 bg-zinc-200 rounded"></div>
-                <div class="w-2/3 h-4 bg-zinc-200 rounded"></div>
+                <div class="w-3/4 h-8 bg-zinc-200 rounded-sm"></div>
+                <div class="w-full h-4 bg-zinc-200 rounded-sm"></div>
+                <div class="w-2/3 h-4 bg-zinc-200 rounded-sm"></div>
                 <div class="pt-6 border-t border-zinc-50 flex items-center gap-3">
                   <div class="w-8 h-8 bg-zinc-200 rounded-full"></div>
                   <div class="space-y-1">
-                    <div class="w-20 h-3 bg-zinc-200 rounded"></div>
-                    <div class="w-16 h-2 bg-zinc-200 rounded"></div>
+                    <div class="w-20 h-3 bg-zinc-200 rounded-sm"></div>
+                    <div class="w-16 h-2 bg-zinc-200 rounded-sm"></div>
                   </div>
                 </div>
               </div>
@@ -188,7 +188,7 @@ defmodule YscWeb.NewsLive do
             class="group flex flex-col bg-white rounded-xl p-2 border border-zinc-100 transition-all duration-300 hover:ring-2 hover:ring-blue-500"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
-              <div class="relative aspect-video sm:aspect-[16/10] overflow-hidden rounded-lg">
+              <div class="relative aspect-video sm:aspect-16/10 overflow-hidden rounded-lg">
                 <.live_component
                   id={"news-image-#{post.id}"}
                   module={YscWeb.Components.Image}

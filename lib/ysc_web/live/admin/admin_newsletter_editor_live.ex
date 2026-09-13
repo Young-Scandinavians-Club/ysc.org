@@ -594,7 +594,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     <%= if title do %>
                       <div class="flex items-center gap-1.5 flex-wrap">
                         <span class={[
-                          "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shrink-0",
+                          "inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shrink-0",
                           type == :event && "bg-purple-100 text-purple-800",
                           type == :post && "bg-sky-100 text-sky-700"
                         ]}>
@@ -643,14 +643,14 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           phx-click={
             JS.show(to: "#editor-panel")
             |> JS.hide(to: "#preview-panel")
-            |> JS.add_class("bg-white shadow-sm text-zinc-900",
+            |> JS.add_class("bg-white shadow-xs text-zinc-900",
               to: "#tab-editor-btn"
             )
-            |> JS.remove_class("bg-white shadow-sm text-zinc-900",
+            |> JS.remove_class("bg-white shadow-xs text-zinc-900",
               to: "#tab-preview-btn"
             )
           }
-          class="flex-1 text-sm font-medium py-1.5 px-3 rounded text-zinc-900 bg-white shadow-sm transition"
+          class="flex-1 text-sm font-medium py-1.5 px-3 rounded-sm text-zinc-900 bg-white shadow-xs transition"
         >
           Editor
         </button>
@@ -660,14 +660,14 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           phx-click={
             JS.hide(to: "#editor-panel")
             |> JS.show(to: "#preview-panel")
-            |> JS.add_class("bg-white shadow-sm text-zinc-900",
+            |> JS.add_class("bg-white shadow-xs text-zinc-900",
               to: "#tab-preview-btn"
             )
-            |> JS.remove_class("bg-white shadow-sm text-zinc-900",
+            |> JS.remove_class("bg-white shadow-xs text-zinc-900",
               to: "#tab-editor-btn"
             )
           }
-          class="flex-1 text-sm font-medium py-1.5 px-3 rounded text-zinc-500 transition"
+          class="flex-1 text-sm font-medium py-1.5 px-3 rounded-sm text-zinc-500 transition"
         >
           Preview
         </button>
@@ -688,11 +688,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           >
             <span class="sr-only">Loading newsletter…</span>
             <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
-              <.skeleton_block class="h-5 w-32 rounded" />
+              <.skeleton_block class="h-5 w-32 rounded-sm" />
               <.skeleton_block class="h-40 w-full rounded-lg" />
             </div>
             <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
-              <.skeleton_block class="h-5 w-24 rounded" />
+              <.skeleton_block class="h-5 w-24 rounded-sm" />
               <.skeleton_block class="h-11 w-full rounded-lg" />
               <.skeleton_block class="h-24 w-full rounded-lg" />
             </div>
@@ -832,7 +832,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                         phx-click="toggle-post"
                         phx-value-id={post.id}
                         class={[
-                          "group text-left transition-all focus:outline-none rounded-xl",
+                          "group text-left transition-all focus:outline-hidden rounded-xl",
                           if(selected?,
                             do: "ring-2 ring-blue-500 ring-offset-2",
                             else:
@@ -854,7 +854,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                           ]} />
                           <span
                             :if={selected_position(@selected_post_ids, post.id)}
-                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm"
+                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-xs"
                           >
                             {selected_position(@selected_post_ids, post.id)}
                           </span>
@@ -921,7 +921,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                         phx-click="toggle-event"
                         phx-value-id={event.id}
                         class={[
-                          "group text-left transition-all focus:outline-none rounded-xl",
+                          "group text-left transition-all focus:outline-hidden rounded-xl",
                           if(selected?,
                             do: "ring-2 ring-blue-500 ring-offset-2",
                             else:
@@ -943,7 +943,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                           ]} />
                           <span
                             :if={selected_position(@selected_event_ids, event.id)}
-                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm"
+                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-xs"
                           >
                             {selected_position(@selected_event_ids, event.id)}
                           </span>
@@ -994,7 +994,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           class="hidden lg:flex lg:flex-col lg:sticky lg:top-6"
           style="height: calc(100vh - 7.5rem);"
         >
-          <div class="flex flex-col h-full rounded-xl border border-zinc-200 overflow-hidden shadow-sm">
+          <div class="flex flex-col h-full rounded-xl border border-zinc-200 overflow-hidden shadow-xs">
             <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-zinc-50 shrink-0">
               <h3 class="text-sm font-semibold text-zinc-700">Email Preview</h3>
               <div class="flex items-center gap-3">
@@ -1037,7 +1037,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       </div>
 
       <%!-- Sticky bottom bar: autosave status + action buttons --%>
-      <div class="sticky bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 border-t border-zinc-200 bg-white/95 backdrop-blur-sm px-6 py-3">
+      <div class="sticky bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 border-t border-zinc-200 bg-white/95 backdrop-blur-xs px-6 py-3">
         <%!-- Left: status badge + autosave indicator --%>
         <div class="flex items-center gap-3 min-w-0">
           <%= if @edition && @edition.status == :sending do %>

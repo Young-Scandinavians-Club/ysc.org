@@ -34,7 +34,7 @@ defmodule YscWeb.Components.News.NewsCard do
       @class
     ]}>
       <.link navigate={~p"/posts/#{@post.url_name}"} class="block">
-        <div class="relative aspect-[16/10] overflow-hidden rounded-xl mb-8">
+        <div class="relative aspect-16/10 overflow-hidden rounded-xl mb-8">
           <.live_component
             id={"news-card-image-#{@post.id}"}
             module={YscWeb.Components.Image}

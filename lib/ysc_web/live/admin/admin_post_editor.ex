@@ -37,7 +37,7 @@ defmodule YscWeb.AdminPostEditorLive do
               <button
                 type="button"
                 class={[
-                  "flex-none rounded hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded text-zinc-800 mr-3",
+                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
                   @preview_device == :phone && "bg-zinc-100"
                 ]}
                 phx-click="phone-preview"
@@ -50,7 +50,7 @@ defmodule YscWeb.AdminPostEditorLive do
               <button
                 type="button"
                 class={[
-                  "flex-none rounded hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded text-zinc-800 mr-3",
+                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
                   @preview_device == :tablet && "bg-zinc-100"
                 ]}
                 phx-click="tablet-preview"
@@ -63,7 +63,7 @@ defmodule YscWeb.AdminPostEditorLive do
               <button
                 type="button"
                 class={[
-                  "flex-none rounded hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded text-zinc-800 mr-3",
+                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
                   @preview_device == :computer && "bg-zinc-100"
                 ]}
                 phx-click="computer-preview"
@@ -75,7 +75,7 @@ defmodule YscWeb.AdminPostEditorLive do
           </ul>
 
           <div class={[
-            "w-full bg-blue-100 h-full rounded border border-1 border-zinc-300",
+            "w-full bg-blue-100 h-full rounded-sm border border border-zinc-300",
             (@preview_device == :phone || @preview_device == :tablet) && "py-20"
           ]}>
             <.phone_mockup :if={@preview_device == :phone} class="m-auto">
@@ -119,7 +119,7 @@ defmodule YscWeb.AdminPostEditorLive do
             Post Settings
           </.admin_page_title>
 
-          <div class="rounded border border-1 border-zinc-100 px-3 py-4">
+          <div class="rounded-sm border border border-zinc-100 px-3 py-4">
             <p class="text-lg font-semibold mb-3">Featured Image</p>
 
             <.live_component
@@ -140,10 +140,10 @@ defmodule YscWeb.AdminPostEditorLive do
         aria-live="polite"
       >
         <span class="sr-only">Loading post…</span>
-        <.skeleton_block class="h-9 w-64 rounded" />
-        <.skeleton_block class="h-5 w-40 rounded" />
+        <.skeleton_block class="h-9 w-64 rounded-sm" />
+        <.skeleton_block class="h-5 w-40 rounded-sm" />
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded" />
+          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded-sm" />
         </div>
       </div>
 
@@ -164,7 +164,7 @@ defmodule YscWeb.AdminPostEditorLive do
                   field={@form[:title]}
                   phx-debounce="500"
                   growing_field_size="large"
-                  class="input-element block border-none font-extrabold text-2xl leading-7 text-zinc-900 outline-none focus:border focus:border-1 focus:border-zinc-200 focus:border-zinc-400 focus:outline focus:outline-zinc-200 focus:ring-0 sm:text-3xl sm:leading-8 rounded"
+                  class="input-element block border-none font-extrabold text-2xl leading-7 text-zinc-900 outline-hidden focus:border focus:border focus:border-zinc-200 focus:border-zinc-400 focus:outline-solid focus:outline-zinc-200 focus:ring-0 sm:text-3xl sm:leading-8 rounded-sm"
                 />
               </div>
 
@@ -367,7 +367,7 @@ defmodule YscWeb.AdminPostEditorLive do
             <.input
               type="text-growing"
               field={@form[:url_name]}
-              class="input-element mt-2 block w-full text-sm outline-none border-none focus:border focus:border-1 focus:border-zinc-200 rounded text-blue-600 focus:border-1 focus:border-zinc-400 focus:outline focus:outline-zinc-200 focus:ring-0 leading-6 focus:border-zinc-400"
+              class="input-element mt-2 block w-full text-sm outline-hidden border-none focus:border focus:border focus:border-zinc-200 rounded-sm text-blue-600 focus:border focus:border-zinc-400 focus:outline-solid focus:outline-zinc-200 focus:ring-0 leading-6 focus:border-zinc-400"
             />
           </span>
         </div>

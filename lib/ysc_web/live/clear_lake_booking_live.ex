@@ -539,13 +539,13 @@ defmodule YscWeb.ClearLakeBookingLive do
           flag_grid_id="clear-lake-hero-flag-grid-member"
         />
         <%!-- Title Text Section --%>
-        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-16 pointer-events-none">
-          <div class="max-w-screen-xl mx-auto pointer-events-auto">
+        <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-16 pointer-events-none">
+          <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
             <div class="flex items-center gap-4 px-4">
               <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-lg">
                 Clear Lake Cabin
               </h1>
-              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-black uppercase tracking-[0.2em] rounded backdrop-blur-sm">
+              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-black uppercase tracking-[0.2em] rounded-sm backdrop-blur-xs">
                 Member Access
               </span>
             </div>
@@ -554,13 +554,13 @@ defmodule YscWeb.ClearLakeBookingLive do
       </section>
       <!-- Booking Dashboard Section -->
       <section :if={@user} class="py-8">
-        <div class="max-w-screen-xl mx-auto px-4 space-y-10">
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4 space-y-10">
           <!-- Essential Alerts Bar (High-Contrast) -->
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-900 text-white p-4 rounded-xl">
             <div id="sleeping-alert" class="flex items-center gap-3">
               <%= cond do %>
                 <% @sleeping_mode == :winter -> %>
-                  <span class="text-xl flex-shrink-0">🛏️</span>
+                  <span class="text-xl shrink-0">🛏️</span>
                   <div>
                     <p class="text-xs font-black text-teal-400 uppercase">
                       Beds set up
@@ -570,7 +570,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     </p>
                   </div>
                 <% @sleeping_mode == :mixed -> %>
-                  <span class="text-xl flex-shrink-0">⛺</span>
+                  <span class="text-xl shrink-0">⛺</span>
                   <div>
                     <p class="text-xs font-black text-teal-400 uppercase">
                       Sleeping
@@ -580,7 +580,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     </p>
                   </div>
                 <% true -> %>
-                  <span class="text-xl flex-shrink-0">⛺</span>
+                  <span class="text-xl shrink-0">⛺</span>
                   <div>
                     <p class="text-xs font-black text-teal-400 uppercase">
                       Sleeping
@@ -592,7 +592,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               <% end %>
             </div>
             <div class="flex items-center gap-3">
-              <span class="text-xl flex-shrink-0">🚫</span>
+              <span class="text-xl shrink-0">🚫</span>
               <div>
                 <p class="text-xs font-black text-zinc-400 uppercase">
                   House rules
@@ -601,7 +601,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
             </div>
             <div class="flex items-center gap-3">
-              <span class="text-xl flex-shrink-0">⚓</span>
+              <span class="text-xl shrink-0">⚓</span>
               <div>
                 <p class="text-xs font-black text-amber-400 uppercase">
                   Access
@@ -612,7 +612,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
             </div>
             <div class="flex items-center gap-3">
-              <span class="text-xl flex-shrink-0">🧹</span>
+              <span class="text-xl shrink-0">🧹</span>
               <div>
                 <p class="text-xs font-black text-zinc-400 uppercase">
                   Community
@@ -634,9 +634,9 @@ defmodule YscWeb.ClearLakeBookingLive do
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <%= for booking <- @active_bookings do %>
-                <div class="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-sm">
+                <div class="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-xs">
                   <div class="flex justify-between items-start mb-3">
-                    <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
+                    <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-sm">
                       {booking.reference_id}
                     </span>
                     <%= if Date.compare(booking.checkout_date, @today) == :eq do %>
@@ -680,7 +680,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <!-- Left Column: Selection Area (2 columns on large screens) -->
             <div class="lg:col-span-2 space-y-8">
               <!-- Step 1: Booking Mode Selection -->
-              <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
+              <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
                 <.step_heading
                   id="booking-step-mode"
                   step={1}
@@ -703,7 +703,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         if(
                           @selected_booking_mode == :day ||
                             @selected_booking_mode == nil,
-                          do: "border-teal-600 bg-teal-50 shadow-sm",
+                          do: "border-teal-600 bg-teal-50 shadow-xs",
                           else:
                             "border-zinc-300 hover:border-teal-400 hover:bg-zinc-50"
                         ),
@@ -761,7 +761,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <label class={[
                         "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition-all",
                         if(@selected_booking_mode == :buyout,
-                          do: "border-teal-600 bg-teal-50 shadow-sm",
+                          do: "border-teal-600 bg-teal-50 shadow-xs",
                           else:
                             "border-zinc-300 hover:border-teal-400 hover:bg-zinc-50"
                         ),
@@ -863,7 +863,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               <!-- Step 2a: Day Booking Details (shown when day mode selected) -->
               <div :if={@selected_booking_mode == :day}>
                 <!-- Section 1: Stay Details -->
-                <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
+                <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
                   <.step_heading
                     id="booking-step-stay-details"
                     step={2}
@@ -890,7 +890,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           aria-labelledby="guests-label"
                           aria-expanded={@guests_dropdown_open}
                           aria-haspopup="true"
-                          class="w-full px-3 py-2 border border-zinc-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                          class="w-full px-3 py-2 border border-zinc-300 rounded-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span class="text-zinc-900">
                             {BookingDisplay.people_label(@guests_count)}
@@ -907,7 +907,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <div
                           :if={@guests_dropdown_open}
                           phx-click-away="close-guests-dropdown"
-                          class="absolute z-50 w-full mt-1 bg-white border border-zinc-300 rounded-md shadow-sm p-4"
+                          class="absolute z-50 w-full mt-1 bg-white border border-zinc-300 rounded-md shadow-xs p-4"
                         >
                           <div class="space-y-4" phx-click="ignore">
                             <!-- Guests Counter -->
@@ -970,7 +970,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               <button
                                 type="button"
                                 phx-click="close-guests-dropdown"
-                                class="w-full px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded transition-colors duration-200"
+                                class="w-full px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white font-semibold rounded-sm transition-colors duration-200"
                               >
                                 Done
                               </button>
@@ -993,7 +993,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
               <!-- Step 2b: Buyout Calendar (shown when buyout mode selected) -->
               <div :if={@selected_booking_mode == :buyout}>
-                <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
+                <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
                   <div class="flex items-center justify-between mb-4">
                     <.step_heading
                       id="booking-step-buyout-dates"
@@ -1058,7 +1058,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
               <!-- Step 3: Select Your Dates (for day mode) -->
               <div :if={@selected_booking_mode == :day}>
-                <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
+                <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
                   <div class="flex items-center justify-between mb-4">
                     <.step_heading
                       id="booking-step-day-dates"
@@ -1151,7 +1151,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 class="bg-red-50 border border-red-200 rounded-xl p-4"
               >
                 <div class="flex items-start">
-                  <div class="flex-shrink-0">
+                  <div class="shrink-0">
                     <.icon
                       name="hero-exclamation-circle"
                       class="h-5 w-5 text-red-600 -mt-1"
@@ -1238,7 +1238,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     class="bg-amber-50 border border-amber-200 rounded-xl p-3"
                   >
                     <div class="flex items-start gap-2">
-                      <div class="flex-shrink-0">
+                      <div class="shrink-0">
                         <.icon
                           name="hero-exclamation-triangle"
                           class="h-4 w-4 text-amber-600 mt-0.5"
@@ -1441,7 +1441,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         @availability_error
                       ) && @can_book
                     }
-                    class="p-3 bg-amber-50 border border-amber-200 rounded"
+                    class="p-3 bg-amber-50 border border-amber-200 rounded-sm"
                   >
                     <p class="text-xs font-semibold text-amber-900 mb-2">
                       Missing Information:
@@ -1513,7 +1513,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           </div>
           <!-- Mobile Sticky Footer (only visible on mobile) -->
           <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t-2 border-zinc-200 shadow-2xl z-50 p-4">
-            <div class="max-w-screen-xl mx-auto flex items-center justify-between gap-4">
+            <div class="max-w-(--breakpoint-xl) mx-auto flex items-center justify-between gap-4">
               <div class="flex-1">
                 <div :if={@calculated_price} class="text-right">
                   <p class="text-xs text-zinc-500 uppercase">Total</p>
@@ -1564,7 +1564,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             {raw(@booking_disabled_reason)}
           </.warning_callout>
           <!-- Information Sections (Tab System) -->
-          <div id="information-section" class="mt-12 max-w-screen-xl mx-auto">
+          <div id="information-section" class="mt-12 max-w-(--breakpoint-xl) mx-auto">
             <!-- Tab Navigation (Sticky) -->
             <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-zinc-200 mb-8 -mx-4 px-4 py-2">
               <nav class="flex gap-2 overflow-x-auto" role="tablist">
@@ -1619,7 +1619,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                   <!-- Important Notice -->
                   <div class="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl not-prose mb-10">
-                    <span class="text-2xl flex-shrink-0">💡</span>
+                    <span class="text-2xl shrink-0">💡</span>
                     <p class="text-sm text-amber-900 m-0">
                       <strong>Remember:</strong>
                       The Clear Lake Cabin is
@@ -1711,7 +1711,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </section>
                 </section>
                 <!-- How to Book -->
-                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
+                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs">
                   <.icon_heading id="clear-lake-how-to-book-heading" icon="🗓️">
                     How to Book
                   </.icon_heading>
@@ -1767,7 +1767,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           Step-by-Step Directions from San Francisco
                           <.icon
                             name="hero-chevron-down"
-                            class="w-5 h-5 text-zinc-500 chevron-icon flex-shrink-0"
+                            class="w-5 h-5 text-zinc-500 chevron-icon shrink-0"
                           />
                         </summary>
                         <div class="p-4 border-t border-zinc-100 bg-white">
@@ -1778,7 +1778,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </div>
                             <!-- Direction steps -->
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">1</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1791,7 +1791,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">2</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1802,7 +1802,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">3</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1815,7 +1815,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">4</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1828,7 +1828,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">5</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1841,7 +1841,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">6</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1854,7 +1854,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">7</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1867,7 +1867,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">8</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1880,7 +1880,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">9</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1893,7 +1893,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <span class="text-white text-xs font-bold">10</span>
                               </div>
                               <div class="flex-1 pb-6">
@@ -1906,7 +1906,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               </div>
                             </div>
                             <div class="relative flex gap-4">
-                              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-teal-700 border-4 border-white shadow-sm flex items-center justify-center z-10">
+                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-700 border-4 border-white shadow-xs flex items-center justify-center z-10">
                                 <.icon name="hero-flag" class="w-4 h-4 text-white" />
                               </div>
                               <div class="flex-1">
@@ -1930,7 +1930,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     </div>
 
                     <div class="space-y-4">
-                      <div class="rounded-xl overflow-hidden border border-zinc-200 shadow-sm h-80">
+                      <div class="rounded-xl overflow-hidden border border-zinc-200 shadow-xs h-80">
                         <.live_component
                           id="clear-lake-cabin-map"
                           module={YscWeb.Components.MapComponent}
@@ -1952,7 +1952,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <section class="grid md:grid-cols-2 gap-6">
                   <div
                     id="door-code-access"
-                    class="bg-teal-600 rounded-xl p-8 text-white shadow-sm"
+                    class="bg-teal-600 rounded-xl p-8 text-white shadow-xs"
                   >
                     <div class="flex items-center gap-3 mb-6">
                       <div class="p-2 bg-white/20 rounded-md">🔑</div>
@@ -1989,7 +1989,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <li class="flex items-center gap-3">
                         <input
                           type="checkbox"
-                          class="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
+                          class="w-5 h-5 rounded-sm border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
                         />
                         <div>
                           <span class="font-semibold">Screenshot Door Code</span>
@@ -2001,7 +2001,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <li class="flex items-center gap-3">
                         <input
                           type="checkbox"
-                          class="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
+                          class="w-5 h-5 rounded-sm border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
                         />
                         <div>
                           <span class="font-semibold">Download Offline Maps</span>
@@ -2016,7 +2016,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Parking -->
                 <section
                   id="parking-transportation"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
+                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs"
                 >
                   <.icon_heading id="clear-lake-parking-heading" icon="🚙">
                     Parking
@@ -2054,21 +2054,21 @@ defmodule YscWeb.ClearLakeBookingLive do
                     navigate={
                       ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
                     }
-                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-xs"
                   >
                     Sign In to Book
                   </.link>
                   <.link
                     :if={@booking_error_title == "Application under review"}
                     navigate={~p"/pending-review"}
-                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-xs"
                   >
                     View application status
                   </.link>
                   <.link
                     :if={@booking_error_title == "Membership Required"}
                     navigate={~p"/users/membership"}
-                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-xs"
                   >
                     Pay or renew membership
                   </.link>
@@ -2076,7 +2076,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Before you go -->
                 <section
                   id="before-you-go"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
+                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs"
                 >
                   <.icon_heading id="clear-lake-before-you-go-heading" icon="📋">
                     Before you go
@@ -2153,7 +2153,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <section
                   id="sleeping-at-the-cabin"
                   class={[
-                    "rounded-xl p-6 shadow-sm border-2",
+                    "rounded-xl p-6 shadow-xs border-2",
                     if(@sleeping_mode == :winter,
                       do: "bg-amber-50 border-amber-200",
                       else: "bg-teal-50 border-teal-200"
@@ -2233,7 +2233,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 </section>
                 <section
                   id="amenities"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
+                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs"
                 >
                   <.icon_heading id="clear-lake-on-property-heading" icon="🏠">
                     On the property
@@ -2278,12 +2278,12 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Golden Rules Banner -->
                 <section class="bg-zinc-100 rounded-xl p-6 mb-12">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-sm">
+                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-xs">
                       <div class="text-4xl mb-3">🚫</div>
                       <div class="font-bold text-red-900 text-lg mb-1">No Pets</div>
                       <div class="text-sm text-red-700">No exceptions</div>
                     </div>
-                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-sm">
+                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-xs">
                       <%= cond do %>
                         <% @sleeping_mode == :winter -> %>
                           <div class="text-4xl mb-3">🧺</div>
@@ -2311,7 +2311,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </div>
                       <% end %>
                     </div>
-                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-sm">
+                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-xs">
                       <div class="text-4xl mb-3">🚭</div>
                       <div class="font-bold text-red-900 text-lg mb-1">
                         No Smoking
@@ -2405,7 +2405,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                 </section>
                 <!-- Booking Policies -->
-                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12">
+                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs mb-12">
                   <.icon_heading
                     id="clear-lake-booking-policies-heading"
                     class="text-zinc-900 mb-6"
@@ -2430,7 +2430,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 </section>
                 <section
                   id="cancellation-policy"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm mb-12"
+                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs mb-12"
                 >
                   <.icon_heading id="clear-lake-cancellation-heading">
                     <:leading>
@@ -2621,8 +2621,8 @@ defmodule YscWeb.ClearLakeBookingLive do
           flag_grid_id="clear-lake-hero-flag-grid-guest"
         />
         <%!-- Title Text Section --%>
-        <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-20 pointer-events-none">
-          <div class="max-w-screen-xl mx-auto pointer-events-auto">
+        <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-20 pointer-events-none">
+          <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
             <p class="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-3 md:mb-4 drop-shadow-md">
               A Legacy for All Seasons
             </p>
@@ -2638,7 +2638,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       <%!-- Main Content for Non-Logged-In Users --%>
       <section :if={!@user} class="bg-white py-6 md:py-12">
         <%!-- Section Header --%>
-        <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-8 md:mb-16">
           <.page_masthead
             eyebrow="Since 1963"
             title="Experience Clear Lake"
@@ -2646,7 +2646,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           />
         </div>
         <%!-- Feature Grid --%>
-        <div class="max-w-screen-xl mx-auto px-4">
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
             <%!-- Private Dock --%>
             <.feature_card title="Private Dock Access">
@@ -2698,7 +2698,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 navigate={
                   ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
                 }
-                class="px-8 py-3 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 transition-colors duration-150"
+                class="px-8 py-3 bg-blue-600 text-white text-sm font-bold rounded-sm hover:bg-blue-700 transition-colors duration-150"
               >
                 Sign In to Book
               </.link>
