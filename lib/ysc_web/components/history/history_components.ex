@@ -16,7 +16,10 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def history_masthead(assigns) do
     ~H"""
-    <div id="history-hero" class="max-w-(--breakpoint-xl) mx-auto px-4 mb-12 md:mb-16">
+    <div
+      id="history-hero"
+      class="max-w-(--breakpoint-xl) mx-auto px-4 mb-12 md:mb-16"
+    >
       <.page_masthead
         id="history-masthead"
         eyebrow="History"

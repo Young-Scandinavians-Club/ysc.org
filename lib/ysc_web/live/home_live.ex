@@ -1909,8 +1909,7 @@ defmodule YscWeb.HomeLive do
                 <div :if={!@async_data_loaded} class="space-y-6">
                   <%= for _i <- 1..3 do %>
                     <div class="flex gap-4 animate-pulse">
-                      <div class="w-16 h-16 rounded-md bg-zinc-200 shrink-0">
-                      </div>
+                      <div class="w-16 h-16 rounded-md bg-zinc-200 shrink-0"></div>
                       <div class="flex-1 space-y-2 pt-1">
                         <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
                         <div class="h-4 bg-zinc-200 rounded-sm w-3/4"></div>

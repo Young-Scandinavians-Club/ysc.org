@@ -30,7 +30,8 @@ defmodule YscWeb.TicketQrLive do
           <%= cond do %>
             <% @loading -> %>
               <div class="h-6 w-48 bg-white/10 rounded-sm animate-pulse"></div>
-              <div class="h-4 w-24 bg-white/10 rounded-sm animate-pulse mt-1.5"></div>
+              <div class="h-4 w-24 bg-white/10 rounded-sm animate-pulse mt-1.5">
+              </div>
             <% @load_error -> %>
               <p
                 id="event-title"

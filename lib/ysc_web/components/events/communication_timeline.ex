@@ -338,7 +338,8 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
     do: "bg-zinc-100 text-zinc-700 text-xs font-medium px-2.5 py-0.5 rounded-sm"
 
   defp badge_class("Event Page"),
-    do: "bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-sm"
+    do:
+      "bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-sm"
 
   defp badge_class("Email"),
     do: "bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-sm"

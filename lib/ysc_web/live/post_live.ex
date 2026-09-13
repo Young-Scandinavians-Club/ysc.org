@@ -159,8 +159,7 @@ defmodule YscWeb.PostLive do
             <div :if={!@comments_loaded && @n_comments > 0} class="space-y-4">
               <%= for _i <- 1..min(@n_comments, 3) do %>
                 <div class="flex gap-4 p-4 bg-zinc-50 rounded-lg animate-pulse">
-                  <div class="w-10 h-10 bg-zinc-200 rounded-full shrink-0">
-                  </div>
+                  <div class="w-10 h-10 bg-zinc-200 rounded-full shrink-0"></div>
                   <div class="flex-1 space-y-2">
                     <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
                     <div class="h-4 bg-zinc-200 rounded-sm w-full"></div>

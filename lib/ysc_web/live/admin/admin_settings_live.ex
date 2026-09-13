@@ -52,7 +52,11 @@ defmodule YscWeb.AdminSettingsLive do
           <.skeleton_block class="h-10 w-24 rounded-sm" />
         </div>
 
-        <div :if={!@loading_settings?} id="admin-settings" class="max-w-(--breakpoint-md)">
+        <div
+          :if={!@loading_settings?}
+          id="admin-settings"
+          class="max-w-(--breakpoint-md)"
+        >
           <.form for={@form} id="admin-settings-form" phx-submit="update-settings">
             <div :for={scope <- @scopes}>
               <h2 class="text-lg leading-8 font-semibold text-zinc-800">
@@ -100,7 +104,10 @@ defmodule YscWeb.AdminSettingsLive do
           </.form>
         </div>
 
-        <div id="google-photos-integration" class="w-full py-4 max-w-(--breakpoint-md)">
+        <div
+          id="google-photos-integration"
+          class="w-full py-4 max-w-(--breakpoint-md)"
+        >
           <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-3">
             Google Photos
           </h2>

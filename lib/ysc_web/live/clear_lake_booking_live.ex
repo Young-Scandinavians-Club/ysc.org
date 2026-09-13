@@ -1564,7 +1564,10 @@ defmodule YscWeb.ClearLakeBookingLive do
             {raw(@booking_disabled_reason)}
           </.warning_callout>
           <!-- Information Sections (Tab System) -->
-          <div id="information-section" class="mt-12 max-w-(--breakpoint-xl) mx-auto">
+          <div
+            id="information-section"
+            class="mt-12 max-w-(--breakpoint-xl) mx-auto"
+          >
             <!-- Tab Navigation (Sticky) -->
             <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-zinc-200 mb-8 -mx-4 px-4 py-2">
               <nav class="flex gap-2 overflow-x-auto" role="tablist">

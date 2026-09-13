@@ -21,7 +21,10 @@ defmodule YscWeb.NewsLive do
       </div>
 
       <%!-- Loading skeleton for featured post --%>
-      <div :if={!@async_data_loaded} class="max-w-(--breakpoint-xl) mx-auto px-4 mb-16">
+      <div
+        :if={!@async_data_loaded}
+        class="max-w-(--breakpoint-xl) mx-auto px-4 mb-16"
+      >
         <div class="animate-pulse">
           <div class="relative aspect-16/10 rounded-xl overflow-hidden bg-zinc-200">
             <div class="absolute inset-0 flex flex-col justify-end p-8 lg:p-12">

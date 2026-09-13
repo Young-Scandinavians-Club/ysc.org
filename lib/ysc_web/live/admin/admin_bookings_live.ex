@@ -2046,8 +2046,7 @@ defmodule YscWeb.AdminBookingsLive do
               <!-- Bookings Row Title (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
                 <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
-                  <div class="h-2 w-2 rounded-full bg-purple-500 shrink-0">
-                  </div>
+                  <div class="h-2 w-2 rounded-full bg-purple-500 shrink-0"></div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                     Guests
                   </div>
@@ -2781,7 +2780,10 @@ defmodule YscWeb.AdminBookingsLive do
         </div>
       </div>
 
-      <div :if={@current_section == :config} class="space-y-8 pb-16 max-w-(--breakpoint-lg)">
+      <div
+        :if={@current_section == :config}
+        class="space-y-8 pb-16 max-w-(--breakpoint-lg)"
+      >
         <!-- Door Codes Section -->
         <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
