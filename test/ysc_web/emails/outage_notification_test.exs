@@ -4,6 +4,7 @@ defmodule YscWeb.Emails.OutageNotificationTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Repo
+  alias Ysc.Bookings.CabinMaster
   alias YscWeb.Emails.OutageNotification
 
   describe "get_template_name/0 and get_subject/0" do
@@ -52,6 +53,14 @@ defmodule YscWeb.Emails.OutageNotificationTest do
                "not_a_real_property_xyz"
              ) ==
                nil
+    end
+
+    test "delegates lookup and mailbox to Bookings.CabinMaster" do
+      assert OutageNotification.get_cabin_master(:tahoe) ==
+               CabinMaster.get(:tahoe)
+
+      assert OutageNotification.get_cabin_master_email(:clear_lake) ==
+               CabinMaster.email(:clear_lake)
     end
   end
 

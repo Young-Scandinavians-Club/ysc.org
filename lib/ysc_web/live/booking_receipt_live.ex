@@ -1281,10 +1281,10 @@ defmodule YscWeb.BookingReceiptLive do
             @booking.property
           )} Cabin Master at
           <a
-            href={"mailto:#{get_cabin_master_email(@booking.property)}"}
+            href={"mailto:#{Ysc.EmailConfig.booking_reply_to(@booking.property)}"}
             class="text-blue-600 hover:text-blue-500 underline"
           >
-            {get_cabin_master_email(@booking.property)}
+            {Ysc.EmailConfig.booking_reply_to(@booking.property)}
           </a>
           .
         </p>
@@ -2572,14 +2572,6 @@ defmodule YscWeb.BookingReceiptLive do
       :tahoe -> ~p"/bookings/tahoe?tab=information&info_tab=rules#cabin-rules"
       :clear_lake -> ~p"/bookings/clear-lake?tab=information#cabin-rules"
       _ -> ~p"/"
-    end
-  end
-
-  defp get_cabin_master_email(property) do
-    case property do
-      :tahoe -> Ysc.EmailConfig.tahoe_email()
-      :clear_lake -> Ysc.EmailConfig.clear_lake_email()
-      _ -> "info@ysc.org"
     end
   end
 

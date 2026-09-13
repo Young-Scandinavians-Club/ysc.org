@@ -12,9 +12,8 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
     only: [absolute_url: 1, member_greeting_name: 1, format_date: 1]
 
   alias Ysc.Repo
-  alias Ysc.Bookings.PropertyDisplay
+  alias Ysc.Bookings.{CabinMaster, PropertyDisplay}
   alias YscWeb.BookingDisplay
-  alias YscWeb.Emails.OutageNotification
 
   def get_template_name() do
     "booking_checkout_reminder"
@@ -71,28 +70,7 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
     property_name = PropertyDisplay.short_name(booking.property)
     property_address = PropertyDisplay.address(booking.property)
 
-    # Get cabin master information
-    cabin_master = OutageNotification.get_cabin_master(booking.property)
-
-    cabin_master_name =
-      if cabin_master do
-        "#{cabin_master.first_name || ""} #{cabin_master.last_name || ""}"
-        |> String.trim()
-      else
-        nil
-      end
-
-    cabin_master_email =
-      OutageNotification.get_cabin_master_email(booking.property)
-
-    cabin_master_phone =
-      if cabin_master,
-        do:
-          Ysc.Extensions.PhoneNumber.format_for_display(
-            cabin_master.phone_number
-          ) ||
-            cabin_master.phone_number,
-        else: nil
+    contact = CabinMaster.contact(booking.property)
 
     # Format dates
     checkout_date = format_date(booking.checkout_date)
@@ -114,9 +92,9 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
       checkout_date: checkout_date,
       checkout_time: BookingDisplay.checkout_time_label(),
       booking_reference_id: booking.reference_id,
-      cabin_master_name: cabin_master_name,
-      cabin_master_email: cabin_master_email,
-      cabin_master_phone: cabin_master_phone,
+      cabin_master_name: contact.name,
+      cabin_master_email: contact.email,
+      cabin_master_phone: contact.phone,
       booking_url: booking_url(booking.id)
     }
   end

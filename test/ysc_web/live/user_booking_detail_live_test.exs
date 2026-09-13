@@ -942,6 +942,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert html =~ "Cancellation Policy"
       assert html =~ "will not receive a refund"
       assert html =~ "Lake Tahoe Cabin Master"
+      assert html =~ ~s(href="mailto:#{Ysc.EmailConfig.tahoe_email()}")
       refute html =~ "cabin volunteer contact"
     end
 

@@ -229,10 +229,10 @@ defmodule YscWeb.UserBookingDetailLive do
                             @booking.property
                           )} Cabin Master at
                           <.link
-                            href={"mailto:#{get_cabin_master_email(@booking.property)}"}
+                            href={"mailto:#{EmailConfig.booking_reply_to(@booking.property)}"}
                             class="text-blue-900 hover:text-blue-700 underline font-medium"
                           >
-                            {get_cabin_master_email(@booking.property)}
+                            {EmailConfig.booking_reply_to(@booking.property)}
                           </.link>
                           for help with cancellations and refunds.
                         </p>
@@ -249,10 +249,10 @@ defmodule YscWeb.UserBookingDetailLive do
                     If you need to cancel due to weather conditions or have other inquiries, please email the {PropertyDisplay.medium_name(
                       @booking.property
                     )} Cabin Master at <.link
-                      href={"mailto:#{get_cabin_master_email(@booking.property)}"}
+                      href={"mailto:#{EmailConfig.booking_reply_to(@booking.property)}"}
                       class="text-blue-900 hover:text-blue-700 underline font-medium"
                     >
-                    <%= get_cabin_master_email(@booking.property) %>
+                    <%= EmailConfig.booking_reply_to(@booking.property) %>
                   </.link>.
                   </p>
                 </div>
@@ -683,10 +683,6 @@ defmodule YscWeb.UserBookingDetailLive do
       nil
     end
   end
-
-  defp get_cabin_master_email(:tahoe), do: EmailConfig.tahoe_email()
-  defp get_cabin_master_email(:clear_lake), do: EmailConfig.clear_lake_email()
-  defp get_cabin_master_email(_), do: EmailConfig.contact_email()
 
   defp format_date(date, _timezone) do
     Timex.format!(date, "{WDfull}, {Mfull} {D}, {YYYY}")

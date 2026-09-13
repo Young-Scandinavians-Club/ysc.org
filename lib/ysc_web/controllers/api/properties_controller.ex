@@ -8,11 +8,9 @@ defmodule YscWeb.Api.PropertiesController do
   use YscWeb, :controller
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{PropertyDisplay, SeasonCache, SeasonHelpers}
-  alias Ysc.Extensions.PhoneNumber
+  alias Ysc.Bookings.{CabinMaster, PropertyDisplay, SeasonCache, SeasonHelpers}
   alias Ysc.Settings
   alias YscWeb.BookingDisplay
-  alias YscWeb.Emails.OutageNotification
 
   action_fallback YscWeb.Api.FallbackController
 
@@ -28,7 +26,7 @@ defmodule YscWeb.Api.PropertiesController do
   def info(conn, %{"property" => property})
       when property in @valid_properties do
     property_atom = String.to_existing_atom(property)
-    cabin_master = OutageNotification.get_cabin_master(property_atom)
+    cabin_master = CabinMaster.get(property_atom)
 
     settings = load_property_settings(property)
     static_info = static_property_info(property_atom, cabin_master)
@@ -329,27 +327,20 @@ defmodule YscWeb.Api.PropertiesController do
 
   defp build_cabin_master_content(nil, _property), do: ""
 
-  defp build_cabin_master_content(cabin_master, property) do
-    name =
-      "#{cabin_master.first_name || ""} #{cabin_master.last_name || ""}"
-      |> String.trim()
-
-    phone =
-      if cabin_master.phone_number do
-        PhoneNumber.format_for_display(cabin_master.phone_number) ||
-          cabin_master.phone_number
-      end
-
-    email = OutageNotification.get_cabin_master_email(property)
+  defp build_cabin_master_content(_cabin_master, property) do
+    contact = CabinMaster.contact(property)
 
     parts =
       []
-      |> maybe_append("**#{name}**", name != "")
-      |> maybe_append("Phone: #{phone}", phone)
-      |> maybe_append("Email: #{email}", email)
+      |> maybe_append("**#{contact.name}**", present?(contact.name))
+      |> maybe_append("Phone: #{contact.phone}", present?(contact.phone))
+      |> maybe_append("Email: #{contact.email}", present?(contact.email))
 
     Enum.join(parts, "\n\n")
   end
+
+  defp present?(value) when is_binary(value), do: value != ""
+  defp present?(_), do: false
 
   defp maybe_append(list, _item, val) when val == false or is_nil(val), do: list
   defp maybe_append(list, item, _), do: list ++ [item]
