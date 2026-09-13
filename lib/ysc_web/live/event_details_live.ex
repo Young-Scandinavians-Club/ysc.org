@@ -1146,15 +1146,15 @@ defmodule YscWeb.EventDetailsLive do
                 <span class="text-sm font-bold text-zinc-900">Don't forget</span>
                 <add-to-calendar-button
                   name={@event.title}
-                  startDate={date_for_add_to_cal(@event.start_date)}
-                  {if get_end_date_for_calendar(@event), do: [endDate: date_for_add_to_cal(get_end_date_for_calendar(@event))], else: []}
+                  start-date={date_for_add_to_cal(@event.start_date)}
+                  {if get_end_date_for_calendar(@event), do: ["end-date": date_for_add_to_cal(get_end_date_for_calendar(@event))], else: []}
                   options="'Apple','Google','iCal','Outlook.com','Yahoo'"
-                  startTime={@event.start_time}
-                  {if get_end_time_for_calendar(@event), do: [endTime: get_end_time_for_calendar(@event)], else: []}
-                  timeZone="America/Los_Angeles"
+                  start-time={@event.start_time}
+                  {if get_end_time_for_calendar(@event), do: ["end-time": get_end_time_for_calendar(@event)], else: []}
+                  time-zone="America/Los_Angeles"
                   location={@event.location_name}
                   size="4"
-                  lightMode="bodyScheme"
+                  light-mode="bodyScheme"
                 ></add-to-calendar-button>
               </div>
             </div>

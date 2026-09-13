@@ -1784,7 +1784,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
     end
 
-    test "a crafted amount-update event while QuickBooks export is in flight does not crash the LiveView",
+    test "a crafted amount-update event while QuickBooks export is in flight is rejected without crashing the LiveView",
          %{conn: conn} do
       member = user_fixture()
 
@@ -1797,6 +1797,9 @@ defmodule YscWeb.AdminMoneyLiveTest do
       |> element("#expense-inbox-review-#{report.id}")
       |> render_click()
 
+      # The export worker claims the row (approved + processing) while the
+      # treasurer's modal is still open. Edit pencils stay visible because
+      # the UI only hides them once paid — the mutation must still refuse.
       report
       |> Ecto.Changeset.change(%{
         status: "approved",
@@ -1922,7 +1925,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert is_nil(Repo.reload!(report).event_id)
     end
 
-    test "a crafted event-association change while QuickBooks export is in flight does not crash the LiveView",
+    test "a crafted event-association change while QuickBooks export is in flight is rejected without crashing the LiveView",
          %{conn: conn} do
       member = user_fixture()
       event = event_fixture()

@@ -5254,9 +5254,7 @@ defmodule YscWeb.AdminBookingsLive do
     date = Date.from_iso8601!(date_str)
 
     bookings =
-      Bookings.list_guests_staying_on_date(:clear_lake, date,
-        preload: [user: :current_avatar]
-      )
+      Bookings.list_guests_staying_on_date_for_admin(:clear_lake, date)
 
     {:noreply,
      socket
@@ -7618,10 +7616,10 @@ defmodule YscWeb.AdminBookingsLive do
           Bookings.list_blackouts(property, start_date, end_date)
         end),
         Task.async(fn ->
-          Bookings.list_bookings(property, start_date, end_date,
-            preload: [:rooms, user: :current_avatar],
-            exclude_statuses: [:canceled, :refunded],
-            exclude_booking_modes: [:day]
+          Bookings.list_bookings_for_admin_calendar(
+            property,
+            start_date,
+            end_date
           )
         end)
       ] ++

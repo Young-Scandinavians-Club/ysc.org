@@ -457,6 +457,7 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       refute html =~ "calendar-booking-continues-right"
       assert html =~ "Continues before view"
       refute html =~ "Continues after view"
+      assert html =~ "Spill Before"
     end
 
     test "shows right continuation when booking ends after the visible range",
@@ -473,6 +474,7 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       refute html =~ "calendar-booking-continues-left"
       assert html =~ "Continues after view"
       refute html =~ "Continues before view"
+      assert html =~ "Spill After"
     end
 
     test "shows both continuation edges when booking spans the entire visible range",
