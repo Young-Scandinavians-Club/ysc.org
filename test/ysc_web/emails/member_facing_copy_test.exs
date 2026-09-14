@@ -832,6 +832,51 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "View Expense Report"
       refute text =~ "reimbursement has been processed"
     end
+
+    test "labels offsets as money already received instead of income" do
+      html =
+        ExpenseReportConfirmation.render(%{
+          first_name: "Jane",
+          expense_report_url: "https://example.com/expensereport/preview",
+          expense_report: %{
+            id: "er-preview",
+            purpose: "Cabin supplies",
+            submitted_date: "September 1, 2026",
+            reimbursement_method: "Bank Transfer",
+            event: nil,
+            bank_account: nil,
+            expense_items: [
+              %{
+                vendor: "Costco",
+                description: "Event snacks",
+                date: "September 1, 2026",
+                amount: "$40.00",
+                mileage: false,
+                mileage_info: nil,
+                has_receipt: true
+              }
+            ],
+            income_items: [
+              %{
+                description: "Guest ticket cash",
+                date: "September 1, 2026",
+                amount: "$20.00",
+                has_proof: true
+              }
+            ],
+            expense_total: "$40.00",
+            income_total: "$20.00",
+            net_total: "$20.00"
+          }
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Money already received"
+      assert text =~ "Guest ticket cash"
+      refute text =~ "Income Items"
+      refute text =~ "Total Income"
+    end
   end
 
   defp html_text(html) do
