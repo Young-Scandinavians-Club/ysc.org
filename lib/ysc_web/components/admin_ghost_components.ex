@@ -13,7 +13,7 @@ defmodule YscWeb.AdminGhostComponents do
   attr :class, :string, default: nil
   attr :width, :string, default: "w-full", doc: "Tailwind width class"
   attr :height, :string, default: "h-3", doc: "Tailwind height class"
-  attr :rounded, :string, default: "rounded", doc: "Tailwind rounded class"
+  attr :rounded, :string, default: "rounded-sm", doc: "Tailwind rounded class"
 
   @doc "A single shimmering bar (title line, table cell, etc.)."
   def admin_ghost_bar(assigns) do
@@ -191,7 +191,7 @@ defmodule YscWeb.AdminGhostComponents do
             readonly
             tabindex="-1"
             placeholder="Search events, posts, tickets, users, bookings..."
-            class="block w-full pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded bg-zinc-50 pointer-events-none"
+            class="block w-full pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded-sm bg-zinc-50 pointer-events-none"
           />
         </div>
       </div>
@@ -244,7 +244,7 @@ defmodule YscWeb.AdminGhostComponents do
 
       <div
         id="dashboard-events-timeline"
-        class="bg-white rounded border border-zinc-200 p-5 sm:p-6 shadow-sm mb-8"
+        class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs mb-8"
       >
         <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-3">
           <h2 class="text-lg font-black text-zinc-900 tracking-tight">
@@ -258,7 +258,7 @@ defmodule YscWeb.AdminGhostComponents do
             id={if(idx == 0, do: "ghost-dashboard-event-primary", else: nil)}
             class="relative pl-6 sm:pl-8 pb-8 last:pb-0"
           >
-            <span class="absolute -left-[7px] sm:-left-[9px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm bg-blue-600 z-10"></span>
+            <span class="absolute left-[-7px] sm:left-[-9px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-xs bg-blue-600 z-10"></span>
             <div class="rounded-xl border border-zinc-200 p-4 sm:p-5 bg-zinc-50/40">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div class="min-w-0 flex-1">
@@ -297,7 +297,7 @@ defmodule YscWeb.AdminGhostComponents do
                   </div>
                   <div class="w-full bg-zinc-200/80 h-2 rounded-full overflow-hidden">
                     <div
-                      class="admin-ghost-tier-progress-fill bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full"
+                      class="admin-ghost-tier-progress-fill bg-linear-to-r from-blue-600 to-indigo-600 h-full rounded-full"
                       style={"--admin-ghost-tier-progress: #{tier_progress_pct(tier)}%"}
                     >
                     </div>
@@ -311,7 +311,7 @@ defmodule YscWeb.AdminGhostComponents do
 
       <div
         id="dashboard-recent-discussions"
-        class="bg-white rounded border border-zinc-200 p-5 shadow-sm mb-4"
+        class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs mb-4"
       >
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-black text-zinc-900 uppercase tracking-widest">
@@ -723,7 +723,7 @@ defmodule YscWeb.AdminGhostComponents do
 
       <.admin_check_in_search_section width={:wide}>
         <div id="ghost-check-in-search-form" class="relative" role="search">
-          <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+          <div class="absolute inset-y-0 inset-s-0 flex items-center ps-3 pointer-events-none">
             <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
           </div>
           <input
@@ -732,7 +732,7 @@ defmodule YscWeb.AdminGhostComponents do
             readonly
             tabindex="-1"
             placeholder="Search by name, email, ORD-xxx, or TKT-xxx…"
-            class="block w-full pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded bg-zinc-50 pointer-events-none"
+            class="block w-full pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded-sm bg-zinc-50 pointer-events-none"
           />
         </div>
         <.admin_check_in_keyboard_hints quick_range="1–8" order_shortcut />
@@ -746,7 +746,7 @@ defmodule YscWeb.AdminGhostComponents do
             </.admin_section_heading>
           </div>
 
-          <div class="hidden md:block bg-white rounded border border-zinc-200">
+          <div class="hidden md:block bg-white rounded-sm border border-zinc-200">
             <.admin_event_check_in_table_header />
 
             <div :for={group <- @pending_groups}>
@@ -777,7 +777,7 @@ defmodule YscWeb.AdminGhostComponents do
             </.admin_section_heading>
           </div>
 
-          <div class="hidden md:block bg-white rounded border border-zinc-200">
+          <div class="hidden md:block bg-white rounded-sm border border-zinc-200">
             <.admin_event_check_in_checked_in_row
               :for={ticket <- @checked_in}
               variant={:desktop}
@@ -809,7 +809,7 @@ defmodule YscWeb.AdminGhostComponents do
       <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div class="flex items-center justify-between mb-6">
           <h1 class="text-2xl font-semibold text-zinc-800">Check-in &amp; Scan</h1>
-          <span class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold border border-zinc-200 text-zinc-700 bg-white">
+          <span class="inline-flex items-center rounded-sm py-2 px-3 text-sm font-semibold border border-zinc-200 text-zinc-700 bg-white">
             <.icon name="hero-clock" class="w-4 h-4 -mt-0.5 me-1" /> Past Sessions
           </span>
         </div>
@@ -818,7 +818,7 @@ defmodule YscWeb.AdminGhostComponents do
           <div id="ghost-scanner-setup" class="space-y-4 max-w-lg">
             <div
               id="ghost-scanner-resume"
-              class="bg-white rounded-xl border border-green-200 p-4 shadow-sm"
+              class="bg-white rounded-xl border border-green-200 p-4 shadow-xs"
             >
               <h2 class="text-sm font-semibold text-green-800 mb-3 flex items-center gap-1.5">
                 <.icon name="hero-arrow-path" class="w-4 h-4" />
@@ -842,7 +842,7 @@ defmodule YscWeb.AdminGhostComponents do
               </div>
             </div>
 
-            <div class="bg-white rounded-xl border border-zinc-200 p-5 shadow-sm">
+            <div class="bg-white rounded-xl border border-zinc-200 p-5 shadow-xs">
               <h2 class="text-lg font-semibold text-zinc-800 mb-4">
                 Start a Check-in Session
               </h2>
@@ -901,13 +901,13 @@ defmodule YscWeb.AdminGhostComponents do
             id="ghost-scanner-phone"
             class="mx-auto lg:mx-0 lg:pt-4 w-[280px] shrink-0"
           >
-            <div class="rounded-[2.25rem] border-[10px] border-zinc-900 bg-zinc-900 shadow-2xl">
-              <div class="rounded-[1.65rem] overflow-hidden bg-black aspect-[9/19] relative">
+            <div class="rounded-[2.25rem] border-10 border-zinc-900 bg-zinc-900 shadow-2xl">
+              <div class="rounded-[1.65rem] overflow-hidden bg-black aspect-9/19 relative">
                 <div class="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-zinc-900 rounded-b-2xl z-30 pointer-events-none">
                 </div>
 
                 <div class="absolute inset-0 flex flex-col bg-black">
-                  <div class="absolute top-0 inset-x-0 z-20 px-3 pt-8 pb-12 bg-gradient-to-b from-blue-950/95 to-transparent">
+                  <div class="absolute top-0 inset-x-0 z-20 px-3 pt-8 pb-12 bg-linear-to-b from-blue-950/95 to-transparent">
                     <div class="flex items-center justify-between gap-2">
                       <div class="flex items-center gap-2 text-white min-w-0">
                         <.icon name="hero-ticket" class="w-4 h-4 shrink-0" />
@@ -936,7 +936,7 @@ defmodule YscWeb.AdminGhostComponents do
                     id="ghost-scanner-viewfinder"
                     class="flex-1 relative bg-zinc-900"
                   >
-                    <div class="absolute inset-0 bg-gradient-to-b from-zinc-800 via-zinc-900 to-zinc-950">
+                    <div class="absolute inset-0 bg-linear-to-b from-zinc-800 via-zinc-900 to-zinc-950">
                     </div>
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div class="relative w-40 h-40">
@@ -1004,7 +1004,7 @@ defmodule YscWeb.AdminGhostComponents do
     <div
       id="ghost-newsletter-email-preview"
       class={[
-        "flex flex-col min-h-[420px] rounded-xl border border-zinc-200 overflow-hidden shadow-sm",
+        "flex flex-col min-h-[420px] rounded-xl border border-zinc-200 overflow-hidden shadow-xs",
         @class
       ]}
     >
@@ -1023,8 +1023,8 @@ defmodule YscWeb.AdminGhostComponents do
         </div>
       </div>
       <div class="flex-1 overflow-hidden bg-zinc-100 px-2 py-3 sm:px-3 sm:py-4">
-        <div class="mx-auto bg-white rounded-lg overflow-hidden shadow-sm">
-          <.admin_ghost_image ratio="aspect-[2/1]" class="rounded-none" />
+        <div class="mx-auto bg-white rounded-lg overflow-hidden shadow-xs">
+          <.admin_ghost_image ratio="aspect-2/1" class="rounded-none" />
           <div class="px-5 sm:px-8 pt-8 pb-4 space-y-2.5">
             <.admin_ghost_bar width="w-4/5" height="h-5" />
             <.admin_ghost_bar width="w-full" height="h-2.5" />
@@ -1036,7 +1036,7 @@ defmodule YscWeb.AdminGhostComponents do
             <div class="flex gap-3 pb-5">
               <.admin_ghost_image
                 class="w-[38%] shrink-0 rounded-lg"
-                ratio="aspect-[4/3]"
+                ratio="aspect-4/3"
               />
               <div class="flex-1 min-w-0 space-y-2 py-0.5">
                 <.admin_ghost_bar width="w-full" height="h-3" />
@@ -1051,7 +1051,7 @@ defmodule YscWeb.AdminGhostComponents do
               Upcoming events
             </p>
             <div class="mt-2 mb-4 border-t border-zinc-200"></div>
-            <.admin_ghost_image ratio="aspect-[21/9]" class="rounded-lg mb-3" />
+            <.admin_ghost_image ratio="aspect-21/9" class="rounded-lg mb-3" />
             <.admin_ghost_bar width="w-2/3" height="h-3.5" />
             <.admin_ghost_bar width="w-2/5" height="h-2.5" class="mt-2" />
             <span class="inline-block mt-3 rounded-md bg-blue-700 text-white text-xs sm:text-sm font-semibold px-4 py-2">
@@ -1088,7 +1088,7 @@ defmodule YscWeb.AdminGhostComponents do
         </div>
         <span
           :if={@position}
-          class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm"
+          class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-xs"
         >
           {@position}
         </span>
@@ -1123,7 +1123,7 @@ defmodule YscWeb.AdminGhostComponents do
       <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0 flex-1 space-y-1">
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <h1 class="text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl break-words">
+            <h1 class="text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl wrap-break-word">
               {@event_title}
             </h1>
             <.badge type={YscWeb.AdminBadgeHelpers.event_state_badge_type(@state)}>
@@ -1149,7 +1149,7 @@ defmodule YscWeb.AdminGhostComponents do
           </div>
         </div>
 
-        <div class="flex flex-shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
+        <div class="flex shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
           <.button
             :if={@state in [:draft, :scheduled]}
             color="blue"
@@ -1242,7 +1242,7 @@ defmodule YscWeb.AdminGhostComponents do
     <div
       id={@id}
       class={[
-        "border border-zinc-200 rounded py-6 px-4 space-y-4 bg-white",
+        "border border-zinc-200 rounded-sm py-6 px-4 space-y-4 bg-white",
         @class
       ]}
     >
@@ -1262,7 +1262,7 @@ defmodule YscWeb.AdminGhostComponents do
     ~H"""
     <div
       id="ghost-event-agenda-card"
-      class={["bg-zinc-100 rounded-lg flex-shrink-0 w-72 flex flex-col", @class]}
+      class={["bg-zinc-100 rounded-lg shrink-0 w-72 flex flex-col", @class]}
     >
       <div class="flex items-center justify-center py-1.5 rounded-t-lg bg-zinc-200/80">
         <div class="flex flex-col gap-0.5">
@@ -1281,7 +1281,7 @@ defmodule YscWeb.AdminGhostComponents do
             :for={{time, idx} <- [{"17:00", 0}, {"18:30", 1}, {"20:00", 2}]}
             class="flex gap-2 items-start rounded-md bg-white border border-zinc-200 px-2 py-2"
           >
-            <span class="text-xs font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded shrink-0">
+            <span class="text-xs font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-sm shrink-0">
               {time}
             </span>
             <div class="flex-1 min-w-0 space-y-1">
@@ -1431,7 +1431,7 @@ defmodule YscWeb.AdminGhostComponents do
     <aside
       id="ghost-public-ticket-sidebar"
       class={[
-        "bg-white rounded-xl border border-zinc-100 overflow-hidden shadow-sm",
+        "bg-white rounded-xl border border-zinc-100 overflow-hidden shadow-xs",
         @class
       ]}
     >
@@ -1660,14 +1660,14 @@ defmodule YscWeb.AdminGhostComponents do
         </div>
         <div :for={{item, idx} <- Enum.with_index(@items)} class="relative group">
           <div class={[
-            "absolute -left-[25px] w-4 h-4 rounded-full border-4 border-white shadow-sm z-10 mt-1.5",
+            "absolute left-[-25px] w-4 h-4 rounded-full border-4 border-white shadow-xs z-10 mt-1.5",
             idx == 0 && "bg-blue-600",
             idx != 0 && "bg-zinc-200"
           ]}>
           </div>
           <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
             <div class="w-36 shrink-0">
-              <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded uppercase tracking-widest whitespace-nowrap">
+              <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm uppercase tracking-widest whitespace-nowrap">
                 {item.time}
               </span>
             </div>
@@ -1702,7 +1702,7 @@ defmodule YscWeb.AdminGhostComponents do
               id="ghost-post-editor-title"
               class="flex min-w-0 w-max max-w-full items-center"
             >
-              <span class="font-extrabold text-2xl leading-7 text-zinc-900 sm:text-3xl sm:leading-8 break-words">
+              <span class="font-extrabold text-2xl leading-7 text-zinc-900 sm:text-3xl sm:leading-8 wrap-break-word">
                 {@title}
               </span>
             </div>
@@ -1783,10 +1783,10 @@ defmodule YscWeb.AdminGhostComponents do
     body_class =
       case assigns.variant do
         :post ->
-          "trix-content block mt-8 max-w-2xl mx-auto px-8 py-8 bg-white border-0 text-wrap min-h-[14rem]"
+          "trix-content block mt-8 max-w-2xl mx-auto px-8 py-8 bg-white border-0 text-wrap min-h-56"
 
         :event ->
-          "trix-content block px-4 py-2 bg-white border-zinc-200 border-l border-b border-r text-wrap min-h-[9rem]"
+          "trix-content block px-4 py-2 bg-white border-zinc-200 border-l border-b border-r text-wrap min-h-36"
       end
 
     assigns =

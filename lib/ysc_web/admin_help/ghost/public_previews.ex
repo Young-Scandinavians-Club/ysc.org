@@ -48,7 +48,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
     ~H"""
     <.public_page_shell label="Club News">
       <div class="mb-10 rounded-xl overflow-hidden border border-zinc-100 bg-white">
-        <.admin_ghost_image ratio="aspect-[16/10]" class="rounded-none" />
+        <.admin_ghost_image ratio="aspect-16/10" class="rounded-none" />
         <div class="p-5 space-y-3 sm:hidden">
           <.admin_ghost_bar width="w-3/4" height="h-5" />
           <.admin_ghost_bar width="w-full" height="h-3" />
@@ -57,9 +57,9 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
       <div class="grid md:grid-cols-2 gap-6">
         <div
           id="ghost-new-post-card"
-          class="rounded-xl border-2 border-blue-400 bg-white p-2 shadow-sm ring-2 ring-blue-100"
+          class="rounded-xl border-2 border-blue-400 bg-white p-2 shadow-xs ring-2 ring-blue-100"
         >
-          <.admin_ghost_image class="rounded-lg mb-4" ratio="aspect-[16/10]" />
+          <.admin_ghost_image class="rounded-lg mb-4" ratio="aspect-16/10" />
           <div class="px-3 pb-4 space-y-2">
             <p class="text-xs font-black text-blue-600 uppercase tracking-widest">
               New
@@ -69,7 +69,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
           </div>
         </div>
         <div :for={_ <- 1..2} class="rounded-xl border border-zinc-100 bg-white p-2">
-          <.admin_ghost_image class="rounded-lg mb-4" ratio="aspect-[16/10]" />
+          <.admin_ghost_image class="rounded-lg mb-4" ratio="aspect-16/10" />
           <div class="px-3 pb-4 space-y-2">
             <.admin_ghost_bar width="w-2/3" height="h-4" />
             <.admin_ghost_bar width="w-full" height="h-3" />
@@ -87,20 +87,20 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         id="ghost-pinned-hero"
         class="relative rounded-xl overflow-hidden border-2 border-amber-300 ring-2 ring-amber-100"
       >
-        <.admin_ghost_image ratio="aspect-[16/10]" class="rounded-none" />
-        <div class="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/30 to-transparent">
+        <.admin_ghost_image ratio="aspect-16/10" class="rounded-none" />
+        <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/30 to-transparent">
         </div>
         <div class="absolute bottom-0 left-0 right-0 p-6 lg:p-10 space-y-3">
-          <span class="inline-flex items-center gap-1 rounded bg-amber-50/90 px-2.5 py-1 text-xs font-black uppercase tracking-widest text-amber-700 border border-amber-200">
+          <span class="inline-flex items-center gap-1 rounded-sm bg-amber-50/90 px-2.5 py-1 text-xs font-black uppercase tracking-widest text-amber-700 border border-amber-200">
             <.icon name="hero-star-solid" class="w-3 h-3" /> Pinned News
           </span>
-          <.admin_ghost_bar width="w-2/3" height="h-6" class="!bg-zinc-300/80" />
-          <.admin_ghost_bar width="w-1/2" height="h-3" class="!bg-zinc-400/60" />
+          <.admin_ghost_bar width="w-2/3" height="h-6" class="bg-zinc-300/80!" />
+          <.admin_ghost_bar width="w-1/2" height="h-3" class="bg-zinc-400/60!" />
         </div>
       </div>
       <div class="mt-8 grid md:grid-cols-2 gap-6 opacity-60">
         <div :for={_ <- 1..2} class="rounded-xl border border-zinc-100 bg-white p-2">
-          <.admin_ghost_image class="rounded-lg mb-4" ratio="aspect-[16/10]" />
+          <.admin_ghost_image class="rounded-lg mb-4" ratio="aspect-16/10" />
           <div class="px-3 pb-4">
             <.admin_ghost_bar width="w-2/3" height="h-4" />
           </div>
@@ -151,19 +151,19 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
       <div class="grid lg:grid-cols-12 gap-6">
         <div class="lg:col-span-9 space-y-6">
           <div class="rounded-2xl overflow-hidden border border-zinc-100 bg-white">
-            <.admin_ghost_image ratio="aspect-[16/10]" class="rounded-none" />
+            <.admin_ghost_image ratio="aspect-16/10" class="rounded-none" />
           </div>
           <div class="grid md:grid-cols-2 gap-4">
             <div
               id="ghost-new-event-card"
               class="rounded-xl border-2 border-blue-400 bg-white p-2 ring-2 ring-blue-100"
             >
-              <.admin_ghost_image class="rounded-lg mb-3" ratio="aspect-[16/10]" />
+              <.admin_ghost_image class="rounded-lg mb-3" ratio="aspect-16/10" />
               <.admin_ghost_bar width="w-4/5" height="h-4" />
               <.admin_ghost_bar width="w-1/2" height="h-2.5" class="mt-2" />
             </div>
             <div class="rounded-xl border border-zinc-100 bg-white p-2">
-              <.admin_ghost_image class="rounded-lg mb-3" ratio="aspect-[16/10]" />
+              <.admin_ghost_image class="rounded-lg mb-3" ratio="aspect-16/10" />
               <.admin_ghost_bar width="w-3/4" height="h-4" />
             </div>
           </div>
@@ -187,7 +187,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
     <.public_page_shell show_header?={false} wide?={true}>
       <div class="relative mb-16 lg:mb-24">
         <div class="rounded-2xl overflow-hidden">
-          <.admin_ghost_image ratio="aspect-[21/9]" class="rounded-2xl" />
+          <.admin_ghost_image ratio="aspect-21/9" class="rounded-2xl" />
         </div>
         <div class="relative -mt-12 mx-2 lg:-mt-16 lg:mx-4 z-10">
           <div class="bg-white rounded-xl shadow-md border border-zinc-100 p-6 lg:p-8 space-y-3">
@@ -205,7 +205,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         </div>
       </div>
 
-      <div class="max-w-screen-xl mx-auto px-2 grid lg:grid-cols-12 gap-6 -mt-6">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-2 grid lg:grid-cols-12 gap-6 -mt-6">
         <div class="lg:col-span-8 max-w-3xl space-y-10 pt-4">
           <.admin_ghost_public_agenda_timeline />
 
@@ -231,7 +231,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
   defp public_event_tickets(assigns) do
     ~H"""
     <div class="admin-help-ghost-public min-h-full bg-white py-6 px-4">
-      <div class="max-w-screen-xl mx-auto">
+      <div class="max-w-(--breakpoint-xl) mx-auto">
         <div class="mb-4">
           <.admin_ghost_bar width="w-1/2" height="h-5" class="max-w-md" />
           <p class="text-sm text-zinc-500 mt-2">
@@ -240,7 +240,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         </div>
         <div class="grid lg:grid-cols-12 gap-6 items-start">
           <div class="lg:col-span-8 space-y-4">
-            <.admin_ghost_image ratio="aspect-[21/9]" class="rounded-2xl" />
+            <.admin_ghost_image ratio="aspect-21/9" class="rounded-2xl" />
             <.admin_ghost_bar width="w-2/3" height="h-4" />
             <.admin_ghost_bar width="w-full" height="h-3" />
           </div>
@@ -306,7 +306,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
     <.public_page_shell show_header?={false} wide?={true}>
       <div class="relative mb-12 lg:mb-20">
         <div class="rounded-2xl overflow-hidden">
-          <.admin_ghost_image ratio="aspect-[21/9]" class="rounded-2xl" />
+          <.admin_ghost_image ratio="aspect-21/9" class="rounded-2xl" />
         </div>
         <div class="relative -mt-10 mx-2 lg:-mt-14 lg:mx-4 z-10">
           <div class="bg-white rounded-xl shadow-md border border-zinc-100 p-5 lg:p-7 space-y-2">
@@ -324,7 +324,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         </div>
       </div>
 
-      <div class="max-w-screen-xl mx-auto px-2 grid lg:grid-cols-12 gap-6 -mt-4">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-2 grid lg:grid-cols-12 gap-6 -mt-4">
         <div class="lg:col-span-8 max-w-3xl space-y-10 pt-2">
           <.admin_ghost_public_agenda_timeline class="space-y-6" />
 
@@ -389,7 +389,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         </p>
         <.admin_ghost_bar width="w-3/4" height="h-6" />
       </div>
-      <div class="max-w-2xl mx-auto rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+      <div class="max-w-2xl mx-auto rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
         <.admin_ghost_image ratio="aspect-video" class="rounded-none" />
         <div class="p-6 space-y-4">
           <.admin_ghost_bar width="w-full" height="h-3" />
@@ -403,7 +403,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
               class="flex gap-3 p-3 rounded-lg border border-zinc-100"
             >
               <.admin_ghost_image
-                class="w-20 shrink-0 rounded"
+                class="w-20 shrink-0 rounded-sm"
                 ratio="aspect-square"
               />
               <div class="flex-1 space-y-2">
@@ -433,7 +433,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
       assign(
         assigns,
         :content_width,
-        if(assigns.wide?, do: "max-w-screen-xl", else: "max-w-4xl")
+        if(assigns.wide?, do: "max-w-(--breakpoint-xl)", else: "max-w-4xl")
       )
 
     ~H"""

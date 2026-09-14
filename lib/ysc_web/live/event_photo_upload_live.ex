@@ -243,7 +243,7 @@ defmodule YscWeb.EventPhotoUploadLive do
               </div>
             </div>
 
-            <div class="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
+            <div class="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur-sm">
               <p
                 :if={
                   @uploads.photos.entries != [] and
@@ -482,7 +482,7 @@ defmodule YscWeb.EventPhotoUploadLive do
     ~H"""
     <div
       id="event-photo-thanks-intro"
-      class="rounded-2xl border border-zinc-200 bg-white px-6 py-8 text-center shadow-sm"
+      class="rounded-2xl border border-zinc-200 bg-white px-6 py-8 text-center shadow-xs"
     >
       <p class="text-sm font-medium uppercase tracking-wide text-blue-700">
         Thank you for being there

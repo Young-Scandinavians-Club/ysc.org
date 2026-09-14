@@ -58,7 +58,7 @@ defmodule YscWeb.NewsletterComponents do
               name="email"
               autocomplete="email"
               value={@email}
-              class="w-full px-4 py-3 border border-zinc-300 rounded text-zinc-900 focus:ring-2 focus:ring-blue-700 focus:border-blue-700 bg-white"
+              class="w-full px-4 py-3 border border-zinc-300 rounded-sm text-zinc-900 focus:ring-2 focus:ring-blue-700 focus:border-blue-700 bg-white"
               placeholder="Email address"
               required
               disabled={@submitted}
@@ -202,7 +202,7 @@ defmodule YscWeb.NewsletterComponents do
         class={
           if(@subscribed,
             do:
-              "shrink-0 px-4 py-2 text-sm !bg-white !text-zinc-700 border border-zinc-300 hover:!bg-zinc-100",
+              "shrink-0 px-4 py-2 text-sm bg-white! text-zinc-700! border border-zinc-300 hover:bg-zinc-100!",
             else: "shrink-0 px-4 py-2 text-sm"
           )
         }

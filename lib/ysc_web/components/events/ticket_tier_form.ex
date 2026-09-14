@@ -180,7 +180,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
                     @form[:requires_registration].value
                   )
                 }
-                class="mt-1 rounded border-zinc-300 text-sky-700 focus:ring-0"
+                class="mt-1 rounded-sm border-zinc-300 text-sky-700 focus:ring-0"
               />
               <span class="flex flex-col gap-0.5">
                 <span class="flex items-center gap-2 font-medium text-sky-900">
@@ -223,7 +223,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
                     @form[:member_only].value
                   )
                 }
-                class="mt-1 rounded border-zinc-300 text-violet-700 focus:ring-0"
+                class="mt-1 rounded-sm border-zinc-300 text-violet-700 focus:ring-0"
               />
               <span class="flex flex-col gap-0.5">
                 <span class="flex items-center gap-2 font-medium text-violet-900">

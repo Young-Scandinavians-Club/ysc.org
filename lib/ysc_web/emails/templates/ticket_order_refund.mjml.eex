@@ -53,7 +53,7 @@
     <!-- Refunded Tickets -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refunded Tickets</mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Order Reference:
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Order number:
       <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
         <%= @ticket_order.reference_id %>
       </span>
@@ -81,8 +81,8 @@
       </tr>
     </mj-table>
     <mj-spacer height="24px"></mj-spacer>
-    <!-- Refunded Ticket References -->
-    <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold">Refunded Ticket Reference Numbers</mj-text>
+    <!-- Refunded ticket numbers -->
+    <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold">Refunded ticket numbers</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The following tickets have been refunded and cancelled:</mj-text>
     <mj-spacer height="8px"></mj-spacer>

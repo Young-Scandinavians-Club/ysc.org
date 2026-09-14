@@ -19,7 +19,7 @@ defmodule YscWeb.AdminSearchComponent do
         phx-target={@myself}
         class="relative"
       >
-        <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
+        <div class="absolute inset-y-0 rtl:inset-r-0 inset-s-0 flex items-center ps-3 pointer-events-none">
           <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
         </div>
         <input
@@ -34,7 +34,7 @@ defmodule YscWeb.AdminSearchComponent do
           spellcheck="false"
           placeholder="Search events, posts, tickets, users, bookings..."
           tabindex="0"
-          class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
+          class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded-sm w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
         />
       </form>
 

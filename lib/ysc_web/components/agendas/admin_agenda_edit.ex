@@ -18,7 +18,7 @@ defmodule YscWeb.AgendaEditComponent do
         class="relative z-10 mb-4 rounded-md bg-amber-50 p-3 border border-amber-200"
       >
         <div class="flex">
-          <div class="flex-shrink-0">
+          <div class="shrink-0">
             <.icon name="hero-exclamation-triangle" class="h-5 w-5 text-amber-400" />
           </div>
           <div class="ml-3">
@@ -66,16 +66,16 @@ defmodule YscWeb.AgendaEditComponent do
               phx-submit="save"
               phx-value-id={form.data.id}
               phx-target={@myself}
-              class="relative flex flex-col sm:flex-row sm:items-start gap-3 p-3 -mx-3 rounded-xl border border-transparent hover:bg-zinc-50 hover:border-zinc-200 focus-within:bg-white focus-within:border-blue-200 focus-within:shadow-sm transition-all group/form drag-ghost:opacity-0"
+              class="relative flex flex-col sm:flex-row sm:items-start gap-3 p-3 -mx-3 rounded-xl border border-transparent hover:bg-zinc-50 hover:border-zinc-200 focus-within:bg-white focus-within:border-blue-200 focus-within:shadow-xs transition-all group/form drag-ghost:opacity-0"
             >
               <!-- Drag Handle (Appears on hover) -->
-              <div class="absolute -left-9 top-4 text-zinc-300 hover:text-zinc-600 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity drag-handle bg-white rounded">
+              <div class="absolute -left-9 top-4 text-zinc-300 hover:text-zinc-600 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity drag-handle bg-white rounded-sm">
                 <.icon name="hero-arrows-up-down" class="w-5 h-5 block" />
               </div>
 
               <!-- Time Inputs (Styled as the blue pill) -->
-              <div class="w-full sm:w-52 flex-shrink-0">
-                <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-0.5 bg-blue-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500 px-2 py-1 rounded transition-all overflow-hidden">
+              <div class="w-full sm:w-52 shrink-0">
+                <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-0.5 bg-blue-50 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500 px-2 py-1 rounded-sm transition-all overflow-hidden">
                   <input
                     type="time"
                     name={form[:start_time].name}
@@ -134,7 +134,7 @@ defmodule YscWeb.AgendaEditComponent do
                   name={form[:title].name}
                   rows="1"
                   phx-hook="AutoResizeTextarea"
-                  class="block w-full text-lg font-black text-zinc-900 tracking-tight leading-tight bg-transparent border-none p-0 focus:ring-0 placeholder:text-zinc-300 transition-colors focus:text-blue-600 resize-none overflow-hidden whitespace-pre-wrap break-words"
+                  class="block w-full text-lg font-black text-zinc-900 tracking-tight leading-tight bg-transparent border-none p-0 focus:ring-0 placeholder:text-zinc-300 transition-colors focus:text-blue-600 resize-none overflow-hidden whitespace-pre-wrap wrap-break-word"
                   placeholder="Agenda Item Title"
                   phx-mounted={!form.data.id && JS.focus()}
                   phx-keydown={!form.data.id && JS.push("discard", target: @myself)}
@@ -148,7 +148,7 @@ defmodule YscWeb.AgendaEditComponent do
                   name={form[:description].name}
                   rows="1"
                   phx-hook="AutoResizeTextarea"
-                  class="block w-full text-sm text-zinc-500 font-normal mt-2 leading-relaxed bg-transparent border-none p-0 focus:ring-0 placeholder:text-zinc-300 resize-none overflow-hidden whitespace-pre-wrap break-words"
+                  class="block w-full text-sm text-zinc-500 font-normal mt-2 leading-relaxed bg-transparent border-none p-0 focus:ring-0 placeholder:text-zinc-300 resize-none overflow-hidden whitespace-pre-wrap wrap-break-word"
                   placeholder="Add a description... (optional)"
                   phx-keydown={!form.data.id && JS.push("discard", target: @myself)}
                   phx-key="escape"
@@ -164,7 +164,7 @@ defmodule YscWeb.AgendaEditComponent do
                   JS.push("delete", target: @myself, value: %{id: form.data.id})
                   |> hide("##{id}")
                 }
-                class="absolute top-3 right-3 opacity-0 group-hover/form:opacity-100 text-zinc-400 hover:text-red-500 transition-all bg-white hover:bg-red-50 rounded p-1.5 shadow-sm border border-zinc-200"
+                class="absolute top-3 right-3 opacity-0 group-hover/form:opacity-100 text-zinc-400 hover:text-red-500 transition-all bg-white hover:bg-red-50 rounded-sm p-1.5 shadow-xs border border-zinc-200"
               >
                 <.icon name="hero-trash" class="w-4 h-4 block" />
               </button>

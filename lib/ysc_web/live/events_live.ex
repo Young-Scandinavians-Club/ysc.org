@@ -14,7 +14,7 @@ defmodule YscWeb.EventsLive do
     ~H"""
     <div class="py-6 md:py-12">
       <%!-- The "Masthead" Header --%>
-      <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-8 md:mb-16">
         <.page_masthead
           eyebrow="Events"
           title={
@@ -24,7 +24,7 @@ defmodule YscWeb.EventsLive do
       </div>
 
       <%!-- Hero and Event List (handled by component) --%>
-      <div class="max-w-screen-xl mx-auto px-4">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
           <%!-- Events Grid --%>
           <div class="lg:col-span-9 min-h-[50vh] lg:min-h-[70vh] flex flex-col">
@@ -138,8 +138,8 @@ defmodule YscWeb.EventsLive do
         :if={!@async_data_loaded}
         class="mt-20 md:mt-32 py-12 md:py-16 border-t border-zinc-100"
       >
-        <div class="max-w-screen-xl mx-auto px-4">
-          <div class="h-8 w-48 bg-zinc-200 rounded mb-12 animate-pulse"></div>
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4">
+          <div class="h-8 w-48 bg-zinc-200 rounded-sm mb-12 animate-pulse"></div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <%= for _i <- 1..4 do %>
               <div class="aspect-video rounded-xl bg-zinc-200 animate-pulse"></div>
@@ -151,7 +151,7 @@ defmodule YscWeb.EventsLive do
       <%!-- Memory Gallery - Past Events --%>
       <%= if @async_data_loaded && @past_events_exist do %>
         <section class="mt-20 md:mt-32 py-12 md:py-16 border-t border-zinc-100">
-          <div class="max-w-screen-xl mx-auto px-4">
+          <div class="max-w-(--breakpoint-xl) mx-auto px-4">
             <h2 class="text-3xl font-black text-zinc-800 tracking-tighter italic mb-12 group relative inline-block">
               <span class="inline-block transition-all duration-500 ease-in-out group-hover:-translate-y-full group-hover:opacity-0">
                 {random_past_events_title()}
@@ -184,9 +184,9 @@ defmodule YscWeb.EventsLive do
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />
                     <%!-- Title overlay — always visible --%>
-                    <div class="absolute inset-0 z-[2] bg-gradient-to-t from-zinc-900/70 via-zinc-900/20 to-transparent">
+                    <div class="absolute inset-0 z-2 bg-linear-to-t from-zinc-900/70 via-zinc-900/20 to-transparent">
                     </div>
-                    <div class="absolute bottom-0 left-0 right-0 z-[3] p-3">
+                    <div class="absolute bottom-0 left-0 right-0 z-3 p-3">
                       <h4 class="text-white text-sm font-black leading-tight line-clamp-2">
                         {event.title}
                       </h4>

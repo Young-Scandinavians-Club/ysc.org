@@ -110,7 +110,7 @@ defmodule YscWeb.PaymentSuccessLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
+    <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
       <div class="text-center">
         <p class="text-zinc-600">Processing your payment...</p>
       </div>

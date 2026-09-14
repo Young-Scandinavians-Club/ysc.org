@@ -50,13 +50,13 @@ defmodule YscWeb.Components.DateRangePicker do
       <div
         :if={@calendar?}
         id={"#{@id}_calendar"}
-        class="absolute z-50 w-96 shadow transition duration-300"
+        class="absolute z-50 w-96 shadow-sm transition duration-300"
         phx-click-away="close-calendar"
         phx-target={@myself}
       >
         <div
           id="calendar_background"
-          class="w-full bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none p-3"
+          class="w-full bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden p-3"
         >
           <div id="calendar_header" class="flex justify-between items-center">
             <button
@@ -80,7 +80,7 @@ defmodule YscWeb.Components.DateRangePicker do
                 phx-click="today"
                 disabled={showing_current_month?(@current.date, @today)}
                 class={[
-                  "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                  "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                   if(showing_current_month?(@current.date, @today),
                     do:
                       "text-zinc-400 bg-zinc-50 border-zinc-200 cursor-not-allowed opacity-60",
@@ -156,9 +156,9 @@ defmodule YscWeb.Components.DateRangePicker do
                   )
                 }
                 class={[
-                  "calendar-day overflow-hidden py-1.5 h-12 rounded w-auto focus:z-10 w-full transition duration-300 flex flex-col items-center justify-center",
+                  "calendar-day overflow-hidden py-1.5 h-12 rounded-sm w-auto focus:z-10 w-full transition duration-300 flex flex-col items-center justify-center",
                   today?(day, @today) &&
-                    "font-bold border-2 border-zinc-500 rounded",
+                    "font-bold border-2 border-zinc-500 rounded-sm",
                   date_disabled?(
                     day,
                     @date_disable_ctx,
@@ -240,7 +240,7 @@ defmodule YscWeb.Components.DateRangePicker do
                 id={date_picker_tooltip_id(@id, day)}
                 role="tooltip"
                 class={[
-                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
+                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-100 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded-sm tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
                   "max-w-[400px]",
                   "text-left"
                 ]}
@@ -260,7 +260,7 @@ defmodule YscWeb.Components.DateRangePicker do
               type="button"
               phx-click="reset-dates"
               phx-target={@myself}
-              class="inline-flex items-center px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              class="inline-flex items-center px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             >
               <.icon name="hero-x-mark" class="w-4 h-4 me-1" /> Reset
             </button>

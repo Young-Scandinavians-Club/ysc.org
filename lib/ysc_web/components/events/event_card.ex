@@ -61,10 +61,10 @@ defmodule YscWeb.Components.Events.EventCard do
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
         </div>
-        <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap pointer-events-none">
+        <div class="absolute top-6 left-6 flex gap-2 z-2 flex-wrap pointer-events-none">
           <%= for badge <- @badges do %>
             <span class={[
-              "px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest pointer-events-auto",
+              "px-3 py-1.5 rounded-sm text-xs font-black uppercase tracking-widest pointer-events-auto",
               badge_class(badge),
               if(badge.text == "Going Fast!",
                 do: "animate-badge-shine-emerald",
@@ -85,7 +85,7 @@ defmodule YscWeb.Components.Events.EventCard do
       <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
         <div class="flex items-center gap-2 mb-4">
           <span class={[
-            "text-sm font-black px-2.5 py-1 rounded uppercase tracking-[0.2em]",
+            "text-sm font-black px-2.5 py-1 rounded-sm uppercase tracking-[0.2em]",
             if(@variant == "dark",
               do: "text-zinc-300 bg-zinc-800",
               else: "text-zinc-900 bg-zinc-100"
@@ -105,7 +105,7 @@ defmodule YscWeb.Components.Events.EventCard do
         </div>
         <.link navigate={~p"/events/#{@event.id}"} class="block">
           <h3 class={[
-            "text-2xl font-black tracking-tight leading-tight mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-[4rem]",
+            "text-2xl font-black tracking-tight leading-tight mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-16",
             if(@variant == "dark", do: "text-white", else: "text-zinc-900")
           ]}>
             {@event.title}
@@ -132,12 +132,12 @@ defmodule YscWeb.Components.Events.EventCard do
               if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-400")
             ]}
           >
-            <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
+            <.icon name="hero-map-pin" class="w-4 h-4 shrink-0" />
             <span class="truncate">{@event.location_name}</span>
           </div>
           <div class="flex items-center justify-between gap-3">
             <span class={[
-              "px-3 py-1.5 rounded text-sm font-black border",
+              "px-3 py-1.5 rounded-sm text-sm font-black border",
               if(@variant == "dark",
                 do: "bg-zinc-900 text-zinc-100 border-zinc-700",
                 else: "bg-zinc-50 text-zinc-900 border-zinc-200"
@@ -149,7 +149,7 @@ defmodule YscWeb.Components.Events.EventCard do
             <.icon
               name="hero-arrow-right"
               class={[
-                "w-5 h-5 group-hover:text-blue-600 group-hover:translate-x-1 transition-all flex-shrink-0",
+                "w-5 h-5 group-hover:text-blue-600 group-hover:translate-x-1 transition-all shrink-0",
                 if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-300")
               ]}
             />

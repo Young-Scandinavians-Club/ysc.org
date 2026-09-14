@@ -16,7 +16,10 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def history_masthead(assigns) do
     ~H"""
-    <div id="history-hero" class="max-w-screen-xl mx-auto px-4 mb-12 md:mb-16">
+    <div
+      id="history-hero"
+      class="max-w-(--breakpoint-xl) mx-auto px-4 mb-12 md:mb-16"
+    >
       <.page_masthead
         id="history-masthead"
         eyebrow="History"
@@ -116,7 +119,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
       data-active={to_string(@active)}
       class={[
         "px-4 py-2 rounded-md text-sm font-medium transition-colors duration-150",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+        "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
         if(@active,
           do: "bg-blue-600 text-white border-blue-600",
           else: "border border-zinc-300 text-zinc-500 hover:border-zinc-400"
@@ -286,7 +289,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def timeline_tag(assigns) do
     ~H"""
-    <span class="px-2.5 py-0.5 text-xs uppercase tracking-wide text-zinc-500 border border-zinc-300 rounded">
+    <span class="px-2.5 py-0.5 text-xs uppercase tracking-wide text-zinc-500 border border-zinc-300 rounded-sm">
       {format_tag(@label)}
     </span>
     """
@@ -306,7 +309,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
         <img
           src={@src}
           alt={@alt}
-          class={["w-full object-cover rounded", aspect_class(@aspect)]}
+          class={["w-full object-cover rounded-sm", aspect_class(@aspect)]}
           loading="lazy"
           decoding="async"
         />
@@ -384,7 +387,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
       </h4>
       <span
         :if={@badge}
-        class="text-xs px-2 py-0.5 rounded border border-zinc-300 text-zinc-500 mt-1"
+        class="text-xs px-2 py-0.5 rounded-sm border border-zinc-300 text-zinc-500 mt-1"
       >
         {@badge}
       </span>
@@ -394,7 +397,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def next_president_invite_card(assigns) do
     ~H"""
-    <div class="p-4 rounded-xl border-2 border-dashed border-zinc-300 bg-stone-50 flex flex-col items-center text-center justify-center min-h-[8rem]">
+    <div class="p-4 rounded-xl border-2 border-dashed border-zinc-300 bg-stone-50 flex flex-col items-center text-center justify-center min-h-32">
       <.icon name="hero-user-plus" class="w-5 h-5 text-zinc-400 mb-2" />
       <span class="text-xs font-medium text-zinc-500 uppercase mb-2 tracking-wide">
         The Next Chapter
@@ -432,13 +435,13 @@ defmodule YscWeb.Components.History.HistoryComponents do
       <div class="flex flex-col sm:flex-row gap-4 justify-center">
         <.link
           navigate={~p"/users/register"}
-          class="px-8 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors duration-150 min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+          class="px-8 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors duration-150 min-h-[44px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
         >
           Become a Member
         </.link>
         <.link
           navigate={~p"/contact"}
-          class="px-8 py-3 text-zinc-700 font-medium rounded-md border border-zinc-300 hover:border-zinc-400 transition-colors duration-150 min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+          class="px-8 py-3 text-zinc-700 font-medium rounded-md border border-zinc-300 hover:border-zinc-400 transition-colors duration-150 min-h-[44px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
         >
           Ask a Question
         </.link>
@@ -467,9 +470,9 @@ defmodule YscWeb.Components.History.HistoryComponents do
     |> Enum.map_join(" ", &String.capitalize/1)
   end
 
-  defp aspect_class("3/4"), do: "aspect-[3/4]"
-  defp aspect_class("4/3"), do: "aspect-[4/3]"
-  defp aspect_class(_), do: "aspect-[4/3]"
+  defp aspect_class("3/4"), do: "aspect-3/4"
+  defp aspect_class("4/3"), do: "aspect-4/3"
+  defp aspect_class(_), do: "aspect-4/3"
 
   defp era_for_year(year) do
     cond do

@@ -55,7 +55,7 @@ defmodule YscWeb.UserRegistrationLive do
           phx-trigger-action={@trigger_submit}
           method="post"
         >
-          <div class="space-y-4 min-h-[28rem]">
+          <div class="space-y-4 min-h-112">
             <p class="text-right text-xs text-zinc-400">* Required fields</p>
             <.error :if={@check_errors}>
               Some required information is missing or incorrect. Check the highlighted fields on this page, then use
@@ -124,7 +124,7 @@ defmodule YscWeb.UserRegistrationLive do
                 <:actions>
                   <.link
                     navigate={~p"/users/log-in"}
-                    class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500"
+                    class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-amber-500"
                   >
                     Sign in
                   </.link>
@@ -253,7 +253,7 @@ defmodule YscWeb.UserRegistrationLive do
                 </div>
 
                 <div class="w-full py-4">
-                  <label class="w-full flex items-center justify-center gap-x-1.5 border border-dashed border-zinc-300 cursor-pointer rounded hover:bg-zinc-50 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-700 active:text-zinc-700/80">
+                  <label class="w-full flex items-center justify-center gap-x-1.5 border border-dashed border-zinc-300 cursor-pointer rounded-sm hover:bg-zinc-50 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-700 active:text-zinc-700/80">
                     <input
                       type="checkbox"
                       name="user[family_members_order][]"
@@ -375,7 +375,7 @@ defmodule YscWeb.UserRegistrationLive do
                       name={field.name}
                       value="true"
                       checked={checked}
-                      class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-0 w-5 h-5 flex-shrink-0"
+                      class="mt-0.5 rounded-sm border-zinc-300 text-zinc-900 focus:ring-0 w-5 h-5 shrink-0"
                     />
                     <label
                       for={field.id}
@@ -391,7 +391,7 @@ defmodule YscWeb.UserRegistrationLive do
                         Young Scandinavians Club Bylaws
                         <.icon
                           name="hero-arrow-top-right-on-square"
-                          class="w-4 h-4 flex-shrink-0"
+                          class="w-4 h-4 shrink-0"
                         />
                       </.link>
                     </label>
@@ -423,7 +423,7 @@ defmodule YscWeb.UserRegistrationLive do
                     variant="outline"
                     color="zinc"
                     phx-click="prev-step"
-                    class="!min-h-0 !border-0 !bg-transparent !shadow-none hover:!bg-zinc-100 !text-zinc-800"
+                    class="min-h-0! border-0! bg-transparent! shadow-none! hover:bg-zinc-100! text-zinc-800!"
                   >
                     <.icon name="hero-arrow-left-solid" class="w-4 h-4 shrink-0" />
                     Previous step

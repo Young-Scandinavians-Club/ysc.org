@@ -11,7 +11,7 @@ defmodule YscWeb.UserTicketsLive do
   def render(assigns) do
     ~H"""
     <div class="py-8 lg:py-12 bg-zinc-50/50 min-h-screen">
-      <div class="max-w-screen-xl mx-auto px-4">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <p class="text-teal-600 text-xs font-bold uppercase tracking-[0.2em] mb-2">
@@ -202,14 +202,14 @@ defmodule YscWeb.UserTicketsLive do
                         navigate={
                           ~p"/tickets/#{ticket_order.id}/qr?return_to=/users/tickets"
                         }
-                        class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-zinc-100 bg-zinc-900 hover:bg-zinc-800 rounded transition-colors"
+                        class="inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-zinc-100 bg-zinc-900 hover:bg-zinc-800 rounded-sm transition-colors"
                       >
                         <.icon name="hero-qr-code" class="w-4 h-4" />
                         Show tickets for check-in
                       </.link>
                       <.link
                         navigate={~p"/orders/#{ticket_order.id}/confirmation"}
-                        class="px-4 py-2.5 bg-white border border-zinc-200 text-zinc-700 text-sm font-semibold rounded hover:bg-zinc-50 transition"
+                        class="px-4 py-2.5 bg-white border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-sm hover:bg-zinc-50 transition"
                       >
                         View order & receipt
                       </.link>
@@ -240,7 +240,7 @@ defmodule YscWeb.UserTicketsLive do
               <%= for item <- @past_items do %>
                 <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
                   <div class="flex justify-between items-start mb-4">
-                    <span class="text-xs font-black text-zinc-400 uppercase tracking-widest border border-zinc-200 px-2 py-0.5 rounded">
+                    <span class="text-xs font-black text-zinc-400 uppercase tracking-widest border border-zinc-200 px-2 py-0.5 rounded-sm">
                       {format_visited_date(item)}
                     </span>
                     <.icon name="hero-check-badge" class="w-5 h-5 text-zinc-300" />

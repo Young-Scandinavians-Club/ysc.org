@@ -158,21 +158,21 @@ defmodule YscWeb.BookingReceiptLive do
     <div
       :if={@loading_booking?}
       id="booking-receipt-loading"
-      class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4"
+      class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
       role="status"
       aria-live="polite"
     >
       <span class="sr-only">Loading booking confirmation…</span>
       <div class="max-w-xl mx-auto lg:mx-0 space-y-6">
-        <.skeleton_block class="h-9 w-56 rounded" />
+        <.skeleton_block class="h-9 w-56 rounded-sm" />
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded" />
+          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
         </div>
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
-          <.skeleton_block class="h-5 w-40 rounded mb-2" />
+          <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
           <div :for={_ <- 1..3} class="flex justify-between">
-            <.skeleton_block class="h-4 w-28 rounded" />
-            <.skeleton_block class="h-4 w-20 rounded" />
+            <.skeleton_block class="h-4 w-28 rounded-sm" />
+            <.skeleton_block class="h-4 w-20 rounded-sm" />
           </div>
         </div>
       </div>
@@ -182,7 +182,7 @@ defmodule YscWeb.BookingReceiptLive do
       id="booking-receipt"
       phx-hook="Confetti"
       data-show-confetti={if @show_confetti, do: "true", else: "false"}
-      class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4"
+      class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
     >
       <!-- Header -->
       <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-100 pb-8">
@@ -271,9 +271,9 @@ defmodule YscWeb.BookingReceiptLive do
           "mb-8 rounded-lg p-8 shadow-xl border-4",
           if(@booking.property == :clear_lake,
             do:
-              "bg-gradient-to-r from-teal-600 to-teal-700 border-teal-400 text-white",
+              "bg-linear-to-r from-teal-600 to-teal-700 border-teal-400 text-white",
             else:
-              "bg-gradient-to-r from-blue-600 to-blue-700 border-blue-400 text-white"
+              "bg-linear-to-r from-blue-600 to-blue-700 border-blue-400 text-white"
           )
         ]}>
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -305,8 +305,8 @@ defmodule YscWeb.BookingReceiptLive do
                 <% end %>
               </p>
             </div>
-            <div class="flex-shrink-0">
-              <div class="bg-white/20 backdrop-blur-sm rounded-lg px-8 py-6 border-2 border-white/30">
+            <div class="shrink-0">
+              <div class="bg-white/20 backdrop-blur-xs rounded-lg px-8 py-6 border-2 border-white/30">
                 <p class={[
                   "text-xs font-bold uppercase tracking-widest mb-2 text-center",
                   if(@booking.property == :clear_lake,
@@ -334,7 +334,7 @@ defmodule YscWeb.BookingReceiptLive do
               <div class="flex items-start gap-4">
                 <.icon
                   name="hero-exclamation-triangle"
-                  class="w-8 h-8 text-red-600 flex-shrink-0 mt-1"
+                  class="w-8 h-8 text-red-600 shrink-0 mt-1"
                 />
                 <div class="flex-1">
                   <h3 class="text-lg font-bold text-red-900 mb-2">
@@ -377,7 +377,7 @@ defmodule YscWeb.BookingReceiptLive do
                   </div>
                 </div>
               <% end %>
-              <div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-6">
+              <div class="absolute inset-0 bg-linear-to-t from-black/40 to-transparent flex items-end p-6">
                 <div class="flex items-center justify-between w-full">
                   <h2 class={[
                     "text-xl font-bold flex items-center gap-2",
@@ -579,7 +579,7 @@ defmodule YscWeb.BookingReceiptLive do
                             <% end %>
                           </h3>
                           <span class={[
-                            "text-xs font-medium px-2 py-1 rounded",
+                            "text-xs font-medium px-2 py-1 rounded-sm",
                             if(guest.is_child,
                               do: "bg-green-200 text-green-800",
                               else: "bg-blue-200 text-blue-800"
@@ -638,19 +638,19 @@ defmodule YscWeb.BookingReceiptLive do
             :if={!@async_data_loaded}
             class="rounded-lg p-8 shadow-xl bg-zinc-900 animate-pulse"
           >
-            <div class="h-3 w-32 bg-zinc-700 rounded mb-6"></div>
+            <div class="h-3 w-32 bg-zinc-700 rounded-sm mb-6"></div>
             <div class="space-y-4">
               <div class="flex justify-between">
-                <div class="h-4 w-24 bg-zinc-700 rounded"></div>
-                <div class="h-4 w-16 bg-zinc-700 rounded"></div>
+                <div class="h-4 w-24 bg-zinc-700 rounded-sm"></div>
+                <div class="h-4 w-16 bg-zinc-700 rounded-sm"></div>
               </div>
               <div class="border-t border-zinc-700 pt-4 flex justify-between">
-                <div class="h-4 w-20 bg-zinc-700 rounded"></div>
-                <div class="h-6 w-24 bg-zinc-700 rounded"></div>
+                <div class="h-4 w-20 bg-zinc-700 rounded-sm"></div>
+                <div class="h-6 w-24 bg-zinc-700 rounded-sm"></div>
               </div>
               <div class="border-t border-zinc-700 pt-4 space-y-2">
-                <div class="h-3 w-28 bg-zinc-700 rounded"></div>
-                <div class="h-3 w-40 bg-zinc-700 rounded"></div>
+                <div class="h-3 w-28 bg-zinc-700 rounded-sm"></div>
+                <div class="h-3 w-40 bg-zinc-700 rounded-sm"></div>
               </div>
             </div>
           </div>
@@ -952,7 +952,7 @@ defmodule YscWeb.BookingReceiptLive do
                                 <img
                                   src={entry.method_logo}
                                   alt=""
-                                  class="h-4 w-auto max-w-[2.5rem] object-contain shrink-0"
+                                  class="h-4 w-auto max-w-10 object-contain shrink-0"
                                   loading="lazy"
                                   decoding="async"
                                 />
@@ -1013,7 +1013,7 @@ defmodule YscWeb.BookingReceiptLive do
                         <div class="flex items-start gap-2">
                           <.icon
                             name="hero-clock"
-                            class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"
+                            class="w-4 h-4 text-amber-600 mt-0.5 shrink-0"
                           />
                           <p class="text-xs text-amber-800">
                             <strong>Refund under review:</strong>
@@ -1109,7 +1109,7 @@ defmodule YscWeb.BookingReceiptLive do
                         <img
                           src={@payment_method_logo}
                           alt=""
-                          class="h-5 w-auto max-w-[3rem] object-contain shrink-0"
+                          class="h-5 w-auto max-w-12 object-contain shrink-0"
                           loading="lazy"
                           decoding="async"
                         />

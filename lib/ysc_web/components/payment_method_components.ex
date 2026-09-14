@@ -15,12 +15,12 @@ defmodule YscWeb.PaymentMethodComponents do
   def stored_payment_method_display(assigns) do
     ~H"""
     <div class="flex items-center gap-3">
-      <div class="flex-shrink-0">
+      <div class="shrink-0">
         <%= if logo = PaymentMethodLogo.path_for_payment_method(@payment_method) do %>
           <img
             src={logo}
             alt=""
-            class="h-6 w-auto max-w-[4rem] object-contain"
+            class="h-6 w-auto max-w-16 object-contain"
             loading="lazy"
             decoding="async"
           />

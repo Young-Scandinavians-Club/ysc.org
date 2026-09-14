@@ -9,7 +9,7 @@ defmodule YscWeb.ConductViolationReportLive do
         <%!-- Success State --%>
         <div
           :if={@submitted}
-          class="bg-white rounded-xl shadow-sm border border-zinc-200 p-8 lg:p-12 text-center"
+          class="bg-white rounded-xl shadow-xs border border-zinc-200 p-8 lg:p-12 text-center"
         >
           <div class="flex justify-center mb-6">
             <.icon name="hero-check-circle" class="text-green-600 w-16 h-16" />
@@ -90,7 +90,7 @@ defmodule YscWeb.ConductViolationReportLive do
               <div class="flex gap-3">
                 <.icon
                   name="hero-exclamation-triangle"
-                  class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"
+                  class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"
                 />
                 <div>
                   <p class="text-sm font-semibold text-amber-900 mb-1">
@@ -105,7 +105,7 @@ defmodule YscWeb.ConductViolationReportLive do
           </div>
 
           <%!-- Form Card --%>
-          <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 lg:p-10">
+          <div class="bg-white rounded-xl shadow-xs border border-zinc-200 p-6 lg:p-10">
             <.simple_form
               for={@form}
               phx-change="validate"
@@ -258,7 +258,7 @@ defmodule YscWeb.ConductViolationReportLive do
                 class="mb-8 p-4 bg-blue-50 border border-blue-100 rounded-lg transition-colors hover:bg-blue-100/50 cursor-pointer block group"
               >
                 <div class="flex items-start gap-3">
-                  <div class="flex items-center h-6 pt-0.5 flex-shrink-0">
+                  <div class="flex items-center h-6 pt-0.5 shrink-0">
                     <input
                       type="hidden"
                       name={@form[:anonymous].name}
@@ -275,7 +275,7 @@ defmodule YscWeb.ConductViolationReportLive do
                           @form[:anonymous].value
                         )
                       }
-                      class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-0 w-5 h-5"
+                      class="mt-0.5 rounded-sm border-zinc-300 text-zinc-900 focus:ring-0 w-5 h-5"
                     />
                   </div>
                   <div class="flex-1">

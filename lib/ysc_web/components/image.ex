@@ -34,7 +34,7 @@ defmodule YscWeb.Components.Image do
         height={image_dimension(@image, :height)}
         phx-hook="BlurHashImage"
         class={[
-          "absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover",
+          "absolute inset-0 z-1 opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover",
           @rounded_class
         ]}
         alt={

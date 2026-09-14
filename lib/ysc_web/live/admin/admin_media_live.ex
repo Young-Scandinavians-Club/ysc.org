@@ -113,7 +113,7 @@ defmodule YscWeb.AdminMediaLive do
             <%= if get_image_version_path(@active_image, @selected_image_version) do %>
               <img
                 src={get_image_version_path(@active_image, @selected_image_version)}
-                class="w-full object-contain rounded max-h-96 border border-zinc-200"
+                class="w-full object-contain rounded-sm max-h-96 border border-zinc-200"
                 alt={@active_image.alt_text || @active_image.title || "Image"}
               />
 
@@ -163,7 +163,7 @@ defmodule YscWeb.AdminMediaLive do
               </div>
 
               <%!-- Image Metadata --%>
-              <div class="mt-4 text-xs text-zinc-500 space-y-1 bg-zinc-50 p-3 rounded">
+              <div class="mt-4 text-xs text-zinc-500 space-y-1 bg-zinc-50 p-3 rounded-sm">
                 <p>
                   <strong>Version:</strong>
                   {String.capitalize(Atom.to_string(@selected_image_version))}
@@ -198,7 +198,7 @@ defmodule YscWeb.AdminMediaLive do
                 )}
               </p>
             <% else %>
-              <div class="w-full h-64 bg-zinc-100 rounded flex items-center justify-center">
+              <div class="w-full h-64 bg-zinc-100 rounded-sm flex items-center justify-center">
                 <div class="text-center">
                   <.icon
                     name="hero-photo"
@@ -226,7 +226,7 @@ defmodule YscWeb.AdminMediaLive do
               <div class="flex justify-end gap-2 mt-4">
                 <button
                   type="button"
-                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80"
+                  class="rounded-sm hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-800/80"
                   phx-click={JS.patch(build_media_url_with_state(assigns))}
                 >
                   Cancel
@@ -272,7 +272,7 @@ defmodule YscWeb.AdminMediaLive do
                         </div>
                         <.live_img_preview
                           entry={entry}
-                          class="group-hover:blur h-[120px] w-[120px]"
+                          class="group-hover:blur-sm h-[120px] w-[120px]"
                         />
                         <figcaption class="text-sm truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1">
                           {entry.client_name}
@@ -360,7 +360,7 @@ defmodule YscWeb.AdminMediaLive do
                 class={[
                   "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   if(@layout_mode == :square,
-                    do: "bg-white text-blue-700 shadow-sm ring-1 ring-zinc-200",
+                    do: "bg-white text-blue-700 shadow-xs ring-1 ring-zinc-200",
                     else: "text-zinc-600 hover:bg-white/70 hover:text-zinc-900"
                   )
                 ]}
@@ -380,7 +380,7 @@ defmodule YscWeb.AdminMediaLive do
                 class={[
                   "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   if(@layout_mode == :masonry,
-                    do: "bg-white text-blue-700 shadow-sm ring-1 ring-zinc-200",
+                    do: "bg-white text-blue-700 shadow-xs ring-1 ring-zinc-200",
                     else: "text-zinc-600 hover:bg-white/70 hover:text-zinc-900"
                   )
                 ]}
@@ -473,7 +473,7 @@ defmodule YscWeb.AdminMediaLive do
                 aria-live="polite"
               >
                 <span class="sr-only">Loading images…</span>
-                <.skeleton_block class="h-5 w-20 rounded" />
+                <.skeleton_block class="h-5 w-20 rounded-sm" />
                 <.thumbnail_grid_skeleton
                   count={12}
                   class="grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
@@ -486,13 +486,13 @@ defmodule YscWeb.AdminMediaLive do
             :if={@media_count > 0 and length(@timeline) > 1}
             id="year-scrubber"
             phx-hook="YearScrubber"
-            class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
+            class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-xs rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
           >
             <%!-- All / reset button --%>
             <button
               phx-click="show-all-years"
               class={[
-                "w-9 h-9 flex items-center justify-center rounded transition-all duration-150 relative group",
+                "w-9 h-9 flex items-center justify-center rounded-sm transition-all duration-150 relative group",
                 if(is_nil(@selected_year),
                   do: "bg-zinc-800 text-white opacity-100",
                   else:
@@ -502,7 +502,7 @@ defmodule YscWeb.AdminMediaLive do
               title="Show all years"
             >
               <.icon name="hero-squares-2x2" class="w-4 h-4" />
-              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+              <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded-sm whitespace-nowrap pointer-events-none">
                 All years
               </span>
             </button>
@@ -512,7 +512,7 @@ defmodule YscWeb.AdminMediaLive do
                 data-year-item={item.year}
                 phx-click="jump-to-year"
                 phx-value-year={item.year}
-                class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded transition-all duration-150 opacity-60 hover:opacity-100 relative group"
+                class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded-sm transition-all duration-150 opacity-60 hover:opacity-100 relative group"
                 title={"#{item.year} (#{item.count} images)"}
               >
                 <span class="group-hover:hidden flex items-center justify-center w-full h-full">
@@ -521,7 +521,7 @@ defmodule YscWeb.AdminMediaLive do
                 <span class="hidden group-hover:flex absolute inset-0 items-center justify-center text-xs font-bold whitespace-nowrap px-1">
                   {item.year}
                 </span>
-                <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                <span class="absolute right-full top-1/2 -translate-y-1/2 mr-2 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded-sm whitespace-nowrap pointer-events-none">
                   {item.count} photos
                 </span>
               </button>
@@ -1433,7 +1433,7 @@ defmodule YscWeb.AdminMediaLive do
           <button
             phx-click="clear-search"
             phx-value-input-id="media-search-input"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded hover:bg-zinc-50 transition-colors"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-sm hover:bg-zinc-50 transition-colors"
           >
             <.icon name="hero-x-mark" class="w-4 h-4" /> Clear search
           </button>
@@ -1456,7 +1456,7 @@ defmodule YscWeb.AdminMediaLive do
               class="media-year-section"
               data-year-section={section.header.date.year}
             >
-              <div class="sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200">
+              <div class="sticky top-0 z-10 bg-white/95 backdrop-blur-sm py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200">
                 {section.header.formatted_date}
               </div>
               <div class={
@@ -1473,7 +1473,7 @@ defmodule YscWeb.AdminMediaLive do
                     }
                     id={"image-#{item.id}"}
                     class={[
-                      "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
+                      "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-hidden focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
                       if(@layout_mode == :square,
                         do: "aspect-square",
                         else: "media-masonry-card bg-zinc-100"
@@ -1496,7 +1496,7 @@ defmodule YscWeb.AdminMediaLive do
                     <%!-- Missing Alt Text Warning --%>
                     <%= if is_nil(item.alt_text) || item.alt_text == "" do %>
                       <div
-                        class="absolute top-2 right-2 z-[3] flex h-7 w-7 items-center justify-center rounded-full bg-yellow-500 text-white shadow-lg"
+                        class="absolute top-2 right-2 z-3 flex h-7 w-7 items-center justify-center rounded-full bg-yellow-500 text-white shadow-lg"
                         title="Missing alt text"
                         aria-label="Missing alt text"
                       >
@@ -1516,7 +1516,7 @@ defmodule YscWeb.AdminMediaLive do
 
                     <img
                       class={[
-                        "z-[1] rounded-lg opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100",
+                        "z-1 rounded-lg opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100",
                         if(@layout_mode == :square,
                           do: "absolute inset-0 h-full w-full object-cover",
                           else: "relative block h-auto w-full object-contain"
@@ -1533,7 +1533,7 @@ defmodule YscWeb.AdminMediaLive do
 
                     <div
                       :if={item.title != nil or item.alt_text != nil}
-                      class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
+                      class="absolute z-2 hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-linear-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
                     >
                       <p
                         :if={item.title != nil}

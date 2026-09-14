@@ -70,8 +70,10 @@ module.exports = {
         }
     },
     plugins: [
-        require("@tailwindcss/typography"),
-        require("@tailwindcss/forms"),
+        // @tailwindcss/typography and @tailwindcss/forms are loaded via
+        // `@plugin` directives in app.css — the standalone Tailwind v4 CLI
+        // only resolves these first-party plugins by name through CSS,
+        // not via require() from a JS config loaded with @config.
         // Allows prefixing tailwind classes with LiveView classes to add rules
         // only when LiveView classes are applied, for example:
         //

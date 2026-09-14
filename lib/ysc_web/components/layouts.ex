@@ -156,7 +156,7 @@ defmodule YscWeb.Layouts do
   end
 
   @doc """
-  Toast container classes with z-[10000] so toasts render above modals (z-50)
+  Toast container classes with z-10000 so toasts render above modals (z-50)
   and mobile menu overlays (z-[9999]).
   """
   def toast_group_class_fn(assigns) do

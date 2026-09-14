@@ -133,7 +133,7 @@ defmodule YscWeb.AdminHelpComponents do
     <div
       id={@id}
       class={[
-        "relative rounded-lg border border-zinc-200 bg-zinc-50 overflow-hidden shadow-sm",
+        "relative rounded-lg border border-zinc-200 bg-zinc-50 overflow-hidden shadow-xs",
         @ghost_slug && Hotspot.admin_ghost?(@ghost_slug) &&
           "admin-help-sidebar-aware"
       ]}
@@ -219,14 +219,14 @@ defmodule YscWeb.AdminHelpComponents do
       <.link
         navigate={~p"/admin/help/#{@topic}"}
         id={"admin-help-link-#{String.replace(@topic, "/", "-")}"}
-        class="inline-flex items-center justify-center rounded-full text-zinc-300 hover:text-blue-600 focus-visible:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition-colors"
+        class="inline-flex items-center justify-center rounded-full text-zinc-300 hover:text-blue-600 focus-visible:text-blue-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 transition-colors"
         aria-label={@label}
       >
         <.icon name="hero-question-mark-circle" class="w-5 h-5" />
       </.link>
       <span
         role="tooltip"
-        class="pointer-events-none absolute left-1/2 top-full z-50 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-zinc-100 opacity-0 shadow-sm transition-opacity duration-150 group-hover/help:opacity-100 group-focus-within/help:opacity-100"
+        class="pointer-events-none absolute left-1/2 top-full z-50 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-zinc-100 opacity-0 shadow-xs transition-opacity duration-150 group-hover/help:opacity-100 group-focus-within/help:opacity-100"
       >
         {@label}
       </span>
@@ -352,7 +352,7 @@ defmodule YscWeb.AdminHelpComponents do
   end
 
   defp guide_tab_class(true) do
-    "inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-900 shadow-sm"
+    "inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-900 shadow-xs"
   end
 
   defp guide_tab_class(false) do
@@ -370,7 +370,7 @@ defmodule YscWeb.AdminHelpComponents do
       <%= if @variant == :web do %>
         <article
           id={@id}
-          class="rounded-xl border border-zinc-200 bg-white shadow-sm print:hidden mt-6"
+          class="rounded-xl border border-zinc-200 bg-white shadow-xs print:hidden mt-6"
         >
           <header class="border-b border-zinc-200 px-6 py-5 md:px-8">
             <h2 class="text-lg font-semibold text-zinc-900">More help</h2>
@@ -472,7 +472,7 @@ defmodule YscWeb.AdminHelpComponents do
       </p>
       <.form for={@form} id={"#{@id}-form"} phx-submit="find-guide" class="mt-4">
         <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-          <div class="flex-1 [&_input]:!mt-0 [&_input]:!h-11 [&_input]:!min-h-11 [&_input]:!py-0">
+          <div class="flex-1 [&_input]:mt-0! [&_input]:h-11! [&_input]:min-h-11! [&_input]:py-0!">
             <.input
               field={@form[:query]}
               type="text"
@@ -484,7 +484,7 @@ defmodule YscWeb.AdminHelpComponents do
           </div>
           <.button
             type="submit"
-            class="!min-h-11 h-11 shrink-0 !py-0"
+            class="min-h-11! h-11 shrink-0 py-0!"
             disabled={@loading?}
           >
             Find guide
@@ -583,7 +583,7 @@ defmodule YscWeb.AdminHelpComponents do
     case Regex.split(pattern, plain, include_captures: true, parts: 2) do
       [before, match, rest] ->
         "<p class=\"mb-3\">#{escape_html(before)}" <>
-          "<mark class=\"admin-help-highlight rounded bg-amber-200/80 box-decoration-clone px-0.5 py-0.5\">#{escape_html(match)}</mark>" <>
+          "<mark class=\"admin-help-highlight rounded-sm bg-amber-200/80 box-decoration-clone px-0.5 py-0.5\">#{escape_html(match)}</mark>" <>
           "#{escape_html(rest)}</p>"
 
       _ ->

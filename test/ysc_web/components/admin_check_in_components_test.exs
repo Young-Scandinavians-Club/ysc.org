@@ -378,7 +378,7 @@ defmodule YscWeb.AdminCheckInComponentsTest do
         """)
 
       assert html =~ "All attendees checked in!"
-      assert html =~ "bg-white rounded border border-zinc-200"
+      assert html =~ "bg-white rounded-sm border border-zinc-200"
       assert html =~ "text-emerald-400"
     end
 

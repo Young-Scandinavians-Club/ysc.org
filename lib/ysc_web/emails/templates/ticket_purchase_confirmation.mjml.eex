@@ -91,7 +91,7 @@
     <!-- Ticket Summary -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Your Tickets </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Order Reference:
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Order number:
       <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
         <%= @ticket_order.reference_id %>
       </span>
@@ -160,15 +160,15 @@
     <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Date: <strong><%= @payment_date %></strong>
     </mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Reference: <strong><%= @payment.reference_id %></strong>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment number: <strong><%= @payment.reference_id %></strong>
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <% end %>
-    <!-- Individual Ticket References -->
-    <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold"> Your Ticket Reference Numbers </mj-text>
+    <!-- Individual ticket numbers -->
+    <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold"> Your ticket numbers </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Please keep these reference numbers for your records: </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Keep these ticket numbers. You'll need them at check-in, or if you write to us about this order: </mj-text>
     <mj-spacer height="8px"></mj-spacer>
     <mj-text align="left" font-size="14px" line-height="1.5" padding="0px" padding-left="16px">
       <%= for ticket <- @tickets do %>

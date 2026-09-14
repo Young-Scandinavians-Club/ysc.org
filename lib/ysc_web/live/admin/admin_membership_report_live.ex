@@ -227,7 +227,7 @@ defmodule YscWeb.AdminMembershipReportLive do
         </div>
 
         <%!-- Date range form --%>
-        <div class="bg-white rounded-lg shadow-sm border border-zinc-200 px-6 py-5 mb-8">
+        <div class="bg-white rounded-lg shadow-xs border border-zinc-200 px-6 py-5 mb-8">
           <form
             id="membership-report-form"
             phx-submit="generate"
@@ -270,7 +270,7 @@ defmodule YscWeb.AdminMembershipReportLive do
         <%!-- Loading state --%>
         <div
           :if={@generating?}
-          class="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden mb-8"
+          class="bg-white rounded-lg shadow-xs border border-zinc-200 overflow-hidden mb-8"
         >
           <.admin_table_skeleton rows={6} columns={3} />
         </div>
@@ -459,7 +459,7 @@ defmodule YscWeb.AdminMembershipReportLive do
     ~H"""
     <div
       id={@id}
-      class="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden"
+      class="bg-white rounded-lg shadow-xs border border-zinc-200 overflow-hidden"
     >
       <div class="px-6 py-4 border-b border-zinc-100">
         <h2 class="text-lg font-bold text-zinc-900">

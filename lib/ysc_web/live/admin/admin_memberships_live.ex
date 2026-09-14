@@ -166,7 +166,7 @@ defmodule YscWeb.AdminMembershipsLive do
         </div>
 
         <%!-- Search, filter and membership list --%>
-        <div class="bg-white rounded-lg shadow-sm border border-zinc-200 overflow-hidden">
+        <div class="bg-white rounded-lg shadow-xs border border-zinc-200 overflow-hidden">
           <div class="px-6 py-4 border-b border-zinc-100 space-y-4">
             <h2 class="text-lg font-bold text-zinc-900">All Memberships</h2>
 

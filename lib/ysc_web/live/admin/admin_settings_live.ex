@@ -34,25 +34,29 @@ defmodule YscWeb.AdminSettingsLive do
         <div
           :if={@loading_settings?}
           id="admin-settings-loading"
-          class="max-w-screen-md space-y-6 animate-pulse"
+          class="max-w-(--breakpoint-md) space-y-6 animate-pulse"
         >
           <%= for _i <- 1..2 do %>
             <div class="space-y-3">
-              <.skeleton_block class="h-6 w-32 rounded" />
+              <.skeleton_block class="h-6 w-32 rounded-sm" />
               <div class="space-y-4">
                 <%= for _j <- 1..3 do %>
                   <div class="space-y-2">
-                    <.skeleton_block class="h-4 w-40 rounded" />
-                    <.skeleton_block class="h-10 w-full rounded" />
+                    <.skeleton_block class="h-4 w-40 rounded-sm" />
+                    <.skeleton_block class="h-10 w-full rounded-sm" />
                   </div>
                 <% end %>
               </div>
             </div>
           <% end %>
-          <.skeleton_block class="h-10 w-24 rounded" />
+          <.skeleton_block class="h-10 w-24 rounded-sm" />
         </div>
 
-        <div :if={!@loading_settings?} id="admin-settings" class="max-w-screen-md">
+        <div
+          :if={!@loading_settings?}
+          id="admin-settings"
+          class="max-w-(--breakpoint-md)"
+        >
           <.form for={@form} id="admin-settings-form" phx-submit="update-settings">
             <div :for={scope <- @scopes}>
               <h2 class="text-lg leading-8 font-semibold text-zinc-800">
@@ -72,7 +76,7 @@ defmodule YscWeb.AdminSettingsLive do
                     <input
                       id={entry.id}
                       type="text"
-                      class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                      class="mt-2 block w-full rounded-sm text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
                       name={"settings[#{entry.name}][value]"}
                       value={entry.value}
                     />
@@ -91,7 +95,7 @@ defmodule YscWeb.AdminSettingsLive do
               </div>
             </div>
             <button
-              class="mt-4 phx-submit-loading:opacity-75 rounded bg-blue-700 hover:bg-blue-800 py-2 px-6 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
+              class="mt-4 phx-submit-loading:opacity-75 rounded-sm bg-blue-700 hover:bg-blue-800 py-2 px-6 transition duration-200 ease-in-out disabled:cursor-not-allowed disabled:opacity-80 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
               phx-disable-with="Saving..."
               type="submit"
             >
@@ -100,29 +104,32 @@ defmodule YscWeb.AdminSettingsLive do
           </.form>
         </div>
 
-        <div id="google-photos-integration" class="w-full py-4 max-w-screen-md">
+        <div
+          id="google-photos-integration"
+          class="w-full py-4 max-w-(--breakpoint-md)"
+        >
           <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-3">
             Google Photos
           </h2>
           <div
             :if={@loading_settings?}
-            class="bg-white shadow rounded-lg p-4 space-y-4 animate-pulse"
+            class="bg-white shadow-sm rounded-lg p-4 space-y-4 animate-pulse"
           >
-            <.skeleton_block class="h-4 w-64 rounded" />
-            <.skeleton_block class="h-10 w-48 rounded" />
+            <.skeleton_block class="h-4 w-64 rounded-sm" />
+            <.skeleton_block class="h-10 w-48 rounded-sm" />
           </div>
           <div
             :if={!@loading_settings?}
-            class="bg-white shadow rounded-lg p-4 space-y-4"
+            class="bg-white shadow-sm rounded-lg p-4 space-y-4"
           >
             <%= if !@google_photos_status.oauth_configured do %>
               <p class="text-sm text-zinc-600">
                 Set
-                <code class="text-xs bg-zinc-100 px-1 rounded">
+                <code class="text-xs bg-zinc-100 px-1 rounded-sm">
                   GOOGLE_PHOTOS_CLIENT_ID
                 </code>
                 and
-                <code class="text-xs bg-zinc-100 px-1 rounded">
+                <code class="text-xs bg-zinc-100 px-1 rounded-sm">
                   GOOGLE_PHOTOS_CLIENT_SECRET
                 </code>
                 to enable this integration.
@@ -132,7 +139,7 @@ defmodule YscWeb.AdminSettingsLive do
                 <div class="space-y-2">
                   <p class="text-sm text-zinc-800">
                     <span class="font-semibold">Status:</span>
-                    <.badge type="green" class="!me-0 ms-2">Connected</.badge>
+                    <.badge type="green" class="me-0! ms-2">Connected</.badge>
                   </p>
                   <p
                     :if={@google_photos_status.account_email}
@@ -168,7 +175,7 @@ defmodule YscWeb.AdminSettingsLive do
                   </p>
                   <p
                     :if={google_photos_scopes_stale?(@google_photos_status.scopes)}
-                    class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2"
+                    class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-sm px-3 py-2"
                   >
                     Missing upload, read, or edit permissions for app-created albums. Disconnect and connect again to grant all required Google Photos scopes.
                   </p>
@@ -178,7 +185,7 @@ defmodule YscWeb.AdminSettingsLive do
                     id="google-photos-test-connection"
                     type="button"
                     phx-click="google-photos-test-connection"
-                    class="rounded px-4 py-2 bg-blue-700 hover:bg-blue-800 text-sm font-semibold text-zinc-100"
+                    class="rounded-sm px-4 py-2 bg-blue-700 hover:bg-blue-800 text-sm font-semibold text-zinc-100"
                     phx-disable-with="Testing..."
                   >
                     Test connection
@@ -187,7 +194,7 @@ defmodule YscWeb.AdminSettingsLive do
                     id="google-photos-disconnect"
                     href={~p"/admin/integrations/google-photos"}
                     method="delete"
-                    class="rounded px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-sm font-semibold text-zinc-800"
+                    class="rounded-sm px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-sm font-semibold text-zinc-800"
                     data-confirm="Disconnect Google Photos? Upload features will stop working until you reconnect."
                   >
                     Disconnect
@@ -200,7 +207,7 @@ defmodule YscWeb.AdminSettingsLive do
                 <.link
                   id="google-photos-connect"
                   href={~p"/admin/integrations/google-photos/connect"}
-                  class="inline-flex rounded px-4 py-2 bg-blue-700 hover:bg-blue-800 text-sm font-semibold text-zinc-100"
+                  class="inline-flex rounded-sm px-4 py-2 bg-blue-700 hover:bg-blue-800 text-sm font-semibold text-zinc-100"
                 >
                   Connect Google Photos
                 </.link>
@@ -212,7 +219,7 @@ defmodule YscWeb.AdminSettingsLive do
         <div class="w-full py-4">
           <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-3">Misc</h2>
           <.link
-            class="rounded px-4 py-3 bg-blue-700 hover:bg-blue-800 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-100"
+            class="rounded-sm px-4 py-3 bg-blue-700 hover:bg-blue-800 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-100"
             navigate={~p"/admin/dashboard"}
           >
             <.icon
@@ -229,22 +236,22 @@ defmodule YscWeb.AdminSettingsLive do
           <div
             :if={!@outages_loaded}
             id="reported-outages-loading"
-            class="bg-white shadow rounded-lg overflow-hidden animate-pulse"
+            class="bg-white shadow-sm rounded-lg overflow-hidden animate-pulse"
           >
             <div class="h-12 bg-zinc-100"></div>
             <%= for _i <- 1..3 do %>
               <div class="h-14 border-t border-zinc-200 flex items-center px-6 gap-4">
-                <div class="h-4 bg-zinc-200 rounded w-24"></div>
-                <div class="h-4 bg-zinc-200 rounded w-20"></div>
-                <div class="h-4 bg-zinc-200 rounded w-40"></div>
-                <div class="h-4 bg-zinc-200 rounded w-32"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-24"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-20"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-40"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-32"></div>
               </div>
             <% end %>
           </div>
           <div
             :if={@outages_loaded}
             id="reported-outages"
-            class="bg-white shadow rounded-lg overflow-hidden"
+            class="bg-white shadow-sm rounded-lg overflow-hidden"
           >
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
@@ -277,7 +284,7 @@ defmodule YscWeb.AdminSettingsLive do
                   <td class="px-6 py-4 whitespace-nowrap">
                     <.badge
                       type={get_outage_type_color(outage.incident_type)}
-                      class="!me-0"
+                      class="me-0!"
                     >
                       {outage.incident_type
                       |> to_string()
@@ -326,13 +333,13 @@ defmodule YscWeb.AdminSettingsLive do
             class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
           >
             <%= for _i <- 1..3 do %>
-              <div class="bg-white shadow rounded-lg p-4 animate-pulse">
-                <div class="h-5 bg-zinc-200 rounded w-24 mb-3"></div>
+              <div class="bg-white shadow-sm rounded-lg p-4 animate-pulse">
+                <div class="h-5 bg-zinc-200 rounded-sm w-24 mb-3"></div>
                 <div class="space-y-2">
                   <%= for _j <- 1..6 do %>
                     <div class="flex justify-between">
-                      <div class="h-4 bg-zinc-100 rounded w-20"></div>
-                      <div class="h-4 bg-zinc-100 rounded w-8"></div>
+                      <div class="h-4 bg-zinc-100 rounded-sm w-20"></div>
+                      <div class="h-4 bg-zinc-100 rounded-sm w-8"></div>
                     </div>
                   <% end %>
                 </div>
@@ -344,42 +351,42 @@ defmodule YscWeb.AdminSettingsLive do
             class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
           >
             <%= for {queue, stats} <- @queue_stats do %>
-              <div class="bg-white shadow rounded-lg p-4">
+              <div class="bg-white shadow-sm rounded-lg p-4">
                 <h3 class="font-semibold text-zinc-900 mb-3">{queue}</h3>
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Available</span>
-                    <.badge type="default" class="!me-0">
+                    <.badge type="default" class="me-0!">
                       {Map.get(stats, "available", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Executing</span>
-                    <.badge type="yellow" class="!me-0">
+                    <.badge type="yellow" class="me-0!">
                       {Map.get(stats, "executing", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Scheduled</span>
-                    <.badge type="sky" class="!me-0">
+                    <.badge type="sky" class="me-0!">
                       {Map.get(stats, "scheduled", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Retryable</span>
-                    <.badge type="yellow" class="!me-0">
+                    <.badge type="yellow" class="me-0!">
                       {Map.get(stats, "retryable", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Completed</span>
-                    <.badge type="green" class="!me-0">
+                    <.badge type="green" class="me-0!">
                       {Map.get(stats, "completed", 0)}
                     </.badge>
                   </div>
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Discarded</span>
-                    <.badge type="red" class="!me-0">
+                    <.badge type="red" class="me-0!">
                       {Map.get(stats, "discarded", 0)}
                     </.badge>
                   </div>
@@ -395,21 +402,21 @@ defmodule YscWeb.AdminSettingsLive do
           </h2>
           <div
             :if={!@oban_data_loaded}
-            class="bg-white shadow rounded-lg overflow-hidden animate-pulse"
+            class="bg-white shadow-sm rounded-lg overflow-hidden animate-pulse"
           >
             <div class="h-12 bg-zinc-100"></div>
             <%= for _i <- 1..5 do %>
               <div class="h-14 border-t border-zinc-200 flex items-center px-6 gap-4">
-                <div class="h-4 bg-zinc-200 rounded w-32"></div>
-                <div class="h-4 bg-zinc-200 rounded w-40"></div>
-                <div class="h-4 bg-zinc-200 rounded w-16"></div>
-                <div class="h-4 bg-zinc-200 rounded w-24"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-32"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-40"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-16"></div>
+                <div class="h-4 bg-zinc-200 rounded-sm w-24"></div>
               </div>
             <% end %>
           </div>
           <div
             :if={@oban_data_loaded}
-            class="bg-white shadow rounded-lg overflow-hidden"
+            class="bg-white shadow-sm rounded-lg overflow-hidden"
           >
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
@@ -574,21 +581,21 @@ defmodule YscWeb.AdminSettingsLive do
               <h3 class="text-sm font-semibold text-zinc-700 mb-2">Arguments</h3>
               <pre
                 phx-no-curly-interpolation
-                class="text-xs bg-zinc-50 p-3 rounded border border-zinc-200 overflow-x-auto"
+                class="text-xs bg-zinc-50 p-3 rounded-sm border border-zinc-200 overflow-x-auto"
               ><%= Jason.encode!(@selected_job.args, pretty: true) %></pre>
             </div>
             <div :if={@selected_job.meta != %{} && @selected_job.meta != nil}>
               <h3 class="text-sm font-semibold text-zinc-700 mb-2">Metadata</h3>
               <pre
                 phx-no-curly-interpolation
-                class="text-xs bg-zinc-50 p-3 rounded border border-zinc-200 overflow-x-auto"
+                class="text-xs bg-zinc-50 p-3 rounded-sm border border-zinc-200 overflow-x-auto"
               ><%= Jason.encode!(@selected_job.meta, pretty: true) %></pre>
             </div>
             <div :if={@selected_job.errors != [] && @selected_job.errors != nil}>
               <h3 class="text-sm font-semibold text-zinc-700 mb-2">Errors</h3>
               <div class="space-y-2">
                 <%= for error <- @selected_job.errors do %>
-                  <div class="bg-red-50 p-3 rounded border border-red-200">
+                  <div class="bg-red-50 p-3 rounded-sm border border-red-200">
                     <p class="text-xs text-red-900 font-mono">
                       {Map.get(error, :error) || Map.get(error, "error")}
                     </p>

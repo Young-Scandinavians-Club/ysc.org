@@ -188,6 +188,16 @@ defmodule YscWeb.EventDetailsLive.MemberOnlyTiersTest do
 
       assert html =~ "Choose a regular ticket type instead"
       refute html =~ "Pick a regular tier instead"
+      refute html =~ "regular tiers"
+    end
+
+    test "checkout toast for ineligible members-only tickets says ticket type, not tiers" do
+      source = File.read!("lib/ysc_web/live/event_details_live.ex")
+
+      assert source =~
+               "Please choose a regular ticket type instead."
+
+      refute source =~ "Please choose from the regular tiers."
     end
 
     test "lifetime member is not blocked after adding one member-only ticket",

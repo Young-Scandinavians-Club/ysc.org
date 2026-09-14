@@ -16,7 +16,7 @@ defmodule YscWeb.AdminKbdTest do
         """)
 
       assert html =~ ~s(<kbd class=")
-      assert html =~ "min-w-[1.375rem]"
+      assert html =~ "min-w-5.5"
       assert html =~ "text-zinc-500"
       assert html =~ "↑"
     end
@@ -30,7 +30,7 @@ defmodule YscWeb.AdminKbdTest do
         """)
 
       assert html =~ "px-1.5 py-0.5"
-      refute html =~ "min-w-[1.375rem]"
+      refute html =~ "min-w-5.5"
       assert html =~ "↵ enter"
     end
 

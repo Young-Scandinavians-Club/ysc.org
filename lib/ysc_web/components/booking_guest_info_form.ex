@@ -20,7 +20,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
 
   def booking_guest_info_form(assigns) do
     ~H"""
-    <div class="bg-white rounded-lg border border-zinc-200 p-8 shadow-sm">
+    <div class="bg-white rounded-lg border border-zinc-200 p-8 shadow-xs">
       <h2 class="text-xl font-bold mb-2">Guest Information</h2>
       <p :if={@intro_text} class="text-sm text-zinc-600 mb-4">{@intro_text}</p>
       <p :if={!@intro_text} class="text-sm text-zinc-600 mb-4">
@@ -55,7 +55,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
                 <p class="text-sm font-semibold text-blue-900">
                   You (the member making this booking)
                 </p>
-                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded">
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-sm">
                   Required
                 </span>
               </div>
@@ -177,7 +177,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
                     Map.get(guest_data, "last_name", "")
                 end %>
               <div class={[
-                "flex items-start gap-4 p-4 rounded-r-lg shadow-sm",
+                "flex items-start gap-4 p-4 rounded-r-lg shadow-xs",
                 if(is_child,
                   do: "bg-white border-l-4 border-green-500",
                   else: "bg-white border-l-4 border-blue-500"
@@ -207,7 +207,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
                             do: "family_#{selected_family_member.id}",
                             else: "other"
                         }
-                        class="text-xs border-none bg-zinc-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="text-xs border-none bg-zinc-100 rounded-sm px-2 py-1 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                       >
                         <optgroup
                           :if={length(@other_family_members) > 0}

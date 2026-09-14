@@ -1328,14 +1328,14 @@ defmodule YscWeb.AdminMoneyLive do
             type="date"
             label="Start"
             id="start_date"
-            class="mt-1 block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            class="mt-1 block w-full rounded-md border-zinc-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           />
           <.input
             field={@date_range_form[:end_date]}
             type="date"
             label="End"
             id="end_date"
-            class="mt-1 block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            class="mt-1 block w-full rounded-md border-zinc-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
           />
           <.button
             type="submit"
@@ -1383,7 +1383,7 @@ defmodule YscWeb.AdminMoneyLive do
         <div
           id="expense-reports-inbox"
           class={[
-            "mb-6 rounded-lg border shadow-sm px-5 py-4",
+            "mb-6 rounded-lg border shadow-xs px-5 py-4",
             if(@expense_reports_inbox != [],
               do: "bg-rose-50 border-rose-200",
               else: "bg-emerald-50 border-emerald-200"
@@ -1543,7 +1543,7 @@ defmodule YscWeb.AdminMoneyLive do
 
         <div
           id="recent-payments-section"
-          class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8"
+          class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8"
         >
           <div class="px-6 py-4 border-b border-zinc-100">
             <h2 class="text-lg font-semibold text-zinc-900">Recent Payments</h2>
@@ -1726,7 +1726,7 @@ defmodule YscWeb.AdminMoneyLive do
       </div>
 
       <div :if={@active_tab == :expenses} id="money-expenses-tab">
-        <div class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8">
+        <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
           <div class="px-6 py-4 border-b border-zinc-100">
             <h2 class="text-lg font-semibold text-zinc-900">Expense Reports</h2>
             <p class="text-sm text-zinc-500 mt-1">
@@ -1750,12 +1750,12 @@ defmodule YscWeb.AdminMoneyLive do
                     Status
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    <span class="block max-w-[7rem] whitespace-normal leading-tight">
+                    <span class="block max-w-28 whitespace-normal leading-tight">
                       QuickBooks Sync Status
                     </span>
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    <span class="block max-w-[7rem] whitespace-normal leading-tight">
+                    <span class="block max-w-28 whitespace-normal leading-tight">
                       QuickBooks Bill ID
                     </span>
                   </th>
@@ -1883,14 +1883,14 @@ defmodule YscWeb.AdminMoneyLive do
             <span class="sr-only">Loading account balances…</span>
             <div
               :for={_ <- 1..6}
-              class="bg-white p-4 rounded-lg shadow-sm border border-zinc-100 space-y-3"
+              class="bg-white p-4 rounded-lg shadow-xs border border-zinc-100 space-y-3"
             >
               <div class="flex justify-between items-start">
-                <.skeleton_block class="h-4 w-28 rounded" />
-                <.skeleton_block class="h-3 w-16 rounded" />
+                <.skeleton_block class="h-4 w-28 rounded-sm" />
+                <.skeleton_block class="h-3 w-16 rounded-sm" />
               </div>
-              <.skeleton_block class="h-3 w-full rounded" />
-              <.skeleton_block class="h-7 w-24 rounded" />
+              <.skeleton_block class="h-3 w-full rounded-sm" />
+              <.skeleton_block class="h-7 w-24 rounded-sm" />
             </div>
           </div>
           <div
@@ -1900,7 +1900,7 @@ defmodule YscWeb.AdminMoneyLive do
           >
             <div
               :for={account_data <- @accounts_with_balances}
-              class="bg-white p-4 rounded-lg shadow-sm border border-zinc-100"
+              class="bg-white p-4 rounded-lg shadow-xs border border-zinc-100"
             >
               <div class="flex justify-between items-start mb-2">
                 <h3 class="font-medium text-zinc-900">
@@ -1925,7 +1925,7 @@ defmodule YscWeb.AdminMoneyLive do
           </div>
         </div>
 
-        <div class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8">
+        <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
           <div class="px-6 py-4 border-b border-zinc-100">
             <h2 class="text-lg font-semibold text-zinc-900">Ledger Entries</h2>
           </div>
@@ -2049,7 +2049,7 @@ defmodule YscWeb.AdminMoneyLive do
       </div>
 
       <div :if={@active_tab == :webhooks} id="money-webhooks-tab">
-        <div class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8">
+        <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
           <div class="px-6 py-4 border-b border-zinc-100">
             <h2 class="text-lg font-semibold text-zinc-900">
               Stripe Webhook Events
@@ -2177,7 +2177,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Ticket Selection for Ticket Orders -->
           <div
             :if={@ticket_order}
-            class="mb-4 p-4 bg-blue-50 rounded border border-blue-200"
+            class="mb-4 p-4 bg-blue-50 rounded-sm border border-blue-200"
           >
             <h4 class="text-sm font-semibold text-zinc-800 mb-3">
               Select Tickets to Refund
@@ -2192,7 +2192,7 @@ defmodule YscWeb.AdminMoneyLive do
                     (@ticket_order.tickets || [])
                     |> Enum.filter(&(&1.status in [:confirmed, :pending]))
                 }
-                class="flex items-start p-2 border border-zinc-200 rounded hover:bg-blue-100 cursor-pointer"
+                class="flex items-start p-2 border border-zinc-200 rounded-sm hover:bg-blue-100 cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -2493,7 +2493,7 @@ defmodule YscWeb.AdminMoneyLive do
           <label class="block text-sm font-medium text-zinc-900 mb-2">
             Payload
           </label>
-          <pre class="bg-zinc-50 border border-zinc-200 rounded p-4 text-xs overflow-auto max-h-96 font-mono text-zinc-800"><%= Jason.encode!(@selected_webhook.payload, pretty: true) %></pre>
+          <pre class="bg-zinc-50 border border-zinc-200 rounded-sm p-4 text-xs overflow-auto max-h-96 font-mono text-zinc-800"><%= Jason.encode!(@selected_webhook.payload, pretty: true) %></pre>
         </div>
 
         <div class="flex justify-end gap-2">
@@ -2586,7 +2586,7 @@ defmodule YscWeb.AdminMoneyLive do
           </div>
         </div>
         <!-- QuickBooks Information -->
-        <div class="mb-6 p-4 bg-amber-50 rounded border border-amber-200">
+        <div class="mb-6 p-4 bg-amber-50 rounded-sm border border-amber-200">
           <h4 class="text-md font-semibold text-zinc-800 mb-3">
             QuickBooks Information
           </h4>
@@ -2948,7 +2948,7 @@ defmodule YscWeb.AdminMoneyLive do
 
         payout_reconciles? =
           payout_computed_net == @selected_payout.amount %>
-        <div class="mb-4 p-4 bg-zinc-50 rounded border">
+        <div class="mb-4 p-4 bg-zinc-50 rounded-sm border">
           <h4 class="text-sm font-semibold text-zinc-800 mb-2">Summary</h4>
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
@@ -3137,7 +3137,7 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
           </div>
           <!-- QuickBooks Information -->
-          <div class="mt-4 p-4 bg-amber-50 rounded border border-amber-200">
+          <div class="mt-4 p-4 bg-amber-50 rounded-sm border border-amber-200">
             <h4 class="text-sm font-semibold text-zinc-800 mb-3">
               QuickBooks Information
             </h4>
@@ -3216,7 +3216,7 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Related Entity -->
           <div
             :if={@payment_related_entity}
-            class="mt-4 p-4 bg-blue-50 rounded border border-blue-200"
+            class="mt-4 p-4 bg-blue-50 rounded-sm border border-blue-200"
           >
             <h4 class="text-sm font-semibold text-zinc-800 mb-2">Related Entity</h4>
             <%= case @payment_related_entity do %>
@@ -3473,7 +3473,7 @@ defmodule YscWeb.AdminMoneyLive do
             phx-window-keydown="expense_attachment_next"
             phx-key="ArrowDown"
           ></span>
-          <div class="flex h-full min-h-0 w-[min(46%,40rem)] min-w-0 shrink-0 flex-col border-r border-zinc-200 lg:min-w-[28rem]">
+          <div class="flex h-full min-h-0 w-[min(46%,40rem)] min-w-0 shrink-0 flex-col border-r border-zinc-200 lg:min-w-md">
             <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
@@ -3509,7 +3509,7 @@ defmodule YscWeb.AdminMoneyLive do
                           type="select"
                           id="expense-report-event-select"
                           label=""
-                          class="rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          class="rounded-sm border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                           options={
                             [{"No event", ""}] ++
                               Enum.map(@expense_report_events, fn event ->
@@ -3625,7 +3625,7 @@ defmodule YscWeb.AdminMoneyLive do
 
               <details
                 id="expense-report-more-details"
-                class="rounded border border-zinc-200 bg-zinc-50 p-3 text-sm"
+                class="rounded-sm border border-zinc-200 bg-zinc-50 p-3 text-sm"
                 open={not is_nil(report.quickbooks_sync_error)}
               >
                 <summary class="cursor-pointer font-medium text-zinc-800">
@@ -3635,7 +3635,7 @@ defmodule YscWeb.AdminMoneyLive do
                   <%= if report.quickbooks_sync_error do %>
                     <div
                       id="expense-report-qb-error"
-                      class="rounded border border-red-200 bg-red-50 p-3 text-red-700"
+                      class="rounded-sm border border-red-200 bg-red-50 p-3 text-red-700"
                     >
                       {format_quickbooks_sync_error(report.quickbooks_sync_error)}
                     </div>
@@ -3938,7 +3938,7 @@ defmodule YscWeb.AdminMoneyLive do
                     color="zinc"
                     variant="outline"
                     phx-click="expense_attachment_prev"
-                    class="!min-h-0 px-2 py-1"
+                    class="min-h-0! px-2 py-1"
                   >
                     <.icon name="hero-chevron-left" class="h-4 w-4" />
                     <span class="sr-only">Previous item</span>
@@ -3949,7 +3949,7 @@ defmodule YscWeb.AdminMoneyLive do
                     color="zinc"
                     variant="outline"
                     phx-click="expense_attachment_next"
-                    class="!min-h-0 px-2 py-1"
+                    class="min-h-0! px-2 py-1"
                   >
                     <.icon name="hero-chevron-right" class="h-4 w-4" />
                     <span class="sr-only">Next item</span>
@@ -3967,7 +3967,7 @@ defmodule YscWeb.AdminMoneyLive do
                   <% end %>
                 </div>
               </div>
-              <div class="relative min-h-0 flex-1 overflow-hidden rounded bg-zinc-100">
+              <div class="relative min-h-0 flex-1 overflow-hidden rounded-sm bg-zinc-100">
                 <div
                   :if={
                     (selected.media == :image && selected.url) ||
@@ -4158,11 +4158,11 @@ defmodule YscWeb.AdminMoneyLive do
                         name="amount"
                         value={money_input_value(row.amount)}
                         autofocus
-                        class="w-20 rounded border border-zinc-300 px-1.5 py-0.5 text-right text-sm tabular-nums focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        class="w-20 rounded-sm border border-zinc-300 px-1.5 py-0.5 text-right text-sm tabular-nums focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                       />
                       <button
                         type="submit"
-                        class="rounded p-0.5 text-green-600 hover:bg-green-50 hover:text-green-800"
+                        class="rounded-sm p-0.5 text-green-600 hover:bg-green-50 hover:text-green-800"
                         aria-label={"Save amount for #{row.label}"}
                       >
                         <.icon name="hero-check" class="h-4 w-4" />
@@ -4170,7 +4170,7 @@ defmodule YscWeb.AdminMoneyLive do
                       <button
                         type="button"
                         phx-click="cancel_edit_expense_item_amount"
-                        class="rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                        class="rounded-sm p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
                         aria-label="Cancel editing amount"
                       >
                         <.icon name="hero-x-mark" class="h-4 w-4" />
@@ -4185,7 +4185,7 @@ defmodule YscWeb.AdminMoneyLive do
                         phx-click="edit_expense_item_amount"
                         phx-value-item_id={row.item_id}
                         phx-value-kind={to_string(row.kind)}
-                        class="rounded p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-blue-600"
+                        class="rounded-sm p-0.5 text-zinc-400 hover:bg-zinc-100 hover:text-blue-600"
                         aria-label={"Edit amount for #{row.label}"}
                       >
                         <.icon name="hero-pencil-square" class="h-3.5 w-3.5" />
@@ -4204,7 +4204,7 @@ defmodule YscWeb.AdminMoneyLive do
                         src={row.url}
                         alt={receipt_cell_label(row)}
                         title={receipt_cell_label(row)}
-                        class="h-10 w-10 rounded object-cover"
+                        class="h-10 w-10 rounded-sm object-cover"
                       />
                     <% row.media == :pdf -> %>
                       <.icon
@@ -4214,7 +4214,7 @@ defmodule YscWeb.AdminMoneyLive do
                     <% true -> %>
                       <span
                         title={receipt_cell_label(row)}
-                        class="inline-block h-8 w-8 rounded border border-dashed border-zinc-300"
+                        class="inline-block h-8 w-8 rounded-sm border border-dashed border-zinc-300"
                       ></span>
                   <% end %>
                 </td>

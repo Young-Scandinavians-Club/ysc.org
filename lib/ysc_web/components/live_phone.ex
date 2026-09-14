@@ -52,7 +52,7 @@ defmodule LivePhone do
   def render(assigns) do
     ~H"""
     <div
-      class={"live_phone relative flex rounded bg-white border-1 mt-2 border-zinc-300 #{if @valid?, do: "live_phone-valid"}"}
+      class={"live_phone relative flex rounded-sm bg-white mt-2 #{if @valid?, do: "live_phone-valid"}"}
       id={"live_phone-#{@id}"}
       phx-hook="LivePhone"
     >
@@ -68,7 +68,7 @@ defmodule LivePhone do
         type="tel"
         id={"live_phone-tel-#{@id}"}
         class={[
-          "live_phone-input text-zinc-900 border-1 rounded-r w-full focus:ring-0 focus:border-zinc-400 sm:text-sm sm:leading-6 bg-none flex-1",
+          "live_phone-input text-zinc-900 border rounded-r w-full sm:text-sm sm:leading-6 bg-none flex-1",
           @class
         ]}
         value={assigns[:value]}
@@ -321,7 +321,7 @@ defmodule LivePhone do
 
     ~H"""
     <div
-      class={"live_phone-country align-middle text-center hover:bg-zinc-100 transition duration-150 ease-in-out justify-center cursor-pointer flex px-3 py-2 rounded-l border-1 border-l border-t border-b border-zinc-300 #{if @opened?, do: "border-zinc-400 bg-zinc-100"}"}
+      class={"live_phone-country align-middle text-center hover:bg-zinc-100 transition duration-150 ease-in-out justify-center cursor-pointer flex px-3 py-2 rounded-l border-l border-t border-b border-zinc-300 #{if @opened?, do: "border-zinc-400 bg-zinc-100"}"}
       tabindex={@tabindex}
       phx-target={@target}
       phx-click="toggle"
@@ -329,7 +329,7 @@ defmodule LivePhone do
       aria-expanded={to_string(@opened?)}
       role="combobox"
     >
-      <span class={"live_phone-country-flag rounded w-7 h-6 fi fi-" <> String.downcase(@country)} />
+      <span class={"live_phone-country-flag rounded-sm w-7 h-6 fi fi-" <> String.downcase(@country)} />
       <span class="live_phone-country-code text-sm text-zinc-600 px-3 mt-0.5">
         {@region_code}
       </span>
@@ -360,7 +360,7 @@ defmodule LivePhone do
 
     ~H"""
     <ul
-      class="live_phone-country-list overflow-auto absolute text-left list-none top-full w-72 max-h-80 bg-white rounded shadow px-2 m-0 z-10"
+      class="live_phone-country-list overflow-auto absolute text-left list-none top-full mt-1 w-72 max-h-80 bg-white rounded-sm shadow-sm px-2 m-0 z-10"
       id={"live_phone-country-list-#{@id}"}
       role="listbox"
     >
@@ -374,7 +374,7 @@ defmodule LivePhone do
         <%= if country == @last_preferred do %>
           <li
             aria-disabled="true"
-            class="live_phone-country-separator m-0 height-0 p-0 overflow-hidden border-b border-1 border-zinc-200"
+            class="live_phone-country-separator m-0 height-0 p-0 overflow-hidden border-b border border-zinc-200"
             role="separator"
           >
           </li>
@@ -389,10 +389,10 @@ defmodule LivePhone do
     assigns = assign(assigns, :selected?, selected?)
 
     class = [
-      "live_phone-country-item flex text-sm cursor-pointer m-0 px-1 py-1 hover:bg-white"
+      "live_phone-country-item flex text-sm cursor-pointer m-0 px-1 py-1 rounded-sm hover:bg-zinc-100"
     ]
 
-    class = if assigns[:selected?], do: ["bg-white" | class], else: class
+    class = if assigns[:selected?], do: ["bg-blue-50" | class], else: class
 
     class =
       if assigns[:country].preferred, do: ["preferred" | class], else: class

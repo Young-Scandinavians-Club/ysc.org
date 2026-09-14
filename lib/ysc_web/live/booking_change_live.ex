@@ -465,11 +465,11 @@ defmodule YscWeb.BookingChangeLive do
       aria-live="polite"
     >
       <span class="sr-only">Loading change booking…</span>
-      <.skeleton_block class="h-4 w-40 rounded mb-6" />
-      <.skeleton_block class="h-9 w-72 rounded mb-2" />
-      <.skeleton_block class="h-5 w-56 rounded mb-6" />
+      <.skeleton_block class="h-4 w-40 rounded-sm mb-6" />
+      <.skeleton_block class="h-9 w-72 rounded-sm mb-2" />
+      <.skeleton_block class="h-5 w-56 rounded-sm mb-6" />
       <div class="bg-white border border-zinc-200 rounded-xl p-6 space-y-4">
-        <.skeleton_block :for={_ <- 1..4} class="h-10 w-full rounded" />
+        <.skeleton_block :for={_ <- 1..4} class="h-10 w-full rounded-sm" />
       </div>
     </div>
     <div
@@ -493,7 +493,7 @@ defmodule YscWeb.BookingChangeLive do
 
       <div
         :if={@step == :edit}
-        class="space-y-6 bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
+        class="space-y-6 bg-white border border-zinc-200 rounded-xl p-6 shadow-xs"
       >
         <%= if @show_payment_form && @payment_intent && @payment_delta &&
                 Money.positive?(@payment_delta) do %>
@@ -634,13 +634,13 @@ defmodule YscWeb.BookingChangeLive do
                   {YscWeb.BookingUserMessages.modification_forfeiture_body()}
                 </p>
 
-                <div class="flex items-start gap-3 bg-white p-3 rounded border border-amber-200">
+                <div class="flex items-start gap-3 bg-white p-3 rounded-sm border border-amber-200">
                   <input
                     type="checkbox"
                     id="acknowledge-forfeiture"
                     phx-click="toggle-acknowledgment"
                     checked={@acknowledged}
-                    class="mt-0.5 h-4 w-4 rounded border-amber-300 text-blue-600 focus:ring-blue-500"
+                    class="mt-0.5 h-4 w-4 rounded-sm border-amber-300 text-blue-600 focus:ring-blue-500"
                   />
                   <label
                     for="acknowledge-forfeiture"
@@ -1637,7 +1637,7 @@ defmodule YscWeb.BookingChangeLive do
           <div
             id="payment-element"
             phx-update="ignore"
-            class="min-h-[12rem]"
+            class="min-h-48"
           />
           <div id="payment-message" class="hidden mt-4" />
         </div>
