@@ -831,6 +831,51 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert html =~ "text-green-700 font-medium\">Yes<"
     end
 
+    test "reservations table still shows guest name and room category after slim load",
+         %{conn: conn} do
+      unique = "SlimCat#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "slim-cat-#{System.unique_integer([:positive])}"
+        })
+        |> Ysc.Repo.insert()
+
+      {:ok, room} =
+        %Ysc.Bookings.Room{}
+        |> Ysc.Bookings.Room.changeset(%{
+          name: "Slim Category Room",
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true,
+          room_category_id: category.id
+        })
+        |> Ysc.Repo.insert()
+
+      _booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          rooms: [room]
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      html = render(view)
+      assert html =~ unique
+      assert html =~ "Slim Category Room"
+      assert has_element?(view, "#admin_reservations_list")
+    end
+
     test "reservations table shows unchecked status when booking.checked_in is false",
          %{
            conn: conn
