@@ -403,6 +403,41 @@ defmodule Ysc.ScanningTest do
       assert other_admin_open_session.id in ids
       refute closed_session.id in ids
     end
+
+    test "preloads slim event title for joinable desks without event body HTML" do
+      admin =
+        user_fixture(%{
+          role: "admin",
+          first_name: "JoinSlim",
+          last_name: "Admin"
+        })
+
+      event =
+        event_fixture(%{
+          title: "Joinable Membership Desk Event",
+          organizer_id: admin.id,
+          raw_details: "<p>joinable sessions must not load this body</p>",
+          rendered_details: "<p>joinable sessions must not load this body</p>"
+        })
+
+      session = event_membership_session_fixture(event, admin)
+
+      {sessions, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.get_open_membership_sessions() end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(sessions, &(&1.id == session.id))
+      assert listed
+      assert listed.event.title == event.title
+      assert listed.created_by.first_name == "JoinSlim"
+      assert listed.created_by.email == admin.email
+      assert is_nil(listed.event.raw_details)
+      assert is_nil(listed.created_by.hashed_password)
+      assert html_cols == 0
+    end
   end
 
   describe "get_open_session_for_event/2" do
@@ -637,6 +672,56 @@ defmodule Ysc.ScanningTest do
 
       assert open_session.id in ids
       refute closed_session.id in ids
+    end
+
+    test "preloads slim event title and creator without password hashes" do
+      admin =
+        user_fixture(%{
+          role: "admin",
+          first_name: "OpenSlim",
+          last_name: "Admin"
+        })
+
+      event =
+        event_fixture(%{
+          title: "Open Session Slim Event",
+          organizer_id: admin.id,
+          raw_details: "<p>open sessions must not load this body</p>",
+          rendered_details: "<p>open sessions must not load this body</p>"
+        })
+
+      {:ok, session} =
+        Scanning.create_session(%{
+          name: "Open event desk",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {sessions, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.get_open_sessions(admin.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(sessions, &(&1.id == session.id))
+      assert listed
+      assert listed.event.title == event.title
+      assert listed.created_by.first_name == "OpenSlim"
+      assert listed.created_by.email == admin.email
+      assert is_nil(listed.event.raw_details)
+      assert is_nil(listed.created_by.hashed_password)
+      assert password_cols == 0
+
+      {_sessions, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.get_open_sessions(admin.id) end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      assert html_cols == 0
     end
   end
 

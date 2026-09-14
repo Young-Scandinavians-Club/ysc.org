@@ -2010,6 +2010,155 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert Payments.get_payment_method!(only.id).id == only.id
     end
 
+    test "delete-payment-method ignores another member's payment_method_id", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      other = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_delpm_idor_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, other} =
+        other
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_delpm_victim_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, default} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_del_idor_default",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      {:ok, extra} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_del_idor_extra",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      {:ok, foreign} =
+        Payments.insert_payment_method(%{
+          user_id: other.id,
+          provider: :stripe,
+          provider_id: "pm_del_idor_foreign",
+          provider_customer_id: other.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      render(view)
+
+      html =
+        render_click(view, "delete-payment-method", %{
+          "payment_method_id" => foreign.id
+        })
+
+      assert html =~ "Payment method not found"
+      refute html =~ "Payment method removed"
+      assert Payments.get_payment_method!(foreign.id).id == foreign.id
+      assert Payments.get_payment_method!(foreign.id).user_id == other.id
+
+      remaining_ids =
+        user
+        |> Payments.list_payment_methods()
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert remaining_ids == Enum.sort([default.id, extra.id])
+    end
+
+    test "select-payment-method ignores another member's payment_method_id", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      other = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_selpm_idor_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, other} =
+        other
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_selpm_victim_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      {:ok, own_default} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_sel_idor_own",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      {:ok, own_extra} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_sel_idor_extra",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: false
+        })
+
+      {:ok, foreign} =
+        Payments.insert_payment_method(%{
+          user_id: other.id,
+          provider: :stripe,
+          provider_id: "pm_sel_idor_foreign",
+          provider_customer_id: other.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      render(view)
+
+      html =
+        render_click(view, "select-payment-method", %{
+          "payment_method_id" => foreign.id
+        })
+
+      assert html =~ "Payment method not found"
+      assert Payments.get_payment_method!(own_default.id).is_default
+      refute Payments.get_payment_method!(own_extra.id).is_default
+      assert Payments.get_payment_method!(foreign.id).is_default
+      assert Payments.get_payment_method!(foreign.id).user_id == other.id
+    end
+
     test "cancel-new-payment-method hides the add form", %{conn: conn} do
       user = user_fixture(%{state: :active})
 
