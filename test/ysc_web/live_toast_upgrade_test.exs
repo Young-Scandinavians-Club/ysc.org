@@ -1,10 +1,13 @@
 defmodule YscWeb.LiveToastUpgradeTest do
   @moduledoc """
-  Guards the live_toast 0.9.0 → 0.10.2 upgrade.
+  Guards the live_toast 0.9.0 → 0.11.0 upgrade.
 
   0.10.0 stops calling gettext on `put_toast`/`send_toast` copy; connection-notice
   translation is opt-in via `:gettext_backend`. 0.10.1/0.10.2 fix custom Phoenix
-  flash rerenders. We pass English strings through `YscWeb.Flash` and do not
+  flash rerenders. 0.11.0 fixes connection notices under Tailwind CSS v4, where
+  `[hidden]` now takes precedence over display styles, by having the JS hook
+  remove the `hidden` attribute (not just toggle `display`) before showing an
+  error toast. We pass English strings through `YscWeb.Flash` and do not
   configure `:gettext_backend` or `toast_component_fn`.
   """
   use YscWeb.ConnCase, async: true
@@ -47,9 +50,9 @@ defmodule YscWeb.LiveToastUpgradeTest do
     |> fetch_flash()
   end
 
-  describe "0.10.2 Hex lock and public APIs" do
-    test "locks the Hex package to 0.10.2" do
-      assert to_string(Application.spec(:live_toast, :vsn)) == "0.10.2"
+  describe "0.11.0 Hex lock and public APIs" do
+    test "locks the Hex package to 0.11.0" do
+      assert to_string(Application.spec(:live_toast, :vsn)) == "0.11.0"
     end
 
     test "APIs we call still exist" do
@@ -137,13 +140,20 @@ defmodule YscWeb.LiveToastUpgradeTest do
       assert source =~ "createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS)"
     end
 
-    test "vendored ESM matches the 0.10.2 package bundle and exports the hook" do
+    test "vendored ESM matches the 0.11.0 package bundle and exports the hook" do
       vendor = File.read!(@vendor_js)
       package = File.read!(@package_js)
       assert vendor == package
       assert vendor =~ "function createLiveToastHook"
       assert vendor =~ "function asToastElement"
       refute vendor =~ "interface HTMLElement"
+    end
+
+    test "vendored ESM removes the hidden attribute before showing a connection error, per Tailwind v4 fix" do
+      vendor = File.read!(@vendor_js)
+
+      assert vendor =~
+               ~s[this.el.removeAttribute("hidden");\n        this.el.style.display = "flex";]
     end
   end
 
