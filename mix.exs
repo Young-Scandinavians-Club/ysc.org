@@ -242,10 +242,12 @@ defmodule Ysc.MixProject do
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
       {:goth, "~> 1.4"},
-      # 7.4.1: TokenBucket ETS refill uses milliseconds instead of whole
-      # seconds. We use default :fix_window (hit/3 scale+limit), not
-      # TokenBucket, so the patch is unused; pin the patched floor.
-      {:hammer, "~> 7.4.1"},
+      # 7.5.0: Atomic TokenBucket/LeakyBucket race (init atomic before ETS
+      # insert); TokenBucket ETS remainder carry + deny retry-ms is real wait
+      # instead of flat 1000. We use default :fix_window (hit/3 scale+limit),
+      # not TokenBucket, so those patches are unused. mix hammer.install is
+      # unused (Igniter optional).
+      {:hammer, "~> 7.5"},
       # 1.5.5: CSS.scrub treats nested tags inside <style> as empty (parser can
       # pass a tree instead of a string); HTML5 also tightens meta http-equiv
       # and object data=. We use BasicHTML / TrixScrubber / strip_tags, not
