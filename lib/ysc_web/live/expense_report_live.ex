@@ -1548,11 +1548,13 @@ defmodule YscWeb.ExpenseReportLive do
               </div>
             </div>
           </div>
-          <!-- Income Items Card -->
+          <!-- Money already received -->
           <%= if not Enum.empty?(@expense_report.income_items) do %>
             <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6">
               <div class="px-6 py-4 border-b border-zinc-200">
-                <h2 class="text-lg font-semibold text-zinc-900">Income Items</h2>
+                <h2 class="text-lg font-semibold text-zinc-900">
+                  Money already received
+                </h2>
               </div>
               <div class="px-6 py-4">
                 <div class="space-y-4">
@@ -1624,7 +1626,7 @@ defmodule YscWeb.ExpenseReportLive do
                 </div>
                 <%= if not Money.zero?(@totals.income_total) do %>
                   <div class="flex justify-between">
-                    <span class="text-zinc-600">Total Income</span>
+                    <span class="text-zinc-600">Money already received</span>
                     <span class="font-medium">
                       {display_money(@totals.income_total)}
                     </span>
@@ -2625,14 +2627,14 @@ defmodule YscWeb.ExpenseReportLive do
                     </.button>
                   </div>
                 </.expense_form_section>
-                <!-- Step 3: Income Items (Optional) -->
+                <!-- Step 3: Money already received (optional) -->
                 <.expense_form_section
                   id="expense-section-income"
                   step={3}
-                  title="Income Items (Optional)"
-                  subtitle="If you received any income related to this expense report, add it here to offset your expenses."
+                  title="Money already received (optional)"
+                  subtitle="If you already got money back for any of these expenses, add it here. We'll subtract it from what we reimburse you."
                 >
-                  <!-- Empty state for income items -->
+                  <!-- Empty state for money already received -->
                   <%= if @income_items_empty? do %>
                     <div class="border-2 border-dashed border-slate-200 rounded-lg p-8 text-center bg-slate-100/50 mb-4">
                       <div class="flex flex-col items-center max-w-md mx-auto">
@@ -2641,17 +2643,17 @@ defmodule YscWeb.ExpenseReportLive do
                           class="w-12 h-12 text-zinc-400 mb-3"
                         />
                         <p class="text-sm font-medium text-zinc-600 mb-2">
-                          No income items yet
+                          None added yet
                         </p>
                         <p class="text-xs text-zinc-500 mb-3">
-                          Add income items if you received any payments related to these expenses
+                          Skip this unless someone already paid you for these expenses, or you received a refund.
                         </p>
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-left w-full">
                           <p class="text-xs font-medium text-blue-900 mb-1">
                             Example:
                           </p>
                           <p class="text-xs text-blue-800">
-                            You collected $20 cash from a member for a guest ticket, or received a refund that should offset your expenses.
+                            You collected $20 cash from a member for a guest ticket, or received a refund that should reduce what we pay you back.
                           </p>
                         </div>
                         <.button
@@ -2660,7 +2662,7 @@ defmodule YscWeb.ExpenseReportLive do
                           variant="outline"
                           color="blue"
                         >
-                          <.icon name="hero-plus" class="w-5 h-5" />Add Income Item
+                          <.icon name="hero-plus" class="w-5 h-5" />Add money received
                         </.button>
                       </div>
                     </div>
@@ -2670,7 +2672,7 @@ defmodule YscWeb.ExpenseReportLive do
                     <div class="bg-zinc-50/70 ring-1 ring-zinc-100 rounded-lg p-4 mb-4 space-y-4">
                       <div class="flex justify-between items-start">
                         <h4 class="text-md font-medium text-zinc-700">
-                          Income Item {income_f.index + 1}
+                          Amount received {income_f.index + 1}
                         </h4>
                         <.button
                           type="button"
@@ -2748,7 +2750,7 @@ defmodule YscWeb.ExpenseReportLive do
                           id={"proof-help-#{income_f.index}"}
                           class="text-xs text-zinc-500 mb-3"
                         >
-                          Upload proof of income (invoice, payment confirmation, etc.)
+                          Upload proof (receipt, payment confirmation, and so on).
                         </p>
                         <!-- Show uploaded proof with inline preview -->
                         <div
@@ -3002,7 +3004,7 @@ defmodule YscWeb.ExpenseReportLive do
 
                   <div :if={not @income_items_empty?} class="mt-4">
                     <.button type="button" phx-click="add_income_item">
-                      <.icon name="hero-plus" class="w-5 h-5" />Add Income Item
+                      <.icon name="hero-plus" class="w-5 h-5" />Add money received
                     </.button>
                   </div>
                 </.expense_form_section>
@@ -3263,7 +3265,9 @@ defmodule YscWeb.ExpenseReportLive do
                     </div>
                     <%= if not Money.zero?(@totals.income_total) do %>
                       <div class="flex justify-between items-center">
-                        <span class="text-sm text-zinc-600">Total Income</span>
+                        <span class="text-sm text-zinc-600">
+                          Money already received
+                        </span>
                         <span class="text-sm font-semibold text-zinc-900">
                           {Ysc.MoneyHelper.format_money!(@totals.income_total)}
                         </span>

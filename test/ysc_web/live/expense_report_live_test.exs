@@ -53,6 +53,31 @@ defmodule YscWeb.ExpenseReportLiveTest do
     refute html =~ "business purpose"
   end
 
+  test "offset section uses money-already-received copy instead of income jargon",
+       %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/expensereport")
+
+    assert has_element?(view, "#expense-section-income")
+
+    html = render(view)
+
+    assert html =~ "Money already received (optional)"
+    assert html =~ "subtract it from what we reimburse you"
+    assert html =~ "None added yet"
+    assert html =~ "Add money received"
+    refute html =~ "Income Items"
+    refute html =~ "Income Item"
+    refute html =~ "Total Income"
+    refute html =~ "proof of income"
+
+    html = render_click(view, "add_income_item", %{})
+
+    assert html =~ "Amount received 1"
+    assert html =~ "Upload proof (receipt, payment confirmation, and so on)."
+    refute html =~ "Income Item"
+    refute html =~ "proof of income"
+  end
+
   test "purchase items without a receipt leave the receipts checklist pending",
        %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/expensereport")
