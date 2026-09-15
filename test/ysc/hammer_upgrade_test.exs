@@ -1,11 +1,16 @@
 defmodule Ysc.HammerUpgradeTest do
   @moduledoc """
-  Guards the hammer 7.4.0 → 7.4.1 upgrade.
+  Guards the hammer 7.4.1 → 7.5.0 upgrade.
 
-  7.4.1 is a patch: TokenBucket ETS refill uses millisecond resolution so
-  `refill_rate > capacity` is not capped at `capacity` tokens/sec. We use
-  `use Hammer, backend: :ets` with the default `:fix_window` algorithm and
-  `hit/3` (scale + limit). No Elixir API breaks for our call sites.
+  7.5.0 is a minor: Atomic TokenBucket/LeakyBucket initialize the atomic
+  before publishing the ETS row; TokenBucket ETS carries the sub-token
+  remainder and returns a real wait on `{:deny, ms}` instead of a flat
+  1000. `mix hammer.install` is an optional Igniter task.
+
+  We use `use Hammer, backend: :ets` with the default `:fix_window`
+  algorithm and `hit/3` (scale + limit). No Elixir API breaks for our
+  call sites. TokenBucket deny rounding does not apply: `RateLimit.check/4`
+  still maps `{:deny, retry_after_ms}` to seconds with `max(1, div/2)`.
   """
   use ExUnit.Case, async: false
 
@@ -27,9 +32,22 @@ defmodule Ysc.HammerUpgradeTest do
     AdminHelpRateLimit
   ]
 
-  describe "7.4.1 Hex lock and public APIs" do
-    test "locks the Hex package to 7.4.1" do
-      assert to_string(Application.spec(:hammer, :vsn)) == "7.4.1"
+  @token_bucket Path.expand(
+                  "../../deps/hammer/lib/hammer/ets/token_bucket.ex",
+                  __DIR__
+                )
+  @atomic_token_bucket Path.expand(
+                         "../../deps/hammer/lib/hammer/atomic/token_bucket.ex",
+                         __DIR__
+                       )
+  @install_task Path.expand(
+                  "../../deps/hammer/lib/mix/tasks/hammer.install.ex",
+                  __DIR__
+                )
+
+  describe "7.5.0 Hex lock and public APIs" do
+    test "locks the Hex package to 7.5.0" do
+      assert to_string(Application.spec(:hammer, :vsn)) == "7.5.0"
     end
 
     test "rate limiters still export fix_window hit/set/get/expires_at" do
@@ -39,13 +57,42 @@ defmodule Ysc.HammerUpgradeTest do
         assert function_exported?(module, :set, 3)
         assert function_exported?(module, :get, 2)
         # expires_at/2 is compiled only for :fix_window / :fix_window_per_key,
-        # not TokenBucket — the algorithm 7.4.1 patched.
+        # not TokenBucket — the algorithm 7.5.0 patched.
         assert function_exported?(module, :expires_at, 2)
+        refute function_exported?(module, :hit, 5)
       end)
     end
   end
 
-  describe "7.4.1 hit/3 still returns allow and deny" do
+  describe "7.5.0 TokenBucket patches stay unused" do
+    test "ETS TokenBucket deny uses ceiling wait instead of a flat 1000" do
+      source = File.read!(@token_bucket)
+
+      assert source =~
+               "{:deny, max(div(deficit * 1000 + refill_rate - 1, refill_rate), 1)}"
+
+      refute source =~ ~r/{:deny,\s*1000}/
+    end
+
+    test "Atomic TokenBucket initializes the atomic before the ETS insert" do
+      source = File.read!(@atomic_token_bucket)
+
+      assert source =~ "atomic = :atomics.new(2, signed: false)"
+      assert source =~ ":ets.insert_new(table, {key, atomic})"
+
+      refute source =~
+               ~r/:ets\.insert_new\(table, \{key, atomic\}\).*atomic = :atomics\.new/s
+    end
+
+    test "optional mix hammer.install task ships with the package" do
+      assert File.exists?(@install_task)
+      source = File.read!(@install_task)
+      assert source =~ "defmodule Mix.Tasks.Hammer.Install"
+      assert source =~ "igniter"
+    end
+  end
+
+  describe "7.5.0 hit/3 still returns allow and deny" do
     test "allows under the limit and denies with a millisecond retry" do
       key = "hammer-upgrade:#{System.unique_integer([:positive])}"
       scale_ms = :timer.minutes(1)
