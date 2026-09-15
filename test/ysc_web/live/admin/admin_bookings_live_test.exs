@@ -1221,6 +1221,56 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
   describe "pending refunds UI" do
     setup [:create_admin]
 
+    test "pending refunds list shows guest email and booking reference", %{
+      conn: conn
+    } do
+      unique_email = "refund-list-#{System.unique_integer([:positive])}@ysc.org"
+      user = user_fixture(%{email: unique_email})
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Repo.update()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_admin_list_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: Money.new(1000, :USD),
+          status: :pending
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=pending_refunds")
+
+      assert has_element?(view, "#pending-refunds-list")
+      assert has_element?(view, "#pending-refund-#{pr.id}")
+      assert has_element?(view, "#pending-refund-#{pr.id}", unique_email)
+
+      assert has_element?(
+               view,
+               "#pending-refund-#{pr.id}",
+               booking.reference_id
+             )
+    end
+
     test "reject flow for pending refund", %{conn: conn} do
       {pr, _booking} = insert_pending_refund!(:tahoe)
 
