@@ -13,9 +13,8 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
 
   alias Ysc.Repo
   alias Ysc.Bookings
-  alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay}
+  alias Ysc.Bookings.{BookingModeDisplay, CabinMaster, PropertyDisplay}
   alias YscWeb.BookingDisplay
-  alias YscWeb.Emails.OutageNotification
 
   def get_template_name() do
     "booking_checkin_reminder"
@@ -76,28 +75,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     property_name = PropertyDisplay.short_name(booking.property)
     property_address = PropertyDisplay.address(booking.property)
 
-    # Get cabin master information
-    cabin_master = OutageNotification.get_cabin_master(booking.property)
-
-    cabin_master_name =
-      if cabin_master do
-        "#{cabin_master.first_name || ""} #{cabin_master.last_name || ""}"
-        |> String.trim()
-      else
-        nil
-      end
-
-    cabin_master_email =
-      OutageNotification.get_cabin_master_email(booking.property)
-
-    cabin_master_phone =
-      if cabin_master,
-        do:
-          Ysc.Extensions.PhoneNumber.format_for_display(
-            cabin_master.phone_number
-          ) ||
-            cabin_master.phone_number,
-        else: nil
+    contact = CabinMaster.contact(booking.property)
 
     # Format dates
     checkin_date = format_date(booking.checkin_date)
@@ -151,9 +129,9 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       is_buyout: is_buyout,
       guests_count: booking.guests_count,
       children_count: booking.children_count || 0,
-      cabin_master_name: cabin_master_name,
-      cabin_master_email: cabin_master_email,
-      cabin_master_phone: cabin_master_phone,
+      cabin_master_name: contact.name,
+      cabin_master_email: contact.email,
+      cabin_master_phone: contact.phone,
       booking_url: booking_url(booking.id),
       clear_lake_info_url: PropertyDisplay.training_videos_url(:clear_lake)
     }

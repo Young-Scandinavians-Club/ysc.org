@@ -482,6 +482,7 @@ defmodule YscWeb.Api.PropertiesControllerTest do
 
       assert sections_text =~ "Casey"
       assert sections_text =~ "Master"
+      assert sections_text =~ Ysc.EmailConfig.clear_lake_email()
     end
   end
 end

@@ -8,10 +8,8 @@ defmodule YscWeb.Emails.OutageNotification do
     mjml_template: "templates/outage_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  alias Ysc.Accounts.User
+  alias Ysc.Bookings.CabinMaster
   alias Ysc.Bookings.PropertyDisplay
-  alias Ysc.Repo
-  import Ecto.Query
   import YscWeb.Emails.Helpers, only: [format_date: 2]
 
   def get_template_name() do
@@ -100,21 +98,7 @@ defmodule YscWeb.Emails.OutageNotification do
   """
   def build_notification_variables(booking, outage) do
     first_name = booking.user.first_name || booking.user.email
-    cabin_master = get_cabin_master(outage.property)
-
-    cabin_master_name =
-      if cabin_master do
-        "#{cabin_master.first_name || ""} #{cabin_master.last_name || ""}"
-        |> String.trim()
-      end
-
-    cabin_master_phone =
-      if cabin_master do
-        Ysc.Extensions.PhoneNumber.format_for_display(cabin_master.phone_number) ||
-          cabin_master.phone_number
-      end
-
-    cabin_master_email = get_cabin_master_email(outage.property)
+    contact = CabinMaster.contact(outage.property)
 
     %{
       first_name: first_name,
@@ -125,9 +109,9 @@ defmodule YscWeb.Emails.OutageNotification do
       description: outage.description,
       checkin_date: booking.checkin_date,
       checkout_date: booking.checkout_date,
-      cabin_master_name: cabin_master_name,
-      cabin_master_phone: cabin_master_phone,
-      cabin_master_email: cabin_master_email
+      cabin_master_name: contact.name,
+      cabin_master_phone: contact.phone,
+      cabin_master_email: contact.email
     }
   end
 
@@ -201,69 +185,17 @@ defmodule YscWeb.Emails.OutageNotification do
 
   @doc """
   Gets the cabin master for a given property.
-  Returns the most recently updated user with the cabin master position.
+
+  Delegates to `Ysc.Bookings.CabinMaster.get/1`.
   """
-  def get_cabin_master(property) when is_atom(property) do
-    board_position =
-      case property do
-        :tahoe -> :tahoe_cabin_master
-        :clear_lake -> :clear_lake_cabin_master
-        _ -> nil
-      end
-
-    if board_position do
-      from(u in User,
-        where: u.board_position == ^board_position,
-        order_by: [desc: u.updated_at],
-        limit: 1
-      )
-      |> Repo.one()
-    else
-      nil
-    end
-  end
-
-  def get_cabin_master(property) when is_binary(property) do
-    property
-    |> String.to_existing_atom()
-    |> get_cabin_master()
-  rescue
-    ArgumentError ->
-      case property do
-        "tahoe" -> get_cabin_master(:tahoe)
-        "clear_lake" -> get_cabin_master(:clear_lake)
-        _ -> nil
-      end
-  end
-
-  def get_cabin_master(_), do: nil
+  defdelegate get_cabin_master(property), to: CabinMaster, as: :get
 
   @doc """
-  Gets the cabin master email for a given property.
-  Returns the specific email address for the property.
+  Gets the cabin master mailbox for a given property.
+
+  Delegates to `Ysc.Bookings.CabinMaster.email/1`.
   """
-  def get_cabin_master_email(property) when is_atom(property) do
-    case property do
-      :tahoe -> Ysc.EmailConfig.tahoe_email()
-      :clear_lake -> Ysc.EmailConfig.clear_lake_email()
-      _ -> nil
-    end
-  end
-
-  def get_cabin_master_email(property) when is_binary(property) do
-    property
-    |> String.to_existing_atom()
-    |> get_cabin_master_email()
-  rescue
-    ArgumentError ->
-      case property do
-        "tahoe" -> Ysc.EmailConfig.tahoe_email()
-        "clear_lake" -> Ysc.EmailConfig.clear_lake_email()
-        _ -> nil
-      end
-  end
-
-  def get_cabin_master_email(_), do: nil
+  defdelegate get_cabin_master_email(property), to: CabinMaster, as: :email
 
   defp incident_type_phrase(incident_type) do
     incident_type
