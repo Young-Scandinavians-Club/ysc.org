@@ -92,30 +92,13 @@ defmodule YscWeb.AccountSetupLive do
               label="6-digit verification code"
               required
             />
-            <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your spam folder.
-              <%= if email_resend_available?(assigns) do %>
-                <.link
-                  phx-click="resend_code"
-                  class="text-blue-600 hover:underline cursor-pointer"
-                >
-                  Resend the code
-                </.link>
-              <% else %>
-                <% email_countdown =
-                  email_resend_seconds_remaining(assigns) |> max(0) %>
-                <span
-                  class="text-zinc-500 cursor-not-allowed"
-                  data-countdown={email_countdown}
-                  data-timer-type="email"
-                >
-                  You can resend the code in {email_countdown}{if email_countdown ==
-                                                                    1,
-                                                                  do: " second",
-                                                                  else: " seconds"}.
-                </span>
-              <% end %>
-            </p>
+            <.verification_resend_prompt
+              id="email-verification-resend"
+              channel={:email}
+              event="resend_code"
+              disabled_until={@email_resend_disabled_until}
+              check_hint="Check your spam folder."
+            />
 
             <:actions>
               <div class="flex justify-end w-full">
@@ -376,42 +359,19 @@ defmodule YscWeb.AccountSetupLive do
             phx-change="validate_phone_code"
             class="pt-8"
           >
-            <p
-              :if={dev_or_sandbox?()}
-              class="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded-sm border border-amber-200"
-            >
-              <strong>Dev Mode:</strong>
-              You can use <code class="bg-amber-100 px-1 rounded-sm">000000</code>
-              as the verification code.
-            </p>
+            <.verification_dev_hint id="phone-verification-dev-hint" />
             <.input
               field={@phone_verification_form[:verification_code]}
               type="otp"
               label="6-digit verification code"
               required
             />
-            <p class="text-xs text-zinc-600 mt-1">
-              Didn't receive the code? Check your messages.
-              <%= if sms_resend_available?(assigns) do %>
-                <.link
-                  phx-click="resend_phone_code"
-                  class="text-blue-600 hover:underline cursor-pointer"
-                >
-                  Resend the code
-                </.link>
-              <% else %>
-                <% sms_countdown = sms_resend_seconds_remaining(assigns) |> max(0) %>
-                <span
-                  class="text-zinc-500 cursor-not-allowed font-bold"
-                  data-countdown={sms_countdown}
-                  data-timer-type="sms"
-                >
-                  You can resend the code in {sms_countdown}{if sms_countdown == 1,
-                    do: " second",
-                    else: " seconds"}.
-                </span>
-              <% end %>
-            </p>
+            <.verification_resend_prompt
+              id="phone-verification-resend"
+              channel={:sms}
+              event="resend_phone_code"
+              disabled_until={@sms_resend_disabled_until}
+            />
 
             <div class="py-2">
               <p class="text-sm mb-2 text-zinc-600 font-bold">
@@ -719,11 +679,6 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  # Helper function to check if we're in dev/sandbox mode
-  defp dev_or_sandbox? do
-    Ysc.Env.non_prod?()
-  end
-
   defp mask_email(email) when is_binary(email) do
     case String.split(email, "@") do
       [local, domain] ->
@@ -739,19 +694,6 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   defp mask_email(_), do: "***@***"
-
-  # Helper functions for resend rate limiting - delegate to ResendRateLimiter
-  defp email_resend_available?(assigns),
-    do: Ysc.ResendRateLimiter.resend_available?(assigns, :email)
-
-  defp sms_resend_available?(assigns),
-    do: Ysc.ResendRateLimiter.resend_available?(assigns, :sms)
-
-  defp email_resend_seconds_remaining(assigns),
-    do: Ysc.ResendRateLimiter.resend_seconds_remaining(assigns, :email)
-
-  defp sms_resend_seconds_remaining(assigns),
-    do: Ysc.ResendRateLimiter.resend_seconds_remaining(assigns, :sms)
 
   @impl true
   def mount(%{"user_id" => user_id}, _session, socket) do

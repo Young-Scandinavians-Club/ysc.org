@@ -230,6 +230,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       assert has_element?(view, "#email_form")
       assert has_element?(view, "#account-setup-home-logo")
+      assert has_element?(view, "#email-verification-resend")
     end
 
     test "stepper is hidden during email verification", %{conn: conn} do
@@ -760,6 +761,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       })
 
       assert has_element?(view, "#phone_verification_form")
+      assert has_element?(view, "#phone-verification-resend")
+      assert has_element?(view, "#phone-verification-dev-hint")
     end
 
     test "resubmitting the same phone number keeps the existing verification code",
