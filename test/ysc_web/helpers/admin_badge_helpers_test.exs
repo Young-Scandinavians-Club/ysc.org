@@ -168,10 +168,22 @@ defmodule YscWeb.AdminBadgeHelpersTest do
       assert AdminBadgeHelpers.event_state_badge_type(:draft) == "sky"
       assert AdminBadgeHelpers.event_state_badge_type(:scheduled) == "yellow"
       assert AdminBadgeHelpers.event_state_badge_type(:published) == "green"
+      assert AdminBadgeHelpers.event_state_badge_type(:cancelled) == "dark"
+      assert AdminBadgeHelpers.event_state_badge_type(:deleted) == "red"
     end
 
     test "defaults unknown states" do
       assert AdminBadgeHelpers.event_state_badge_type(:unknown) == "default"
+    end
+  end
+
+  describe "event_state_label/1" do
+    test "capitalizes event states" do
+      assert AdminBadgeHelpers.event_state_label(:draft) == "Draft"
+      assert AdminBadgeHelpers.event_state_label(:scheduled) == "Scheduled"
+      assert AdminBadgeHelpers.event_state_label(:published) == "Published"
+      assert AdminBadgeHelpers.event_state_label(:cancelled) == "Cancelled"
+      assert AdminBadgeHelpers.event_state_label(:deleted) == "Deleted"
     end
   end
 
