@@ -174,6 +174,35 @@ defmodule Ysc.Bookings.BookingValidatorTest do
     {next_monday, Date.add(next_monday, 2)}
   end
 
+  defp first_monday_on_or_after(%Date{} = date) do
+    days_until_monday = rem(8 - Date.day_of_week(date, :monday), 7)
+    Date.add(date, days_until_monday)
+  end
+
+  # create_test_seasons/0: Summer is May 1–Sep 30 (not canonical Oct 31).
+  defp test_summer_date?(%Date{month: month}) when month in 5..9, do: true
+  defp test_summer_date?(_), do: false
+
+  # Monday check-in in this module's Summer, strictly after `today + advance_days`.
+  # `today + 14` can land in Winter (Oct 1), which still has a 90-day window, so
+  # mutating Summer's limit would never apply (CI 2026-09-15).
+  defp next_test_summer_monday_beyond(%Date{} = today, advance_days)
+       when is_integer(advance_days) and advance_days >= 0 do
+    min_checkin = Date.add(today, advance_days + 1)
+
+    checkin =
+      min_checkin
+      |> first_monday_on_or_after()
+      |> Stream.iterate(&Date.add(&1, 7))
+      |> Stream.take(60)
+      |> Enum.find(&test_summer_date?/1)
+
+    checkin ||
+      flunk(
+        "Could not find a Monday in May 1–Sep 30 on or after #{min_checkin}"
+      )
+  end
+
   defp insert_family_booking!(user, rooms, attrs) do
     room = Map.get(attrs, :room, rooms.tahoe_room1)
     attrs = Map.drop(attrs, [:room])
@@ -1695,19 +1724,13 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       Repo.update!(Ecto.Changeset.change(summer, advance_booking_days: 7))
       Ysc.Bookings.SeasonCache.invalidate_property(:tahoe)
 
-      today = Date.utc_today()
       advance_days = 7
-
-      # Pick a Monday far enough out to exceed the advance booking window.
-      checkin =
-        today
-        |> Date.add(advance_days + 7)
-        |> then(fn base ->
-          days_to_monday = rem(8 - Date.day_of_week(base, :monday), 7)
-          Date.add(base, days_to_monday)
-        end)
-
+      today = Ysc.Bookings.SeasonHelpers.cabin_today()
+      checkin = next_test_summer_monday_beyond(today, advance_days)
       checkout = Date.add(checkin, 2)
+
+      assert test_summer_date?(checkin)
+      assert Date.compare(checkin, Date.add(today, advance_days)) == :gt
 
       attrs = %{
         user_id: user.id,
