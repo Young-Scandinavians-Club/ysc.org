@@ -349,6 +349,14 @@ defmodule YscWeb.UserSettingsLiveTest do
       render(view)
       assert view |> element("#membership_form") |> has_element?()
 
+      html = render(view)
+
+      assert html =~
+               "You can switch between Single and Family. Switching to Family starts right away"
+
+      refute html =~ "Upgrades take effect immediately"
+      refute html =~ "downgrades apply"
+
       # Select family (upgrade) so the "Change Membership Plan" button appears
       render_change(view, "validate_membership", %{
         "membership_type" => "family"
