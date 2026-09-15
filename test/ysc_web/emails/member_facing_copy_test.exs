@@ -49,6 +49,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "There's one more step before you can book the cabins"
       assert text =~ "pay your annual membership dues"
       assert text =~ "Pay your membership dues"
+      assert text =~ "After you pay, you'll be able to"
+      refute text =~ "Once your payment is processed"
       refute text =~ "You're officially a Young Scandinavian"
       refute text =~ "Pay Your Membership"
       refute text =~ "completing your membership payment"
@@ -626,7 +628,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "We've issued your ticket refund"
       assert text =~ "same card or bank account"
       assert text =~ "Order number:"
+      assert text =~ "Refund number:"
       assert text =~ "Refunded ticket numbers"
+      refute text =~ "Refund Reference"
       refute text =~ "Order Reference"
       refute text =~ "Ticket Reference"
       refute text =~ "has been processed"
@@ -666,6 +670,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Your booking refund is on the way"
       assert text =~ "We've issued your cabin booking refund"
       assert text =~ "Cabin Master"
+      assert text =~ "Refund number:"
+      assert text =~ "Payment number:"
+      refute text =~ "Refund Reference"
+      refute text =~ "Payment Reference"
       refute text =~ "has been processed"
       refute text =~ "will be processed"
     end
@@ -707,6 +715,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "You don't need to do anything else"
       assert text =~ "Cabin Master"
       assert text =~ "money is on the way"
+      assert text =~ "Payment number:"
+      refute text =~ "Payment Reference"
       refute text =~ "refund request"
       refute text =~ "approved and processed"
     end
@@ -733,6 +743,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       pending_text = html_text(pending_html)
 
       assert pending_text =~ "money is on the way"
+      assert pending_text =~ "Payment number:"
+      refute pending_text =~ "Payment Reference"
       refute pending_text =~ "approved and processed"
       refute pending_text =~ "will be processed"
 
@@ -757,6 +769,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       completed_text = html_text(completed_html)
 
       assert completed_text =~ "go back to your original payment method"
+      assert completed_text =~ "Payment number:"
+      refute completed_text =~ "Payment Reference"
       refute completed_text =~ "will be processed"
       refute completed_text =~ "processed and credited"
     end

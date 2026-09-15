@@ -445,13 +445,24 @@ defmodule YscWeb.FamilyManagementLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/family")
 
-      assert render(view) =~ email
+      html = render(view)
+      assert html =~ email
 
-      view
-      |> element(
-        "button[phx-click='revoke_invite'][phx-value-invite_id='#{invite.id}']"
-      )
-      |> render_click()
+      cancel_button =
+        element(
+          view,
+          "button[phx-click='revoke_invite'][phx-value-invite_id='#{invite.id}']"
+        )
+
+      assert has_element?(cancel_button)
+
+      cancel_html = render(cancel_button)
+
+      assert cancel_html =~ "Cancel this invitation?"
+      assert cancel_html =~ "email the person you invited"
+      refute cancel_html =~ "invitee"
+
+      cancel_button |> render_click()
 
       refute render(view) =~ email
     end
