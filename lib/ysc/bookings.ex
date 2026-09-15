@@ -527,6 +527,36 @@ defmodule Ysc.Bookings do
 
   @occupancy_room_fields [:id]
 
+  # Admin reservations table + user-detail bookings tab. Guest name/email,
+  # room name + category name, stay dates, status, and the Flop sort columns.
+  # Skip password hashes, bios, booking JSON, room descriptions, and
+  # category notes.
+  @admin_list_booking_fields [
+    :id,
+    :reference_id,
+    :user_id,
+    :checkin_date,
+    :checkout_date,
+    :guests_count,
+    :children_count,
+    :booking_mode,
+    :status,
+    :checked_in,
+    :property,
+    :inserted_at
+  ]
+
+  @admin_list_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name
+  ]
+
+  @admin_list_room_fields [:id, :name, :room_category_id]
+
+  @admin_list_room_category_fields [:id, :name]
+
   @doc """
   Bookings for the admin calendar grid.
 
@@ -615,6 +645,37 @@ defmodule Ysc.Bookings do
     from(a in Avatar, select: struct(a, ^@admin_calendar_avatar_fields))
   end
 
+  defp admin_list_user_preload_query do
+    from(u in User, select: struct(u, ^@admin_list_user_fields))
+  end
+
+  defp admin_list_room_preload_query do
+    from(r in Room,
+      select: struct(r, ^@admin_list_room_fields),
+      preload: [room_category: ^admin_list_room_category_preload_query()]
+    )
+  end
+
+  defp admin_list_room_category_preload_query do
+    from(rc in RoomCategory,
+      select: struct(rc, ^@admin_list_room_category_fields)
+    )
+  end
+
+  defp apply_admin_list_booking_load(query) do
+    from(b in query,
+      select: struct(b, ^@admin_list_booking_fields),
+      preload: [
+        user: ^admin_list_user_preload_query(),
+        rooms: ^admin_list_room_preload_query()
+      ]
+    )
+  end
+
+  defp paginated_bookings_base_query do
+    apply_admin_list_booking_load(Booking)
+  end
+
   @doc """
   Lists bookings with guests staying overnight on the given date.
 
@@ -678,6 +739,12 @@ defmodule Ysc.Bookings do
 
   Supports fuzzy search by user name, email, or booking reference.
   Supports date range filtering by booking dates.
+
+  Member is a slim `select: struct` preload (name/email). Rooms are
+  name + category name. Booking JSON (`pricing_items`,
+  `modification_hold_attrs`) is not selected — the reservations table
+  never renders it. Clicking a row still refetches via
+  `get_booking_for_admin_view!/1`.
   """
   def list_paginated_bookings(params) do
     # Extract date range filters if present
@@ -685,10 +752,7 @@ defmodule Ysc.Bookings do
     # Extract property filter if present
     {property_filter, other_params} = extract_property_filter(other_params)
 
-    base_query =
-      from(b in Booking,
-        preload: [:user, rooms: :room_category]
-      )
+    base_query = paginated_bookings_base_query()
 
     # Apply property filter
     base_query =
@@ -780,12 +844,13 @@ defmodule Ysc.Bookings do
 
   @doc """
   Lists paginated bookings for a specific user with Flop.
+
+  Same slim member/room/category preload as `list_paginated_bookings/1`.
   """
   def list_user_bookings_paginated(user_id, params) do
     base_query =
-      from(b in Booking,
-        where: b.user_id == ^user_id,
-        preload: [:user, rooms: :room_category]
+      from(b in paginated_bookings_base_query(),
+        where: b.user_id == ^user_id
       )
 
     case Flop.validate_and_run(base_query, params, for: Booking) do
@@ -806,9 +871,9 @@ defmodule Ysc.Bookings do
         fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
-          ilike(b.reference_id, ^search_like),
-      preload: [:user, rooms: :room_category]
+          ilike(b.reference_id, ^search_like)
     )
+    |> apply_admin_list_booking_load()
   end
 
   defp extract_property_filter(params) do
@@ -6348,6 +6413,26 @@ defmodule Ysc.Bookings do
       today,
       Date.add(today, 30),
       statuses: [:hold, :complete]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_paginated_bookings_query do
+    from(b in paginated_bookings_base_query(),
+      where: b.property == :tahoe,
+      order_by: [desc: b.inserted_at],
+      limit: 50
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_user_bookings_paginated_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    from(b in paginated_bookings_base_query(),
+      where: b.user_id == ^user_id,
+      order_by: [desc: b.inserted_at],
+      limit: 50
     )
   end
 end

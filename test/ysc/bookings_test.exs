@@ -1583,6 +1583,182 @@ defmodule Ysc.BookingsTest do
       assert length(bookings_a) == length(bookings_b)
       assert meta_a.total_count == meta_b.total_count
     end
+
+    test "list_paginated_bookings/1 slims user, room, category, and booking columns" do
+      {user, room, category, booking} = admin_list_slim_booking_fixture()
+
+      {{:ok, {loaded, _meta}}, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_paginated_bookings(%{page: 1, page_size: 50})
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.user.first_name == "List"
+      assert found.user.last_name == "Guest"
+      assert found.user.email == user.email
+      assert found.reference_id == booking.reference_id
+      assert found.checked_in == false
+      assert found.guests_count == 2
+      assert hd(found.rooms).name == room.name
+      assert hd(found.rooms).room_category.name == category.name
+      assert is_nil(found.user.hashed_password)
+      assert is_nil(found.user.board_bio)
+      assert is_nil(found.pricing_items)
+      assert is_nil(found.modification_hold_attrs)
+      assert is_nil(hd(found.rooms).description)
+      assert is_nil(hd(found.rooms).room_category.notes)
+      assert password_cols == 0
+
+      {_result, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_paginated_bookings(%{page: 1, page_size: 50})
+          end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_result, json_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_paginated_bookings(%{page: 1, page_size: 50})
+          end,
+          pattern: ~r/pricing_items|modification_hold_attrs/i,
+          caller_pids: [self()]
+        )
+
+      {_result, room_copy_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_paginated_bookings(%{page: 1, page_size: 50})
+          end,
+          pattern: ~r/r0\."description"|rooms.*description/i,
+          caller_pids: [self()]
+        )
+
+      {_result, category_notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_paginated_bookings(%{page: 1, page_size: 50})
+          end,
+          pattern: ~r/r1\."notes"|room_categories.*notes/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+      assert json_cols == 0
+      assert room_copy_cols == 0
+      assert category_notes_cols == 0
+    end
+
+    test "list_paginated_bookings/2 search slims user password hashes" do
+      {user, _room, _category, booking} = admin_list_slim_booking_fixture()
+
+      {{:ok, {loaded, _meta}}, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_paginated_bookings(
+              %{page: 1, page_size: 50},
+              user.email
+            )
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.user.email == user.email
+      assert is_nil(found.user.hashed_password)
+      assert is_nil(found.pricing_items)
+      assert password_cols == 0
+    end
+
+    test "list_user_bookings_paginated/2 slims user password hashes and room copy" do
+      {user, room, category, booking} = admin_list_slim_booking_fixture()
+
+      {{:ok, {loaded, _meta}}, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_user_bookings_paginated(user.id, %{
+              page: 1,
+              page_size: 50
+            })
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.user.email == user.email
+      assert hd(found.rooms).name == room.name
+      assert hd(found.rooms).room_category.name == category.name
+      assert is_nil(found.user.hashed_password)
+      assert is_nil(found.pricing_items)
+      assert is_nil(hd(found.rooms).description)
+      assert password_cols == 0
+    end
+  end
+
+  defp admin_list_slim_booking_fixture do
+    user =
+      user_fixture(%{first_name: "List", last_name: "Guest"})
+      |> Ecto.Changeset.change(%{
+        board_bio: "reservations table must not load this bio"
+      })
+      |> Ysc.Repo.update!()
+
+    {:ok, category} =
+      %RoomCategory{}
+      |> RoomCategory.changeset(%{
+        name: "list-slim-#{System.unique_integer([:positive])}",
+        notes: "category notes the reservations table must not load"
+      })
+      |> Repo.insert()
+
+    {:ok, room} =
+      %Room{}
+      |> Room.changeset(%{
+        name: "List Slim Room",
+        description: "room description the reservations table must not load",
+        property: :tahoe,
+        capacity_max: 2,
+        is_active: true,
+        room_category_id: category.id
+      })
+      |> Repo.insert()
+
+    checkin = ~D[2031-09-10]
+    checkout = ~D[2031-09-12]
+
+    booking =
+      %Booking{}
+      |> Booking.changeset(
+        %{
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 2,
+          children_count: 1,
+          property: :tahoe,
+          booking_mode: :room,
+          user_id: user.id,
+          status: :complete,
+          total_price: Money.new(200, :USD),
+          pricing_items: %{"secret" => "reservations table must not load json"},
+          modification_hold_attrs: %{"hold" => "reservations must not load"}
+        },
+        skip_validation: true,
+        rooms: [room]
+      )
+      |> Repo.insert!()
+
+    {user, room, category, booking}
   end
 
   describe "validate_bookings_for_check_in/1" do
