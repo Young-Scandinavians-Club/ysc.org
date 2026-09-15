@@ -250,6 +250,15 @@ require_commands() {
   fi
 }
 
+# EXIT runs after sync_database returns (script teardown), so the trap must
+# not read a `local workdir` — that hits `set -u` ("unbound variable") after a
+# successful upload. Expand the path into the trap command now.
+register_workdir_cleanup() {
+  local dir="${1}"
+  # shellcheck disable=SC2064
+  trap "rm -rf -- $(printf '%q' "${dir}")" EXIT
+}
+
 sync_database() {
   parse_maxmind_credentials "${MAXMIND_LICENSE_KEY}" "${MAXMIND_ACCOUNT_ID}"
 
@@ -264,10 +273,7 @@ sync_database() {
 
   local workdir archive_path checksum_path
   workdir="$(mktemp -d "${TMPDIR:-/tmp}/ysc-geoip.XXXXXX")"
-  cleanup() {
-    rm -rf "${workdir}"
-  }
-  trap cleanup EXIT
+  register_workdir_cleanup "${workdir}"
 
   archive_path="${workdir}/${EDITION_ID}.tar.gz"
   checksum_path="${workdir}/${EDITION_ID}.tar.gz.sha256"
@@ -367,7 +373,7 @@ wait_for_port_file() {
 }
 
 self_test() {
-  local tmp n url port_file dest pid port
+  local tmp n url port_file dest pid port trap_dir trap_status
 
   tmp="$(mktemp)"
   echo 0 >"${tmp}"
@@ -447,6 +453,31 @@ self_test() {
   kill "${pid}" 2>/dev/null || true
   wait "${pid}" 2>/dev/null || true
   rm -f "${port_file}" "${dest}"
+
+  # EXIT trap must not read a `local workdir` after the function returns.
+  # Weekly CI failed after a successful MaxMind download + Tigris upload with
+  # `workdir: unbound variable` (runs 34138027070, 34866093857).
+  trap_dir="$(mktemp -d "${TMPDIR:-/tmp}/ysc-geoip-test.XXXXXX")"
+  echo marker >"${trap_dir}/file"
+  trap_status=0
+  (
+    set -euo pipefail
+    with_local_workdir() {
+      local workdir="${trap_dir}"
+      register_workdir_cleanup "${workdir}"
+    }
+    with_local_workdir
+  ) || trap_status=$?
+  if [ "${trap_status}" -ne 0 ]; then
+    echo "sync_geoip_database.sh: EXIT cleanup after function return failed" >&2
+    rm -rf "${trap_dir}"
+    return 1
+  fi
+  if [ -e "${trap_dir}" ]; then
+    echo "sync_geoip_database.sh: expected EXIT trap to remove workdir" >&2
+    rm -rf "${trap_dir}"
+    return 1
+  fi
 
   echo "sync_geoip_database.sh: self-test passed"
 }
