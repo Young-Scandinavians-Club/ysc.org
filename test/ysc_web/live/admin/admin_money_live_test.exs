@@ -1784,7 +1784,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
     end
 
-    test "a crafted amount-update event is rejected while the report is claimed for QuickBooks export",
+    test "a crafted amount-update event while QuickBooks export is in flight is rejected without crashing the LiveView",
          %{conn: conn} do
       member = user_fixture()
 
@@ -1807,18 +1807,16 @@ defmodule YscWeb.AdminMoneyLiveTest do
       })
       |> Repo.update!()
 
-      render_submit(view, "save_expense_item_amount", %{
-        "item_id" => purchase.id,
-        "kind" => "expense",
-        "amount" => "999.99"
-      })
+      html =
+        render_submit(view, "save_expense_item_amount", %{
+          "item_id" => purchase.id,
+          "kind" => "expense",
+          "amount" => "999.99"
+        })
 
+      assert html =~ "being exported to QuickBooks"
       assert Money.to_string!(Repo.reload!(purchase).amount) == "$12.50"
-
-      flash = :sys.get_state(view.pid).socket.assigns.flash
-
-      assert Phoenix.Flash.get(flash, :error) =~
-               "currently being exported to QuickBooks"
+      assert has_element?(view, "#expense-report-modal")
     end
   end
 
@@ -1927,7 +1925,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert is_nil(Repo.reload!(report).event_id)
     end
 
-    test "a crafted event-association change is rejected while the report is claimed for QuickBooks export",
+    test "a crafted event-association change while QuickBooks export is in flight is rejected without crashing the LiveView",
          %{conn: conn} do
       member = user_fixture()
       event = event_fixture()
@@ -1948,16 +1946,14 @@ defmodule YscWeb.AdminMoneyLiveTest do
       })
       |> Repo.update!()
 
-      render_change(view, "change_expense_report_event", %{
-        "event_id" => event.id
-      })
+      html =
+        render_change(view, "change_expense_report_event", %{
+          "event_id" => event.id
+        })
 
+      assert html =~ "being exported to QuickBooks"
       assert is_nil(Repo.reload!(report).event_id)
-
-      flash = :sys.get_state(view.pid).socket.assigns.flash
-
-      assert Phoenix.Flash.get(flash, :error) =~
-               "currently being exported to QuickBooks"
+      assert has_element?(view, "#expense-report-modal")
     end
   end
 

@@ -1207,6 +1207,58 @@ defmodule Ysc.ExpenseReportsTest do
       end)
     end
 
+    test "re-approving while a QuickBooks claim is in flight does not reset processing or enqueue a second job",
+         %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      {:ok, report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "status" => "draft",
+            "purpose" => "Revert then re-approve",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      report = Ysc.Repo.preload(report, :expense_items)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, approved} =
+          ExpenseReports.update_expense_report(report, %{status: "approved"})
+
+        {:ok, processing} =
+          approved
+          |> Ecto.Changeset.change(%{quickbooks_sync_status: "processing"})
+          |> Repo.update()
+
+        {:ok, submitted} =
+          ExpenseReports.update_expense_report(processing, %{
+            status: "submitted"
+          })
+
+        {:ok, reapproved} =
+          ExpenseReports.update_expense_report(submitted, %{status: "approved"})
+
+        assert Repo.reload!(reapproved).quickbooks_sync_status == "processing"
+
+        jobs =
+          all_enqueued(worker: YscWeb.Workers.QuickbooksSyncExpenseReportWorker)
+          |> Enum.filter(&(&1.args["expense_report_id"] == report.id))
+
+        assert length(jobs) == 1
+      end)
+    end
+
     test "update_expense_report returns error for invalid status", %{user: user} do
       {:ok, bank_account} =
         ExpenseReports.create_bank_account(
