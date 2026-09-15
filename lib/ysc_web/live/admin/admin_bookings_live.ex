@@ -2670,9 +2670,12 @@ defmodule YscWeb.AdminBookingsLive do
               <p class="text-zinc-500">No pending refunds at this time.</p>
             </div>
           <% else %>
-            <div class="space-y-4">
+            <div id="pending-refunds-list" class="space-y-4">
               <%= for pending_refund <- @pending_refunds do %>
-                <div class="border border-zinc-200 rounded-lg p-4 hover:bg-zinc-50 transition-colors">
+                <div
+                  id={"pending-refund-#{pending_refund.id}"}
+                  class="border border-zinc-200 rounded-lg p-4 hover:bg-zinc-50 transition-colors"
+                >
                   <div class="flex items-start justify-between mb-4">
                     <div class="flex-1">
                       <div class="flex items-center gap-3 mb-2">
@@ -7839,15 +7842,7 @@ defmodule YscWeb.AdminBookingsLive do
     selected_property = socket.assigns.selected_property
 
     # Query pending refunds with property filter at DB level and preload all associations in one query
-    pending_refunds =
-      from(pr in Ysc.Bookings.PendingRefund,
-        join: b in assoc(pr, :booking),
-        where: pr.status == :pending,
-        where: b.property == ^selected_property,
-        order_by: [asc: pr.inserted_at],
-        preload: [booking: [:user, rooms: :room_category], payment: :user]
-      )
-      |> Repo.all()
+    pending_refunds = Bookings.list_pending_refunds_for_admin(selected_property)
 
     socket
     |> assign(:pending_refunds, pending_refunds)

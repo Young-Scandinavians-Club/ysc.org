@@ -5033,18 +5033,69 @@ defmodule Ysc.Bookings do
     |> Map.new()
   end
 
+  # Pending-refunds table: reference, stay dates, total, guest email.
+  # Skip rooms, payments, booking JSON, and user hashes/bios.
+  @admin_pending_refund_booking_fields [
+    :id,
+    :reference_id,
+    :property,
+    :checkin_date,
+    :checkout_date,
+    :total_price,
+    :user_id,
+    :status
+  ]
+
+  @admin_pending_refund_user_fields [:id, :email]
+
   @doc """
-  Lists all pending refunds that require admin review.
+  Lists pending refunds that require admin review.
+
+  Booking is a slim `select: struct` preload (reference, dates, total,
+  property). Member is email-only. Rooms, payments, booking JSON, and
+  password hashes are not loaded — the pending-refunds table never shows them.
   """
   def list_pending_refunds do
-    import Ecto.Query
+    list_pending_refunds_query()
+    |> Repo.all()
+  end
 
+  @doc """
+  Pending refunds for one cabin property, used by `AdminBookingsLive`.
+  """
+  def list_pending_refunds_for_admin(property) do
+    property
+    |> list_pending_refunds_for_admin_query()
+    |> Repo.all()
+  end
+
+  defp list_pending_refunds_query do
     from(pr in PendingRefund,
       where: pr.status == :pending,
       order_by: [asc: pr.inserted_at],
-      preload: [:booking, :payment]
+      preload: [booking: ^admin_pending_refund_booking_preload_query()]
     )
-    |> Repo.all()
+  end
+
+  defp list_pending_refunds_for_admin_query(property) do
+    from(pr in PendingRefund,
+      join: b in assoc(pr, :booking),
+      where: pr.status == :pending,
+      where: b.property == ^property,
+      order_by: [asc: pr.inserted_at],
+      preload: [booking: ^admin_pending_refund_booking_preload_query()]
+    )
+  end
+
+  defp admin_pending_refund_booking_preload_query do
+    from(b in Booking,
+      select: struct(b, ^@admin_pending_refund_booking_fields),
+      preload: [user: ^admin_pending_refund_user_preload_query()]
+    )
+  end
+
+  defp admin_pending_refund_user_preload_query do
+    from(u in User, select: struct(u, ^@admin_pending_refund_user_fields))
   end
 
   @checkout_time_pst ~T[11:00:00]
@@ -5161,11 +5212,31 @@ defmodule Ysc.Bookings do
     end
   end
 
+  # Home itinerary + cabin "your bookings" cards: destination, reference,
+  # dates, guests, mode. Skip booking JSON. Tahoe still needs room names;
+  # home and Clear Lake do not load rooms.
+  @member_active_booking_fields [
+    :id,
+    :reference_id,
+    :property,
+    :checkin_date,
+    :checkout_date,
+    :guests_count,
+    :booking_mode,
+    :status,
+    :user_id
+  ]
+
+  @member_active_room_fields [:id, :name]
+
   @doc """
   Lists upcoming active bookings for a user's home dashboard itinerary.
 
   Includes complete bookings whose checkout has not yet passed (11:00 AM PST on
   checkout day), ordered by check-in date.
+
+  Only itinerary columns are selected — not rooms, users, or booking JSON
+  (`pricing_items`, `modification_hold_attrs`). The home cards never read those.
 
   ## Options
 
@@ -5173,6 +5244,13 @@ defmodule Ysc.Bookings do
   """
   def list_upcoming_active_bookings_for_user(user_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 10)
+
+    user_id
+    |> upcoming_active_bookings_for_user_query(limit)
+    |> Repo.all()
+  end
+
+  defp upcoming_active_bookings_for_user_query(user_id, limit) do
     checkout_filter = checkout_still_active_dynamic()
 
     from(b in Booking,
@@ -5181,9 +5259,8 @@ defmodule Ysc.Bookings do
       where: ^checkout_filter,
       order_by: [asc: b.checkin_date],
       limit: ^limit,
-      preload: [:rooms]
+      select: struct(b, ^@member_active_booking_fields)
     )
-    |> Repo.all()
   end
 
   @doc """
@@ -5193,12 +5270,23 @@ defmodule Ysc.Bookings do
   `list_upcoming_active_bookings_for_user/2` before `LIMIT`, so stale
   checkout-today rows cannot hide future stays.
 
+  Rooms are `{id, name}` only for the "your bookings" cards and room-count
+  eligibility checks. Users and booking JSON are not loaded — `user_id` is
+  already on the booking.
+
   ## Options
 
     * `:limit` - max rows (default `10`)
   """
   def list_active_tahoe_bookings_for_family(family_user_ids, opts \\ []) do
     limit = Keyword.get(opts, :limit, 10)
+
+    family_user_ids
+    |> active_tahoe_bookings_for_family_query(limit)
+    |> Repo.all()
+  end
+
+  defp active_tahoe_bookings_for_family_query(family_user_ids, limit) do
     checkout_filter = checkout_still_active_dynamic()
 
     from(b in Booking,
@@ -5208,9 +5296,13 @@ defmodule Ysc.Bookings do
       where: ^checkout_filter,
       order_by: [asc: b.checkin_date],
       limit: ^limit,
-      preload: [:rooms, :user]
+      select: struct(b, ^@member_active_booking_fields),
+      preload: [rooms: ^member_active_room_preload_query()]
     )
-    |> Repo.all()
+  end
+
+  defp member_active_room_preload_query do
+    from(r in Room, select: struct(r, ^@member_active_room_fields))
   end
 
   @doc """
@@ -5220,12 +5312,21 @@ defmodule Ysc.Bookings do
   `list_upcoming_active_bookings_for_user/2` before `LIMIT`, so stale
   checkout-today rows cannot hide future stays.
 
+  Same slim itinerary columns as the home dashboard — no rooms or booking JSON.
+
   ## Options
 
     * `:limit` - max rows (default `10`)
   """
   def list_active_clear_lake_bookings_for_user(user_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 10)
+
+    user_id
+    |> active_clear_lake_bookings_for_user_query(limit)
+    |> Repo.all()
+  end
+
+  defp active_clear_lake_bookings_for_user_query(user_id, limit) do
     checkout_filter = checkout_still_active_dynamic()
 
     from(b in Booking,
@@ -5234,9 +5335,9 @@ defmodule Ysc.Bookings do
       where: b.status == :complete,
       where: ^checkout_filter,
       order_by: [asc: b.checkin_date],
-      limit: ^limit
+      limit: ^limit,
+      select: struct(b, ^@member_active_booking_fields)
     )
-    |> Repo.all()
   end
 
   @doc """
@@ -6271,47 +6372,24 @@ defmodule Ysc.Bookings do
   @doc false
   def ci_query_explain_list_upcoming_active_bookings_for_user_query do
     user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
-    checkout_filter = checkout_still_active_dynamic()
-
-    from(b in Booking,
-      where: b.user_id == ^user_id,
-      where: b.status == :complete,
-      where: ^checkout_filter,
-      order_by: [asc: b.checkin_date],
-      limit: 10,
-      preload: [:rooms]
-    )
+    upcoming_active_bookings_for_user_query(user_id, 10)
   end
 
   @doc false
   def ci_query_explain_list_active_tahoe_bookings_for_family_query do
     family_user_ids = [Ysc.Ci.QueryExplain.Fixtures.ulid()]
-    checkout_filter = checkout_still_active_dynamic()
-
-    from(b in Booking,
-      where: b.user_id in ^family_user_ids,
-      where: b.property == :tahoe,
-      where: b.status == :complete,
-      where: ^checkout_filter,
-      order_by: [asc: b.checkin_date],
-      limit: 10,
-      preload: [:rooms, :user]
-    )
+    active_tahoe_bookings_for_family_query(family_user_ids, 10)
   end
 
   @doc false
   def ci_query_explain_list_active_clear_lake_bookings_for_user_query do
     user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
-    checkout_filter = checkout_still_active_dynamic()
+    active_clear_lake_bookings_for_user_query(user_id, 10)
+  end
 
-    from(b in Booking,
-      where: b.user_id == ^user_id,
-      where: b.property == :clear_lake,
-      where: b.status == :complete,
-      where: ^checkout_filter,
-      order_by: [asc: b.checkin_date],
-      limit: 10
-    )
+  @doc false
+  def ci_query_explain_list_pending_refunds_for_admin_query do
+    list_pending_refunds_for_admin_query(:tahoe)
   end
 
   @doc false

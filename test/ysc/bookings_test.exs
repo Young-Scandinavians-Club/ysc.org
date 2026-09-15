@@ -511,6 +511,118 @@ defmodule Ysc.BookingsTest do
       end
     end
 
+    test "list_upcoming_active_bookings_for_user/2 slims booking JSON and skips rooms" do
+      user = user_fixture(%{first_name: "Home", last_name: "Itinerary"})
+
+      {:ok, room} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Home Slim Room",
+          description: "home itinerary must not load this description",
+          property: :clear_lake,
+          capacity_max: 2,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      booking =
+        insert_json_booking(user, :clear_lake, :day, rooms: [room])
+
+      {loaded, json_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_upcoming_active_bookings_for_user(user.id) end,
+          pattern: ~r/pricing_items|modification_hold_attrs/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, room_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_upcoming_active_bookings_for_user(user.id) end,
+          pattern: ~r/FROM "rooms"/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.reference_id == booking.reference_id
+      assert found.property == :clear_lake
+      assert found.checkin_date == booking.checkin_date
+      assert found.booking_mode == :day
+      assert is_nil(found.pricing_items)
+      assert is_nil(found.modification_hold_attrs)
+      refute Ecto.assoc_loaded?(found.rooms)
+      assert json_cols == 0
+      assert room_queries == 0
+    end
+
+    test "list_active_tahoe_bookings_for_family/2 slims rooms and skips users" do
+      user =
+        user_fixture(%{first_name: "Tahoe", last_name: "Family"})
+        |> Ecto.Changeset.change(%{board_bio: "family list must not load bio"})
+        |> Repo.update!()
+
+      {:ok, room} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Family Slim Room",
+          description: "tahoe family list must not load this description",
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      booking = insert_json_booking(user, :tahoe, :room, rooms: [room])
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_active_tahoe_bookings_for_family([user.id])
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, room_copy_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.list_active_tahoe_bookings_for_family([user.id])
+          end,
+          pattern: ~r/r0\."description"|rooms.*description/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.user_id == user.id
+      assert found.guests_count == 2
+      assert Enum.map(found.rooms, & &1.name) == ["Family Slim Room"]
+      assert is_nil(hd(found.rooms).description)
+      refute Ecto.assoc_loaded?(found.user)
+      assert is_nil(found.pricing_items)
+      assert password_cols == 0
+      assert room_copy_cols == 0
+    end
+
+    test "list_active_clear_lake_bookings_for_user/2 slims booking JSON" do
+      user = user_fixture(%{first_name: "Clear", last_name: "Lake"})
+      booking = insert_json_booking(user, :clear_lake, :day)
+
+      {loaded, json_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_active_clear_lake_bookings_for_user(user.id) end,
+          pattern: ~r/pricing_items|modification_hold_attrs/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == booking.id))
+      assert found
+      assert found.reference_id == booking.reference_id
+      assert found.property == :clear_lake
+      assert is_nil(found.pricing_items)
+      assert json_cols == 0
+    end
+
     test "list_bookings/4 filters by statuses and exclude_statuses" do
       active =
         booking_fixture()
@@ -2723,6 +2835,132 @@ defmodule Ysc.BookingsTest do
     test "list_pending_refunds/0 returns pending refunds" do
       refunds = Bookings.list_pending_refunds()
       assert is_list(refunds)
+    end
+
+    test "list_pending_refunds_for_admin/1 slims users and skips rooms and payments" do
+      user =
+        user_fixture(%{first_name: "Refund", last_name: "Guest"})
+        |> Ecto.Changeset.change(%{
+          board_bio: "pending refunds must not load bio"
+        })
+        |> Repo.update!()
+
+      {:ok, room} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Refund Slim Room",
+          description: "pending refunds must not load this description",
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      booking = insert_json_booking(user, :tahoe, :room, rooms: [room])
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_pending_slim_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: booking.id,
+          payment_id: payment.id,
+          policy_refund_amount: Money.new(1000, :USD),
+          status: :pending,
+          cancellation_reason: "Change of plans"
+        })
+        |> Ysc.Repo.insert()
+
+      clear_lake_booking = insert_json_booking(user, :clear_lake, :day)
+
+      {:ok, {clear_lake_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: clear_lake_booking.total_price,
+          entity_type: :booking,
+          entity_id: clear_lake_booking.id,
+          external_payment_id:
+            "pi_pending_cl_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(100, :USD),
+          description: "Clear Lake payment",
+          property: :clear_lake,
+          payment_method_id: nil
+        })
+
+      {:ok, _clear_lake_pr} =
+        %PendingRefund{}
+        |> PendingRefund.changeset(%{
+          booking_id: clear_lake_booking.id,
+          payment_id: clear_lake_payment.id,
+          policy_refund_amount: Money.new(500, :USD),
+          status: :pending
+        })
+        |> Ysc.Repo.insert()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_pending_refunds_for_admin(:tahoe) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_pending_refunds_for_admin(:tahoe) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, json_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_pending_refunds_for_admin(:tahoe) end,
+          pattern: ~r/pricing_items|modification_hold_attrs/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, room_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_pending_refunds_for_admin(:tahoe) end,
+          pattern: ~r/FROM "rooms"/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, payment_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Bookings.list_pending_refunds_for_admin(:tahoe) end,
+          pattern: ~r/FROM "payments"/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(loaded, &(&1.id == pr.id))
+      assert found
+      assert found.booking.reference_id == booking.reference_id
+      assert found.booking.total_price == booking.total_price
+      assert found.booking.user.email == user.email
+      assert found.cancellation_reason == "Change of plans"
+      assert is_nil(found.booking.user.hashed_password)
+      assert is_nil(found.booking.user.board_bio)
+      assert is_nil(found.booking.pricing_items)
+      refute Ecto.assoc_loaded?(found.booking.rooms)
+      refute Ecto.assoc_loaded?(found.payment)
+      refute Enum.any?(loaded, &(&1.booking.property == :clear_lake))
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert json_cols == 0
+      assert room_queries == 0
+      assert payment_queries == 0
     end
 
     test "get_pending_refund!/1 returns pending refund by id" do
@@ -6036,6 +6274,9 @@ defmodule Ysc.BookingsTest do
 
       assert %Ecto.Query{} =
                Bookings.ci_query_explain_list_guests_staying_on_date_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_list_pending_refunds_for_admin_query()
     end
 
     test "the admin property dashboard stats query executes against the database" do
@@ -6053,6 +6294,36 @@ defmodule Ysc.BookingsTest do
                )
              )
     end
+  end
+
+  defp insert_json_booking(user, property, booking_mode, opts \\ []) do
+    rooms = Keyword.get(opts, :rooms, [])
+    unique = System.unique_integer([:positive])
+    checkin = Date.add(~D[2032-08-10], rem(unique, 20))
+    checkout = Date.add(checkin, 2)
+
+    changeset_opts =
+      [skip_validation: true] ++
+        if(rooms == [], do: [], else: [rooms: rooms])
+
+    %Booking{}
+    |> Booking.changeset(
+      %{
+        checkin_date: checkin,
+        checkout_date: checkout,
+        guests_count: 2,
+        property: property,
+        booking_mode: booking_mode,
+        user_id: user.id,
+        status: :complete,
+        total_price: Money.new(200, :USD),
+        reference_id: "BKG-SLIM-#{unique}",
+        pricing_items: %{"secret" => "list queries must not load this json"},
+        modification_hold_attrs: %{"hold" => "list queries must not load"}
+      },
+      changeset_opts
+    )
+    |> Ysc.Repo.insert!()
   end
 
   defp insert_complete_booking(user, checkin_date, checkout_date) do
