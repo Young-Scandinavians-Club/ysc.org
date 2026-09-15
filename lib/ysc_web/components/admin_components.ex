@@ -406,6 +406,68 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_event_state_badge
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Badge for an event's `EventState` on admin event list and editor pages.
+
+  When `state` is `:scheduled` and `publish_at` is set, the badge shows a
+  tooltip with the Pacific publish time.
+
+  ## Examples
+
+      <.admin_event_state_badge id="admin-event-1-state" state={event.state} />
+
+      <.admin_event_state_badge
+        id="admin-event-1-state"
+        state={event.state}
+        publish_at={event.publish_at}
+      />
+  """
+  attr :id, :string, default: nil
+  attr :state, :atom, required: true
+  attr :publish_at, :any, default: nil
+
+  def admin_event_state_badge(assigns) do
+    assigns =
+      assign(assigns,
+        badge_type:
+          YscWeb.AdminBadgeHelpers.event_state_badge_type(assigns.state),
+        label: YscWeb.AdminBadgeHelpers.event_state_label(assigns.state),
+        tooltip_text:
+          scheduled_publish_tooltip(assigns.state, assigns.publish_at)
+      )
+
+    ~H"""
+    <div id={@id} class="contents">
+      <%= if @tooltip_text do %>
+        <.tooltip tooltip_text={@tooltip_text}>
+          <.badge type={@badge_type}>
+            {@label}
+          </.badge>
+        </.tooltip>
+      <% else %>
+        <.badge type={@badge_type}>
+          {@label}
+        </.badge>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp scheduled_publish_tooltip(:scheduled, %DateTime{} = publish_at) do
+    formatted =
+      publish_at
+      |> DateTime.shift_zone!("America/Los_Angeles")
+      |> Calendar.strftime("%B %d, %Y at %I:%M %p %Z")
+
+    "Publishes on #{formatted}"
+  end
+
+  defp scheduled_publish_tooltip(_, _), do: nil
+
+  # ---------------------------------------------------------------------------
   # admin_country_with_flag
   # ---------------------------------------------------------------------------
 

@@ -138,12 +138,23 @@ defmodule YscWeb.AdminBadgeHelpers do
 
   @doc """
   Badge `type` for `EventState` values in admin event previews and lists.
+
+  Cancelled uses `"dark"` (zinc) because `<.badge>` has no orange type — the
+  editor previously requested `"orange"` and rendered an unstyled badge.
   """
   @spec event_state_badge_type(atom()) :: String.t()
   def event_state_badge_type(:draft), do: "sky"
   def event_state_badge_type(:scheduled), do: "yellow"
   def event_state_badge_type(:published), do: "green"
+  def event_state_badge_type(:cancelled), do: "dark"
+  def event_state_badge_type(:deleted), do: "red"
   def event_state_badge_type(_), do: "default"
+
+  @doc """
+  Human-readable label for `EventState` values (`:draft` → `"Draft"`).
+  """
+  @spec event_state_label(atom()) :: String.t()
+  def event_state_label(state), do: String.capitalize("#{state}")
 
   @doc """
   Badge `type` for a newsletter subscriber's `source` string (admin subscribers list).

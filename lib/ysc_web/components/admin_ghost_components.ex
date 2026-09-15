@@ -347,12 +347,12 @@ defmodule YscWeb.AdminGhostComponents do
   @doc "Desktop events table from `AdminEventsLive` (title rows, state badges, actions)."
   def admin_ghost_events_table(assigns) do
     rows = [
-      %{state: :published, label: "Published"},
-      %{state: :draft, label: "Draft"},
-      %{state: :published, label: "Published"},
-      %{state: :scheduled, label: "Scheduled"},
-      %{state: :published, label: "Published"},
-      %{state: :draft, label: "Draft"}
+      %{state: :published},
+      %{state: :draft},
+      %{state: :published},
+      %{state: :scheduled},
+      %{state: :published},
+      %{state: :draft}
     ]
 
     assigns = assign(assigns, :rows, rows)
@@ -385,9 +385,7 @@ defmodule YscWeb.AdminGhostComponents do
         <.admin_ghost_bar width="w-16" height="h-3" />
         <.admin_ghost_bar width="w-12" height="h-3" />
         <.admin_ghost_bar width="w-20" height="h-3" />
-        <.badge type={YscWeb.AdminBadgeHelpers.event_state_badge_type(row.state)}>
-          {row.label}
-        </.badge>
+        <.admin_event_state_badge state={row.state} />
         <.admin_ghost_bar width="w-16" height="h-3" />
         <div class="relative flex justify-end">
           <button
@@ -1126,9 +1124,7 @@ defmodule YscWeb.AdminGhostComponents do
             <h1 class="text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl wrap-break-word">
               {@event_title}
             </h1>
-            <.badge type={YscWeb.AdminBadgeHelpers.event_state_badge_type(@state)}>
-              {event_state_label(@state)}
-            </.badge>
+            <.admin_event_state_badge state={@state} />
             <span
               class="inline-flex shrink-0 items-center justify-center rounded-full text-zinc-300"
               aria-hidden="true"
@@ -1959,10 +1955,6 @@ defmodule YscWeb.AdminGhostComponents do
   defp table_cols(5), do: "grid-cols-5"
   defp table_cols(6), do: "grid-cols-6"
   defp table_cols(_), do: "grid-cols-4"
-
-  defp event_state_label(:draft), do: "Draft"
-  defp event_state_label(:scheduled), do: "Scheduled"
-  defp event_state_label(:published), do: "Published"
 
   defp event_tab_class(true),
     do:
