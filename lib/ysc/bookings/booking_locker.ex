@@ -2190,7 +2190,7 @@ defmodule Ysc.Bookings.BookingLocker do
              rooms: booking.rooms,
              skip_validation: true
            )
-           |> put_change(:applied_booking_entitlement_id, nil)
+           |> maybe_clear_hold_entitlement(booking)
            |> put_change(:subtotal_price, nil)
            |> put_change(:discount_total, nil)
            |> Repo.update() do
@@ -2273,7 +2273,7 @@ defmodule Ysc.Bookings.BookingLocker do
              rooms: booking.rooms,
              skip_validation: true
            )
-           |> put_change(:applied_booking_entitlement_id, nil)
+           |> maybe_clear_hold_entitlement(booking)
            |> put_change(:subtotal_price, nil)
            |> put_change(:discount_total, nil)
            |> Repo.update() do
@@ -3906,6 +3906,20 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   ## Private Functions
+
+  # Keep the entitlement attached when a PaymentIntent is on the hold so a late
+  # confirm-from-canceled (Stripe already captured) still consumes the benefit.
+  # Unpaid abandons clear it so the member can apply the entitlement elsewhere.
+  defp maybe_clear_hold_entitlement(changeset, %Booking{
+         payment_intent_id: payment_intent_id
+       })
+       when is_binary(payment_intent_id) and payment_intent_id != "" do
+    changeset
+  end
+
+  defp maybe_clear_hold_entitlement(changeset, _booking) do
+    put_change(changeset, :applied_booking_entitlement_id, nil)
+  end
 
   # Cancel the stored checkout PaymentIntent after inventory is released.
   # Stripe is kept out of the DB transaction so hold expiry / sibling-hold

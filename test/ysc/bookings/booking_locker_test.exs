@@ -1559,6 +1559,119 @@ defmodule Ysc.Bookings.BookingLockerTest do
       end
     end
 
+    test "keeps applied entitlement when a PaymentIntent is attached so late confirm can consume it",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {checkin, checkout} = locker_buyout_dates(411)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      {:ok, booking} =
+        Bookings.attach_payment_intent(
+          booking,
+          "pi_release_keep_entitlement_#{System.unique_integer([:positive])}"
+        )
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: booking.payment_intent_id,
+             status: "canceled"
+           }}
+        end)
+
+        assert {:ok, released} = BookingLocker.release_hold(booking.id)
+        assert released.status == :canceled
+        assert released.applied_booking_entitlement_id == entitlement.id
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
+        assert confirmed.status == :complete
+        assert confirmed.applied_booking_entitlement_id == entitlement.id
+
+        consumed = Entitlements.get_entitlement(entitlement.id)
+        assert consumed.status == :consumed
+        assert consumed.consumed_booking_id == booking.id
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "clears applied entitlement when releasing an unpaid hold", %{
+      user: user
+    } do
+      alias Ysc.Bookings.Entitlements
+
+      {checkin, checkout} = locker_buyout_dates(412)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
+
+      assert {:ok, released} = BookingLocker.release_hold(booking.id)
+      assert released.status == :canceled
+      assert is_nil(released.applied_booking_entitlement_id)
+
+      still_active = Entitlements.get_entitlement(entitlement.id)
+      assert still_active.status == :active
+    end
+
     test "does not call Stripe when the hold has no PaymentIntent", %{
       user: user
     } do
