@@ -6,14 +6,21 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
   - Expiration of expired booking holds
   - Error handling for hold release failures
   - Worker job execution
+
+  Uses `async: false` because Stripe-first expiry tests pin `:stripe_client`
+  via Application env, which races with DataCase setup in parallel tests.
+  `Ysc.TestStripeClient.cancel_payment_intent/2` always succeeds, so a leaked
+  client would expire a hold that should stay on `:hold` while processing.
   """
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
 
   alias Ysc.Bookings.{Booking, HoldExpiryWorker}
   alias Ysc.Repo
+
+  setup :verify_on_exit!
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -34,6 +41,12 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
          object: "list",
          url: "/v1/payment_intents"
        }}
+    end)
+
+    Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
     end)
 
     %{user: user}
@@ -453,53 +466,46 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
 
       amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
 
-      previous_client = Application.get_env(:ysc, :stripe_client)
-      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :payment_intent_unexpected_state,
+           message:
+             "You cannot cancel this PaymentIntent because it has a status of succeeded",
+           extra: %{}
+         }}
+      end)
 
-      try do
-        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
-          {:error,
-           %Stripe.Error{
-             source: :stripe,
-             code: :payment_intent_unexpected_state,
-             message:
-               "You cannot cancel this PaymentIntent because it has a status of succeeded",
-             extra: %{}
-           }}
-        end)
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => user.id
+           }
+         }}
+      end)
 
-        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                            _opts ->
-          {:ok,
-           %Stripe.PaymentIntent{
-             id: payment_intent_id,
-             status: "succeeded",
-             amount: amount_cents,
-             metadata: %{
-               "booking_id" => booking.id,
-               "user_id" => user.id
-             }
-           }}
-        end)
+      HoldExpiryWorker.expire_expired_holds()
 
-        HoldExpiryWorker.expire_expired_holds()
+      confirmed = Repo.get!(Booking, booking.id)
+      assert confirmed.status == :complete
+      assert confirmed.applied_booking_entitlement_id == entitlement.id
 
-        confirmed = Repo.get!(Booking, booking.id)
-        assert confirmed.status == :complete
-        assert confirmed.applied_booking_entitlement_id == entitlement.id
+      consumed = Entitlements.get_entitlement(entitlement.id)
+      assert consumed.status == :consumed
+      assert consumed.consumed_booking_id == booking.id
 
-        consumed = Entitlements.get_entitlement(entitlement.id)
-        assert consumed.status == :consumed
-        assert consumed.consumed_booking_id == booking.id
-
-        payment = Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
-        assert payment
-        assert payment.status == :completed
-        assert Money.equal?(payment.amount, booking.total_price)
-      after
-        Application.put_env(:ysc, :stripe_client, previous_client)
-      end
+      payment = Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      assert payment
+      assert payment.status == :completed
+      assert Money.equal?(payment.amount, booking.total_price)
     end
 
     test "skips expiry while PaymentIntent is still processing", %{user: user} do
@@ -532,40 +538,33 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
         })
         |> Repo.update!()
 
-      previous_client = Application.get_env(:ysc, :stripe_client)
-      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :payment_intent_unexpected_state,
+           message:
+             "You cannot cancel this PaymentIntent because it has a status of processing",
+           extra: %{}
+         }}
+      end)
 
-      try do
-        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
-          {:error,
-           %Stripe.Error{
-             source: :stripe,
-             code: :payment_intent_unexpected_state,
-             message:
-               "You cannot cancel this PaymentIntent because it has a status of processing",
-             extra: %{}
-           }}
-        end)
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "processing",
+           amount: 10_000,
+           metadata: %{"booking_id" => booking.id}
+         }}
+      end)
 
-        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                            _opts ->
-          {:ok,
-           %Stripe.PaymentIntent{
-             id: payment_intent_id,
-             status: "processing",
-             amount: 10_000,
-             metadata: %{"booking_id" => booking.id}
-           }}
-        end)
+      HoldExpiryWorker.expire_expired_holds()
 
-        HoldExpiryWorker.expire_expired_holds()
-
-        reloaded = Repo.get!(Booking, booking.id)
-        assert reloaded.status == :hold
-      after
-        Application.put_env(:ysc, :stripe_client, previous_client)
-      end
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.status == :hold
     end
 
     test "releases the hold and clears entitlement when Stripe accepts the cancel",
@@ -614,30 +613,23 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
         })
         |> Repo.update!()
 
-      previous_client = Application.get_env(:ysc, :stripe_client)
-      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+      stub(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                      _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "canceled"
+         }}
+      end)
 
-      try do
-        stub(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
-                                                        _opts ->
-          {:ok,
-           %Stripe.PaymentIntent{
-             id: payment_intent_id,
-             status: "canceled"
-           }}
-        end)
+      HoldExpiryWorker.expire_expired_holds()
 
-        HoldExpiryWorker.expire_expired_holds()
+      released = Repo.get!(Booking, booking.id)
+      assert released.status == :canceled
+      assert is_nil(released.applied_booking_entitlement_id)
 
-        released = Repo.get!(Booking, booking.id)
-        assert released.status == :canceled
-        assert is_nil(released.applied_booking_entitlement_id)
-
-        still_active = Entitlements.get_entitlement(entitlement.id)
-        assert still_active.status == :active
-      after
-        Application.put_env(:ysc, :stripe_client, previous_client)
-      end
+      still_active = Entitlements.get_entitlement(entitlement.id)
+      assert still_active.status == :active
     end
   end
 end
