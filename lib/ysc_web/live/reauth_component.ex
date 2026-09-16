@@ -302,14 +302,12 @@ defmodule YscWeb.ReauthComponent do
 
           <%!-- Passkey section --%>
           <div class="space-y-3">
-            <div :if={@user_has_password} class="relative">
-              <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-zinc-200"></div>
-              </div>
-              <div class="relative flex justify-center text-sm">
-                <span class="px-2 bg-white text-zinc-500">OR</span>
-              </div>
-            </div>
+            <.labeled_divider
+              :if={@user_has_password}
+              id="reauth-passkey-or-divider"
+            >
+              OR
+            </.labeled_divider>
 
             <h3 class="font-semibold text-zinc-900">
               {if @user_has_password,
@@ -345,14 +343,7 @@ defmodule YscWeb.ReauthComponent do
         <%!-- OAuth section — rendered outside the hook div since these cause a full
              page redirect and don't interact with WebAuthn. --%>
         <div class="mt-6 space-y-3">
-          <div class="relative">
-            <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-zinc-200"></div>
-            </div>
-            <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-white text-zinc-500">OR</span>
-            </div>
-          </div>
+          <.labeled_divider id="reauth-oauth-or-divider">OR</.labeled_divider>
 
           <p class="text-sm font-semibold text-zinc-900">
             Verify with a social account

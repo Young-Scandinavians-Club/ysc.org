@@ -41,8 +41,7 @@ defmodule YscWeb.UserLoginLiveTest do
       assert html =~ "Sign in with Google"
       assert html =~ "Sign in with Facebook"
 
-      # Check for divider
-      assert html =~ "or"
+      assert has_element?(lv, "#login-or-divider")
     end
 
     test "renders passkey button when supported", %{conn: conn} do

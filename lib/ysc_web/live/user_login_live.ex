@@ -143,15 +143,13 @@ defmodule YscWeb.UserLoginLive do
           phx-click="sign_in_with_facebook"
         />
       </div>
-      <!-- Divider -->
-      <div class="relative my-6">
-        <div class="absolute inset-0 flex items-center">
-          <div class="w-full border-t border-zinc-300"></div>
-        </div>
-        <div class="relative flex justify-center items-center text-sm leading-none">
-          <span class="bg-white px-2 text-zinc-500">or</span>
-        </div>
-      </div>
+      <.labeled_divider
+        id="login-or-divider"
+        class="my-6"
+        line_class="border-zinc-300"
+      >
+        or
+      </.labeled_divider>
       <!-- Failed Sign-in Attempts Banner -->
       <div
         :if={@failed_login_attempts >= 3 && !@banner_dismissed}
