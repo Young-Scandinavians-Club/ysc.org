@@ -42,6 +42,47 @@ defmodule Ysc.Ledgers do
   # Treasurer payment tables only show name/email. Skip hashed_password,
   # board_bio, and other columns the overview never renders.
   @admin_payment_user_fields [:id, :email, :first_name, :last_name]
+  # Payment detail modal + refund emails need identity, amount, Stripe id,
+  # and QuickBooks status. Skip `quickbooks_response` JSON and the Stripe
+  # payment-method `payload` blob — neither surface renders them.
+  @admin_payment_detail_fields [
+    :id,
+    :reference_id,
+    :external_provider,
+    :external_payment_id,
+    :amount,
+    :status,
+    :payment_date,
+    :user_id,
+    :quickbooks_sales_receipt_id,
+    :quickbooks_sync_status,
+    :quickbooks_sync_error,
+    :quickbooks_synced_at,
+    :quickbooks_last_sync_attempt_at,
+    :inserted_at,
+    :updated_at
+  ]
+  @related_booking_fields [
+    :id,
+    :reference_id,
+    :property,
+    :status,
+    :checkin_date,
+    :checkout_date
+  ]
+  @related_ticket_fields [:id]
+  @admin_refund_list_fields [
+    :id,
+    :reference_id,
+    :amount,
+    :reason,
+    :status,
+    :payment_id,
+    :quickbooks_sync_status,
+    :quickbooks_sync_error,
+    :inserted_at
+  ]
+  @admin_ledger_account_fields [:id, :name, :account_type]
   @admin_payout_list_fields [:id, :payment_id, :stripe_payout_id]
   @admin_subscription_list_fields [:id]
 
@@ -1253,10 +1294,7 @@ defmodule Ysc.Ledgers do
     require Ysc.Logging
 
     try do
-      # Reload payment with associations
-      payment = get_payment_with_associations(payment.id)
-
-      if payment.user do
+      if payment && payment.user do
         # Determine if this is for a booking or ticket order
         case get_payment_related_entity(payment) do
           {:booking, booking} ->
@@ -2302,43 +2340,109 @@ defmodule Ysc.Ledgers do
   @doc """
   Gets the related entity (booking or ticket order) for a payment.
 
+  Booking rows are slim `select: struct` loads (reference/dates/status).
+  Ticket orders load event title and ticket ids only — not event body HTML,
+  ticket-tier copy, the paying user, or the payment row. Refund emails
+  refetch the full booking / ticket order before rendering.
+
   Returns:
   - `{:booking, booking}` if payment is for a booking
   - `{:ticket_order, ticket_order}` if payment is for a ticket order
   - `nil` if no related entity found
   """
   def get_payment_related_entity(payment) do
-    # Look for ledger entries with related_entity_type
-    entries = get_entries_by_payment(payment.id)
+    case Repo.one(payment_related_booking_id_query(payment.id)) do
+      nil ->
+        case Repo.one(related_ticket_order_query(payment.id)) do
+          nil -> nil
+          ticket_order -> {:ticket_order, ticket_order}
+        end
 
-    # Check for booking entry
-    booking_entry =
-      Enum.find(entries, fn entry ->
-        to_string(entry.related_entity_type) == "booking" &&
-          entry.related_entity_id
-      end)
-
-    if booking_entry do
-      case Repo.get(Ysc.Bookings.Booking, booking_entry.related_entity_id) do
-        nil -> nil
-        booking -> {:booking, booking}
-      end
-    else
-      # Check for ticket order by looking for event entry or checking payment_id on ticket_order
-      ticket_order =
-        from(to in Ysc.Tickets.TicketOrder,
-          where: to.payment_id == ^payment.id,
-          preload: [:user, :event, :payment, tickets: :ticket_tier],
-          limit: 1
-        )
-        |> Repo.one()
-
-      if ticket_order do
-        {:ticket_order, ticket_order}
-      else
-        nil
-      end
+      booking_id ->
+        case Repo.one(related_booking_query(booking_id)) do
+          nil -> nil
+          booking -> {:booking, booking}
+        end
     end
+  end
+
+  defp payment_related_booking_id_query(payment_id) do
+    from(e in LedgerEntry,
+      where: e.payment_id == ^payment_id,
+      where: e.related_entity_type == :booking,
+      where: not is_nil(e.related_entity_id),
+      select: e.related_entity_id,
+      limit: 1
+    )
+  end
+
+  defp related_booking_query(booking_id) do
+    from(b in Booking,
+      where: b.id == ^booking_id,
+      select: struct(b, ^@related_booking_fields)
+    )
+  end
+
+  defp related_ticket_order_query(payment_id) do
+    event_query = history_event_query()
+
+    ticket_query =
+      from(t in Ticket, select: struct(t, ^@related_ticket_fields))
+
+    from(to in TicketOrder,
+      where: to.payment_id == ^payment_id,
+      select: struct(to, ^@history_ticket_order_fields),
+      preload: [event: ^event_query, tickets: ^ticket_query],
+      limit: 1
+    )
+  end
+
+  @doc """
+  Refunds shown on the treasurer payment-detail modal.
+
+  Skips the member row and QuickBooks `quickbooks_response` JSON — the
+  table only renders reference, amount, reason, status, QB status, and date.
+  """
+  def list_refunds_for_payment(payment_id) do
+    payment_id
+    |> list_refunds_for_payment_query()
+    |> Repo.all()
+  end
+
+  defp list_refunds_for_payment_query(payment_id) do
+    from(r in Refund,
+      where: r.payment_id == ^payment_id,
+      select: struct(r, ^@admin_refund_list_fields),
+      order_by: [desc: r.inserted_at]
+    )
+  end
+
+  @doc """
+  Ledger lines shown on the treasurer payment-detail modal.
+
+  Account is name + type only. Do not JOIN the payment or refund rows —
+  they are already loaded separately for the same modal.
+  """
+  def list_ledger_entries_for_payment(payment_id) do
+    payment_id
+    |> list_ledger_entries_for_payment_query()
+    |> Repo.all()
+  end
+
+  defp list_ledger_entries_for_payment_query(payment_id) do
+    account_query = admin_ledger_account_query()
+
+    from(e in LedgerEntry,
+      where: e.payment_id == ^payment_id,
+      preload: [account: ^account_query],
+      order_by: [desc: e.inserted_at]
+    )
+  end
+
+  defp admin_ledger_account_query do
+    from(a in LedgerAccount,
+      select: struct(a, ^@admin_ledger_account_fields)
+    )
   end
 
   @doc """
@@ -3382,14 +3486,27 @@ defmodule Ysc.Ledgers do
   end
 
   @doc """
-  Gets a payment by ID with preloaded associations.
+  Gets a payment by ID with the associations the treasurer modal and refund
+  emails actually render.
+
+  Member is a slim `select: struct` preload (name/email). Payment methods
+  (including Stripe `payload` JSON) and QuickBooks `quickbooks_response`
+  are not loaded.
   """
   def get_payment_with_associations(id) do
-    Repo.get(Payment, id)
-    |> case do
-      nil -> nil
-      payment -> Repo.preload(payment, [:user, :payment_method])
-    end
+    id
+    |> payment_with_associations_query()
+    |> Repo.one()
+  end
+
+  defp payment_with_associations_query(id) do
+    user_query = admin_payment_user_query()
+
+    from(p in Payment,
+      where: p.id == ^id,
+      select: struct(p, ^@admin_payment_detail_fields),
+      preload: [user: ^user_query]
+    )
   end
 
   @doc """
@@ -4475,5 +4592,35 @@ defmodule Ysc.Ledgers do
   @doc false
   def ci_query_explain_user_payment_history_free_orders_query do
     history_free_ticket_orders_query(Ysc.Ci.QueryExplain.Fixtures.ulid(), 30)
+  end
+
+  @doc false
+  def ci_query_explain_payment_with_associations_query do
+    payment_with_associations_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_payment_related_booking_id_query do
+    payment_related_booking_id_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_related_booking_query do
+    related_booking_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_related_ticket_order_query do
+    related_ticket_order_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_refunds_for_payment_query do
+    list_refunds_for_payment_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_ledger_entries_for_payment_query do
+    list_ledger_entries_for_payment_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
