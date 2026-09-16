@@ -812,7 +812,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert is_binary(html)
       assert String.length(html) > 0
       assert html =~ "Membership Upgrade Successful"
-      assert html =~ "Single to Family membership upgrade"
+      assert html =~ "switched from Single to Family"
       assert html =~ "$65.00"
     end
 
@@ -860,7 +860,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert String.length(html) > 0
       assert html =~ "Membership Updated"
       assert html =~ "changed from Family to Single"
-      assert html =~ "We processed a payment"
+      assert html =~ "We charged"
       assert html =~ "$10.00"
     end
 

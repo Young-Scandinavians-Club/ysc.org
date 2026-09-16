@@ -639,10 +639,10 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       html = MembershipPaymentFailure.render(assigns)
       assert html =~ user.email
-      assert html =~ "Retry Payment Now"
+      assert html =~ "Try paying again"
     end
 
-    test "renders payment reference when invoice_id is present", %{user: user} do
+    test "renders payment ID when invoice_id is present", %{user: user} do
       assigns = %{
         first_name: user.first_name,
         last_name: user.last_name,
@@ -657,7 +657,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       html = MembershipPaymentFailure.render(assigns)
       assert html =~ "in_123"
-      assert html =~ "payment reference"
+      assert html =~ "payment ID"
+      refute html =~ "payment reference"
       assert html =~ user.email
     end
 
