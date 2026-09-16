@@ -492,6 +492,11 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
         consumed = Entitlements.get_entitlement(entitlement.id)
         assert consumed.status == :consumed
         assert consumed.consumed_booking_id == booking.id
+
+        payment = Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+        assert Money.equal?(payment.amount, booking.total_price)
       after
         Application.put_env(:ysc, :stripe_client, previous_client)
       end
@@ -558,6 +563,78 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
 
         reloaded = Repo.get!(Booking, booking.id)
         assert reloaded.status == :hold
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "releases the hold and clears entitlement when Stripe accepts the cancel",
+         %{user: user} do
+      alias Ysc.Bookings.BookingLocker
+      alias Ysc.Bookings.Entitlements
+
+      {checkin, checkout} = locker_buyout_dates(503)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      payment_intent_id =
+        "pi_hold_expiry_canceled_#{System.unique_integer([:positive])}"
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id,
+          payment_intent_id: payment_intent_id,
+          hold_expires_at:
+            DateTime.add(
+              DateTime.utc_now() |> DateTime.truncate(:second),
+              -1,
+              :minute
+            )
+        })
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "canceled"
+           }}
+        end)
+
+        HoldExpiryWorker.expire_expired_holds()
+
+        released = Repo.get!(Booking, booking.id)
+        assert released.status == :canceled
+        assert is_nil(released.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
       after
         Application.put_env(:ysc, :stripe_client, previous_client)
       end

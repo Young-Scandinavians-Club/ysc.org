@@ -289,6 +289,21 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
                )
     end
 
+    test "accepts a PaymentIntent id string for booking hold expiry" do
+      payment_intent_id = "pi_hold_expiry_cancel_ok"
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok, payment_intent("canceled", payment_intent_id)}
+      end)
+
+      assert {:cancel, %Stripe.PaymentIntent{id: ^payment_intent_id}} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 payment_intent_id,
+                 "hold_expiry_worker"
+               )
+    end
+
     test "returns {:already_succeeded, payment_intent} when Stripe refuses because payment succeeded" do
       payment_intent_id = "pi_abandon_succeeded"
 

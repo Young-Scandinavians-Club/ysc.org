@@ -109,8 +109,62 @@ defmodule Ysc.Bookings.HoldExpiryWorker do
          %Booking{} = booking,
          %Stripe.PaymentIntent{} = payment_intent
        ) do
+    case Ysc.Bookings.verify_booking_payment_intent(payment_intent, booking) do
+      :ok ->
+        confirm_verified_hold_payment(booking, payment_intent)
+
+      {:error, :payment_amount_mismatch} = error ->
+        Ysc.Logging.error(
+          "Payment succeeded during hold expiry but amount did not match the hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(error)
+        )
+
+        Ysc.Bookings.maybe_refund_unfulfilled_checkout_payment(
+          booking,
+          payment_intent,
+          :payment_amount_mismatch
+        )
+
+        # Charge does not match this hold — release so the entitlement is not
+        # stuck and inventory is not held against an unfulfillable payment.
+        :release
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded during hold expiry but could not be verified for this hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
+  end
+
+  defp confirm_verified_hold_payment(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
     case BookingLocker.confirm_booking(booking.id) do
       {:ok, confirmed} ->
+        case Ysc.Bookings.record_hold_checkout_ledger_payment(
+               confirmed,
+               payment_intent
+             ) do
+          :ok ->
+            :ok
+
+          {:error, ledger_reason} ->
+            Ysc.Logging.error(
+              "Booking confirmed during hold expiry but ledger payment recording failed",
+              booking_id: confirmed.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(ledger_reason)
+            )
+        end
+
         Ysc.Logging.info(
           "Confirmed booking hold after payment succeeded during hold expiry reconcile",
           booking_id: confirmed.id,

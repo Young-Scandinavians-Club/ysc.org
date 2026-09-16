@@ -1390,6 +1390,36 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @doc false
+  def record_hold_checkout_ledger_payment(
+        %Booking{} = booking,
+        %Stripe.PaymentIntent{} = payment_intent
+      ) do
+    amount = Ysc.MoneyHelper.cents_to_money(payment_intent.amount, :USD)
+
+    stripe_fee =
+      payment_intent
+      |> Ysc.Stripe.WebhookHandler.extract_stripe_fee_from_payment_intent()
+      |> normalize_stripe_fee()
+
+    attrs = %{
+      user_id: booking.user_id,
+      amount: amount,
+      entity_type: :booking,
+      entity_id: booking.id,
+      external_payment_id: payment_intent.id,
+      stripe_fee: stripe_fee,
+      description: "Booking payment - #{booking.reference_id}",
+      property: booking.property,
+      payment_method_id: nil
+    }
+
+    case Ledgers.process_payment(attrs) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # Includes inventory-contention errors from confirm_booking/1 when a canceled
   # hold is reclaimed after HoldExpiryWorker released seats (Stripe already
   # succeeded). Those atoms are what confirm_*_from_available! roll back with;
