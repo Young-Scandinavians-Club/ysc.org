@@ -273,6 +273,10 @@ defmodule Ysc.MixProject do
       # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix
       # flash components rerender on same-kind replacement and LiveView navigation.
       {:live_toast, "~> 0.11"},
+      # 2.3.16: HTTP Accept header uses commas (RFC 9110) instead of
+      # semicolons. We load GeoLite2-City via custom S3 fetcher, not the
+      # HTTP downloader, so that patch is unused. Public :locus.lookup/2
+      # and start_loader/3 APIs are unchanged.
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.
