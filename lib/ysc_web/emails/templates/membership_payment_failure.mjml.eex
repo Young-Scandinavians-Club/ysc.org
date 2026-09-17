@@ -31,11 +31,11 @@
     <mj-spacer height="24px"></mj-spacer>
     <%= if @is_renewal do %>
       <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" css-class="red-alert-box">
-        <strong>Action needed:</strong> We couldn't process your <%= @membership_type %> membership renewal. Update your payment method and try again so your membership stays active.
+        <strong>Action needed:</strong> We couldn't take payment for your <%= @membership_type %> membership renewal. Update your card or bank account and try again so your membership stays active.
       </mj-text>
       <mj-spacer height="24px"></mj-spacer>
       <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-        We attempted to renew your Young Scandinavians Club <%= @membership_type %> membership, but encountered an issue with your payment method. This could be due to:
+        We tried to renew your Young Scandinavians Club <%= @membership_type %> membership, but there was a problem with your card or bank account. This could be due to:
       </mj-text>
     <% else %>
       <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
@@ -43,7 +43,7 @@
       </mj-text>
       <mj-spacer height="12px"></mj-spacer>
       <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-        Unfortunately, we encountered an issue processing your recent membership payment. This could be due to:
+        Unfortunately, we couldn't take your recent membership payment. This could be due to:
       </mj-text>
     <% end %>
     <mj-text font-size="18px" align="left" line-height="1.5">
@@ -65,22 +65,26 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#6b7280">
       <%= if @invoice_id do %>
-        If you contact us, mention payment reference <%= @invoice_id %> or the email on your account: <%= @email %>
+        If you contact us, mention the email on your account: <%= @email %>. You can also share this payment ID: <%= @invoice_id %>
       <% else %>
-        If you contact us, mention the email address on your account: <%= @email %>
+        If you contact us, mention the email on your account: <%= @email %>
       <% end %>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <%= if @is_renewal do %>
-        To keep your membership active and ensure uninterrupted access to all member benefits, please update your payment method and retry the payment as soon as possible.
+        To keep your membership active, please update your card or bank account and try the payment again as soon as you can.
       <% else %>
-        Don't worry - your membership application remains approved and we're here to help you complete the payment process.
+        Don't worry — your membership application is still approved. You just need to finish paying your dues.
       <% end %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <%= if @retry_payment_url do %>
-      <mj-button href="<%= @retry_payment_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Retry Payment Now →</mj-button>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+        If your card still works, try the payment again. If you need a different card or bank account, update your payment method first.
+      </mj-text>
+      <mj-spacer height="12px"></mj-spacer>
+      <mj-button href="<%= @retry_payment_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Try paying again →</mj-button>
       <mj-spacer height="12px"></mj-spacer>
     <% end %>
     <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Update Payment Method →</mj-button>
@@ -107,9 +111,9 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <%= if @is_renewal do %>
-        Once your payment method is updated and the renewal payment is successfully processed, your <%= @membership_type %> membership will continue uninterrupted with full access to all member benefits, including:
+        After you update your card and pay, your <%= @membership_type %> membership stays active with access to:
       <% else %>
-        Once your payment is successfully processed, you'll immediately gain access to all member benefits, including:
+        After you pay, you'll have access to all member benefits, including:
       <% end %>
     </mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">

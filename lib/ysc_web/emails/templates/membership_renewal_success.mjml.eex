@@ -43,7 +43,7 @@
         <% @is_downgrade and @old_membership_type -> %>
           Your membership has been changed from <%= @old_membership_type %> to <%= @membership_type %> on <%= @renewal_date %>.
         <% @is_single_to_family_upgrade -> %>
-          Your Single to Family membership upgrade has been successfully processed on <%= @renewal_date %>.
+          Your membership switched from Single to Family on <%= @renewal_date %>.
         <% true -> %>
           Your <%= @membership_type %> membership has been successfully renewed on <%= @renewal_date %>.
       <% end %>
@@ -54,13 +54,13 @@
         <%= if @is_upgrade do %>
           We charged <strong><%= @amount %></strong> for the upgrade to <%= @membership_type %>. That amount covers the rest of your current membership year at the new price.
         <% else %>
-          We processed a payment of <strong><%= @amount %></strong> for your membership change. It accounts for unused time on your old plan and the remaining time at the new price.
+          We charged <strong><%= @amount %></strong> for switching plans. That amount covers unused time on your old plan and the rest of the year at the new price.
         <% end %>
       <% else %>
         <%= if @is_single_to_family_upgrade do %>
-          Your payment of <strong><%= @amount %></strong> has been processed for your Single to Family membership upgrade.
+          We received your payment of <strong><%= @amount %></strong> for switching to Family.
         <% else %>
-          Your payment of <strong><%= @amount %></strong> has been processed.
+          We received your payment of <strong><%= @amount %></strong>.
         <% end %>
       <% end %>
       Thank you for continuing to be part of the Young Scandinavians Club community!
