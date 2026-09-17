@@ -59,8 +59,11 @@ defmodule Ysc.Tickets.CheckoutCancel do
   end
 
   @doc """
-  Resolves a checkout abandonment by attempting to *cancel* the order's Stripe
+  Resolves a checkout abandonment by attempting to *cancel* the Stripe
   PaymentIntent, rather than merely reading its status.
+
+  Accepts either a `%TicketOrder{}` (ticket checkout) or a PaymentIntent id
+  string (booking holds).
 
   A point-in-time status read (as used by `pending_order_safe_to_cancel?/2`) leaves
   a gap: the client can still be mid-confirmation when we read "not yet succeeded,"
@@ -84,7 +87,7 @@ defmodule Ysc.Tickets.CheckoutCancel do
     * `{:error, reason}` - could not reach Stripe; be conservative and don't cancel
   """
   def cancel_payment_intent_for_abandoned_checkout(
-        ticket_order,
+        ticket_order_or_payment_intent_id,
         context \\ "cancel_ticket_order"
       )
 
@@ -99,6 +102,24 @@ defmodule Ysc.Tickets.CheckoutCancel do
         %TicketOrder{payment_intent_id: payment_intent_id, id: ticket_order_id},
         context
       ) do
+    cancel_payment_intent_by_id(payment_intent_id, ticket_order_id, context)
+  end
+
+  def cancel_payment_intent_for_abandoned_checkout(
+        payment_intent_id,
+        context
+      )
+      when is_binary(payment_intent_id) and payment_intent_id != "" do
+    cancel_payment_intent_by_id(payment_intent_id, nil, context)
+  end
+
+  def cancel_payment_intent_for_abandoned_checkout(nil, _context),
+    do: {:cancel, nil}
+
+  def cancel_payment_intent_for_abandoned_checkout("", _context),
+    do: {:cancel, nil}
+
+  defp cancel_payment_intent_by_id(payment_intent_id, owner_id, context) do
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     case stripe_client.cancel_payment_intent(payment_intent_id, %{}) do
@@ -109,7 +130,7 @@ defmodule Ysc.Tickets.CheckoutCancel do
         resolve_uncancellable_payment_intent(
           stripe_client,
           payment_intent_id,
-          ticket_order_id,
+          owner_id,
           context
         )
 
@@ -121,7 +142,7 @@ defmodule Ysc.Tickets.CheckoutCancel do
   defp resolve_uncancellable_payment_intent(
          stripe_client,
          payment_intent_id,
-         ticket_order_id,
+         owner_id,
          context
        ) do
     case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
@@ -130,7 +151,8 @@ defmodule Ysc.Tickets.CheckoutCancel do
           "Payment succeeded before checkout-abandonment cancel reached Stripe; fulfilling instead of orphaning it",
           context: context,
           payment_intent_id: payment_intent_id,
-          ticket_order_id: ticket_order_id
+          ticket_order_id: owner_id,
+          booking_id: owner_id
         )
 
         {:already_succeeded, payment_intent}
@@ -146,7 +168,8 @@ defmodule Ysc.Tickets.CheckoutCancel do
           "Could not retrieve payment intent after failed cancel, not cancelling order",
           context: context,
           payment_intent_id: payment_intent_id,
-          ticket_order_id: ticket_order_id
+          ticket_order_id: owner_id,
+          booking_id: owner_id
         )
 
         {:error, reason}
