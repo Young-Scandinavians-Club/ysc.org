@@ -4342,125 +4342,148 @@ defmodule YscWeb.UserSettingsLive do
   def handle_event("cancel-membership", _params, socket) do
     user = socket.assigns.user
 
-    if user.state != :active do
-      {:noreply,
-       YscWeb.Flash.put_toast(
-         socket,
-         :error,
-         "You must have an approved account to manage auto-renewal.",
-         title: "Membership"
-       )}
-    else
-      # Turn off auto-renewal at period end in Stripe (membership stays active until then)
-      case Subscriptions.cancel(socket.assigns.current_membership) do
-        {:ok, _subscription} ->
-          # Cache invalidation is handled in Subscriptions.cancel
-          # Also invalidate for sub-accounts since they inherit from primary user
-          sub_accounts = Accounts.get_sub_accounts(user)
+    case authorize_own_membership_billing(socket) do
+      {:error, _} ->
+        deny_family_billing(socket)
 
-          Enum.each(sub_accounts, fn sub_account ->
-            MembershipCache.invalidate_user(sub_account.id)
-          end)
-
-          {:noreply,
-           YscWeb.Flash.put_toast(
-             socket,
-             :info,
-             "Auto-renewal is off. You'll keep access until your current membership year ends.",
-             title: "Membership"
-           )
-           |> push_patch(to: ~p"/users/membership")}
-
-        {:error, reason} when is_binary(reason) ->
-          {:noreply,
-           YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
-
-        {:error, _changeset} ->
+      :ok ->
+        if user.state != :active do
           {:noreply,
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Couldn't turn off auto-renewal. Please try again.",
+             "You must have an approved account to manage auto-renewal.",
              title: "Membership"
            )}
-      end
+        else
+          # Turn off auto-renewal at period end in Stripe (membership stays
+          # active until then)
+          case Subscriptions.cancel(socket.assigns.current_membership) do
+            {:ok, _subscription} ->
+              # Cache invalidation is handled in Subscriptions.cancel
+              # Also invalidate for sub-accounts since they inherit from primary
+              sub_accounts = Accounts.get_sub_accounts(user)
+
+              Enum.each(sub_accounts, fn sub_account ->
+                MembershipCache.invalidate_user(sub_account.id)
+              end)
+
+              {:noreply,
+               YscWeb.Flash.put_toast(
+                 socket,
+                 :info,
+                 "Auto-renewal is off. You'll keep access until your current membership year ends.",
+                 title: "Membership"
+               )
+               |> push_patch(to: ~p"/users/membership")}
+
+            {:error, reason} when is_binary(reason) ->
+              {:noreply,
+               YscWeb.Flash.put_toast(socket, :error, reason,
+                 title: "Membership"
+               )}
+
+            {:error, _changeset} ->
+              {:noreply,
+               YscWeb.Flash.put_toast(
+                 socket,
+                 :error,
+                 "Couldn't turn off auto-renewal. Please try again.",
+                 title: "Membership"
+               )}
+          end
+        end
     end
   end
 
   def handle_event("cancel-scheduled-downgrade", _params, socket) do
-    case Subscriptions.cancel_scheduled_downgrade(
-           socket.assigns.current_membership
-         ) do
-      {:ok, _subscription} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :info,
-           "Plan change cancelled. You'll stay on your current membership.",
-           title: "Membership"
-         )
-         |> push_patch(to: ~p"/users/membership")}
-
-      {:error, :no_scheduled_downgrade} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "There is no plan change scheduled on your account. Your current membership level is already in effect.",
-           title: "Membership"
-         )
-         |> push_patch(to: ~p"/users/membership")}
-
-      {:error, reason} when is_binary(reason) ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
-
+    case authorize_own_membership_billing(socket) do
       {:error, _} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "We couldn't keep your current plan. Please try again, or email info@ysc.org if this continues.",
-           title: "Membership"
-         )}
+        deny_family_billing(socket)
+
+      :ok ->
+        case Subscriptions.cancel_scheduled_downgrade(
+               socket.assigns.current_membership
+             ) do
+          {:ok, _subscription} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :info,
+               "Plan change cancelled. You'll stay on your current membership.",
+               title: "Membership"
+             )
+             |> push_patch(to: ~p"/users/membership")}
+
+          {:error, :no_scheduled_downgrade} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "There is no plan change scheduled on your account. Your current membership level is already in effect.",
+               title: "Membership"
+             )
+             |> push_patch(to: ~p"/users/membership")}
+
+          {:error, reason} when is_binary(reason) ->
+            {:noreply,
+             YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
+
+          {:error, _} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "We couldn't keep your current plan. Please try again, or email info@ysc.org if this continues.",
+               title: "Membership"
+             )}
+        end
     end
   end
 
   def handle_event("reactivate-membership", _params, socket) do
     user = socket.assigns.user
 
-    if user.state != :active do
-      {:noreply,
-       YscWeb.Flash.put_toast(
-         socket,
-         :error,
-         "You must have an approved account to manage auto-renewal.",
-         title: "Membership"
-       )}
-    else
-      case Subscriptions.resume(socket.assigns.current_membership) do
-        {:error, reason} ->
-          {:noreply,
-           YscWeb.Flash.put_toast(socket, :error, reason, title: "Membership")}
+    case authorize_own_membership_billing(socket) do
+      {:error, _} ->
+        deny_family_billing(socket)
 
-        {:ok, _subscription} ->
-          # Cache invalidation is handled in Subscriptions.resume (via update_subscription)
-          # Also invalidate for sub-accounts since they inherit from primary user
-          sub_accounts = Accounts.get_sub_accounts(user)
-
-          Enum.each(sub_accounts, fn sub_account ->
-            MembershipCache.invalidate_user(sub_account.id)
-          end)
-
+      :ok ->
+        if user.state != :active do
           {:noreply,
            YscWeb.Flash.put_toast(
              socket,
-             :info,
-             "Auto-renewal is on. Your membership will renew as usual.",
+             :error,
+             "You must have an approved account to manage auto-renewal.",
              title: "Membership"
-           )
-           |> push_patch(to: ~p"/users/membership")}
-      end
+           )}
+        else
+          case Subscriptions.resume(socket.assigns.current_membership) do
+            {:error, reason} ->
+              {:noreply,
+               YscWeb.Flash.put_toast(socket, :error, reason,
+                 title: "Membership"
+               )}
+
+            {:ok, _subscription} ->
+              # Cache invalidation is handled in Subscriptions.resume
+              # Also invalidate for sub-accounts since they inherit from primary
+              sub_accounts = Accounts.get_sub_accounts(user)
+
+              Enum.each(sub_accounts, fn sub_account ->
+                MembershipCache.invalidate_user(sub_account.id)
+              end)
+
+              {:noreply,
+               YscWeb.Flash.put_toast(
+                 socket,
+                 :info,
+                 "Auto-renewal is on. Your membership will renew as usual.",
+                 title: "Membership"
+               )
+               |> push_patch(to: ~p"/users/membership")}
+          end
+        end
     end
   end
 
@@ -4499,7 +4522,8 @@ defmodule YscWeb.UserSettingsLive do
     user = socket.assigns.user
 
     result =
-      with :ok <- validate_user_active_for_membership(user),
+      with :ok <- authorize_own_membership_billing(socket),
+           :ok <- validate_user_active_for_membership(user),
            :ok <- validate_membership_type(params, socket),
            current_membership <- socket.assigns.current_membership,
            :ok <- validate_current_membership_exists(current_membership),
@@ -4973,6 +4997,50 @@ defmodule YscWeb.UserSettingsLive do
       {:error,
        "You must have an approved account to change your membership plan."}
     end
+  end
+
+  # Finding 72: sub-accounts inherit the primary's Stripe subscription via
+  # MembershipCache. UI hides billing controls, but handle_event still mutated
+  # that inherited subscription (cancel/resume/plan change).
+  defp authorize_own_membership_billing(socket) do
+    user = socket.assigns.user
+    membership = socket.assigns.current_membership
+
+    if Accounts.sub_account?(user) or
+         inherited_billing_membership?(user, membership) do
+      {:error, family_billing_denied_message()}
+    else
+      :ok
+    end
+  end
+
+  defp inherited_billing_membership?(user, membership) do
+    owner_id = billing_membership_owner_id(membership)
+    is_binary(owner_id) and owner_id != user.id
+  end
+
+  defp billing_membership_owner_id(%Subscriptions.Subscription{
+         user_id: user_id
+       }),
+       do: user_id
+
+  defp billing_membership_owner_id(%{type: :lifetime, user_id: user_id}),
+    do: user_id
+
+  defp billing_membership_owner_id(_membership), do: nil
+
+  defp family_billing_denied_message do
+    "You're on a family membership and can't manage billing for the household. Ask the member who manages your family account to make membership changes."
+  end
+
+  defp deny_family_billing(socket) do
+    {:noreply,
+     YscWeb.Flash.put_toast(
+       socket,
+       :error,
+       family_billing_denied_message(),
+       title: "Membership"
+     )}
   end
 
   defp validate_not_selecting(socket) do

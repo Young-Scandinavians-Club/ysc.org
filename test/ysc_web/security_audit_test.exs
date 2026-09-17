@@ -66,6 +66,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 68 (HIGH)     Volunteers could create irreversible cabin booking blackouts via event publish
   Finding 70 (MEDIUM)   Volunteers could force tickets_tbd on events that already have live ticket tiers
   Finding 71 (HIGH)     Password reset LiveView never re-checked the token on submit, so a still-open tab could take over the account after expiry or after the victim already reset
+  Finding 72 (HIGH)     Family sub-accounts inherited the primary's Stripe subscription and could cancel/resume/change it via hidden LiveView events
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -4532,6 +4533,115 @@ defmodule YscWeb.SecurityAuditTest do
                "attacker takeover password"
              )
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 72 (HIGH): Family sub-accounts must not mutate the primary's Stripe
+  # subscription. MembershipCache returns the primary's sub for linked members;
+  # billing buttons are hidden, but handle_event still ran cancel/resume/change.
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 72: family sub-accounts cannot manage household billing" do
+    test "hides billing controls and rejects forged cancel/resume/change events",
+         %{conn: conn} do
+      {primary, subscription, sub_account} = family_billing_fixture()
+
+      conn = log_in_user(conn, sub_account)
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+
+      refute has_element?(view, "button[phx-click=\"cancel-membership\"]")
+      refute has_element?(view, "button[phx-click=\"reactivate-membership\"]")
+      refute has_element?(view, "#cancel-scheduled-downgrade-btn")
+      refute has_element?(view, "button[phx-click=\"change-membership\"]")
+
+      html = render_click(view, "cancel-membership")
+      assert html =~ "manage billing for the household"
+
+      assert Repo.get!(Subscriptions.Subscription, subscription.id).cancel_at_period_end !=
+               true
+
+      html = render_click(view, "reactivate-membership")
+      assert html =~ "manage billing for the household"
+
+      html = render_click(view, "cancel-scheduled-downgrade")
+      assert html =~ "manage billing for the household"
+
+      html =
+        render_click(view, "change-membership", %{"membership_type" => "single"})
+
+      assert html =~ "manage billing for the household"
+
+      still = Repo.get!(Subscriptions.Subscription, subscription.id)
+      assert still.user_id == primary.id
+      assert still.stripe_status == "active"
+      assert still.cancel_at_period_end != true
+    end
+
+    test "lifetime family sub-accounts also cannot cancel inherited membership",
+         %{conn: conn} do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      sub_account = user_fixture(%{state: :active})
+
+      assert {:ok, sub_account} =
+               Accounts.admin_link_user_to_family(primary, sub_account)
+
+      MembershipCache.invalidate_user(primary.id)
+      MembershipCache.invalidate_user(sub_account.id)
+
+      conn = log_in_user(conn, sub_account)
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+
+      refute has_element?(view, "button[phx-click=\"cancel-membership\"]")
+
+      html = render_click(view, "cancel-membership")
+      assert html =~ "manage billing for the household"
+      refute html =~ "Lifetime memberships cannot be cancelled"
+    end
+  end
+
+  defp family_billing_fixture do
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+    family_plan = Enum.find(membership_plans, &(&1.id == :family))
+    assert family_plan, "test config must include a family membership plan"
+
+    primary = user_fixture(%{state: :active})
+
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: primary.id,
+        stripe_id: "sub_finding72_#{System.unique_integer([:positive])}",
+        stripe_status: "active",
+        name: "Family Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    {:ok, _item} =
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_price_id: family_plan.stripe_price_id,
+        stripe_product_id:
+          "prod_finding72_#{System.unique_integer([:positive])}",
+        stripe_id: "si_finding72_#{System.unique_integer([:positive])}",
+        quantity: 1
+      })
+
+    primary = Accounts.get_user!(primary.id, [:subscriptions])
+    sub_account = user_fixture(%{state: :active})
+
+    assert {:ok, sub_account} =
+             Accounts.admin_link_user_to_family(primary, sub_account)
+
+    MembershipCache.invalidate_user(primary.id)
+    MembershipCache.invalidate_user(sub_account.id)
+
+    {primary, subscription, sub_account}
   end
 
   defp volunteer_app_conn(conn, volunteer) do
