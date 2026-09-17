@@ -3,6 +3,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
 
   alias Ysc.Accounts
   alias Ysc.Accounts.AuthEvent
@@ -169,6 +170,55 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
         |> render_click()
 
       assert bookings_html =~ "Bookings"
+    end
+
+    test "bookings tab still shows reference, room, and category after slim load",
+         %{conn: conn} do
+      user = user_fixture()
+
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "user-detail-cat-#{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      room_name = "User Detail Slim Room #{System.unique_integer([:positive])}"
+
+      {:ok, room} =
+        %Ysc.Bookings.Room{}
+        |> Ysc.Bookings.Room.changeset(%{
+          name: room_name,
+          description: "user-detail bookings table must not need this copy",
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true,
+          room_category_id: category.id
+        })
+        |> Repo.insert()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          status: :complete,
+          rooms: [room]
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/bookings")
+
+      render_async(view)
+
+      assert has_element?(view, "#user_bookings_list")
+      assert has_element?(view, "#user_bookings_list", booking.reference_id)
+      assert has_element?(view, "#user_bookings_list", room_name)
+
+      assert has_element?(
+               view,
+               "#user_bookings_list",
+               String.capitalize(category.name)
+             )
     end
 
     test "legacy booking-benefits route redirects and expands benefits on bookings tab",

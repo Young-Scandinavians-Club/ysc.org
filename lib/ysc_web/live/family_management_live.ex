@@ -962,7 +962,7 @@ defmodule YscWeb.FamilyManagementLive do
         tone={:danger}
         phx-click="revoke_invite"
         phx-value-invite_id={@invite.id}
-        data-confirm="Cancel this invite? The invitee will receive an email notification."
+        data-confirm="Cancel this invitation? We'll email the person you invited to let them know."
       >
         Cancel invite
       </.dropdown_menu_item>

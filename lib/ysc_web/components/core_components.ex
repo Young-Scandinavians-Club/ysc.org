@@ -4313,6 +4313,135 @@ defmodule YscWeb.CoreComponents do
   defp form_notice_icon(_kind, icon) when is_binary(icon), do: icon
 
   @doc """
+  Amber hint that the six-digit bypass code `000000` works in non-prod.
+
+  Hidden in production via `Ysc.Env.non_prod?/0`. Used under phone OTP
+  inputs on account setup and user settings.
+
+  ## Examples
+
+      <.verification_dev_hint id="phone-verification-dev-hint" />
+  """
+  attr :id, :string, default: "verification-dev-hint"
+
+  def verification_dev_hint(assigns) do
+    assigns = assign(assigns, :show?, Ysc.Env.non_prod?())
+
+    ~H"""
+    <p
+      :if={@show?}
+      id={@id}
+      class="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded-sm border border-amber-200"
+    >
+      <strong>Dev Mode:</strong>
+      You can use <code class="bg-amber-100 px-1 rounded-sm">000000</code>
+      as the verification code.
+    </p>
+    """
+  end
+
+  @doc """
+  "Didn't receive the code?" prompt with a resend link or countdown.
+
+  Pair with `phx-hook="ResendTimer"` on an ancestor. The countdown span
+  keeps `data-countdown` and `data-timer-type` so the hook can tick and
+  push `resend_timer_expired`.
+
+  ## Examples
+
+      <.verification_resend_prompt
+        id="phone-verification-resend"
+        channel={:sms}
+        event="resend_phone_code"
+        disabled_until={@sms_resend_disabled_until}
+      />
+
+      <.verification_resend_prompt
+        id="email-verification-resend"
+        channel={:email}
+        event="resend_code"
+        disabled_until={@email_resend_disabled_until}
+        check_hint="Check your spam folder."
+      />
+  """
+  attr :id, :string, required: true
+  attr :channel, :atom, required: true, values: [:email, :sms]
+  attr :event, :string, required: true
+
+  attr :disabled_until, :any,
+    default: nil,
+    doc: "UTC DateTime until which resend is blocked, or nil when allowed"
+
+  attr :check_hint, :string,
+    default: nil,
+    doc:
+      "Where to look for the code. Defaults to messages (SMS) or email (email)."
+
+  def verification_resend_prompt(assigns) do
+    seconds = verification_resend_seconds_remaining(assigns.disabled_until)
+
+    assigns =
+      assigns
+      |> assign(
+        :available?,
+        verification_resend_available?(assigns.disabled_until)
+      )
+      |> assign(:seconds_remaining, seconds)
+      |> assign(
+        :check_hint,
+        assigns.check_hint || verification_resend_default_hint(assigns.channel)
+      )
+      |> assign(:wait_copy, verification_resend_wait_copy(seconds))
+
+    ~H"""
+    <p id={@id} class="text-xs text-zinc-600 mt-1">
+      Didn't receive the code? {@check_hint}
+      <.link
+        :if={@available?}
+        phx-click={@event}
+        phx-disable-with="Sending..."
+        class="text-blue-600 hover:underline cursor-pointer"
+      >
+        Resend the code
+      </.link>
+      <span
+        :if={!@available?}
+        id={"#{@id}-countdown"}
+        class="text-zinc-500 cursor-not-allowed font-bold"
+        data-countdown={@seconds_remaining}
+        data-timer-type={Atom.to_string(@channel)}
+      >
+        {@wait_copy}
+      </span>
+    </p>
+    """
+  end
+
+  defp verification_resend_default_hint(:sms), do: "Check your messages."
+  defp verification_resend_default_hint(:email), do: "Check your email."
+
+  defp verification_resend_available?(nil), do: true
+
+  defp verification_resend_available?(%DateTime{} = disabled_until) do
+    DateTime.compare(disabled_until, DateTime.utc_now()) == :lt
+  end
+
+  defp verification_resend_available?(_), do: true
+
+  defp verification_resend_seconds_remaining(%DateTime{} = disabled_until) do
+    max(0, DateTime.diff(disabled_until, DateTime.utc_now(), :second))
+  end
+
+  defp verification_resend_seconds_remaining(_), do: 0
+
+  defp verification_resend_wait_copy(1),
+    do: "You can resend the code in 1 second."
+
+  defp verification_resend_wait_copy(seconds) do
+    "You can resend the code in #{seconds} seconds."
+  end
+
+  @doc """
   Signed-in identity banner for public forms (contact, volunteer).
 
   Shows the member's avatar, title-cased name, and email so they can confirm

@@ -179,25 +179,8 @@ defmodule YscWeb.AdminMoneyLive do
       # Add payment type info
       payment = Ledgers.add_payment_type_info(payment)
 
-      # Get refunds for this payment
-      refunds =
-        from(r in Ysc.Ledgers.Refund,
-          where: r.payment_id == ^payment_id,
-          preload: [:user],
-          order_by: [desc: r.inserted_at]
-        )
-        |> Repo.all()
-
-      # Get ledger entries for this payment
-      ledger_entries =
-        from(e in Ysc.Ledgers.LedgerEntry,
-          where: e.payment_id == ^payment_id,
-          preload: [:account],
-          order_by: [desc: e.inserted_at]
-        )
-        |> Repo.all()
-
-      # Get related entity (booking or ticket order)
+      refunds = Ledgers.list_refunds_for_payment(payment_id)
+      ledger_entries = Ledgers.list_ledger_entries_for_payment(payment_id)
       related_entity = Ledgers.get_payment_related_entity(payment)
 
       socket
@@ -3079,7 +3062,7 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">User</p>
-              <p class="text-sm text-zinc-900">
+              <p id="payment-modal-user" class="text-sm text-zinc-900">
                 <%= if Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user do %>
                   <.link
                     navigate={~p"/admin/users/#{@selected_payment.user.id}/details"}
@@ -3216,12 +3199,13 @@ defmodule YscWeb.AdminMoneyLive do
           <!-- Related Entity -->
           <div
             :if={@payment_related_entity}
+            id="payment-related-entity"
             class="mt-4 p-4 bg-blue-50 rounded-sm border border-blue-200"
           >
             <h4 class="text-sm font-semibold text-zinc-800 mb-2">Related Entity</h4>
             <%= case @payment_related_entity do %>
               <% {:booking, booking} -> %>
-                <div class="text-sm text-zinc-700">
+                <div id="payment-related-booking" class="text-sm text-zinc-700">
                   <p><strong>Type:</strong> Booking</p>
                   <p>
                     <strong>Reference:</strong> {booking.reference_id ||
@@ -3246,14 +3230,16 @@ defmodule YscWeb.AdminMoneyLive do
                   </p>
                 </div>
               <% {:ticket_order, ticket_order} -> %>
-                <div class="text-sm text-zinc-700">
+                <div id="payment-related-ticket-order" class="text-sm text-zinc-700">
                   <p><strong>Type:</strong> Ticket Order</p>
                   <p>
                     <strong>Reference:</strong> {ticket_order.reference_id ||
                       ticket_order.id}
                   </p>
                   <%= if ticket_order.event do %>
-                    <p><strong>Event:</strong> {ticket_order.event.title}</p>
+                    <p id="payment-related-event-title">
+                      <strong>Event:</strong> {ticket_order.event.title}
+                    </p>
                   <% end %>
                   <p>
                     <strong>Tickets:</strong> {length(ticket_order.tickets || [])}

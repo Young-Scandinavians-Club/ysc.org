@@ -349,6 +349,14 @@ defmodule YscWeb.UserSettingsLiveTest do
       render(view)
       assert view |> element("#membership_form") |> has_element?()
 
+      html = render(view)
+
+      assert html =~
+               "You can switch between Single and Family. Switching to Family starts right away"
+
+      refute html =~ "Upgrades take effect immediately"
+      refute html =~ "downgrades apply"
+
       # Select family (upgrade) so the "Change Membership Plan" button appears
       render_change(view, "validate_membership", %{
         "membership_type" => "family"
@@ -1187,6 +1195,8 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert render(view) =~ "Verify Your Phone Number"
       assert has_element?(view, "#phone_verification_form")
       assert has_element?(view, "#phone-verification-keep-open-notice")
+      assert has_element?(view, "#phone-verification-resend")
+      assert has_element?(view, "#phone-verification-dev-hint")
 
       render_submit(view, "verify_phone_code", %{
         "verification_code" => "000000"
@@ -2581,6 +2591,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       assert render(view) =~ "Verify Your New Email Address"
       assert has_element?(view, "#email-verification-keep-open-notice")
+      assert has_element?(view, "#email-verification-resend")
 
       render_submit(view, "verify_email_code", %{
         "verification_code" => "000000"
@@ -2665,6 +2676,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       assert render(view) =~ "Verify Your New Email Address"
       assert has_element?(view, "#email-verification-keep-open-notice")
+      assert has_element?(view, "#email-verification-resend")
 
       render_submit(view, "verify_email_code", %{
         "verification_code" => "000000"
@@ -2737,6 +2749,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       assert render(view) =~ "Verify Your New Email Address"
       assert has_element?(view, "#email-verification-keep-open-notice")
+      assert has_element?(view, "#email-verification-resend")
     end
 
     test "resend_email_code sends toast when on email verification route", %{

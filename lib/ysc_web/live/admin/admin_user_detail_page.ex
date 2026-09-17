@@ -2141,7 +2141,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         phx-click="admin_cancel_family_invite"
                         phx-value-invite_id={invite.id}
                         phx-disable-with="Cancelling..."
-                        data-confirm="Cancel this invite? The invitee will receive an email notification."
+                        data-confirm="Cancel this invitation? We'll email the person you invited to let them know."
                         class="min-h-0! text-sm! px-3! py-1.5! shrink-0"
                       >
                         Cancel invite

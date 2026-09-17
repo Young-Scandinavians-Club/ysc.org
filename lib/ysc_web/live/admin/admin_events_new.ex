@@ -66,9 +66,11 @@ defmodule YscWeb.AdminEventsNewLive do
                     {@event_title}
                   </h1>
 
-                  <.badge type={event_state_to_badge_style(@state)}>
-                    {String.capitalize("#{@state}")}
-                  </.badge>
+                  <.admin_event_state_badge
+                    id="admin-event-header-state-badge"
+                    state={@state}
+                    publish_at={@event.publish_at}
+                  />
 
                   <.presence_avatars editors={@editors} size={:md} />
 
@@ -3607,13 +3609,6 @@ defmodule YscWeb.AdminEventsNewLive do
 
   defp description_length(nil), do: 0
   defp description_length(description), do: String.length(description)
-
-  defp event_state_to_badge_style(:draft), do: "sky"
-  defp event_state_to_badge_style(:scheduled), do: "yellow"
-  defp event_state_to_badge_style(:published), do: "green"
-  defp event_state_to_badge_style(:cancelled), do: "orange"
-  defp event_state_to_badge_style(:deleted), do: "red"
-  defp event_state_to_badge_style(_), do: "default"
 
   defp schedule_button_text(:scheduled), do: "Scheduled"
   defp schedule_button_text(_), do: "Schedule"

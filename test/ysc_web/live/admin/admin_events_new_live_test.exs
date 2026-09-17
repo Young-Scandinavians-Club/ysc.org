@@ -78,6 +78,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
                view,
                "a[href='/admin/events/#{event.id}/check-in']"
              )
+
+      assert has_element?(view, "#admin-event-header-state-badge")
     end
   end
 

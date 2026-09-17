@@ -100,10 +100,30 @@ defmodule YscWeb.UserResetPasswordLive do
   end
 
   defp do_reset_password(socket, user_params) do
-    case Accounts.reset_user_password(socket.assigns.user, user_params) do
+    # Finding 71: re-check the reset token at submit time. Mount only proves
+    # the link was valid when the page opened — a LiveView can stay connected
+    # after the token expires, is used, or is revoked by a password change.
+    case Accounts.get_user_by_reset_password_token(socket.assigns.token) do
+      nil ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This password reset link no longer works. It may have expired — request a new one from the sign-in page.",
+           title: "Password reset"
+         )
+         |> redirect(to: ~p"/users/log-in")}
+
+      user ->
+        apply_reset_password(socket, user, user_params)
+    end
+  end
+
+  defp apply_reset_password(socket, user, user_params) do
+    case Accounts.reset_user_password(user, user_params) do
       {:ok, user} ->
         # Log successful password reset
-        AuthService.log_password_reset_success(socket.assigns.user, socket)
+        AuthService.log_password_reset_success(user, socket)
 
         # Send password changed notification
         UserNotifier.deliver_password_changed_notification(user)

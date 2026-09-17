@@ -1224,6 +1224,147 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       reloaded = Tickets.get_ticket_order(order.id)
       assert reloaded.status == :pending
     end
+
+    test "checkout-expired expires the pending order when Stripe cancel succeeds",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+        event = Repo.preload(event, :ticket_tiers, force: true)
+        tier = hd(event.ticket_tiers)
+
+        payment_intent_id =
+          "pi_cancellable_expire_#{System.unique_integer([:positive])}"
+
+        expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+          {:ok,
+           build_payment_intent(%{
+             id: payment_intent_id,
+             status: "requires_payment_method",
+             amount: params.amount
+           })}
+        end)
+
+        {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+        view = wait_for_async(view)
+
+        render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+        render_click(view, "proceed-to-checkout")
+
+        order =
+          Tickets.list_user_ticket_orders(user.id)
+          |> List.first()
+
+        assert order.status == :pending
+        assert order.payment_intent_id == payment_intent_id
+
+        render_click(view, "checkout-expired")
+
+        reloaded = Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :expired
+      end)
+    end
+
+    test "checkout-expired fulfills when Stripe cancel reveals payment already succeeded",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Ysc.Ledgers.ensure_basic_accounts()
+
+        event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+        event = Repo.preload(event, :ticket_tiers, force: true)
+        tier = hd(event.ticket_tiers)
+
+        payment_intent_id =
+          "pi_expire_already_succeeded_#{System.unique_integer([:positive])}"
+
+        expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+          {:ok,
+           build_payment_intent(%{
+             id: payment_intent_id,
+             status: "requires_payment_method",
+             amount: params.amount
+           })}
+        end)
+
+        {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+        view = wait_for_async(view)
+
+        render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+        render_click(view, "proceed-to-checkout")
+
+        order =
+          Tickets.list_user_ticket_orders(user.id)
+          |> List.first()
+
+        assert order.status == :pending
+        assert order.payment_intent_id == payment_intent_id
+
+        amount_cents = money_to_cents(order.total_amount)
+
+        succeeded_payment_intent =
+          struct(Stripe.PaymentIntent, %{
+            id: payment_intent_id,
+            status: "succeeded",
+            amount: amount_cents,
+            metadata: %{
+              "ticket_order_id" => order.id,
+              "user_id" => order.user_id
+            }
+          })
+
+        # LiveView pre-check + expire_ticket_order/1 pre-check both retrieve
+        # before attempting Stripe cancel.
+        expect(
+          Ysc.StripeMock,
+          :retrieve_payment_intent,
+          2,
+          fn ^payment_intent_id, _opts ->
+            {:ok,
+             build_payment_intent(%{
+               id: payment_intent_id,
+               status: "requires_payment_method"
+             })}
+          end
+        )
+
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, succeeded_payment_intent}
+        end)
+
+        render_click(view, "checkout-expired")
+
+        reloaded = Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :completed
+        assert reloaded.payment_id
+
+        tickets =
+          Repo.all(
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^order.id
+          )
+
+        assert tickets != []
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end)
+    end
   end
 
   defp payment_submit_disabled?(html) do

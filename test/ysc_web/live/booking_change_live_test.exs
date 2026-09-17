@@ -1144,6 +1144,39 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ "No changes were made to your booking."
   end
 
+  test "submit-modification shows weekend-rule copy for a crafted Saturday check-in",
+       %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    {_friday, saturday, sunday} = next_tahoe_summer_friday_sunday_span()
+
+    # The date-range picker disables Saturday check-in. Crafted params still
+    # reach prepare_modification; the stay must not apply, and the member
+    # must see weekend-rule copy (not a CaseClauseError or silent success).
+    html =
+      render_submit(view, "submit-modification", %{
+        "modification" => %{
+          "checkin_date" => date_to_datetime_string(saturday),
+          "checkout_date" => date_to_datetime_string(sunday)
+        }
+      })
+
+    assert html =~ "modification-preview-error"
+
+    assert html =~
+             Ysc.Bookings.BookingValidator.saturday_requires_friday_start_message()
+
+    reloaded = Repo.reload!(booking)
+    assert reloaded.checkin_date == booking.checkin_date
+    assert reloaded.checkout_date == booking.checkout_date
+  end
+
   test "submit-modification shows a validation error for an invalid date range",
        %{conn: conn} do
     user = user_fixture() |> active_user(conn)

@@ -27,7 +27,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     FamilyMemberRemoved,
     MembershipEnded,
     MembershipPaymentConfirmation,
+    MembershipPaymentFailure,
     MembershipRenewalPaymentMethodReminder,
+    MembershipRenewalSuccess,
     OutageNotification,
     SaveTheDateAvailable,
     TahoeSummerBuyoutAvailable,
@@ -49,6 +51,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "There's one more step before you can book the cabins"
       assert text =~ "pay your annual membership dues"
       assert text =~ "Pay your membership dues"
+      assert text =~ "After you pay, you'll be able to"
+      refute text =~ "Once your payment is processed"
       refute text =~ "You're officially a Young Scandinavian"
       refute text =~ "Pay Your Membership"
       refute text =~ "completing your membership payment"
@@ -107,6 +111,119 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Book a stay at our Tahoe and Clear Lake cabins"
       refute text =~ "Reserve our"
       refute text =~ "Clear Lake properties"
+    end
+
+    test "payment-failure email says after you pay, not once payment is processed" do
+      html =
+        MembershipPaymentFailure.render(%{
+          first_name: "Jane",
+          email: "jane@example.com",
+          membership_type: "Single",
+          is_renewal: false,
+          invoice_id: "in_123",
+          pay_membership_url: "https://example.com/users/membership",
+          retry_payment_url:
+            "https://example.com/users/membership?retry_invoice=in_123"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "After you pay, you'll have access"
+      assert text =~ "You just need to finish paying your dues"
+      assert text =~ "Try paying again"
+      assert text =~ "If your card still works, try the payment again"
+      assert text =~ "payment ID: in_123"
+      assert text =~ "jane@example.com"
+      refute text =~ "successfully processed"
+      refute text =~ "complete the payment process"
+      refute text =~ "payment reference"
+      refute text =~ "Retry Payment Now"
+    end
+
+    test "renewal-failure email says after you pay, not once payment is processed" do
+      html =
+        MembershipPaymentFailure.render(%{
+          first_name: "Jane",
+          email: "jane@example.com",
+          membership_type: "Family",
+          is_renewal: true,
+          invoice_id: nil,
+          pay_membership_url: "https://example.com/users/membership",
+          retry_payment_url: nil
+        })
+
+      text = html_text(html)
+
+      assert text =~
+               "We couldn't take payment for your Family membership renewal"
+
+      assert text =~ "After you update your card and pay"
+      refute text =~ "successfully processed"
+      refute text =~ "couldn't process your"
+    end
+
+    test "renewal-success email says we received payment instead of processed" do
+      html =
+        MembershipRenewalSuccess.render(%{
+          first_name: "Jane",
+          membership_type: "Single",
+          amount: "$50.00",
+          renewal_date: "December 01, 2024",
+          is_single_to_family_upgrade: false,
+          is_upgrade: false,
+          is_downgrade: false,
+          old_membership_type: nil,
+          has_proration: false
+        })
+
+      text = html_text(html)
+
+      assert text =~ "We received your payment of $50.00"
+      refute text =~ "has been processed"
+      refute text =~ "successfully processed"
+    end
+
+    test "plan-change success emails say switched or charged, not processed" do
+      family_html =
+        MembershipRenewalSuccess.render(%{
+          first_name: "Jane",
+          membership_type: "Family",
+          amount: "$65.00",
+          renewal_date: "December 01, 2024",
+          is_single_to_family_upgrade: true,
+          is_upgrade: false,
+          is_downgrade: false,
+          old_membership_type: nil,
+          has_proration: false
+        })
+
+      family_text = html_text(family_html)
+
+      assert family_text =~ "Your membership switched from Single to Family"
+
+      assert family_text =~
+               "We received your payment of $65.00 for switching to Family"
+
+      refute family_text =~ "successfully processed"
+      refute family_text =~ "has been processed"
+
+      switch_html =
+        MembershipRenewalSuccess.render(%{
+          first_name: "Jane",
+          membership_type: "Single",
+          amount: "$10.00",
+          renewal_date: "February 17, 2026",
+          is_single_to_family_upgrade: false,
+          is_upgrade: false,
+          is_downgrade: true,
+          old_membership_type: "Family",
+          has_proration: true
+        })
+
+      switch_text = html_text(switch_html)
+
+      assert switch_text =~ "We charged $10.00 for switching plans"
+      refute switch_text =~ "We processed a payment"
     end
   end
 
@@ -626,7 +743,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "We've issued your ticket refund"
       assert text =~ "same card or bank account"
       assert text =~ "Order number:"
+      assert text =~ "Refund number:"
       assert text =~ "Refunded ticket numbers"
+      refute text =~ "Refund Reference"
       refute text =~ "Order Reference"
       refute text =~ "Ticket Reference"
       refute text =~ "has been processed"
@@ -666,6 +785,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Your booking refund is on the way"
       assert text =~ "We've issued your cabin booking refund"
       assert text =~ "Cabin Master"
+      assert text =~ "Refund number:"
+      assert text =~ "Payment number:"
+      refute text =~ "Refund Reference"
+      refute text =~ "Payment Reference"
       refute text =~ "has been processed"
       refute text =~ "will be processed"
     end
@@ -707,6 +830,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "You don't need to do anything else"
       assert text =~ "Cabin Master"
       assert text =~ "money is on the way"
+      assert text =~ "Payment number:"
+      refute text =~ "Payment Reference"
       refute text =~ "refund request"
       refute text =~ "approved and processed"
     end
@@ -733,6 +858,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       pending_text = html_text(pending_html)
 
       assert pending_text =~ "money is on the way"
+      assert pending_text =~ "Payment number:"
+      refute pending_text =~ "Payment Reference"
       refute pending_text =~ "approved and processed"
       refute pending_text =~ "will be processed"
 
@@ -757,6 +884,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       completed_text = html_text(completed_html)
 
       assert completed_text =~ "go back to your original payment method"
+      assert completed_text =~ "Payment number:"
+      refute completed_text =~ "Payment Reference"
       refute completed_text =~ "will be processed"
       refute completed_text =~ "processed and credited"
     end

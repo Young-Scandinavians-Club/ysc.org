@@ -23,7 +23,7 @@
       <strong>Refund Date:</strong> <%= @refund_date %>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Refund Reference:</strong>
+      <strong>Refund number:</strong>
       <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">
         <%= @refund.reference_id %>
       </span>

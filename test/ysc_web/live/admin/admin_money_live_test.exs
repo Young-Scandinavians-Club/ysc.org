@@ -4,6 +4,8 @@ defmodule YscWeb.AdminMoneyLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.BookingsFixtures
+  import Ysc.TicketsFixtures
   import Mox
   import Ecto.Query
 
@@ -677,9 +679,81 @@ defmodule YscWeb.AdminMoneyLiveTest do
     test "opens payment modal when navigating to payment URL", %{conn: conn} do
       payment = LedgersFixtures.payment_fixture()
 
-      {:ok, _view, html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
+      {:ok, view, html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
 
       assert html =~ "Payment Details"
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, "#payment-modal-user")
+    end
+
+    test "shows slim related booking without loading booking JSON", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(20_000, :USD),
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_modal_booking_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(640, :USD),
+          description: "Tahoe booking",
+          property: :tahoe,
+          payment_method_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
+
+      assert has_element?(view, "#payment-related-booking")
+      assert has_element?(view, "#payment-modal-user")
+    end
+
+    test "shows slim related ticket order event title", %{conn: conn} do
+      user = user_fixture()
+
+      event =
+        event_fixture(%{
+          title: "Modal Slim Gala XYZ",
+          raw_details: "<p>toast body that payment modal must not load</p>",
+          rendered_details: "<p>toast body that payment modal must not load</p>"
+        })
+
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(10_000, :USD),
+          event_amount: Money.new(10_000, :USD),
+          donation_amount: Money.new(0, :USD),
+          event_id: event.id,
+          external_payment_id:
+            "pi_modal_event_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          payment_method_id: nil
+        })
+
+      ticket_order
+      |> Ecto.Changeset.change(%{payment_id: payment.id})
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
+
+      assert has_element?(view, "#payment-related-ticket-order")
+      assert has_element?(view, "#payment-related-event-title", event.title)
     end
 
     test "close_payment_modal patches back to index", %{conn: conn} do
