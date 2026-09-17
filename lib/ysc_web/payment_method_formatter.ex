@@ -2,6 +2,7 @@ defmodule YscWeb.PaymentMethodFormatter do
   @moduledoc false
 
   alias Ysc.Stripe.PaymentIntentHelpers
+  alias YscWeb.PaymentMethodLogo
 
   def normalize_payment_type(type) when is_atom(type), do: type
 
@@ -95,6 +96,91 @@ defmodule YscWeb.PaymentMethodFormatter do
   end
 
   defp extract_link_details_from_charge_pmd(_), do: {nil, nil, nil}
+
+  @fallback_stripe_summary %{
+    description: "Credit or debit card",
+    logo_path: nil
+  }
+
+  @doc """
+  Fetches a display summary (label + logo) from a Stripe PaymentIntent.
+
+  Ticket confirmation and booking receipt use this when the payment method
+  is not stored locally.
+
+  Accepts a PaymentIntent id or a map/struct with `:external_payment_id`.
+
+  ## Options
+
+    * `:format` - `:standard` (default) or `:receipt`
+    * `:stripe_client` - defaults to the `:stripe_client` app env / `Ysc.StripeClient`
+
+  """
+  def stripe_summary(payment_or_id, opts \\ [])
+
+  def stripe_summary(nil, _opts), do: @fallback_stripe_summary
+
+  def stripe_summary(%{external_payment_id: id}, opts),
+    do: stripe_summary(id, opts)
+
+  def stripe_summary(payment_intent_id, opts)
+      when is_binary(payment_intent_id) do
+    format = Keyword.get(opts, :format, :standard)
+    stripe_client = stripe_client(opts)
+
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
+           expand: ["payment_method", "latest_charge"]
+         }) do
+      {:ok, payment_intent} ->
+        stripe_summary_from_intent(payment_intent, stripe_client, format)
+
+      {:error, _} ->
+        @fallback_stripe_summary
+    end
+  end
+
+  def stripe_summary(_, _opts), do: @fallback_stripe_summary
+
+  defp stripe_client(opts) do
+    Keyword.get(opts, :stripe_client) ||
+      Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+  end
+
+  defp stripe_summary_from_intent(payment_intent, stripe_client, format) do
+    {payment_method_type, last_four, display_brand} =
+      payment_details_from_payment_intent(payment_intent, stripe_client)
+
+    case payment_method_type do
+      nil ->
+        @fallback_stripe_summary
+
+      type ->
+        normalized = normalize_payment_type(type)
+
+        %{
+          description:
+            stripe_summary_description(
+              format,
+              normalized,
+              last_four,
+              display_brand
+            ),
+          logo_path:
+            PaymentMethodLogo.path_for_stripe_summary(
+              normalized,
+              display_brand
+            )
+        }
+    end
+  end
+
+  defp stripe_summary_description(:receipt, type, last_four, display_brand) do
+    format_payment_method_for_receipt(type, last_four, display_brand)
+  end
+
+  defp stripe_summary_description(_format, type, last_four, display_brand) do
+    format_payment_method_with_details(type, last_four, display_brand)
+  end
 
   @doc false
   def payment_details_from_payment_intent(payment_intent, stripe_client) do
@@ -300,45 +386,51 @@ defmodule YscWeb.PaymentMethodFormatter do
 
   def extract_stripe_pm_display_brand_for_type(_, _), do: nil
 
-  def format_payment_method_with_details(type, last_four, display_brand) do
-    case normalize_payment_type(type) do
-      :card ->
-        if last_four do
-          brand = payment_brand_label(display_brand || "Card")
-          "#{brand} ending in #{last_four}"
-        else
-          "Credit Card"
-        end
+  @doc """
+  Label for a locally stored payment method (card, bank, Link, wallets).
 
-      :link ->
-        format_link_payment_method(last_four, display_brand)
+  `format` is `:standard` (default) or `:receipt`. Receipts mask card PANs
+  and keep Link on the receipt wording; other types share the standard label.
+  """
+  def description_from_stored(payment_method, format \\ :standard)
 
-      :bank_account ->
-        if last_four do
-          bank_name = display_brand || "Bank"
-          "#{bank_name} Account ending in #{last_four}"
-        else
-          "Bank Account"
-        end
+  def description_from_stored(nil, _format), do: nil
 
-      :us_bank_account ->
-        if last_four do
-          bank_name = display_brand || "Bank"
-          "#{bank_name} Account ending in #{last_four}"
-        else
-          "Bank Account"
-        end
+  def description_from_stored(payment_method, format) do
+    case stored_payment_type(payment_method) do
+      nil ->
+        nil
 
-      normalized_type ->
-        payment_method =
-          if last_four do
-            %{last_four: last_four, display_brand: display_brand}
-          else
-            nil
-          end
-
-        format_alternative_payment_method(normalized_type, payment_method)
+      type ->
+        stored_description(type, payment_method, format)
     end
+  end
+
+  defp stored_payment_type(payment_method) do
+    case payment_method_field(payment_method, :type) do
+      nil -> nil
+      type -> normalize_payment_type(type)
+    end
+  end
+
+  defp stored_description(type, payment_method, :receipt)
+       when type in [:card, :link] do
+    format_payment_method_for_receipt(
+      type,
+      payment_method_field(payment_method, :last_four),
+      payment_method_field(payment_method, :display_brand)
+    )
+  end
+
+  defp stored_description(type, payment_method, _format) do
+    format_alternative_payment_method(type, payment_method)
+  end
+
+  def format_payment_method_with_details(type, last_four, display_brand) do
+    format_alternative_payment_method(type, %{
+      last_four: last_four,
+      display_brand: display_brand
+    })
   end
 
   def format_alternative_payment_method(type, payment_method)
