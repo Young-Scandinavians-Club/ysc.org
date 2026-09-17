@@ -65,6 +65,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 67 (HIGH)     Volunteers could unpublish or cancel any published event
   Finding 68 (HIGH)     Volunteers could create irreversible cabin booking blackouts via event publish
   Finding 70 (MEDIUM)   Volunteers could force tickets_tbd on events that already have live ticket tiers
+  Finding 71 (HIGH)     Password reset LiveView never re-checked the token on submit, so a still-open tab could take over the account after expiry or after the victim already reset
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -4387,6 +4388,149 @@ defmodule YscWeb.SecurityAuditTest do
       })
 
       refute Repo.get!(Ysc.Events.Event, event.id).tickets_tbd
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 71 (HIGH): Password reset must re-check the token on submit
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 71: password reset re-checks token on submit" do
+    test "open LiveView cannot reset after the token is consumed", %{
+      conn: conn
+    } do
+      user = user_fixture()
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_reset_password_instructions(user, url)
+        end)
+
+      {:ok, attacker_view, _html} =
+        live(conn, ~p"/users/reset-password/#{token}")
+
+      {:ok, victim_view, _html} =
+        live(build_conn(), ~p"/users/reset-password/#{token}")
+
+      {:ok, _victim_conn} =
+        victim_view
+        |> form("#reset_password_form",
+          user: %{
+            "password" => "victim reset password",
+            "password_confirmation" => "victim reset password"
+          }
+        )
+        |> render_submit()
+        |> follow_redirect(build_conn(), ~p"/users/log-in")
+
+      {:ok, attacker_conn} =
+        attacker_view
+        |> form("#reset_password_form",
+          user: %{
+            "password" => "attacker takeover password",
+            "password_confirmation" => "attacker takeover password"
+          }
+        )
+        |> render_submit()
+        |> follow_redirect(build_conn(), ~p"/users/log-in")
+
+      assert Phoenix.Flash.get(attacker_conn.assigns.flash, :error) =~
+               "no longer works"
+
+      assert Accounts.get_user_by_email_and_password(
+               user.email,
+               "victim reset password"
+             )
+
+      refute Accounts.get_user_by_email_and_password(
+               user.email,
+               "attacker takeover password"
+             )
+    end
+
+    test "open LiveView cannot reset after the token expires", %{conn: conn} do
+      user = user_fixture()
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_reset_password_instructions(user, url)
+        end)
+
+      {:ok, view, _html} = live(conn, ~p"/users/reset-password/#{token}")
+
+      {1, _} =
+        from(t in UserToken,
+          where: t.user_id == ^user.id and t.context == "reset_password"
+        )
+        |> Repo.update_all(
+          set: [
+            inserted_at:
+              DateTime.utc_now()
+              |> DateTime.add(-2, :day)
+              |> DateTime.truncate(:second)
+          ]
+        )
+
+      {:ok, conn} =
+        view
+        |> form("#reset_password_form",
+          user: %{
+            "password" => "expired token password",
+            "password_confirmation" => "expired token password"
+          }
+        )
+        |> render_submit()
+        |> follow_redirect(conn, ~p"/users/log-in")
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "no longer works"
+
+      refute Accounts.get_user_by_email_and_password(
+               user.email,
+               "expired token password"
+             )
+    end
+
+    test "open LiveView cannot reset after a logged-in password change", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      original_password = valid_user_password()
+
+      token =
+        extract_user_token(fn url ->
+          Accounts.deliver_user_reset_password_instructions(user, url)
+        end)
+
+      {:ok, view, _html} = live(conn, ~p"/users/reset-password/#{token}")
+
+      {:ok, _updated} =
+        Accounts.update_user_password(user, original_password, %{
+          password: "settings changed password",
+          password_confirmation: "settings changed password"
+        })
+
+      {:ok, conn} =
+        view
+        |> form("#reset_password_form",
+          user: %{
+            "password" => "attacker takeover password",
+            "password_confirmation" => "attacker takeover password"
+          }
+        )
+        |> render_submit()
+        |> follow_redirect(conn, ~p"/users/log-in")
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "no longer works"
+
+      assert Accounts.get_user_by_email_and_password(
+               user.email,
+               "settings changed password"
+             )
+
+      refute Accounts.get_user_by_email_and_password(
+               user.email,
+               "attacker takeover password"
+             )
     end
   end
 

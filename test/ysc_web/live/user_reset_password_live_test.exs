@@ -100,5 +100,53 @@ defmodule YscWeb.UserResetPasswordLiveTest do
       assert result =~ "should be at least 12 character(s)"
       assert result =~ "Please enter the same password in both fields"
     end
+
+    test "does not reset password after the token is consumed by another submit",
+         %{
+           conn: conn,
+           token: token,
+           user: user
+         } do
+      {:ok, attacker_lv, _html} =
+        live(conn, ~p"/users/reset-password/#{token}")
+
+      {:ok, victim_lv, _html} =
+        live(build_conn(), ~p"/users/reset-password/#{token}")
+
+      {:ok, _victim_conn} =
+        victim_lv
+        |> form("#reset_password_form",
+          user: %{
+            "password" => "victim reset password",
+            "password_confirmation" => "victim reset password"
+          }
+        )
+        |> render_submit()
+        |> follow_redirect(build_conn(), ~p"/users/log-in")
+
+      {:ok, attacker_conn} =
+        attacker_lv
+        |> form("#reset_password_form",
+          user: %{
+            "password" => "attacker takeover password",
+            "password_confirmation" => "attacker takeover password"
+          }
+        )
+        |> render_submit()
+        |> follow_redirect(build_conn(), ~p"/users/log-in")
+
+      assert Phoenix.Flash.get(attacker_conn.assigns.flash, :error) ==
+               "This password reset link no longer works. It may have expired — request a new one from the sign-in page."
+
+      assert Accounts.get_user_by_email_and_password(
+               user.email,
+               "victim reset password"
+             )
+
+      refute Accounts.get_user_by_email_and_password(
+               user.email,
+               "attacker takeover password"
+             )
+    end
   end
 end
