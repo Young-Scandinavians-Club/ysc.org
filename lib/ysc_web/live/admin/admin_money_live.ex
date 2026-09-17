@@ -1230,15 +1230,10 @@ defmodule YscWeb.AdminMoneyLive do
     offset = (page - 1) * per_page
 
     ledger_entries =
-      from(e in Ysc.Ledgers.LedgerEntry,
-        preload: [:account, :payment, :refund],
-        where: e.inserted_at >= ^start_date,
-        where: e.inserted_at <= ^end_date,
-        order_by: [desc: e.inserted_at],
-        limit: ^per_page,
-        offset: ^offset
+      Ledgers.list_ledger_entries_for_admin(start_date, end_date,
+        limit: per_page,
+        offset: offset
       )
-      |> Repo.all()
 
     socket
     |> assign(:ledger_entries, ledger_entries)
@@ -1253,15 +1248,10 @@ defmodule YscWeb.AdminMoneyLive do
     offset = (page - 1) * per_page
 
     webhook_events =
-      from(w in Ysc.Webhooks.WebhookEvent,
-        where: w.provider == "stripe",
-        where: w.inserted_at >= ^start_date,
-        where: w.inserted_at <= ^end_date,
-        order_by: [desc: w.inserted_at],
-        limit: ^per_page,
-        offset: ^offset
+      Webhooks.list_webhook_events_for_admin(start_date, end_date,
+        limit: per_page,
+        offset: offset
       )
-      |> Repo.all()
 
     socket
     |> assign(:webhook_events, webhook_events)

@@ -1155,8 +1155,38 @@ defmodule Ysc.TicketsTest do
       |> TicketOrder.status_changeset(%{payment_id: payment.id})
       |> Ysc.Repo.update!()
 
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>toast body that refund modal must not load</p>",
+        rendered_details: "<p>toast body that refund modal must not load</p>"
+      })
+      |> Ysc.Repo.update!()
+
+      {_found, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_by_payment_id(payment.id) end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_found, hash_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_by_payment_id(payment.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
       found = Tickets.get_ticket_order_by_payment_id(payment.id)
       assert found.id == order.id
+      assert html_cols == 0
+      assert hash_cols == 0
+      refute Ecto.assoc_loaded?(found.user)
+      refute Ecto.assoc_loaded?(found.event)
+      assert found.tickets != []
+      ticket = hd(found.tickets)
+      assert ticket.ticket_tier.name == "General Admission"
+      assert ticket.ticket_tier.type == :paid
+      assert ticket.ticket_tier.description == nil
     end
   end
 

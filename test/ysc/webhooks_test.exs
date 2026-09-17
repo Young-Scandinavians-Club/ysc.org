@@ -422,4 +422,46 @@ defmodule Ysc.WebhooksTest do
       assert Enum.any?(in_range, &(&1.id == event.id))
     end
   end
+
+  describe "list_webhook_events_for_admin/3" do
+    test "skips payload JSON" do
+      now = DateTime.utc_now()
+
+      event =
+        Webhooks.create_webhook_event!(%{
+          provider: :stripe,
+          event_id: "evt_admin_list_payload",
+          event_type: "payment_intent.succeeded",
+          payload: %{"secret" => "stripe-webhook-body"},
+          state: :processed
+        })
+
+      {_events, payload_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Webhooks.list_webhook_events_for_admin(
+              DateTime.add(now, -1, :day),
+              DateTime.add(now, 1, :day),
+              limit: 20
+            )
+          end,
+          pattern: ~r/"payload"/i,
+          caller_pids: [self()]
+        )
+
+      loaded =
+        Webhooks.list_webhook_events_for_admin(
+          DateTime.add(now, -1, :day),
+          DateTime.add(now, 1, :day),
+          limit: 20
+        )
+        |> Enum.find(&(&1.id == event.id))
+
+      assert payload_cols == 0
+      assert loaded
+      assert loaded.event_id == "evt_admin_list_payload"
+      assert loaded.event_type == "payment_intent.succeeded"
+      assert loaded.payload == nil
+    end
+  end
 end

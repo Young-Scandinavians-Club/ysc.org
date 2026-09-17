@@ -233,6 +233,43 @@ defmodule Ysc.Webhooks do
     Repo.all(query)
   end
 
+  # Treasurer webhook table: id, Stripe event id/type, state, received-at.
+  # Skip `payload` JSON — the modal refetches via `get_webhook_event/1`.
+  @admin_webhook_list_fields [
+    :id,
+    :provider,
+    :state,
+    :event_id,
+    :event_type,
+    :inserted_at
+  ]
+
+  @doc """
+  Paginated Stripe webhook rows for the treasurer Money webhooks tab.
+
+  Skips `payload` JSON. Click-through uses `get_webhook_event/1`.
+  """
+  def list_webhook_events_for_admin(start_date, end_date, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 20)
+    offset = Keyword.get(opts, :offset, 0)
+
+    start_date
+    |> list_webhook_events_for_admin_query(end_date, limit, offset)
+    |> Repo.all()
+  end
+
+  defp list_webhook_events_for_admin_query(start_date, end_date, limit, offset) do
+    from(w in WebhookEvent,
+      where: w.provider == :stripe,
+      where: w.inserted_at >= ^start_date,
+      where: w.inserted_at <= ^end_date,
+      select: struct(w, ^@admin_webhook_list_fields),
+      order_by: [desc: w.inserted_at],
+      limit: ^limit,
+      offset: ^offset
+    )
+  end
+
   defp maybe_filter_by_provider(query, nil), do: query
 
   defp maybe_filter_by_provider(query, provider) do
@@ -270,5 +307,11 @@ defmodule Ysc.Webhooks do
       order_by: [asc: w.inserted_at],
       limit: 100
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_webhook_events_for_admin_query do
+    now = Ysc.Ci.QueryExplain.Fixtures.now()
+    list_webhook_events_for_admin_query(now, now, 20, 0)
   end
 end

@@ -62,6 +62,25 @@ defmodule Ysc.Ledgers do
     :inserted_at,
     :updated_at
   ]
+  # Overview table: identity, amount, status, date. Skip QuickBooks JSON
+  # (`quickbooks_response`) and Stripe ids the rows never render.
+  @admin_payment_list_fields [
+    :id,
+    :reference_id,
+    :amount,
+    :status,
+    :payment_date,
+    :user_id
+  ]
+  @admin_payment_type_entry_fields [
+    :id,
+    :payment_id,
+    :related_entity_type,
+    :related_entity_id,
+    :account_id
+  ]
+  @admin_ledger_list_payment_fields [:id, :reference_id]
+  @admin_ledger_list_refund_fields [:id, :reference_id]
   @related_booking_fields [
     :id,
     :reference_id,
@@ -3551,10 +3570,10 @@ defmodule Ysc.Ledgers do
   @doc """
   Paginated payments for the treasurer Money overview.
 
-  Member is a slim `select: struct` preload (name/email). Payment methods
-  (including Stripe `payload` JSON) are not loaded — the table never
-  renders card last-4. Type labels are attached in one batch so event
-  titles, membership plan names, and payout ids do not N+1.
+  Member is a slim `select: struct` preload (name/email). Payment rows skip
+  `quickbooks_response` JSON and Stripe payment-method `payload`. Type labels
+  are attached in one batch so event titles, membership plan names, and
+  payout ids do not N+1.
 
   Do not JOIN full `users` or `events` rows. Event type details only
   need `title`; loading `raw_details` / `rendered_details` would pull
@@ -3574,6 +3593,7 @@ defmodule Ysc.Ledgers do
     user_query = admin_payment_user_query()
 
     from(p in Payment,
+      select: struct(p, ^@admin_payment_list_fields),
       preload: [user: ^user_query],
       where: p.payment_date >= ^start_date,
       where: p.payment_date <= ^end_date,
@@ -3605,14 +3625,50 @@ defmodule Ysc.Ledgers do
   Gets ledger entries within a date range.
   """
   def get_ledger_entries(start_date, end_date, limit \\ 500) do
+    list_ledger_entries_for_admin(start_date, end_date, limit: limit)
+  end
+
+  @doc """
+  Paginated ledger lines for the treasurer Money ledger tab.
+
+  Account is name + type only. Payment and refund are `reference_id` only —
+  skip QuickBooks `quickbooks_response` JSON on those rows. The table never
+  renders member emails, Stripe ids, or account descriptions.
+  """
+  def list_ledger_entries_for_admin(start_date, end_date, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+    offset = Keyword.get(opts, :offset, 0)
+
+    start_date
+    |> list_ledger_entries_for_admin_query(end_date, limit, offset)
+    |> Repo.all()
+  end
+
+  defp list_ledger_entries_for_admin_query(start_date, end_date, limit, offset) do
+    account_query = admin_ledger_account_query()
+    payment_query = admin_ledger_list_payment_query()
+    refund_query = admin_ledger_list_refund_query()
+
     from(e in LedgerEntry,
-      preload: [:account, :payment],
+      preload: [
+        account: ^account_query,
+        payment: ^payment_query,
+        refund: ^refund_query
+      ],
       where: e.inserted_at >= ^start_date,
       where: e.inserted_at <= ^end_date,
       order_by: [desc: e.inserted_at],
-      limit: ^limit
+      limit: ^limit,
+      offset: ^offset
     )
-    |> Repo.all()
+  end
+
+  defp admin_ledger_list_payment_query do
+    from(p in Payment, select: struct(p, ^@admin_ledger_list_payment_fields))
+  end
+
+  defp admin_ledger_list_refund_query do
+    from(r in Refund, select: struct(r, ^@admin_ledger_list_refund_fields))
   end
 
   @doc """
@@ -3740,16 +3796,10 @@ defmodule Ysc.Ledgers do
         |> Repo.all()
         |> Map.new(&{&1.payment_id, &1})
 
-      # Batch fetch all revenue entries with accounts preloaded
+      # Batch fetch revenue entries (entity ids + account name only)
       revenue_entries =
-        from(e in LedgerEntry,
-          join: a in LedgerAccount,
-          on: e.account_id == a.id,
-          where: e.payment_id in ^payment_ids,
-          where: a.account_type == ^"revenue",
-          where: e.debit_credit == ^"credit",
-          preload: [:account]
-        )
+        payment_ids
+        |> admin_payment_type_entries_query()
         |> Repo.all()
         |> Map.new(&{&1.payment_id, &1})
 
@@ -3985,6 +4035,20 @@ defmodule Ysc.Ledgers do
     from(e in Ysc.Events.Event,
       where: e.id in ^event_ids,
       select: {e.id, e.title}
+    )
+  end
+
+  defp admin_payment_type_entries_query(payment_ids) do
+    account_query = admin_ledger_account_query()
+
+    from(e in LedgerEntry,
+      join: a in LedgerAccount,
+      on: e.account_id == a.id,
+      where: e.payment_id in ^payment_ids,
+      where: a.account_type == ^"revenue",
+      where: e.debit_credit == ^"credit",
+      select: struct(e, ^@admin_payment_type_entry_fields),
+      preload: [account: ^account_query]
     )
   end
 
@@ -4622,5 +4686,16 @@ defmodule Ysc.Ledgers do
   @doc false
   def ci_query_explain_list_ledger_entries_for_payment_query do
     list_ledger_entries_for_payment_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_ledger_entries_for_admin_query do
+    now = Ysc.Ci.QueryExplain.Fixtures.now()
+    list_ledger_entries_for_admin_query(now, now, 20, 0)
+  end
+
+  @doc false
+  def ci_query_explain_admin_payment_type_entries_query do
+    admin_payment_type_entries_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 end
