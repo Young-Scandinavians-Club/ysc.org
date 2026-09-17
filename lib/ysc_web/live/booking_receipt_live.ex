@@ -2399,7 +2399,7 @@ defmodule YscWeb.BookingReceiptLive do
 
     if payment_method_summary_needs_stripe_enrichment?(summary, payment) do
       payment
-      |> get_payment_method_from_stripe()
+      |> PaymentMethodFormatter.stripe_summary(format: :receipt)
       |> merge_stripe_payment_summary(summary)
     else
       summary
@@ -2449,40 +2449,14 @@ defmodule YscWeb.BookingReceiptLive do
   defp stripe_desc_has_card_mask?(_), do: false
 
   defp payment_method_summary_from_db(payment) do
-    local_logo = PaymentMethodLogo.path_for_payment(payment)
-
-    case payment.payment_method do
-      nil ->
-        %{description: nil, logo_path: local_logo}
-
-      payment_method ->
-        payment_type =
-          case payment_method.type do
-            nil -> nil
-            type -> PaymentMethodFormatter.normalize_payment_type(type)
-          end
-
-        desc =
-          case payment_type do
-            type when type in [:card, :link] ->
-              PaymentMethodFormatter.format_payment_method_for_receipt(
-                type,
-                payment_method.last_four,
-                payment_method.display_brand
-              )
-
-            type when not is_nil(type) ->
-              PaymentMethodFormatter.format_alternative_payment_method(
-                type,
-                payment_method
-              )
-
-            _ ->
-              nil
-          end
-
-        %{description: desc, logo_path: local_logo}
-    end
+    %{
+      description:
+        PaymentMethodFormatter.description_from_stored(
+          payment.payment_method,
+          :receipt
+        ),
+      logo_path: PaymentMethodLogo.path_for_payment(payment)
+    }
   end
 
   defp payment_method_summary_needs_stripe_enrichment?(
@@ -2503,54 +2477,6 @@ defmodule YscWeb.BookingReceiptLive do
 
       true ->
         false
-    end
-  end
-
-  defp get_payment_method_from_stripe(payment) do
-    get_payment_method_from_stripe_id(payment.external_payment_id)
-  end
-
-  defp get_payment_method_from_stripe_id(nil),
-    do: %{description: "Credit or debit card", logo_path: nil}
-
-  defp get_payment_method_from_stripe_id(payment_intent_id) do
-    stripe_fallback = %{description: "Credit or debit card", logo_path: nil}
-    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
-
-    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
-           expand: ["payment_method", "latest_charge"]
-         }) do
-      {:ok, payment_intent} ->
-        {payment_method_type, last_four, display_brand} =
-          PaymentMethodFormatter.payment_details_from_payment_intent(
-            payment_intent,
-            stripe_client
-          )
-
-        case payment_method_type do
-          nil ->
-            stripe_fallback
-
-          type ->
-            normalized = PaymentMethodFormatter.normalize_payment_type(type)
-
-            %{
-              description:
-                PaymentMethodFormatter.format_payment_method_for_receipt(
-                  normalized,
-                  last_four,
-                  display_brand
-                ),
-              logo_path:
-                PaymentMethodLogo.path_for_stripe_summary(
-                  normalized,
-                  display_brand
-                )
-            }
-        end
-
-      {:error, _} ->
-        stripe_fallback
     end
   end
 

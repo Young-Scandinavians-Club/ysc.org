@@ -729,4 +729,126 @@ defmodule YscWeb.PaymentMethodFormatterTest do
              ) == {nil, nil, nil}
     end
   end
+
+  describe "description_from_stored/2" do
+    test "returns nil for a missing payment method" do
+      assert PaymentMethodFormatter.description_from_stored(nil) == nil
+    end
+
+    test "returns nil when the stored type is missing" do
+      assert PaymentMethodFormatter.description_from_stored(%{
+               last_four: "4242"
+             }) ==
+               nil
+    end
+
+    test "formats a stored card with brand and last four" do
+      assert PaymentMethodFormatter.description_from_stored(%{
+               type: :card,
+               last_four: "4242",
+               display_brand: "visa"
+             }) == "Visa ending in 4242"
+    end
+
+    test "formats a stored bank using bank_name" do
+      assert PaymentMethodFormatter.description_from_stored(%{
+               type: :bank_account,
+               last_four: "6789",
+               bank_name: "Chase"
+             }) == "Chase Account ending in 6789"
+    end
+
+    test "receipt format masks card PANs and keeps bank labels" do
+      assert PaymentMethodFormatter.description_from_stored(
+               %{type: :card, last_four: "4242", display_brand: "visa"},
+               :receipt
+             ) == "**** **** **** 4242"
+
+      assert PaymentMethodFormatter.description_from_stored(
+               %{type: :link, last_four: "4242", display_brand: "visa"},
+               :receipt
+             ) == "Link · Visa **** **** **** 4242"
+
+      assert PaymentMethodFormatter.description_from_stored(
+               %{type: :bank_account, last_four: "6789", bank_name: "Chase"},
+               :receipt
+             ) == "Chase Account ending in 6789"
+    end
+  end
+
+  describe "stripe_summary/2" do
+    defmodule SummaryStripeClient do
+      def retrieve_payment_intent("pi_card", _opts) do
+        {:ok,
+         %{
+           payment_method: %{
+             type: "card",
+             card: %{brand: "visa", last4: "4242"}
+           }
+         }}
+      end
+
+      def retrieve_payment_intent("pi_empty", _opts) do
+        {:ok, %{payment_method: nil, latest_charge: nil}}
+      end
+
+      def retrieve_payment_intent(_id, _opts), do: {:error, :not_found}
+
+      def retrieve_payment_method(_id), do: {:error, :not_found}
+      def retrieve_charge(_id, _opts), do: {:error, :not_found}
+    end
+
+    @summary_opts [stripe_client: SummaryStripeClient]
+
+    test "returns the shared fallback for a nil id" do
+      assert PaymentMethodFormatter.stripe_summary(nil) == %{
+               description: "Credit or debit card",
+               logo_path: nil
+             }
+    end
+
+    test "formats a card PaymentIntent with a brand label and logo" do
+      assert PaymentMethodFormatter.stripe_summary("pi_card", @summary_opts) ==
+               %{
+                 description: "Visa ending in 4242",
+                 logo_path: "/images/cards/visa.png"
+               }
+    end
+
+    test "receipt format uses a PAN mask" do
+      assert PaymentMethodFormatter.stripe_summary(
+               "pi_card",
+               Keyword.put(@summary_opts, :format, :receipt)
+             ) == %{
+               description: "**** **** **** 4242",
+               logo_path: "/images/cards/visa.png"
+             }
+    end
+
+    test "reads external_payment_id from a payment map" do
+      summary =
+        PaymentMethodFormatter.stripe_summary(
+          %{external_payment_id: "pi_card"},
+          @summary_opts
+        )
+
+      assert summary.description == "Visa ending in 4242"
+    end
+
+    test "returns the fallback when Stripe lookup fails" do
+      assert PaymentMethodFormatter.stripe_summary("pi_error", @summary_opts) ==
+               %{
+                 description: "Credit or debit card",
+                 logo_path: nil
+               }
+    end
+
+    test "returns the fallback when the intent has no payment method details" do
+      assert PaymentMethodFormatter.stripe_summary("pi_empty", @summary_opts) ==
+               %{
+                 description: "Credit or debit card",
+                 logo_path: nil
+               }
+    end
+  end
 end

@@ -868,101 +868,7 @@ defmodule YscWeb.OrderConfirmationLive do
   defp payment_method_description_without_stripe(nil), do: nil
 
   defp payment_method_description_without_stripe(payment) do
-    case payment.payment_method do
-      nil ->
-        nil
-
-      payment_method ->
-        payment_type =
-          case payment_method.type do
-            nil -> nil
-            type -> PaymentMethodFormatter.normalize_payment_type(type)
-          end
-
-        case payment_type do
-          :card ->
-            if payment_method.last_four do
-              brand =
-                PaymentMethodFormatter.payment_brand_label(
-                  payment_method.display_brand || "Card"
-                )
-
-              "#{brand} ending in #{payment_method.last_four}"
-            else
-              "Credit Card"
-            end
-
-          :bank_account ->
-            if payment_method.last_four do
-              bank_name = payment_method.bank_name || "Bank"
-              "#{bank_name} Account ending in #{payment_method.last_four}"
-            else
-              "Bank Account"
-            end
-
-          type when not is_nil(type) ->
-            PaymentMethodFormatter.format_alternative_payment_method(
-              type,
-              payment_method
-            )
-
-          _ ->
-            nil
-        end
-    end
-  end
-
-  # Get payment method label + logo from Stripe when not synced to database
-  defp get_payment_method_from_stripe(payment) do
-    get_payment_method_from_stripe_id(payment.external_payment_id)
-  end
-
-  defp get_payment_method_from_stripe_id(nil),
-    do: stripe_payment_method_fallback()
-
-  defp get_payment_method_from_stripe_id(payment_intent_id) do
-    stripe_client =
-      Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
-
-    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
-           expand: ["payment_method", "latest_charge"]
-         }) do
-      {:ok, payment_intent} ->
-        {payment_method_type, last_four, display_brand} =
-          PaymentMethodFormatter.payment_details_from_payment_intent(
-            payment_intent,
-            stripe_client
-          )
-
-        case payment_method_type do
-          nil ->
-            stripe_payment_method_fallback()
-
-          type ->
-            normalized = PaymentMethodFormatter.normalize_payment_type(type)
-
-            %{
-              description:
-                PaymentMethodFormatter.format_payment_method_with_details(
-                  normalized,
-                  last_four,
-                  display_brand
-                ),
-              logo_path:
-                PaymentMethodLogo.path_for_stripe_summary(
-                  normalized,
-                  display_brand
-                )
-            }
-        end
-
-      {:error, _} ->
-        stripe_payment_method_fallback()
-    end
-  end
-
-  defp stripe_payment_method_fallback do
-    %{description: "Credit or debit card", logo_path: nil}
+    PaymentMethodFormatter.description_from_stored(payment.payment_method)
   end
 
   defp payment_method_label(ticket_order, description, async_data_loaded?) do
@@ -999,11 +905,13 @@ defmodule YscWeb.OrderConfirmationLive do
       stripe_payment_summary =
         cond do
           ticket_order.payment && is_nil(ticket_order.payment.payment_method) ->
-            get_payment_method_from_stripe(ticket_order.payment)
+            PaymentMethodFormatter.stripe_summary(ticket_order.payment)
 
           is_nil(ticket_order.payment) && !free_order?(ticket_order) &&
               ticket_order.payment_intent_id ->
-            get_payment_method_from_stripe_id(ticket_order.payment_intent_id)
+            PaymentMethodFormatter.stripe_summary(
+              ticket_order.payment_intent_id
+            )
 
           true ->
             nil
