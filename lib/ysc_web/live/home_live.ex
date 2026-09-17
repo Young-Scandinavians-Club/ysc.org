@@ -1263,6 +1263,7 @@ defmodule YscWeb.HomeLive do
 
                 <div
                   :if={@async_data_loaded && !Enum.empty?(@future_bookings)}
+                  id="home-itinerary-list"
                   class="space-y-4"
                 >
                   <%= for booking <- @future_bookings do %>
@@ -1271,6 +1272,7 @@ defmodule YscWeb.HomeLive do
                       days_until_this_booking == :started ||
                         days_until_this_booking == 0 %>
                     <.link
+                      id={"home-itinerary-booking-#{booking.id}"}
                       navigate={~p"/bookings/#{booking.id}/receipt"}
                       class={[
                         "relative bg-white rounded-xl overflow-hidden flex flex-col md:flex-row transition-colors duration-200 group border border-zinc-200 hover:border-zinc-300",

@@ -1248,9 +1248,15 @@ defmodule YscWeb.TahoeBookingLive do
                 Your bookings
               <% end %>
             </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div
+              id="tahoe-active-bookings-list"
+              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
               <%= for booking <- @active_bookings do %>
-                <div class="bg-white border-2 border-blue-100 rounded-xl p-5 shadow-xs">
+                <div
+                  id={"tahoe-active-booking-#{booking.id}"}
+                  class="bg-white border-2 border-blue-100 rounded-xl p-5 shadow-xs"
+                >
                   <div class="flex justify-between items-start mb-3">
                     <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-sm">
                       {booking.reference_id}

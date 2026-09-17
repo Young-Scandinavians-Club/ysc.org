@@ -7,6 +7,7 @@ defmodule YscWeb.UserSettingsLiveTest do
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
+  import Ysc.TicketsFixtures
   import Ecto.Query
 
   alias Money
@@ -936,6 +937,95 @@ defmodule YscWeb.UserSettingsLiveTest do
     html = render(view)
     assert html =~ "Tahoe Booking"
     assert html =~ booking.reference_id
+  end
+
+  test "payments tab still shows event title, ticket summary, and booking room after slim load",
+       %{conn: conn} do
+    unique = System.unique_integer([:positive])
+    user = user_fixture(%{state: :active})
+    conn = log_in_user(conn, user)
+
+    event = event_fixture(%{title: "Slim History Gala #{unique}"})
+    tier_name = "GalaVIP#{unique}"
+    tier = ticket_tier_fixture(%{event_id: event.id, name: tier_name})
+
+    ticket_order =
+      ticket_order_fixture(%{
+        user: user,
+        event: event,
+        tier: tier,
+        ticket_selections: %{tier.id => 2}
+      })
+
+    {:ok, {event_payment, _, _}} =
+      Ysc.Ledgers.process_payment(%{
+        user_id: user.id,
+        amount: Money.new(10_000, :USD),
+        entity_type: :event,
+        entity_id: event.id,
+        external_payment_id: "pi_settings_event_#{unique}",
+        stripe_fee: Money.new(320, :USD),
+        description: "Event tickets",
+        property: nil,
+        payment_method_id: nil
+      })
+
+    ticket_order
+    |> Ecto.Changeset.change(payment_id: event_payment.id, status: :completed)
+    |> Repo.update!()
+
+    room_name = "History Cabin #{unique}"
+
+    {:ok, room} =
+      %Ysc.Bookings.Room{}
+      |> Ysc.Bookings.Room.changeset(%{
+        name: room_name,
+        description: "payment history must not need this copy",
+        property: :tahoe,
+        capacity_max: 4,
+        is_active: true
+      })
+      |> Repo.insert()
+
+    booking =
+      booking_fixture(%{
+        user_id: user.id,
+        property: :tahoe,
+        rooms: [room],
+        status: :complete
+      })
+
+    {:ok, {_booking_payment, _, _}} =
+      Ysc.Ledgers.process_payment(%{
+        user_id: user.id,
+        amount: booking.total_price,
+        entity_type: :booking,
+        entity_id: booking.id,
+        external_payment_id: "pi_settings_booking_#{unique}",
+        stripe_fee: Money.new(50, :USD),
+        description: "Booking payment",
+        property: booking.property,
+        payment_method_id: nil
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/users/payments")
+    render_async(view)
+
+    assert has_element?(view, "#payment-ticket-#{ticket_order.id}", event.title)
+
+    assert has_element?(
+             view,
+             "#payment-ticket-#{ticket_order.id}",
+             "2x #{tier_name}"
+           )
+
+    assert has_element?(view, "#payment-booking-#{booking.id}", room_name)
+
+    assert has_element?(
+             view,
+             "#payment-booking-#{booking.id}",
+             booking.reference_id
+           )
   end
 
   describe "settings page — payments tab" do

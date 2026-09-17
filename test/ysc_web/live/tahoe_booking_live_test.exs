@@ -476,6 +476,58 @@ defmodule YscWeb.TahoeBookingLiveTest do
       refute socket.assigns.can_book
       assert socket.assigns.booking_error_title == "Maximum rooms reached"
     end
+
+    test "active booking cards still show room names after slim family load",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      room = create_tahoe_room!(suffix: "slim-active-card")
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      {:ok, booking} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            booking_mode: :room,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            status: :complete,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      %BookingRoom{booking_id: booking.id, room_id: room.id}
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      render_async(view, 2_000)
+
+      assert has_element?(view, "#tahoe-active-bookings-list")
+
+      assert has_element?(
+               view,
+               "#tahoe-active-booking-#{booking.id}",
+               booking.reference_id
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-active-booking-#{booking.id}",
+               room.name
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-active-booking-#{booking.id}",
+               "Rooms"
+             )
+    end
   end
 
   describe "booking modes" do
