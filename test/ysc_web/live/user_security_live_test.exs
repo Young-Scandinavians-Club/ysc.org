@@ -207,6 +207,8 @@ defmodule YscWeb.UserSecurityLiveTest do
       })
 
       assert has_element?(view, "#reauth-modal")
+      assert has_element?(view, "#reauth-passkey-or-divider")
+      assert has_element?(view, "#reauth-oauth-or-divider")
       assert render(view) =~ "Verify Your Identity"
     end
 
@@ -749,6 +751,8 @@ defmodule YscWeb.UserSecurityLiveTest do
       })
 
       assert has_element?(view, "#reauth-modal")
+      refute has_element?(view, "#reauth-passkey-or-divider")
+      assert has_element?(view, "#reauth-oauth-or-divider")
       refute render(view) =~ "Verify with your password"
       assert render(view) =~ "Verify with your passkey"
     end
@@ -768,6 +772,7 @@ defmodule YscWeb.UserSecurityLiveTest do
         }
       })
 
+      assert has_element?(view, "#reauth-oauth-or-divider")
       assert has_element?(view, "button[phx-click='reauth_with_google']")
       assert has_element?(view, "button[phx-click='reauth_with_facebook']")
     end

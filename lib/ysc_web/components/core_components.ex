@@ -5646,6 +5646,49 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Horizontal rule with a centered label, used between alternative actions.
+
+  Sign-in, re-authentication, and similar screens place this between OAuth /
+  passkey options and a password form.
+
+  ## Examples
+
+      <.labeled_divider id="login-or-divider" class="my-6" line_class="border-zinc-300">
+        or
+      </.labeled_divider>
+
+      <.labeled_divider id="reauth-oauth-or-divider">OR</.labeled_divider>
+  """
+  attr :id, :string, required: true
+
+  attr :class, :any,
+    default: nil,
+    doc: "Extra classes on the wrapper (e.g. `my-6` for vertical spacing)"
+
+  attr :line_class, :string,
+    default: "border-zinc-200",
+    doc: "Border color class for the rule"
+
+  attr :label_class, :any,
+    default: "bg-white px-2 text-zinc-500",
+    doc: "Classes on the centered label span"
+
+  slot :inner_block, required: true
+
+  def labeled_divider(assigns) do
+    ~H"""
+    <div id={@id} class={["relative", @class]}>
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class={["w-full border-t", @line_class]}></div>
+      </div>
+      <div class="relative flex justify-center items-center text-sm leading-none">
+        <span class={@label_class}>{render_slot(@inner_block)}</span>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders an OAuth provider button with brand icon styling.
 
   Use for sign-in and re-authentication flows. Pass LiveView event attrs via
