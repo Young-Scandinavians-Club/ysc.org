@@ -17,7 +17,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= pay_membership_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Pay your membership dues →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Once your payment is processed, you'll be able to:</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">After you pay, you'll be able to:</mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">
       <ul>
         <li style="padding-bottom: 10px"><strong>Attend an event:</strong> Meet new people and experience Scandinavian culture firsthand at one of our many gatherings, including <strong>cultural events, parties, and hikes</strong>. Check out our upcoming events: <a href="<%= upcoming_events_url() %>">Upcoming Events</a></li>

@@ -1535,7 +1535,7 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="p-6 border-b border-zinc-100">
                   <h2 class="text-zinc-900 font-bold text-xl">Change Plan</h2>
                   <p class="text-sm text-zinc-500 mt-1">
-                    Switch between Single and Family plans. Upgrades take effect immediately; downgrades apply at your next renewal.
+                    You can switch between Single and Family. Switching to Family starts right away and you'll be charged the difference for the rest of this year. Switching to Single starts at your next renewal.
                   </p>
                 </div>
 
@@ -4420,7 +4420,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Failed to cancel scheduled downgrade. Please try again.",
+           "We couldn't keep your current plan. Please try again, or email info@ysc.org if this continues.",
            title: "Membership"
          )}
     end
