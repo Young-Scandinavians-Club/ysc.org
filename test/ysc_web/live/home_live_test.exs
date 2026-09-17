@@ -637,6 +637,24 @@ defmodule YscWeb.HomeLiveTest do
   end
 
   describe "passkey prompt" do
+    test "dead render hides passkey banner until async home data confirms it",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_session("just_logged_in", true)
+
+      conn = get(conn, ~p"/")
+      html = html_response(conn, 200)
+
+      refute html =~ ~s|id="passkey-prompt-banner"|
+      refute html =~ "Sign in faster with Passkeys"
+    end
+
     test "setup_passkey navigates to passkey registration", %{conn: conn} do
       user = user_fixture()
 

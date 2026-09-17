@@ -136,6 +136,59 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorkerTest do
       assert Repo.reload!(expense_report).quickbooks_bill_id == nil
     end
 
+    test "reclaims an in-flight processing report on retry after a crash", %{
+      user: user
+    } do
+      # `processing` stays eligible so Oban can retry after a crash that
+      # claimed the row but never reached QuickbooksSync's error handler.
+      # Skipping this status would stall reimbursements until the backup
+      # worker's stale-claim window (3 hours). Enqueue skip of processing
+      # (duplicate-bill guard) must not be copied into claim_for_sync/1.
+      earlier =
+        DateTime.utc_now()
+        |> DateTime.add(-3 * 3600, :second)
+        |> DateTime.truncate(:second)
+
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Crash retry reclaim",
+          status: "approved",
+          quickbooks_sync_status: "processing",
+          quickbooks_last_sync_attempt_at: earlier,
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"expense_report_id" => expense_report.id},
+        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportWorker",
+        queue: "default",
+        state: "available",
+        attempt: 2
+      }
+
+      result =
+        try do
+          QuickbooksSyncExpenseReportWorker.perform(job)
+        rescue
+          _ -> {:error, :quickbooks_not_configured}
+        catch
+          _, _ -> {:error, :quickbooks_not_configured}
+        end
+
+      assert result == :ok or match?({:error, _}, result)
+
+      reloaded = Repo.reload!(expense_report)
+
+      assert DateTime.compare(reloaded.quickbooks_last_sync_attempt_at, earlier) ==
+               :gt
+
+      assert is_nil(reloaded.quickbooks_bill_id)
+      refute reloaded.quickbooks_sync_status in ["skipped", "pending"]
+    end
+
     test "handles pending sync expense reports", %{user: user} do
       # Insert expense report with pending sync status
       expense_report =
