@@ -161,17 +161,11 @@ defmodule YscWeb.AdminEventsLive do
 
                 <:footer>
                   <div>
-                    <%= if event.state == :scheduled && event.publish_at do %>
-                      <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
-                        <.badge type={event_state_to_badge_style(event.state)}>
-                          {String.capitalize("#{event.state}")}
-                        </.badge>
-                      </.tooltip>
-                    <% else %>
-                      <.badge type={event_state_to_badge_style(event.state)}>
-                        {String.capitalize("#{event.state}")}
-                      </.badge>
-                    <% end %>
+                    <.admin_event_state_badge
+                      id={"admin-event-card-#{event.id}-state"}
+                      state={event.state}
+                      publish_at={event.publish_at}
+                    />
                   </div>
 
                   <.event_actions_dropdown
@@ -229,17 +223,11 @@ defmodule YscWeb.AdminEventsLive do
                 </:col>
 
                 <:col :let={{_, event}} label="State" field={:state}>
-                  <%= if event.state == :scheduled && event.publish_at do %>
-                    <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
-                      <.badge type={event_state_to_badge_style(event.state)}>
-                        {String.capitalize("#{event.state}")}
-                      </.badge>
-                    </.tooltip>
-                  <% else %>
-                    <.badge type={event_state_to_badge_style(event.state)}>
-                      {String.capitalize("#{event.state}")}
-                    </.badge>
-                  <% end %>
+                  <.admin_event_state_badge
+                    id={"admin-event-row-#{event.id}-state"}
+                    state={event.state}
+                    publish_at={event.publish_at}
+                  />
                 </:col>
 
                 <:col :let={{_, event}} label="Created" field={:inserted_at}>
@@ -525,13 +513,6 @@ defmodule YscWeb.AdminEventsLive do
     {:noreply, push_patch(socket, to: ~p"/admin/events?#{new_params}")}
   end
 
-  defp event_state_to_badge_style(:draft), do: "sky"
-  defp event_state_to_badge_style(:scheduled), do: "yellow"
-  defp event_state_to_badge_style(:published), do: "green"
-  defp event_state_to_badge_style(:cancelled), do: "dark"
-  defp event_state_to_badge_style(:deleted), do: "red"
-  defp event_state_to_badge_style(_), do: "default"
-
   defp format_date(nil), do: "n/a"
   defp format_date(date), do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
 
@@ -548,14 +529,6 @@ defmodule YscWeb.AdminEventsLive do
       _ -> "#{registrations} / ∞"
     end
   end
-
-  defp format_publish_at(%DateTime{} = publish_at) do
-    publish_at
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> Calendar.strftime("%B %d, %Y at %I:%M %p %Z")
-  end
-
-  defp format_publish_at(_), do: nil
 
   defp do_clear_search(socket, input_id) do
     new_params = Map.delete(socket.assigns[:params], "search")
