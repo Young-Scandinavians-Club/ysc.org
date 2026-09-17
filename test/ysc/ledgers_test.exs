@@ -2091,6 +2091,72 @@ defmodule Ysc.LedgersTest do
       assert Ecto.assoc_loaded?(retrieved.user)
     end
 
+    test "get_payment_with_associations/1 slims member columns and skips payment methods",
+         %{
+           user: user,
+           payment: payment
+         } do
+      {:ok, payment_method} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_assoc_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_assoc",
+          type: :card,
+          provider_type: "card",
+          last_four: "4242",
+          display_brand: "visa",
+          payload: %{"card" => %{"brand" => "visa"}}
+        })
+
+      payment
+      |> Ecto.Changeset.change(%{
+        payment_method_id: payment_method.id,
+        quickbooks_response: %{"Id" => "qb-secret-blob"}
+      })
+      |> Repo.update!()
+
+      {_retrieved, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_with_associations(payment.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_retrieved, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_with_associations(payment.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_retrieved, method_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_with_associations(payment.id) end,
+          pattern: ~r/FROM "payment_methods"/i,
+          caller_pids: [self()]
+        )
+
+      {_retrieved, qb_response_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_with_associations(payment.id) end,
+          pattern: ~r/quickbooks_response/i,
+          caller_pids: [self()]
+        )
+
+      retrieved = Ledgers.get_payment_with_associations(payment.id)
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert method_queries == 0
+      assert qb_response_cols == 0
+      assert retrieved.user.email == user.email
+      assert retrieved.user.hashed_password == nil
+      assert retrieved.user.board_bio == nil
+      assert retrieved.quickbooks_response == nil
+      refute Ecto.assoc_loaded?(retrieved.payment_method)
+    end
+
     test "get_payment_by_external_id/1 returns payment by external id", %{
       payment: payment
     } do
@@ -3576,6 +3642,191 @@ defmodule Ysc.LedgersTest do
                Ledgers.get_payment_related_entity(payment)
 
       assert found_order.id == ticket_order.id
+    end
+
+    test "get_payment_related_entity/1 slims booking JSON and ticket-order event HTML",
+         %{
+           user: user
+         } do
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, {booking_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(20_000, :USD),
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_related_slim_booking_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(640, :USD),
+          description: "Tahoe booking",
+          property: :tahoe,
+          payment_method_id: nil
+        })
+
+      event =
+        event_fixture(%{
+          title: "Slim Related Event XYZ",
+          raw_details: "<p>toast body that payment modal must not load</p>",
+          rendered_details: "<p>toast body that payment modal must not load</p>"
+        })
+
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      {:ok, {event_payment, _, _}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: Money.new(10_000, :USD),
+          event_amount: Money.new(10_000, :USD),
+          donation_amount: Money.new(0, :USD),
+          event_id: event.id,
+          external_payment_id:
+            "pi_related_slim_event_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          payment_method_id: nil
+        })
+
+      ticket_order
+      |> Ecto.Changeset.change(%{payment_id: event_payment.id})
+      |> Repo.update!()
+
+      {_result, json_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_related_entity(booking_payment) end,
+          pattern: ~r/pricing_items|modification_hold_attrs/i,
+          caller_pids: [self()]
+        )
+
+      {_result, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_related_entity(event_payment) end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_result, hash_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_related_entity(event_payment) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_result, account_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payment_related_entity(booking_payment) end,
+          pattern: ~r/FROM "ledger_accounts"/i,
+          caller_pids: [self()]
+        )
+
+      assert {:booking, found_booking} =
+               Ledgers.get_payment_related_entity(booking_payment)
+
+      assert {:ticket_order, found_order} =
+               Ledgers.get_payment_related_entity(event_payment)
+
+      assert json_cols == 0
+      assert html_cols == 0
+      assert hash_cols == 0
+      assert account_queries == 0
+      assert found_booking.id == booking.id
+      assert found_booking.reference_id == booking.reference_id
+      assert found_booking.pricing_items == nil
+      assert found_booking.modification_hold_attrs == nil
+      assert found_order.id == ticket_order.id
+      assert found_order.event.title == "Slim Related Event XYZ"
+      assert found_order.event.raw_details == nil
+      assert found_order.tickets != []
+      refute Ecto.assoc_loaded?(found_order.user)
+      refute Ecto.assoc_loaded?(found_order.payment)
+      refute Ecto.assoc_loaded?(hd(found_order.tickets).ticket_tier)
+    end
+
+    test "list_refunds_for_payment/1 skips member rows and QuickBooks response JSON",
+         %{
+           user: user
+         } do
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_refund_list_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, {refund, _tx, _entries}} =
+               Ledgers.process_refund(%{
+                 payment_id: payment.id,
+                 refund_amount: Money.new(2_000, :USD),
+                 reason: "Partial",
+                 external_refund_id:
+                   "re_refund_list_#{System.unique_integer([:positive])}"
+               })
+
+      refund
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-refund-secret"}
+      })
+      |> Repo.update!()
+
+      {_refunds, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.list_refunds_for_payment(payment.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_refunds, qb_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.list_refunds_for_payment(payment.id) end,
+          pattern: ~r/quickbooks_response/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] = Ledgers.list_refunds_for_payment(payment.id)
+
+      assert password_cols == 0
+      assert qb_cols == 0
+      assert loaded.id == refund.id
+      assert loaded.reason == "Partial"
+      assert loaded.quickbooks_response == nil
+      refute Ecto.assoc_loaded?(loaded.user)
+    end
+
+    test "list_ledger_entries_for_payment/1 slims account copy", %{user: user} do
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_entry_list_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      entries = Ledgers.list_ledger_entries_for_payment(payment.id)
+
+      assert entries != []
+      assert hd(entries).account.name
+      assert hd(entries).account.description == nil
     end
 
     test "process_refund/1 for event payment with ticket order triggers ticket refund path",
@@ -7653,6 +7904,25 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
 
       assert %Ecto.Query{} =
                Ledgers.ci_query_explain_user_payment_history_free_orders_query()
+    end
+
+    test "payment-detail explain builders return Ecto queries" do
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_payment_with_associations_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_payment_related_booking_id_query()
+
+      assert %Ecto.Query{} = Ledgers.ci_query_explain_related_booking_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_related_ticket_order_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_list_refunds_for_payment_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_list_ledger_entries_for_payment_query()
     end
   end
 end
