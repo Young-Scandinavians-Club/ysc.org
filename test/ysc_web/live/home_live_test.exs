@@ -499,10 +499,21 @@ defmodule YscWeb.HomeLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
 
       render_async(view, 5_000)
-      html = render(view)
 
-      assert html =~ "Your Upcoming Stays"
-      assert html =~ "Lake Tahoe"
+      assert has_element?(view, "#home-itinerary-list")
+      assert has_element?(view, "#home-itinerary-booking-#{booking.id}")
+
+      assert has_element?(
+               view,
+               "#home-itinerary-booking-#{booking.id}",
+               booking.reference_id
+             )
+
+      assert has_element?(
+               view,
+               "#home-itinerary-booking-#{booking.id}",
+               "Lake Tahoe"
+             )
     end
   end
 
@@ -1019,10 +1030,20 @@ defmodule YscWeb.HomeLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
 
       render_async(view, 5_000)
-      html = render(view)
 
-      assert html =~ "Your Upcoming Stays"
-      assert html =~ "Clear Lake"
+      assert has_element?(view, "#home-itinerary-list")
+
+      assert has_element?(
+               view,
+               "#home-itinerary-booking-#{booking.id}",
+               booking.reference_id
+             )
+
+      assert has_element?(
+               view,
+               "#home-itinerary-booking-#{booking.id}",
+               "Clear Lake"
+             )
     end
   end
 
