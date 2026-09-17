@@ -239,15 +239,59 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
-  Gets a ticket order by payment ID with preloaded associations.
+  Gets a ticket order by payment ID with the associations the treasurer
+  refund modal actually renders.
+
+  Tickets are id/status/reference + tier name/type/price. Skip the member
+  row (`hashed_password`) and event body HTML (`raw_details` /
+  `rendered_details`) — the checkboxes never show them. Refund amount
+  calculation re-fetches tickets via `order_tickets_for_refund_query/1`.
   """
   def get_ticket_order_by_payment_id(payment_id) do
+    payment_id
+    |> ticket_order_by_payment_id_query()
+    |> Repo.one()
+  end
+
+  # Refund modal: order identity + ticket checkboxes. Omits event HTML and
+  # the purchaser row.
+  @admin_refund_ticket_order_fields [
+    :id,
+    :status,
+    :total_amount,
+    :payment_id,
+    :event_id,
+    :user_id,
+    :reference_id
+  ]
+  @admin_refund_ticket_fields [
+    :id,
+    :status,
+    :reference_id,
+    :ticket_tier_id,
+    :ticket_order_id,
+    :discount_amount
+  ]
+  @admin_refund_ticket_tier_fields [:id, :name, :type, :price]
+
+  defp ticket_order_by_payment_id_query(payment_id) do
+    tier_query =
+      from(tt in TicketTier,
+        select: struct(tt, ^@admin_refund_ticket_tier_fields)
+      )
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@admin_refund_ticket_fields),
+        preload: [ticket_tier: ^tier_query]
+      )
+
     from(to in TicketOrder,
       where: to.payment_id == ^payment_id,
       limit: 1,
-      preload: [:user, event: [], tickets: :ticket_tier]
+      select: struct(to, ^@admin_refund_ticket_order_fields),
+      preload: [tickets: ^ticket_query]
     )
-    |> Repo.one()
   end
 
   def get_ticket_order_by_reference(reference_id) do
@@ -2926,6 +2970,11 @@ defmodule Ysc.Tickets do
   def ci_query_explain_owned_member_only_tickets_count_query do
     ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
     owned_member_only_tickets_count_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_by_payment_id_query do
+    ticket_order_by_payment_id_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   defp stripe_client do

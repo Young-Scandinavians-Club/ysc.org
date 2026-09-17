@@ -3050,9 +3050,10 @@ defmodule Ysc.LedgersTest do
              end)
     end
 
-    test "list_payments_for_admin/3 slims user columns and event titles", %{
-      user: user
-    } do
+    test "list_payments_for_admin/3 slims user columns, event titles, and QuickBooks JSON",
+         %{
+           user: user
+         } do
       event =
         event_fixture(%{
           title: "Slim Payment Event XYZ",
@@ -3089,7 +3090,10 @@ defmodule Ysc.LedgersTest do
         })
 
       payment
-      |> Ecto.Changeset.change(%{payment_method_id: payment_method.id})
+      |> Ecto.Changeset.change(%{
+        payment_method_id: payment_method.id,
+        quickbooks_response: %{"Id" => "qb-admin-list-secret"}
+      })
       |> Repo.update!()
 
       start_date = DateTime.add(DateTime.utc_now(), -30, :day)
@@ -3122,6 +3126,15 @@ defmodule Ysc.LedgersTest do
           caller_pids: [self()]
         )
 
+      {_payments, qb_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.list_payments_for_admin(start_date, end_date, limit: 20)
+          end,
+          pattern: ~r/quickbooks_response/i,
+          caller_pids: [self()]
+        )
+
       [loaded] =
         Ledgers.list_payments_for_admin(start_date, end_date, limit: 20)
         |> Enum.filter(&(&1.id == payment.id))
@@ -3129,8 +3142,10 @@ defmodule Ysc.LedgersTest do
       assert password_cols == 0
       assert html_cols == 0
       assert method_queries == 0
+      assert qb_cols == 0
       assert loaded.user.email == user.email
       assert loaded.user.hashed_password == nil
+      assert loaded.quickbooks_response == nil
       refute Ecto.assoc_loaded?(loaded.payment_method)
       assert loaded.payment_type_info.type == "Event"
       assert loaded.payment_type_info.details == "Slim Payment Event XYZ"
@@ -3156,6 +3171,77 @@ defmodule Ysc.LedgersTest do
       entries = Ledgers.get_ledger_entries(start_date, end_date, 100)
       assert is_list(entries)
       assert length(entries) <= 100
+    end
+
+    test "list_ledger_entries_for_admin/3 skips QuickBooks JSON and account descriptions",
+         %{user: user} do
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_admin_ledger_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Test payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-ledger-payment-secret"}
+      })
+      |> Repo.update!()
+
+      assert {:ok, {refund, _tx, _refund_entries}} =
+               Ledgers.process_refund(%{
+                 payment_id: payment.id,
+                 refund_amount: Money.new(2_000, :USD),
+                 reason: "Partial",
+                 external_refund_id:
+                   "re_admin_ledger_#{System.unique_integer([:positive])}"
+               })
+
+      refund
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-ledger-refund-secret"}
+      })
+      |> Repo.update!()
+
+      start_date = DateTime.add(DateTime.utc_now(), -30, :day)
+      end_date = DateTime.utc_now()
+
+      {_entries, qb_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.list_ledger_entries_for_admin(start_date, end_date,
+              limit: 20
+            )
+          end,
+          pattern: ~r/quickbooks_response/i,
+          caller_pids: [self()]
+        )
+
+      loaded =
+        Ledgers.list_ledger_entries_for_admin(start_date, end_date, limit: 20)
+
+      payment_entry =
+        Enum.find(loaded, &(&1.payment && &1.payment.id == payment.id))
+
+      refund_entry =
+        Enum.find(loaded, &(&1.refund && &1.refund.id == refund.id))
+
+      assert qb_cols == 0
+      assert payment_entry
+      assert payment_entry.account.name
+      assert payment_entry.account.description == nil
+      assert payment_entry.payment.reference_id == payment.reference_id
+      assert payment_entry.payment.quickbooks_response == nil
+      assert refund_entry
+      assert refund_entry.refund.reference_id == refund.reference_id
+      assert refund_entry.refund.quickbooks_response == nil
     end
   end
 

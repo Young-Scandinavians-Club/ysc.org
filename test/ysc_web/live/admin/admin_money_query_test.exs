@@ -180,7 +180,7 @@ defmodule YscWeb.AdminMoneyQueryTest do
       %{conn: log_in_user(conn, admin)}
     end
 
-    test "connected overview does not SELECT event HTML or payment methods",
+    test "connected overview does not SELECT event HTML, payment methods, or QuickBooks JSON",
          %{conn: conn} do
       member =
         user_fixture(%{first_name: "Slim", last_name: "Payer"})
@@ -221,7 +221,10 @@ defmodule YscWeb.AdminMoneyQueryTest do
         })
 
       payment
-      |> Ecto.Changeset.change(%{payment_method_id: payment_method.id})
+      |> Ecto.Changeset.change(%{
+        payment_method_id: payment_method.id,
+        quickbooks_response: %{"Id" => "qb-overview-secret"}
+      })
       |> Repo.update!()
 
       {{:ok, view, _html}, html_cols} =
@@ -244,9 +247,20 @@ defmodule YscWeb.AdminMoneyQueryTest do
           pattern: ~r/FROM "payment_methods"/i
         )
 
+      {{:ok, _view, _html}, qb_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} = live(conn, ~p"/admin/money")
+            render(view)
+            {:ok, view, html}
+          end,
+          pattern: ~r/quickbooks_response/i
+        )
+
       html = render(view)
       assert html_cols == 0
       assert method_queries == 0
+      assert qb_cols == 0
       assert html =~ "Slim Payer"
       assert html =~ "Overview Event XYZ"
     end
