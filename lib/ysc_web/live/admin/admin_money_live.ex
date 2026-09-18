@@ -253,12 +253,7 @@ defmodule YscWeb.AdminMoneyLive do
 
   defp apply_action(socket, :view_payout, %{"id" => payout_id}) do
     # Find payout by ID (the ID in the URL is the payout ID, not payment ID)
-    payout =
-      try do
-        Ledgers.get_payout!(payout_id)
-      rescue
-        Ecto.NoResultsError -> nil
-      end
+    payout = Ledgers.get_payout_for_admin(payout_id)
 
     if payout do
       socket
@@ -659,7 +654,7 @@ defmodule YscWeb.AdminMoneyLive do
     |> YscWeb.Workers.QuickbooksSyncPayoutWorker.new()
     |> Oban.insert()
 
-    payout = Repo.preload(payout, [:payments, :refunds])
+    payout = Ledgers.get_payout_for_admin(payout.id)
 
     {:noreply,
      socket
