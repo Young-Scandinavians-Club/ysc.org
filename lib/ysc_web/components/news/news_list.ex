@@ -1,6 +1,7 @@
 defmodule YscWeb.NewsListLive do
   use YscWeb, :live_component
 
+  alias Ysc.Accounts.UserDisplay
   alias Ysc.Posts
   alias YscWeb.PlainText
 
@@ -33,7 +34,7 @@ defmodule YscWeb.NewsListLive do
               </time>
               <span class="mx-2">•</span>
               <span>
-                by {post.author.first_name} {post.author.last_name}
+                by {UserDisplay.full_name(post.author)}
               </span>
             </div>
 

@@ -16,7 +16,7 @@ defmodule YscWeb.HomeLive do
 
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay, Season}
-  alias Ysc.Posts.Post
+  alias Ysc.Posts.ReadingTime
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.{DateDisplay, NewsletterSubscribe, PlainText, TimeZone}
@@ -889,10 +889,14 @@ defmodule YscWeb.HomeLive do
                   preferred_type={:optimized}
                 />
               </div>
-              <time class="text-xs font-semibold text-blue-700 uppercase tracking-widest">
-                {DateDisplay.format_date_short_in_zone(post.published_on, @timezone)} · {reading_time_for_news(
-                  post
-                )} min read
+              <time
+                id={"home-news-reading-time-#{post.id}"}
+                class="text-xs font-semibold text-blue-700 uppercase tracking-widest"
+              >
+                {DateDisplay.format_date_short_in_zone(
+                  post.published_on,
+                  @timezone
+                )} · {ReadingTime.minutes(post)} min read
               </time>
               <h3 class="text-2xl font-extrabold text-zinc-900 tracking-tight mt-3 group-hover:text-blue-700 transition-colors leading-snug">
                 {post.title}
@@ -2239,14 +2243,6 @@ defmodule YscWeb.HomeLive do
   end
 
   defp days_since_inserted(_), do: 999
-
-  defp reading_time_for_news(%Post{rendered_body: nil}), do: 1
-
-  defp reading_time_for_news(%Post{rendered_body: rendered_body}) do
-    word_count = String.split(rendered_body, ~r/\s+/, trim: true) |> length()
-    # Average reading speed is 200 words per minute
-    ceil(word_count / 200) |> max(1)
-  end
 
   defp preview_text_for_news(post) do
     post
