@@ -5,12 +5,15 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
   been refunded yet, without hunting through the Tickets tab order by order.
 
   Orders that can't be refunded here (already refunded, free/no payment
-  collected, or paid in person) are shown with a status badge explaining why
-  instead of a checkbox, so the admin can see at a glance who still needs
-  action.
+  collected, paid in person, or cancelled with no refund on record) are shown
+  with a status badge explaining why instead of a checkbox, so the admin can
+  see at a glance who still needs action.
   """
   use YscWeb, :live_component
 
+  import YscWeb.Live.AsyncHelpers
+
+  alias Ysc.Ledgers
   alias Ysc.Tickets
 
   @impl true
@@ -37,20 +40,21 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
 
         <div :if={@orders != []} class="mt-6 space-y-3">
           <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 text-sm text-zinc-600">
-              <input
-                type="checkbox"
-                checked={
-                  @refundable_order_ids != [] &&
-                    MapSet.new(@refundable_order_ids) ==
-                      MapSet.new(@selected_order_ids)
-                }
-                disabled={@refundable_order_ids == []}
-                phx-click="toggle-select-all"
-                phx-target={@myself}
-                class="rounded-sm border-zinc-300"
-              /> Select all refundable orders
-            </label>
+            <.input
+              type="checkbox"
+              id="cancellation-refund-select-all"
+              name="cancellation_refund_select_all"
+              value="true"
+              label="Select all refundable orders"
+              checked={
+                @refundable_order_ids != [] &&
+                  MapSet.new(@refundable_order_ids) ==
+                    MapSet.new(@selected_order_ids)
+              }
+              disabled={@refundable_order_ids == []}
+              phx-click="toggle-select-all"
+              phx-target={@myself}
+            />
             <span class="text-xs text-zinc-500">
               {length(@orders)} order{if length(@orders) != 1, do: "s"}
             </span>
@@ -63,14 +67,17 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
               class="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-3"
             >
               <div class="shrink-0">
-                <input
+                <.input
                   :if={entry.state == :refundable}
                   type="checkbox"
+                  id={"cancellation-refund-order-#{entry.order.id}-checkbox"}
+                  name={"cancellation_refund_order_#{entry.order.id}"}
+                  value="true"
+                  aria-label={"Select order #{entry.order.reference_id} for refund"}
                   checked={MapSet.member?(@selected_order_ids, entry.order.id)}
                   phx-click="toggle-selection"
                   phx-value-id={entry.order.id}
                   phx-target={@myself}
-                  class="rounded-sm border-zinc-300"
                 />
               </div>
 
@@ -102,6 +109,9 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
                   Paid in person ({offline_payment_label(
                     entry.order.payment_channel
                   )}) — refund manually
+                </.badge>
+                <.badge :if={entry.state == :unrefunded_cancelled} type="red">
+                  Cancelled, no refund on record — check manually
                 </.badge>
                 <span
                   :if={entry.state == :refundable}
@@ -192,10 +202,10 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
   end
 
   # Classifies an order for the cancellation-refund flow:
-  # - `:refunded` once every ticket on it is cancelled (a `:completed` order
-  #   only reaches `:cancelled` this way -- see `Tickets.refund_tickets/3`)
   # - `:offline_payment` for in-person cash/check sales, which never touch
-  #   Stripe and so can't be refunded from here
+  #   Stripe and so can't be refunded from here (checked first: these orders
+  #   also carry no `payment_id`, same as a free grant)
+  # - for an order with no active tickets left, see `classify_cancelled_order/1`
   # - `:no_payment` for free/admin-granted orders and any order whose amount
   #   can't be resolved to a refundable ticket set
   # - `:refundable` otherwise, carrying the still-active ticket ids and the
@@ -207,15 +217,15 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
       |> Enum.map(& &1.id)
 
     cond do
-      active_ticket_ids == [] ->
-        %{state: :refunded, active_ticket_ids: [], amount: nil}
-
       order.payment_channel ->
         %{
           state: :offline_payment,
           active_ticket_ids: active_ticket_ids,
           amount: nil
         }
+
+      active_ticket_ids == [] ->
+        classify_cancelled_order(order)
 
       is_nil(order.payment_id) || is_nil(order.total_amount) ||
           Money.zero?(order.total_amount) ->
@@ -237,6 +247,28 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
               amount: nil
             }
         end
+    end
+  end
+
+  # An order with no active tickets left either never collected any money
+  # (free/admin grant, or an abandoned unpaid checkout -- `payment_id` is nil
+  # either way) or was fully refunded. `Tickets.refund_tickets/3` cancels
+  # tickets without itself touching Stripe or the ledger, so don't infer
+  # "refunded" just from the tickets being gone -- every current caller
+  # refunds via `Tickets.refund_via_stripe/4` (which records a
+  # `Ysc.Ledgers.Refund`) first, but trusting that call order would silently
+  # hide a real gap if that ever changed. Check the ledger instead, and flag
+  # a cancelled order with money on file but no recorded refund for manual
+  # follow-up rather than mislabeling it "Refunded".
+  defp classify_cancelled_order(%{payment_id: nil}) do
+    %{state: :no_payment, active_ticket_ids: [], amount: nil}
+  end
+
+  defp classify_cancelled_order(%{payment_id: payment_id}) do
+    if Ledgers.list_refunds_for_payment(payment_id) != [] do
+      %{state: :refunded, active_ticket_ids: [], amount: nil}
+    else
+      %{state: :unrefunded_cancelled, active_ticket_ids: [], amount: nil}
     end
   end
 
@@ -296,7 +328,22 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
               MapSet.member?(socket.assigns.selected_order_ids, &1.order.id))
         )
 
-      results = Enum.map(selected_entries, &refund_order(&1, "Event cancelled"))
+      # Each refund is a Stripe call (with its own retry backoff) followed by
+      # a DB write, so refunding a large batch serially could block the
+      # modal -- and the LiveView process itself -- for the sum of every
+      # order's network round trip. Bounded concurrency keeps a big event
+      # cancellation from stalling the toast/refresh for minutes.
+      results =
+        selected_entries
+        |> async_stream_with_repo(&refund_order(&1, "Event cancelled"),
+          max_concurrency: 5,
+          timeout: :infinity
+        )
+        |> Enum.map(fn
+          {:ok, result} -> result
+          {:exit, reason} -> {:error, {:exited, reason}}
+        end)
+
       succeeded = Enum.count(results, &match?({:ok, _}, &1))
       failed = length(results) - succeeded
 

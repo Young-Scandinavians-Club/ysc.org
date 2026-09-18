@@ -161,8 +161,16 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
          %{conn: conn} do
       event = event_fixture(%{state: :published})
 
-      %{ticket_order: order, tickets: [ticket]} =
+      %{ticket_order: order, tickets: [ticket], payment: payment} =
         completed_ticket_order_with_payment!(event: event)
+
+      {:ok, {_refund, _transaction, _entries}} =
+        Tickets.refund_via_stripe(
+          payment,
+          order.total_amount,
+          "Pre-cancelled refund",
+          ticket_ids: [ticket.id]
+        )
 
       {:ok, _refund_info} =
         Tickets.refund_tickets(order, [ticket.id], "Pre-cancelled refund")
@@ -174,6 +182,43 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
       |> render_click()
 
       assert has_element?(
+               view,
+               "#cancellation-refund-order-#{order.id}",
+               "Refunded"
+             )
+
+      refute has_element?(
+               view,
+               "#cancellation-refund-order-#{order.id} input[type=checkbox]"
+             )
+    end
+
+    test "a cancelled order with no recorded refund is flagged for manual follow-up",
+         %{conn: conn} do
+      event = event_fixture(%{state: :published})
+
+      %{ticket_order: order, tickets: [ticket]} =
+        completed_ticket_order_with_payment!(event: event)
+
+      # Cancels the ticket without ever issuing a Stripe/ledger refund --
+      # simulates a gap this modal must surface rather than hide behind a
+      # false "Refunded" badge.
+      {:ok, _refund_info} =
+        Tickets.refund_tickets(order, [ticket.id], "Cancelled without refund")
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#cancellation-refund-order-#{order.id}",
+               "no refund on record"
+             )
+
+      refute has_element?(
                view,
                "#cancellation-refund-order-#{order.id}",
                "Refunded"
