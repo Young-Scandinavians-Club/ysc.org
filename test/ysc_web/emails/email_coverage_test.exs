@@ -239,7 +239,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
                "conduct_violation_confirmation"
 
       assert ConductViolationConfirmation.get_subject() ==
-               "Conduct Violation Report Received - YSC"
+               "We received your report - YSC"
 
       assert ConductViolationConfirmation.code_of_conduct_url() ==
                YscWeb.Endpoint.url() <> "/code-of-conduct"
@@ -259,6 +259,14 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       html = ConductViolationConfirmation.render(assigns)
       assert is_binary(html)
       assert html =~ "Sam"
+      assert html =~ "We received your report"
+      assert html =~ "report a concern"
+
+      assert html =~
+               "Your name stays private from the people this report is about"
+
+      refute html =~ "Anonymity Status"
+      refute html =~ "Conduct Violation Report Received"
     end
   end
 

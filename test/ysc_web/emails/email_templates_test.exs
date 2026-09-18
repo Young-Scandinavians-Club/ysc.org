@@ -157,6 +157,11 @@ defmodule YscWeb.Emails.EmailTemplatesTest do
       html = ConductViolationConfirmation.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
+      assert html =~ "We received your report"
+      assert html =~ "report a concern"
+      assert html =~ "You did not ask us to hide your name"
+      refute html =~ "Anonymity Status"
+      refute html =~ "You have not requested anonymity"
 
       # Test that the template name is correct
       assert ConductViolationConfirmation.get_template_name() ==
@@ -164,7 +169,7 @@ defmodule YscWeb.Emails.EmailTemplatesTest do
 
       # Test that the subject is correct
       assert ConductViolationConfirmation.get_subject() ==
-               "Conduct Violation Report Received - YSC"
+               "We received your report - YSC"
     end
 
     test "ConductViolationBoardNotification renders without errors" do

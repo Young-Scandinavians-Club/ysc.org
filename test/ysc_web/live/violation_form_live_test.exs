@@ -75,6 +75,8 @@ defmodule YscWeb.ViolationFormLiveTest do
         |> render_submit()
 
       assert html =~ "Thank You for Your Report"
+      assert html =~ "confirmation email with a copy is on its way"
+      refute html =~ "successfully submitted"
 
       assert html =~
                "This is a complete summary of what happened for the report."

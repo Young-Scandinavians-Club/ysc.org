@@ -257,8 +257,10 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       )
       |> render_submit()
 
-      # Check for redirect to login page (flash content tested via integration)
-      assert_redirected(view, "/users/log-in")
+      # Check for redirect to login with a toast that confirms they joined the family
+      flash = assert_redirected(view, "/users/log-in")
+      assert flash["info"] =~ "joined the family membership"
+      assert flash["info"] =~ "Sign in"
     end
   end
 

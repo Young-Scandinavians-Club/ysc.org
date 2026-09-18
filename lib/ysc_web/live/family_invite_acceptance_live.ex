@@ -178,7 +178,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Account created successfully! You can now sign in with your email and password.",
+           "You've joined the family membership! Sign in with your email and password to start using member benefits.",
            title: "Family invitation"
          )
          |> redirect(to: ~p"/users/log-in")}

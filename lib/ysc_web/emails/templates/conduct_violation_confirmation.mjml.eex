@@ -10,7 +10,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Conduct Violation Report Received</strong>
+      <strong>We received your report</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -30,7 +30,7 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      Thank you for taking the time to report a conduct violation to the Young Scandinavians Club. We have received your report and take all such matters seriously.
+      Thank you for taking the time to report a concern to the Young Scandinavians Club. We've received your report and take it seriously.
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
@@ -42,11 +42,12 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" background-color="<%= if @anonymous, do: "#fff3cd", else: "#e7f3ff" %>" border-radius="4px" border="2px solid <%= if @anonymous, do: "#ffc107", else: "#1976d2" %>" color="<%= if @anonymous, do: "#856404", else: "#004085" %>">
-      <strong>🔒 Anonymity Status:</strong> <%= if @anonymous, do: "You have requested to keep your name private from the people this report is about.", else: "You have not requested anonymity." %><br/><br/>
       <%= if @anonymous do %>
-        <strong>What this means:</strong> Your name and contact information will be visible to the YSC Board of Directors for follow-up, but will NOT be shared with the people involved in what happened. This helps protect your privacy while allowing the board to contact you if additional information is needed.
+        <strong>Your name stays private from the people this report is about.</strong><br/><br/>
+        <strong>What this means:</strong> The YSC Board of Directors can still see your name and contact information so they can follow up with you. They will not share that information with the people involved in what happened.
       <% else %>
-        <strong>Note:</strong> Your report will be handled with discretion and confidentiality by the board. If you have concerns about your privacy, please contact the board directly.
+        <strong>You did not ask us to hide your name from the people this report is about.</strong><br/><br/>
+        The board still handles your report carefully and privately. If you have privacy concerns, use <a href="<%= contact_url() %>">our contact page</a>.
       <% end %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
@@ -59,15 +60,15 @@
     </mj-text>
     <mj-spacer height="8px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      • We will investigate the matter according to our Code of Conduct procedures
+      • The board will follow the Code of Conduct process
     </mj-text>
     <mj-spacer height="8px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      • You will be contacted if we need additional information
+      • Someone will contact you if they need more information
     </mj-text>
     <mj-spacer height="8px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      • Appropriate action will be taken based on our findings
+      • The board will decide next steps based on what they learn
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
@@ -75,7 +76,7 @@
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      If you have any questions or need to provide additional information, please don't hesitate to contact us at <a href="<%= contact_url() %>">our contact page</a>.
+      If you have questions or more details to add, use <a href="<%= contact_url() %>">our contact page</a>.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">

@@ -712,7 +712,7 @@ defmodule YscWeb.UserBookingDetailLive do
           "Payment method"
       end
     else
-      "N/A"
+      "Not on file"
     end
   end
 
