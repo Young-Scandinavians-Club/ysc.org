@@ -18,7 +18,7 @@ defmodule YscWeb.ConductViolationReportLive do
             Thank You for Your Report
           </h1>
           <p class="text-zinc-600 mb-4 text-lg">
-            Your report has been successfully submitted. A confirmation email with a copy of your report has been sent to your email address.
+            We've received your report. A confirmation email with a copy is on its way to you.
           </p>
           <p class="text-zinc-500 mb-6">
             The YSC board will review your report and you can expect a response within 48-72 hours. We take all reports seriously and will handle this matter with care and discretion.

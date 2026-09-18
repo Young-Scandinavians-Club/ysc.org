@@ -142,8 +142,12 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
       assert html =~ "Home to YSC Cabin — 20 mi"
       assert html =~ "Mileage — no receipt required"
       assert html =~ "Amount we will reimburse"
+      assert html =~ "Treasurer is reviewing it"
+      assert html =~ "Reference number"
       refute html =~ "Net Total"
       refute html =~ "No receipt attached"
+      refute html =~ "being processed"
+      refute html =~ "Report ID"
     end
   end
 end

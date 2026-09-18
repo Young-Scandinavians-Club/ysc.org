@@ -11,13 +11,13 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for submitting your expense report. We've received your submission and it's now being processed by our Treasurer.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for sending your expense report. We've received it, and the Treasurer is reviewing it.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Expense Report Details -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Expense Report Details</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Report ID:</strong>
+      <strong>Reference number:</strong>
       <span class="expense-report-id-badge">
         <%= @expense_report.id %>
       </span>
