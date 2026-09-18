@@ -65,6 +65,37 @@ defmodule YscWeb.HomeLiveTest do
       assert has_element?(view, "a[href='/posts/#{url_name}']", title)
     end
 
+    @tag process_caches: true
+    test "guest news teasers show shared reading time", %{conn: conn} do
+      author = user_fixture(%{role: "admin"})
+      title = "Reading Time News #{System.unique_integer()}"
+      url_name = "reading-time-news-#{System.unique_integer()}"
+      raw_body = "<p>" <> String.duplicate("word ", 450) <> "</p>"
+
+      assert {:ok, post} =
+               Posts.create_post(
+                 %{
+                   "title" => title,
+                   "raw_body" => raw_body,
+                   "url_name" => url_name,
+                   "state" => "published",
+                   "featured_post" => false,
+                   "published_on" => DateTime.utc_now()
+                 },
+                 author
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(view, "a[href='/posts/#{url_name}']", title)
+
+      assert has_element?(
+               view,
+               "#home-news-reading-time-#{post.id}",
+               "2 min read"
+             )
+    end
+
     test "shows upcoming event title when an upcoming event exists", %{
       conn: conn
     } do
