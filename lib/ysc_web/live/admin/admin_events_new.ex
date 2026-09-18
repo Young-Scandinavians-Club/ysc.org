@@ -21,6 +21,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
   alias Ysc.Events.Agenda
   alias Ysc.Agendas
+  alias YscWeb.AdminEventsLive.CancellationRefundModal
   alias YscWeb.AdminEventsLive.TicketTierManagement
   alias YscWeb.Components.Events.CommunicationTimeline
   alias YscWeb.Emails.EventUpdateNotification
@@ -387,6 +388,14 @@ defmodule YscWeb.AdminEventsNewLive do
               </.button>
             </div>
           </.modal>
+
+          <.live_component
+            :if={@show_cancellation_refund_modal}
+            id={"cancellation-refund-modal-#{@event.id}"}
+            module={CancellationRefundModal}
+            event_id={@event.id}
+            admin_role={@admin_role}
+          />
 
           <div :if={@live_action == :edit} class="relative py-8">
             <div class="border max-w-3xl rounded-sm border-zinc-200 py-6 px-4 space-y-4">
@@ -1518,6 +1527,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign(:blackout_prompt, nil)
+    |> assign(:show_cancellation_refund_modal, false)
     |> assign(:location_presets, EventLocationConfig.presets())
     |> assign_check_in_path(event)
     |> assign(:loading_event?, false)
@@ -2063,11 +2073,13 @@ defmodule YscWeb.AdminEventsNewLive do
       case Events.cancel_event(socket.assigns.event,
              acting_role: socket.assigns.admin_role
            ) do
-        {:ok, _event} ->
+        {:ok, event} ->
           {:noreply,
            socket
+           |> assign(:event, event)
+           |> assign(:state, event.state)
            |> YscWeb.Flash.put_toast(:info, "Event cancelled.", title: "Event")
-           |> push_navigate(to: "/admin/events")}
+           |> assign(:show_cancellation_refund_modal, true)}
 
         {:error, _} ->
           {:noreply,
@@ -2079,6 +2091,11 @@ defmodule YscWeb.AdminEventsNewLive do
            )}
       end
     end
+  end
+
+  @impl true
+  def handle_event("close-cancellation-refund-modal", _, socket) do
+    {:noreply, assign(socket, :show_cancellation_refund_modal, false)}
   end
 
   @impl true

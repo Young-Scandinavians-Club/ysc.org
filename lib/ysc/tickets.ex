@@ -964,6 +964,38 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Lists ticket orders for an event that an admin cancelling the whole event
+  needs to review for refunds: every order that reached `:completed` (paid or
+  granted), plus any that were later `:cancelled` -- which, for a `:completed`
+  order, only happens by refunding every ticket on it (see `refund_tickets/3`).
+  Including `:cancelled` orders lets the cancellation-refund UI show a
+  "already refunded" order alongside the ones still needing action, instead
+  of silently dropping it from the list.
+
+  Preloads all of the order's `:tickets` (not just `:confirmed` ones, unlike
+  `list_tickets_for_admin/1`) so a partially-refunded order still shows which
+  tickets remain, plus the purchasing `:user`.
+  """
+  def list_orders_for_event_refund(event_id) do
+    event_id
+    |> list_orders_for_event_refund_query()
+    |> Repo.all()
+  end
+
+  defp list_orders_for_event_refund_query(event_id) do
+    user_query =
+      from(u in Ysc.Accounts.User,
+        select: struct(u, ^@admin_ticket_user_fields)
+      )
+
+    from(o in TicketOrder,
+      where: o.event_id == ^event_id and o.status in [:completed, :cancelled],
+      order_by: [desc: o.completed_at],
+      preload: [tickets: :ticket_tier, user: ^user_query]
+    )
+  end
+
+  @doc """
   Loads the Stripe payment row for a ticket order, or `nil` when the order
   never collected a payment (admin grants, free tickets).
   """
