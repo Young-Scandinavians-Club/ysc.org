@@ -174,9 +174,12 @@ defmodule Ysc.MixProject do
       {:decimal, "~> 3.1", override: true},
       # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17
       # and its Hackney adapter expects the 1.x body/ref API. See Ysc.Tzdata.HttpClient.
-      # webtransport 0.4.3 pins h2 ~> 0.10.4; hackney 4.7+ needs h2 ~> 0.11.0 — override below.
+      # webtransport 0.4.5 pins h2 ~> 0.12; hackney 4.7.4 needs h2 ~> 0.12.0 — override below.
+      # 0.12.0: serve_socket/2 for embedders that own the TLS listener; handshake
+      # now runs in the per-connection process. We do not start h2 servers;
+      # hackney talks to h2_connection client APIs only, so those are unused.
       {:hackney, "~> 4.7", override: true},
-      {:h2, "~> 0.11.0", override: true},
+      {:h2, "~> 0.12.0", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
