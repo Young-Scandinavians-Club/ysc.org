@@ -206,7 +206,9 @@ defmodule YscWeb.SesWebhookControllerTest do
       refute Repo.get_by(EmailEvent, email: email, event_type: "bounce")
     end
 
-    test "still records hard bounces when the allowlist is empty", %{conn: conn} do
+    test "refuses notifications when the allowlist is empty (Finding 73)", %{
+      conn: conn
+    } do
       prev = Application.get_env(:ysc, :sns_allowed_topic_arns)
       Application.put_env(:ysc, :sns_allowed_topic_arns, [])
 
@@ -227,9 +229,9 @@ defmodule YscWeb.SesWebhookControllerTest do
         )
 
       conn = post_notification(conn, ses_event)
-      assert conn.status == 200
-      assert Repo.reload!(subscriber).subscribed == false
-      assert Newsletter.hard_bounced?(email)
+      assert conn.status == 403
+      assert Repo.reload!(subscriber).subscribed == true
+      refute Newsletter.hard_bounced?(email)
     end
   end
 
