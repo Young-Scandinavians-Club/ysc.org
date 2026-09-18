@@ -15,6 +15,7 @@ defmodule YscWeb.BookingCheckoutLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Stripe.PaymentIntentHelpers
+  alias Ysc.Tickets.CheckoutCancel
   alias YscWeb.BookingGuestForm
   alias YscWeb.BookingUserMessages
   alias YscWeb.BookingDisplay
@@ -1491,9 +1492,11 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def handle_event("cancel-booking", _params, socket) do
-    case BookingLocker.release_hold(socket.assigns.booking.id) do
-      {:ok, _canceled_booking} ->
-        property = socket.assigns.booking.property
+    booking = reload_checkout_booking(socket.assigns.booking.id)
+
+    case abandon_checkout_hold(booking) do
+      {:released, _canceled_booking} ->
+        property = booking.property
         redirect_path = get_property_redirect_path(property)
 
         {:noreply,
@@ -1505,17 +1508,39 @@ defmodule YscWeb.BookingCheckoutLive do
          )
          |> redirect(to: redirect_path)}
 
+      {:confirmed, confirmed} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Payment successful! Your booking is confirmed.",
+           title: "Booking confirmed",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
+         )
+         |> push_navigate(
+           to: ~p"/bookings/#{confirmed.id}/receipt?confetti=true"
+         )}
+
+      :in_progress ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           BookingUserMessages.checkout_cancel_payment_in_progress(),
+           title: "Checkout"
+         )}
+
       {:error, reason} ->
         Ysc.Logging.error("[BookingCheckout] Failed to cancel booking hold",
           reason: inspect(reason),
-          booking_id: socket.assigns.booking.id
+          booking_id: booking.id
         )
 
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           YscWeb.BookingUserMessages.checkout_cancel_failed(),
+           BookingUserMessages.checkout_cancel_failed(),
            title: "Checkout"
          )}
     end
@@ -2763,6 +2788,66 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp remaining_minutes(_), do: 0
+
+  # Cancel the PaymentIntent *before* releasing seats. `release_hold/1` then
+  # `StripeService.cancel_payment_intent/1` treats a succeeded Intent as `:ok`,
+  # so Cancel after a captured charge would orphan the payment, clear
+  # `applied_booking_entitlement_id`, and redirect away before `payment-success`
+  # can confirm. Same Stripe-first abandon as HoldExpiryWorker / ticket checkout.
+  defp abandon_checkout_hold(%Booking{} = booking) do
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           booking.payment_intent_id,
+           "booking_checkout_cancel"
+         ) do
+      {:cancel, _payment_intent} ->
+        release_abandoned_checkout_hold(booking)
+
+      {:already_succeeded, payment_intent} ->
+        confirm_succeeded_checkout_after_cancel(booking, payment_intent)
+
+      {:in_progress, _payment_intent} ->
+        Ysc.Logging.info(
+          "[BookingCheckout] Skipped cancel while checkout payment is in flight",
+          booking_id: booking.id,
+          payment_intent_id: booking.payment_intent_id
+        )
+
+        :in_progress
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp release_abandoned_checkout_hold(%Booking{} = booking) do
+    case BookingLocker.release_hold(booking.id) do
+      {:ok, canceled} -> {:released, canceled}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp confirm_succeeded_checkout_after_cancel(booking, payment_intent) do
+    result = process_payment_success(booking, payment_intent.id)
+    reloaded = reload_checkout_booking(booking.id)
+
+    case {result, reloaded.status} do
+      {{:ok, confirmed}, _} ->
+        {:confirmed, confirmed}
+
+      {_, :complete} ->
+        {:confirmed, reloaded}
+
+      {{:error, reason}, _} ->
+        Ysc.Logging.error(
+          "[BookingCheckout] Payment succeeded during cancel; could not confirm booking",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        {:error, reason}
+    end
+  end
 
   defp reload_checkout_booking(booking_id) do
     Repo.get!(Booking, booking_id)

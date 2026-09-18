@@ -990,11 +990,211 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     end
   end
 
+  describe "cancel-booking Stripe-first abandon" do
+    setup %{conn: conn} do
+      user = user_with_membership()
+      %{conn: log_in_user(conn, user), user: user}
+    end
+
+    test "confirms the hold when Cancel races a succeeded PaymentIntent", %{
+      conn: conn,
+      user: user
+    } do
+      Ysc.TestHelpers.setup_quickbooks_mocks()
+
+      {checkin, checkout} = tahoe_booking_dates(7)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      pi_id = "pi_checkout_cancel_#{System.unique_integer([:positive])}"
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{payment_intent_id: pi_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+      expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+        {:error, succeeded_payment_intent_error()}
+      end)
+
+      stub(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok, succeeded_booking_payment_intent(pi_id, booking, amount_cents)}
+      end)
+
+      assert {:error, {:live_redirect, %{to: receipt_path}}} =
+               view
+               |> element("button[phx-click=\"cancel-booking\"]")
+               |> render_click()
+
+      assert receipt_path =~ "/receipt"
+      assert Repo.get!(Booking, booking.id).status == :complete
+      assert booking_ledger_payment_count(booking.id) == 1
+    end
+
+    test "consumes an applied entitlement instead of clearing it on paid cancel",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Ysc.TestHelpers.setup_quickbooks_mocks()
+
+      {checkin, checkout} = tahoe_booking_dates(14)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      pi_id = "pi_checkout_cancel_ent_#{System.unique_integer([:positive])}"
+
+      booking =
+        Repo.get!(Booking, booking.id)
+        |> Ecto.Changeset.change(%{payment_intent_id: pi_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+      expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+        {:error, succeeded_payment_intent_error()}
+      end)
+
+      stub(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok, succeeded_booking_payment_intent(pi_id, booking, amount_cents)}
+      end)
+
+      assert {:error, {:live_redirect, %{to: receipt_path}}} =
+               view
+               |> element("button[phx-click=\"cancel-booking\"]")
+               |> render_click()
+
+      assert receipt_path =~ "/receipt"
+
+      confirmed = Repo.get!(Booking, booking.id)
+      assert confirmed.status == :complete
+      assert confirmed.applied_booking_entitlement_id == entitlement.id
+
+      consumed = Entitlements.get_entitlement(entitlement.id)
+      assert consumed.status == :consumed
+      assert consumed.consumed_booking_id == booking.id
+    end
+
+    test "keeps the hold when Stripe says the PaymentIntent is still processing",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(21)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      pi_id = "pi_checkout_cancel_proc_#{System.unique_integer([:positive])}"
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{payment_intent_id: pi_id})
+        |> Repo.update!()
+
+      expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :payment_intent_unexpected_state,
+           message:
+             "You cannot cancel this PaymentIntent because it has a status of processing",
+           extra: %{}
+         }}
+      end)
+
+      stub(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok, %Stripe.PaymentIntent{id: pi_id, status: "processing"}}
+      end)
+
+      html =
+        view
+        |> element("button[phx-click=\"cancel-booking\"]")
+        |> render_click()
+
+      assert html =~ "still processing"
+      assert Repo.get!(Booking, booking.id).status == :hold
+    end
+  end
+
   defp booking_ledger_payment_count(booking_id) do
     case Bookings.get_booking_payment(%Booking{id: booking_id}) do
       {:ok, _} -> 1
       {:error, :payment_not_found} -> 0
     end
+  end
+
+  defp succeeded_payment_intent_error do
+    %Stripe.Error{
+      source: :stripe,
+      code: :payment_intent_unexpected_state,
+      message:
+        "You cannot cancel this PaymentIntent because it has a status of succeeded",
+      extra: %{}
+    }
+  end
+
+  defp succeeded_booking_payment_intent(pi_id, booking, amount_cents) do
+    %Stripe.PaymentIntent{
+      id: pi_id,
+      status: "succeeded",
+      amount: amount_cents,
+      metadata: %{
+        "booking_id" => booking.id,
+        "user_id" => booking.user_id
+      },
+      customer: nil,
+      payment_method: nil,
+      latest_charge: nil
+    }
   end
 
   defp payment_submit_disabled?(html) do

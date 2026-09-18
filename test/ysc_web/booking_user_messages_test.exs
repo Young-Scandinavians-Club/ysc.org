@@ -210,6 +210,9 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_payment_setup_failed() =~ "info@ysc.org"
     assert BookingUserMessages.checkout_cancel_failed() =~ "info@ysc.org"
 
+    assert BookingUserMessages.checkout_cancel_payment_in_progress() =~
+             "still processing"
+
     assert BookingUserMessages.checkout_booking_confirmation_failed() =~
              "info@ysc.org"
 
