@@ -103,6 +103,46 @@ defmodule Ysc.Ledgers do
   ]
   @admin_ledger_account_fields [:id, :name, :account_type]
   @admin_payout_list_fields [:id, :payment_id, :stripe_payout_id]
+  # Treasurer payout modal: identity, amounts, arrival, QuickBooks status.
+  # Skip `quickbooks_response` JSON and Stripe metadata the modal never shows.
+  @admin_payout_detail_fields [
+    :id,
+    :stripe_payout_id,
+    :amount,
+    :fee_total,
+    :reserve_adjustment,
+    :status,
+    :arrival_date,
+    :inserted_at,
+    :payment_id,
+    :quickbooks_deposit_id,
+    :quickbooks_transaction_type,
+    :quickbooks_sync_status,
+    :quickbooks_sync_error,
+    :quickbooks_synced_at,
+    :quickbooks_last_sync_attempt_at
+  ]
+  @admin_payout_payment_fields [
+    :id,
+    :reference_id,
+    :amount,
+    :status,
+    :payment_date,
+    :user_id,
+    :quickbooks_sync_status,
+    :quickbooks_sync_error
+  ]
+  @admin_payout_refund_fields [
+    :id,
+    :reference_id,
+    :amount,
+    :reason,
+    :status,
+    :inserted_at,
+    :user_id,
+    :quickbooks_sync_status,
+    :quickbooks_sync_error
+  ]
   @admin_subscription_list_fields [:id]
 
   @admin_subscription_item_list_fields [
@@ -2019,10 +2059,49 @@ defmodule Ysc.Ledgers do
 
   @doc """
   Gets a payout by ID with preloaded payments and refunds (including their users).
+
+  Used by Stripe webhooks and reconciliation, which need full payment/refund
+  rows. Treasurer UI should call `get_payout_for_admin/1` instead.
   """
   def get_payout!(id) do
     Repo.get!(Payout, id)
     |> Repo.preload([:payment, payments: :user, refunds: :user])
+  end
+
+  @doc """
+  Gets a payout for the treasurer payout modal.
+
+  Associated payments and refunds skip QuickBooks `quickbooks_response` JSON
+  and Stripe ids the table never renders. Members are a slim name/email
+  preload. The payout's own ledger payment row is not loaded — the modal
+  never shows it.
+  """
+  def get_payout_for_admin(id) do
+    id
+    |> payout_for_admin_query()
+    |> Repo.one()
+  end
+
+  defp payout_for_admin_query(id) do
+    user_query = admin_payment_user_query()
+
+    payment_query =
+      from(p in Payment,
+        select: struct(p, ^@admin_payout_payment_fields),
+        preload: [user: ^user_query]
+      )
+
+    refund_query =
+      from(r in Refund,
+        select: struct(r, ^@admin_payout_refund_fields),
+        preload: [user: ^user_query]
+      )
+
+    from(p in Payout,
+      where: p.id == ^id,
+      select: struct(p, ^@admin_payout_detail_fields),
+      preload: [payments: ^payment_query, refunds: ^refund_query]
+    )
   end
 
   @doc """
@@ -4697,5 +4776,10 @@ defmodule Ysc.Ledgers do
   @doc false
   def ci_query_explain_admin_payment_type_entries_query do
     admin_payment_type_entries_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_payout_for_admin_query do
+    payout_for_admin_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

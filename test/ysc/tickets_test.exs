@@ -2051,12 +2051,64 @@ defmodule Ysc.TicketsTest do
           "email" => "ada@example.com"
         })
 
+      tier1
+      |> Ecto.Changeset.change(%{
+        description: "toast copy the admin ticket list must not load"
+      })
+      |> Repo.update!()
+
+      order
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes: "grant notes the admin ticket list must not load",
+        cancellation_reason: "cancel copy the admin ticket list must not load",
+        payment_intent_id: "pi_admin_ticket_list_secret"
+      })
+      |> Repo.update!()
+
+      {_loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_tickets_for_admin(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_tickets_for_admin(event.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, description_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_tickets_for_admin(event.id) end,
+          pattern: ~r/ticket_tiers.*description|t0\.\"description\"/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_tickets_for_admin(event.id) end,
+          pattern: ~r/admin_grant_notes|cancellation_reason|payment_intent_id/i,
+          caller_pids: [self()]
+        )
+
       assert [loaded] = Tickets.list_tickets_for_admin(event.id)
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert description_cols == 0
+      assert notes_cols == 0
       assert loaded.id == ticket.id
       assert loaded.ticket_tier.id == tier1.id
+      assert loaded.ticket_tier.name == tier1.name
+      assert loaded.ticket_tier.description == nil
       assert loaded.user.id == user.id
       assert loaded.user.email == user.email
+      assert loaded.user.hashed_password == nil
       assert loaded.ticket_order.id == order.id
+      assert loaded.ticket_order.reference_id == order.reference_id
+      assert loaded.ticket_order.admin_grant_notes == nil
+      assert loaded.ticket_order.payment_intent_id == nil
       assert loaded.registration.first_name == "Ada"
       refute Ecto.assoc_loaded?(loaded.ticket_order.payment)
     end

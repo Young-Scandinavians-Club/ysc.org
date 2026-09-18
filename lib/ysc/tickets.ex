@@ -20,6 +20,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Tickets.DonationDisplay
   alias Ysc.Events.Ticket
+  alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.Events.MemberOnlyTickets
@@ -927,6 +928,9 @@ defmodule Ysc.Tickets do
   only when refunding — it is not needed to render the list.
   Pending/cancelled/expired tickets aren't actionable from this list, so
   they're excluded.
+
+  Tiers skip description/sale-window columns; orders skip grant notes,
+  Stripe payment-intent ids, and cancellation copy the table never renders.
   """
   def list_tickets_for_admin(event_id) do
     event_id
@@ -944,6 +948,33 @@ defmodule Ysc.Tickets do
     :most_connected_country,
     :current_avatar_id
   ]
+  @admin_ticket_tier_fields [:id, :name, :type, :price, :requires_registration]
+  @admin_ticket_order_fields [
+    :id,
+    :reference_id,
+    :total_amount,
+    :completed_at,
+    :user_id,
+    :payment_id
+  ]
+  @admin_ticket_registration_fields [
+    :id,
+    :ticket_id,
+    :first_name,
+    :last_name,
+    :email
+  ]
+  @admin_ticket_list_fields [
+    :id,
+    :reference_id,
+    :inserted_at,
+    :ticket_order_id,
+    :user_id,
+    :ticket_tier_id,
+    :discount_amount,
+    :status,
+    :event_id
+  ]
 
   defp list_tickets_for_admin_query(event_id) do
     user_query =
@@ -951,14 +982,29 @@ defmodule Ysc.Tickets do
         select: struct(u, ^@admin_ticket_user_fields)
       )
 
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@admin_ticket_tier_fields))
+
+    registration_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@admin_ticket_registration_fields)
+      )
+
+    order_query =
+      from(to in TicketOrder,
+        select: struct(to, ^@admin_ticket_order_fields),
+        preload: [user: ^user_query]
+      )
+
     from(t in Ticket,
       where: t.event_id == ^event_id and t.status == :confirmed,
       order_by: [desc: t.inserted_at],
+      select: struct(t, ^@admin_ticket_list_fields),
       preload: [
-        :ticket_tier,
-        :registration,
+        ticket_tier: ^tier_query,
+        registration: ^registration_query,
         user: ^user_query,
-        ticket_order: [user: ^user_query]
+        ticket_order: ^order_query
       ]
     )
   end
