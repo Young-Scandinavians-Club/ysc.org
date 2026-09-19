@@ -288,46 +288,24 @@ defmodule YscWeb.UserSettingsLive do
                         name="hero-trash"
                         class="w-4 h-4"
                       />
-                      <svg
+                      <.loading_spinner
                         :if={deleting_this?}
-                        class="w-4 h-4 animate-spin text-red-600"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          class="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          stroke-width="4"
-                        />
-                        <path
-                          class="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
+                        id={"delete-payment-method-spinner-#{payment_method.id}"}
+                        class="w-4 h-4 text-red-600"
+                      />
                     </button>
                   </div>
                 <% end %>
               </div>
             </div>
-            <%!-- Separator --%>
-            <div class="relative my-6">
-              <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-zinc-200"></div>
-              </div>
-              <div
-                :if={!@show_new_payment_form}
-                class="relative flex justify-center"
-              >
-                <span class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide">
-                  Add new
-                </span>
-              </div>
-            </div>
+            <.labeled_divider
+              id="payment-add-new-divider"
+              class="my-6"
+              show_label={!@show_new_payment_form}
+              label_class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide"
+            >
+              Add new
+            </.labeled_divider>
             <%!-- Section 2: Add new payment method button OR Stripe form --%>
             <div :if={!@show_new_payment_form} class="flex justify-center py-2">
               <.button
@@ -434,26 +412,10 @@ defmodule YscWeb.UserSettingsLive do
                     :if={@avatar_processing}
                     class="absolute inset-0 flex items-center justify-center"
                   >
-                    <svg
-                      class="w-8 h-8 text-blue-600 animate-spin"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
+                    <.loading_spinner
+                      id="avatar-processing-overlay-spinner"
+                      class="w-8 h-8 text-blue-600"
+                    />
                   </div>
                 </div>
 
@@ -549,27 +511,10 @@ defmodule YscWeb.UserSettingsLive do
                     :if={@avatar_processing}
                     class="flex items-center gap-2 text-sm text-blue-600"
                   >
-                    <svg
-                      class="w-4 h-4 animate-spin"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                    Processing your photo…
+                    <.loading_spinner
+                      id="avatar-processing-label-spinner"
+                      class="w-4 h-4"
+                    /> Processing your photo…
                   </div>
 
                   <%!-- Avatar library: avoid tall skeleton that collapses when empty (CLS) --%>
@@ -610,28 +555,10 @@ defmodule YscWeb.UserSettingsLive do
                             :if={@selecting_avatar_id == avatar.id}
                             class="absolute inset-0 flex items-center justify-center rounded-full bg-white/60"
                           >
-                            <svg
-                              class="animate-spin w-5 h-5 text-blue-600"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                class="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                stroke-width="4"
-                              >
-                              </circle>
-                              <path
-                                class="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                              >
-                              </path>
-                            </svg>
+                            <.loading_spinner
+                              id={"select-avatar-spinner-#{avatar.id}"}
+                              class="w-5 h-5 text-blue-600"
+                            />
                           </div>
                           <button
                             type="button"
