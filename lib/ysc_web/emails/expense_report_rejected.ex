@@ -43,7 +43,7 @@ defmodule YscWeb.Emails.ExpenseReportRejected do
       first_name: member_greeting_name(expense_report.user),
       expense_report: %{
         id: expense_report.id,
-        purpose: presence(expense_report.purpose) || "N/A"
+        purpose: presence(expense_report.purpose) || "Not specified"
       },
       rejection_note:
         presence(expense_report.rejection_note) || "No note was provided.",

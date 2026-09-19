@@ -1509,7 +1509,11 @@ defmodule YscWeb.UserSettingsLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/users/membership")
-      render(view)
+      html = render(view)
+
+      assert html =~ "Application pending review"
+      refute html =~ "Account Pending Approval"
+      refute html =~ "approved account"
 
       assert has_element?(
                view,
@@ -2441,7 +2445,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       send(view.pid, {:retry_invoice_payment, "in_test_inactive_user"})
 
-      assert render(view) =~ "approved account"
+      assert render(view) =~ "reviewing your application"
     end
 
     test "retry invoice handle_info shows error for invalid invoice id", %{
@@ -2497,7 +2501,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       render_click(view, "cancel-membership")
 
-      assert render(view) =~ "approved account"
+      assert render(view) =~ "reviewing your application"
     end
 
     test "reactivate-membership shows error for non-active user", %{conn: conn} do
@@ -2515,7 +2519,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       render_click(view, "reactivate-membership")
 
-      assert render(view) =~ "approved account"
+      assert render(view) =~ "reviewing your application"
     end
 
     test "resend_phone_code shows rate limit toast on second request", %{
