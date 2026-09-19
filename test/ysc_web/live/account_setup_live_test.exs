@@ -239,6 +239,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       # Stepper only shows once the user has passed step 0
       refute has_element?(view, "ol li", "Payment")
+      refute has_element?(view, "ol li", "Save card")
       refute has_element?(view, "ol li", "Password")
     end
 
@@ -525,7 +526,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert has_element?(view, "ol")
     end
 
-    test "stepper shows payment, password, and phone labels for pending users",
+    test "stepper shows Save card, password, and phone labels for pending users",
          %{
            conn: conn,
            user: user
@@ -533,11 +534,10 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "1"}))
 
-      html = render(view)
-
-      assert html =~ "Payment"
-      assert html =~ "Password"
-      assert html =~ "Phone"
+      assert has_element?(view, "ol li", "Save card")
+      refute has_element?(view, "ol li", "Payment")
+      assert has_element?(view, "ol li", "Password")
+      assert has_element?(view, "ol li", "Phone")
     end
 
     test "payment-method-set event with Stripe error stays on step 1", %{
@@ -1003,9 +1003,10 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       refute has_element?(view, "ol li", "Password")
       refute has_element?(view, "ol li", "Payment")
+      refute has_element?(view, "ol li", "Save card")
     end
 
-    test "shows payment, password, and phone labels for pending users on step 1",
+    test "shows Save card, password, and phone labels for pending users on step 1",
          %{conn: conn} do
       user = verified_pending_user(%{password_set_at: nil})
       conn = log_in_user(conn, user)
@@ -1013,11 +1014,10 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "1"}))
 
-      html = render(view)
-
-      assert html =~ "Payment"
-      assert html =~ "Password"
-      assert html =~ "Phone"
+      assert has_element?(view, "ol li", "Save card")
+      refute has_element?(view, "ol li", "Payment")
+      assert has_element?(view, "ol li", "Password")
+      assert has_element?(view, "ol li", "Phone")
     end
 
     test "does not show payment label for active users", %{conn: conn} do
@@ -1032,7 +1032,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       refute html =~ "Payment"
     end
 
-    test "stepper_needs frozen — payment label persists after payment-method-set fires",
+    test "stepper_needs frozen — Save card label persists after payment-method-set fires",
          %{
            conn: conn
          } do
@@ -1042,16 +1042,18 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "1"}))
 
-      # Stepper shows payment on step 1
-      assert render(view) =~ "Payment"
+      # Stepper shows Save card on step 1 for pending applicants
+      assert has_element?(view, "ol li", "Save card")
+      refute has_element?(view, "ol li", "Payment")
 
       # Fire payment-method-set (will error in tests due to Stripe not being available)
       render_click(view, "payment-method-set", %{
         "payment_method_id" => "pm_test"
       })
 
-      # stepper_needs is frozen — payment label should still be rendered
-      assert render(view) =~ "Payment"
+      # stepper_needs is frozen — Save card label should still be rendered
+      assert has_element?(view, "ol li", "Save card")
+      refute has_element?(view, "ol li", "Payment")
     end
 
     test "shows password and phone labels for users who need them", %{
@@ -1295,7 +1297,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       html = render(view)
 
       assert html =~ "Activate Your Membership"
-      assert html =~ "Payment"
+      assert has_element?(view, "ol li", "Payment")
+      refute has_element?(view, "ol li", "Save card")
 
       assert has_element?(view, "#setup-payment-form") or
                has_element?(view, "[phx-click=\"retry_payment_setup\"]")

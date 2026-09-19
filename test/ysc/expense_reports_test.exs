@@ -2504,7 +2504,7 @@ defmodule Ysc.ExpenseReportsTest do
         assert :ok = perform_job(EmailNotifier, job.args)
       end)
 
-      assert_email_sent(subject: "Expense Report Submitted - Confirmation")
+      assert_email_sent(subject: "We received your expense report")
 
       assert_email_sent(
         subject: "New Expense Report Submitted - Action Required"

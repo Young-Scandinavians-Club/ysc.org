@@ -25,7 +25,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
   end
 
   def get_subject() do
-    "Expense Report Submitted - Confirmation"
+    "We received your expense report"
   end
 
   @doc """
@@ -61,7 +61,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
       first_name: member_greeting_name(expense_report.user),
       expense_report: %{
         id: expense_report.id,
-        purpose: expense_report.purpose || "N/A",
+        purpose: present_or(expense_report.purpose, "Not specified"),
         submitted_date: submitted_date,
         reimbursement_method: reimbursement_method,
         expense_total: format_money(expense_total),
@@ -159,8 +159,8 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
   defp format_expense_items(expense_items_list) do
     Enum.map(expense_items_list, fn item ->
       %{
-        vendor: item.vendor || "N/A",
-        description: item.description || "N/A",
+        vendor: present_or(item.vendor, "Not specified"),
+        description: present_or(item.description, "Not specified"),
         date: format_date(item.date),
         amount: format_money(item.amount),
         has_receipt:
@@ -182,7 +182,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
   defp format_income_items(income_items_list) do
     Enum.map(income_items_list, fn item ->
       %{
-        description: item.description || "N/A",
+        description: present_or(item.description, "Not specified"),
         date: format_date(item.date),
         amount: format_money(item.amount),
         has_proof: !is_nil(item.proof_s3_path) && item.proof_s3_path != ""
@@ -204,7 +204,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
 
   defp build_bank_account_info(bank_account) do
     %{
-      last_4: bank_account.account_number_last_4 || "N/A"
+      last_4: present_or(bank_account.account_number_last_4, "Not on file")
     }
   end
 
@@ -219,4 +219,13 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
     do: String.capitalize(method)
 
   defp format_reimbursement_method(_), do: "Not specified"
+
+  defp present_or(value, fallback) when is_binary(value) do
+    case String.trim(value) do
+      "" -> fallback
+      trimmed -> trimmed
+    end
+  end
+
+  defp present_or(_value, fallback), do: fallback
 end

@@ -486,7 +486,7 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   # Build stepper steps dynamically - only show steps that are actually needed for this user
-  defp build_stepper_steps(user_needs, _current_user) do
+  defp build_stepper_steps(user_needs, current_user) do
     steps = []
 
     # Email verification is not shown in stepper (handled separately)
@@ -495,7 +495,7 @@ defmodule YscWeb.AccountSetupLive do
     steps =
       if Map.get(user_needs, :payment_method_setup, false) or
            Map.get(user_needs, :membership_activation, false),
-         do: steps ++ ["Payment"],
+         do: steps ++ [payment_stepper_label(current_user)],
          else: steps
 
     # Add password setup if needed
@@ -510,6 +510,11 @@ defmodule YscWeb.AccountSetupLive do
 
     steps
   end
+
+  # Pending applicants save a card without being charged; unpaid active members
+  # pay dues on this step. The label must match the page body, not imply a charge.
+  defp payment_stepper_label(%{state: :active}), do: "Payment"
+  defp payment_stepper_label(_), do: "Save card"
 
   # Helper function to map current_step to stepper display step
   # Dynamically calculates position based on which steps are shown

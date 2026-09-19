@@ -1168,7 +1168,7 @@ defmodule YscWeb.UserSettingsLive do
                   />
                   <div>
                     <h3 class="text-sm font-semibold text-yellow-800">
-                      Account Pending Approval
+                      Application pending review
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
                       Your application is being reviewed by the board. If you already saved a payment method during setup, your membership will start automatically when you're approved. Otherwise we'll email you a secure link to pay your dues. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
@@ -1550,10 +1550,10 @@ defmodule YscWeb.UserSettingsLive do
                     />
                     <div>
                       <h3 class="text-sm font-semibold text-yellow-800">
-                        Account Pending Approval
+                        Application pending review
                       </h3>
                       <p class="text-sm text-yellow-700 mt-1">
-                        You will be able to manage your membership once your account is approved.
+                        You can change your plan after the board approves your application.
                       </p>
                     </div>
                   </div>
@@ -3725,7 +3725,7 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to manage your membership plan.",
+         "The board is still reviewing your application. You can manage your membership plan after you're approved.",
          title: "Membership"
        )}
     else
@@ -3902,7 +3902,7 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to update your payment method.",
+         "The board is still reviewing your application. You can update your payment method after you're approved.",
          title: "Payment"
        )}
     else
@@ -4028,7 +4028,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You must have an approved account to update your payment method.",
+           "The board is still reviewing your application. You can update your payment method after you're approved.",
            title: "Payment"
          )}
 
@@ -4352,7 +4352,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "You must have an approved account to manage auto-renewal.",
+             "The board is still reviewing your application. You can manage automatic renewal after you're approved.",
              title: "Membership"
            )}
         else
@@ -4454,7 +4454,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "You must have an approved account to manage auto-renewal.",
+             "The board is still reviewing your application. You can manage automatic renewal after you're approved.",
              title: "Membership"
            )}
         else
@@ -4995,7 +4995,7 @@ defmodule YscWeb.UserSettingsLive do
       :ok
     else
       {:error,
-       "You must have an approved account to change your membership plan."}
+       "The board is still reviewing your application. You can change your membership plan after you're approved."}
     end
   end
 
@@ -6191,7 +6191,7 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "You must have an approved account to retry this payment.",
+         "The board is still reviewing your application. You can retry this payment after you're approved.",
          title: "Payment"
        )}
     else
