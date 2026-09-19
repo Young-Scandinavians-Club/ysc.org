@@ -272,7 +272,10 @@ defmodule YscWeb.AdminEventsNewLive do
                       </li>
 
                       <li
-                        :if={@event.state in [:draft, :scheduled]}
+                        :if={
+                          @event.state == :draft or
+                            (@event.state == :scheduled and @admin_role == :admin)
+                        }
                         class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100"
                       >
                         <button
@@ -1949,12 +1952,18 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("delete-event", _, socket) do
-    case Events.delete_event(socket.assigns.event) do
+    # Finding 74: volunteers must not wipe scheduled events (queued publish).
+    case Events.delete_event(socket.assigns.event,
+           acting_role: socket.assigns.admin_role
+         ) do
       {:ok, _event} ->
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "Event deleted.", title: "Event")
          |> push_navigate(to: "/admin/events")}
+
+      {:error, :unauthorized} ->
+        {:noreply, deny_full_admin(socket, "Event")}
 
       {:error, :invalid_state} ->
         {:noreply,

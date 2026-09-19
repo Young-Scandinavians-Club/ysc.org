@@ -67,6 +67,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 70 (MEDIUM)   Volunteers could force tickets_tbd on events that already have live ticket tiers
   Finding 71 (HIGH)     Password reset LiveView never re-checked the token on submit, so a still-open tab could take over the account after expiry or after the victim already reset
   Finding 72 (HIGH)     Family sub-accounts inherited the primary's Stripe subscription and could cancel/resume/change it via hidden LiveView events
+  Finding 74 (MEDIUM)   Volunteers could soft-delete any scheduled event (including others') via the list and editor; Finding 59 only blocked published/cancelled
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -4603,6 +4604,87 @@ defmodule YscWeb.SecurityAuditTest do
       html = render_click(view, "cancel-membership")
       assert html =~ "manage billing for the household"
       refute html =~ "Lifetime memberships cannot be cancelled"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 74 (MEDIUM): Volunteers must not soft-delete scheduled events
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 74: volunteers cannot delete scheduled events" do
+    import Ysc.EventsFixtures
+
+    test "volunteer editor hides delete and refuses the event on another organizer's scheduled event" do
+      organizer = user_fixture(%{role: :member})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :scheduled,
+          published_at: nil,
+          publish_at: DateTime.add(DateTime.utc_now(), 1, :day),
+          title: "Finding 74 Victim Event #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      refute has_element?(view, "#delete-event-btn")
+      refute has_element?(view, "button[phx-click=delete-event]")
+
+      render_click(view, "delete-event", %{})
+
+      reloaded = Ysc.Events.get_event!(event.id)
+      assert reloaded.state == :scheduled
+      assert reloaded.organizer_id == organizer.id
+    end
+
+    test "volunteer events list hides scheduled delete and refuses a forged click" do
+      organizer = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :scheduled,
+          published_at: nil,
+          publish_at: DateTime.add(DateTime.utc_now(), 1, :day),
+          title: "Finding 74 List Event #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events?tab=scheduled")
+
+      refute has_element?(view, "#event-actions-dt-#{event.id}-delete")
+      refute has_element?(view, "#event-actions-mob-#{event.id}-delete")
+
+      render_click(view, "delete-event", %{"id" => event.id})
+
+      assert Ysc.Events.get_event!(event.id).state == :scheduled
+    end
+
+    test "full admin can still delete a scheduled event from the editor" do
+      admin = user_fixture(%{role: :admin})
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          state: :scheduled,
+          published_at: nil,
+          publish_at: DateTime.add(DateTime.utc_now(), 1, :day),
+          title: "Finding 74 Admin Delete #{System.unique_integer([:positive])}"
+        })
+
+      conn = log_in_user(build_conn(), admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#delete-event-btn")
+
+      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
+               render_click(view, "delete-event", %{})
+
+      assert Ysc.Events.get_event!(event.id).state == :deleted
     end
   end
 

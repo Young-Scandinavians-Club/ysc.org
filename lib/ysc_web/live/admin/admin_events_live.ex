@@ -170,6 +170,7 @@ defmodule YscWeb.AdminEventsLive do
 
                   <.event_actions_dropdown
                     event={event}
+                    admin_role={@admin_role}
                     menu_id={"event-actions-mob-#{event.id}"}
                     check_in_path={
                       AdminCheckInPaths.path_for_event(
@@ -237,6 +238,7 @@ defmodule YscWeb.AdminEventsLive do
                 <:action :let={{_, event}}>
                   <.event_actions_dropdown
                     event={event}
+                    admin_role={@admin_role}
                     menu_id={"event-actions-dt-#{event.id}"}
                     check_in_path={
                       AdminCheckInPaths.path_for_event(
@@ -265,6 +267,7 @@ defmodule YscWeb.AdminEventsLive do
   attr :event, :map, required: true
   attr :menu_id, :string, required: true
   attr :check_in_path, :string, required: true
+  attr :admin_role, :atom, required: true
 
   def event_actions_dropdown(assigns) do
     ~H"""
@@ -305,7 +308,10 @@ defmodule YscWeb.AdminEventsLive do
         Check in
       </.dropdown_menu_item>
       <.dropdown_menu_item
-        :if={@event.state in [:draft, :scheduled]}
+        :if={
+          @event.state == :draft or
+            (@event.state == :scheduled and @admin_role == :admin)
+        }
         id={"#{@menu_id}-delete"}
         icon="hero-trash"
         tone={:danger}
@@ -451,7 +457,8 @@ defmodule YscWeb.AdminEventsLive do
   def handle_event("delete-event", %{"id" => id}, socket) do
     event = Events.get_event!(id)
 
-    case Events.delete_event(event) do
+    # Finding 74: volunteers must not wipe scheduled events (queued publish).
+    case Events.delete_event(event, acting_role: socket.assigns.admin_role) do
       {:ok, _event} ->
         {:noreply,
          socket
@@ -464,6 +471,14 @@ defmodule YscWeb.AdminEventsLive do
          |> assign(
            :event_list,
            Enum.reject(socket.assigns.event_list, &(&1.id == event.id))
+         )}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "You do not have permission to perform this action."
          )}
 
       {:error, :invalid_state} ->

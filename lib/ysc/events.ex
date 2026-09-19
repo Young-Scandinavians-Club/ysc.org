@@ -790,25 +790,45 @@ defmodule Ysc.Events do
   Published and cancelled events must be cancelled / left cancelled rather than
   deleted, so ticket holders keep a public status page. Matches the admin help
   copy and the events-list delete affordance.
-  """
-  def delete_event(%Event{} = event) do
-    # Finding 59: refuse published/cancelled deletes so volunteers cannot wipe
-    # another organizer's live event (and sold tickets) via the editor menu.
-    if event.state in [:draft, :scheduled] do
-      event
-      |> Event.changeset(%{state: :deleted, published_at: nil})
-      |> Repo.update()
-      |> case do
-        {:ok, event} ->
-          invalidate_event_caches()
-          broadcast(%Ysc.MessagePassingEvents.EventDeleted{event: event})
-          {:ok, event}
 
-        {:error, changeset} ->
-          {:error, changeset}
-      end
-    else
-      {:error, :invalid_state}
+  Pass `acting_role:` from the admin LiveView. Omitted role stays
+  admin-compatible for scripts and tests.
+
+  Finding 59: refuse published/cancelled deletes so volunteers cannot wipe
+  another organizer's live event (and sold tickets).
+
+  Finding 74: refuse scheduled deletes for non-admins. Scheduled events are
+  already queued to go live (`EventPublishWorker`); wiping them is the same
+  class of sabotage as deleting a published event, just before the publish
+  job runs.
+  """
+  def delete_event(%Event{} = event, opts \\ []) do
+    cond do
+      event.state == :draft ->
+        do_soft_delete_event(event)
+
+      event.state == :scheduled ->
+        with :ok <- require_full_admin_lifecycle(opts) do
+          do_soft_delete_event(event)
+        end
+
+      true ->
+        {:error, :invalid_state}
+    end
+  end
+
+  defp do_soft_delete_event(%Event{} = event) do
+    event
+    |> Event.changeset(%{state: :deleted, published_at: nil})
+    |> Repo.update()
+    |> case do
+      {:ok, event} ->
+        invalidate_event_caches()
+        broadcast(%Ysc.MessagePassingEvents.EventDeleted{event: event})
+        {:ok, event}
+
+      {:error, changeset} ->
+        {:error, changeset}
     end
   end
 
