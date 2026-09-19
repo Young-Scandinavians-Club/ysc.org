@@ -2168,6 +2168,157 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "list_orders_for_event_refund/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns completed orders with slim user, ticket, and tier columns",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, {payment, _tx, _en}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: order.total_amount,
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id:
+            "pi_event_refund_list_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(160, :USD),
+          description: "Event tickets",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, completed} = Tickets.complete_ticket_order(order, payment.id)
+
+      [ticket] = tickets_for_order(completed.id)
+      ticket |> Ecto.Changeset.change(status: :confirmed) |> Repo.update!()
+
+      tier1
+      |> Ecto.Changeset.change(%{
+        description: "toast copy the cancellation refund list must not load"
+      })
+      |> Repo.update!()
+
+      completed
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes:
+          "grant notes the cancellation refund list must not load",
+        cancellation_reason:
+          "cancel copy the cancellation refund list must not load",
+        payment_intent_id: "pi_event_refund_list_secret"
+      })
+      |> Repo.update!()
+
+      {_loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_orders_for_event_refund(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, description_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_orders_for_event_refund(event.id) end,
+          pattern: ~r/ticket_tiers.*description|t0\.\"description\"/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_orders_for_event_refund(event.id) end,
+          pattern: ~r/admin_grant_notes|cancellation_reason|payment_intent_id/i,
+          caller_pids: [self()]
+        )
+
+      assert [loaded] = Tickets.list_orders_for_event_refund(event.id)
+      assert password_cols == 0
+      assert description_cols == 0
+      assert notes_cols == 0
+      assert loaded.id == completed.id
+      assert loaded.reference_id == completed.reference_id
+      assert loaded.payment_id == payment.id
+      assert loaded.admin_grant_notes == nil
+      assert loaded.payment_intent_id == nil
+      assert loaded.user.id == user.id
+      assert loaded.user.email == user.email
+      assert loaded.user.hashed_password == nil
+      assert [loaded_ticket] = loaded.tickets
+      assert loaded_ticket.id == ticket.id
+      assert loaded_ticket.status == :confirmed
+      assert loaded_ticket.ticket_tier.id == tier1.id
+      assert loaded_ticket.ticket_tier.type == :paid
+      assert loaded_ticket.ticket_tier.description == nil
+      refute Ecto.assoc_loaded?(loaded.payment)
+
+      assert {:ok, from_db} =
+               Tickets.calculate_refund_amount(completed, [ticket.id])
+
+      assert {:ok, from_loaded} =
+               Tickets.refund_amount_from_loaded_tickets(loaded, [ticket.id])
+
+      assert Money.equal?(from_db, from_loaded)
+      assert Money.equal?(from_loaded, Money.new(50, :USD))
+    end
+
+    test "includes cancelled orders and excludes pending ones", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, completed_source} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, {payment, _tx, _en}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: completed_source.total_amount,
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id:
+            "pi_event_refund_cancelled_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(160, :USD),
+          description: "Event tickets",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, completed} =
+        Tickets.complete_ticket_order(completed_source, payment.id)
+
+      [ticket] = tickets_for_order(completed.id)
+
+      {:ok, _refund_info} =
+        Tickets.refund_tickets(completed, [ticket.id], "test cancel")
+
+      other_user =
+        user_fixture_unique()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      {:ok, pending} =
+        Tickets.create_ticket_order(other_user.id, event.id, %{tier1.id => 1})
+
+      ids =
+        event.id
+        |> Tickets.list_orders_for_event_refund()
+        |> Enum.map(& &1.id)
+
+      assert completed.id in ids
+      refute pending.id in ids
+    end
+  end
+
   describe "get_payment_for_order/1" do
     setup do
       tickets_setup()
@@ -2997,6 +3148,11 @@ defmodule Ysc.TicketsTest do
     test "ci_query_explain_list_tickets_for_admin_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Tickets.ci_query_explain_list_tickets_for_admin_query()
+    end
+
+    test "ci_query_explain_list_orders_for_event_refund_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_list_orders_for_event_refund_query()
     end
 
     test "ci_query_explain_owned_member_only_tickets_count_query/0 builds an Ecto.Query" do

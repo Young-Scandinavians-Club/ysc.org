@@ -697,12 +697,37 @@ defmodule Ysc.Tickets do
   provider-side failure doesn't leave tickets cancelled with no refund
   actually issued.
 
+  Re-reads tickets from the database. For classifying already-loaded orders
+  (the event-cancellation refund modal), use
+  `refund_amount_from_loaded_tickets/2` instead so each order does not
+  issue another tickets SELECT.
+
   ## Returns:
   - `{:ok, Money.t()}` on success
   - `{:error, :no_valid_tickets}` if none of `ticket_ids` are refundable
   """
   def calculate_refund_amount(ticket_order, ticket_ids) do
     case fetch_refundable_tickets(ticket_order, ticket_ids) do
+      {:ok, %{refund_amount: refund_amount}} -> {:ok, refund_amount}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Computes a refund amount from tickets already preloaded on the order.
+
+  Same arithmetic as `calculate_refund_amount/2` (`price - discount`,
+  donation remainder split across every donation ticket on the order), but
+  skips the per-order tickets re-SELECT. Callers that mutate tickets must
+  still use `calculate_refund_amount/2` / `refund_tickets/3` so they see a
+  fresh snapshot.
+  """
+  def refund_amount_from_loaded_tickets(
+        %{tickets: tickets} = ticket_order,
+        ticket_ids
+      )
+      when is_list(tickets) do
+    case refundable_from_order_tickets(ticket_order, tickets, ticket_ids) do
       {:ok, %{refund_amount: refund_amount}} -> {:ok, refund_amount}
       {:error, reason} -> {:error, reason}
     end
@@ -1021,6 +1046,11 @@ defmodule Ysc.Tickets do
   Preloads all of the order's `:tickets` (not just `:confirmed` ones, unlike
   `list_tickets_for_admin/1`) so a partially-refunded order still shows which
   tickets remain, plus the purchasing `:user`.
+
+  Orders skip grant notes, Stripe payment-intent ids, and cancellation copy.
+  Tickets skip check-in / expiry columns. Tiers skip description and the
+  sale window — classification only needs type and price to compute refund
+  amounts. Users skip `hashed_password` and board copy.
   """
   def list_orders_for_event_refund(event_id) do
     event_id
@@ -1028,16 +1058,47 @@ defmodule Ysc.Tickets do
     |> Repo.all()
   end
 
+  # Cancellation-refund modal: purchaser card, order reference/total/channel,
+  # and enough ticket/tier columns to classify refunds and compute amounts.
+  @event_refund_order_fields [
+    :id,
+    :reference_id,
+    :total_amount,
+    :user_id,
+    :payment_id,
+    :payment_channel,
+    :status,
+    :event_id
+  ]
+  @event_refund_ticket_fields [
+    :id,
+    :status,
+    :ticket_order_id,
+    :ticket_tier_id,
+    :discount_amount
+  ]
+  @event_refund_tier_fields [:id, :type, :price]
+
   defp list_orders_for_event_refund_query(event_id) do
     user_query =
       from(u in Ysc.Accounts.User,
         select: struct(u, ^@admin_ticket_user_fields)
       )
 
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@event_refund_tier_fields))
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@event_refund_ticket_fields),
+        preload: [ticket_tier: ^tier_query]
+      )
+
     from(o in TicketOrder,
       where: o.event_id == ^event_id and o.status in [:completed, :cancelled],
       order_by: [desc: o.completed_at],
-      preload: [tickets: :ticket_tier, user: ^user_query]
+      select: struct(o, ^@event_refund_order_fields),
+      preload: [tickets: ^ticket_query, user: ^user_query]
     )
   end
 
@@ -1061,16 +1122,20 @@ defmodule Ysc.Tickets do
   # status) keeps a later refund of a remaining donation at the original
   # per-ticket amount.
   defp fetch_refundable_tickets(ticket_order, ticket_ids) do
+    order_tickets =
+      ticket_order.id
+      |> order_tickets_for_refund_query()
+      |> Repo.all()
+
+    refundable_from_order_tickets(ticket_order, order_tickets, ticket_ids)
+  end
+
+  defp refundable_from_order_tickets(ticket_order, order_tickets, ticket_ids) do
     ticket_id_set =
       ticket_ids
       |> List.wrap()
       |> Enum.map(&to_string/1)
       |> MapSet.new()
-
-    order_tickets =
-      ticket_order.id
-      |> order_tickets_for_refund_query()
-      |> Repo.all()
 
     tickets_to_refund =
       Enum.filter(order_tickets, fn ticket ->
@@ -3032,6 +3097,11 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_list_tickets_for_admin_query do
     list_tickets_for_admin_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_orders_for_event_refund_query do
+    list_orders_for_event_refund_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

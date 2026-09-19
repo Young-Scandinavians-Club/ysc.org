@@ -2516,6 +2516,38 @@ defmodule Ysc.Ledgers do
   end
 
   @doc """
+  Returns the subset of `payment_ids` that have at least one ledger refund.
+
+  One `WHERE payment_id IN (...)` instead of N `list_refunds_for_payment/1`
+  round-trips. Used by the event-cancellation refund modal to label
+  already-refunded orders without loading refund rows or QuickBooks JSON.
+  """
+  def payment_ids_with_refunds([]), do: MapSet.new()
+
+  def payment_ids_with_refunds(payment_ids) when is_list(payment_ids) do
+    ids = Enum.reject(payment_ids, &is_nil/1)
+
+    case ids do
+      [] ->
+        MapSet.new()
+
+      [_ | _] ->
+        ids
+        |> payment_ids_with_refunds_query()
+        |> Repo.all()
+        |> MapSet.new()
+    end
+  end
+
+  defp payment_ids_with_refunds_query(payment_ids) do
+    from(r in Refund,
+      where: r.payment_id in ^payment_ids,
+      distinct: true,
+      select: r.payment_id
+    )
+  end
+
+  @doc """
   Ledger lines shown on the treasurer payment-detail modal.
 
   Account is name + type only. Do not JOIN the payment or refund rows —
@@ -4760,6 +4792,11 @@ defmodule Ysc.Ledgers do
   @doc false
   def ci_query_explain_list_refunds_for_payment_query do
     list_refunds_for_payment_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_payment_ids_with_refunds_query do
+    payment_ids_with_refunds_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 
   @doc false

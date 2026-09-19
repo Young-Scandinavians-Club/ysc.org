@@ -179,10 +179,19 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
   end
 
   defp refresh_orders(socket) do
-    orders =
+    raw_orders =
       socket.assigns.event_id
       |> Tickets.list_orders_for_event_refund()
-      |> Enum.map(&Map.merge(%{order: &1}, classify_order(&1)))
+
+    refunded_payment_ids =
+      raw_orders
+      |> cancelled_paid_payment_ids()
+      |> Ledgers.payment_ids_with_refunds()
+
+    orders =
+      Enum.map(raw_orders, fn order ->
+        Map.merge(%{order: order}, classify_order(order, refunded_payment_ids))
+      end)
 
     refundable_order_ids =
       orders
@@ -201,16 +210,25 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
     |> assign(:selected_order_ids, selected)
   end
 
+  defp cancelled_paid_payment_ids(orders) do
+    orders
+    |> Enum.filter(fn order ->
+      not is_nil(order.payment_id) and
+        Enum.all?(order.tickets, &(&1.status not in [:confirmed, :pending]))
+    end)
+    |> Enum.map(& &1.payment_id)
+  end
+
   # Classifies an order for the cancellation-refund flow:
   # - `:offline_payment` for in-person cash/check sales, which never touch
   #   Stripe and so can't be refunded from here (checked first: these orders
   #   also carry no `payment_id`, same as a free grant)
-  # - for an order with no active tickets left, see `classify_cancelled_order/1`
+  # - for an order with no active tickets left, see `classify_cancelled_order/2`
   # - `:no_payment` for free/admin-granted orders and any order whose amount
   #   can't be resolved to a refundable ticket set
   # - `:refundable` otherwise, carrying the still-active ticket ids and the
   #   amount a refund of all of them would issue
-  defp classify_order(order) do
+  defp classify_order(order, refunded_payment_ids) do
     active_ticket_ids =
       order.tickets
       |> Enum.filter(&(&1.status in [:confirmed, :pending]))
@@ -225,14 +243,14 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
         }
 
       active_ticket_ids == [] ->
-        classify_cancelled_order(order)
+        classify_cancelled_order(order, refunded_payment_ids)
 
       is_nil(order.payment_id) || is_nil(order.total_amount) ||
           Money.zero?(order.total_amount) ->
         %{state: :no_payment, active_ticket_ids: active_ticket_ids, amount: nil}
 
       true ->
-        case Tickets.calculate_refund_amount(order, active_ticket_ids) do
+        case Tickets.refund_amount_from_loaded_tickets(order, active_ticket_ids) do
           {:ok, amount} ->
             %{
               state: :refundable,
@@ -260,12 +278,12 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
   # hide a real gap if that ever changed. Check the ledger instead, and flag
   # a cancelled order with money on file but no recorded refund for manual
   # follow-up rather than mislabeling it "Refunded".
-  defp classify_cancelled_order(%{payment_id: nil}) do
+  defp classify_cancelled_order(%{payment_id: nil}, _refunded_payment_ids) do
     %{state: :no_payment, active_ticket_ids: [], amount: nil}
   end
 
-  defp classify_cancelled_order(%{payment_id: payment_id}) do
-    if Ledgers.list_refunds_for_payment(payment_id) != [] do
+  defp classify_cancelled_order(%{payment_id: payment_id}, refunded_payment_ids) do
+    if MapSet.member?(refunded_payment_ids, payment_id) do
       %{state: :refunded, active_ticket_ids: [], amount: nil}
     else
       %{state: :unrefunded_cancelled, active_ticket_ids: [], amount: nil}
