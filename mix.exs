@@ -282,8 +282,12 @@ defmodule Ysc.MixProject do
       # and start_loader/3 APIs are unchanged.
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
-      # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.
-      {:nested_filter, "~> 2.1", override: true},
+      # passbook pins nested_filter ~> 1.2.2; override keeps drop_by_key/drop_by_value
+      # used in Passbook.Pass.generate_json/1.
+      # 2.2.0: filter/take_by_key/compact accept empties: :prune (default) | :keep;
+      # compact prune_empty is a deprecated alias (removed in 3.0). We do not
+      # call filter, take_by_key, or compact in app code.
+      {:nested_filter, "~> 2.2", override: true},
       {:mjml_eex, "~> 0.13"},
       # 1.3.0: Elixir 1.15 floor; Process.info parent for allowances when
       # `$callers` is missing. 1.3.1: shared-mode verify after an unexpected
