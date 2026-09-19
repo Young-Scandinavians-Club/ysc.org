@@ -253,6 +253,88 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
                "#cancellation-refund-order-#{order.id} input[type=checkbox]"
              )
     end
+
+    test "opening the refund modal does not N+1 ticket queries", %{
+      conn: conn
+    } do
+      event = event_fixture(%{state: :published})
+
+      refundable_orders =
+        for _i <- 1..3 do
+          completed_ticket_order_with_payment!(event: event)
+        end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      {_html, ticket_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> element("#cancel-event-btn")
+            |> render_click()
+          end,
+          pattern: ~r/FROM "tickets"/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert ticket_queries <= 1
+
+      for %{ticket_order: order} <- refundable_orders do
+        assert has_element?(view, "#cancellation-refund-order-#{order.id}")
+      end
+    end
+
+    test "opening the refund modal batches refund existence into one query", %{
+      conn: conn
+    } do
+      event = event_fixture(%{state: :published})
+
+      refunded_orders =
+        for _i <- 1..3 do
+          %{ticket_order: order, tickets: [ticket], payment: payment} =
+            completed_ticket_order_with_payment!(event: event)
+
+          {:ok, {_refund, _transaction, _entries}} =
+            Tickets.refund_via_stripe(
+              payment,
+              order.total_amount,
+              "Pre-cancelled refund",
+              ticket_ids: [ticket.id]
+            )
+
+          {:ok, _refund_info} =
+            Tickets.refund_tickets(order, [ticket.id], "Pre-cancelled refund")
+
+          order
+        end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      {_html, refund_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> element("#cancel-event-btn")
+            |> render_click()
+          end,
+          pattern: ~r/FROM "refunds"/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert refund_queries == 1
+
+      for order <- refunded_orders do
+        assert has_element?(
+                 view,
+                 "#cancellation-refund-order-#{order.id}",
+                 "Refunded"
+               )
+      end
+    end
   end
 
   describe "permissions" do
