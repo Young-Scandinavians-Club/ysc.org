@@ -14,7 +14,8 @@ defmodule Ysc.SNS.SignatureVerifier do
 
   Topic ARNs are allowlisted separately (`:sns_allowed_topic_arns` /
   `SNS_TOPIC_ARN`). A valid AWS signature only proves the message came
-  from SNS, not from *your* SES topic.
+  from SNS, not from *your* SES topic. Both SubscriptionConfirmation and
+  Notification processing fail closed when the allowlist is empty.
   """
   require Ysc.Logging
 
@@ -120,14 +121,19 @@ defmodule Ysc.SNS.SignatureVerifier do
   @doc """
   Returns whether an SNS Notification `TopicArn` may be processed.
 
-  When no allowlist is configured, notifications are accepted so an already
-  confirmed SES topic keeps delivering. Once `SNS_TOPIC_ARN` is set, only
-  those ARNs are accepted.
+  Fail-closed like `allow_subscription_confirmation?/1`: an empty
+  `sns_allowed_topic_arns` rejects every notification. A valid SNS signature
+  only proves the message came from *some* AWS SNS topic, not from the club's
+  SES topic. Without an allowlist, an attacker can publish a forged SES bounce
+  JSON to their own SNS topic, capture the signed Notification delivered to
+  their endpoint, and replay it to `POST /webhooks/ses` (SNS signatures are
+  not bound to the destination URL) to suppress mail for arbitrary addresses
+  (Finding 73).
   """
   @spec allow_notification_topic?(term()) :: boolean()
   def allow_notification_topic?(topic_arn) when is_binary(topic_arn) do
     case allowed_topic_arns() do
-      [] -> true
+      [] -> false
       allowed -> topic_arn in allowed
     end
   end
