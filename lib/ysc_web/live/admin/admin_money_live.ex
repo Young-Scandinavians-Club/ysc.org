@@ -1928,7 +1928,7 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={entry <- @ledger_entries}>
+                <tr :for={entry <- @ledger_entries} id={"ledger-entry-#{entry.id}"}>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                     {format_datetime(
                       entry.inserted_at,
