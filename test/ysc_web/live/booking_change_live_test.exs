@@ -621,6 +621,160 @@ defmodule YscWeb.BookingChangeLiveTest do
     refute has_element?(view, "#modification-payment-step")
   end
 
+  test "applies paid date change when Edit changes races a succeeded PaymentIntent",
+       %{conn: conn} do
+    Ysc.TestHelpers.setup_quickbooks_mocks()
+
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    pi_id = "pi_change_cancel_succeeded"
+
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: pi_id,
+         client_secret: "#{pi_id}_secret",
+         status: "requires_payment_method",
+         amount: params.amount
+       }}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+      {:error, succeeded_modification_payment_intent_error()}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+    original_checkout = booking.checkout_date
+    extended_checkout = Date.add(original_checkout, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    payment_delta = :sys.get_state(view.pid).socket.assigns.payment_delta
+    amount_cents = Ysc.MoneyHelper.money_to_cents(payment_delta)
+
+    stub(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+      {:ok, succeeded_modification_payment_intent(pi_id, booking, amount_cents)}
+    end)
+
+    view |> element("#back-to-modification-button") |> render_click()
+
+    {path, _flash} = assert_redirect(view, @change_async_timeout)
+
+    assert path =~ "/bookings/#{booking.id}/receipt"
+    updated = Repo.get!(Booking, booking.id)
+    assert updated.checkout_date == extended_checkout
+    assert Bookings.modification_ledger_recorded?(booking.id, pi_id)
+  end
+
+  test "keeps the modification hold when Edit changes races an in-flight PaymentIntent",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    pi_id = "pi_change_cancel_processing"
+
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: pi_id,
+         client_secret: "#{pi_id}_secret",
+         status: "requires_payment_method",
+         amount: params.amount
+       }}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :payment_intent_unexpected_state,
+         message:
+           "You cannot cancel this PaymentIntent because it has a status of processing",
+         extra: %{}
+       }}
+    end)
+
+    stub(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+      {:ok, %Stripe.PaymentIntent{id: pi_id, status: "processing"}}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+    original_checkout = booking.checkout_date
+    extended_checkout = Date.add(original_checkout, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    html = view |> element("#back-to-modification-button") |> render_click()
+
+    assert has_element?(view, "#modification-payment-step")
+    refute has_element?(view, "#modification-dates")
+    assert html =~ "still processing"
+
+    held = Repo.get!(Booking, booking.id)
+    assert held.checkout_date == original_checkout
+    assert held.modification_hold_expires_at
+    refute Bookings.modification_ledger_recorded?(booking.id, pi_id)
+  end
+
   test "shows downgrade notice when shortening stay reduces total", %{
     conn: conn
   } do
@@ -1445,5 +1599,31 @@ defmodule YscWeb.BookingChangeLiveTest do
       end
     end) ||
       flunk("Could not navigate calendar to #{target_label}")
+  end
+
+  defp succeeded_modification_payment_intent_error do
+    %Stripe.Error{
+      source: :stripe,
+      code: :payment_intent_unexpected_state,
+      message:
+        "You cannot cancel this PaymentIntent because it has a status of succeeded",
+      extra: %{}
+    }
+  end
+
+  defp succeeded_modification_payment_intent(pi_id, booking, amount_cents) do
+    %Stripe.PaymentIntent{
+      id: pi_id,
+      status: "succeeded",
+      amount: amount_cents,
+      metadata: %{
+        "booking_id" => to_string(booking.id),
+        "user_id" => to_string(booking.user_id),
+        "modification" => "true"
+      },
+      customer: nil,
+      payment_method: nil,
+      latest_charge: %Stripe.Charge{id: "ch_#{pi_id}"}
+    }
   end
 end

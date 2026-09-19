@@ -15,7 +15,7 @@ defmodule YscWeb.Emails.ConductViolationConfirmation do
   end
 
   def get_subject() do
-    "Conduct Violation Report Received - YSC"
+    "We received your report - YSC"
   end
 
   def code_of_conduct_url() do

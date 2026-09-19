@@ -440,33 +440,42 @@ defmodule YscWeb.NewsLiveTest do
     test "uses rendered_body for reading time when present", %{conn: conn} do
       long_html = "<p>" <> String.duplicate("word ", 500) <> "</p>"
 
-      create_post(%{
-        title: "Rendered Body Post",
-        raw_body: "<p>short</p>",
-        rendered_body: long_html,
-        preview_text: nil
-      })
+      post =
+        create_post(%{
+          title: "Rendered Body Post",
+          raw_body: "<p>short</p>",
+          rendered_body: long_html,
+          preview_text: nil,
+          featured_post: true
+        })
 
       {:ok, view, _html} = live(conn, ~p"/news")
       render_news_async(view)
 
-      html = render(view)
-      assert html =~ "min read"
+      assert has_element?(
+               view,
+               "#news-featured-reading-time-#{post.id}",
+               "2 min read"
+             )
     end
 
     test "shows default reading time when bodies are empty", %{conn: conn} do
-      create_post(%{
-        title: "Empty Body Post",
-        raw_body: "",
-        rendered_body: nil,
-        preview_text: nil
-      })
+      post =
+        create_post(%{
+          title: "Empty Body Post",
+          raw_body: "",
+          rendered_body: nil,
+          preview_text: nil
+        })
 
       {:ok, view, _html} = live(conn, ~p"/news")
       render_news_async(view)
 
-      html = render(view)
-      assert html =~ "1 min read"
+      assert has_element?(
+               view,
+               "#news-grid-reading-time-#{post.id}",
+               "1 min read"
+             )
     end
 
     test "formats unknown board position strings via title case fallback", %{
@@ -514,18 +523,22 @@ defmodule YscWeb.NewsLiveTest do
       html_preview =
         "<p>" <> String.duplicate("alpha ", 400) <> "</p>"
 
-      create_post(%{
-        title: "Preview Time",
-        raw_body: "",
-        rendered_body: nil,
-        preview_text: html_preview
-      })
+      post =
+        create_post(%{
+          title: "Preview Time",
+          raw_body: "",
+          rendered_body: nil,
+          preview_text: html_preview
+        })
 
       {:ok, view, _html} = live(conn, ~p"/news")
       render_news_async(view)
 
-      html = render(view)
-      assert html =~ "min read"
+      assert has_element?(
+               view,
+               "#news-grid-reading-time-#{post.id}",
+               "2 min read"
+             )
     end
   end
 

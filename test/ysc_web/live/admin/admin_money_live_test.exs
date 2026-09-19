@@ -14,11 +14,13 @@ defmodule YscWeb.AdminMoneyLiveTest do
   alias Ysc.ExpenseReports.ExpenseReportItem
   alias Ysc.ExpenseReports.ExpenseReportIncomeItem
   alias Ysc.Ledgers
+  alias Ysc.Ledgers.LedgerEntry
   alias Ysc.Ledgers.Refund
   alias Ysc.LedgersFixtures
   alias Ysc.Repo
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
+  alias Ysc.Webhooks
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -486,6 +488,148 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert has_element?(view, "#payment-refund-#{payment.id}", "Refund")
       refute has_element?(view, "button.bg-red-600", "Refund")
       refute has_element?(view, "button.bg-blue-600", "View")
+    end
+
+    test "overview payment rows still show reference, amount, status, and event type after slim loads",
+         %{conn: conn} do
+      Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture(%{first_name: "ListRow", last_name: "Payer"})
+
+      event = event_fixture(%{title: "List Row Event XYZ"})
+      amount = Money.new(87, :USD)
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: member.id,
+          total_amount: amount,
+          event_amount: amount,
+          donation_amount: Money.new(0, :USD),
+          event_id: event.id,
+          external_payment_id:
+            "pi_list_row_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          payment_method_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      row = "#payments-#{payment.id}"
+
+      assert has_element?(view, row, payment.reference_id)
+      assert has_element?(view, row, "ListRow Payer")
+      assert has_element?(view, row, member.email)
+      assert has_element?(view, row, "Event")
+      assert has_element?(view, row, "List Row Event XYZ")
+      assert has_element?(view, row, Money.to_string!(amount))
+      assert has_element?(view, row, to_string(payment.status))
+    end
+
+    test "ledger tab still shows payment and refund references after slim loads",
+         %{conn: conn} do
+      Ledgers.ensure_basic_accounts()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user_fixture().id,
+          amount: Money.new(64, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_ledger_row_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {refund, _tx, _refund_entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(19, :USD),
+          reason: "Partial list-row refund",
+          external_refund_id:
+            "re_ledger_row_#{System.unique_integer([:positive])}"
+        })
+
+      payment_entry =
+        Repo.one!(
+          from(e in LedgerEntry,
+            where: e.payment_id == ^payment.id and is_nil(e.refund_id),
+            limit: 1
+          )
+        )
+
+      refund_entry =
+        Repo.one!(
+          from(e in LedgerEntry, where: e.refund_id == ^refund.id, limit: 1)
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money?tab=ledger")
+
+      assert has_element?(
+               view,
+               "#ledger-entry-#{payment_entry.id}",
+               payment.reference_id
+             )
+
+      assert has_element?(
+               view,
+               "#ledger-entry-#{payment_entry.id}",
+               Money.to_string!(payment_entry.amount)
+             )
+
+      assert has_element?(
+               view,
+               "#ledger-entry-#{refund_entry.id}",
+               refund.reference_id
+             )
+
+      assert has_element?(
+               view,
+               "#ledger-entry-#{refund_entry.id}",
+               Money.to_string!(refund_entry.amount)
+             )
+    end
+
+    test "webhooks tab lists slim rows and the modal still loads payload JSON",
+         %{conn: conn} do
+      event_id =
+        "evt_treasurer_list_#{System.unique_integer([:positive])}_abcdefghijklmnopqrstuvwxyz"
+
+      webhook =
+        Webhooks.create_webhook_event!(%{
+          provider: :stripe,
+          event_id: event_id,
+          event_type: "payment_intent.succeeded",
+          payload: %{"secret" => "treasurer-webhook-payload-xyz"},
+          state: :processed
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money?tab=webhooks")
+
+      row = "#webhook-row-#{webhook.id}"
+      truncated_event_id = String.slice(event_id, 0..20)
+
+      assert has_element?(view, row, truncated_event_id)
+      assert has_element?(view, row, "payment_intent.succeeded")
+      assert has_element?(view, row, "processed")
+      refute has_element?(view, row, "treasurer-webhook-payload-xyz")
+
+      view
+      |> element("#webhook-view-#{webhook.id}")
+      |> render_click()
+
+      assert has_element?(view, "#webhook-modal")
+      assert has_element?(view, "#webhook-modal", event_id)
+
+      assert has_element?(
+               view,
+               "#webhook-modal",
+               "treasurer-webhook-payload-xyz"
+             )
     end
   end
 

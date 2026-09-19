@@ -266,6 +266,86 @@ defmodule YscWeb.AdminMoneyQueryTest do
     end
   end
 
+  describe "payout modal queries" do
+    setup %{conn: conn} do
+      setup_qb_mocks()
+      Ledgers.ensure_basic_accounts()
+      admin = user_fixture(%{role: "admin"})
+      %{conn: log_in_user(conn, admin)}
+    end
+
+    test "opening payout details does not SELECT password hashes or QuickBooks JSON",
+         %{conn: conn} do
+      member = user_fixture(%{first_name: "Payout", last_name: "Payer"})
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: member.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_payout_modal_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          payment_method_id: nil,
+          property: nil
+        })
+
+      {:ok, {_payout_payment, _transaction, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          stripe_payout_id: "po_modal_#{System.unique_integer([:positive])}",
+          payout_amount: Money.new(9_680, :USD),
+          arrival_date: DateTime.utc_now() |> DateTime.truncate(:second),
+          status: "paid",
+          currency: "usd",
+          description: "Test payout"
+        })
+
+      {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+
+      payment
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-payout-modal-secret"}
+      })
+      |> Repo.update!()
+
+      payout
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-payout-row-secret"}
+      })
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+      render(view)
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            render_patch(view, ~p"/admin/money/payouts/#{payout.id}")
+          end,
+          pattern: ~r/hashed_password/i
+        )
+
+      {_html, qb_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            render_patch(view, ~p"/admin/money/payouts/#{payout.id}")
+          end,
+          pattern: ~r/quickbooks_response/i
+        )
+
+      html = render(view)
+
+      assert password_cols == 0
+      assert qb_cols == 0
+      assert has_element?(view, "#payout-modal")
+      assert html =~ payout.stripe_payout_id
+      assert html =~ "Payout Payer"
+      assert html =~ payment.reference_id
+    end
+  end
+
   defp setup_qb_mocks do
     Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 

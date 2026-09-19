@@ -21,7 +21,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
   describe "get_subject/0" do
     test "returns correct subject" do
       assert ExpenseReportConfirmation.get_subject() ==
-               "Expense Report Submitted - Confirmation"
+               "We received your expense report"
     end
   end
 
@@ -75,6 +75,45 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
 
       assert data.expense_report.purpose == "Conference travel"
       assert is_binary(data.expense_report.submitted_date)
+    end
+
+    test "uses plain-language fallbacks instead of N/A for missing fields", %{
+      report: report
+    } do
+      report
+      |> Ecto.Changeset.change(%{purpose: nil})
+      |> Repo.update!()
+
+      %ExpenseReportItem{}
+      |> ExpenseReportItem.draft_changeset(%{
+        expense_report_id: report.id,
+        date: Date.utc_today(),
+        expense_type: "purchase",
+        amount: Money.new(:USD, "10.00")
+      })
+      |> Repo.insert!()
+
+      report =
+        Repo.get!(ExpenseReport, report.id)
+        |> Repo.preload([
+          :user,
+          :expense_items,
+          :income_items,
+          :event,
+          :bank_account,
+          :address
+        ])
+
+      data = ExpenseReportConfirmation.prepare_email_data(report)
+      [row] = data.expense_report.expense_items
+
+      assert data.expense_report.purpose == "Not specified"
+      assert row.vendor == "Not specified"
+      assert row.description == "Not specified"
+
+      html = ExpenseReportConfirmation.render(data)
+      assert html =~ "Not specified"
+      refute html =~ "N/A"
     end
   end
 
@@ -142,8 +181,12 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
       assert html =~ "Home to YSC Cabin — 20 mi"
       assert html =~ "Mileage — no receipt required"
       assert html =~ "Amount we will reimburse"
+      assert html =~ "Treasurer is reviewing it"
+      assert html =~ "Reference number"
       refute html =~ "Net Total"
       refute html =~ "No receipt attached"
+      refute html =~ "being processed"
+      refute html =~ "Report ID"
     end
   end
 end

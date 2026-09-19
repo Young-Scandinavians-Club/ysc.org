@@ -206,6 +206,24 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def checkout_cancel_payment_in_progress do
+    trim("""
+    Your payment is still processing, so we can't cancel this booking yet. Stay on this page — if the payment goes through, your stay will be confirmed.
+    """)
+  end
+
+  def modification_abandon_payment_in_progress do
+    trim("""
+    Your payment is still processing, so we can't go back yet. Stay on this page — if the payment goes through, your booking will be updated.
+    """)
+  end
+
+  def modification_abandon_failed do
+    trim("""
+    We couldn't cancel this payment yet. Stay on this page and try again, or email info@ysc.org if you need help.
+    """)
+  end
+
   def checkout_hold_expired do
     trim("""
     These dates are no longer reserved for you. Go back to the cabin page and start a new booking.

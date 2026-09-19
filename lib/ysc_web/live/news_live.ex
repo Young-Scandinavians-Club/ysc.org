@@ -7,9 +7,9 @@ defmodule YscWeb.NewsLive do
 
   alias Ysc.{Accounts, Posts, PublicContentCache}
   alias Ysc.Accounts.UserDisplay
-  alias YscWeb.{DateDisplay, PlainText}
-  alias Ysc.Posts.Post
   alias Ysc.Media.Image
+  alias Ysc.Posts.ReadingTime
+  alias YscWeb.{DateDisplay, PlainText}
 
   @impl true
   def render(assigns) do
@@ -107,8 +107,11 @@ defmodule YscWeb.NewsLive do
                       )}
                     </span>
                     <span class="h-3 w-px bg-zinc-300 sm:bg-white/40"></span>
-                    <span class="text-sm font-bold uppercase tracking-widest">
-                      {reading_time(@featured)} min read
+                    <span
+                      id={"news-featured-reading-time-#{@featured.id}"}
+                      class="text-sm font-bold uppercase tracking-widest"
+                    >
+                      {ReadingTime.minutes(@featured)} min read
                     </span>
                   </div>
 
@@ -212,8 +215,11 @@ defmodule YscWeb.NewsLive do
                   )}
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
-                <span class="text-sm font-bold text-zinc-500 uppercase tracking-widest">
-                  {reading_time(post)} min read
+                <span
+                  id={"news-grid-reading-time-#{post.id}"}
+                  class="text-sm font-bold text-zinc-500 uppercase tracking-widest"
+                >
+                  {ReadingTime.minutes(post)} min read
                 </span>
               </div>
 
@@ -401,55 +407,4 @@ defmodule YscWeb.NewsLive do
   end
 
   defp preview_text(post), do: PlainText.from_post(post)
-
-  # Calculate reading time based on word count (average 225 words per minute)
-  # Uses rendered_body if available, otherwise falls back to raw_body
-  defp reading_time(%Post{} = post) do
-    cond do
-      post.rendered_body && post.rendered_body != "" ->
-        word_count = count_words_in_html(post.rendered_body)
-        calculate_minutes(word_count)
-
-      post.raw_body && post.raw_body != "" ->
-        word_count =
-          post.raw_body |> PlainText.from_html() |> count_words_in_text()
-
-        calculate_minutes(word_count)
-
-      post.preview_text && post.preview_text != "" ->
-        word_count =
-          post.preview_text |> PlainText.from_html() |> count_words_in_text()
-
-        calculate_minutes(word_count)
-
-      true ->
-        "1"
-    end
-  end
-
-  # Count words in HTML by stripping tags and counting
-  defp count_words_in_html(html) do
-    html
-    |> String.replace(~r/<[^>]*>/, " ")
-    |> String.replace(~r/&[a-z]+;/i, " ")
-    |> String.replace(~r/&#\d+;/, " ")
-    |> count_words_in_text()
-  end
-
-  # Count words in plain text
-  defp count_words_in_text(text) do
-    text
-    |> String.trim()
-    |> String.split(~r/\s+/)
-    |> Enum.reject(&(&1 == ""))
-    |> length()
-  end
-
-  # Calculate minutes from word count (225 words per minute)
-  defp calculate_minutes(word_count) when word_count <= 0, do: "1"
-
-  defp calculate_minutes(word_count) do
-    minutes = max(1, round(word_count / 225.0))
-    Integer.to_string(minutes)
-  end
 end

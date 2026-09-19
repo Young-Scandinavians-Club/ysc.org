@@ -1242,6 +1242,30 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert render(view) =~ "Bank account ending in 6789"
     end
 
+    test "payment summary says not on file when no payment method is stored",
+         %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, {_payment, _, _}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id: "pi_pm_missing_#{booking.id}",
+          stripe_fee: Money.new(50, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
+      html = render(view)
+      assert html =~ "Not on file"
+      refute html =~ "N/A"
+    end
+
     test "payment status failed uses gray badge", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})

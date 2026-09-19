@@ -210,6 +210,9 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_payment_setup_failed() =~ "info@ysc.org"
     assert BookingUserMessages.checkout_cancel_failed() =~ "info@ysc.org"
 
+    assert BookingUserMessages.checkout_cancel_payment_in_progress() =~
+             "still processing"
+
     assert BookingUserMessages.checkout_booking_confirmation_failed() =~
              "info@ysc.org"
 
@@ -238,6 +241,12 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.modification_finalize_failed() =~
              "couldn't save your new dates"
+
+    assert BookingUserMessages.modification_abandon_payment_in_progress() =~
+             "still processing"
+
+    assert BookingUserMessages.modification_abandon_failed() =~
+             "info@ysc.org"
 
     assert BookingUserMessages.modification_after_payment_recovery_suffix() =~
              "booking reference"

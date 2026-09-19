@@ -3316,6 +3316,82 @@ defmodule Ysc.LedgersTest do
       end
     end
 
+    test "get_payout_for_admin/1 slims payout, payment, refund, and member columns",
+         %{
+           user: user,
+           payment: payment,
+           payout: payout
+         } do
+      {:ok, {refund, _transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(5_000, :USD),
+          external_refund_id: "re_admin_payout_slim",
+          reason: "Test refund"
+        })
+
+      {:ok, _} = Ledgers.link_refund_to_payout(payout, refund)
+
+      payout
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-payout-secret"}
+      })
+      |> Repo.update!()
+
+      payment
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-payout-payment-secret"}
+      })
+      |> Repo.update!()
+
+      refund
+      |> Ecto.Changeset.change(%{
+        quickbooks_response: %{"Id" => "qb-payout-refund-secret"}
+      })
+      |> Repo.update!()
+
+      {_found, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payout_for_admin(payout.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_found, qb_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.get_payout_for_admin(payout.id) end,
+          pattern: ~r/quickbooks_response/i,
+          caller_pids: [self()]
+        )
+
+      found = Ledgers.get_payout_for_admin(payout.id)
+
+      assert password_cols == 0
+      assert qb_cols == 0
+      assert found.id == payout.id
+      assert found.stripe_payout_id == payout.stripe_payout_id
+      assert found.quickbooks_response == nil
+      refute Ecto.assoc_loaded?(found.payment)
+
+      [loaded_payment] = found.payments
+      assert loaded_payment.id == payment.id
+      assert loaded_payment.reference_id == payment.reference_id
+      assert loaded_payment.quickbooks_response == nil
+      assert loaded_payment.user.email == user.email
+      assert loaded_payment.user.hashed_password == nil
+
+      [loaded_refund] = found.refunds
+      assert loaded_refund.id == refund.id
+      assert loaded_refund.reason == "Test refund"
+      assert loaded_refund.quickbooks_response == nil
+      assert loaded_refund.user.email == user.email
+      assert loaded_refund.user.hashed_password == nil
+    end
+
+    test "get_payout_for_admin/1 returns nil for unknown id" do
+      assert Ledgers.get_payout_for_admin(Ecto.ULID.generate()) == nil
+    end
+
     test "get_payout_payments/1 returns payments for payout", %{
       payout: payout,
       payment: payment
@@ -3891,6 +3967,69 @@ defmodule Ysc.LedgersTest do
       assert loaded.reason == "Partial"
       assert loaded.quickbooks_response == nil
       refute Ecto.assoc_loaded?(loaded.user)
+    end
+
+    test "payment_ids_with_refunds/1 returns ids that have a refund in one query",
+         %{
+           user: user
+         } do
+      {:ok, {with_refund, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_refund_ids_yes_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {without_refund, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_refund_ids_no_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, {_refund, _tx, _entries}} =
+               Ledgers.process_refund(%{
+                 payment_id: with_refund.id,
+                 refund_amount: Money.new(2_000, :USD),
+                 reason: "Partial",
+                 external_refund_id:
+                   "re_refund_ids_#{System.unique_integer([:positive])}"
+               })
+
+      ids = [with_refund.id, without_refund.id, nil]
+
+      {found, refund_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.payment_ids_with_refunds(ids) end,
+          pattern: ~r/FROM "refunds"/i,
+          caller_pids: [self()]
+        )
+
+      {_empty, empty_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ledgers.payment_ids_with_refunds([]) end,
+          pattern: ~r/FROM "refunds"/i,
+          caller_pids: [self()]
+        )
+
+      assert refund_queries == 1
+      assert empty_queries == 0
+      assert MapSet.member?(found, with_refund.id)
+      refute MapSet.member?(found, without_refund.id)
     end
 
     test "list_ledger_entries_for_payment/1 slims account copy", %{user: user} do
@@ -8008,7 +8147,13 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
                Ledgers.ci_query_explain_list_refunds_for_payment_query()
 
       assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_payment_ids_with_refunds_query()
+
+      assert %Ecto.Query{} =
                Ledgers.ci_query_explain_list_ledger_entries_for_payment_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_payout_for_admin_query()
     end
   end
 end

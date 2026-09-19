@@ -13,6 +13,7 @@ defmodule YscWeb.Components.News.NewsCard do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.UserDisplay
+  alias Ysc.Posts.ReadingTime
   alias YscWeb.PlainText
 
   attr :post, :any, required: true
@@ -25,7 +26,7 @@ defmodule YscWeb.Components.News.NewsCard do
   def news_card(assigns) do
     assigns =
       assigns
-      |> assign(:reading_time, reading_time(assigns.post))
+      |> assign(:reading_time, ReadingTime.minutes(assigns.post))
       |> assign(:preview_text, preview_text(assigns.post))
 
     ~H"""
@@ -54,7 +55,10 @@ defmodule YscWeb.Components.News.NewsCard do
               else: ""}
           </span>
           <span class="h-3 w-px bg-zinc-200"></span>
-          <span class="text-sm font-bold text-zinc-500 uppercase tracking-widest">
+          <span
+            id={"news-card-reading-time-#{@post.id}"}
+            class="text-sm font-bold text-zinc-500 uppercase tracking-widest"
+          >
             {@reading_time} min read
           </span>
         </div>
@@ -98,53 +102,6 @@ defmodule YscWeb.Components.News.NewsCard do
       </div>
     </div>
     """
-  end
-
-  # Calculate reading time based on word count (average 225 words per minute)
-  defp reading_time(post) do
-    cond do
-      post.rendered_body && post.rendered_body != "" ->
-        word_count = count_words_in_html(post.rendered_body)
-        calculate_minutes(word_count)
-
-      post.raw_body && post.raw_body != "" ->
-        word_count =
-          post.raw_body |> PlainText.from_html() |> count_words_in_text()
-
-        calculate_minutes(word_count)
-
-      post.preview_text && post.preview_text != "" ->
-        word_count =
-          post.preview_text |> PlainText.from_html() |> count_words_in_text()
-
-        calculate_minutes(word_count)
-
-      true ->
-        "1"
-    end
-  end
-
-  defp count_words_in_html(html) do
-    html
-    |> String.replace(~r/<[^>]*>/, " ")
-    |> String.replace(~r/&[a-z]+;/i, " ")
-    |> String.replace(~r/&#\d+;/, " ")
-    |> count_words_in_text()
-  end
-
-  defp count_words_in_text(text) do
-    text
-    |> String.trim()
-    |> String.split(~r/\s+/)
-    |> Enum.reject(&(&1 == ""))
-    |> length()
-  end
-
-  defp calculate_minutes(word_count) when word_count <= 0, do: "1"
-
-  defp calculate_minutes(word_count) do
-    minutes = max(1, round(word_count / 225.0))
-    Integer.to_string(minutes)
   end
 
   defp preview_text(post), do: PlainText.from_post(post)

@@ -337,6 +337,42 @@ defmodule Ysc.EventsTest do
       assert {:error, :invalid_state} = Events.delete_event(event)
       assert Events.get_event!(event.id).state == :published
     end
+
+    test "delete_event/2 refuses scheduled events for volunteers", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Scheduled Keep",
+          description: "Description",
+          state: :scheduled,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          publish_at: DateTime.add(DateTime.utc_now(), 1, :day),
+          published_at: nil
+        })
+
+      assert {:error, :unauthorized} =
+               Events.delete_event(event, acting_role: :volunteer)
+
+      assert Events.get_event!(event.id).state == :scheduled
+    end
+
+    test "delete_event/2 allows scheduled deletes for full admins", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Scheduled Admin Delete",
+          description: "Description",
+          state: :scheduled,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          publish_at: DateTime.add(DateTime.utc_now(), 1, :day),
+          published_at: nil
+        })
+
+      assert {:ok, deleted} = Events.delete_event(event, acting_role: :admin)
+      assert deleted.state == :deleted
+    end
   end
 
   describe "copy_event/1" do
