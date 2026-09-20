@@ -346,7 +346,9 @@ defmodule Ysc.MixProject do
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
       # 1.27.1: AmazonSES returns {:error, %{code, message}} instead of crashing when
       # SES error XML is missing Code/Message nodes (we use SES).
-      {:swoosh, "~> 1.27.1"},
+      # 1.28.0: TurboSMTP adapter. 1.28.1: Customer.io CC. We use AmazonSES, so
+      # both are unused.
+      {:swoosh, "~> 1.28.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
       # tag_values is still supported and emits no deprecation warning. We keep
