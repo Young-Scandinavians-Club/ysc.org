@@ -70,7 +70,7 @@ defmodule YscWeb.Emails.BookingCancellationEmailsTest do
       assert html =~ "Refund Amount"
       refute html =~ "Refund Pending Review"
       assert html =~ "Payment Details"
-      assert html =~ "go back to your original payment method"
+      assert html =~ "go back to the same card or bank account you used"
       refute html =~ "will be processed"
     end
 

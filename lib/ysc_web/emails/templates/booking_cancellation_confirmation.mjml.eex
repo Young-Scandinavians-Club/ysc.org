@@ -50,7 +50,7 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Refund Amount:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @refund.amount %></span>
     </mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your refund will go back to your original payment method within 5-10 business days.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your refund will go back to the same card or bank account you used within 5–10 business days.</mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <% else %>
