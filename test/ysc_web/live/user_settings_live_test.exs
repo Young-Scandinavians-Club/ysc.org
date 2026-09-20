@@ -1864,6 +1864,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       render(view)
 
       assert has_element?(view, "#update-payment-method-modal")
+      assert has_element?(view, "#payment-add-new-divider")
       assert html =~ "Secure, encrypted payment"
     end
 
@@ -1902,6 +1903,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert html =~ "/images/cards/link.png"
       assert html =~ "Link · Visa ending in 4242"
       assert html =~ "Expires 12 / 2030"
+      assert has_element?(view, "#payment-add-new-divider", "Add new")
     end
 
     test "select-payment-method sets default when Stripe customer update succeeds",

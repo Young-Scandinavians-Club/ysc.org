@@ -5649,7 +5649,9 @@ defmodule YscWeb.CoreComponents do
   Horizontal rule with a centered label, used between alternative actions.
 
   Sign-in, re-authentication, and similar screens place this between OAuth /
-  passkey options and a password form.
+  passkey options and a password form. Payment-method settings uses the same
+  rule between saved cards and the add-new action; pass `show_label={false}`
+  to keep the line when the label should hide.
 
   ## Examples
 
@@ -5658,6 +5660,15 @@ defmodule YscWeb.CoreComponents do
       </.labeled_divider>
 
       <.labeled_divider id="reauth-oauth-or-divider">OR</.labeled_divider>
+
+      <.labeled_divider
+        id="payment-add-new-divider"
+        class="my-6"
+        show_label={!@show_new_payment_form}
+        label_class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide"
+      >
+        Add new
+      </.labeled_divider>
   """
   attr :id, :string, required: true
 
@@ -5673,6 +5684,10 @@ defmodule YscWeb.CoreComponents do
     default: "bg-white px-2 text-zinc-500",
     doc: "Classes on the centered label span"
 
+  attr :show_label, :boolean,
+    default: true,
+    doc: "When false, renders only the rule (e.g. while an add form is open)"
+
   slot :inner_block, required: true
 
   def labeled_divider(assigns) do
@@ -5681,10 +5696,62 @@ defmodule YscWeb.CoreComponents do
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class={["w-full border-t", @line_class]}></div>
       </div>
-      <div class="relative flex justify-center items-center text-sm leading-none">
+      <div
+        :if={@show_label}
+        class="relative flex justify-center items-center text-sm leading-none"
+      >
         <span class={@label_class}>{render_slot(@inner_block)}</span>
       </div>
     </div>
+    """
+  end
+
+  @doc """
+  Inline circular busy spinner for in-place actions (deleting a row, overlay
+  on an avatar). Decorative: `aria-hidden` so surrounding buttons keep their
+  accessible name.
+
+  For a labeled loading row, prefer `<.async_section_loader>`.
+
+  ## Examples
+
+      <.loading_spinner id="delete-pm-spinner" class="w-4 h-4 text-red-600" />
+
+      <.loading_spinner
+        id="avatar-processing-spinner"
+        class="w-8 h-8 text-blue-600"
+      />
+  """
+  attr :id, :string, required: true
+
+  attr :class, :any,
+    default: "w-5 h-5",
+    doc: "Size and color utilities (merged with `animate-spin`)"
+
+  def loading_spinner(assigns) do
+    ~H"""
+    <svg
+      id={@id}
+      class={["animate-spin", @class]}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        class="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        stroke-width="4"
+      />
+      <path
+        class="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
     """
   end
 
