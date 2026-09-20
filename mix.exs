@@ -235,10 +235,12 @@ defmodule Ysc.MixProject do
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
-      # 1.10.0: EEF-CVE-2026-82728 (unbounded HTTP/1 status-line / chunk-extension
-      # buffering) and EEF-CVE-2026-82729 (quadratic chunk-size parsing). Finch
-      # still lists mint ~> 1.8, so pin the patched floor.
-      {:mint, "~> 1.10", override: true},
+      # 1.10.1: EEF-CVE-2026-82672 (unvalidated HTTP/1 chunk-size line tail →
+      # response smuggling on pooled connections). 1.10.0 also covers
+      # EEF-CVE-2026-82728 (unbounded status-line / chunk-extension buffering)
+      # and EEF-CVE-2026-82729 (quadratic chunk-size parsing). Finch still lists
+      # mint ~> 1.8, so pin the patched floor.
+      {:mint, "~> 1.10.1", override: true},
       {:floki, "~> 0.38"},
       {:flop, "~> 0.28.0"},
       {:flop_phoenix, "~> 0.26.3"},
@@ -344,7 +346,9 @@ defmodule Ysc.MixProject do
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
       # 1.27.1: AmazonSES returns {:error, %{code, message}} instead of crashing when
       # SES error XML is missing Code/Message nodes (we use SES).
-      {:swoosh, "~> 1.27.1"},
+      # 1.28.0: TurboSMTP adapter. 1.28.1: Customer.io CC. We use AmazonSES, so
+      # both are unused.
+      {:swoosh, "~> 1.28.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
       # tag_values is still supported and emits no deprecation warning. We keep

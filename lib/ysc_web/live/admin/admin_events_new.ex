@@ -416,7 +416,7 @@ defmodule YscWeb.AdminEventsNewLive do
               for={@form}
               id="new_event_form"
               phx-change="validate"
-              class="space-y-6 max-w-3xl"
+              class="space-y-6 max-w-3xl mt-6"
             >
               <.input
                 type="hidden"
