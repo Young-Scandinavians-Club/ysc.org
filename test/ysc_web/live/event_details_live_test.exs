@@ -2179,6 +2179,52 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       refute has_element?(view, "span", "1x Donation")
     end
+
+    test "shows a partial refund badge when an order has cancelled sibling tickets",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      paid_tier = hd(event.ticket_tiers)
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: paid_tier,
+          ticket_selections: %{paid_tier.id => 2}
+        })
+
+      [first, second] =
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload([:tickets])
+        |> Map.fetch!(:tickets)
+        |> Enum.sort_by(& &1.id)
+
+      first
+      |> Ecto.Changeset.change(status: :confirmed)
+      |> Ysc.Repo.update!()
+
+      second
+      |> Ecto.Changeset.change(status: :cancelled)
+      |> Ysc.Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert has_element?(view, "#user-tickets-section")
+
+      assert has_element?(
+               view,
+               "#user-tickets-confirmed-count",
+               "1 confirmed ticket"
+             )
+
+      html = render(view)
+      assert html =~ "Partial Refund"
+    end
   end
 
   describe "attendees section" do

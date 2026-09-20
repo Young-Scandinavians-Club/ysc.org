@@ -4232,30 +4232,19 @@ defmodule YscWeb.EventDetailsLive do
   defp load_user_tickets(nil, _event_id), do: {[], %{}}
 
   defp load_user_tickets(current_user, event_id) do
-    import Ecto.Query
-    alias Ysc.Events.Ticket
+    Ysc.Tickets.list_user_event_tickets_for_page(current_user.id, event_id)
+  end
 
-    confirmed_tickets =
-      Ysc.Tickets.list_user_tickets_for_event(current_user.id, event_id)
+  defp assign_user_event_tickets(socket, user, event_id) do
+    {user_tickets, all_tickets_by_order} = load_user_tickets(user, event_id)
 
-    order_ids =
-      confirmed_tickets
-      |> Enum.filter(&(&1.ticket_order_id != nil))
-      |> Enum.map(& &1.ticket_order_id)
-      |> Enum.uniq()
-
-    all_tickets_by_order =
-      if Enum.empty?(order_ids) do
-        %{}
-      else
-        Ticket
-        |> where([t], t.ticket_order_id in ^order_ids)
-        |> preload([:ticket_tier, :ticket_order])
-        |> Repo.all()
-        |> Enum.group_by(& &1.ticket_order_id)
-      end
-
-    {confirmed_tickets, all_tickets_by_order}
+    socket
+    |> assign(:user_tickets, user_tickets)
+    |> assign(:all_tickets_by_order, all_tickets_by_order)
+    |> assign(
+      :member_only_tickets_owned,
+      member_only_owned_count(user_tickets)
+    )
   end
 
   defp load_user_reservations(nil, _event_id), do: []
@@ -5846,22 +5835,15 @@ defmodule YscWeb.EventDetailsLive do
         # The payment actually succeeded moments before the user closed the
         # modal - grant the tickets and send them to the confirmation page
         # instead of discarding a paid-for order.
-        updated_user_tickets =
-          Ysc.Tickets.list_user_tickets_for_event(
-            socket.assigns.current_user.id,
-            socket.assigns.event.id
-          )
-
         {:noreply,
          socket
          |> assign(:show_payment_modal, false)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
-         |> assign(:user_tickets, updated_user_tickets)
-         |> assign(
-           :member_only_tickets_owned,
-           member_only_owned_count(updated_user_tickets)
+         |> assign_user_event_tickets(
+           socket.assigns.current_user,
+           socket.assigns.event.id
          )
          |> assign(:payment_intent, nil)
          |> clear_selected_tickets()
@@ -7807,22 +7789,14 @@ defmodule YscWeb.EventDetailsLive do
       order ->
         case Ysc.Tickets.process_free_ticket_order(order) do
           {:ok, updated_order} ->
-            # Update user tickets for this event
-            updated_user_tickets =
-              Ysc.Tickets.list_user_tickets_for_event(
-                socket.assigns.current_user.id,
-                socket.assigns.event.id
-              )
-
             {:noreply,
              socket
              |> assign(:show_free_ticket_confirmation, false)
              |> assign(:show_order_completion, true)
              |> assign(:ticket_order, updated_order)
-             |> assign(:user_tickets, updated_user_tickets)
-             |> assign(
-               :member_only_tickets_owned,
-               member_only_owned_count(updated_user_tickets)
+             |> assign_user_event_tickets(
+               socket.assigns.current_user,
+               socket.assigns.event.id
              )
              |> clear_selected_tickets()
              |> assign(:tickets_requiring_registration, [])
@@ -7867,23 +7841,15 @@ defmodule YscWeb.EventDetailsLive do
     # Process the successful payment
     case Ysc.Tickets.StripeService.process_successful_payment(payment_intent_id) do
       {:ok, completed_order} ->
-        # Update user tickets for this event
-        updated_user_tickets =
-          Ysc.Tickets.list_user_tickets_for_event(
-            socket.assigns.current_user.id,
-            socket.assigns.event.id
-          )
-
         {:noreply,
          socket
          |> assign(:show_payment_modal, false)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
-         |> assign(:user_tickets, updated_user_tickets)
-         |> assign(
-           :member_only_tickets_owned,
-           member_only_owned_count(updated_user_tickets)
+         |> assign_user_event_tickets(
+           socket.assigns.current_user,
+           socket.assigns.event.id
          )
          |> assign(:payment_intent, nil)
          |> clear_selected_tickets()

@@ -947,6 +947,58 @@ defmodule Ysc.TicketsTest do
       assert loaded.event.rendered_details == nil
     end
 
+    test "omits grant notes, Stripe payment-intent ids, and tier description",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      tier1
+      |> Ecto.Changeset.change(%{
+        description: "toast copy the member ticket list must not load"
+      })
+      |> Repo.update!()
+
+      order
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes: "grant notes the member ticket list must not load",
+        cancellation_reason: "cancel copy the member ticket list must not load",
+        payment_intent_id: "pi_member_ticket_list_secret"
+      })
+      |> Repo.update!()
+
+      {_loaded, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_upcoming_ticket_orders(user.id) end,
+          pattern: ~r/admin_grant_notes|cancellation_reason|payment_intent_id/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, description_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_upcoming_ticket_orders(user.id) end,
+          pattern:
+            ~r/ticket_tiers.*description|t1\.\"description\"|tt0\.\"description\"/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] = Tickets.list_user_upcoming_ticket_orders(user.id)
+      ticket = hd(loaded.tickets)
+
+      assert notes_cols == 0
+      assert description_cols == 0
+      assert loaded.id == order.id
+      assert loaded.reference_id == order.reference_id
+      assert loaded.admin_grant_notes == nil
+      assert loaded.payment_intent_id == nil
+      assert ticket.ticket_tier.name == tier1.name
+      assert ticket.ticket_tier.price == tier1.price
+      assert ticket.ticket_tier.description == nil
+    end
+
     test "respects limit option", %{user: user} do
       for i <- 1..3 do
         {:ok, event} =
@@ -1055,6 +1107,124 @@ defmodule Ysc.TicketsTest do
       assert ticket.event.start_date == event.start_date
       assert ticket.event.raw_details == nil
       assert ticket.event.rendered_details == nil
+    end
+
+    test "omits tier description and order Stripe payment-intent ids", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      from(t in Ticket, where: t.ticket_order_id == ^order.id)
+      |> Repo.update_all(set: [status: :confirmed])
+
+      tier1
+      |> Ecto.Changeset.change(%{
+        description: "toast copy the QR ticket list must not load"
+      })
+      |> Repo.update!()
+
+      order
+      |> Ecto.Changeset.change(%{
+        payment_intent_id: "pi_qr_ticket_list_secret",
+        admin_grant_notes: "grant notes the QR ticket list must not load"
+      })
+      |> Repo.update!()
+
+      {_loaded, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_tickets_for_event(user.id, event.id) end,
+          pattern: ~r/admin_grant_notes|payment_intent_id/i,
+          caller_pids: [self()]
+        )
+
+      [ticket] = Tickets.list_user_tickets_for_event(user.id, event.id)
+
+      assert notes_cols == 0
+      assert ticket.ticket_tier.name == tier1.name
+      assert ticket.ticket_tier.description == nil
+      assert ticket.ticket_order.reference_id == order.reference_id
+      assert ticket.ticket_order.payment_intent_id == nil
+    end
+  end
+
+  describe "list_user_event_tickets_for_page/2" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns confirmed tickets plus cancelled siblings in one tickets query",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      [first, second] = tickets_for_order(order.id)
+
+      first |> Ecto.Changeset.change(status: :confirmed) |> Repo.update!()
+      second |> Ecto.Changeset.change(status: :cancelled) |> Repo.update!()
+
+      tier1
+      |> Ecto.Changeset.change(%{
+        description: "toast copy the event page must not load"
+      })
+      |> Repo.update!()
+
+      order
+      |> Ecto.Changeset.change(%{
+        payment_intent_id: "pi_event_page_ticket_secret",
+        admin_grant_notes: "grant notes the event page must not load"
+      })
+      |> Repo.update!()
+
+      {{confirmed, by_order}, ticket_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_event_tickets_for_page(user.id, event.id) end,
+          pattern: ~r/FROM "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_event_tickets_for_page(user.id, event.id) end,
+          pattern: ~r/admin_grant_notes|payment_intent_id/i,
+          caller_pids: [self()]
+        )
+
+      assert ticket_queries == 1
+      assert notes_cols == 0
+      assert Enum.map(confirmed, & &1.id) == [first.id]
+
+      siblings = Map.fetch!(by_order, order.id)
+
+      assert Enum.sort(Enum.map(siblings, & &1.id)) ==
+               Enum.sort([first.id, second.id])
+
+      assert Enum.any?(siblings, &(&1.status == :cancelled))
+
+      loaded = hd(confirmed)
+      assert loaded.ticket_tier.name == tier1.name
+      assert loaded.ticket_tier.description == nil
+      assert loaded.ticket_order.reference_id == order.reference_id
+      assert loaded.ticket_order.payment_intent_id == nil
+    end
+
+    test "returns empty when the user has no confirmed tickets for the event",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, _order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert Tickets.list_user_event_tickets_for_page(user.id, event.id) ==
+               {[], %{}}
     end
   end
 
@@ -3155,9 +3325,14 @@ defmodule Ysc.TicketsTest do
                Tickets.ci_query_explain_list_orders_for_event_refund_query()
     end
 
-    test "ci_query_explain_owned_member_only_tickets_count_query/0 builds an Ecto.Query" do
+    test "ci_query_explain_list_user_tickets_for_event_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
-               Tickets.ci_query_explain_owned_member_only_tickets_count_query()
+               Tickets.ci_query_explain_list_user_tickets_for_event_query()
+    end
+
+    test "ci_query_explain_list_user_event_tickets_for_page_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_list_user_event_tickets_for_page_query()
     end
   end
 end

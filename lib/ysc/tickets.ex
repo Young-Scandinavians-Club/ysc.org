@@ -419,6 +419,43 @@ defmodule Ysc.Tickets do
     |> Repo.all()
   end
 
+  # Member "Your Tickets" list: order identity + ticket cards. Omits Stripe
+  # payment-intent ids, grant notes, and cancellation copy the page never renders.
+  @member_upcoming_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :event_id,
+    :expires_at,
+    :total_amount
+  ]
+  @member_upcoming_ticket_fields [
+    :id,
+    :reference_id,
+    :status,
+    :ticket_tier_id,
+    :ticket_order_id,
+    :discount_amount
+  ]
+  @member_upcoming_ticket_tier_fields [:id, :name, :type, :price]
+
+  # Public event page + QR check-in: ticket identity, order grouping, and
+  # member-only counting. Omits payment ids, check-in columns, and tier
+  # description / sale-window columns.
+  @member_event_ticket_fields [
+    :id,
+    :reference_id,
+    :status,
+    :inserted_at,
+    :ticket_order_id,
+    :ticket_tier_id,
+    :user_id,
+    :event_id
+  ]
+  @member_event_ticket_tier_fields [:id, :name, :type, :member_only]
+  @member_event_ticket_order_fields [:id, :reference_id, :completed_at]
+  @member_event_registration_fields [:id, :ticket_id, :first_name, :last_name]
+
   @doc """
   Ticket orders for the member "Your Tickets" list: not cancelled, linked to an event,
   and the event start is strictly after `now` (same filter semantics as `UserTicketsLive`).
@@ -430,7 +467,24 @@ defmodule Ysc.Tickets do
     now = Keyword.get(opts, :now, DateTime.utc_now())
     limit = Keyword.get(opts, :limit, 50)
 
+    user_id
+    |> list_user_upcoming_ticket_orders_query(now, limit)
+    |> Repo.all()
+  end
+
+  defp list_user_upcoming_ticket_orders_query(user_id, now, limit) do
     event_query = event_summary_preload_query()
+
+    tier_query =
+      from(tt in TicketTier,
+        select: struct(tt, ^@member_upcoming_ticket_tier_fields)
+      )
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@member_upcoming_ticket_fields),
+        preload: [ticket_tier: ^tier_query]
+      )
 
     from(to in TicketOrder,
       where: to.user_id == ^user_id,
@@ -440,13 +494,12 @@ defmodule Ysc.Tickets do
       where: e.start_date > ^now,
       order_by: [desc: to.inserted_at],
       limit: ^limit,
+      select: struct(to, ^@member_upcoming_order_fields),
       preload: [
-        :tickets,
-        tickets: :ticket_tier,
+        tickets: ^ticket_query,
         event: ^event_query
       ]
     )
-    |> Repo.all()
   end
 
   @doc """
@@ -492,23 +545,102 @@ defmodule Ysc.Tickets do
 
   @doc """
   Gets all confirmed tickets for a user for a specific event.
+
+  Used by the QR check-in page. Selects event summary columns (no body HTML),
+  slim tiers, order identity, and registration names — not payment or
+  check-in columns.
   """
   def list_user_tickets_for_event(user_id, event_id) do
+    user_id
+    |> list_user_tickets_for_event_query(event_id)
+    |> Repo.all()
+  end
+
+  defp list_user_tickets_for_event_query(user_id, event_id) do
     event_query = event_summary_preload_query()
+
+    {tier_query, order_query, registration_query} =
+      member_event_ticket_preloads()
 
     from(t in Ticket,
       where:
         t.user_id == ^user_id and t.event_id == ^event_id and
           t.status == :confirmed,
       order_by: [desc: t.inserted_at],
+      select: struct(t, ^@member_event_ticket_fields),
       preload: [
-        :ticket_tier,
-        :ticket_order,
-        :registration,
+        ticket_tier: ^tier_query,
+        ticket_order: ^order_query,
+        registration: ^registration_query,
         event: ^event_query
       ]
     )
-    |> Repo.all()
+  end
+
+  @doc """
+  Tickets for the public event page "Your Tickets" card.
+
+  Returns `{confirmed_tickets, tickets_by_order}` in one tickets SELECT:
+  confirmed tickets the viewer holds, plus every ticket on those same orders
+  (cancelled siblings for refund / partial-refund badges). Previously the
+  LiveView issued a second `WHERE ticket_order_id IN (...)` query after this
+  list, doubling ticket/tier/order preloads.
+  """
+  def list_user_event_tickets_for_page(user_id, event_id) do
+    tickets =
+      user_id
+      |> list_user_event_tickets_for_page_query(event_id)
+      |> Repo.all()
+
+    confirmed_tickets =
+      Enum.filter(tickets, fn ticket ->
+        ticket.user_id == user_id and ticket.status == :confirmed
+      end)
+
+    {confirmed_tickets, Enum.group_by(tickets, & &1.ticket_order_id)}
+  end
+
+  defp list_user_event_tickets_for_page_query(user_id, event_id) do
+    {tier_query, order_query, _registration_query} =
+      member_event_ticket_preloads()
+
+    order_ids_query =
+      from(t in Ticket,
+        where:
+          t.user_id == ^user_id and t.event_id == ^event_id and
+            t.status == :confirmed and not is_nil(t.ticket_order_id),
+        distinct: true,
+        select: t.ticket_order_id
+      )
+
+    from(t in Ticket,
+      where: t.ticket_order_id in subquery(order_ids_query),
+      order_by: [desc: t.inserted_at],
+      select: struct(t, ^@member_event_ticket_fields),
+      preload: [
+        ticket_tier: ^tier_query,
+        ticket_order: ^order_query
+      ]
+    )
+  end
+
+  defp member_event_ticket_preloads do
+    tier_query =
+      from(tt in TicketTier,
+        select: struct(tt, ^@member_event_ticket_tier_fields)
+      )
+
+    order_query =
+      from(to in TicketOrder,
+        select: struct(to, ^@member_event_ticket_order_fields)
+      )
+
+    registration_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@member_event_registration_fields)
+      )
+
+    {tier_query, order_query, registration_query}
   end
 
   @doc """
@@ -3074,24 +3206,27 @@ defmodule Ysc.Tickets do
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
 
-    user_id = Fixtures.ulid()
-    now = Fixtures.now()
-
-    event_query = event_summary_preload_query()
-
-    from(to in TicketOrder,
-      where: to.user_id == ^user_id,
-      where: to.status != ^:cancelled,
-      join: e in Event,
-      on: e.id == to.event_id,
-      where: e.start_date > ^now,
-      order_by: [desc: to.inserted_at],
-      preload: [
-        :tickets,
-        tickets: :ticket_tier,
-        event: ^event_query
-      ]
+    list_user_upcoming_ticket_orders_query(
+      Fixtures.ulid(),
+      Fixtures.now(),
+      50
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_user_tickets_for_event_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    ulid = Fixtures.ulid()
+    list_user_tickets_for_event_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_list_user_event_tickets_for_page_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    ulid = Fixtures.ulid()
+    list_user_event_tickets_for_page_query(ulid, ulid)
   end
 
   @doc false
