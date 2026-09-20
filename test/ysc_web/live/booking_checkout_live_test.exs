@@ -1163,6 +1163,43 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "still processing"
       assert Repo.get!(Booking, booking.id).status == :hold
     end
+
+    test "keeps the hold when Stripe cancel cannot be reached", %{
+      conn: conn,
+      user: user
+    } do
+      {checkin, checkout} = tahoe_booking_dates(21)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      pi_id = "pi_checkout_cancel_timeout_#{System.unique_integer([:positive])}"
+
+      _booking =
+        booking
+        |> Ecto.Changeset.change(%{payment_intent_id: pi_id})
+        |> Repo.update!()
+
+      expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+        {:error, :timeout}
+      end)
+
+      html =
+        view
+        |> element("button[phx-click=\"cancel-booking\"]")
+        |> render_click()
+
+      assert html =~ "cancel this booking from here"
+      assert Repo.get!(Booking, booking.id).status == :hold
+    end
   end
 
   defp booking_ledger_payment_count(booking_id) do
