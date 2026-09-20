@@ -56,7 +56,7 @@ defmodule YscWeb.Components.DateRangePicker do
       >
         <div
           id="calendar_background"
-          class="w-full bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden p-3"
+          class="w-full bg-white rounded-md shadow-lg ring-1 ring-black/5 focus:outline-hidden p-3"
         >
           <div id="calendar_header" class="flex justify-between items-center">
             <button
