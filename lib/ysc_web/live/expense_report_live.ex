@@ -3370,7 +3370,7 @@ defmodule YscWeb.ExpenseReportLive do
         <%= if @bank_account_form do %>
           <div class="fixed inset-0 z-200 overflow-y-auto" id="modal-backdrop">
             <div
-              class="fixed inset-0 transition-opacity bg-zinc-500 bg-opacity-75"
+              class="fixed inset-0 transition-opacity bg-zinc-500/75"
               phx-click="close-bank-account-modal"
               aria-hidden="true"
             >
@@ -3384,7 +3384,7 @@ defmodule YscWeb.ExpenseReportLive do
               </span>
 
               <div
-                class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
                 phx-click-away="close-bank-account-modal"
                 phx-click="noop"
               >
