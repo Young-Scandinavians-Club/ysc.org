@@ -326,6 +326,7 @@ defmodule Ysc.Agendas do
     end
   end
 
+  @dialyzer {:nowarn_function, do_create_agenda_item: 3}
   defp do_create_agenda_item(event_id, agenda, attrs) do
     changeset = AgendaItem.changeset(%AgendaItem{agenda_id: agenda.id}, attrs)
 
