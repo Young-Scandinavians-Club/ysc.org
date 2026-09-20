@@ -274,34 +274,5 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorkerTest do
       assert {:discard, msg} = QuickbooksSyncPaymentWorker.perform(job)
       assert is_binary(msg)
     end
-
-    test "returns ok when payment row is locked by another transaction" do
-      # Verify the worker's rescue clause correctly handles the
-      # Postgrex lock_not_available error that FOR UPDATE NOWAIT raises.
-      # Real lock contention can't be simulated in Ecto SQL Sandbox
-      # (all processes share one connection), so we exercise the rescue
-      # logic directly by wrapping perform in a function that raises.
-      error =
-        %Postgrex.Error{
-          postgres: %{
-            code: :lock_not_available,
-            message: "could not obtain lock on row"
-          }
-        }
-
-      result =
-        try do
-          raise error
-        rescue
-          e in Postgrex.Error ->
-            if match?(%{postgres: %{code: :lock_not_available}}, e) do
-              :ok
-            else
-              reraise e, __STACKTRACE__
-            end
-        end
-
-      assert result == :ok
-    end
   end
 end
