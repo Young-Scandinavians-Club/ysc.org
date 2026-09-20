@@ -31,15 +31,15 @@ html.sidebar-collapsed #admin-collapse-chevron {
 }
 
 
-/* Sidebar nav scroll area — thin track that matches zinc-600 (#52525b), thumb aligned with nav hovers / blue accent */
+/* Sidebar nav scroll area — thin track that matches zinc-600, thumb aligned with nav hovers / blue accent */
 
 #admin-sidebar-menu-scroll {
     scrollbar-width: thin;
-    scrollbar-color: #52525b transparent;
+    scrollbar-color: var(--color-zinc-600) transparent;
 }
 
 #admin-sidebar-menu-scroll:hover {
-    scrollbar-color: #71717a transparent;
+    scrollbar-color: var(--color-zinc-500) transparent;
 }
 
 #admin-sidebar-menu-scroll::-webkit-scrollbar {
@@ -977,7 +977,7 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
     padding-right: 14px;
     -ms-overflow-style: auto;
     scrollbar-width: thin;
-    scrollbar-color: #a1a1aa #f4f4f5;
+    scrollbar-color: var(--color-zinc-400) #f4f4f5;
 }
 
 .calendar-scroll-area::-webkit-scrollbar {
@@ -991,12 +991,12 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 }
 
 .calendar-scroll-area::-webkit-scrollbar-thumb {
-    background: #a1a1aa;
+    background: var(--color-zinc-400);
     border-radius: 9999px;
 }
 
 .calendar-scroll-area::-webkit-scrollbar-thumb:hover {
-    background: #71717a;
+    background: var(--color-zinc-500);
 }
 
 .calendar-booking-bar {
@@ -1283,7 +1283,7 @@ html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot {
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #52525b;
+    color: var(--color-zinc-600);
     margin: 0 0 0.5rem;
 }
 
@@ -1297,14 +1297,14 @@ html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot {
 
 .admin-help-print-summary {
     font-size: 12pt;
-    color: #3f3f46;
+    color: var(--color-zinc-700);
     margin: 0 0 0.75rem;
     max-width: 42rem;
 }
 
 .admin-help-print-meta {
     font-size: 9pt;
-    color: #71717a;
+    color: var(--color-zinc-500);
     margin: 0;
 }
 
@@ -1385,7 +1385,7 @@ html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot {
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #3f3f46;
+    color: var(--color-zinc-700);
 }
 
 .admin-help-print-figure {
@@ -1412,7 +1412,7 @@ html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot {
 .admin-help-print-cta {
     margin: 0.75rem 0 0;
     font-size: 10pt;
-    color: #3f3f46;
+    color: var(--color-zinc-700);
 }
 
 .admin-help-print-appendix {
@@ -1434,13 +1434,13 @@ html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot {
 
 .admin-help-print-faq dd {
     margin: 0.25rem 0 0;
-    color: #3f3f46;
+    color: var(--color-zinc-700);
 }
 
 .admin-help-print-troubleshooting {
     margin: 0;
     padding-left: 1.25rem;
-    color: #3f3f46;
+    color: var(--color-zinc-700);
 }
 
 .admin-help-print-troubleshooting li {
@@ -1473,13 +1473,13 @@ html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot {
 .admin-help-print-guide-card p {
     margin: 0;
     font-size: 10pt;
-    color: #52525b;
+    color: var(--color-zinc-600);
 }
 
 .admin-help-print-guide-url {
     margin-top: 0.35rem !important;
     font-size: 8.5pt !important;
-    color: #71717a !important;
+    color: var(--color-zinc-500) !important;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -1488,7 +1488,7 @@ html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot {
     padding-top: 0.75rem;
     border-top: 1px solid #d4d4d8;
     font-size: 9pt;
-    color: #71717a;
+    color: var(--color-zinc-500);
     break-inside: avoid;
 }
 
