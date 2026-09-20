@@ -2684,7 +2684,10 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={payment <- @selected_payout.payments}>
+                <tr
+                  :for={payment <- @selected_payout.payments}
+                  id={"payout-modal-payment-#{payment.id}"}
+                >
                   <td class="px-4 py-2 whitespace-nowrap font-mono text-xs">
                     {payment.reference_id}
                   </td>
@@ -2797,7 +2800,10 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={refund <- @selected_payout.refunds}>
+                <tr
+                  :for={refund <- @selected_payout.refunds}
+                  id={"payout-modal-refund-#{refund.id}"}
+                >
                   <td class="px-4 py-2 whitespace-nowrap font-mono text-xs">
                     {refund.reference_id}
                   </td>
