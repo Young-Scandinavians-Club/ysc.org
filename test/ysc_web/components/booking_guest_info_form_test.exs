@@ -52,7 +52,7 @@ defmodule YscWeb.Components.BookingGuestInfoFormTest do
         selected_family_members_for_guests: %{},
         current_user: nil,
         intro_text: "Custom intro for checkout",
-        submit_label: "Continue to Payment"
+        submit_label: "Continue to payment"
       }
 
       heex = ~H"""
@@ -86,7 +86,7 @@ defmodule YscWeb.Components.BookingGuestInfoFormTest do
       assert html =~ "Child Guest"
       assert html =~ ~s|id="guest-number-1"|
       assert html =~ ~s|id="guest-number-2"|
-      assert html =~ "Continue to Payment"
+      assert html =~ "Continue to payment"
       assert html =~ ~s|name="guests[1][first_name]"|
       assert html =~ ~s|type="hidden" name="guests[0][first_name]"|
     end

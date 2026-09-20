@@ -509,7 +509,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert html =~ "not be charged until your application is approved"
     end
 
-    test "shows authorization and auto-renewal copy", %{conn: conn, user: user} do
+    test "shows authorization and automatic renewal copy", %{conn: conn, user: user} do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "1"}))
 
@@ -517,6 +517,10 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       assert html =~ "charge this card for your first year of membership"
       assert html =~ "renews automatically each year"
+      assert html =~ "automatic renewal"
+      refute html =~ "auto-renewal"
+      assert html =~ "Save your card"
+      assert html =~ "Save card &amp; continue"
     end
 
     test "stepper is visible on step 1", %{conn: conn, user: user} do

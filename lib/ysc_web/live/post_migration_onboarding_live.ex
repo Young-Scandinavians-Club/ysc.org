@@ -711,7 +711,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Your Membership
           <:subtitle>
-            Your membership is active. Review the details below and make sure a payment method is on file for auto-renewal.
+            Your membership is active. Review the details below and make sure a card or bank account is on file for automatic renewal.
           </:subtitle>
         </.header>
 
@@ -775,7 +775,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             <div class="mt-6 flex justify-end">
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
                 <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
-                Add Payment Method
+                Add a card
               </.button>
             </div>
           <% else %>
@@ -795,7 +795,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <div class="flex justify-end mt-4">
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
                   <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
-                  Save Payment Method
+                  Save card
                 </.button>
               </div>
             </form>
@@ -804,9 +804,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <% else %>
         <%!-- No active subscription: offer to set one up, with a skip option --%>
         <.header class="text-left">
-          Set Up Renewal Payment
+          Set up automatic renewal
           <:subtitle>
-            Add a card or bank account so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a payment method later in account settings.
+            Add a card or bank account so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a card later in account settings.
           </:subtitle>
         </.header>
 
@@ -845,7 +845,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               phx-click="confirm_payment_step"
               phx-disable-with="Setting up renewal..."
             >
-              Turn on auto-renewal and continue
+              Turn on automatic renewal and continue
               <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>
@@ -863,7 +863,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               </.button>
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
                 <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
-                Add Payment Method
+                Add a card
               </.button>
             </div>
           <% else %>
@@ -892,7 +892,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 </.button>
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
                   <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
-                  Save payment method
+                  Save card
                 </.button>
               </div>
             </form>
@@ -1848,7 +1848,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     base =
       if skip_payment,
         do: base,
-        else: base ++ [{"Renewal Payment", @step_payment}]
+        else: base ++ [{"Save card", @step_payment}]
 
     if needs_family_members_step,
       do: base ++ [{"Family", @step_family}],

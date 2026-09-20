@@ -26,7 +26,7 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
   end
 
   def get_subject() do
-    "Booking Cancellation Confirmed"
+    "Your booking is cancelled"
   end
 
   def booking_url(booking_id) do

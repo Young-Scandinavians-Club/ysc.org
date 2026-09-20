@@ -735,7 +735,7 @@ defmodule YscWeb.BookingCheckoutLive do
               <%= if @complimentary_checkout do %>
                 Continue to confirmation
               <% else %>
-                Continue to Payment
+                Continue to payment
               <% end %>
             </span>
             <.icon name="hero-arrow-right" class="w-5 h-5" />
@@ -3185,7 +3185,7 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp checkout_guest_info_submit_label(true), do: "Continue to confirmation"
-  defp checkout_guest_info_submit_label(false), do: "Continue to Payment"
+  defp checkout_guest_info_submit_label(false), do: "Continue to payment"
 
   defp save_guests(booking, guest_changesets) when is_list(guest_changesets) do
     # Delete existing guests first (in case of re-submission)

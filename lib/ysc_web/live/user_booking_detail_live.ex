@@ -379,7 +379,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 <% end %>
 
                 <div class="flex justify-between text-sm">
-                  <span class="text-zinc-600">Payment Method</span>
+                  <span class="text-zinc-600">How you paid</span>
                   <span class="text-zinc-900">
                     {get_payment_method_description(@payment)}
                   </span>
@@ -791,7 +791,7 @@ defmodule YscWeb.UserBookingDetailLive do
     MoneyHelper.format_money!(Money.new(normalize_currency(currency), amount))
   end
 
-  defp format_money_from_map(_), do: "N/A"
+  defp format_money_from_map(_), do: "Not available"
 
   defp sync_booking_after_partial_cancel(socket, booking, reason) do
     if partial_cancel_post_booking_error?(reason) do

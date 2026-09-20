@@ -125,6 +125,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       refute has_element?(view, "#booking-payment-loading")
       html = render(view)
       assert html =~ "Payment Summary"
+      assert html =~ "How you paid"
+      refute html =~ "Payment Method"
     end
 
     test "does not show children suffix when children_count is zero", %{

@@ -148,7 +148,7 @@
     <%= if @payment_method != "Free" do %>
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Payment Details </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Payment Method: <strong><%= @payment_method %></strong>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> How you paid: <strong><%= @payment_method %></strong>
     </mj-text>
     <%= if @paid_in_person do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Amount Collected: <strong><%= @total_amount %></strong>

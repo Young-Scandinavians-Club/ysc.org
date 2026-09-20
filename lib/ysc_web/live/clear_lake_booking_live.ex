@@ -1490,7 +1490,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       class="w-full text-lg py-4"
                       color="teal"
                     >
-                      Continue to Payment
+                      Continue to payment
                     </.button>
                     <.button
                       :if={@availability_error}
@@ -1547,7 +1547,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   end
                 }
               >
-                Continue to Payment
+                Continue to payment
               </.button>
             </div>
           </div>

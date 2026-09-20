@@ -49,7 +49,7 @@ defmodule YscWeb.Emails.BookingCancellationEmailsTest do
       assert data.payment.reference_id == "N/A"
 
       html = BookingCancellationConfirmation.render(data)
-      assert html =~ "No Refund"
+      assert html =~ "No refund"
       refute html =~ "Original Payment"
     end
 
@@ -95,7 +95,7 @@ defmodule YscWeb.Emails.BookingCancellationEmailsTest do
 
     test "get_subject/0 and booking_url/1" do
       assert BookingCancellationConfirmation.get_subject() ==
-               "Booking Cancellation Confirmed"
+               "Your booking is cancelled"
 
       booking = booking_with_user()
 

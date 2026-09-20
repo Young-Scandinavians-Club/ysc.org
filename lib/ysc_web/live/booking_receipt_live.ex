@@ -1185,7 +1185,7 @@ defmodule YscWeb.BookingReceiptLive do
               <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <div class="flex items-center gap-2 text-amber-800">
                   <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
-                  <p class="font-semibold">No Refund Available</p>
+                  <p class="font-semibold">No refund available</p>
                 </div>
                 <p class="text-sm text-amber-700 mt-2 pl-7">
                   This booking was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
@@ -1234,7 +1234,7 @@ defmodule YscWeb.BookingReceiptLive do
                 <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <div class="flex items-center gap-2 text-amber-800">
                     <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
-                    <p class="font-semibold">No Refund Available</p>
+                    <p class="font-semibold">No refund available</p>
                   </div>
                   <p class="text-sm text-amber-700 mt-2 pl-7">
                     Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.

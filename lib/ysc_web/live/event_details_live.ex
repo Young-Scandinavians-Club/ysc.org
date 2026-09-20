@@ -2995,7 +2995,7 @@ defmodule YscWeb.EventDetailsLive do
               <%= if Money.zero?(@ticket_order.total_amount) do %>
                 Continue to Confirmation
               <% else %>
-                Continue to Payment
+                Continue to payment
               <% end %>
             </.button>
           </div>
