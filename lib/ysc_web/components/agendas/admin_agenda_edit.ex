@@ -292,6 +292,9 @@ defmodule YscWeb.AgendaEditComponent do
           {:ok, _updated_agenda_item} ->
             {:noreply, socket}
 
+          {:error, :wrong_event} ->
+            {:noreply, resync_agenda_items(socket)}
+
           {:error, changeset} ->
             {:noreply,
              stream_insert(
@@ -316,6 +319,9 @@ defmodule YscWeb.AgendaEditComponent do
           socket |> stream_delete(:agenda_items, empty_form)
         }
 
+      {:error, :wrong_event} ->
+        {:noreply, resync_agenda_items(socket)}
+
       {:error, changeset} ->
         {:noreply,
          stream_insert(
@@ -339,10 +345,16 @@ defmodule YscWeb.AgendaEditComponent do
         {:noreply, socket}
 
       agenda_item ->
-        {:ok, _} =
-          Agendas.delete_agenda_item(socket.assigns.event_id, agenda_item)
+        case Agendas.delete_agenda_item(socket.assigns.event_id, agenda_item) do
+          {:ok, _} ->
+            {:noreply, socket}
 
-        {:noreply, socket}
+          {:error, :wrong_event} ->
+            {:noreply, resync_agenda_items(socket)}
+
+          {:error, _} ->
+            {:noreply, socket}
+        end
     end
   end
 

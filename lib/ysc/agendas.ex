@@ -250,6 +250,20 @@ defmodule Ysc.Agendas do
   end
 
   def update_agenda_item(event_id, agenda_item, params) do
+    # Finding 75: refuse updates when the item is not on this event, and never
+    # accept a client `agenda_id` reassignment (cast removed on AgendaItem).
+    agenda_item = preload_agenda_item_event(agenda_item)
+
+    cond do
+      is_nil(agenda_item.agenda) or agenda_item.agenda.event_id != event_id ->
+        {:error, :wrong_event}
+
+      true ->
+        do_update_agenda_item(event_id, agenda_item, params)
+    end
+  end
+
+  defp do_update_agenda_item(event_id, agenda_item, params) do
     agenda_item
     |> AgendaItem.changeset(params)
     |> Repo.update()
@@ -267,6 +281,18 @@ defmodule Ysc.Agendas do
   end
 
   def update_agenda(event_id, agenda, params) do
+    # Finding 75: refuse title saves that try to re-home the agenda onto
+    # another event (`event_id` is no longer cast; still gate on ownership).
+    agenda = ensure_agenda_struct(agenda)
+
+    if agenda.event_id == event_id do
+      do_update_agenda(event_id, agenda, params)
+    else
+      {:error, :wrong_event}
+    end
+  end
+
+  defp do_update_agenda(event_id, agenda, params) do
     agenda
     |> Agenda.changeset(params)
     |> Repo.update()
@@ -289,6 +315,18 @@ defmodule Ysc.Agendas do
 
   @dialyzer {:nowarn_function, create_agenda_item: 3}
   def create_agenda_item(event_id, agenda, attrs \\ %{}) do
+    # Finding 75: agenda must belong to this event; `agenda_id` is taken from
+    # the loaded agenda struct only (not from client attrs).
+    agenda = ensure_agenda_struct(agenda)
+
+    if agenda.event_id == event_id do
+      do_create_agenda_item(event_id, agenda, attrs)
+    else
+      {:error, :wrong_event}
+    end
+  end
+
+  defp do_create_agenda_item(event_id, agenda, attrs) do
     changeset = AgendaItem.changeset(%AgendaItem{agenda_id: agenda.id}, attrs)
 
     Ecto.Multi.new()

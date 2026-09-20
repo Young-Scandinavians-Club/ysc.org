@@ -24,9 +24,16 @@ defmodule Ysc.Events.Agenda do
     timestamps()
   end
 
+  @doc """
+  Changeset for agenda title (and required `event_id` already on the struct).
+
+  Does not cast `:event_id` from attrs — the owning event is set by
+  `Agendas.create_agenda/2`. Casting `event_id` from the editor title form
+  allowed reassigning an agenda onto another event (Finding 75).
+  """
   def changeset(agenda, attrs) do
     agenda
-    |> cast(attrs, [:title, :event_id])
+    |> cast(attrs, [:title])
     |> validate_required([:title, :event_id])
     |> validate_length(:title, max: 256)
     |> foreign_key_constraint(:event_id)
