@@ -157,6 +157,51 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
       assert length(refunds) == 1
     end
 
+    test "refunding still cancels tickets when the event has already started",
+         %{conn: conn} do
+      event = event_fixture(%{state: :published})
+
+      %{ticket_order: order, tickets: [ticket], payment: payment} =
+        completed_ticket_order_with_payment!(event: event)
+
+      event
+      |> Ecto.Changeset.change(%{
+        start_date:
+          DateTime.utc_now()
+          |> DateTime.add(-2, :day)
+          |> DateTime.truncate(:second),
+        end_date:
+          DateTime.utc_now()
+          |> DateTime.add(-1, :day)
+          |> DateTime.truncate(:second)
+      })
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      view
+      |> element("#cancellation-refund-order-#{order.id} input[type=checkbox]")
+      |> render_click()
+
+      view
+      |> element("button[phx-click='refund-selected']")
+      |> render_click()
+
+      assert Repo.get!(Ticket, ticket.id).status == :cancelled
+      assert Repo.get!(TicketOrder, order.id).status == :cancelled
+
+      refunds =
+        Repo.all(
+          from(r in Ysc.Ledgers.Refund, where: r.payment_id == ^payment.id)
+        )
+
+      assert length(refunds) == 1
+    end
+
     test "an already-refunded order shows a Refunded badge with no checkbox",
          %{conn: conn} do
       event = event_fixture(%{state: :published})
