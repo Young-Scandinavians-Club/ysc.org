@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Booking Cancellation Confirmed</strong>
+      <strong>Your booking is cancelled</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -50,12 +50,12 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Refund Amount:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @refund.amount %></span>
     </mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your refund will go back to your original payment method within 5-10 business days.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your refund will go back to the same card or bank account you used within 5–10 business days.</mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" css-class="gray-alert-box" background-color="#F9FAFB" border-left="4px solid #6B7280" border-radius="6px">
-      <strong>No Refund:</strong> Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.
+      <strong>No refund:</strong> Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <% end %>

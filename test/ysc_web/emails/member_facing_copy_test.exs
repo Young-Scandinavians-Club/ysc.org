@@ -830,6 +830,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "You don't need to do anything else"
       assert text =~ "Cabin Master"
       assert text =~ "money is on the way"
+      assert text =~ "same card or bank account you used"
+      refute text =~ "original payment method"
       assert text =~ "Payment number:"
       refute text =~ "Payment Reference"
       refute text =~ "refund request"
@@ -883,7 +885,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       completed_text = html_text(completed_html)
 
-      assert completed_text =~ "go back to your original payment method"
+      assert completed_text =~
+               "go back to the same card or bank account you used"
+
       assert completed_text =~ "Payment number:"
       refute completed_text =~ "Payment Reference"
       refute completed_text =~ "will be processed"

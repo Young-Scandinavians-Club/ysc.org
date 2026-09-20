@@ -130,9 +130,9 @@ defmodule YscWeb.AccountSetupLive do
             </.header>
           <% else %>
             <.header class="text-left">
-              Save Your Payment Method
+              Save your card
               <:subtitle>
-                Save a payment method so we can activate your membership if you're approved. You won't be charged until the board approves your application.
+                Save a card so we can activate your membership if you're approved. You won't be charged until the board approves your application.
               </:subtitle>
             </.header>
           <% end %>
@@ -154,7 +154,7 @@ defmodule YscWeb.AccountSetupLive do
             <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900 space-y-2">
               <p>
                 <strong>You're approved.</strong>
-                We'll charge your card now for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
+                We'll charge your card now for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal in account settings.
               </p>
             </div>
 
@@ -191,7 +191,7 @@ defmodule YscWeb.AccountSetupLive do
                 </strong>
               </p>
               <p>
-                If your application is approved, we'll charge this card for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
+                If your application is approved, we'll charge this card for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal in account settings.
               </p>
             </div>
           <% end %>
@@ -220,9 +220,9 @@ defmodule YscWeb.AccountSetupLive do
                 >
                   <.icon name="hero-credit-card" class="w-4 h-4" />
                   <%= if @user.state == :active do %>
-                    Save Payment Method &amp; Activate
+                    Save card &amp; activate
                   <% else %>
-                    Save Payment Method &amp; Continue
+                    Save card &amp; continue
                   <% end %>
                 </.button>
               </div>

@@ -1428,7 +1428,7 @@ defmodule YscWeb.UserSettingsLive do
                     disabled={!@user_is_active}
                     class="w-full sm:w-auto justify-center"
                   >
-                    Turn on auto-renewal
+                    Turn on automatic renewal
                   </.button>
                   <.button
                     :if={
@@ -1446,10 +1446,10 @@ defmodule YscWeb.UserSettingsLive do
                           @current_membership
                         )
                     }
-                    data-confirm="Turn off automatic renewal? You keep full membership benefits until your current membership year ends, and you can turn auto-renewal back on anytime before then."
+                    data-confirm="Turn off automatic renewal? You keep full membership benefits until your current membership year ends, and you can turn automatic renewal back on anytime before then."
                     class="w-full sm:w-auto justify-center"
                   >
-                    Turn off auto-renewal
+                    Turn off automatic renewal
                   </.button>
                 </div>
               </div>
@@ -4315,7 +4315,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "Couldn't turn off auto-renewal. Please try again.",
+                 "Couldn't turn off automatic renewal. Please try again.",
                  title: "Membership"
                )}
           end
