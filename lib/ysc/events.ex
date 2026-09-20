@@ -649,20 +649,16 @@ defmodule Ysc.Events do
           {:ok, new_event} ->
             Enum.each(event.agendas || [], fn agenda ->
               agenda_cs =
-                %Agenda{}
-                |> Agenda.changeset(%{
-                  event_id: new_event.id,
-                  title: agenda.title
-                })
+                %Agenda{event_id: new_event.id}
+                |> Agenda.changeset(%{title: agenda.title})
                 |> Ecto.Changeset.put_change(:position, agenda.position || 0)
 
               {:ok, new_agenda} = Repo.insert(agenda_cs)
 
               Enum.each(agenda.agenda_items || [], fn item ->
                 item_cs =
-                  %AgendaItem{}
+                  %AgendaItem{agenda_id: new_agenda.id}
                   |> AgendaItem.changeset(%{
-                    agenda_id: new_agenda.id,
                     title: item.title,
                     description: item.description,
                     start_time: item.start_time,

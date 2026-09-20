@@ -20,15 +20,34 @@ defmodule Ysc.Events.AgendaItemTest do
 
       attrs = %{
         title: long_title,
-        description: long_desc,
-        agenda_id: Ecto.ULID.generate()
+        description: long_desc
       }
 
-      changeset = AgendaItem.changeset(%AgendaItem{}, attrs)
+      changeset =
+        AgendaItem.changeset(
+          %AgendaItem{agenda_id: Ecto.ULID.generate()},
+          attrs
+        )
+
       refute changeset.valid?
       assert "should be at most 256 character(s)" in errors_on(changeset).title
 
       assert "should be at most 1024 character(s)" in errors_on(changeset).description
+    end
+
+    test "ignores client-supplied agenda_id (Finding 75)" do
+      owned = Ecto.ULID.generate()
+      forged = Ecto.ULID.generate()
+
+      changeset =
+        AgendaItem.changeset(%AgendaItem{agenda_id: owned}, %{
+          title: "Talk",
+          agenda_id: forged
+        })
+
+      assert changeset.valid?
+      assert Ecto.Changeset.get_field(changeset, :agenda_id) == owned
+      assert is_nil(Ecto.Changeset.get_change(changeset, :agenda_id))
     end
   end
 end

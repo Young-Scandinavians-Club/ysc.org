@@ -29,10 +29,15 @@ defmodule Ysc.Events.AgendaItem do
 
   @doc """
   Creates a changeset for an agenda item.
+
+  Does not cast `:agenda_id` — association ownership is set by the Agendas
+  context (`create_agenda_item/3`, `move_agenda_item_to_agenda/4`). Casting
+  `agenda_id` from LiveView params allowed planting or moving items onto
+  another event's agenda (Finding 75, sibling of Finding 64).
   """
   def changeset(agenda_item, attrs) do
     agenda_item
-    |> cast(attrs, [:title, :description, :start_time, :end_time, :agenda_id])
+    |> cast(attrs, [:title, :description, :start_time, :end_time])
     |> validate_required([:title, :agenda_id])
     |> validate_length(:title, max: 256)
     |> validate_length(:description, max: 1024)

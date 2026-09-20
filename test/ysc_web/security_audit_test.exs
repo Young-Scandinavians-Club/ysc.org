@@ -60,6 +60,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 69 (HIGH)     Volunteers could unpublish then delete live posts via restore-post (Finding 62 bypass)
   Finding 63 (MEDIUM)   Public post comments trusted client post_id, allowing comments on draft/other posts
   Finding 64 (MEDIUM)   Event agenda delete/move did not verify event ownership (cross-event agenda IDOR)
+  Finding 75 (MEDIUM)   Event agenda create/update cast client agenda_id/event_id, allowing cross-event planting and reassignment (Finding 64 bypass)
   Finding 65 (MEDIUM)   Trix upload post_id auto-set cover image on any post without ownership binding
   Finding 66 (MEDIUM)   Ticket checkout ignored tier sale end_date (early-bird price after window)
   Finding 67 (HIGH)     Volunteers could unpublish or cancel any published event
@@ -4010,6 +4011,163 @@ defmodule YscWeb.SecurityAuditTest do
 
       reloaded = Ysc.Agendas.get_agenda_item!(item.id)
       assert reloaded.agenda_id == agenda_a.id
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 75 (MEDIUM): Agenda create/update must not cast association FKs
+  # Finding 64 blocked delete/move across events; create/update still cast
+  # client `agenda_id` / `event_id`, so a volunteer editing Event A could plant
+  # items onto Event B or re-home an entire agenda day onto another event.
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 75: agenda association mass assignment" do
+    test "create_agenda_item ignores forged agenda_id and stays on the source agenda" do
+      organizer = user_fixture(%{role: :volunteer})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Create A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Create B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
+        })
+
+      {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "A"})
+      {:ok, agenda_b} = Ysc.Agendas.create_agenda(event_b, %{title: "B"})
+
+      assert {:ok, item} =
+               Ysc.Agendas.create_agenda_item(event_a.id, agenda_a, %{
+                 "title" => "Planted?",
+                 "agenda_id" => agenda_b.id
+               })
+
+      assert item.agenda_id == agenda_a.id
+      assert Ysc.Agendas.get_agenda!(agenda_b.id).agenda_items == []
+    end
+
+    test "update_agenda_item ignores forged agenda_id and refuses foreign items" do
+      organizer = user_fixture(%{role: :volunteer})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Update A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Update B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
+        })
+
+      {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "A"})
+      {:ok, agenda_b} = Ysc.Agendas.create_agenda(event_b, %{title: "B"})
+
+      {:ok, item} =
+        Ysc.Agendas.create_agenda_item(event_a.id, agenda_a, %{
+          "title" => "Talk"
+        })
+
+      assert {:ok, updated} =
+               Ysc.Agendas.update_agenda_item(event_a.id, item, %{
+                 "title" => "Talk updated",
+                 "agenda_id" => agenda_b.id
+               })
+
+      assert updated.agenda_id == agenda_a.id
+      assert updated.title == "Talk updated"
+
+      assert {:error, :wrong_event} =
+               Ysc.Agendas.update_agenda_item(event_b.id, item, %{
+                 "title" => "Hijacked"
+               })
+
+      reloaded = Ysc.Agendas.get_agenda_item!(item.id)
+      assert reloaded.agenda_id == agenda_a.id
+      assert reloaded.title == "Talk updated"
+    end
+
+    test "update_agenda ignores forged event_id and refuses foreign agendas" do
+      organizer = user_fixture(%{role: :volunteer})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Agenda A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Agenda B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
+        })
+
+      {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "Day 1"})
+
+      assert {:ok, updated} =
+               Ysc.Agendas.update_agenda(event_a.id, agenda_a, %{
+                 "title" => "Day One",
+                 "event_id" => event_b.id
+               })
+
+      assert updated.event_id == event_a.id
+      assert updated.title == "Day One"
+
+      assert {:error, :wrong_event} =
+               Ysc.Agendas.update_agenda(event_b.id, agenda_a, %{
+                 "title" => "Stolen"
+               })
+
+      reloaded = Ysc.Agendas.get_agenda!(agenda_a.id)
+      assert reloaded.event_id == event_a.id
+      assert reloaded.title == "Day One"
     end
   end
 

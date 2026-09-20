@@ -54,10 +54,18 @@ defmodule YscWeb.AgendasLive.FormComponent do
   end
 
   def handle_event("save", %{"agenda" => agenda_params}, socket) do
-    # save_list(socket, socket.assigns.action, agenda_params)
     agenda = Agendas.get_agenda!(socket.assigns.agenda_id)
-    Agendas.update_agenda(socket.assigns.event_id, agenda, agenda_params)
-    {:noreply, socket}
+
+    case Agendas.update_agenda(socket.assigns.event_id, agenda, agenda_params) do
+      {:ok, _} ->
+        {:noreply, socket}
+
+      {:error, :wrong_event} ->
+        {:noreply, socket}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, assign_form(socket, changeset)}
+    end
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
