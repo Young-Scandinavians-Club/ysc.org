@@ -1994,6 +1994,62 @@ defmodule Ysc.TicketsTest do
       assert Repo.get!(Ticket, second.id).status == :pending
       assert Tickets.get_ticket_order(order.id).status == :pending
     end
+
+    test "cancels tickets after the event has started", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      event
+      |> Ecto.Changeset.change(%{
+        start_date:
+          DateTime.utc_now()
+          |> DateTime.add(-2, :day)
+          |> DateTime.truncate(:second),
+        end_date:
+          DateTime.utc_now()
+          |> DateTime.add(-1, :day)
+          |> DateTime.truncate(:second)
+      })
+      |> Repo.update!()
+
+      assert Ysc.Events.EventDateTime.in_past?(
+               Repo.get!(Ysc.Events.Event, event.id)
+             )
+
+      assert {:ok, refund_info} =
+               Tickets.refund_tickets(order, [ticket.id], "event cancelled")
+
+      assert Repo.get!(Ticket, ticket.id).status == :cancelled
+      assert Tickets.get_ticket_order(order.id).status == :cancelled
+      assert Money.equal?(refund_info.refund_amount, Money.new(50, :USD))
+    end
+
+    test "cancels tickets after the purchaser's membership lapses", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      user
+      |> Ecto.Changeset.change(lifetime_membership_awarded_at: nil)
+      |> Repo.update!()
+
+      assert {:ok, _refund_info} =
+               Tickets.refund_tickets(order, [ticket.id], "event cancelled")
+
+      assert Repo.get!(Ticket, ticket.id).status == :cancelled
+      assert Tickets.get_ticket_order(order.id).status == :cancelled
+    end
   end
 
   describe "reassign_ticket/2" do

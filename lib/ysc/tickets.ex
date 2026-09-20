@@ -766,11 +766,22 @@ defmodule Ysc.Tickets do
               Repo.rollback(error_reason)
           end
 
-        # Cancel the tickets (this returns them to stock)
+        # Administrative cancel — skip purchase-time membership / event-in-past
+        # checks. `Ticket.changeset/2` is for buying tickets; using it here
+        # silently left tickets confirmed after a Stripe refund when the event
+        # had already started (the #1341 cancel-and-refund modal) or the
+        # purchaser's membership had lapsed. `Repo.update` errors were also
+        # dropped by `Enum.each`, so the transaction still returned `:ok`.
         Enum.each(tickets_to_refund, fn ticket ->
-          ticket
-          |> Ticket.changeset(%{status: :cancelled})
-          |> Repo.update()
+          case ticket
+               |> Ticket.status_changeset(%{status: :cancelled})
+               |> Repo.update() do
+            {:ok, _ticket} ->
+              :ok
+
+            {:error, changeset} ->
+              Repo.rollback(changeset)
+          end
         end)
 
         # Check if all tickets in the order are now cancelled
