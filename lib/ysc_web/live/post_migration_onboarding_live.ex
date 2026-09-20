@@ -774,8 +774,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <%= if is_nil(@payment_intent_secret) do %>
             <div class="mt-6 flex justify-end">
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
-                <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
-                Add a card
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" /> Add a card
               </.button>
             </div>
           <% else %>
@@ -794,8 +793,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <div id="payment-element"></div>
               <div class="flex justify-end mt-4">
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
-                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
-                  Save card
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" /> Save card
                 </.button>
               </div>
             </form>
@@ -862,8 +860,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 Skip for now
               </.button>
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
-                <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
-                Add a card
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" /> Add a card
               </.button>
             </div>
           <% else %>
@@ -891,8 +888,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                   Skip for now
                 </.button>
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
-                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
-                  Save card
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" /> Save card
                 </.button>
               </div>
             </form>

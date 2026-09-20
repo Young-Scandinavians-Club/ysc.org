@@ -509,7 +509,10 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert html =~ "not be charged until your application is approved"
     end
 
-    test "shows authorization and automatic renewal copy", %{conn: conn, user: user} do
+    test "shows authorization and automatic renewal copy", %{
+      conn: conn,
+      user: user
+    } do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "1"}))
 
