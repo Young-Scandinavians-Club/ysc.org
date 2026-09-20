@@ -209,8 +209,14 @@ html.sidebar-collapsed #admin-collapse-chevron {
 
 /*
 === TRIX ===
+Wrapped in `@layer base` so this vendored default Trix look stays the
+baseline everywhere, while page-specific Tailwind utility classes (e.g.
+editor_class="... border-0 ... mx-auto ...") can still override it — Tailwind
+v4's utilities live in a real `@layer utilities`, which always wins over an
+unlayered rule of any specificity, so this can no longer be plain CSS.
 */
 
+@layer base {
 trix-editor {
     border: 1px solid #bbb;
     border-radius: 3px;
@@ -696,6 +702,7 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
     margin: 1.5em 0;
 }
 
+}
 
 /*
 === ADMIN DATA TABLES ===
