@@ -6,9 +6,10 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   """
   use YscWeb, :live_component
 
-  alias Ysc.Bookings
+  import YscWeb.Components.CalendarMonth, only: [calendar_month_nav: 1]
 
-  @week_start_at :monday
+  alias Ysc.Bookings
+  alias YscWeb.Components.CalendarMonth
 
   @impl true
   def render(assigns) do
@@ -19,59 +20,14 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       data-phx-component={@id}
     >
       <div class="bg-white rounded-lg border border-zinc-200 p-6 overflow-visible">
-        <div class="flex justify-between items-center mb-4">
-          <button
-            type="button"
-            phx-target={@myself}
-            phx-click="prev-month"
-            class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-            aria-label="Previous month"
-          >
-            <.icon name="hero-arrow-left" />
-          </button>
-
-          <div class="flex flex-col items-center gap-1">
-            <div class="font-semibold text-lg" id={"#{@id}-month-label"}>
-              {@current.month}
-            </div>
-            <button
-              id={"#{@id}-go-to-today"}
-              type="button"
-              phx-target={@myself}
-              phx-click="today"
-              disabled={showing_current_month?(@current.date, @today)}
-              class={[
-                "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-                if(showing_current_month?(@current.date, @today),
-                  do:
-                    "text-zinc-400 bg-zinc-50 border-zinc-200 cursor-not-allowed opacity-60",
-                  else:
-                    "text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border-zinc-300"
-                )
-              ]}
-              aria-label={
-                if showing_current_month?(@current.date, @today) do
-                  "Already showing #{Calendar.strftime(@today, "%B %Y")}"
-                else
-                  "Go to current month, #{Calendar.strftime(@today, "%B %Y")}"
-                end
-              }
-            >
-              <.icon name="hero-calendar-days" class="w-4 h-4" aria-hidden="true" />
-              Today
-            </button>
-          </div>
-
-          <button
-            type="button"
-            phx-target={@myself}
-            phx-click="next-month"
-            class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-            aria-label="Next month"
-          >
-            <.icon name="hero-arrow-right" />
-          </button>
-        </div>
+        <.calendar_month_nav
+          id={@id}
+          current={@current}
+          today={@today}
+          target={@myself}
+          class="mb-4"
+          month_label_class="font-semibold text-lg"
+        />
 
         <div
           id={"#{@id}_calendar_days"}
@@ -181,7 +137,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     {
       :ok,
       socket
-      |> assign(:current, format_date(today))
+      |> assign(:current, CalendarMonth.month_state(today))
       |> assign(:checkin_date, nil)
       |> assign(:checkout_date, nil)
       |> assign(:hover_checkout_date, nil)
@@ -335,7 +291,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     updated_socket =
       socket
       |> assign(assigns)
-      |> assign(:current, format_date(current_date))
+      |> assign(:current, CalendarMonth.month_state(current_date))
       |> assign(:availability, availability)
       |> assign(:today, today)
       |> assign(:min, assigns[:min] || today)
@@ -355,7 +311,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   @impl true
   def handle_event("prev-month", _, socket) do
     new_date = prev_month_date(socket.assigns.current.date)
-    socket = socket |> assign(:current, format_date(new_date))
+    socket = socket |> assign(:current, CalendarMonth.month_state(new_date))
     socket = reload_availability_if_needed(socket, new_date)
     {:noreply, socket}
   end
@@ -363,7 +319,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   @impl true
   def handle_event("next-month", _, socket) do
     new_date = next_month_date(socket.assigns.current.date)
-    socket = socket |> assign(:current, format_date(new_date))
+    socket = socket |> assign(:current, CalendarMonth.month_state(new_date))
     socket = reload_availability_if_needed(socket, new_date)
     {:noreply, socket}
   end
@@ -371,7 +327,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   @impl true
   def handle_event("today", _, socket) do
     today = socket.assigns.today
-    socket = socket |> assign(:current, format_date(today))
+    socket = socket |> assign(:current, CalendarMonth.month_state(today))
     socket = reload_availability_if_needed(socket, today)
     {:noreply, socket}
   end
@@ -1540,11 +1496,6 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
   defp today?(day, today), do: today && day == today
 
-  defp showing_current_month?(current_date, today) do
-    today &&
-      Date.beginning_of_month(current_date) == Date.beginning_of_month(today)
-  end
-
   defp other_month?(day, current),
     do: Date.beginning_of_month(day) != Date.beginning_of_month(current)
 
@@ -1659,23 +1610,5 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       (mode == :buyout && !info.can_book_buyout) ||
       (mode == :day && !info.can_book_day) ||
       (mode == :room && !info.can_book_room)
-  end
-
-  defp format_date(date) do
-    %{
-      date: date,
-      month: Calendar.strftime(date, "%B %Y"),
-      week_rows: week_rows(date)
-    }
-  end
-
-  defp week_rows(date) do
-    first =
-      date
-      |> Date.beginning_of_month()
-      |> Date.beginning_of_week(@week_start_at)
-
-    last = date |> Date.end_of_month() |> Date.end_of_week(@week_start_at)
-    Date.range(first, last) |> Enum.map(& &1) |> Enum.chunk_every(7)
   end
 end
