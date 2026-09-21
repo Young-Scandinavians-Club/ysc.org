@@ -679,6 +679,10 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(view, "#modification-payment-step")
 
+    held = Repo.get!(Booking, booking.id)
+
+    assert Bookings.modification_hold_payment_intent_id(held) == pi_id
+
     payment_delta = :sys.get_state(view.pid).socket.assigns.payment_delta
     amount_cents = Ysc.MoneyHelper.money_to_cents(payment_delta)
 
