@@ -524,23 +524,54 @@ defmodule Ysc.Tickets do
     |> Repo.all()
   end
 
+  # Admin user-detail orders table: identity, amount, status, event title/date,
+  # and ticket ids for the count column. Omits payment (incl. QuickBooks JSON),
+  # grant notes, Stripe payment-intent ids, cancellation copy, event body HTML,
+  # and ticket tiers — that page never renders them.
+  @admin_user_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :event_id,
+    :total_amount,
+    :inserted_at,
+    :completed_at
+  ]
+  @admin_user_order_ticket_fields [:id, :ticket_order_id]
+  @admin_user_order_event_fields [:id, :title, :start_date]
+
   @doc """
   Gets paginated ticket orders for a user with Flop.
+
+  Used by the admin user-detail orders table. Keep `get_user_ticket_order/2`
+  and `get_ticket_order/1` fat for cancel/resume and confirmation emails.
   """
   def list_user_ticket_orders_paginated(user_id, params) do
-    base_query =
-      from(to in TicketOrder,
-        where: to.user_id == ^user_id,
-        preload: [:tickets, :event, :payment, tickets: :ticket_tier]
-      )
-
-    case Flop.validate_and_run(base_query, params, for: TicketOrder) do
+    case Flop.validate_and_run(
+           list_user_ticket_orders_paginated_query(user_id),
+           params,
+           for: TicketOrder
+         ) do
       {:ok, {orders, meta}} ->
         {:ok, {orders, meta}}
 
       error ->
         error
     end
+  end
+
+  defp list_user_ticket_orders_paginated_query(user_id) do
+    event_query =
+      from(e in Event, select: struct(e, ^@admin_user_order_event_fields))
+
+    ticket_query =
+      from(t in Ticket, select: struct(t, ^@admin_user_order_ticket_fields))
+
+    from(to in TicketOrder,
+      where: to.user_id == ^user_id,
+      select: struct(to, ^@admin_user_order_fields),
+      preload: [event: ^event_query, tickets: ^ticket_query]
+    )
   end
 
   @doc """
@@ -3238,6 +3269,11 @@ defmodule Ysc.Tickets do
 
     ulid = Fixtures.ulid()
     list_user_event_tickets_for_page_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_list_user_ticket_orders_paginated_query do
+    list_user_ticket_orders_paginated_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

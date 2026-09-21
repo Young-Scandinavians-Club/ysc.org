@@ -1064,6 +1064,86 @@ defmodule Ysc.EventsTest do
       end
     end
 
+    test "list_events_paginated/1 slims organizer to name columns" do
+      organizer =
+        user_fixture(%{
+          first_name: "Astrid",
+          last_name: "Lindgren"
+        })
+
+      {:ok, event} =
+        create_event_fixture(%{
+          organizer_id: organizer.id,
+          title: "Organizer slim #{System.unique_integer([:positive])}"
+        })
+
+      params = %{page: 1, page_size: 50}
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_events_paginated(params) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_result, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_events_paginated(params) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, {events, _meta}} = Events.list_events_paginated(params)
+      loaded = Enum.find(events, &(&1.id == event.id))
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert loaded
+      assert Ecto.assoc_loaded?(loaded.organizer)
+      assert loaded.organizer.first_name == "Astrid"
+      assert loaded.organizer.last_name == "Lindgren"
+      assert loaded.organizer.hashed_password == nil
+      assert loaded.organizer.board_bio == nil
+      assert loaded.organizer.email == nil
+    end
+
+    test "list_events_paginated/2 search path slims organizer to name columns" do
+      title = "UniqueOrganizerSearch#{System.unique_integer([:positive])}"
+
+      organizer =
+        user_fixture(%{
+          first_name: "Selma",
+          last_name: "Lagerlof"
+        })
+
+      {:ok, event} =
+        create_event_fixture(%{
+          organizer_id: organizer.id,
+          title: title
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_events_paginated(params, title) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, {events, _meta}} =
+               Events.list_events_paginated(params, title)
+
+      loaded = Enum.find(events, &(&1.id == event.id))
+
+      assert password_cols == 0
+      assert loaded
+      assert loaded.organizer.first_name == "Selma"
+      assert loaded.organizer.last_name == "Lagerlof"
+      assert loaded.organizer.hashed_password == nil
+      assert loaded.organizer.board_bio == nil
+    end
+
     test "list_events_paginated/1 capacity_info registrations exclude donation tickets" do
       user = user_fixture()
 
