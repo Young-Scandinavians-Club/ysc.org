@@ -2553,6 +2553,12 @@ defmodule Ysc.Bookings.BookingLocker do
       {:ok, updated_booking} ->
         reschedule_booking_reminders(updated_booking)
         send_booking_modification_email(updated_booking, previous_details)
+
+        send_booking_modification_cabin_master_email(
+          updated_booking,
+          previous_details
+        )
+
         invalidate_availability_cache({:ok, updated_booking})
         {:ok, updated_booking}
 
@@ -3646,6 +3652,92 @@ defmodule Ysc.Bookings.BookingLocker do
           booking_id: booking.id,
           error: Exception.message(error)
         )
+    end
+  end
+
+  defp send_booking_modification_cabin_master_email(booking, previous_details) do
+    require Ysc.Logging
+
+    try do
+      booking =
+        Repo.get(Booking, booking.id)
+        |> Repo.preload([:user, :rooms])
+
+      if booking && booking.user do
+        cabin_master = find_active_cabin_master(booking.property)
+
+        if cabin_master && cabin_master.email do
+          email_data =
+            YscWeb.Emails.BookingModificationCabinMasterNotification.prepare_email_data(
+              booking,
+              previous_details
+            )
+
+          idempotency_key =
+            "booking_modification_cabin_master_#{booking.id}_#{System.unique_integer([:positive, :monotonic])}"
+
+          result =
+            YscWeb.Emails.Notifier.schedule_email(
+              cabin_master.email,
+              idempotency_key,
+              YscWeb.Emails.BookingModificationCabinMasterNotification.get_subject(),
+              "booking_modification_cabin_master_notification",
+              email_data,
+              "",
+              cabin_master.id,
+              Ysc.EmailConfig.booking_reply_to(booking.property)
+            )
+
+          case result do
+            %Oban.Job{} = job ->
+              Ysc.Logging.info(
+                "Cabin master modification email scheduled successfully",
+                booking_id: booking.id,
+                cabin_master_id: cabin_master.id,
+                job_id: job.id
+              )
+
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Failed to schedule cabin master modification email",
+                booking_id: booking.id,
+                cabin_master_id: cabin_master.id,
+                error: reason
+              )
+          end
+        else
+          Ysc.Logging.warning(
+            "No cabin master found for property, skipping modification notification",
+            property: booking.property,
+            booking_id: booking.id
+          )
+        end
+      end
+    rescue
+      error ->
+        Ysc.Logging.error(
+          "Failed to send cabin master modification email",
+          booking_id: booking.id,
+          error: Exception.message(error)
+        )
+    end
+  end
+
+  defp find_active_cabin_master(property) do
+    cabin_master_position =
+      case property do
+        :tahoe -> "tahoe_cabin_master"
+        :clear_lake -> "clear_lake_cabin_master"
+        _ -> nil
+      end
+
+    if cabin_master_position do
+      from(u in Ysc.Accounts.User,
+        where:
+          u.board_position == ^cabin_master_position and u.state == :active,
+        limit: 1
+      )
+      |> Repo.one()
     end
   end
 

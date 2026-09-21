@@ -199,6 +199,26 @@
       manage_bookings_hint:
         "Start a new booking to use this benefit — it appears on your price summary automatically before you confirm."
     },
+    "booking_modification_cabin_master_notification" => %{
+      booking: %{
+        reference_id: "BK-PREVIEW-123",
+        property: "Tahoe",
+        checkin_date: "December 1, 2026",
+        checkout_date: "December 3, 2026",
+        guests_count: 2,
+        children_count: 0
+      },
+      previous: %{
+        checkin_date: "November 28, 2026",
+        checkout_date: "November 30, 2026",
+        guests_count: 2,
+        children_count: 0
+      },
+      dates_changed: true,
+      guests_changed: false,
+      user: %{name: "Astrid Berg", email: "astrid@example.com"},
+      booking_url: "http://localhost:4000/admin/bookings/preview"
+    },
     "booking_modification_confirmation" => %{
       first_name: "Astrid",
       booking: %{
