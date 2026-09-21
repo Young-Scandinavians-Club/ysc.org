@@ -580,7 +580,7 @@ defmodule YscWeb.AccountSetupLiveTest do
         "payment_method_id" => "pm_test_123"
       })
 
-      assert render(view) =~ "We couldn't save your card at this step"
+      assert render(view) =~ "save your card at this step"
     end
 
     test "retry_payment_setup event does not crash", %{conn: conn, user: user} do

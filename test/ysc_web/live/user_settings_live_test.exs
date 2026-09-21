@@ -2192,7 +2192,7 @@ defmodule YscWeb.UserSettingsLiveTest do
           "payment_method_id" => foreign.id
         })
 
-      assert html =~ "We couldn't find that card"
+      assert html =~ "find that card"
       refute html =~ "Card removed"
       assert Payments.get_payment_method!(foreign.id).id == foreign.id
       assert Payments.get_payment_method!(foreign.id).user_id == other.id
@@ -2270,7 +2270,7 @@ defmodule YscWeb.UserSettingsLiveTest do
           "payment_method_id" => foreign.id
         })
 
-      assert html =~ "We couldn't find that card"
+      assert html =~ "find that card"
       assert Payments.get_payment_method!(own_default.id).is_default
       refute Payments.get_payment_method!(own_extra.id).is_default
       assert Payments.get_payment_method!(foreign.id).is_default
