@@ -91,11 +91,12 @@ defmodule YscWeb.Emails.BookingModificationCabinMasterNotificationTest do
         )
 
       html = BookingModificationCabinMasterNotification.render(data)
+      text = html |> LazyHTML.from_document() |> LazyHTML.text()
 
-      assert html =~ "Booking Modification Notification"
-      assert html =~ "What Changed"
-      assert html =~ "Processed Automatically"
-      assert html =~ booking.reference_id
+      assert text =~ "Booking Modification Notification"
+      assert text =~ "What Changed"
+      assert text =~ "Processed Automatically"
+      assert text =~ booking.reference_id
     end
   end
 

@@ -218,6 +218,55 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       end)
     end
 
+    test "schedules a distinct cabin master notification for each of two back-to-back modifications",
+         %{user: user} do
+      {:ok, _} =
+        Ysc.Accounts.assign_board_position(
+          user_fixture(),
+          :tahoe_cabin_master
+        )
+
+      {checkin, checkout} = locker_buyout_dates(8)
+      {second_checkin, second_checkout} = locker_buyout_dates_after(checkout, 7)
+
+      {third_checkin, third_checkout} =
+        locker_buyout_dates_after(second_checkout, 7)
+
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, modified} =
+                 BookingLocker.modify_complete_booking(booking, %{
+                   checkin_date: second_checkin,
+                   checkout_date: second_checkout,
+                   guests_count: 4,
+                   children_count: 0
+                 })
+
+        assert {:ok, _modified_again} =
+                 BookingLocker.modify_complete_booking(modified, %{
+                   checkin_date: third_checkin,
+                   checkout_date: third_checkout,
+                   guests_count: 4,
+                   children_count: 0
+                 })
+
+        cabin_master_jobs =
+          all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+          |> Enum.filter(
+            &(&1.args["template"] ==
+                "booking_modification_cabin_master_notification")
+          )
+
+        assert length(cabin_master_jobs) == 2
+
+        assert cabin_master_jobs
+               |> Enum.map(& &1.args["idempotency_key"])
+               |> Enum.uniq()
+               |> length() == 2
+      end)
+    end
+
     test "skips cabin master notification when no active cabin master exists",
          %{user: user} do
       {checkin, checkout} = locker_buyout_dates(5)

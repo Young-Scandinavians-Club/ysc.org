@@ -3673,13 +3673,8 @@ defmodule Ysc.Bookings.BookingLocker do
               previous_details
             )
 
-          modified_at_unix =
-            (booking.updated_at || DateTime.utc_now())
-            |> DateTime.truncate(:second)
-            |> DateTime.to_unix()
-
           idempotency_key =
-            "booking_modification_cabin_master_#{booking.id}_#{modified_at_unix}"
+            "booking_modification_cabin_master_#{booking.id}_#{System.unique_integer([:positive, :monotonic])}"
 
           result =
             YscWeb.Emails.Notifier.schedule_email(
