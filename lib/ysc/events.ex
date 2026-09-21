@@ -266,31 +266,12 @@ defmodule Ysc.Events do
     |> Repo.preload(:organizer)
   end
 
+  # Admin events table only renders `UserDisplay.full_name/1`. Omits
+  # hashed_password, board_bio, and other columns the list never shows.
+  @admin_event_organizer_fields [:id, :first_name, :last_name]
+
   def list_events_paginated(params, opts \\ []) do
-    opts = normalize_list_events_opts(opts)
-    date_from = Keyword.get(opts, :date_from, "")
-    date_to = Keyword.get(opts, :date_to, "")
-    search_term = Keyword.get(opts, :search_term)
-    tab = opts |> Keyword.get(:tab, :all) |> normalize_tab()
-
-    query =
-      if search_term in [nil, ""] do
-        Event
-        |> where([e], e.state not in ["deleted"])
-        |> maybe_filter_tab(tab)
-        |> maybe_filter_start_date_from(date_from)
-        |> maybe_filter_start_date_to(date_to)
-        |> join(:left, [e], u in assoc(e, :organizer), as: :organizer)
-        |> select_event_summary()
-        |> preload([organizer: o], organizer: o)
-      else
-        fuzzy_search_event(search_term)
-        |> maybe_filter_tab(tab)
-        |> maybe_filter_start_date_from(date_from)
-        |> maybe_filter_start_date_to(date_to)
-      end
-
-    case query
+    case list_events_paginated_base_query(opts)
          |> Flop.validate_and_run(params, for: Event) do
       {:ok, {events, meta}} ->
         events = enrich_events_with_capacity(events)
@@ -298,6 +279,30 @@ defmodule Ysc.Events do
 
       error ->
         error
+    end
+  end
+
+  defp list_events_paginated_base_query(opts) do
+    opts = normalize_list_events_opts(opts)
+    date_from = Keyword.get(opts, :date_from, "")
+    date_to = Keyword.get(opts, :date_to, "")
+    search_term = Keyword.get(opts, :search_term)
+    tab = opts |> Keyword.get(:tab, :all) |> normalize_tab()
+
+    if search_term in [nil, ""] do
+      Event
+      |> where([e], e.state not in ["deleted"])
+      |> maybe_filter_tab(tab)
+      |> maybe_filter_start_date_from(date_from)
+      |> maybe_filter_start_date_to(date_to)
+      |> join(:left, [e], u in assoc(e, :organizer), as: :organizer)
+      |> select_event_summary()
+      |> preload_admin_event_organizer()
+    else
+      fuzzy_search_event(search_term)
+      |> maybe_filter_tab(tab)
+      |> maybe_filter_start_date_from(date_from)
+      |> maybe_filter_start_date_to(date_to)
     end
   end
 
@@ -452,8 +457,16 @@ defmodule Ysc.Events do
                    ilike(u.first_name, ^search_like) or
                    ilike(u.last_name, ^search_like)))),
       select: struct(e, ^Event.summary_fields()),
-      preload: [organizer: u]
+      preload: [organizer: ^admin_event_organizer_preload_query()]
     )
+  end
+
+  defp preload_admin_event_organizer(query) do
+    preload(query, organizer: ^admin_event_organizer_preload_query())
+  end
+
+  defp admin_event_organizer_preload_query do
+    from(u in User, select: struct(u, ^@admin_event_organizer_fields))
   end
 
   defp select_event_summary(query) do
@@ -3931,5 +3944,15 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_event_for_check_in_query do
     event_for_check_in_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_events_paginated_query do
+    list_events_paginated_base_query(tab: :upcoming)
+  end
+
+  @doc false
+  def ci_query_explain_list_events_paginated_search_query do
+    list_events_paginated_base_query(tab: :upcoming, search_term: "ci")
   end
 end

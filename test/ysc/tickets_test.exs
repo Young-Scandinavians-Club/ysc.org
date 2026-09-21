@@ -1054,6 +1054,83 @@ defmodule Ysc.TicketsTest do
       assert is_list(orders)
       assert Map.has_key?(meta, :total_count)
     end
+
+    test "slims event/ticket columns and skips payment and ticket tiers", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>admin order list should not load this</p>",
+        rendered_details: "<p>admin order list should not load this</p>"
+      })
+      |> Ysc.Repo.update!()
+
+      order
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes: "grant notes the admin order list must not load",
+        cancellation_reason: "cancel copy the admin order list must not load",
+        payment_intent_id: "pi_admin_order_list_secret"
+      })
+      |> Ysc.Repo.update!()
+
+      params = %{page: 1, page_size: 10}
+
+      {_result, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_ticket_orders_paginated(user.id, params) end,
+          pattern: ~r/admin_grant_notes|cancellation_reason|payment_intent_id/i,
+          caller_pids: [self()]
+        )
+
+      {_result, payment_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_ticket_orders_paginated(user.id, params) end,
+          pattern: ~r/FROM ["']?payments["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_result, tier_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_ticket_orders_paginated(user.id, params) end,
+          pattern: ~r/FROM ["']?ticket_tiers["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_result, event_html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.list_user_ticket_orders_paginated(user.id, params) end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, {orders, _meta}} =
+               Tickets.list_user_ticket_orders_paginated(user.id, params)
+
+      loaded = Enum.find(orders, &(&1.id == order.id))
+
+      assert notes_cols == 0
+      assert payment_queries == 0
+      assert tier_queries == 0
+      assert event_html_cols == 0
+      assert loaded
+      assert loaded.reference_id == order.reference_id
+      assert loaded.total_amount == order.total_amount
+      assert loaded.status == order.status
+      assert loaded.admin_grant_notes == nil
+      assert loaded.payment_intent_id == nil
+      refute Ecto.assoc_loaded?(loaded.payment)
+      assert length(loaded.tickets) == 1
+      refute Ecto.assoc_loaded?(hd(loaded.tickets).ticket_tier)
+      assert loaded.event.title == event.title
+      assert loaded.event.start_date
+      assert loaded.event.raw_details == nil
+      assert loaded.event.rendered_details == nil
+    end
   end
 
   describe "list_user_tickets_for_event/2" do
