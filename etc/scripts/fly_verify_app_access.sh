@@ -46,7 +46,7 @@ cleanup() {
 trap cleanup EXIT
 printf '%s' "$LIST_JSON" >"$tmp"
 
-if ! python3 - "$APP" "$EXPECT_ORG" "$tmp" <<'PY'; then
+if ! python3 - "$APP" "$EXPECT_ORG" "$tmp" <<'PY'
 import json, sys
 
 app_name = sys.argv[1]
@@ -97,6 +97,7 @@ if expect_org:
 suffix = f" (org {expect_org})" if expect_org else ""
 print(f"OK: Fly credentials can access app '{app_name}'{suffix}.")
 PY
+then
   fly_hint_env
   exit 1
 fi
