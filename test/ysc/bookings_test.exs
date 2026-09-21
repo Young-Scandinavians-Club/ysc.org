@@ -6429,6 +6429,51 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "attach_modification_payment_intent/2" do
+    test "stores the PaymentIntent id on modification hold attrs" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0
+          }
+        })
+        |> Repo.update!()
+
+      assert {:ok, updated} =
+               Bookings.attach_modification_payment_intent(
+                 booking,
+                 "pi_mod_attach"
+               )
+
+      refute updated.payment_intent_id == "pi_mod_attach"
+
+      assert Bookings.modification_hold_payment_intent_id(updated) ==
+               "pi_mod_attach"
+
+      reloaded = Repo.reload!(booking)
+
+      assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+               "pi_mod_attach"
+    end
+
+    test "returns an error when no modification hold attrs are present" do
+      booking = booking_fixture(%{status: :complete})
+
+      assert {:error, :no_modification_hold} =
+               Bookings.attach_modification_payment_intent(
+                 booking.id,
+                 "pi_mod_missing_hold"
+               )
+    end
+  end
+
   describe "ci_query_explain_* query builders" do
     test "each helper builds a runnable Ecto query" do
       assert %Ecto.Query{} = Bookings.ci_query_explain_query()

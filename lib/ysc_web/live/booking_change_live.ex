@@ -1594,9 +1594,36 @@ defmodule YscWeb.BookingChangeLive do
         "booking_modification_#{booking.id}_#{amount_cents}_#{attempt_id}"
       )
 
-    stripe_client.create_payment_intent(payment_intent_params,
-      idempotency_key: idempotency_key
-    )
+    case stripe_client.create_payment_intent(payment_intent_params,
+           idempotency_key: idempotency_key
+         ) do
+      {:ok, payment_intent} ->
+        case Bookings.attach_modification_payment_intent(
+               booking.id,
+               payment_intent.id
+             ) do
+          {:ok, _booking} ->
+            {:ok, payment_intent}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Created booking modification PaymentIntent but could not persist it on the hold",
+              booking_id: booking.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(reason)
+            )
+
+            CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+              payment_intent.id,
+              "booking_modification_attach_failed"
+            )
+
+            {:error, reason}
+        end
+
+      other ->
+        other
+    end
   end
 
   defp format_changeset_errors(changeset) do

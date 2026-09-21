@@ -1054,6 +1054,57 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Stores the Stripe PaymentIntent id created for a paid booking modification
+  on `modification_hold_attrs`.
+
+  Checkout already has `payment_intent_id` (unique, the original stay charge).
+  Modification payments must not overwrite that column. The expiry worker reads
+  this hold-attrs id to Stripe-reconcile before releasing extra nights.
+  """
+  def attach_modification_payment_intent(booking_id, payment_intent_id)
+
+  def attach_modification_payment_intent(
+        %Booking{id: booking_id},
+        payment_intent_id
+      )
+      when is_binary(payment_intent_id) do
+    attach_modification_payment_intent(booking_id, payment_intent_id)
+  end
+
+  def attach_modification_payment_intent(booking_id, payment_intent_id)
+      when is_binary(booking_id) and is_binary(payment_intent_id) and
+             payment_intent_id != "" do
+    booking = Repo.get!(Booking, booking_id)
+
+    case booking.modification_hold_attrs do
+      %{} = attrs ->
+        booking
+        |> Booking.changeset(
+          %{
+            modification_hold_attrs:
+              Map.put(attrs, "payment_intent_id", payment_intent_id)
+          },
+          skip_validation: true
+        )
+        |> Repo.update()
+
+      _ ->
+        {:error, :no_modification_hold}
+    end
+  end
+
+  @doc """
+  PaymentIntent id stored on an in-progress modification hold, if any.
+  """
+  def modification_hold_payment_intent_id(%Booking{
+        modification_hold_attrs: %{"payment_intent_id" => id}
+      })
+      when is_binary(id) and id != "",
+      do: id
+
+  def modification_hold_payment_intent_id(_), do: nil
+
+  @doc """
   Returns the total amount paid for a booking across all recorded Stripe payments.
   """
   def get_booking_total_paid_amount(booking) do
