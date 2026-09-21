@@ -128,9 +128,55 @@ defmodule YscWeb.PageControllerTest do
 
       conn = get(conn, ~p"/pending-review")
 
-      assert html_response(conn, 200) =~ "Account Pending Review"
+      html = html_response(conn, 200)
+      assert html =~ "Account Pending Review"
+      refute html =~ "saved payment method"
+      assert html =~ "saved a card or bank account"
       assert conn.assigns.application_submitted_date != nil
       assert conn.assigns.time_delta =~ "ago"
+    end
+
+    test "explains a saved card instead of a payment method when one is on file",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_pending_review_#{System.unique_integer([:positive])}"
+        })
+        |> Ysc.Repo.update()
+
+      {:ok, _pm} =
+        Ysc.Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id:
+            "pm_pending_review_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      submitted_date = DateTime.add(DateTime.utc_now(), -300, :second)
+
+      Mox.expect(
+        Ysc.AccountsMock,
+        :get_signup_application_submission_date,
+        fn _user_id ->
+          %{submit_date: submitted_date, timezone: "America/Los_Angeles"}
+        end
+      )
+
+      conn = conn |> log_in_user(user) |> get(~p"/pending-review")
+      html = html_response(conn, 200)
+
+      assert html =~ "You've saved a card for payment"
+      assert html =~ "we'll charge the card you saved"
+      refute html =~ "saved payment method"
+      refute html =~ "payment method will be charged"
     end
 
     test "renders pending review page with submission from different timezone",

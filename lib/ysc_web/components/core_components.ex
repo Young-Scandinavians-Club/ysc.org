@@ -3331,7 +3331,7 @@ defmodule YscWeb.CoreComponents do
 
       <.async_section_loader :if={@passkeys_loading} id="passkeys-loading" label="Loading passkeys..." />
 
-      <.async_section_loader label="Loading payment methods..." class="py-12" />
+      <.async_section_loader label="Loading your cards..." class="py-12" />
   """
   attr :id, :string, default: nil
   attr :label, :string, required: true
@@ -3687,7 +3687,7 @@ defmodule YscWeb.CoreComponents do
       role="status"
       aria-live="polite"
     >
-      <span class="sr-only">Loading payment methods…</span>
+      <span class="sr-only">Loading your cards…</span>
       <div class="flex items-center gap-3">
         <.skeleton_block class="h-8 w-12 rounded-sm" />
         <div class="space-y-1.5">

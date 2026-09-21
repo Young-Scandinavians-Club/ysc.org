@@ -645,7 +645,7 @@ defmodule Ysc.Subscriptions do
         )
 
         {:error,
-         "We couldn't turn off auto-renewal right now. Please try again in a few minutes, or email #{Ysc.EmailConfig.membership_email()} for help."}
+         "We couldn't turn off automatic renewal right now. Please try again in a few minutes, or email #{Ysc.EmailConfig.membership_email()} for help."}
     end
   end
 

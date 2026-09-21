@@ -188,13 +188,13 @@ defmodule YscWeb.UserSettingsLive do
           show
         >
           <.modal_title id="update-payment-method-modal-title">
-            Payment Method
+            Your card
           </.modal_title>
           <%!-- Loading state --%>
           <.async_section_loader
             :if={assigns[:loading_payment_methods]}
             id="user-settings-payment-methods-loading"
-            label="Loading payment methods..."
+            label="Loading your cards..."
             class="py-12"
           />
           <%!-- Loaded content --%>
@@ -202,7 +202,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Section 1: Existing payment methods --%>
             <div :if={length(@all_payment_methods) > 0}>
               <p class="text-sm font-medium text-zinc-500 uppercase tracking-wide mb-3">
-                Saved methods
+                Saved cards
               </p>
               <div class="space-y-2">
                 <%= for payment_method <- @all_payment_methods do %>
@@ -279,8 +279,8 @@ defmodule YscWeb.UserSettingsLive do
                       phx-click="delete-payment-method"
                       phx-value-payment_method_id={payment_method.id}
                       disabled={busy?}
-                      data-confirm="Remove this payment method? It will be removed from your account and can no longer be used for membership payments."
-                      aria-label="Remove payment method"
+                      data-confirm="Remove this card? It will be removed from your account and can no longer be used to pay membership dues."
+                      aria-label="Remove card"
                       class="shrink-0 p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <.icon
@@ -317,7 +317,7 @@ defmodule YscWeb.UserSettingsLive do
                 phx-disable-with="Loading..."
                 class="border-2 border-dashed border-zinc-300 px-5 text-zinc-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
               >
-                <.icon name="hero-plus-circle" class="w-5 h-5" /> Add Payment Method
+                <.icon name="hero-plus-circle" class="w-5 h-5" /> Add a card
               </.button>
             </div>
             <div :if={@show_new_payment_form && @payment_intent_secret}>
@@ -357,7 +357,7 @@ defmodule YscWeb.UserSettingsLive do
               color="blue"
               class="px-4"
             >
-              Save Payment Method
+              Save card
             </.button>
           </div>
         </.modal>
@@ -1098,7 +1098,7 @@ defmodule YscWeb.UserSettingsLive do
                       Application pending review
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
-                      Your application is being reviewed by the board. If you already saved a payment method during setup, your membership will start automatically when you're approved. Otherwise we'll email you a secure link to pay your dues. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
+                      Your application is being reviewed by the board. If you already saved a card during setup, your membership will start automatically when you're approved. Otherwise we'll email you a secure link to pay your dues. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
                       <.link
                         navigate={~p"/pending-review"}
                         class="font-semibold text-yellow-900 underline underline-offset-2"
@@ -1165,7 +1165,7 @@ defmodule YscWeb.UserSettingsLive do
                       </span>
                       <div>
                         <h3 class="text-lg font-semibold text-zinc-900">
-                          Payment Method
+                          Your card
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
                           Used for this purchase and all future automatic renewals.
@@ -1192,7 +1192,7 @@ defmodule YscWeb.UserSettingsLive do
                           class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
                         />
                         <span class="text-zinc-600 font-medium group-hover:text-blue-700">
-                          Add a payment method
+                          Add a card
                         </span>
                       </div>
                       <.icon
@@ -1281,7 +1281,7 @@ defmodule YscWeb.UserSettingsLive do
                       }
                       class="mt-3 text-sm text-zinc-500"
                     >
-                      Add a payment method in step 2 to complete your purchase.
+                      Add a card in step 2 to complete your purchase.
                     </p>
 
                     <p
@@ -1415,8 +1415,7 @@ defmodule YscWeb.UserSettingsLive do
                     variant="outline"
                     class="w-full sm:w-auto justify-center"
                   >
-                    <.icon name="hero-credit-card" class="w-5 h-5" />
-                    Change Payment Method
+                    <.icon name="hero-credit-card" class="w-5 h-5" /> Change card
                   </.button>
                   <.button
                     :if={
@@ -1612,7 +1611,7 @@ defmodule YscWeb.UserSettingsLive do
                       </span>
                       <div>
                         <h3 class="text-lg font-semibold text-zinc-900">
-                          Payment Method
+                          Your card
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
                           Used for this change and all future automatic renewals.
@@ -1638,7 +1637,7 @@ defmodule YscWeb.UserSettingsLive do
                           class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
                         />
                         <span class="text-zinc-600 font-medium group-hover:text-blue-700">
-                          Add a payment method
+                          Add a card
                         </span>
                       </div>
                       <.icon
@@ -3829,7 +3828,7 @@ defmodule YscWeb.UserSettingsLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "The board is still reviewing your application. You can update your payment method after you're approved.",
+         "The board is still reviewing your application. You can update your card after you're approved.",
          title: "Payment"
        )}
     else
@@ -3918,7 +3917,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "We couldn't load your saved payment methods. Please refresh the page or try again in a few minutes.",
+             "We couldn't load your saved cards. Please refresh the page or try again in a few minutes.",
              title: "Payment"
            )}
       end
@@ -3955,7 +3954,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "The board is still reviewing your application. You can update your payment method after you're approved.",
+           "The board is still reviewing your application. You can update your card after you're approved.",
            title: "Payment"
          )}
 
@@ -3967,7 +3966,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Payment method not found.",
+           "We couldn't find that card.",
            title: "Payment"
          )}
     end
@@ -3995,7 +3994,7 @@ defmodule YscWeb.UserSettingsLive do
 
       nil ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Payment method not found.",
+         YscWeb.Flash.put_toast(socket, :error, "We couldn't find that card.",
            title: "Payment"
          )}
 
@@ -4007,7 +4006,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "This is the only payment method on file for your active membership. Add another payment method first, or cancel your membership, before removing it.",
+           "This is the only card on file for your membership. Add another card first, or turn off automatic renewal, before removing it.",
            title: "Payment"
          )}
     end
@@ -4906,14 +4905,14 @@ defmodule YscWeb.UserSettingsLive do
            |> assign(:user, refreshed)
            |> assign(:current_membership, membership)
            |> assign(:active_plan_type, plan_type),
-           "Payment method saved and your membership is now active!"}
+           "Card saved and your membership is now active!"}
 
         {:error, _reason} ->
           {socket,
-           "Payment method updated. We couldn't activate membership automatically — choose a plan below to finish."}
+           "Card saved. We couldn't activate membership automatically — choose a plan below to finish."}
       end
     else
-      {socket, "Payment method updated and set as default."}
+      {socket, "Card saved and set as default."}
     end
   end
 
@@ -5027,7 +5026,7 @@ defmodule YscWeb.UserSettingsLive do
            :default_payment_method,
            Ysc.Payments.get_default_payment_method(user)
          )
-         |> YscWeb.Flash.put_toast(:info, "Payment method removed.",
+         |> YscWeb.Flash.put_toast(:info, "Card removed.",
            title: "Payment",
            icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
          )}
@@ -5038,7 +5037,7 @@ defmodule YscWeb.UserSettingsLive do
          |> assign(:deleting_payment_method_id, nil)
          |> YscWeb.Flash.put_toast(
            :error,
-           "This is the only payment method on file for your active membership. Add another payment method first, or cancel your membership, before removing it.",
+           "This is the only card on file for your membership. Add another card first, or turn off automatic renewal, before removing it.",
            title: "Payment"
          )}
 
@@ -5054,7 +5053,7 @@ defmodule YscWeb.UserSettingsLive do
          |> assign(:deleting_payment_method_id, nil)
          |> YscWeb.Flash.put_toast(
            :error,
-           "We couldn't remove that payment method. Please try again, or contact us at info@ysc.org if this keeps happening.",
+           "We couldn't remove that card. Please try again, or contact us at info@ysc.org if this keeps happening.",
            title: "Payment"
          )}
     end
@@ -5092,7 +5091,7 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:selecting_payment_method, false)
-         |> YscWeb.Flash.put_toast(:info, "Payment method set as default.",
+         |> YscWeb.Flash.put_toast(:info, "This card is now your default.",
            title: "Payment",
            icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
          )}
@@ -5204,7 +5203,7 @@ defmodule YscWeb.UserSettingsLive do
      revert_optimistic_update(socket)
      |> YscWeb.Flash.put_toast(
        :error,
-       "Failed to set payment method as default",
+       "We couldn't set that card as your default.",
        title: "Payment"
      )}
   end
@@ -5214,7 +5213,7 @@ defmodule YscWeb.UserSettingsLive do
      revert_optimistic_update(socket)
      |> YscWeb.Flash.put_toast(
        :error,
-       "We couldn't update your default payment method. Please try again, or contact us at info@ysc.org if this keeps happening.",
+       "We couldn't update your default card. Please try again, or contact us at info@ysc.org if this keeps happening.",
        title: "Payment"
      )}
   end
@@ -5294,8 +5293,7 @@ defmodule YscWeb.UserSettingsLive do
     if socket.assigns[:default_payment_method] do
       :ok
     else
-      {:error,
-       "To upgrade, please add a payment method first. Use the Payment method step above to add a card or bank account."}
+      {:error, "To upgrade, add a card first using the step above."}
     end
   end
 
@@ -6205,7 +6203,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, email info@ysc.org.",
+             "Your payment could not be processed. Please try a different card or contact your bank. If the issue persists, email info@ysc.org.",
              title: "Payment"
            )}
       end

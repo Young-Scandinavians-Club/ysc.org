@@ -357,6 +357,9 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       refute html =~ "Upgrades take effect immediately"
       refute html =~ "downgrades apply"
+      assert html =~ "Your card"
+      assert html =~ "Add a card"
+      refute html =~ "Payment Method"
 
       # Select family (upgrade) so the "Change Membership Plan" button appears
       render_change(view, "validate_membership", %{
@@ -1514,6 +1517,10 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert html =~ "Application pending review"
       refute html =~ "Account Pending Approval"
       refute html =~ "approved account"
+      refute html =~ "saved a payment method"
+      assert html =~ "saved a card during setup"
+      assert html =~ "Your card"
+      refute html =~ "Payment Method"
 
       assert has_element?(
                view,
@@ -1860,11 +1867,16 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, view, html} = live(conn, ~p"/users/membership/payment-method")
-      render(view)
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      html = render(view)
 
       assert has_element?(view, "#update-payment-method-modal")
       assert has_element?(view, "#payment-add-new-divider")
+      assert html =~ "Your card"
+      assert html =~ "Add a card"
+      refute html =~ "Payment Method"
+      refute html =~ "Add Payment Method"
+      refute html =~ "Save Payment Method"
       assert html =~ "Secure, encrypted payment"
     end
 
@@ -2015,7 +2027,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       |> render_click()
 
       html = render(view)
-      assert html =~ "Payment method removed"
+      assert html =~ "Card removed"
 
       remaining = Payments.list_payment_methods(user)
       refute Enum.any?(remaining, &(&1.id == extra.id))
@@ -2065,7 +2077,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "only payment method"
+      assert render(view) =~ "only card on file"
       assert Payments.get_payment_method!(only.id).id == only.id
     end
 
@@ -2112,7 +2124,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "only payment method"
+      assert render(view) =~ "only card on file"
       assert Payments.get_payment_method!(only.id).id == only.id
     end
 
@@ -2180,8 +2192,8 @@ defmodule YscWeb.UserSettingsLiveTest do
           "payment_method_id" => foreign.id
         })
 
-      assert html =~ "Payment method not found"
-      refute html =~ "Payment method removed"
+      assert html =~ "We couldn't find that card"
+      refute html =~ "Card removed"
       assert Payments.get_payment_method!(foreign.id).id == foreign.id
       assert Payments.get_payment_method!(foreign.id).user_id == other.id
 
@@ -2258,7 +2270,7 @@ defmodule YscWeb.UserSettingsLiveTest do
           "payment_method_id" => foreign.id
         })
 
-      assert html =~ "Payment method not found"
+      assert html =~ "We couldn't find that card"
       assert Payments.get_payment_method!(own_default.id).is_default
       refute Payments.get_payment_method!(own_extra.id).is_default
       assert Payments.get_payment_method!(foreign.id).is_default
@@ -2283,7 +2295,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       render_click(view, "add-new-payment-method")
       render_click(view, "cancel-new-payment-method")
 
-      assert render(view) =~ "Payment Method"
+      assert render(view) =~ "Your card"
     end
 
     test "retry-invoice-payment click shows feedback for unknown invoice", %{

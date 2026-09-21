@@ -125,7 +125,7 @@ defmodule YscWeb.AccountSetupLive do
             <.header class="text-left">
               Activate Your Membership
               <:subtitle>
-                Your application is approved. Add or confirm a payment method to activate your membership and unlock member benefits.
+                Your application is approved. Add or confirm a card to activate your membership and unlock member benefits.
               </:subtitle>
             </.header>
           <% else %>
@@ -446,7 +446,7 @@ defmodule YscWeb.AccountSetupLive do
                   class="w-16 h-16 text-blue-600 mx-auto mb-4"
                 />
                 <p class="text-zinc-600 mb-4">
-                  Add a payment method to activate your membership.
+                  Add a card to activate your membership.
                 </p>
                 <.link
                   patch={~p"/account/setup/#{@user.id}?step=1"}
@@ -1570,7 +1570,7 @@ defmodule YscWeb.AccountSetupLive do
     if not setup_owner?(socket) or socket.assigns.current_step != 1 do
       YscWeb.Flash.send_toast(
         :error,
-        "Cannot save payment method at this step.",
+        "We couldn't save your card at this step.",
         title: "Account setup"
       )
 
@@ -1615,7 +1615,7 @@ defmodule YscWeb.AccountSetupLive do
 
               YscWeb.Flash.send_toast(
                 :error,
-                "Failed to save payment method. Please try again.",
+                "We couldn't save your card. Please try again.",
                 title: "Payment"
               )
 
@@ -1670,7 +1670,7 @@ defmodule YscWeb.AccountSetupLive do
         {:error, :no_payment_method} ->
           YscWeb.Flash.send_toast(
             :error,
-            "Please save a payment method first.",
+            "Please save a card first.",
             title: "Membership"
           )
 
@@ -1735,13 +1735,13 @@ defmodule YscWeb.AccountSetupLive do
 
             socket = refresh_setup_user_and_needs(socket)
 
-            {socket, "Payment saved and your membership is now active!", true}
+            {socket, "Card saved and your membership is now active!", true}
 
           {:error, _reason} ->
             socket = refresh_setup_user_and_needs(socket)
 
             {socket,
-             "Payment method saved, but we couldn't activate membership yet. Use Activate Membership Now, or pay on the Membership page.",
+             "Card saved, but we couldn't activate membership yet. Use Activate Membership Now, or pay on the Membership page.",
              false}
         end
       else
@@ -1751,7 +1751,7 @@ defmodule YscWeb.AccountSetupLive do
           |> refine_setup_needs_assigns(user)
 
         {socket,
-         "Payment method saved! We'll charge it automatically if your application is approved.",
+         "Card saved! We'll charge it automatically if your application is approved.",
          false}
       end
 
