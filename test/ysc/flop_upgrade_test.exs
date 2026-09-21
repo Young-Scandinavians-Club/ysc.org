@@ -1,11 +1,13 @@
 defmodule Ysc.FlopUpgradeTest do
   @moduledoc """
-  Guards the flop 0.28.0 / flop_phoenix 0.26.3 upgrade.
+  Guards the flop 0.29.0 / flop_phoenix 0.27.0 upgrade.
 
-  0.28.0 appends the primary key as a sort tiebreaker, rejects `ecto_type: nil`
-  on join fields, and drops `:=~` on booleans. We use page pagination (not
-  cursors), declare `ecto_type: :string` on join fields, and do not pass
-  `sortable`/`filterable` into `Flop.validate_and_run/3` to add extra fields.
+  0.29.0 turns `Flop.Schema` from a protocol into a behaviour (`use Flop.Schema`
+  + `@flop_options`). `field_info/2`, `get_field/3`, and `primary_key/1` take
+  the schema module. Schema option accessors are gone; use `Flop.get_option/3`
+  and `Flop.allowed_fields/2`. We use page pagination (not cursors), declare
+  `ecto_type: :string` on join fields, and do not pass `sortable`/`filterable`
+  into `Flop.validate_and_run/3` to add extra fields.
   """
   use Ysc.DataCase, async: true
 
@@ -15,13 +17,26 @@ defmodule Ysc.FlopUpgradeTest do
   alias Ysc.Bookings.Booking
   alias Ysc.Events.Event
   alias Ysc.Media.Image
+  alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Posts.Post
+  alias Ysc.Tickets.TicketOrder
 
-  describe "0.28.0 / 0.26.3 Hex locks" do
-    test "locks flop to 0.28.0 and flop_phoenix to 0.26.3" do
-      assert to_string(Application.spec(:flop, :vsn)) == "0.28.0"
-      assert to_string(Application.spec(:flop_phoenix, :vsn)) == "0.26.3"
+  @paginated_schemas [
+    User,
+    Booking,
+    Event,
+    Post,
+    Subscriber,
+    Image,
+    Edition,
+    TicketOrder
+  ]
+
+  describe "0.29.0 / 0.27.0 Hex locks" do
+    test "locks flop to 0.29.0 and flop_phoenix to 0.27.0" do
+      assert to_string(Application.spec(:flop, :vsn)) == "0.29.0"
+      assert to_string(Application.spec(:flop_phoenix, :vsn)) == "0.27.0"
     end
 
     test "validate_and_run/3 and run/3 still exist" do
@@ -30,23 +45,66 @@ defmodule Ysc.FlopUpgradeTest do
       assert function_exported?(Flop, :run, 3)
       assert function_exported?(Flop, :ordering, 2)
       assert function_exported?(Flop, :cursor_fields, 2)
+      assert function_exported?(Flop, :allowed_fields, 2)
+      assert function_exported?(Flop, :get_option, 3)
+      assert function_exported?(Flop.Schema, :flop_schema!, 1)
     end
   end
 
-  describe "Flop.Schema 0.28 protocol" do
-    test "primary_key is the ULID :id on schemas we paginate" do
-      assert Flop.Schema.primary_key(%User{}) == [:id]
-      assert Flop.Schema.primary_key(%Booking{}) == [:id]
-      assert Flop.Schema.primary_key(%Event{}) == [:id]
-      assert Flop.Schema.primary_key(%Post{}) == [:id]
-      assert Flop.Schema.primary_key(%Subscriber{}) == [:id]
-      assert Flop.Schema.primary_key(%Image{}) == [:id]
+  describe "Flop.Schema 0.29 behaviour" do
+    test "schemas we paginate implement the behaviour via __flop_schema__/0" do
+      for schema <- @paginated_schemas do
+        assert function_exported?(schema, :__flop_schema__, 0)
+        config = Flop.Schema.flop_schema!(schema)
+        assert is_map(config)
+        assert is_list(config.filterable)
+        assert is_list(config.sortable)
+      end
     end
 
-    test "tiebreaker is unset so Flop defaults to the primary key" do
-      assert Flop.Schema.tiebreaker(%User{}) == nil
-      assert Flop.Schema.tiebreaker(%Booking{}) == nil
-      assert Flop.Schema.max_filters(%User{}) == nil
+    test "primary_key is the ULID :id on schemas we paginate" do
+      for schema <- @paginated_schemas do
+        assert Flop.Schema.primary_key(schema) == [:id]
+      end
+    end
+
+    test "unset tiebreaker and max_filters stay nil on the schema config" do
+      user_config = Flop.Schema.flop_schema!(User)
+      booking_config = Flop.Schema.flop_schema!(Booking)
+
+      assert user_config.tiebreaker == nil
+      assert booking_config.tiebreaker == nil
+      assert user_config.max_filters == nil
+    end
+  end
+
+  describe "allowed_fields/2 and get_option/3" do
+    test "returns the schema filterable and sortable fields" do
+      assert Flop.allowed_fields(:filterable, for: Image) == [
+               :title,
+               :alt_text,
+               :user_id
+             ]
+
+      assert Flop.allowed_fields(:sortable, for: Image) == [:inserted_at]
+    end
+
+    test "narrows sortable fields when a query option is passed" do
+      assert Flop.allowed_fields(:sortable,
+               for: Image,
+               sortable: [:inserted_at]
+             ) ==
+               [:inserted_at]
+
+      assert Flop.allowed_fields(:filterable, for: Image, filterable: [:title]) ==
+               [:title]
+    end
+
+    test "reads default_limit and max_limit from the schema" do
+      assert Flop.get_option(:default_limit, for: User) == 50
+      assert Flop.get_option(:max_limit, for: User) == 200
+      assert Flop.get_option(:default_limit, for: Subscriber) == 20
+      assert Flop.get_option(:max_limit, for: Subscriber) == 100
     end
   end
 
@@ -114,12 +172,12 @@ defmodule Ysc.FlopUpgradeTest do
     end
   end
 
-  describe "join field get_field/2 (0.28.0)" do
+  describe "join field get_field/3 (0.29.0)" do
     test "raises when the association is not loaded" do
       booking = %Booking{}
 
       assert_raise ArgumentError, ~r/association :user is not loaded/, fn ->
-        Flop.Schema.get_field(booking, :user_first)
+        Flop.Schema.get_field(Booking, booking, :user_first)
       end
     end
 
@@ -132,9 +190,11 @@ defmodule Ysc.FlopUpgradeTest do
         }
       }
 
-      assert Flop.Schema.get_field(booking, :user_first) == "Ada"
-      assert Flop.Schema.get_field(booking, :user_last) == "Lovelace"
-      assert Flop.Schema.get_field(booking, :user_email) == "ada@ysc.org"
+      assert Flop.Schema.get_field(Booking, booking, :user_first) == "Ada"
+      assert Flop.Schema.get_field(Booking, booking, :user_last) == "Lovelace"
+
+      assert Flop.Schema.get_field(Booking, booking, :user_email) ==
+               "ada@ysc.org"
     end
   end
 

@@ -1,21 +1,47 @@
 defmodule YscWeb.FlopPhoenixUpgradeTest do
   @moduledoc """
-  Guards flop_phoenix 0.26.3 (allows flop 0.28) against the pagination and
-  path helpers our admin tables use.
+  Guards flop_phoenix 0.27.0 (requires flop 0.29) against the pagination and
+  path helpers our admin tables use. 0.27.0 resolves sortable/filterable
+  fields with `Flop.allowed_fields/2`.
   """
   use ExUnit.Case, async: true
 
-  describe "0.26.3 lock" do
-    test "locks the Hex package to 0.26.3" do
-      assert to_string(Application.spec(:flop_phoenix, :vsn)) == "0.26.3"
+  alias Ysc.Accounts.User
+  alias Ysc.Media.Image
+
+  describe "0.27.0 lock" do
+    test "locks the Hex package to 0.27.0" do
+      assert to_string(Application.spec(:flop_phoenix, :vsn)) == "0.27.0"
     end
 
     test "table, pagination, and path helpers we use still exist" do
       assert function_exported?(Flop.Phoenix, :table, 1)
       assert function_exported?(Flop.Phoenix, :pagination, 1)
+      assert function_exported?(Flop.Phoenix, :filter_fields, 1)
       assert function_exported?(Flop.Phoenix, :page_link_range, 3)
       assert function_exported?(Flop.Phoenix, :build_path, 2)
       assert function_exported?(Flop.Phoenix, :build_path, 3)
+    end
+  end
+
+  describe "allowed_fields/2 used by flop_phoenix 0.27" do
+    test "admin user filter fields stay filterable" do
+      assert :state in Flop.allowed_fields(:filterable, for: User)
+      assert :role in Flop.allowed_fields(:filterable, for: User)
+      assert :membership_type in Flop.allowed_fields(:filterable, for: User)
+    end
+
+    test "admin user table sort fields stay sortable" do
+      sortable = Flop.allowed_fields(:sortable, for: User)
+
+      for field <- [:first_name, :state, :membership_type, :application_date] do
+        assert field in sortable
+      end
+    end
+
+    test "applies a narrowed filterable list from query options" do
+      assert Flop.allowed_fields(:filterable, for: Image, filterable: [:title]) ==
+               [:title]
     end
   end
 

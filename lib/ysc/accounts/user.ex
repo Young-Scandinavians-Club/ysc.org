@@ -6,6 +6,7 @@ defmodule Ysc.Accounts.User do
   for user data manipulation.
   """
   use Ecto.Schema
+  use Flop.Schema
   import Ecto.Changeset
   import Ecto.Query
 
@@ -14,8 +15,7 @@ defmodule Ysc.Accounts.User do
   alias Ysc.Extensions.PhoneNumber
   alias Ysc.Accounts.{Address, Email, FamilyMember, SignupApplication, User}
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [
       :email,
       :first_name,
@@ -42,7 +42,7 @@ defmodule Ysc.Accounts.User do
       order_by: [:first_name, :last_name],
       order_directions: [:asc, :asc]
     }
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID

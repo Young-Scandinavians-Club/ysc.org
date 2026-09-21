@@ -5,14 +5,14 @@ defmodule Ysc.Bookings.Booking do
   Represents a room booking with check-in and check-out dates.
   """
   use Ecto.Schema
+  use Flop.Schema
   import Ecto.Changeset
 
   alias Ysc.ReferenceGenerator
 
   @reference_prefix "BKG"
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [:property, :booking_mode],
     sortable: [
       :reference_id,
@@ -52,7 +52,7 @@ defmodule Ysc.Bookings.Booking do
         user_name: [:user_first, :user_last]
       ]
     ]
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
