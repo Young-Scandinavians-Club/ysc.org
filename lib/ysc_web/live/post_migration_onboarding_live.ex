@@ -522,9 +522,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         Family Membership
         <:subtitle>
           <%= if @primary_user do %>
-            Your membership benefits are shared with you by {@primary_user.first_name} {@primary_user.last_name}. You do not need to choose a plan or add a payment method.
+            Your membership benefits are shared with you by {@primary_user.first_name} {@primary_user.last_name}. You do not need to choose a plan or add a card.
           <% else %>
-            Your membership benefits are shared with you by the member who manages your family account. You do not need to choose a plan or add a payment method.
+            Your membership benefits are shared with you by the member who manages your family account. You do not need to choose a plan or add a card.
           <% end %>
         </:subtitle>
       </.header>
@@ -1521,7 +1521,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
                   YscWeb.Flash.send_toast(
                     :error,
-                    "Your payment method was saved, but we could not set it as your default for renewals. Please try again or contact info@ysc.org.",
+                    "Your card was saved, but we could not set it as your default for renewals. Please try again or contact info@ysc.org.",
                     title: "Payment"
                   )
 
@@ -1542,7 +1542,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:error, _} ->
             YscWeb.Flash.send_toast(
               :error,
-              "We couldn't save your payment method. Please try again, or email memberships@ysc.org if this keeps happening.",
+              "We couldn't save your card. Please try again, or email memberships@ysc.org if this keeps happening.",
               title: "Payment"
             )
 
@@ -1552,7 +1552,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, _} ->
         YscWeb.Flash.send_toast(
           :error,
-          "We couldn't confirm your payment method. Please try again, or email memberships@ysc.org if this keeps happening.",
+          "We couldn't confirm your card. Please try again, or email memberships@ysc.org if this keeps happening.",
           title: "Payment"
         )
 
@@ -1575,7 +1575,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       is_nil(default_pm) ->
         YscWeb.Flash.send_toast(
           :error,
-          "Please add a payment method before continuing.",
+          "Please add a card before continuing.",
           title: "Payment Required"
         )
 
@@ -1629,7 +1629,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :error,
-              "We couldn't turn on automatic renewal. Your payment method was saved — please try again, or email info@ysc.org for help.",
+              "We couldn't turn on automatic renewal. Your card was saved — please try again, or email info@ysc.org for help.",
               title: "Payment setup"
             )
 

@@ -522,6 +522,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert html =~ "renews automatically each year"
       assert html =~ "automatic renewal"
       refute html =~ "auto-renewal"
+      refute html =~ "payment method"
       assert html =~ "Save your card"
       assert html =~ "Save card &amp; continue"
     end
@@ -579,7 +580,7 @@ defmodule YscWeb.AccountSetupLiveTest do
         "payment_method_id" => "pm_test_123"
       })
 
-      assert render(view) =~ "Cannot save payment method"
+      assert render(view) =~ "save your card at this step"
     end
 
     test "retry_payment_setup event does not crash", %{conn: conn, user: user} do
@@ -1304,6 +1305,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       html = render(view)
 
       assert html =~ "Activate Your Membership"
+      assert html =~ "Add or confirm a card"
+      refute html =~ "payment method"
       assert has_element?(view, "ol li", "Payment")
       refute has_element?(view, "ol li", "Save card")
 
