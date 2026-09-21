@@ -242,8 +242,14 @@ defmodule Ysc.MixProject do
       # mint ~> 1.8, so pin the patched floor.
       {:mint, "~> 1.10.1", override: true},
       {:floki, "~> 0.38"},
-      {:flop, "~> 0.28.0"},
-      {:flop_phoenix, "~> 0.26.3"},
+      # 0.29.0: Flop.Schema is a behaviour (`use Flop.Schema` + `@flop_options`)
+      # instead of a protocol (`@derive`). field_info/2, get_field/3, and
+      # primary_key/1 take the schema module. Schema option accessors are gone
+      # (use Flop.get_option/3 and Flop.allowed_fields/2). We paginate with
+      # validate_and_run/3 + page pagination; join fields still declare ecto_type.
+      {:flop, "~> 0.29.0"},
+      # 0.27.0: requires Flop 0.29; sortable/filterable via allowed_fields/2.
+      {:flop_phoenix, "~> 0.27.0"},
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
       {:goth, "~> 1.4"},

@@ -9,18 +9,18 @@ defmodule Ysc.Newsletter.Subscriber do
   confirmation (trusted/authenticated subscribe paths are auto-confirmed).
   """
   use Ecto.Schema
+  use Flop.Schema
   import Ecto.Changeset
 
   alias Ysc.Accounts.User
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [:email, :subscribed],
     sortable: [:email, :subscribed_at, :source, :first_name, :last_name],
     default_limit: 20,
     max_limit: 100,
     default_order: %{order_by: [:subscribed_at], order_directions: [:desc]}
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID

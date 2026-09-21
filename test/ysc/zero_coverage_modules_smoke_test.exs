@@ -295,15 +295,17 @@ defmodule Ysc.ZeroCoverageModulesSmokeTest do
     end
   end
 
-  describe "Ysc.Media.Image (Flop.Schema derive)" do
+  describe "Ysc.Media.Image (Flop.Schema behaviour)" do
     test "exports Flop schema metadata" do
-      assert Flop.Schema.filterable(%Ysc.Media.Image{}) == [
+      assert Flop.allowed_fields(:filterable, for: Ysc.Media.Image) == [
                :title,
                :alt_text,
                :user_id
              ]
 
-      assert Flop.Schema.sortable(%Ysc.Media.Image{}) == [:inserted_at]
+      assert Flop.allowed_fields(:sortable, for: Ysc.Media.Image) == [
+               :inserted_at
+             ]
     end
   end
 

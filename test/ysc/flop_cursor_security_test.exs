@@ -87,23 +87,23 @@ defmodule Ysc.FlopCursorSecurityTest do
 
   describe "join field ecto_type (flop 0.27.0+)" do
     test "Event organizer join fields declare ecto_type" do
-      assert Flop.Schema.field_info(%Event{}, :organizer_first).ecto_type ==
+      assert Flop.Schema.field_info(Event, :organizer_first).ecto_type ==
                :string
 
-      assert Flop.Schema.field_info(%Event{}, :organizer_last).ecto_type ==
+      assert Flop.Schema.field_info(Event, :organizer_last).ecto_type ==
                :string
     end
 
     test "Post author join fields declare ecto_type" do
-      assert Flop.Schema.field_info(%Post{}, :author_first).ecto_type == :string
-      assert Flop.Schema.field_info(%Post{}, :author_last).ecto_type == :string
+      assert Flop.Schema.field_info(Post, :author_first).ecto_type == :string
+      assert Flop.Schema.field_info(Post, :author_last).ecto_type == :string
     end
 
     test "Booking user join fields declare ecto_type" do
-      assert Flop.Schema.field_info(%Booking{}, :user_first).ecto_type ==
+      assert Flop.Schema.field_info(Booking, :user_first).ecto_type ==
                :string
 
-      assert Flop.Schema.field_info(%Booking{}, :user_email).ecto_type ==
+      assert Flop.Schema.field_info(Booking, :user_email).ecto_type ==
                :string
     end
   end
@@ -111,7 +111,7 @@ defmodule Ysc.FlopCursorSecurityTest do
   describe "UnknownFieldError (flop 0.27.0+)" do
     test "raises for fields that are not configured on the schema" do
       assert_raise Flop.UnknownFieldError, fn ->
-        Flop.Schema.field_info(%User{}, :not_a_real_field)
+        Flop.Schema.field_info(User, :not_a_real_field)
       end
     end
   end

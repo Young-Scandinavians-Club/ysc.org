@@ -6,6 +6,7 @@ defmodule Ysc.Events.Event do
   for event data manipulation.
   """
   use Ecto.Schema
+  use Flop.Schema
 
   import Ecto.Changeset
 
@@ -15,8 +16,7 @@ defmodule Ysc.Events.Event do
 
   @reference_prefix "EVT"
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [
       :state,
       :organizer_id,
@@ -46,7 +46,7 @@ defmodule Ysc.Events.Event do
         organizer_name: [:organizer_first, :organizer_last]
       ]
     ]
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
