@@ -78,16 +78,22 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
     }
   end
 
-  defp grant_ticket_order!(event, buyer, granted_by) do
-    tier = ticket_tier_fixture(%{event_id: event.id, price: Money.new(0, :USD)})
+  defp grant_ticket_order!(event, buyer, granted_by, opts \\ []) do
+    price = Keyword.get(opts, :price, Money.new(0, :USD))
+    quantity = Keyword.get(opts, :quantity, 1)
+
+    grant_opts =
+      Keyword.take(opts, [:payment_channel, :offline_amount_collected])
+
+    tier = ticket_tier_fixture(%{event_id: event.id, price: price})
 
     {:ok, order} =
       Tickets.grant_admin_tickets(
         granted_by.id,
         buyer.id,
         event.id,
-        %{tier.id => 1},
-        skip_email: true
+        %{tier.id => quantity},
+        Keyword.merge([skip_email: true], grant_opts)
       )
 
     order
@@ -123,6 +129,26 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
                view,
                "#cancellation-refund-order-#{order.id} input[type=checkbox]"
              )
+    end
+
+    test "a refundable order row shows the reference, ticket count, and amount",
+         %{conn: conn} do
+      event = event_fixture(%{state: :published})
+
+      %{ticket_order: order} =
+        completed_ticket_order_with_payment!(event: event, quantity: 2)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      row = "#cancellation-refund-order-#{order.id}"
+
+      assert has_element?(view, row, order.reference_id)
+      assert has_element?(view, row, "2 tickets")
+      assert has_element?(view, row, Money.to_string!(order.total_amount))
     end
 
     test "refunding a selected order cancels its tickets and issues a Stripe refund",
@@ -297,6 +323,48 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
                view,
                "#cancellation-refund-order-#{order.id} input[type=checkbox]"
              )
+    end
+
+    test "an in-person cash sale shows a paid-in-person badge and cannot be selected",
+         %{conn: conn, admin: admin} do
+      event = event_fixture(%{state: :published})
+      buyer = user_fixture()
+
+      order =
+        grant_ticket_order!(event, buyer, admin,
+          payment_channel: "cash",
+          offline_amount_collected: Money.new(:USD, "90.00")
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      row = "#cancellation-refund-order-#{order.id}"
+
+      assert has_element?(view, row, "Paid in person (cash)")
+      refute has_element?(view, row, "nothing to refund")
+      refute has_element?(view, "#{row} input[type=checkbox]")
+    end
+
+    test "an other in-person channel uses the generic paid-in-person label",
+         %{conn: conn, admin: admin} do
+      event = event_fixture(%{state: :published})
+      buyer = user_fixture()
+      order = grant_ticket_order!(event, buyer, admin, payment_channel: "other")
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      row = "#cancellation-refund-order-#{order.id}"
+
+      assert has_element?(view, row, "Paid in person (in person)")
+      refute has_element?(view, "#{row} input[type=checkbox]")
     end
 
     test "opening the refund modal does not N+1 ticket queries", %{
