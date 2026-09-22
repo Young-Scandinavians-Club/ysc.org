@@ -2327,6 +2327,10 @@ defmodule Ysc.Bookings.BookingLocker do
               |> DateTime.add(hold_minutes, :minute)
               |> DateTime.truncate(:second)
 
+            # Rebuilds attrs from the new dates. Does not keep
+            # `payment_intent_id` from a prior hold — callers that might
+            # replace a paid hold must Stripe-reconcile first
+            # (`BookingChangeLive.proceed_after_modification_details/3`).
             hold_attrs =
               encode_modification_hold_attrs(booking, attrs, hold_data, opts)
 
