@@ -18,6 +18,40 @@ defmodule YscWeb.UserTicketsLiveTest do
       assert has_element?(view, "#ticket-orders-list")
     end
 
+    test "renders slim-loaded order reference, ticket count, tiers, and total",
+         %{
+           conn: conn
+         } do
+      data = Ysc.TestDataFactory.complete_ticket_order()
+
+      Enum.each(data.tickets, fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+
+      conn = log_in_user(conn, data.user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      render(view)
+
+      row = "#ticket_orders-#{data.order.id}"
+      formatted_total = Ysc.MoneyHelper.format_money!(data.order.total_amount)
+
+      assert has_element?(view, row, data.event.title)
+      assert has_element?(view, row, data.order.reference_id)
+      assert has_element?(view, row, "2 Tickets")
+      assert has_element?(view, row, "Paid")
+      assert has_element?(view, row, "Total Paid")
+      assert has_element?(view, row, formatted_total)
+      assert has_element?(view, row, "Ready to use")
+
+      Enum.each(data.tickets, fn ticket ->
+        assert has_element?(view, row, ticket.reference_id)
+        assert has_element?(view, row, ticket.ticket_tier.name)
+      end)
+    end
+
     test "loads tickets page successfully", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
