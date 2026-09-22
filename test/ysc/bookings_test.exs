@@ -2194,6 +2194,128 @@ defmodule Ysc.BookingsTest do
       assert Ecto.assoc_loaded?(view_loaded.check_ins)
     end
 
+    test "get_user_booking_for_member_checkout/2 slims rooms and skips user" do
+      {user, room, _category, booking} = admin_list_slim_booking_fixture()
+
+      {loaded, category_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_checkout(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?room_categories["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, user_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_checkout(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?users["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, room_copy} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_checkout(booking.id, user.id)
+          end,
+          pattern: ~r/description|hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == booking.id
+      assert hd(loaded.rooms).id == room.id
+      assert hd(loaded.rooms).name == room.name
+      assert hd(loaded.rooms).capacity_max == room.capacity_max
+      assert is_nil(hd(loaded.rooms).description)
+      refute Ecto.assoc_loaded?(loaded.user)
+      assert Ecto.assoc_loaded?(loaded.booking_guests)
+      refute Ecto.assoc_loaded?(hd(loaded.rooms).room_category)
+      assert category_queries == 0
+      assert user_queries == 0
+      assert room_copy == 0
+    end
+
+    test "get_user_booking_for_member_detail/2 skips guests, user, and categories" do
+      {user, room, _category, booking} = admin_list_slim_booking_fixture()
+
+      {loaded, category_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_detail(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?room_categories["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, guest_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_detail(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?booking_guests["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == booking.id
+      assert hd(loaded.rooms).name == room.name
+      refute Ecto.assoc_loaded?(loaded.user)
+      refute Ecto.assoc_loaded?(loaded.booking_guests)
+      assert category_queries == 0
+      assert guest_queries == 0
+    end
+
+    test "get_user_booking_for_receipt/2 slims user and skips room categories" do
+      {user, room, _category, booking} = admin_list_slim_booking_fixture()
+
+      {loaded, category_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_receipt(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?room_categories["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_receipt(booking.id, user.id)
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == booking.id
+      assert loaded.user.id == user.id
+      assert loaded.user.first_name == user.first_name
+      assert is_nil(loaded.user.hashed_password)
+      assert is_nil(loaded.user.board_bio)
+      assert hd(loaded.rooms).name == room.name
+      assert Ecto.assoc_loaded?(loaded.booking_guests)
+      assert category_queries == 0
+      assert password_cols == 0
+    end
+
+    test "member checkout loaders return nil for another user's booking" do
+      {_user, _room, _category, booking} = admin_list_slim_booking_fixture()
+      other = user_fixture()
+
+      assert is_nil(
+               Bookings.get_user_booking_for_member_checkout(
+                 booking.id,
+                 other.id
+               )
+             )
+
+      assert is_nil(
+               Bookings.get_user_booking_for_member_detail(booking.id, other.id)
+             )
+
+      assert is_nil(Bookings.get_user_booking_for_receipt(booking.id, other.id))
+    end
+
     test "mark_booking_checked_in/1 marks booking as checked in" do
       booking = booking_fixture()
       refute booking.checked_in
@@ -6498,6 +6620,15 @@ defmodule Ysc.BookingsTest do
 
       assert %Ecto.Query{} =
                Bookings.ci_query_explain_list_pending_refunds_for_admin_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_get_user_booking_for_member_checkout_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_get_user_booking_for_member_detail_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_get_user_booking_for_receipt_query()
     end
 
     test "the admin property dashboard stats query executes against the database" do

@@ -320,6 +320,11 @@ defmodule Ysc.AccountsTest do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_membership_renewals_ytd_query()
     end
+
+    test "ci_query_explain_list_household_guest_picker_users_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_list_household_guest_picker_users_query()
+    end
   end
 
   describe "get_user_by_phone_number/1" do
@@ -610,6 +615,46 @@ defmodule Ysc.AccountsTest do
       sub_accounts = Accounts.get_sub_accounts(primary)
       assert length(sub_accounts) == 1
       assert hd(sub_accounts).id == sub.id
+    end
+
+    test "list_household_guest_picker_users slims name fields only", %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098301",
+          first_name: "Primary",
+          last_name: "Guest"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "guest picker must not load this bio"
+        })
+        |> Repo.update!()
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098302",
+          first_name: "Sub",
+          last_name: "Guest"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {members, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_household_guest_picker_users(primary) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      ids = Enum.map(members, & &1.id)
+      assert primary.id in ids
+      assert sub.id in ids
+      assert Enum.all?(members, &is_nil(&1.hashed_password))
+      assert Enum.all?(members, &is_nil(&1.board_bio))
+      assert password_cols == 0
     end
 
     test "get_family_group_user_ids returns all family user ids", %{} do
