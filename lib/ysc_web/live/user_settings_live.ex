@@ -4298,7 +4298,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :info,
-                 "Auto-renewal is off. You'll keep access until your current membership year ends.",
+                 "Automatic renewal is off. You'll keep access until your current membership year ends.",
                  title: "Membership"
                )
                |> push_patch(to: ~p"/users/membership")}
@@ -4404,7 +4404,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :info,
-                 "Auto-renewal is on. Your membership will renew as usual.",
+                 "Automatic renewal is on. Your membership will renew as usual.",
                  title: "Membership"
                )
                |> push_patch(to: ~p"/users/membership")}

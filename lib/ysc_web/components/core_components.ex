@@ -5151,7 +5151,7 @@ defmodule YscWeb.CoreComponents do
             }
             class="text-sm text-green-900 mt-2"
           >
-            Auto-renewal is on. Your membership will
+            Your membership will
             <strong class="text-green-900">automatically renew</strong>
             on
             <strong class="text-green-900">
@@ -5160,7 +5160,7 @@ defmodule YscWeb.CoreComponents do
                 @timezone
               )}
             </strong>
-            unless you turn it off beforehand.
+            unless you turn that off beforehand.
           </p>
 
           <p

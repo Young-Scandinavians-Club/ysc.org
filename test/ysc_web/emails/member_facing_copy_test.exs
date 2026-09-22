@@ -13,6 +13,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     ApplicationApproved,
     ApplicationApprovedFamilyLinked,
     ApplicationApprovedPaymentSuccess,
+    ApplicationSubmitted,
     BookingCancellationConfirmation,
     BookingCheckinReminder,
     BookingCheckoutReminder,
@@ -76,7 +77,17 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
                "Velkommen! (Welcome!) Your YSC Membership is Active! 🎉"
 
       assert text =~ "Velkommen! (Welcome!) Your Membership is Active"
+      assert text =~ "Your saved card has been charged"
       refute text =~ "Velkommen! Your Membership is Active"
+      refute text =~ "saved payment method"
+    end
+
+    test "application-submitted email says save a card, not payment method" do
+      html = ApplicationSubmitted.render(%{first_name: "Jane"})
+      text = html_text(html)
+
+      assert text =~ "option to save a card"
+      refute text =~ "payment method"
     end
 
     test "payment confirmation tells members they can book a stay at the cabins" do
@@ -132,12 +143,17 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "You just need to finish paying your dues"
       assert text =~ "Try paying again"
       assert text =~ "If your card still works, try the payment again"
+      assert text =~ "Update your card or bank account"
+      assert text =~ "Expired or invalid card"
+      assert text =~ "Using a different card"
       assert text =~ "payment ID: in_123"
       assert text =~ "jane@example.com"
       refute text =~ "successfully processed"
       refute text =~ "complete the payment process"
       refute text =~ "payment reference"
       refute text =~ "Retry Payment Now"
+      refute text =~ "Update Payment Method"
+      refute text =~ "payment method"
     end
 
     test "renewal-failure email says after you pay, not once payment is processed" do
@@ -158,8 +174,11 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
                "We couldn't take payment for your Family membership renewal"
 
       assert text =~ "After you update your card and pay"
+      assert text =~ "Update your card or bank account"
       refute text =~ "successfully processed"
       refute text =~ "couldn't process your"
+      refute text =~ "Update Payment Method"
+      refute text =~ "payment method"
     end
 
     test "renewal-success email says we received payment instead of processed" do

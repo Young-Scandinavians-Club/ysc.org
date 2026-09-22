@@ -2097,7 +2097,7 @@ defmodule YscWeb.EventDetailsLive do
                 Payment failed
               </h2>
               <p class="text-zinc-600 max-w-md">
-                Your payment did not go through. Please select tickets again and try a different payment method if needed.
+                Your payment did not go through. Please select tickets again and try a different card if needed.
               </p>
             </div>
 

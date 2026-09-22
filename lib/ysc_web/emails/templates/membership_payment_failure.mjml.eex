@@ -52,7 +52,7 @@
           Insufficient funds in your account
         </li>
         <li style="padding-bottom: 10px">
-          Expired or invalid payment method
+          Expired or invalid card
         </li>
         <li style="padding-bottom: 10px">
           Bank security restrictions
@@ -81,13 +81,13 @@
     <mj-spacer height="24px"></mj-spacer>
     <%= if @retry_payment_url do %>
       <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-        If your card still works, try the payment again. If you need a different card or bank account, update your payment method first.
+        If your card still works, try the payment again. Otherwise, update your card or bank account first.
       </mj-text>
       <mj-spacer height="12px"></mj-spacer>
       <mj-button href="<%= @retry_payment_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Try paying again →</mj-button>
       <mj-spacer height="12px"></mj-spacer>
     <% end %>
-    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Update Payment Method →</mj-button>
+    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Update your card or bank account →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       If you continue to experience issues, please try:
@@ -98,7 +98,7 @@
           <strong>Contacting your bank:</strong> They may need to authorize the transaction
         </li>
         <li style="padding-bottom: 10px">
-          <strong>Using a different payment method:</strong> Try a different card or payment option
+          <strong>Using a different card:</strong> Try a different card or payment option
         </li>
         <li style="padding-bottom: 10px">
           <strong>Checking your account balance:</strong> Ensure sufficient funds are available
