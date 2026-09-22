@@ -203,6 +203,15 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       )
   end
 
+  # Buyout is summer-only. `today + 7` then next Monday can land in Winter
+  # (2026-09-22 → Oct 5), so inserting a buyout fixture fails with winter-nights
+  # instead of exercising exclusivity (CI 2026-09-22).
+  defp next_test_summer_monday_wednesday do
+    today = Ysc.Bookings.SeasonHelpers.cabin_today()
+    checkin = next_test_summer_monday_beyond(today, 0)
+    {checkin, Date.add(checkin, 2)}
+  end
+
   defp insert_family_booking!(user, rooms, attrs) do
     room = Map.get(attrs, :room, rooms.tahoe_room1)
     attrs = Map.drop(attrs, [:room])
@@ -1198,13 +1207,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
     } do
       user = create_subscription(user, :family)
 
-      today = Date.utc_today()
-      days_to_monday = rem(8 - Date.day_of_week(today, :monday), 7)
-      next_monday = Date.add(today, days_to_monday + 7)
-      buyout_checkin = next_monday
-      buyout_checkout = Date.add(next_monday, 2)
-      room_checkin = Date.add(next_monday, 21)
-      room_checkout = Date.add(next_monday, 23)
+      {buyout_checkin, buyout_checkout} = next_test_summer_monday_wednesday()
+      room_checkin = Date.add(buyout_checkin, 21)
+      room_checkout = Date.add(buyout_checkin, 23)
 
       {:ok, _buyout} =
         %Booking{}
