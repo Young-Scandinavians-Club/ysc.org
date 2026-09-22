@@ -145,7 +145,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "If your card still works, try the payment again"
       assert text =~ "Update your card or bank account"
       assert text =~ "Expired or invalid card"
-      assert text =~ "Using a different card"
+      assert text =~ "Using a different card or bank account"
       assert text =~ "payment ID: in_123"
       assert text =~ "jane@example.com"
       refute text =~ "successfully processed"

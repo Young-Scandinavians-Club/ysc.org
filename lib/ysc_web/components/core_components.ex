@@ -5160,7 +5160,7 @@ defmodule YscWeb.CoreComponents do
                 @timezone
               )}
             </strong>
-            unless you turn that off beforehand.
+            unless you turn off automatic renewal beforehand.
           </p>
 
           <p

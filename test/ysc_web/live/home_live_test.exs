@@ -654,10 +654,12 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~
-               "will automatically renew on Mar 5, 2027 unless you turn it off"
+               "will automatically renew on Mar 5, 2027 unless you turn off automatic renewal"
 
       assert html =~ "Mar 5, 2027"
       refute html =~ "Mar 4, 2027"
+      refute html =~ "Auto-renewal"
+      refute html =~ "club properties"
     end
   end
 
