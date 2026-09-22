@@ -539,6 +539,9 @@ defmodule YscWeb.AdminComponents do
   Pass `target={@myself}` from LiveComponents so search/select/clear events
   stay on the component.
 
+  Drive the search / select / clear assigns with `YscWeb.AdminUserSearch`
+  instead of copying `Accounts.search_users/2` handlers in each LiveView.
+
   ## Examples
 
       <.admin_user_autocomplete
@@ -554,6 +557,13 @@ defmodule YscWeb.AdminComponents do
         target={@myself}
         required
       />
+
+      # In the LiveView / LiveComponent:
+      alias YscWeb.AdminUserSearch
+
+      {:noreply, AdminUserSearch.search(socket, query)}
+      {:noreply, AdminUserSearch.select(socket, id)}
+      {:noreply, AdminUserSearch.assign_blank(socket)}
   """
   attr :id, :string, required: true
   attr :label, :string, default: "Member"

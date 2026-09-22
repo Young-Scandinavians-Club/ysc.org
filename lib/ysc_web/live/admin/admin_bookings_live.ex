@@ -13,9 +13,9 @@ defmodule YscWeb.AdminBookingsLive do
   alias Ysc.Bookings.BookingLocker
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.MoneyHelper
-  alias Ysc.Accounts
   alias Ysc.Ledgers.{Payment, Refund}
   alias Ysc.Repo
+  alias YscWeb.AdminUserSearch
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
   alias YscWeb.AdminBadgeHelpers
@@ -3487,9 +3487,7 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:show_refund_modal, false)
       |> assign(:refund_form, nil)
       |> assign(:calendar_range_form, changeset)
-      |> assign(:user_search, "")
-      |> assign(:user_search_results, [])
-      |> assign(:selected_user, nil)
+      |> AdminUserSearch.assign_blank()
       |> assign(:date_selection_type, nil)
       |> assign(:date_selection_start, nil)
       |> assign(:date_selection_room_id, nil)
@@ -4157,9 +4155,7 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:booking_room_id, room_id)
     |> assign(:booking_payments, [])
     |> assign(:booking_refunds, [])
-    |> assign(:user_search, "")
-    |> assign(:user_search_results, [])
-    |> assign(:selected_user, nil)
+    |> AdminUserSearch.assign_blank()
   end
 
   defp apply_action(socket, :edit_booking, %{"id" => id}) do
@@ -4210,9 +4206,7 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:booking_room_id, room_id)
     |> assign(:booking_payments, [])
     |> assign(:booking_refunds, [])
-    |> assign(:user_search, "")
-    |> assign(:user_search_results, [])
-    |> assign(:selected_user, booking.user)
+    |> AdminUserSearch.assign_selected(booking.user)
   end
 
   defp apply_action(socket, :new_refund_policy, _params) do
@@ -5564,35 +5558,15 @@ defmodule YscWeb.AdminBookingsLive do
 
   # User autocomplete handlers for booking form
   def handle_event("search-booking-users", %{"value" => query}, socket) do
-    results =
-      if String.length(query) >= 2 do
-        Accounts.search_users(query, limit: 10)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:user_search, query)
-     |> assign(:user_search_results, results)}
+    {:noreply, AdminUserSearch.search(socket, query)}
   end
 
   def handle_event("select-booking-user", %{"id" => id}, socket) do
-    user = Accounts.get_user!(id)
-
-    {:noreply,
-     socket
-     |> assign(:selected_user, user)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+    {:noreply, AdminUserSearch.select(socket, id)}
   end
 
   def handle_event("clear-booking-user", _, socket) do
-    {:noreply,
-     socket
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+    {:noreply, AdminUserSearch.assign_blank(socket)}
   end
 
   def handle_event("save-booking", %{"booking" => booking_params}, socket) do

@@ -7,6 +7,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   alias Ysc.Accounts.UserDisplay
   alias Ysc.Tickets
   alias YscWeb.AdminEventsLive.TicketTierManagement
+  alias YscWeb.AdminUserSearch
 
   @impl true
   def render(assigns) do
@@ -145,9 +146,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
          :form,
          to_form(default_form_params(ticket_tier_id), as: "ticket_grant")
        )
-       |> assign(:selected_user, nil)
-       |> assign(:user_search, "")
-       |> assign(:user_search_results, [])}
+       |> AdminUserSearch.assign_blank()}
     end
   end
 
@@ -162,17 +161,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     if socket.assigns[:admin_role] != :admin do
       {:noreply, socket}
     else
-      results =
-        if String.length(query) >= 2 do
-          Accounts.search_users(query, limit: 10)
-        else
-          []
-        end
-
-      {:noreply,
-       socket
-       |> assign(:user_search, query)
-       |> assign(:user_search_results, results)}
+      {:noreply, AdminUserSearch.search(socket, query)}
     end
   end
 
@@ -181,28 +170,23 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     if socket.assigns[:admin_role] != :admin do
       {:noreply, socket}
     else
-      user = Accounts.get_user!(id)
-      merged = merge_form_params(socket, %{"user_id" => user.id})
+      socket = AdminUserSearch.select(socket, id)
 
-      {:noreply,
-       socket
-       |> assign(:selected_user, user)
-       |> assign(:user_search, "")
-       |> assign(:user_search_results, [])
-       |> assign(:form, to_form(merged, as: "ticket_grant"))}
+      merged =
+        merge_form_params(socket, %{
+          "user_id" => socket.assigns.selected_user.id
+        })
+
+      {:noreply, assign(socket, :form, to_form(merged, as: "ticket_grant"))}
     end
   end
 
   @impl true
   def handle_event("clear-user", _params, socket) do
+    socket = AdminUserSearch.assign_blank(socket)
     merged = merge_form_params(socket, %{}) |> Map.delete("user_id")
 
-    {:noreply,
-     socket
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])
-     |> assign(:form, to_form(merged, as: "ticket_grant"))}
+    {:noreply, assign(socket, :form, to_form(merged, as: "ticket_grant"))}
   end
 
   @impl true
