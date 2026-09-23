@@ -335,6 +335,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
         )
 
       assert has_element?(view, "h2", "Payment failed")
+      assert has_element?(view, "#payment-modal", "try a different card")
+      refute has_element?(view, "#payment-modal", "payment method")
       refute has_element?(view, "h2", "Time ran out")
     end
 

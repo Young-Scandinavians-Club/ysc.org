@@ -21,11 +21,16 @@ defmodule Ysc.PaymentUserMessagesTest do
   end
 
   test "format_stripe_error maps declined cards" do
-    assert PaymentUserMessages.format_stripe_error(%Stripe.Error{
-             code: "card_declined",
-             message: "Your card was declined.",
-             source: :api
-           }) =~ "declined"
+    declined =
+      PaymentUserMessages.format_stripe_error(%Stripe.Error{
+        code: "card_declined",
+        message: "Your card was declined.",
+        source: :api
+      })
+
+    assert declined =~ "declined"
+    assert declined =~ "try a different card"
+    refute declined =~ "payment method"
 
     assert PaymentUserMessages.format_stripe_error("card was declined") =~
              "declined"
@@ -84,7 +89,9 @@ defmodule Ysc.PaymentUserMessagesTest do
     message = PaymentUserMessages.generic_payment_failed()
 
     assert message =~ "couldn't process your payment"
+    assert message =~ "try another card"
     assert message =~ "info@ysc.org"
     refute message =~ "payment_intent"
+    refute message =~ "payment method"
   end
 end

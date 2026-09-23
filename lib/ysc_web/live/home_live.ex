@@ -1991,9 +1991,9 @@ defmodule YscWeb.HomeLive do
     case plan_type do
       :lifetime ->
         if is_sub_account do
-          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the member who manages your family account"}. Enjoy full access to all club properties and events forever."
+          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the member who manages your family account"}. Enjoy full access to our cabins and events forever."
         else
-          "You are a lifetime member. Enjoy full access to all club properties and events forever."
+          "You are a lifetime member. Enjoy full access to our cabins and events forever."
         end
 
       plan_id when not is_nil(plan_id) ->
@@ -2013,7 +2013,7 @@ defmodule YscWeb.HomeLive do
               "Your #{membership_type} membership will not automatically renew. You are still an active member until #{format_membership_date(renewal_date, timezone)}."
 
             renewal_date ->
-              "You have an active #{membership_type} membership. Auto-renewal is on—your membership will automatically renew on #{format_membership_date(renewal_date, timezone)} unless you turn it off beforehand."
+              "You have an active #{membership_type} membership. It will automatically renew on #{format_membership_date(renewal_date, timezone)} unless you turn off automatic renewal beforehand."
 
             true ->
               "You have an active #{membership_type} membership."
@@ -2021,7 +2021,7 @@ defmodule YscWeb.HomeLive do
         end
 
       _ ->
-        "You have an active membership with access to all club properties and events."
+        "You have an active membership with access to our cabins and events."
     end
   end
 

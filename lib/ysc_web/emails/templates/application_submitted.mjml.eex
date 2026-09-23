@@ -42,7 +42,7 @@
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      While finishing your account setup, you'll have the option to save a payment method. If you do, <strong>you will not be charged unless your application is approved</strong> — but if approved, your membership will activate automatically with no extra steps needed.
+      While finishing your account setup, you'll have the option to save a card. If you do, <strong>you will not be charged unless your application is approved</strong> — but if approved, your membership will activate automatically with no extra steps needed.
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
