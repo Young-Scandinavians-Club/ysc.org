@@ -133,7 +133,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         <.admin_ghost_bar width="w-full" height="h-3" />
         <.admin_ghost_bar width="w-full" height="h-3" />
         <.admin_ghost_bar width="w-5/6" height="h-3" />
-        <.admin_ghost_bar width="w-2/5" height="h-5" class="mt-4" />
+        <.admin_ghost_bar width="w-2/5" height="h-5" />
         <.admin_ghost_bar width="w-full" height="h-3" />
         <.admin_ghost_bar width="w-[92%]" height="h-3" />
       </div>

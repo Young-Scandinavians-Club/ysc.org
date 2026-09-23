@@ -1433,7 +1433,7 @@ defmodule YscWeb.TahoeBookingLive do
                 </fieldset>
               </section>
               <!-- Booking Rules & Policies (Above Stay Details) -->
-              <div :if={@booking_step == :details} class="space-y-3 mb-6">
+              <div :if={@booking_step == :details} class="space-y-3">
                 <!-- Weekend Rule Alert (Reactive - shows when a stay includes Saturday without spanning Friday-Sunday) -->
                 <div
                   :if={
@@ -2812,7 +2812,7 @@ defmodule YscWeb.TahoeBookingLive do
                         Confirm Your Booking
                       </h3>
                       <div class="mt-2 flex flex-col gap-4">
-                        <p class="text-sm text-zinc-500 mb-4">
+                        <p class="text-sm text-zinc-500">
                           Before confirming, please acknowledge the following requirements:
                         </p>
                         <label class="flex items-start gap-3 cursor-pointer p-3 bg-zinc-50 border border-zinc-200 rounded-sm">

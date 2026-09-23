@@ -786,7 +786,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           </div>
 
           <div :if={@selected_user_application != nil} class="flex flex-col gap-6">
-            <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-6 gap-4">
+            <div class="flex items-center justify-between border-b border-zinc-200 pb-4 gap-4">
               <div class="min-w-0">
                 <.admin_page_title level={2} variant={:emphasis}>
                   Application
@@ -2312,7 +2312,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :logs} class="max-w-full py-8 px-2">
           <div class="flex flex-col gap-6">
-            <h2 class="text-xl font-semibold text-zinc-800 mb-4">User Notes</h2>
+            <h2 class="text-xl font-semibold text-zinc-800">User Notes</h2>
 
             <div class="bg-white border border-zinc-200 rounded-lg p-6">
               <h3 class="text-lg font-semibold text-zinc-800 mb-4">Add Note</h3>

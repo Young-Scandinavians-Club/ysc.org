@@ -342,7 +342,7 @@ defmodule YscWeb.AdminUsersLive do
                       field={@rejection_form[:note]}
                       type="textarea"
                       label="Rejection note (optional)"
-                      class="mt-1 block w-full rounded-sm border-zinc-300 text-zinc-900 sm:text-sm"
+                      class="block w-full rounded-sm border-zinc-300 text-zinc-900 sm:text-sm"
                       rows="3"
                     />
                     <button

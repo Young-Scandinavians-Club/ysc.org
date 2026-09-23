@@ -882,7 +882,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                   :if={@selected_post_ids != [] && @picker_data_loaded?}
                   class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
                 >
-                  <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
+                  <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
                     Selected ({length(@selected_post_ids)})
                   </p>
                   <%= for {pos, post} <- selected_items_in_order(@post_results, @selected_post_ids) do %>
@@ -971,7 +971,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                   :if={@selected_event_ids != [] && @picker_data_loaded?}
                   class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
                 >
-                  <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
+                  <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
                     Selected ({length(@selected_event_ids)})
                   </p>
                   <%= for {pos, event} <- selected_items_in_order(@event_results, @selected_event_ids) do %>

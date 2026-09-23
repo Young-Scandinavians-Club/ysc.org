@@ -1357,7 +1357,7 @@ defmodule YscWeb.AdminBookingsLive do
         </.header>
 
         <div :if={@refund_policy} class="flex flex-col gap-4">
-          <div class="bg-blue-50 rounded-sm border border-blue-200 p-4 mb-4">
+          <div class="bg-blue-50 rounded-sm border border-blue-200 p-4">
             <p class="text-sm font-semibold text-zinc-700 mb-1">
               {@refund_policy.name}
             </p>
@@ -1368,7 +1368,7 @@ defmodule YscWeb.AdminBookingsLive do
             </p>
           </div>
           <!-- Existing Rules -->
-          <div class="mb-6">
+          <div>
             <h3 class="text-md font-semibold text-zinc-800 mb-3">Current Rules</h3>
             <div
               :if={@refund_policy_rules == []}
@@ -1472,7 +1472,7 @@ defmodule YscWeb.AdminBookingsLive do
             </.simple_form>
           </div>
 
-          <div class="flex justify-end mt-6 pt-4 border-t border-zinc-200">
+          <div class="flex justify-end mt-2 pt-4 border-t border-zinc-200">
             <.button
               phx-click={
                 query_params =

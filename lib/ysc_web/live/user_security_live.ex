@@ -484,7 +484,7 @@ defmodule YscWeb.UserSecurityLive do
                 :if={@passkeys_loaded && @passkeys != []}
                 class="flex flex-col gap-4 min-h-48"
               >
-                <.button navigate={~p"/users/settings/passkeys/new"} class="mb-4">
+                <.button navigate={~p"/users/settings/passkeys/new"}>
                   <.icon name="hero-plus" class="w-5 h-5" /> Add Passkey
                 </.button>
 
