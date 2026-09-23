@@ -518,7 +518,9 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       html = render(view)
 
-      assert html =~ "charge this payment method for your first year of membership"
+      assert html =~
+               "charge this payment method for your first year of membership"
+
       assert html =~ "renews automatically each year"
       assert html =~ "automatic renewal"
       refute html =~ "auto-renewal"

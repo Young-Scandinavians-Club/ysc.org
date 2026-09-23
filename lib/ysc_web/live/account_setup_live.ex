@@ -1735,7 +1735,8 @@ defmodule YscWeb.AccountSetupLive do
 
             socket = refresh_setup_user_and_needs(socket)
 
-            {socket, "Payment method saved and your membership is now active!", true}
+            {socket, "Payment method saved and your membership is now active!",
+             true}
 
           {:error, _reason} ->
             socket = refresh_setup_user_and_needs(socket)

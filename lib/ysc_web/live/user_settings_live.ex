@@ -317,7 +317,8 @@ defmodule YscWeb.UserSettingsLive do
                 phx-disable-with="Loading..."
                 class="border-2 border-dashed border-zinc-300 px-5 text-zinc-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
               >
-                <.icon name="hero-plus-circle" class="w-5 h-5" /> Add a payment method
+                <.icon name="hero-plus-circle" class="w-5 h-5" />
+                Add a payment method
               </.button>
             </div>
             <div :if={@show_new_payment_form && @payment_intent_secret}>
@@ -1415,7 +1416,8 @@ defmodule YscWeb.UserSettingsLive do
                     variant="outline"
                     class="w-full sm:w-auto justify-center"
                   >
-                    <.icon name="hero-credit-card" class="w-5 h-5" /> Change payment method
+                    <.icon name="hero-credit-card" class="w-5 h-5" />
+                    Change payment method
                   </.button>
                   <.button
                     :if={
@@ -3994,7 +3996,10 @@ defmodule YscWeb.UserSettingsLive do
 
       nil ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "We couldn't find that payment method.",
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "We couldn't find that payment method.",
            title: "Payment"
          )}
 
@@ -5091,7 +5096,9 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:selecting_payment_method, false)
-         |> YscWeb.Flash.put_toast(:info, "This payment method is now your default.",
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "This payment method is now your default.",
            title: "Payment",
            icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
          )}
