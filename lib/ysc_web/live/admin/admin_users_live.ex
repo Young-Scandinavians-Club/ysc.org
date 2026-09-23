@@ -333,7 +333,7 @@ defmodule YscWeb.AdminUsersLive do
                     for={@rejection_form}
                     id="reject-application-form"
                     phx-submit="deny-application"
-                    class="space-y-3"
+                    class="flex flex-col gap-3"
                   >
                     <p class="text-sm text-zinc-600">
                       Optional rejection note (internal use only; not sent to the applicant).
@@ -342,7 +342,7 @@ defmodule YscWeb.AdminUsersLive do
                       field={@rejection_form[:note]}
                       type="textarea"
                       label="Rejection note (optional)"
-                      class="mt-1 block w-full rounded-sm border-zinc-300 text-zinc-900 sm:text-sm"
+                      class="block w-full rounded-sm border-zinc-300 text-zinc-900 sm:text-sm"
                       rows="3"
                     />
                     <button

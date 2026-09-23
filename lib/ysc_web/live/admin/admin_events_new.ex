@@ -461,8 +461,8 @@ defmodule YscWeb.AdminEventsNewLive do
                 </p>
               </div>
 
-              <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
-                <h2 class="text-xl font-bold mb-2">Date and Location</h2>
+              <div class="border border-zinc-200 rounded-sm py-6 px-4 flex flex-col gap-4">
+                <h2 class="text-xl font-bold">Date and Location</h2>
 
                 <h3 class="text-lg font-medium">Date and Time</h3>
                 <div class="flex flex-row w-full space-x-4">

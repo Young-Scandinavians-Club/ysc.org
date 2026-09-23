@@ -798,7 +798,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Sub-account: read-only view --%>
             <div
               :if={@is_sub_account}
-              class="rounded-sm border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -829,7 +829,7 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
                 </div>
               </div>
-              <div class="mt-4 pt-4 border-t border-zinc-200">
+              <div class="pt-4 border-t border-zinc-200">
                 <p class="text-sm text-zinc-600 mb-2">
                   You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
                 </p>
@@ -910,7 +910,7 @@ defmodule YscWeb.UserSettingsLive do
               </.button>
               <div
                 :if={@pending_family_invites != []}
-                class="mt-6 border-t border-zinc-100 pt-4"
+                class="mt-2 border-t border-zinc-100 pt-4"
               >
                 <h3 class="text-sm font-semibold text-zinc-900">
                   Pending Family Invitations
@@ -946,7 +946,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Lifetime membership: special case --%>
             <div
               :if={@active_plan_type == :lifetime && !@is_sub_account}
-              class="rounded-sm border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <.membership_status
@@ -1000,14 +1000,14 @@ defmodule YscWeb.UserSettingsLive do
               </.button>
               <.link
                 navigate={~p"/users/settings/family"}
-                class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 ms-2"
+                class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 ms-2"
               >
                 <.icon name="hero-user-group" class="w-4 h-4" />
                 Add family members to your membership
               </.link>
               <div
                 :if={@pending_family_invites != []}
-                class="mt-6 border-t border-zinc-100 pt-4"
+                class="mt-2 border-t border-zinc-100 pt-4"
               >
                 <h3 class="text-sm font-semibold text-zinc-900">
                   Pending Family Invitations
@@ -1799,14 +1799,14 @@ defmodule YscWeb.UserSettingsLive do
           </.modal>
 
           <div :if={@live_action == :notifications} class="space-y-6">
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 flex flex-col gap-4">
               <h2 class="text-zinc-900 font-bold text-xl">
                 Notification Preferences
               </h2>
               <p class="text-sm text-zinc-600">
                 Manage how you receive notifications from the YSC. You can control which types of notifications you receive by email or text message.
               </p>
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p class="text-sm text-blue-900">
                   <strong>SMS Consent:</strong>
                   By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club (YSC). Message and data rates may apply. You can opt out at any time by unchecking the Text options below or sending a STOP message to the number you receive messages from. See our
