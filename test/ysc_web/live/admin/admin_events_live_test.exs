@@ -30,6 +30,31 @@ defmodule YscWeb.AdminEventsLiveTest do
       assert has_element?(view, "#admin-help-link-events-create")
     end
 
+    test "lists events still show organizer name after slim organizer load", %{
+      conn: conn
+    } do
+      organizer =
+        user_fixture(%{first_name: "Astrid", last_name: "Lindgren"})
+
+      title = "Organizer Slim #{System.unique_integer([:positive])}"
+
+      event =
+        event_fixture(%{title: title, organizer_id: organizer.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      assert has_element?(view, "#admin-event-card-#{event.id}", title)
+
+      assert has_element?(
+               view,
+               "#admin-event-card-#{event.id}",
+               "Astrid Lindgren"
+             )
+
+      assert has_element?(view, "#admin_events_list", title)
+      assert has_element?(view, "#admin_events_list", "Astrid Lindgren")
+    end
+
     test "renders date range filter inputs", %{conn: conn} do
       {:ok, view, _} = live(conn, ~p"/admin/events")
       render_async(view, 5000)

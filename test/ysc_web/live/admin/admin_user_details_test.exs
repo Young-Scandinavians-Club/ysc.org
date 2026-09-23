@@ -159,6 +159,26 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert orders_html =~ "Tickets"
     end
 
+    test "orders tab still shows reference, event, ticket count, and amount after slim load",
+         %{conn: conn} do
+      data = Ysc.TestDataFactory.complete_ticket_order()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{data.user.id}/details/orders")
+
+      render_async(view)
+
+      table = "#user_ticket_orders_list"
+      formatted_total = Ysc.MoneyHelper.format_money!(data.order.total_amount)
+
+      assert has_element?(view, table)
+      assert has_element?(view, table, data.order.reference_id)
+      assert has_element?(view, table, data.event.title)
+      assert has_element?(view, table, "2 ticket(s)")
+      assert has_element?(view, table, formatted_total)
+      assert has_element?(view, table, "Completed")
+    end
+
     test "can navigate to bookings tab", %{conn: conn} do
       user = user_fixture()
 
