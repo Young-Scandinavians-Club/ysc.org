@@ -1325,7 +1325,7 @@ defmodule YscWeb.HomeLive do
                             "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded-sm uppercase tracking-tighter",
                             case days_until_this_booking do
                               :started ->
-                                "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
+                                "bg-green-50 text-green-700 ring-1 ring-green-200/50 animate-pulse"
 
                               0 ->
                                 "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
@@ -1334,7 +1334,7 @@ defmodule YscWeb.HomeLive do
                                 "bg-blue-50 text-blue-700 ring-1 ring-blue-200/50"
 
                               days when days <= 7 ->
-                                "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/50"
+                                "bg-violet-50 text-violet-700 ring-1 ring-violet-200/50"
 
                               _ ->
                                 "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
