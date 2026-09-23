@@ -46,6 +46,7 @@ defmodule Ysc.Bookings.BookingLocker do
   }
 
   alias Ysc.Bookings
+  alias Ysc.Tickets.CheckoutCancel
 
   @hold_duration_minutes 30
 
@@ -2081,9 +2082,14 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  # Helper to cancel all other hold bookings for the same property and user
+  # Abandoned checkouts for the same property/user are released after a
+  # successful confirm so leftover inventory is not stuck on :hold. Stripe-first
+  # the sibling PaymentIntent before `release_hold/1`:
+  # `StripeService.cancel_payment_intent/1` treats a succeeded Intent as `:ok`,
+  # which would cancel a paid sibling, clear `applied_booking_entitlement_id`,
+  # and leave HoldExpiryWorker with nothing to confirm (`status != :hold`).
+  # Same atomic abandon as HoldExpiryWorker / checkout Cancel / ticket TimeoutWorker.
   defp cancel_other_hold_bookings(property, user_id, exclude_booking_id) do
-    # Find all other hold bookings for the same property and user
     other_hold_bookings =
       Repo.all(
         from b in Booking,
@@ -2093,22 +2099,145 @@ defmodule Ysc.Bookings.BookingLocker do
           where: b.id != ^exclude_booking_id
       )
 
-    # Release each hold booking
     Enum.each(other_hold_bookings, fn hold_booking ->
-      case release_hold(hold_booking.id) do
-        {:ok, _} ->
-          # Successfully released
-          :ok
-
-        {:error, reason} ->
-          # Log error but don't fail the main operation
-          require Ysc.Logging
-
-          Ysc.Logging.warning(
-            "Failed to release hold booking #{hold_booking.id} when confirming booking #{exclude_booking_id}: #{inspect(reason)}"
-          )
-      end
+      reconcile_sibling_hold(hold_booking, exclude_booking_id)
     end)
+  end
+
+  defp reconcile_sibling_hold(%Booking{} = hold_booking, confirmed_booking_id) do
+    case reconcile_sibling_hold_payment(hold_booking) do
+      :release ->
+        case release_hold(hold_booking.id) do
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Ysc.Logging.warning(
+              "Failed to release hold booking #{hold_booking.id} when confirming booking #{confirmed_booking_id}: #{inspect(reason)}"
+            )
+        end
+
+      :confirmed ->
+        :ok
+
+      :skip ->
+        Ysc.Logging.info(
+          "Skipped releasing sibling hold while checkout payment is in flight",
+          booking_id: hold_booking.id,
+          confirmed_booking_id: confirmed_booking_id,
+          payment_intent_id: hold_booking.payment_intent_id
+        )
+    end
+  end
+
+  defp reconcile_sibling_hold_payment(
+         %Booking{payment_intent_id: payment_intent_id} = booking
+       )
+       when is_binary(payment_intent_id) and payment_intent_id != "" do
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           payment_intent_id,
+           "confirm_booking_sibling_hold"
+         ) do
+      {:cancel, _payment_intent} ->
+        :release
+
+      {:already_succeeded, payment_intent} ->
+        confirm_succeeded_sibling_hold(booking, payment_intent)
+
+      {:in_progress, _payment_intent} ->
+        :skip
+
+      {:error, stripe_error} ->
+        Ysc.Logging.warning(
+          "Could not reconcile sibling hold payment with Stripe, not releasing hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent_id,
+          error: inspect(stripe_error)
+        )
+
+        :skip
+    end
+  end
+
+  defp reconcile_sibling_hold_payment(_booking), do: :release
+
+  defp confirm_succeeded_sibling_hold(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case Bookings.verify_booking_payment_intent(payment_intent, booking) do
+      :ok ->
+        confirm_verified_sibling_hold(booking, payment_intent)
+
+      {:error, :payment_amount_mismatch} = error ->
+        Ysc.Logging.error(
+          "Payment succeeded on a sibling hold but amount did not match the hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(error)
+        )
+
+        Bookings.maybe_refund_unfulfilled_checkout_payment(
+          booking,
+          payment_intent,
+          :payment_amount_mismatch
+        )
+
+        :release
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on a sibling hold but could not be verified",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
+  end
+
+  defp confirm_verified_sibling_hold(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case confirm_booking(booking.id) do
+      {:ok, confirmed} ->
+        case Bookings.record_hold_checkout_ledger_payment(
+               confirmed,
+               payment_intent
+             ) do
+          :ok ->
+            :ok
+
+          {:error, ledger_reason} ->
+            Ysc.Logging.error(
+              "Sibling hold confirmed after payment succeeded but ledger payment recording failed",
+              booking_id: confirmed.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(ledger_reason)
+            )
+        end
+
+        Ysc.Logging.info(
+          "Confirmed sibling hold after payment succeeded during confirm_booking cleanup",
+          booking_id: confirmed.id,
+          reference_id: confirmed.reference_id,
+          payment_intent_id: payment_intent.id
+        )
+
+        :confirmed
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on a sibling hold but booking could not be confirmed",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
   end
 
   @doc """
