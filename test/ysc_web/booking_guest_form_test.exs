@@ -914,5 +914,14 @@ defmodule YscWeb.BookingGuestFormTest do
       assert user.id in Enum.map(family_members, & &1.id)
       refute user.id in Enum.map(other_family_members, & &1.id)
     end
+
+    test "does not load password hashes or bios" do
+      user = user_fixture()
+
+      {family_members, _other} = BookingGuestForm.load_family_members(user)
+
+      assert Enum.all?(family_members, &is_nil(&1.hashed_password))
+      assert Enum.all?(family_members, &is_nil(&1.board_bio))
+    end
   end
 end

@@ -17,13 +17,11 @@ defmodule YscWeb.BookingChangeLive do
   }
 
   alias Ysc.MoneyHelper
-  alias Ysc.Repo
   alias Ysc.Tickets.CheckoutCancel
   alias YscWeb.BookingActions
   alias YscWeb.BookingGuestForm
   alias YscWeb.BookingDisplay
   import YscWeb.Components.BookingGuestInfoForm
-  import Ecto.Query
   require Ysc.Logging
 
   @payment_finalize_retry_attempts 5
@@ -882,13 +880,7 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp load_booking(booking_id, user) do
-    booking_query =
-      from(b in Booking,
-        where: b.id == ^booking_id and b.user_id == ^user.id,
-        preload: [rooms: :room_category, booking_guests: []]
-      )
-
-    case Repo.one(booking_query) do
+    case Bookings.get_user_booking_for_member_checkout(booking_id, user.id) do
       nil -> {:error, :not_found}
       booking -> {:ok, booking}
     end
@@ -1141,8 +1133,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp assign_paid_modification_finalize(socket, payment_intent_id) do
     booking =
-      Repo.get!(Booking, socket.assigns.booking.id)
-      |> Repo.preload(:rooms)
+      Bookings.get_booking_for_member_checkout!(socket.assigns.booking.id)
 
     params = modification_params_for_payment_apply(socket, booking)
 

@@ -3521,6 +3521,28 @@ defmodule Ysc.Accounts do
     end
   end
 
+  # Guest pickers only need identity + name. Skip password hashes, bios,
+  # Stripe ids, and notification flags that `get_family_group/1` loads.
+  @guest_picker_user_fields [:id, :first_name, :last_name]
+
+  @doc """
+  Household members for Tahoe guest-info dropdowns.
+
+  One SELECT of `id`/`first_name`/`last_name` for the primary user and
+  sub-accounts. Does not replace `get_family_group/1` for billing/board checks.
+  """
+  def list_household_guest_picker_users(%User{} = user) do
+    list_household_guest_picker_users_query(user.primary_user_id || user.id)
+    |> Repo.all()
+  end
+
+  defp list_household_guest_picker_users_query(primary_id) do
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      select: struct(u, ^@guest_picker_user_fields)
+    )
+  end
+
   @doc """
   Returns the first household member (primary or sub-account) who currently
   holds a board position, or `nil` if nobody in the household does.
@@ -4924,6 +4946,13 @@ defmodule Ysc.Accounts do
       where: u.state != :deleted,
       order_by: [asc: u.last_name, asc: u.first_name],
       limit: 50
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_household_guest_picker_users_query do
+    list_household_guest_picker_users_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
     )
   end
 

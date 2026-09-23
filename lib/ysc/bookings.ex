@@ -952,6 +952,98 @@ defmodule Ysc.Bookings do
     ])
   end
 
+  # Member checkout / change / detail / receipt pages only render room names
+  # (and receipt avatars). Skip `room_category`, room descriptions, and the
+  # full User row (`hashed_password`, `board_bio`, …). Keep `get_booking!/1`
+  # fat for confirm/cancel mutations.
+  @member_page_room_fields [:id, :name, :property, :capacity_max]
+
+  @doc """
+  Loads a member's booking for checkout or change-booking.
+
+  Preloads ordered guests and slim rooms. Does not load `:user` (the LiveView
+  already has `current_user`) or `rooms: :room_category`.
+  """
+  def get_user_booking_for_member_checkout(booking_id, user_id) do
+    member_checkout_query()
+    |> where([b], b.id == ^booking_id and b.user_id == ^user_id)
+    |> Repo.one()
+  end
+
+  @doc """
+  Reloads a checkout/change booking by id after a mutation on that hold.
+  """
+  def get_booking_for_member_checkout!(booking_id) do
+    member_checkout_query()
+    |> where([b], b.id == ^booking_id)
+    |> Repo.one!()
+  end
+
+  @doc """
+  Loads a member's booking for the booking-detail page.
+
+  Detail only lists room names — no guests, user row, or room category.
+  """
+  def get_user_booking_for_member_detail(booking_id, user_id) do
+    from(b in Booking,
+      where: b.id == ^booking_id and b.user_id == ^user_id,
+      preload: [rooms: ^member_page_room_preload_query()]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Loads a member's booking for the receipt page.
+
+  Needs guest rows and a slim user + avatar for the booking-member badge.
+  Does not load `room_category` or user password/bio columns.
+  """
+  def get_user_booking_for_receipt(booking_id, user_id) do
+    from(b in Booking,
+      where: b.id == ^booking_id and b.user_id == ^user_id,
+      preload: [
+        {:booking_guests, ^member_page_guests_preload_query()},
+        user: ^member_receipt_user_preload_query(),
+        rooms: ^member_page_room_preload_query()
+      ]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Same as `get_user_booking_for_receipt/2` but raises if the booking is missing.
+  """
+  def get_user_booking_for_receipt!(booking_id, user_id) do
+    case get_user_booking_for_receipt(booking_id, user_id) do
+      nil -> raise Ecto.NoResultsError, queryable: Booking
+      booking -> booking
+    end
+  end
+
+  defp member_checkout_query do
+    from(b in Booking,
+      preload: [
+        {:booking_guests, ^member_page_guests_preload_query()},
+        rooms: ^member_page_room_preload_query()
+      ]
+    )
+  end
+
+  defp member_page_guests_preload_query do
+    from(bg in BookingGuest, order_by: [asc: bg.order_index])
+  end
+
+  defp member_page_room_preload_query do
+    from(r in Room, select: struct(r, ^@member_page_room_fields))
+  end
+
+  defp member_receipt_user_preload_query do
+    from(u in User,
+      select: struct(u, ^@admin_calendar_user_fields),
+      preload: [current_avatar: ^admin_calendar_avatar_preload_query()]
+    )
+  end
+
   @admin_booking_modal_preloads [
     {:booking_guests,
      from(bg in BookingGuest, order_by: [asc: bg.order_index])},
@@ -6581,6 +6673,43 @@ defmodule Ysc.Bookings do
       where: b.property == :tahoe,
       order_by: [desc: b.inserted_at],
       limit: 50
+    )
+  end
+
+  @doc false
+  def ci_query_explain_get_user_booking_for_member_checkout_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    member_checkout_query()
+    |> where(
+      [b],
+      b.id == ^Ysc.Ci.QueryExplain.Fixtures.ulid() and b.user_id == ^user_id
+    )
+  end
+
+  @doc false
+  def ci_query_explain_get_user_booking_for_member_detail_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    from(b in Booking,
+      where:
+        b.id == ^Ysc.Ci.QueryExplain.Fixtures.ulid() and b.user_id == ^user_id,
+      preload: [rooms: ^member_page_room_preload_query()]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_get_user_booking_for_receipt_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    from(b in Booking,
+      where:
+        b.id == ^Ysc.Ci.QueryExplain.Fixtures.ulid() and b.user_id == ^user_id,
+      preload: [
+        {:booking_guests, ^member_page_guests_preload_query()},
+        user: ^member_receipt_user_preload_query(),
+        rooms: ^member_page_room_preload_query()
+      ]
     )
   end
 

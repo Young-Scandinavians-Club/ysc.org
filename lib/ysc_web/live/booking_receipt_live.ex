@@ -1328,17 +1328,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp fetch_user_booking(booking_id, user) do
-    # SECURITY: Filter by user_id in the database query to prevent unauthorized access
-    # PERFORMANCE: Preload all associations in a single query to avoid N+1
-    from(b in Booking,
-      where: b.id == ^booking_id and b.user_id == ^user.id,
-      preload: [
-        {:user, :current_avatar},
-        :booking_guests,
-        rooms: :room_category
-      ]
-    )
-    |> Repo.one()
+    Bookings.get_user_booking_for_receipt(booking_id, user.id)
   end
 
   defp mount_receipt_with_stripe_redirect(socket, user, booking_id, params) do
@@ -1479,16 +1469,10 @@ defmodule YscWeb.BookingReceiptLive do
 
     booking =
       if booking_updated do
-        from(b in Booking,
-          where:
-            b.id == ^booking_id and b.user_id == ^socket.assigns.current_user.id,
-          preload: [
-            {:user, :current_avatar},
-            :booking_guests,
-            rooms: :room_category
-          ]
+        Bookings.get_user_booking_for_receipt!(
+          booking_id,
+          socket.assigns.current_user.id
         )
-        |> Repo.one!()
       else
         booking
       end
@@ -2693,8 +2677,8 @@ defmodule YscWeb.BookingReceiptLive do
   defp sync_booking_after_partial_cancel(socket, booking, reason) do
     if partial_cancel_post_booking_error?(reason) do
       updated_booking =
-        Repo.get!(Booking, booking.id)
-        |> Repo.preload([:user, :booking_guests, rooms: :room_category])
+        Bookings.get_user_booking_for_receipt(booking.id, booking.user_id) ||
+          booking
 
       socket
       |> assign(:booking, updated_booking)

@@ -16,7 +16,6 @@ defmodule YscWeb.UserBookingDetailLive do
   alias YscWeb.BookingDisplay
   alias YscWeb.Authorization.Policy
   alias YscWeb.BookingActions
-  import Ecto.Query
 
   @impl true
   def mount(%{"id" => booking_id}, _session, socket) do
@@ -75,7 +74,10 @@ defmodule YscWeb.UserBookingDetailLive do
         case Bookings.cancel_booking(booking, Date.utc_today(), reason) do
           {:ok, updated_booking, refund_amount, refund_result} ->
             updated_booking =
-              Repo.preload(updated_booking, [:user, rooms: :room_category])
+              Bookings.get_user_booking_for_member_detail(
+                booking.id,
+                user.id
+              ) || updated_booking
 
             refund_info =
               get_refund_info(updated_booking, socket.assigns.payment)
@@ -525,13 +527,7 @@ defmodule YscWeb.UserBookingDetailLive do
       |> maybe_assign_booking_payment_details()
     else
       # SECURITY: Filter by user_id in the database query to prevent unauthorized access
-      booking_query =
-        from(b in Booking,
-          where: b.id == ^booking_id and b.user_id == ^user.id,
-          preload: [:user, rooms: :room_category]
-        )
-
-      case Repo.one(booking_query) do
+      case Bookings.get_user_booking_for_member_detail(booking_id, user.id) do
         nil ->
           socket
           |> YscWeb.Flash.put_toast(
@@ -796,8 +792,8 @@ defmodule YscWeb.UserBookingDetailLive do
   defp sync_booking_after_partial_cancel(socket, booking, reason) do
     if partial_cancel_post_booking_error?(reason) do
       updated_booking =
-        Repo.get!(Booking, booking.id)
-        |> Repo.preload([:user, rooms: :room_category])
+        Bookings.get_user_booking_for_member_detail(booking.id, booking.user_id) ||
+          booking
 
       refund_info = get_refund_info(updated_booking, socket.assigns.payment)
 
