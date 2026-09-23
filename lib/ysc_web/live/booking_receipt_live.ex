@@ -603,8 +603,8 @@ defmodule YscWeb.BookingReceiptLive do
                 <h3 class="font-bold text-zinc-900 mb-3 flex items-center gap-2">
                   <.icon name="hero-key" class="w-5 h-5" /> Cabin Access
                 </h3>
-                <p class="text-sm text-zinc-600 mb-4">
-                  Door codes and key instructions are sent via email 24 hours before your check-in.
+                <p id="cabin-access-timing" class="text-sm text-zinc-600 mb-4">
+                  {YscWeb.BookingUserMessages.cabin_access_receipt_body()}
                 </p>
                 <a
                   href={get_cabin_access_url(@booking.property)}

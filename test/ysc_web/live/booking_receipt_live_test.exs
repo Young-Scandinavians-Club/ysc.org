@@ -882,6 +882,14 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       html = render(view)
       refute html =~ "Your Door Code"
+
+      assert has_element?(
+               view,
+               "#cabin-access-timing",
+               "about 3 days before check-in"
+             )
+
+      refute has_element?(view, "#cabin-access-timing", "24 hours")
     end
 
     test "does not show door code for cancelled bookings", %{conn: conn} do

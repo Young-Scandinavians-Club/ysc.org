@@ -107,6 +107,16 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_cabin_access_step() =~
              "cabin access details"
 
+    assert BookingUserMessages.checkout_cabin_access_step() =~
+             BookingUserMessages.door_code_email_timing_phrase()
+
+    refute BookingUserMessages.checkout_cabin_access_step() =~ "24 hours"
+
+    assert BookingUserMessages.cabin_access_receipt_body() =~
+             BookingUserMessages.door_code_email_timing_phrase()
+
+    refute BookingUserMessages.cabin_access_receipt_body() =~ "24 hours"
+
     assert BookingUserMessages.checkout_manage_booking_step() =~
              "My Bookings & Payments"
   end
