@@ -31,6 +31,39 @@ defmodule YscWeb.Emails.EventNotificationTest do
     end
   end
 
+  describe "render/1 backward compatibility" do
+    test "renders using the legacy notification_settings_url assign when unsubscribe_url is absent" do
+      # Oban may already hold email jobs persisted (as JSON args) by the old
+      # code before this deploy, with notification_settings_url but no
+      # unsubscribe_url. Those must still render instead of crashing and
+      # getting marked as a terminal delivery failure.
+      assigns = %{
+        first_name: "Astrid",
+        event: %{
+          id: "EVT-123",
+          title: "Test Event",
+          description: "A test event",
+          start_date: ~D[2024-12-01],
+          start_time: ~T[10:00:00],
+          end_date: nil,
+          end_time: nil,
+          location_name: "Test Location",
+          address: "123 Test St",
+          age_restriction: "21+",
+          organizer: nil
+        },
+        event_date_time: "Dec 1, 2024 at 10:00 AM",
+        event_url: "https://example.com/events/123",
+        event_image_url: nil,
+        notification_settings_url: "https://example.com/users/notifications"
+      }
+
+      html = EventNotification.render(assigns)
+      assert is_binary(html)
+      assert html =~ "https://example.com/users/notifications"
+    end
+  end
+
   describe "get_subject/1" do
     test "prefixes subject with [YSC]", %{event: event} do
       subject = EventNotification.get_subject(event)
