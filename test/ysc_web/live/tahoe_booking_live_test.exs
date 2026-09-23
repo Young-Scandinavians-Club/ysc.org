@@ -144,6 +144,26 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
     end
 
+    test "information tab exposes the door-code-access anchor used by receipts",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/bookings/tahoe?tab=information&info_tab=general"
+        )
+
+      render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "Door Code & Access"
+             )
+    end
+
     test "uses book, not rent or reserve, for the entire-cabin option", %{
       conn: conn
     } do
