@@ -262,6 +262,10 @@ defmodule YscWeb.Router do
       live "/newsletter/unsubscribe/:token", NewsletterUnsubscribeLive, :index
       live "/newsletter/confirm/:token", NewsletterConfirmLive, :index
 
+      live "/event-notifications/unsubscribe/:token",
+           EventNotificationUnsubscribeLive,
+           :index
+
       live "/bookings/tahoe", TahoeBookingLive, :index
 
       live "/bookings/clear-lake", ClearLakeBookingLive, :index

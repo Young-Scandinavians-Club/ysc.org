@@ -1350,7 +1350,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: nil,
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url: "https://example.com/event-notifications/unsubscribe/token"
       }
 
       html = EventNotification.render(assigns)

@@ -938,7 +938,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: nil,
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url: "https://example.com/users/notifications"
       }
 
       html = EventNotification.render(assigns)
@@ -969,7 +969,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: "https://example.com/images/event-cover.jpg",
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url: "https://example.com/users/notifications"
       }
 
       html = EventNotification.render(assigns)
@@ -1066,6 +1066,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           "2026/2027",
           user
         )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
+        )
 
       html = TahoeWinterWeekendAvailable.render(assigns)
       assert is_binary(html)
@@ -1082,6 +1086,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           ~D[2027-05-09],
           "2027",
           user
+        )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
         )
 
       html = TahoeSummerBuyoutAvailable.render(assigns)

@@ -257,6 +257,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           "2027",
           user
         )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
+        )
         |> TahoeSummerBuyoutAvailable.render()
 
       text = html_text(html)
@@ -282,6 +286,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           ~D[2026-11-08],
           "2026/2027",
           user
+        )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
         )
         |> TahoeWinterWeekendAvailable.render()
 
@@ -530,7 +538,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           event_date_time: "Dec 1, 2026 at 7:00 PM PST",
           event_url: "https://example.com/events/preview",
           event_image_url: nil,
-          notification_settings_url: "https://example.com/users/notifications"
+          unsubscribe_url: "https://example.com/event-notifications/unsubscribe/token"
         })
 
       text = html_text(html)
