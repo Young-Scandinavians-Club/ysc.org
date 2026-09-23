@@ -50,61 +50,15 @@ defmodule YscWeb.EventNotificationUnsubscribeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      class="py-16 lg:py-24 max-w-xl mx-auto px-4"
+    <.unsubscribe_page
       id="event-notification-unsubscribe-page"
-    >
-      <div class="text-center">
-        <h1 :if={@user && !@unsubscribed} class="text-2xl font-bold text-zinc-900">
-          Unsubscribe from event notifications
-        </h1>
-        <h1 :if={@user && @unsubscribed} class="text-2xl font-bold text-zinc-900">
-          You have been unsubscribed
-        </h1>
-        <h1 :if={!@user} class="text-2xl font-bold text-zinc-900">
-          This link no longer works
-        </h1>
-
-        <p :if={@user && !@unsubscribed} class="mt-4 text-zinc-600">
-          You are subscribed as <strong><%= @user.email %></strong>. Click below to stop receiving event notification emails.
-        </p>
-
-        <p :if={@user && @unsubscribed} class="mt-4 text-zinc-600">
-          You will no longer receive event notification emails. You can turn them back on anytime from your notification settings.
-        </p>
-
-        <p :if={!@user} class="mt-4 text-zinc-600">
-          This link does not work. It may be outdated or mistyped. If you still receive event notifications, email
-          <.link
-            href="mailto:info@ysc.org"
-            class="text-blue-600 hover:underline font-semibold"
-          >
-            info@ysc.org
-          </.link>
-          with the address you want removed and we will unsubscribe you manually.
-        </p>
-
-        <.button
-          :if={@user && !@unsubscribed}
-          phx-click="unsubscribe"
-          class="mt-8"
-        >
-          Unsubscribe
-        </.button>
-
-        <.link
-          :if={@user && @unsubscribed}
-          navigate={~p"/"}
-          class="mt-8 inline-block"
-        >
-          <.button>Return to home</.button>
-        </.link>
-
-        <.link :if={!@user} navigate={~p"/"} class="mt-8 inline-block">
-          <.button>Return to home</.button>
-        </.link>
-      </div>
-    </div>
+      email={@user && @user.email}
+      unsubscribed={@unsubscribed}
+      subscribed_title="Unsubscribe from event notifications"
+      subscribed_action="event notification emails"
+      unsubscribed_body="You will no longer receive event notification emails. You can turn them back on anytime from your notification settings."
+      still_receive="event notifications"
+    />
     """
   end
 

@@ -3061,6 +3061,126 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Centered public page for unsubscribing from an email list via a token link.
+
+  Shared by the newsletter and event-notification unsubscribe LiveViews.
+  Three states:
+
+    * Recipient still subscribed — title, email, unsubscribe button
+    * Already unsubscribed — confirmation and a home link
+    * Missing/invalid token (`email` nil or blank) — "link no longer works" and contact
+
+  Keep token verification and the unsubscribe side-effect in the LiveView.
+
+  ## Examples
+
+      <.unsubscribe_page
+        id="newsletter-unsubscribe-page"
+        email={@subscriber && @subscriber.email}
+        unsubscribed={@unsubscribed}
+        subscribed_title="Unsubscribe from our newsletter"
+        subscribed_action="our newsletter"
+        unsubscribed_body="You will no longer receive our newsletter. You can sign up again anytime from our home page."
+        still_receive="our newsletter"
+      />
+  """
+  attr :id, :string, required: true
+
+  attr :email, :string,
+    default: nil,
+    doc:
+      "Recipient email when the token resolved; omit or nil for the invalid-link state"
+
+  attr :unsubscribed, :boolean, required: true
+
+  attr :subscribed_title, :string, required: true
+
+  attr :subscribed_action, :string,
+    required: true,
+    doc: "Phrase after \"stop receiving\", e.g. `our newsletter`"
+
+  attr :unsubscribed_body, :string, required: true
+
+  attr :still_receive, :string,
+    required: true,
+    doc: "Phrase after \"If you still receive\" on the invalid-link state"
+
+  attr :unsubscribe_event, :string,
+    default: "unsubscribe",
+    doc: "LiveView event name for the unsubscribe button"
+
+  def unsubscribe_page(assigns) do
+    recipient? = present_unsubscribe_email?(assigns.email)
+
+    assigns =
+      assign(assigns,
+        recipient?: recipient?,
+        show_unsubscribe?: recipient? and not assigns.unsubscribed
+      )
+
+    ~H"""
+    <div class="py-16 lg:py-24 max-w-xl mx-auto px-4" id={@id}>
+      <div class="text-center">
+        <h1 :if={@show_unsubscribe?} class="text-2xl font-bold text-zinc-900">
+          {@subscribed_title}
+        </h1>
+        <h1
+          :if={@recipient? && @unsubscribed}
+          class="text-2xl font-bold text-zinc-900"
+        >
+          You have been unsubscribed
+        </h1>
+        <h1 :if={!@recipient?} class="text-2xl font-bold text-zinc-900">
+          This link no longer works
+        </h1>
+
+        <p :if={@show_unsubscribe?} class="mt-4 text-zinc-600">
+          You are subscribed as <strong>{@email}</strong>. Click below to stop receiving {@subscribed_action}.
+        </p>
+
+        <p :if={@recipient? && @unsubscribed} class="mt-4 text-zinc-600">
+          {@unsubscribed_body}
+        </p>
+
+        <p :if={!@recipient?} class="mt-4 text-zinc-600">
+          This link does not work. It may be outdated or mistyped. If you still receive {@still_receive}, email
+          <.link
+            href="mailto:info@ysc.org"
+            class="text-blue-600 hover:underline font-semibold"
+          >
+            info@ysc.org
+          </.link>
+          with the address you want removed and we will unsubscribe you manually.
+        </p>
+
+        <.button
+          :if={@show_unsubscribe?}
+          id={"#{@id}-button"}
+          phx-click={@unsubscribe_event}
+          class="mt-8"
+        >
+          Unsubscribe
+        </.button>
+
+        <.link
+          :if={!@show_unsubscribe?}
+          id={"#{@id}-home"}
+          navigate={~p"/"}
+          class="mt-8 inline-block"
+        >
+          <.button>Return to home</.button>
+        </.link>
+      </div>
+    </div>
+    """
+  end
+
+  defp present_unsubscribe_email?(email) when is_binary(email),
+    do: String.trim(email) != ""
+
+  defp present_unsubscribe_email?(_), do: false
+
   attr :viking, :integer, default: 4
   attr :title, :string, default: "Looks like this page is empty"
   attr :suggestion, :string, default: nil

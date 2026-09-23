@@ -65,6 +65,7 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
       refute html =~ "This link no longer works"
       assert html =~ "Unsubscribe from event notifications"
       assert html =~ user.email
+      assert has_element?(view, "#event-notification-unsubscribe-page-button")
       assert has_element?(view, "button", "Unsubscribe")
     end
 
@@ -78,6 +79,7 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
         live(conn, ~p"/event-notifications/unsubscribe/#{token}")
 
       assert html =~ "id=\"event-notification-unsubscribe-page\""
+      assert html =~ "id=\"event-notification-unsubscribe-page-button\""
     end
   end
 
@@ -99,6 +101,7 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
 
       assert html =~ "You have been unsubscribed"
       refute has_element?(view, "button", "Unsubscribe")
+      assert has_element?(view, "#event-notification-unsubscribe-page-home")
       assert has_element?(view, "a[href='/']", "Return to home")
     end
 
