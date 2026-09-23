@@ -19,7 +19,9 @@ defmodule Ysc.Events do
   alias Ysc.Events.EventNotificationSubscription
   alias Ysc.Events.EventUpdate
   alias Ysc.Accounts.User
+  alias Ysc.Avatars.Avatar
   alias Ysc.StaffPreview
+  alias Ysc.Tickets.TicketOrder
 
   @max_sales_chart_days 120
 
@@ -523,12 +525,31 @@ defmodule Ysc.Events do
     end
   end
 
+  # Event page "Who's going" chips and host pills: name, country for default
+  # avatars, and current avatar thumbs. Omits password hashes, bios, Stripe
+  # ids, and email the cards never render.
+  @event_card_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :most_connected_country,
+    :current_avatar_id
+  ]
+  @event_card_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+
   @doc """
   List hosts for an event, preloaded from the join table.
   """
   def list_event_hosts(%Event{} = event) do
     event
-    |> Repo.preload(hosts: :current_avatar)
+    |> Repo.preload(hosts: event_card_user_preload_query())
     |> then(& &1.hosts)
   end
 
@@ -536,13 +557,8 @@ defmodule Ysc.Events do
   List hosts for an event by event_id, without needing a full Event struct.
   """
   def list_event_hosts_by_event_id(event_id) do
-    from(u in User,
-      join: eh in "event_hosts",
-      on: eh.user_id == u.id,
-      where: eh.event_id == type(^event_id, Ecto.ULID),
-      order_by: [asc: eh.user_id],
-      preload: [:current_avatar]
-    )
+    event_id
+    |> list_event_hosts_by_event_id_query()
     |> Repo.all()
   end
 
@@ -2113,10 +2129,8 @@ defmodule Ysc.Events do
       else
         order_map = user_ids |> Enum.with_index() |> Map.new()
 
-        from(u in User,
-          where: u.id in ^user_ids,
-          preload: [:current_avatar]
-        )
+        user_ids
+        |> attendee_users_query()
         |> Repo.all()
         |> Enum.sort_by(fn user -> Map.get(order_map, user.id, 999_999) end)
       end
@@ -2597,12 +2611,28 @@ defmodule Ysc.Events do
     |> Repo.all()
   end
 
+  # Member home "Event Tickets" cards: event summary, tier name badges, and
+  # order id for the receipt link. Omits Stripe payment-intent ids, grant notes,
+  # cancellation copy, tier description, and ticket check-in columns.
+  @home_ticket_fields [
+    :id,
+    :status,
+    :event_id,
+    :ticket_tier_id,
+    :ticket_order_id
+  ]
+  @home_ticket_tier_fields [:id, :name]
+  @home_ticket_order_fields [:id]
+
   @doc """
   Returns confirmed tickets for `user_id` with event, tier, and order preloaded.
 
   Uses start of today in `America/Los_Angeles` as a coarse `start_date` filter so
   callers (e.g. the member home page) avoid loading the user's full ticket history.
   Finer "event has not started yet" filtering should happen in the caller when needed.
+
+  Event, tier, and order preloads are column-slimmed for the home dashboard:
+  event summary fields, tier `id`/`name`, and order `id` only.
 
   ## Options
 
@@ -2622,19 +2652,10 @@ defmodule Ysc.Events do
         start_of_today_in_pst_as_utc()
       end
 
-    # Join `events` by id (not `assoc`) so `preload: event` is a separate
-    # SELECT of summary columns — joining `assoc` would force Ecto to use the
-    # join row and load `raw_details` / `rendered_details`.
-    base_query =
-      Ticket
-      |> where([t], t.user_id == ^user_id and t.status == :confirmed)
-      |> join(:inner, [t], e in Event, on: e.id == t.event_id)
-      |> where([t, e], not is_nil(e.start_date))
-      |> where([t, e], e.start_date >= ^start_boundary)
-
     event_ids =
       if event_limit do
-        base_query
+        user_id
+        |> upcoming_confirmed_tickets_for_user_base_query(start_boundary)
         |> group_by([t, e], [e.id])
         |> order_by([t, e], asc: min(e.start_date), asc: min(e.start_time))
         |> limit(^event_limit)
@@ -2642,27 +2663,19 @@ defmodule Ysc.Events do
         |> Repo.all()
       end
 
-    event_card_query = event_summary_preload_query()
+    query_opts =
+      if event_limit do
+        [event_ids: event_ids]
+      else
+        [row_limit: row_limit]
+      end
 
-    query =
-      base_query
-      |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
-      |> join(:left, [t], to in assoc(t, :ticket_order), as: :ticket_order)
-      |> maybe_where_event_ids(event_ids)
-      |> preload([ticket_tier: tt, ticket_order: to],
-        event: ^event_card_query,
-        ticket_tier: tt,
-        ticket_order: to
-      )
-      |> order_by([t, e], asc: e.start_date, asc: e.start_time)
-
-    if event_limit do
-      Repo.all(query)
-    else
-      query
-      |> limit(^row_limit)
-      |> Repo.all()
-    end
+    user_id
+    |> list_upcoming_confirmed_tickets_for_user_query(
+      start_boundary,
+      query_opts
+    )
+    |> Repo.all()
   end
 
   defp maybe_where_event_ids(query, nil), do: query
@@ -2671,6 +2684,89 @@ defmodule Ysc.Events do
 
   defp maybe_where_event_ids(query, event_ids) do
     where(query, [t], t.event_id in ^event_ids)
+  end
+
+  defp maybe_limit_tickets(query, nil), do: query
+
+  defp maybe_limit_tickets(query, row_limit), do: limit(query, ^row_limit)
+
+  # Join `events` by id (not `assoc`) so `preload: event` is a separate
+  # SELECT of summary columns — joining `assoc` would force Ecto to use the
+  # join row and load `raw_details` / `rendered_details`.
+  defp upcoming_confirmed_tickets_for_user_base_query(user_id, start_boundary) do
+    Ticket
+    |> where([t], t.user_id == ^user_id and t.status == :confirmed)
+    |> join(:inner, [t], e in Event, on: e.id == t.event_id)
+    |> where([t, e], not is_nil(e.start_date))
+    |> where([t, e], e.start_date >= ^start_boundary)
+  end
+
+  defp list_upcoming_confirmed_tickets_for_user_query(
+         user_id,
+         start_boundary,
+         opts
+       ) do
+    event_ids = Keyword.get(opts, :event_ids)
+    row_limit = Keyword.get(opts, :row_limit)
+    event_card_query = event_summary_preload_query()
+    tier_query = home_ticket_tier_preload_query()
+    order_query = home_ticket_order_preload_query()
+
+    user_id
+    |> upcoming_confirmed_tickets_for_user_base_query(start_boundary)
+    |> maybe_where_event_ids(event_ids)
+    |> maybe_limit_tickets(row_limit)
+    |> order_by([t, e], asc: e.start_date, asc: e.start_time)
+    |> select([t], struct(t, ^@home_ticket_fields))
+    |> preload(
+      event: ^event_card_query,
+      ticket_tier: ^tier_query,
+      ticket_order: ^order_query
+    )
+  end
+
+  defp home_ticket_tier_preload_query do
+    from(tt in TicketTier, select: struct(tt, ^@home_ticket_tier_fields))
+  end
+
+  defp home_ticket_order_preload_query do
+    from(to in TicketOrder, select: struct(to, ^@home_ticket_order_fields))
+  end
+
+  defp event_card_user_preload_query do
+    avatar_query = event_card_avatar_preload_query()
+
+    from(u in User,
+      select: struct(u, ^@event_card_user_fields),
+      preload: [current_avatar: ^avatar_query]
+    )
+  end
+
+  defp event_card_avatar_preload_query do
+    from(a in Avatar, select: struct(a, ^@event_card_avatar_fields))
+  end
+
+  defp list_event_hosts_by_event_id_query(event_id) do
+    avatar_query = event_card_avatar_preload_query()
+
+    from(u in User,
+      join: eh in "event_hosts",
+      on: eh.user_id == u.id,
+      where: eh.event_id == type(^event_id, Ecto.ULID),
+      order_by: [asc: eh.user_id],
+      select: struct(u, ^@event_card_user_fields),
+      preload: [current_avatar: ^avatar_query]
+    )
+  end
+
+  defp attendee_users_query(user_ids) do
+    avatar_query = event_card_avatar_preload_query()
+
+    from(u in User,
+      where: u.id in ^user_ids,
+      select: struct(u, ^@event_card_user_fields),
+      preload: [current_avatar: ^avatar_query]
+    )
   end
 
   defp event_summary_preload_query do
@@ -3954,5 +4050,24 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_list_events_paginated_search_query do
     list_events_paginated_base_query(tab: :upcoming, search_term: "ci")
+  end
+
+  @doc false
+  def ci_query_explain_list_upcoming_confirmed_tickets_for_user_query do
+    list_upcoming_confirmed_tickets_for_user_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      Ysc.Ci.QueryExplain.Fixtures.now(),
+      row_limit: 100
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_event_hosts_by_event_id_query do
+    list_event_hosts_by_event_id_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_attendee_users_query do
+    attendee_users_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 end
