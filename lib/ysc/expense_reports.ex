@@ -325,6 +325,9 @@ defmodule Ysc.ExpenseReports do
   purpose, status, and net total. Drafts are omitted — they are a member's
   in-progress scratch copy. Headline totals still use `totals_for_event/2`,
   which counts only approved/paid reports.
+
+  Callers must be full admins. LetMe `expense_report :read` is admin or
+  own_resource; Finding 76 was volunteers loading this on event Statistics.
   """
   def list_expense_reports_for_event(event_id) do
     event_id

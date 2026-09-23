@@ -69,6 +69,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 71 (HIGH)     Password reset LiveView never re-checked the token on submit, so a still-open tab could take over the account after expiry or after the victim already reset
   Finding 72 (HIGH)     Family sub-accounts inherited the primary's Stripe subscription and could cancel/resume/change it via hidden LiveView events
   Finding 74 (MEDIUM)   Volunteers could soft-delete any scheduled event (including others') via the list and editor; Finding 59 only blocked published/cancelled
+  Finding 76 (MEDIUM)   Volunteers could read other members' expense reports (submitter, purpose, status, net cost) on the event Statistics tab, bypassing LetMe expense_report :read (admin or own_resource) and the full-admin Money page
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -4843,6 +4844,75 @@ defmodule YscWeb.SecurityAuditTest do
                render_click(view, "delete-event", %{})
 
       assert Ysc.Events.get_event!(event.id).state == :deleted
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 76 (MEDIUM): Volunteers must not read other members' expense reports
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 76: volunteers cannot read expense reports on event statistics" do
+    import Ysc.EventsFixtures
+
+    test "volunteer statistics tab omits another member's submitted expense report" do
+      organizer = user_fixture(%{role: :member})
+      volunteer = user_fixture(%{role: :volunteer})
+      member = user_fixture(%{first_name: "Astrid", last_name: "Finding76"})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 76 Stats #{System.unique_integer([:positive])}"
+        })
+
+      report =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Finding 76 confidential reimbursement purpose",
+          reimbursement_method: "bank_transfer",
+          certification_accepted: true
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      refute has_element?(view, "#event-expense-reports-section")
+      refute has_element?(view, "#expense-report-#{report.id}")
+    end
+
+    test "full admin statistics tab still lists the submitted expense report" do
+      admin = user_fixture(%{role: :admin})
+
+      member =
+        user_fixture(%{first_name: "Astrid", last_name: "Finding76Admin"})
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          state: :published,
+          title: "Finding 76 Admin Stats #{System.unique_integer([:positive])}"
+        })
+
+      report =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Finding 76 admin-visible purpose",
+          reimbursement_method: "bank_transfer",
+          certification_accepted: true
+        })
+
+      conn = log_in_user(build_conn(), admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      assert has_element?(view, "#event-expense-reports-section")
+      assert has_element?(view, "#expense-report-#{report.id}")
     end
   end
 
