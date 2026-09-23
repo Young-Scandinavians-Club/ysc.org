@@ -3520,7 +3520,10 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- Pre-Arrival Checklist & Door Code -->
                 <section class="grid md:grid-cols-2 gap-6">
-                  <div class="bg-blue-600 rounded-xl p-8 text-white shadow-xs">
+                  <div
+                    id="door-code-access"
+                    class="bg-blue-600 rounded-xl p-8 text-white shadow-xs"
+                  >
                     <div class="flex items-center gap-3 mb-6">
                       <div class="p-2 bg-white/20 rounded-md">🔑</div>
                       <h2 class="text-xl font-bold text-white">
