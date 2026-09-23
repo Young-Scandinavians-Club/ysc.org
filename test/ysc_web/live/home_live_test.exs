@@ -282,6 +282,52 @@ defmodule YscWeb.HomeLiveTest do
       assert has_element?(view, "#home-newsletter-member-status", "Subscribed")
     end
 
+    test "toggles event notifications from the member dashboard", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/")
+      render_async(view, 5_000)
+
+      assert user.event_notifications
+
+      assert has_element?(
+               view,
+               "#home-event-notifications-status",
+               "Event notifications on"
+             )
+
+      view
+      |> element(
+        "#home-event-notifications-status button[phx-click='toggle_event_notifications']",
+        "Turn off"
+      )
+      |> render_click()
+
+      refute Ysc.Accounts.get_user!(user.id).event_notifications
+
+      assert has_element?(
+               view,
+               "#home-event-notifications-status",
+               "Event notifications off"
+             )
+
+      view
+      |> element(
+        "#home-event-notifications-status button[phx-click='toggle_event_notifications']",
+        "Turn on"
+      )
+      |> render_click()
+
+      assert Ysc.Accounts.get_user!(user.id).event_notifications
+
+      assert has_element?(
+               view,
+               "#home-event-notifications-status",
+               "Event notifications on"
+             )
+    end
+
     test "uses Norwegian greeting when most_connected_country is Norway", %{
       conn: conn
     } do
