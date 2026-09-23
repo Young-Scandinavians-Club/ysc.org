@@ -403,6 +403,11 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Cabin:"
       assert text =~ "Individual room(s)"
       assert text =~ "Tahoe Cabin Master at tahoe@ysc.org"
+
+      assert text =~
+               "About 3 days before check-in, we'll email you the door code"
+
+      refute text =~ "24 hours before"
       refute text =~ "Room Booking"
       refute text =~ "Day Booking"
       refute text =~ "our Tahoe property"

@@ -3531,7 +3531,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </h2>
                     </div>
                     <p class="text-blue-100 mb-6 leading-relaxed">
-                      Sent via email <strong>24 hours before check-in</strong>. Unique to your booking. The code is also displayed on your booking confirmation page when your stay is within 48 hours of check-in or currently active.
+                      Sent via email <strong>{YscWeb.BookingUserMessages.door_code_email_timing_phrase()}</strong>, and shown on your booking confirmation page within 48 hours of check-in or while your stay is active.
                     </p>
                     <div class="bg-blue-700/50 border border-white/10 rounded-xl p-4 text-sm">
                       <p class="font-semibold text-blue-50 mb-2">Important:</p>
@@ -3539,7 +3539,9 @@ defmodule YscWeb.TahoeBookingLive do
                         <li>
                           Save the door code before you arrive — cell service can be limited in the area
                         </li>
-                        <li>The door code is unique to your booking period</li>
+                        <li>
+                          The cabin door code can change between stays — use the code we send you for this visit
+                        </li>
                         <li>
                           If you don't receive the code, check your spam folder. Still nothing? Email the Tahoe cabin contact at <a
                             href={"mailto:#{EmailConfig.tahoe_email()}"}

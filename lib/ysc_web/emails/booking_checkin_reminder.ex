@@ -2,7 +2,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
   @moduledoc """
   Email template for booking check-in reminder.
 
-  Sent 2 days before check-in with door code, location, and check-in information.
+  Sent 3 days before check-in with door code, location, and check-in information.
   """
   use MjmlEEx,
     mjml_template: "templates/booking_checkin_reminder.mjml.eex",

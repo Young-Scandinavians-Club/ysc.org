@@ -168,8 +168,16 @@ defmodule YscWeb.BookingUserMessages do
     "You'll get a confirmation email right away with your booking details"
   end
 
+  def door_code_email_timing_phrase do
+    "about 3 days before check-in"
+  end
+
   def checkout_cabin_access_step do
-    "You'll receive cabin access details (door code or key instructions) by email before check-in"
+    "You'll receive cabin access details (door code or key instructions) by email #{door_code_email_timing_phrase()}"
+  end
+
+  def cabin_access_receipt_body do
+    "We'll email you the door code and key instructions #{door_code_email_timing_phrase()}. The code also appears on this page within 48 hours of check-in."
   end
 
   def checkout_manage_booking_step do

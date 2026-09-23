@@ -15,7 +15,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <!-- Important Notice -->
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #DBEAFE; padding: 16px; border-radius: 6px; border-left: 4px solid #1E40AF;">
-      <strong>📧 Important:</strong> You will receive a separate email before your check-in date with your door code and important check-in information. Please keep an eye out for this email!
+      <strong>📧 Important:</strong> About 3 days before check-in, we'll email you the door code and important check-in information. Please keep an eye out for this email!
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Booking Details -->
@@ -76,7 +76,7 @@
       <strong>What's Next?</strong>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• You will receive a separate email before your check-in date with your door code and important check-in information</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• About 3 days before check-in, we'll email you the door code and important check-in information</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Check-in time is <%= YscWeb.BookingDisplay.checkin_time_label() %> and check-out time is <%= YscWeb.BookingDisplay.checkout_time_label() %></mj-text>
     <% cabin_email = assigns[:cabin_email] || Ysc.EmailConfig.contact_email() %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If you have any questions, contact the <%= @booking.property %> Cabin Master at <a href="mailto:<%= cabin_email %>"><%= cabin_email %></a>.</mj-text>
