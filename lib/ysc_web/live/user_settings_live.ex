@@ -381,7 +381,7 @@ defmodule YscWeb.UserSettingsLive do
           }
         />
 
-        <div class="text-medium px-2 text-zinc-500 rounded-sm w-full md:border-l md:border md:border-zinc-100 md:pl-16">
+        <div class="text-medium px-2 text-zinc-500 rounded-sm w-full min-w-0 md:border-l md:border-zinc-100 md:pl-16">
           <div :if={@live_action == :edit} class="space-y-8">
             <!-- Profile Picture Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
