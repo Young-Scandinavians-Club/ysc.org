@@ -1628,6 +1628,38 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert has_element?(view, "#expense-report-#{submitted.id}")
       refute has_element?(view, "#expense-report-#{draft.id}")
     end
+
+    test "volunteers do not see per-report expense rows (Finding 76)", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: "volunteer"})
+      conn = log_in_user(conn, volunteer)
+      member = user_fixture(%{first_name: "Nils", last_name: "VolunteerStats"})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: "Volunteer Stats Event"
+        })
+
+      report =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Volunteer should not see this purpose",
+          reimbursement_method: "bank_transfer",
+          certification_accepted: true
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/statistics")
+
+      render_async(view)
+
+      refute has_element?(view, "#event-expense-reports-section")
+      refute has_element?(view, "#expense-report-#{report.id}")
+    end
   end
 
   describe "editing presence" do

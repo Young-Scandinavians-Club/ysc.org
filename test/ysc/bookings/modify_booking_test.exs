@@ -292,6 +292,41 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       end)
     end
 
+    test "skips cabin master notification when the assigned cabin master is not active",
+         %{user: user} do
+      {:ok, cabin_master} =
+        Ysc.Accounts.assign_board_position(
+          user_fixture(),
+          :tahoe_cabin_master
+        )
+
+      cabin_master
+      |> Ecto.Changeset.change(%{state: :suspended})
+      |> Repo.update!()
+
+      {checkin, checkout} = locker_buyout_dates(5)
+      {new_checkin, new_checkout} = locker_buyout_dates_after(checkout, 7)
+
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _updated} =
+                 BookingLocker.modify_complete_booking(booking, %{
+                   checkin_date: new_checkin,
+                   checkout_date: new_checkout,
+                   guests_count: 4,
+                   children_count: 0
+                 })
+
+        refute_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "booking_modification_cabin_master_notification"
+          }
+        )
+      end)
+    end
+
     test "calculate_refund returns zero after modification", %{user: user} do
       {checkin, checkout} = locker_buyout_dates(2)
       {new_checkin, new_checkout} = locker_buyout_dates_after(checkout, 7)

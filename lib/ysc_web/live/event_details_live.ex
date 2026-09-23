@@ -110,9 +110,9 @@ defmodule YscWeb.EventDetailsLive do
                 else: "border-zinc-100"
               )
             ]}>
-              <div class="space-y-4">
+              <div class="flex flex-col gap-4">
                 <%= if @event.state == :cancelled do %>
-                  <div class="mb-4 p-4 bg-red-600 text-white rounded-xl shadow-lg">
+                  <div class="p-4 bg-red-600 text-white rounded-xl shadow-lg">
                     <div class="flex items-center justify-center gap-3">
                       <.icon name="hero-x-circle-solid" class="w-5 h-5" />
                       <p class="font-semibold text-base">
@@ -133,7 +133,7 @@ defmodule YscWeb.EventDetailsLive do
                       (@event.state != :cancelled && @async_data_loaded &&
                          @event_sold_out_for_user && !@event.tickets_tbd)
                   }
-                  class="flex flex-wrap items-center gap-2 mb-4"
+                  class="flex flex-wrap items-center gap-2"
                 >
                   <span
                     :if={event_day_label == :today}
@@ -185,7 +185,7 @@ defmodule YscWeb.EventDetailsLive do
                     @event.start_date != nil && @event.start_date != "" &&
                       @event.state != :cancelled
                   }
-                  class="flex items-center gap-3 mb-4"
+                  class="flex items-center gap-3"
                 >
                   <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
                     {format_start_date(@event.start_date)}
@@ -706,8 +706,8 @@ defmodule YscWeb.EventDetailsLive do
             </section>
 
             <%!-- Event Updates --%>
-            <section :if={@event_updates != []} class="space-y-6">
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
+            <section :if={@event_updates != []} class="flex flex-col gap-6">
+              <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
                 <span class="w-8 h-px bg-zinc-200"></span> Updates
               </h3>
               <div class="space-y-6">
@@ -733,8 +733,8 @@ defmodule YscWeb.EventDetailsLive do
             </section>
 
             <%!-- Details --%>
-            <section class="space-y-6">
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
+            <section class="flex flex-col gap-6">
+              <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
                 <span class="w-8 h-px bg-zinc-200"></span> Details
               </h3>
               <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-normal leading-relaxed">
@@ -1872,7 +1872,7 @@ defmodule YscWeb.EventDetailsLive do
         </div>
         <!-- Right Panel: Price Breakdown -->
         <div class="lg:w-1/3 space-y-4 justify-between flex flex-col">
-          <div class="space-y-4">
+          <div class="flex flex-col gap-4">
             <div class="w-full hidden lg:block">
               <.live_component
                 id={"event-checkout-#{@event.id}"}
@@ -1883,7 +1883,7 @@ defmodule YscWeb.EventDetailsLive do
               />
             </div>
 
-            <h3 class="font-semibold mb-2">Order Summary</h3>
+            <h3 class="font-semibold">Order Summary</h3>
 
             <div
               class="bg-zinc-50 rounded-xl p-6 space-y-4 flex flex-col justify-between"
@@ -2701,8 +2701,8 @@ defmodule YscWeb.EventDetailsLive do
               </div>
               <!-- Checkout Zone: Payment Action Area -->
               <div class="mt-8 border-t border-zinc-200 pt-6">
-                <div class="max-w-md mx-auto space-y-4">
-                  <div class="flex items-center justify-between mb-2">
+                <div class="max-w-md mx-auto flex flex-col gap-4">
+                  <div class="flex items-center justify-between">
                     <span class="text-zinc-600">Amount due:</span>
                     <span class="text-2xl font-bold text-zinc-900">
                       {calculate_total_price(
@@ -2923,8 +2923,8 @@ defmodule YscWeb.EventDetailsLive do
                   (ticket_detail && ticket_detail.email) || ""
                 )
             } %>
-            <div class="border border-zinc-200 rounded-xl p-6 space-y-4">
-              <div class="flex items-center justify-between mb-4">
+            <div class="border border-zinc-200 rounded-xl p-6 flex flex-col gap-4">
+              <div class="flex items-center justify-between">
                 <div>
                   <h3 class="text-lg font-semibold text-zinc-900">
                     Ticket #{ticket.reference_id}
@@ -3046,9 +3046,9 @@ defmodule YscWeb.EventDetailsLive do
         <% tickets_requiring_registration =
           get_tickets_requiring_registration(@ticket_order.tickets || []) %>
         <%= if Enum.any?(tickets_requiring_registration) do %>
-          <div class="space-y-3 border-t border-zinc-200 pt-6">
-            <h3 class="font-semibold text-lg mb-1">Ticket Registration</h3>
-            <p class="text-base text-zinc-600 mb-4">
+          <div class="flex flex-col gap-3 border-t border-zinc-200 pt-6">
+            <h3 class="font-semibold text-lg">Ticket Registration</h3>
+            <p class="text-base text-zinc-600">
               Please provide details for each ticket that requires registration.
             </p>
 
@@ -3131,8 +3131,8 @@ defmodule YscWeb.EventDetailsLive do
                     end
                 end %>
 
-              <div class="border border-zinc-200 rounded-xl p-4 space-y-4">
-                <div class="flex items-center justify-between mb-2">
+              <div class="border border-zinc-200 rounded-xl p-4 flex flex-col gap-4">
+                <div class="flex items-center justify-between">
                   <div>
                     <h4 class="text-sm font-semibold text-zinc-900">
                       Ticket {index + 1} of {length(tickets_requiring_registration)}

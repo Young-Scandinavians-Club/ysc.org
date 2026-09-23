@@ -144,14 +144,24 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
     end
 
-    test "door code access copy matches the 3-day reminder, not 24 hours", %{
-      conn: conn
-    } do
+    test "information tab exposes door-code-access copy matching the 3-day reminder",
+         %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?tab=information")
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/bookings/tahoe?tab=information&info_tab=general"
+        )
+
       render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "Door Code & Access"
+             )
 
       assert has_element?(
                view,

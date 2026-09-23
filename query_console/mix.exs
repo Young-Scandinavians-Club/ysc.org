@@ -55,7 +55,11 @@ defmodule QueryConsole.MixProject do
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.3.0"},
-      {:bandit, "~> 1.5"},
+      # 1.12.5: EEF-CVE-2026-74836 (HIGH) bounds/cancels HTTP/2 sends blocked on
+      # the connection window; EEF-CVE-2026-75484 (MEDIUM) rejects HTTP/2 header
+      # values with CR/LF/NUL. We use Bandit.PhoenixAdapter (bandit_pid/1 for
+      # idle shutdown). Public adapter APIs are unchanged.
+      {:bandit, "~> 1.12.5"},
       {:req, "~> 0.5"},
       {:lotus, "~> 0.16.6"},
       {:lotus_web, "~> 0.14.1"},

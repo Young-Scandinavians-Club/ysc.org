@@ -10,7 +10,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
   alias Money
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, BookingLocker}
+  alias Ysc.Bookings.{Booking, BookingLocker, BookingRoom, Room}
   alias Ysc.Bookings.Entitlements
   alias Ysc.Payments
   alias Ysc.Repo
@@ -210,6 +210,94 @@ defmodule YscWeb.BookingReceiptLiveTest do
       for guest <- guests do
         assert has_element?(view, "#receipt-guest-#{guest.id}-badge")
       end
+    end
+
+    test "tahoe receipt links cabin access to the door-code-access section", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert has_element?(
+               view,
+               ~s(a[href="/bookings/tahoe?tab=information&info_tab=general#door-code-access"]),
+               "View Door Code Info"
+             )
+
+      assert has_element?(
+               view,
+               ~s(a[href="/bookings/tahoe?tab=information&info_tab=rules#cabin-rules"]),
+               "Read Cabin Rules"
+             )
+    end
+
+    test "clear lake receipt links cabin access to the door-code-access section",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :clear_lake
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert has_element?(
+               view,
+               ~s(a[href="/bookings/clear-lake?tab=information#door-code-access"]),
+               "View Door Code Info"
+             )
+
+      assert has_element?(
+               view,
+               ~s(a[href="/bookings/clear-lake?tab=information#cabin-rules"]),
+               "Read Cabin Rules"
+             )
+    end
+
+    test "lists slim-loaded room names on the receipt", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :room,
+          property: :tahoe
+        })
+
+      {:ok, room} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Receipt Slim Room",
+          property: :tahoe,
+          capacity_max: 2
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %BookingRoom{
+          booking_id: booking.id,
+          room_id: room.id
+        }
+        |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      assert has_element?(view, "#booking-receipt", "Receipt Slim Room")
     end
   end
 
