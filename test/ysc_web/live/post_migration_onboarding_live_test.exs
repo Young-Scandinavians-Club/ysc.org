@@ -419,7 +419,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       assert has_element?(view, ~s|button[phx-value-step="2"]|, "Membership")
       refute has_element?(view, "button", "Membership Type")
       refute has_element?(view, "button", "Renewal Payment")
-      refute has_element?(view, "button", "Save card")
+      refute has_element?(view, "button", "Save payment method")
       refute has_element?(view, "button", "Family")
       refute has_element?(view, "#membership-selection")
       refute has_element?(view, "#onboarding-payment-form")

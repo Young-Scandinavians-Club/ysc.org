@@ -130,13 +130,12 @@ defmodule YscWeb.PageControllerTest do
 
       html = html_response(conn, 200)
       assert html =~ "Account Pending Review"
-      refute html =~ "saved payment method"
-      assert html =~ "saved a card or bank account"
+      assert html =~ "saved a payment method"
       assert conn.assigns.application_submitted_date != nil
       assert conn.assigns.time_delta =~ "ago"
     end
 
-    test "explains a saved card instead of a payment method when one is on file",
+    test "explains a saved payment method when one is on file",
          %{
            conn: conn,
            user: user
@@ -173,9 +172,8 @@ defmodule YscWeb.PageControllerTest do
       conn = conn |> log_in_user(user) |> get(~p"/pending-review")
       html = html_response(conn, 200)
 
-      assert html =~ "You've saved a card for payment"
-      assert html =~ "we'll charge the card you saved"
-      refute html =~ "saved payment method"
+      assert html =~ "You've saved a payment method"
+      assert html =~ "we'll charge the payment method you saved"
       refute html =~ "payment method will be charged"
     end
 

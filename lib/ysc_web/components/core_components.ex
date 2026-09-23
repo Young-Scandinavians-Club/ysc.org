@@ -3331,7 +3331,7 @@ defmodule YscWeb.CoreComponents do
 
       <.async_section_loader :if={@passkeys_loading} id="passkeys-loading" label="Loading passkeys..." />
 
-      <.async_section_loader label="Loading your cards..." class="py-12" />
+      <.async_section_loader label="Loading your payment methods..." class="py-12" />
   """
   attr :id, :string, default: nil
   attr :label, :string, required: true

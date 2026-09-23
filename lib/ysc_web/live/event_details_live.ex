@@ -5,7 +5,7 @@ defmodule YscWeb.EventDetailsLive do
 
   @attendees_preview_count 10
   @availability_refresh_debounce_ms 300
-  @ticket_checkout_timeout_message "Your ticket checkout timed out. Choose your tickets again if any are still available. If you see a charge on your card, email info@ysc.org with the date and amount."
+  @ticket_checkout_timeout_message "Your ticket checkout timed out. Choose your tickets again if any are still available. If you see a charge, email info@ysc.org with the date and amount."
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -2097,7 +2097,7 @@ defmodule YscWeb.EventDetailsLive do
                 Payment failed
               </h2>
               <p class="text-zinc-600 max-w-md">
-                Your payment did not go through. Please select tickets again and try a different card if needed.
+                Your payment did not go through. Please select tickets again and try a different payment method if needed.
               </p>
             </div>
 
