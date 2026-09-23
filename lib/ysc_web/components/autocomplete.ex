@@ -66,6 +66,9 @@ defmodule YscWeb.Components.Autocomplete do
   From a LiveComponent, pass `target={@myself}` so search, select, and
   clear events stay on the component instead of bubbling to the parent
   LiveView.
+
+  For the admin member picker, prefer `<.admin_user_autocomplete>` plus
+  `YscWeb.AdminUserSearch` for the search / select / clear assigns.
   """
   use Phoenix.Component
 
