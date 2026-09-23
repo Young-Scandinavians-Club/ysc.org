@@ -224,7 +224,12 @@ defmodule YscWeb.Components.DateRangePicker do
               <.icon name="hero-x-mark" class="w-4 h-4 me-1" /> Reset
             </button>
             <div :if={!@range_start && !@range_end}></div>
-            <.button type="button" phx-click="close-calendar" phx-target={@myself}>
+            <.button
+              type="button"
+              phx-click="close-calendar"
+              phx-target={@myself}
+              disabled={incomplete_range?(@is_range?, @range_start, @range_end)}
+            >
               {select_button_text(@range_start, @range_end)}
             </.button>
           </div>
@@ -334,6 +339,19 @@ defmodule YscWeb.Components.DateRangePicker do
         "close-calendar",
         _,
         %{assigns: %{range_start: nil, range_end: nil}} = socket
+      ) do
+    {:noreply, socket |> assign(:calendar?, false)}
+  end
+
+  # A range picker with only a start date picked is not a valid selection
+  # (e.g. clicking away, or a stale button click, before an end date is
+  # chosen). Closing here must not silently commit a zero-night stay by
+  # defaulting the end date to the start date.
+  @impl true
+  def handle_event(
+        "close-calendar",
+        _,
+        %{assigns: %{is_range?: true, range_end: nil}} = socket
       ) do
     {:noreply, socket |> assign(:calendar?, false)}
   end
@@ -1155,6 +1173,13 @@ defmodule YscWeb.Components.DateRangePicker do
   end
 
   defp to_datetime(other) when is_binary(other), do: from_str!(other)
+
+  # A range picker with a start date but no end date yet is not a valid
+  # selection to confirm — the confirm button must stay disabled until both
+  # ends of the range are picked.
+  defp incomplete_range?(is_range?, range_start, range_end) do
+    is_range? && !is_nil(range_start) && is_nil(range_end)
+  end
 
   defp select_button_text(_start_date, nil) do
     "Select Date"
