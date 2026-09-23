@@ -1311,7 +1311,11 @@ defmodule YscWeb.AdminEventsNewLive do
                 </table>
               </div>
 
-              <div class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4">
+              <div
+                :if={@admin_role == :admin}
+                id="event-expense-reports-section"
+                class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4"
+              >
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <h2 class="text-xl font-bold">Expense Reports</h2>
@@ -1695,7 +1699,10 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:donations_total, data.donations_total)
   end
 
-  defp fetch_statistics_tab_data(event_id) do
+  defp fetch_statistics_tab_data(event_id, opts) do
+    include_expense_reports? =
+      Keyword.get(opts, :include_expense_reports?, false)
+
     tasks = [
       {:sales_stats, fn -> Events.get_event_sales_stats(event_id) end},
       {:sales_over_time,
@@ -1707,7 +1714,13 @@ defmodule YscWeb.AdminEventsNewLive do
       {:stripe_fees_total,
        fn -> Events.get_event_stripe_fees_total(event_id) end},
       {:expense_reports,
-       fn -> ExpenseReports.list_expense_reports_for_event(event_id) end},
+       fn ->
+         if include_expense_reports? do
+           ExpenseReports.list_expense_reports_for_event(event_id)
+         else
+           []
+         end
+       end},
       {:expense_report_totals,
        fn -> ExpenseReports.totals_for_event(event_id) end},
       {:event_updates, fn -> Events.list_event_updates(event_id) end},
@@ -1914,10 +1927,16 @@ defmodule YscWeb.AdminEventsNewLive do
               assign_edit_tab_data(socket, event)
 
             :statistics ->
+              # Finding 76: per-report rows (submitter, purpose, status, amount)
+              # are treasurer-only. Volunteers still get aggregate cost KPIs.
+              include_expense_reports? = socket.assigns[:admin_role] == :admin
+
               socket
               |> assign(:statistics_loading?, true)
               |> start_async(:load_statistics, fn ->
-                fetch_statistics_tab_data(event.id)
+                fetch_statistics_tab_data(event.id,
+                  include_expense_reports?: include_expense_reports?
+                )
               end)
 
             _ ->
