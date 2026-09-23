@@ -215,6 +215,9 @@ jobs:
       - name: start_minio self-test
         run: ./etc/scripts/ci/start_minio.sh --self-test
 
+      - name: docker_buildx_push_retry self-test
+        run: ./etc/scripts/docker_buildx_push_retry.sh --self-test
+
       - name: dprint (format check)
         run: dprint check
 
