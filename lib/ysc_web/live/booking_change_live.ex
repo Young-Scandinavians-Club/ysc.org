@@ -1446,7 +1446,8 @@ defmodule YscWeb.BookingChangeLive do
   # the hold — same invariant as Edit changes / hold expiry.
   defp proceed_after_modification_details(socket, params, preview) do
     if Money.positive?(preview.delta) do
-      booking = Repo.get!(Booking, socket.assigns.booking.id)
+      booking =
+        Bookings.get_booking_for_member_checkout!(socket.assigns.booking.id)
 
       case reconcile_existing_modification_payment_for_new_attempt(booking) do
         {:already_succeeded, payment_intent_id} ->
