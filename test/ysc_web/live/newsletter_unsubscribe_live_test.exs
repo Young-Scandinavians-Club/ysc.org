@@ -52,6 +52,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
 
       refute html =~ "This link no longer works"
       assert html =~ "Unsubscribe from our newsletter"
+      assert has_element?(view, "#newsletter-unsubscribe-page-button")
       assert has_element?(view, "button", "Unsubscribe")
     end
 
@@ -101,6 +102,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
         live(conn, ~p"/newsletter/unsubscribe/#{sub.subscription_token}")
 
       assert html =~ "id=\"newsletter-unsubscribe-page\""
+      assert html =~ "id=\"newsletter-unsubscribe-page-button\""
     end
   end
 
@@ -119,6 +121,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
 
       assert html =~ "You have been unsubscribed"
       refute has_element?(view, "button", "Unsubscribe")
+      assert has_element?(view, "#newsletter-unsubscribe-page-home")
       assert has_element?(view, "a[href='/']", "Return to home")
     end
 
