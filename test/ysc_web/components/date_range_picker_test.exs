@@ -424,5 +424,31 @@ defmodule YscWeb.Components.DateRangePickerTest do
       assert DateTime.to_date(start_date) == ~D[2026-08-12]
       assert DateTime.to_date(end_date) == ~D[2026-08-14]
     end
+
+    test "does not commit a single picked date as a zero-night range" do
+      socket =
+        init_socket(
+          base_assigns(%{min_nights: 1})
+          |> Map.put(:form, %{})
+        )
+
+      {:noreply, socket} =
+        DateRangePicker.handle_event("open-calendar", %{}, socket)
+
+      {:noreply, socket} =
+        DateRangePicker.handle_event(
+          "pick-date",
+          %{"date" => iso_date(~D[2026-08-12])},
+          socket
+        )
+
+      assert socket.assigns.range_end == nil
+
+      {:noreply, socket} =
+        DateRangePicker.handle_event("close-calendar", %{}, socket)
+
+      assert socket.assigns.calendar? == false
+      refute_receive {:updated_event, _}
+    end
   end
 end
