@@ -120,6 +120,27 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
       assert html2 =~ "You have been unsubscribed"
       refute has_element?(view2, "button", "Unsubscribe")
     end
+
+    test "re-firing the unsubscribe event on an already-disabled user stays idempotent",
+         %{conn: conn} do
+      user = user_fixture(%{phone_number: "+14159098268"})
+
+      {:ok, user} =
+        Accounts.update_notification_preferences(user, %{
+          "event_notifications" => "false"
+        })
+
+      token = EventNotificationUnsubscribeToken.sign(user.id)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/event-notifications/unsubscribe/#{token}")
+
+      # The button is hidden once unsubscribed, but re-firing the event
+      # (e.g. a stale client) must stay safe and idempotent.
+      html = render_click(view, "unsubscribe")
+      assert html =~ "You have been unsubscribed"
+      assert Accounts.get_user_by_email(user.email).event_notifications == false
+    end
   end
 
   describe "unsubscribe action - success" do
@@ -254,6 +275,18 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
 
       assert html =~ "This link no longer works"
       refute has_element?(view, "button", "Unsubscribe")
+    end
+
+    test "firing the unsubscribe event on an invalid token is a no-op error, never a crash",
+         %{conn: conn} do
+      {:ok, view, _html} =
+        live(conn, ~p"/event-notifications/unsubscribe/bad-token")
+
+      # The button is hidden when the token is invalid, but the event handler
+      # must still resolve safely if fired directly (e.g. a stale client).
+      html = render_click(view, "unsubscribe")
+      assert is_binary(html)
+      assert html =~ "This link no longer works"
     end
   end
 
