@@ -370,23 +370,21 @@ jobs:
           cache-from: type=gha,scope=main-app
           cache-to: type=gha,mode=max,scope=main-app
 
-      - name: Log in to Fly registry
+      # BuildKit retries blob PUTs with 1s/2s/4s backoff, which is not enough
+      # when registry.fly.io 502s for minutes. The retry script re-auths
+      # (`flyctl auth docker` tokens expire after 5 minutes) and waits 30s
+      # between full push attempts.
+      - name: Push image
         if: steps.version.outputs.skip != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
-        run: flyctl auth docker
-
-      - name: Push image
-        if: steps.version.outputs.skip != 'true'
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: etc/docker/Dockerfile
-          push: true
-          tags: registry.fly.io/ysc-sandbox:${{ steps.version.outputs.version }}
-          build-args: |
-            BUILD_VERSION=${{ steps.version.outputs.version }}
-          cache-from: type=gha,scope=main-app
+        run: |
+          bash etc/scripts/docker_buildx_push_retry.sh \
+            --context . \
+            --file etc/docker/Dockerfile \
+            --tag "registry.fly.io/ysc-sandbox:${{ steps.version.outputs.version }}" \
+            --cache-scope main-app \
+            --build-arg "BUILD_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Deploy to Fly.io sandbox
         if: steps.version.outputs.skip != 'true'
@@ -462,24 +460,20 @@ jobs:
           cache-from: type=gha,scope=query-console
           cache-to: type=gha,mode=max,scope=query-console
 
-      - name: Log in to Fly registry
+      # Same Fly registry 502 retry as the app sandbox push. This job's default
+      # working-directory is query_console/, so run from the repo root.
+      - name: Push image
         if: steps.version.outputs.skip != 'true'
         working-directory: .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
-        run: flyctl auth docker
-
-      - name: Push image
-        if: steps.version.outputs.skip != 'true'
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: query_console
-          file: query_console/Dockerfile
-          push: true
-          tags: registry.fly.io/ysc-query-console-sandbox:${{ steps.version.outputs.version }}
-          build-args: |
-            BUILD_VERSION=${{ steps.version.outputs.version }}
-          cache-from: type=gha,scope=query-console
+        run: |
+          bash etc/scripts/docker_buildx_push_retry.sh \
+            --context query_console \
+            --file query_console/Dockerfile \
+            --tag "registry.fly.io/ysc-query-console-sandbox:${{ steps.version.outputs.version }}" \
+            --cache-scope query-console \
+            --build-arg "BUILD_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Deploy query console to Fly.io sandbox
         if: steps.version.outputs.skip != 'true'
