@@ -1839,32 +1839,86 @@ defmodule YscWeb.HomeLive do
                 </div>
               </.modal>
 
-              <%!-- Newsletter Subscription --%>
+              <%!-- Notifications --%>
               <section>
                 <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
-                  Newsletter
+                  Notifications
                 </h2>
 
                 <div
                   :if={!@async_data_loaded}
-                  class="flex items-center gap-3 animate-pulse"
+                  class="space-y-4 animate-pulse"
                 >
-                  <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
-                  <div class="space-y-2 flex-1">
-                    <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
-                    <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
+                  <div :for={_i <- 1..2} class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
+                    <div class="space-y-2 flex-1">
+                      <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
+                      <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
+                    </div>
                   </div>
                 </div>
 
-                <div :if={@async_data_loaded}>
+                <div :if={@async_data_loaded} class="space-y-4">
                   <.newsletter_member_status
                     id="home-newsletter-member-status"
                     subscribed={@newsletter_subscribed}
                     layout={:compact}
                   />
+
+                  <div
+                    id="home-event-notifications-status"
+                    class="flex items-center gap-3"
+                  >
+                    <div class={[
+                      "flex items-center justify-center w-9 h-9 rounded-full shrink-0",
+                      if(@current_user.event_notifications,
+                        do: "bg-emerald-100",
+                        else: "bg-zinc-100"
+                      )
+                    ]}>
+                      <.icon
+                        name={
+                          if(@current_user.event_notifications,
+                            do: "hero-bell",
+                            else: "hero-bell-slash"
+                          )
+                        }
+                        class={[
+                          "w-4 h-4",
+                          if(@current_user.event_notifications,
+                            do: "text-emerald-600",
+                            else: "text-zinc-500"
+                          )
+                        ]}
+                      />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="font-semibold text-zinc-900 text-sm">
+                        {if @current_user.event_notifications,
+                          do: "Event notifications on",
+                          else: "Event notifications off"}
+                      </p>
+                      <p class="text-xs text-zinc-500 mt-0.5">
+                        {if @current_user.event_notifications,
+                          do: "You'll hear about new events and reminders.",
+                          else: "Turn on to hear about new events and reminders."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      phx-click="toggle_event_notifications"
+                      phx-disable-with="Saving..."
+                      class="shrink-0 text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      {if @current_user.event_notifications,
+                        do: "Turn off",
+                        else: "Turn on"}
+                    </button>
+                  </div>
+
                   <.link
                     navigate={~p"/newsletters"}
-                    class="mt-3 flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
+                    class="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
                   >
                     Browse newsletter archive
                     <.icon name="hero-arrow-right" class="w-3 h-3" />
@@ -2178,6 +2232,34 @@ defmodule YscWeb.HomeLive do
      NewsletterSubscribe.toggle_member(socket, source: "home_dashboard")}
   end
 
+  def handle_event("toggle_event_notifications", _params, socket) do
+    user = socket.assigns.current_user
+    now_enabled? = !user.event_notifications
+
+    case Accounts.update_notification_preferences(user, %{
+           "event_notifications" => now_enabled?
+         }) do
+      {:ok, _updated_user} ->
+        {title, body} = event_notifications_toggle_toast(now_enabled?)
+
+        {:noreply,
+         socket
+         |> assign(:current_user, %{user | event_notifications: now_enabled?})
+         |> YscWeb.Flash.put_toast(:info, body,
+           title: title,
+           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+         )}
+
+      {:error, _changeset} ->
+        {:noreply,
+         Phoenix.LiveView.put_flash(
+           socket,
+           :error,
+           "We couldn't update your event notification preference. Please try again, or email info@ysc.org if this keeps happening."
+         )}
+    end
+  end
+
   defp format_event_time(_event_start_date, %Time{} = time) do
     Calendar.strftime(time, "%-I:%M %p")
   end
@@ -2197,6 +2279,13 @@ defmodule YscWeb.HomeLive do
   end
 
   defp format_event_time(_, _), do: ""
+
+  defp event_notifications_toggle_toast(true),
+    do:
+      {"Event notifications on", "You'll hear about new events and reminders."}
+
+  defp event_notifications_toggle_toast(false),
+    do: {"Event notifications off", "You won't receive event notifications."}
 
   defp format_membership_date(%DateTime{} = dt, timezone) do
     DateDisplay.format_date_in_zone(dt, timezone)
