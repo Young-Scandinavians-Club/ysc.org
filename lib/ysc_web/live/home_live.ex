@@ -1465,7 +1465,7 @@ defmodule YscWeb.HomeLive do
                           <% end %>
                         </div>
                         <div class="flex flex-col gap-1.5">
-                          <div class="flex items-center gap-3">
+                          <div class="flex flex-wrap items-center gap-3">
                             <.button
                               navigate={
                                 ~p"/events/#{event.id}/tickets/qr?return_to=/"
