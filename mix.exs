@@ -178,8 +178,11 @@ defmodule Ysc.MixProject do
       # 0.12.0: serve_socket/2 for embedders that own the TLS listener; handshake
       # now runs in the per-connection process. We do not start h2 servers;
       # hackney talks to h2_connection client APIs only, so those are unused.
+      # 0.12.1: decode rejected HEADERS (and CONTINUATION) before dropping them
+      # (RFC 9113 §4.3) so HPACK stays in sync after RST_STREAM. Unused in app
+      # code; hackney still uses h2_connection client APIs.
       {:hackney, "~> 4.7", override: true},
-      {:h2, "~> 0.12.0", override: true},
+      {:h2, "~> 0.12.1", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
