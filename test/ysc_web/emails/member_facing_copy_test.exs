@@ -77,17 +77,15 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
                "Velkommen! (Welcome!) Your YSC Membership is Active! 🎉"
 
       assert text =~ "Velkommen! (Welcome!) Your Membership is Active"
-      assert text =~ "Your saved card has been charged"
+      assert text =~ "Your saved payment method has been charged"
       refute text =~ "Velkommen! Your Membership is Active"
-      refute text =~ "saved payment method"
     end
 
-    test "application-submitted email says save a card, not payment method" do
+    test "application-submitted email says save a payment method, not card" do
       html = ApplicationSubmitted.render(%{first_name: "Jane"})
       text = html_text(html)
 
-      assert text =~ "option to save a card"
-      refute text =~ "payment method"
+      assert text =~ "option to save a payment method"
     end
 
     test "payment confirmation tells members they can book a stay at the cabins" do
@@ -142,7 +140,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "After you pay, you'll have access"
       assert text =~ "You just need to finish paying your dues"
       assert text =~ "Try paying again"
-      assert text =~ "If your card still works, try the payment again"
+      assert text =~ "If your card or bank account still works, try the payment again"
       assert text =~ "Update your card or bank account"
       assert text =~ "Expired or invalid card"
       assert text =~ "Using a different card or bank account"
@@ -173,7 +171,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~
                "We couldn't take payment for your Family membership renewal"
 
-      assert text =~ "After you update your card and pay"
+      assert text =~ "After you update your card or bank account and pay"
       assert text =~ "Update your card or bank account"
       refute text =~ "successfully processed"
       refute text =~ "couldn't process your"
@@ -543,7 +541,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
   end
 
   describe "membership renewal payment reminder" do
-    test "asks members to save a card instead of a payment method on file" do
+    test "asks members to add a payment method, not just a card" do
       html =
         MembershipRenewalPaymentMethodReminder.render(%{
           first_name: "Jane",
@@ -556,9 +554,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       text = html_text(html)
 
       assert MembershipRenewalPaymentMethodReminder.get_subject() ==
-               "Please add a card so your membership can renew"
+               "Please add a payment method so your membership can renew"
 
-      assert text =~ "Please add a card so your membership can renew"
+      assert text =~ "Please add a payment method so your membership can renew"
       assert text =~ "We don't have a card or bank account saved"
       assert text =~ "Add a card or bank account"
       assert text =~ "Click the button above"

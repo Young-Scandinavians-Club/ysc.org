@@ -522,9 +522,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         Family Membership
         <:subtitle>
           <%= if @primary_user do %>
-            Your membership benefits are shared with you by {@primary_user.first_name} {@primary_user.last_name}. You do not need to choose a plan or add a card.
+            Your membership benefits are shared with you by {@primary_user.first_name} {@primary_user.last_name}. You do not need to choose a plan or add a payment method.
           <% else %>
-            Your membership benefits are shared with you by the member who manages your family account. You do not need to choose a plan or add a card.
+            Your membership benefits are shared with you by the member who manages your family account. You do not need to choose a plan or add a payment method.
           <% end %>
         </:subtitle>
       </.header>
@@ -711,7 +711,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Your Membership
           <:subtitle>
-            Your membership is active. Review the details below and make sure a card or bank account is on file for automatic renewal.
+            Your membership is active. Review the details below and make sure a payment method is on file for automatic renewal.
           </:subtitle>
         </.header>
 
@@ -768,13 +768,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm">
             <.icon name="hero-exclamation-triangle" class="w-5 h-5 mt-0.5 shrink-0" />
             <span>
-              You haven't saved a card or bank account yet. Add one so your membership can renew automatically.
+              You haven't saved a payment method yet. Add one so your membership can renew automatically.
             </span>
           </div>
           <%= if is_nil(@payment_intent_secret) do %>
             <div class="mt-6 flex justify-end">
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
-                <.icon name="hero-credit-card" class="w-4 h-4 me-1" /> Add a card
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" /> Add a payment method
               </.button>
             </div>
           <% else %>
@@ -793,7 +793,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <div id="payment-element"></div>
               <div class="flex justify-end mt-4">
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
-                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" /> Save card
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" /> Save payment method
                 </.button>
               </div>
             </form>
@@ -804,7 +804,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Set up automatic renewal
           <:subtitle>
-            Add a card or bank account so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a card later in account settings.
+            Add a payment method so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a payment method later in account settings.
           </:subtitle>
         </.header>
 
@@ -860,7 +860,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 Skip for now
               </.button>
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
-                <.icon name="hero-credit-card" class="w-4 h-4 me-1" /> Add a card
+                <.icon name="hero-credit-card" class="w-4 h-4 me-1" /> Add a payment method
               </.button>
             </div>
           <% else %>
@@ -888,7 +888,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                   Skip for now
                 </.button>
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
-                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" /> Save card
+                  <.icon name="hero-lock-closed" class="w-4 h-4 me-1" /> Save payment method
                 </.button>
               </div>
             </form>
@@ -1452,7 +1452,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
         YscWeb.Flash.send_toast(
           :error,
-          "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a card.",
+          "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a payment method.",
           title: "Payment Error"
         )
 
@@ -1521,7 +1521,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
                   YscWeb.Flash.send_toast(
                     :error,
-                    "Your card was saved, but we could not set it as your default for renewals. Please try again or contact info@ysc.org.",
+                    "Your payment method was saved, but we could not set it as your default for renewals. Please try again or contact info@ysc.org.",
                     title: "Payment"
                   )
 
@@ -1542,7 +1542,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:error, _} ->
             YscWeb.Flash.send_toast(
               :error,
-              "We couldn't save your card. Please try again, or email memberships@ysc.org if this keeps happening.",
+              "We couldn't save your payment method. Please try again, or email memberships@ysc.org if this keeps happening.",
               title: "Payment"
             )
 
@@ -1552,7 +1552,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, _} ->
         YscWeb.Flash.send_toast(
           :error,
-          "We couldn't confirm your card. Please try again, or email memberships@ysc.org if this keeps happening.",
+          "We couldn't confirm your payment method. Please try again, or email memberships@ysc.org if this keeps happening.",
           title: "Payment"
         )
 
@@ -1575,7 +1575,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       is_nil(default_pm) ->
         YscWeb.Flash.send_toast(
           :error,
-          "Please add a card before continuing.",
+          "Please add a payment method before continuing.",
           title: "Payment Required"
         )
 
@@ -1629,7 +1629,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :error,
-              "We couldn't turn on automatic renewal. Your card was saved — please try again, or email info@ysc.org for help.",
+              "We couldn't turn on automatic renewal. Your payment method was saved — please try again, or email info@ysc.org for help.",
               title: "Payment setup"
             )
 
@@ -1844,7 +1844,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     base =
       if skip_payment,
         do: base,
-        else: base ++ [{"Save card", @step_payment}]
+        else: base ++ [{"Save payment method", @step_payment}]
 
     if needs_family_members_step,
       do: base ++ [{"Family", @step_family}],
@@ -2804,10 +2804,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp payment_method_display(%{last_four: last4}) when is_binary(last4) do
-    "Card ···· #{last4}"
+    "Payment method ···· #{last4}"
   end
 
-  defp payment_method_display(_), do: "Card on file"
+  defp payment_method_display(_), do: "Payment method on file"
 
   defp assign_avatar_data(socket, user) do
     socket

@@ -23,7 +23,7 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
   end
 
   def get_subject() do
-    "Please add a card so your membership can renew"
+    "Please add a payment method so your membership can renew"
   end
 
   def prepare_email_data(user, subscription) do

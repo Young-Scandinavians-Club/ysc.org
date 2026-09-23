@@ -39,13 +39,13 @@
 
       <%= if @has_payment_method do %>
         <div class="my-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-900 text-sm">
-          <strong>You've saved a card for payment.</strong>
+          <strong>You've saved a payment method.</strong>
           If the board approves you, we'll charge your dues and turn on membership automatically — no extra steps.
         </div>
       <% else %>
         <div class="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-sm space-y-2">
           <p>
-            You haven't saved a card or bank account yet. Add one so your dues can be charged automatically if you're approved. You won't be charged unless the board approves your application.
+            You haven't saved a payment method yet. Add one so your dues can be charged automatically if you're approved. You won't be charged unless the board approves your application.
           </p>
           <p>
             <.link
@@ -89,7 +89,7 @@
           <span class="min-w-0 pt-0.5">
             <%= if @has_payment_method do %>
               <strong>Activation:</strong>
-              If approved, we'll charge the card you saved and turn on membership automatically — no extra steps.
+              If approved, we'll charge the payment method you saved and turn on membership automatically — no extra steps.
             <% else %>
               <strong>Activation:</strong>
               If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.

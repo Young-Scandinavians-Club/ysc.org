@@ -236,12 +236,12 @@ defmodule YscWeb.BookingUserMessages do
 
   def booking_creation_failed do
     trim("""
-    We couldn't complete your booking. Your card has not been charged. Please try again, or choose different dates. If the problem continues, email info@ysc.org with your dates and guest count.
+    We couldn't complete your booking. You have not been charged. Please try again, or choose different dates. If the problem continues, email info@ysc.org with your dates and guest count.
     """)
   end
 
   def booking_creation_failed_sidebar do
-    "Couldn't complete booking. Your card wasn't charged — try again."
+    "Couldn't complete booking. You weren't charged — try again."
   end
 
   def modification_redirect_hold_expired do

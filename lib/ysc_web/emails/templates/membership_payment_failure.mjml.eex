@@ -81,7 +81,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <%= if @retry_payment_url do %>
       <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-        If your card still works, try the payment again. Otherwise, update your card or bank account first.
+        If your card or bank account still works, try the payment again. Otherwise, update it first.
       </mj-text>
       <mj-spacer height="12px"></mj-spacer>
       <mj-button href="<%= @retry_payment_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Try paying again →</mj-button>
@@ -111,7 +111,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <%= if @is_renewal do %>
-        After you update your card and pay, your <%= @membership_type %> membership stays active with access to:
+        After you update your card or bank account and pay, your <%= @membership_type %> membership stays active with access to:
       <% else %>
         After you pay, you'll have access to all member benefits, including:
       <% end %>

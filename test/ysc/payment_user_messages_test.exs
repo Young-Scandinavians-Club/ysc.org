@@ -89,9 +89,8 @@ defmodule Ysc.PaymentUserMessagesTest do
     message = PaymentUserMessages.generic_payment_failed()
 
     assert message =~ "couldn't process your payment"
-    assert message =~ "try another card"
+    assert message =~ "try another payment method"
     assert message =~ "info@ysc.org"
     refute message =~ "payment_intent"
-    refute message =~ "payment method"
   end
 end
