@@ -364,7 +364,7 @@ defmodule YscWeb.ReauthComponent do
           />
         </div>
 
-        <div class="mt-4 text-center">
+        <div class="flex justify-end mt-6 pt-4 border-t border-zinc-200">
           <.button
             type="button"
             variant="outline"
