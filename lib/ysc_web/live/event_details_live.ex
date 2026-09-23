@@ -110,7 +110,7 @@ defmodule YscWeb.EventDetailsLive do
                 else: "border-zinc-100"
               )
             ]}>
-              <div class="space-y-4">
+              <div class="flex flex-col gap-4">
                 <%= if @event.state == :cancelled do %>
                   <div class="mb-4 p-4 bg-red-600 text-white rounded-xl shadow-lg">
                     <div class="flex items-center justify-center gap-3">
@@ -706,7 +706,7 @@ defmodule YscWeb.EventDetailsLive do
             </section>
 
             <%!-- Event Updates --%>
-            <section :if={@event_updates != []} class="space-y-6">
+            <section :if={@event_updates != []} class="flex flex-col gap-6">
               <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
                 <span class="w-8 h-px bg-zinc-200"></span> Updates
               </h3>
@@ -733,7 +733,7 @@ defmodule YscWeb.EventDetailsLive do
             </section>
 
             <%!-- Details --%>
-            <section class="space-y-6">
+            <section class="flex flex-col gap-6">
               <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
                 <span class="w-8 h-px bg-zinc-200"></span> Details
               </h3>
@@ -1872,7 +1872,7 @@ defmodule YscWeb.EventDetailsLive do
         </div>
         <!-- Right Panel: Price Breakdown -->
         <div class="lg:w-1/3 space-y-4 justify-between flex flex-col">
-          <div class="space-y-4">
+          <div class="flex flex-col gap-4">
             <div class="w-full hidden lg:block">
               <.live_component
                 id={"event-checkout-#{@event.id}"}
@@ -2701,7 +2701,7 @@ defmodule YscWeb.EventDetailsLive do
               </div>
               <!-- Checkout Zone: Payment Action Area -->
               <div class="mt-8 border-t border-zinc-200 pt-6">
-                <div class="max-w-md mx-auto space-y-4">
+                <div class="max-w-md mx-auto flex flex-col gap-4">
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-zinc-600">Amount due:</span>
                     <span class="text-2xl font-bold text-zinc-900">
@@ -2923,7 +2923,7 @@ defmodule YscWeb.EventDetailsLive do
                   (ticket_detail && ticket_detail.email) || ""
                 )
             } %>
-            <div class="border border-zinc-200 rounded-xl p-6 space-y-4">
+            <div class="border border-zinc-200 rounded-xl p-6 flex flex-col gap-4">
               <div class="flex items-center justify-between mb-4">
                 <div>
                   <h3 class="text-lg font-semibold text-zinc-900">
@@ -3046,7 +3046,7 @@ defmodule YscWeb.EventDetailsLive do
         <% tickets_requiring_registration =
           get_tickets_requiring_registration(@ticket_order.tickets || []) %>
         <%= if Enum.any?(tickets_requiring_registration) do %>
-          <div class="space-y-3 border-t border-zinc-200 pt-6">
+          <div class="flex flex-col gap-3 border-t border-zinc-200 pt-6">
             <h3 class="font-semibold text-lg mb-1">Ticket Registration</h3>
             <p class="text-base text-zinc-600 mb-4">
               Please provide details for each ticket that requires registration.
@@ -3131,7 +3131,7 @@ defmodule YscWeb.EventDetailsLive do
                     end
                 end %>
 
-              <div class="border border-zinc-200 rounded-xl p-4 space-y-4">
+              <div class="border border-zinc-200 rounded-xl p-4 flex flex-col gap-4">
                 <div class="flex items-center justify-between mb-2">
                   <div>
                     <h4 class="text-sm font-semibold text-zinc-900">

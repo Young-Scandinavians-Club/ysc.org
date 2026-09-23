@@ -168,7 +168,7 @@ defmodule YscWeb.BookingReceiptLive do
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
           <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
         </div>
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3">
           <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
           <div :for={_ <- 1..3} class="flex justify-between">
             <.skeleton_block class="h-4 w-28 rounded-sm" />
@@ -327,7 +327,7 @@ defmodule YscWeb.BookingReceiptLive do
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <!-- Left Column: Main Content -->
-        <div class="lg:col-span-2 space-y-8">
+        <div class="lg:col-span-2 flex flex-col gap-8">
           <%= if @booking.status == :canceled do %>
             <!-- Cancelled Booking Notice -->
             <div class="bg-red-50 border-2 border-red-300 rounded-lg p-6 mb-6">

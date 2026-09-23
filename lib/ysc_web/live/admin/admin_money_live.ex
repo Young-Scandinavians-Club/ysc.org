@@ -3016,7 +3016,7 @@ defmodule YscWeb.AdminMoneyLive do
       >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Payment Details</h3>
 
-        <div class="mb-6 space-y-4">
+        <div class="mb-6 flex flex-col gap-4">
           <!-- Payment Information -->
           <div class="grid grid-cols-2 gap-4">
             <div>

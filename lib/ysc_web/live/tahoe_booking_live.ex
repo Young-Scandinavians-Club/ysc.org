@@ -1310,7 +1310,7 @@ defmodule YscWeb.TahoeBookingLive do
             class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
           >
             <!-- Left Column: Selection Area (2 columns on large screens) -->
-            <div class="lg:col-span-2 space-y-8">
+            <div class="lg:col-span-2 flex flex-col gap-8">
               <!-- Step 1: Booking Mode Selection -->
               <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
                 <.step_heading id="booking-step-mode" step={1} class="mb-4">
@@ -2811,7 +2811,7 @@ defmodule YscWeb.TahoeBookingLive do
                       <h3 class="text-lg leading-6 font-medium text-zinc-900 mb-4">
                         Confirm Your Booking
                       </h3>
-                      <div class="mt-2 space-y-4">
+                      <div class="mt-2 flex flex-col gap-4">
                         <p class="text-sm text-zinc-500 mb-4">
                           Before confirming, please acknowledge the following requirements:
                         </p>

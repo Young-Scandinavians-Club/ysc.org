@@ -1255,7 +1255,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     :if={@calculated_price && @checkin_date && @checkout_date}
                     class="pt-4 border-t border-zinc-200"
                   >
-                    <div class="space-y-3">
+                    <div class="flex flex-col gap-3">
                       <!-- Price Breakdown -->
                       <div class="space-y-2 text-sm">
                         <span :if={@selected_booking_mode == :day}>
@@ -2272,7 +2272,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div
                 :if={Map.get(assigns, :info_tab, :general) == :rules}
                 id="cabin-rules"
-                class="space-y-16"
+                class="flex flex-col gap-16"
               >
                 <!-- Golden Rules Banner -->
                 <section class="bg-zinc-100 rounded-xl p-6 mb-12">

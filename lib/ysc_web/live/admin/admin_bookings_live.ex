@@ -1356,7 +1356,7 @@ defmodule YscWeb.AdminBookingsLive do
           Manage Refund Policy Rules
         </.header>
 
-        <div :if={@refund_policy} class="space-y-4">
+        <div :if={@refund_policy} class="flex flex-col gap-4">
           <div class="bg-blue-50 rounded-sm border border-blue-200 p-4 mb-4">
             <p class="text-sm font-semibold text-zinc-700 mb-1">
               {@refund_policy.name}

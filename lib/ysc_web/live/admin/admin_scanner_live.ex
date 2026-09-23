@@ -167,7 +167,7 @@ defmodule YscWeb.AdminScannerLive do
         <div
           :if={!@data_loaded?}
           id="scanner-session-detail-loading"
-          class="space-y-6"
+          class="flex flex-col gap-6"
           role="status"
           aria-live="polite"
         >

@@ -797,7 +797,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Sub-account: read-only view --%>
             <div
               :if={@is_sub_account}
-              class="rounded-sm border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -945,7 +945,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Lifetime membership: special case --%>
             <div
               :if={@active_plan_type == :lifetime && !@is_sub_account}
-              class="rounded-sm border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <.membership_status
@@ -1797,7 +1797,7 @@ defmodule YscWeb.UserSettingsLive do
           </.modal>
 
           <div :if={@live_action == :notifications} class="space-y-6">
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 flex flex-col gap-4">
               <h2 class="text-zinc-900 font-bold text-xl">
                 Notification Preferences
               </h2>

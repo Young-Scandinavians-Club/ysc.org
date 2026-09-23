@@ -880,7 +880,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 </div>
                 <div
                   :if={@selected_post_ids != [] && @picker_data_loaded?}
-                  class="mt-3 pt-3 border-t border-zinc-100 space-y-1.5"
+                  class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
                 >
                   <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
                     Selected ({length(@selected_post_ids)})
@@ -969,7 +969,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 </div>
                 <div
                   :if={@selected_event_ids != [] && @picker_data_loaded?}
-                  class="mt-3 pt-3 border-t border-zinc-100 space-y-1.5"
+                  class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
                 >
                   <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
                     Selected ({length(@selected_event_ids)})

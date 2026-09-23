@@ -333,7 +333,7 @@ defmodule YscWeb.AdminUsersLive do
                     for={@rejection_form}
                     id="reject-application-form"
                     phx-submit="deny-application"
-                    class="space-y-3"
+                    class="flex flex-col gap-3"
                   >
                     <p class="text-sm text-zinc-600">
                       Optional rejection note (internal use only; not sent to the applicant).

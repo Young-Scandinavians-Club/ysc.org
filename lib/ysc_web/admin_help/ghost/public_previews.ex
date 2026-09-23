@@ -129,7 +129,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
       >
         <.admin_ghost_image ratio="aspect-video" class="rounded-none" />
       </div>
-      <div class="max-w-2xl mx-auto space-y-3">
+      <div class="max-w-2xl mx-auto flex flex-col gap-3">
         <.admin_ghost_bar width="w-full" height="h-3" />
         <.admin_ghost_bar width="w-full" height="h-3" />
         <.admin_ghost_bar width="w-5/6" height="h-3" />

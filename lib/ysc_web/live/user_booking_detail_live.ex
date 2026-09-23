@@ -147,7 +147,7 @@ defmodule YscWeb.UserBookingDetailLive do
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
           <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
         </div>
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3">
           <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
           <div :for={_ <- 1..3} class="flex justify-between">
             <.skeleton_block class="h-4 w-28 rounded-sm" />
@@ -353,7 +353,7 @@ defmodule YscWeb.UserBookingDetailLive do
           <div
             :if={@loading_booking_payment_details}
             id="booking-payment-loading"
-            class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3"
+            class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3"
             role="status"
             aria-live="polite"
           >
