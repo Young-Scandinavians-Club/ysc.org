@@ -13,7 +13,6 @@ defmodule YscWeb.Emails.TahoeSummerBuyoutAvailable do
   import YscWeb.Emails.Helpers,
     only: [
       member_greeting_name: 1,
-      notification_settings_url: 0,
       tahoe_booking_url: 0
     ]
 
@@ -34,8 +33,7 @@ defmodule YscWeb.Emails.TahoeSummerBuyoutAvailable do
       first_name: member_greeting_name(user),
       cycle_label: cycle_label,
       weekend_range: format_weekend_range(weekend_checkin, weekend_checkout),
-      booking_url: tahoe_booking_url(),
-      notification_settings_url: notification_settings_url()
+      booking_url: tahoe_booking_url()
     }
   end
 

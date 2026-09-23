@@ -938,7 +938,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: nil,
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url: "https://example.com/users/notifications"
       }
 
       html = EventNotification.render(assigns)
@@ -969,7 +969,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: "https://example.com/images/event-cover.jpg",
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url: "https://example.com/users/notifications"
       }
 
       html = EventNotification.render(assigns)
@@ -1066,6 +1066,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           "2026/2027",
           user
         )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
+        )
 
       html = TahoeWinterWeekendAvailable.render(assigns)
       assert is_binary(html)
@@ -1073,6 +1077,28 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
 
       assert TahoeWinterWeekendAvailable.get_template_name() ==
                "tahoe_winter_weekend_available"
+    end
+
+    test "TahoeWinterWeekendAvailable renders using the legacy notification_settings_url assign when unsubscribe_url is absent",
+         %{user: user} do
+      # Guards against already-enqueued Oban jobs (persisted before this
+      # deploy) whose variables still carry notification_settings_url
+      # instead of unsubscribe_url.
+      assigns =
+        TahoeWinterWeekendAvailable.prepare_email_data(
+          ~D[2026-11-06],
+          ~D[2026-11-08],
+          "2026/2027",
+          user
+        )
+        |> Map.put(
+          :notification_settings_url,
+          "https://example.com/users/notifications"
+        )
+
+      html = TahoeWinterWeekendAvailable.render(assigns)
+      assert is_binary(html)
+      assert html =~ "https://example.com/users/notifications"
     end
 
     test "TahoeSummerBuyoutAvailable renders", %{user: user} do
@@ -1083,6 +1109,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           "2027",
           user
         )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
+        )
 
       html = TahoeSummerBuyoutAvailable.render(assigns)
       assert is_binary(html)
@@ -1090,6 +1120,28 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
 
       assert TahoeSummerBuyoutAvailable.get_template_name() ==
                "tahoe_summer_buyout_available"
+    end
+
+    test "TahoeSummerBuyoutAvailable renders using the legacy notification_settings_url assign when unsubscribe_url is absent",
+         %{user: user} do
+      # Guards against already-enqueued Oban jobs (persisted before this
+      # deploy) whose variables still carry notification_settings_url
+      # instead of unsubscribe_url.
+      assigns =
+        TahoeSummerBuyoutAvailable.prepare_email_data(
+          ~D[2027-05-07],
+          ~D[2027-05-09],
+          "2027",
+          user
+        )
+        |> Map.put(
+          :notification_settings_url,
+          "https://example.com/users/notifications"
+        )
+
+      html = TahoeSummerBuyoutAvailable.render(assigns)
+      assert is_binary(html)
+      assert html =~ "https://example.com/users/notifications"
     end
   end
 

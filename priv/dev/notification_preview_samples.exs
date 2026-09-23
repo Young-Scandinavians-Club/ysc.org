@@ -346,7 +346,8 @@
       event_date_time: "Jun 21, 2026 at 2:00 PM",
       event_url: "http://localhost:4000/events/preview",
       event_image_url: nil,
-      notification_settings_url: "http://localhost:4000/users/notifications"
+      unsubscribe_url:
+        "http://localhost:4000/event-notifications/unsubscribe/preview"
     },
     "event_photo_upload_reminder" => %{
       first_name: "Astrid",
@@ -703,14 +704,16 @@
       cycle_label: "2027",
       weekend_range: "May 7–9, 2027",
       booking_url: "http://localhost:4000/bookings/tahoe",
-      notification_settings_url: "http://localhost:4000/users/notifications"
+      unsubscribe_url:
+        "http://localhost:4000/event-notifications/unsubscribe/preview"
     },
     "tahoe_winter_weekend_available" => %{
       first_name: "Astrid",
       cycle_label: "2026/2027",
       weekend_range: "November 6–8, 2026",
       booking_url: "http://localhost:4000/bookings/tahoe",
-      notification_settings_url: "http://localhost:4000/users/notifications"
+      unsubscribe_url:
+        "http://localhost:4000/event-notifications/unsubscribe/preview"
     },
     "ticket_order_refund" => %{
       first_name: "Astrid",

@@ -85,6 +85,15 @@ defmodule YscWeb.Emails.Helpers do
   def notification_settings_url, do: absolute_url("/users/notifications")
 
   @doc """
+  Absolute URL for unsubscribing a specific user from event notifications
+  without signing in, mirroring the newsletter unsubscribe link.
+  """
+  def event_notification_unsubscribe_url(user_id) do
+    token = Ysc.Accounts.EventNotificationUnsubscribeToken.sign(user_id)
+    absolute_url("/event-notifications/unsubscribe/#{token}")
+  end
+
+  @doc """
   Absolute URL for Tahoe cabin booking.
   """
   def tahoe_booking_url, do: absolute_url("/bookings/tahoe")

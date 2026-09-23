@@ -121,10 +121,11 @@ defmodule YscWeb.Workers.EventNotificationWorker do
             subject: subject,
             template: template_name,
             variables:
-              Map.put(
-                shared,
-                :first_name,
-                EmailHelpers.member_greeting_name(user)
+              shared
+              |> Map.put(:first_name, EmailHelpers.member_greeting_name(user))
+              |> Map.put(
+                :unsubscribe_url,
+                EmailHelpers.event_notification_unsubscribe_url(user.id)
               ),
             text_body: "",
             user_id: user.id
