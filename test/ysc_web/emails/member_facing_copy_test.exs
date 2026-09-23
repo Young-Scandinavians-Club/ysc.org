@@ -538,7 +538,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           event_date_time: "Dec 1, 2026 at 7:00 PM PST",
           event_url: "https://example.com/events/preview",
           event_image_url: nil,
-          unsubscribe_url: "https://example.com/event-notifications/unsubscribe/token"
+          unsubscribe_url:
+            "https://example.com/event-notifications/unsubscribe/token"
         })
 
       text = html_text(html)

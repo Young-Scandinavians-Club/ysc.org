@@ -13,6 +13,7 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.EventNotificationUnsubscribeToken
+  alias Ysc.Repo
 
   describe "mount - invalid or missing token" do
     test "shows invalid link message for unknown token", %{conn: conn} do
@@ -85,7 +86,12 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
       conn: conn
     } do
       user = user_fixture(%{phone_number: "+14159098268"})
-      {:ok, user} = Accounts.update_notification_preferences(user, %{"event_notifications" => "false"})
+
+      {:ok, user} =
+        Accounts.update_notification_preferences(user, %{
+          "event_notifications" => "false"
+        })
+
       token = EventNotificationUnsubscribeToken.sign(user.id)
 
       {:ok, view, html} =
@@ -189,6 +195,25 @@ defmodule YscWeb.EventNotificationUnsubscribeLiveTest do
 
       updated = Accounts.get_user_by_email(user.email)
       assert updated.account_notifications == true
+    end
+  end
+
+  describe "unsubscribe action - failure" do
+    test "survives unsubscribe failure and shows contact guidance toast", %{
+      conn: conn
+    } do
+      user = user_fixture(%{phone_number: "+14159098268"})
+      token = EventNotificationUnsubscribeToken.sign(user.id)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/event-notifications/unsubscribe/#{token}")
+
+      Repo.delete!(user)
+
+      html = view |> element("button", "Unsubscribe") |> render_click()
+      assert is_binary(html)
+      assert html =~ "We couldn&#39;t unsubscribe you right now"
+      assert Accounts.get_user_by_email(user.email) == nil
     end
   end
 
