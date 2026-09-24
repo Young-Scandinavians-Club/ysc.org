@@ -325,6 +325,21 @@ defmodule Ysc.AccountsTest do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_list_household_guest_picker_users_query()
     end
+
+    test "ci_query_explain_list_household_dashboard_users_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_list_household_dashboard_users_query()
+    end
+
+    test "ci_query_explain_household_board_member_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_household_board_member_query()
+    end
+
+    test "ci_query_explain_household_user_ids_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_household_user_ids_query()
+    end
   end
 
   describe "get_user_by_phone_number/1" do
@@ -617,7 +632,8 @@ defmodule Ysc.AccountsTest do
       assert hd(sub_accounts).id == sub.id
     end
 
-    test "list_household_guest_picker_users slims name fields only", %{} do
+    test "list_household_guest_picker_users slims name and email fields only",
+         %{} do
       primary =
         user_fixture(%{
           phone_number: "+14159098301",
@@ -654,7 +670,104 @@ defmodule Ysc.AccountsTest do
       assert sub.id in ids
       assert Enum.all?(members, &is_nil(&1.hashed_password))
       assert Enum.all?(members, &is_nil(&1.board_bio))
+      assert Enum.any?(members, &(&1.email == primary.email))
       assert password_cols == 0
+    end
+
+    test "list_household_dashboard_users slims name, relationship, and avatar",
+         %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098360",
+          first_name: "Dana",
+          last_name: "Dashboard"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "dashboard must not load this bio",
+          board_position: :treasurer
+        })
+        |> Repo.update!()
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098361",
+          first_name: "Sam",
+          last_name: "Dashboard"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{family_relationship: "spouse"})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_household_dashboard_users(primary) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_members, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_household_dashboard_users(sub) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      by_id = Map.new(loaded, &{&1.id, &1})
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert map_size(by_id) == 2
+      assert by_id[primary.id].first_name == "Dana"
+      assert by_id[primary.id].board_position == :treasurer
+      assert by_id[sub.id].family_relationship == :spouse
+      assert Enum.all?(loaded, &is_nil(&1.hashed_password))
+      assert Enum.all?(loaded, &is_nil(&1.board_bio))
+      assert Enum.all?(loaded, &Ecto.assoc_loaded?(&1.current_avatar))
+    end
+
+    test "household_board_member slims board identity without password hashes",
+         %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098362",
+          first_name: "Bo",
+          last_name: "Ard"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "board member must not load this bio"
+        })
+        |> Repo.update!()
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098363",
+          first_name: "Kid",
+          last_name: "Ard"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{board_position: :vice_president})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {member, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.household_board_member(primary) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert member.id == sub.id
+      assert member.first_name == "Kid"
+      assert member.board_position == :vice_president
+      assert is_nil(member.hashed_password)
+      assert is_nil(member.board_bio)
+      assert is_nil(Accounts.household_board_member(user_fixture()))
     end
 
     test "get_family_group_user_ids returns all family user ids", %{} do
@@ -671,6 +784,16 @@ defmodule Ysc.AccountsTest do
       assert length(ids) == 2
       assert primary.id in ids
       assert sub.id in ids
+
+      {from_sub, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_family_group_user_ids(sub) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert Enum.sort(from_sub) == Enum.sort(ids)
+      assert password_cols == 0
     end
 
     test "remove_sub_account clears primary_user_id", %{} do
