@@ -1,4 +1,14 @@
+import { loadScript } from "./load_external_asset";
 import { pushEventToIfConnected } from "./live_view_safe_push";
+
+const TURNSTILE_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+// Longest a submit waits for a token before going through anyway (the server
+// then rejects it and refreshes the widget).
+const SUBMIT_HOLD_MS = 15000;
+
+// Interaction that means someone is filling in the form.
+const INTERACTION_EVENTS = ["focusin", "pointerdown", "input"];
 
 function callbackEvent(self, name, eventName) {
     return (payload) => {
@@ -12,69 +22,168 @@ function callbackEvent(self, name, eventName) {
     };
 }
 
-// Wait for Turnstile library to be available
-function waitForTurnstile(callback, maxAttempts = 50, attempt = 0) {
-    if (typeof window.turnstile !== "undefined") {
-        callback();
-    } else if (attempt < maxAttempts) {
-        // Check every 100ms for up to 5 seconds
-        setTimeout(() => {
-            waitForTurnstile(callback, maxAttempts, attempt + 1);
-        }, 100);
-    } else {
-        console.error(
-            "Turnstile library failed to load after 5 seconds. Please check your internet connection and CSP settings.",
-        );
-    }
-}
-
+/**
+ * Cloudflare Turnstile widget hook.
+ *
+ * The Turnstile script (~28 KB) is not in the root layout; it loads the first
+ * time a widget needs it. Invisible widgets (`appearance="interaction-only"`,
+ * e.g. the homepage newsletter form) wait until someone interacts with their
+ * form. Visible widgets load on mount so the box doesn't pop in and shift the
+ * layout.
+ *
+ * A submit that happens before a token exists (fast typing, password-manager
+ * autofill) is held and re-sent once Turnstile returns a token, errors out, or
+ * SUBMIT_HOLD_MS passes.
+ */
 export const Turnstile = {
     mounted() {
         this._turnstileDestroyed = false;
+        this.form = this.el.closest("form");
 
-        waitForTurnstile(() => {
-            if (this._turnstileDestroyed || !this.el?.isConnected) return;
-            turnstile.render(this.el, {
-                theme: "light",
-                callback: callbackEvent(this, "success"),
-                "error-callback": callbackEvent(this, "error"),
-                "expired-callback": callbackEvent(this, "expired"),
-                "before-interactive-callback": callbackEvent(
-                    this,
-                    "beforeInteractive",
-                    "before-interactive",
-                ),
-                "after-interactive-callback": callbackEvent(
-                    this,
-                    "afterInteractive",
-                    "after-interactive",
-                ),
-                "unsupported-callback": callbackEvent(this, "unsupported"),
-                "timeout-callback": callbackEvent(this, "timeout"),
-            });
-        });
+        const interactionOnly = this.el.dataset.appearance === "interaction-only";
+
+        if (this.form) {
+            this.onSubmit = (e) => this.holdSubmitUntilToken(e);
+            // Capture on the form runs before LiveView's window-level submit listener.
+            this.form.addEventListener("submit", this.onSubmit, true);
+        }
+
+        if (!interactionOnly || !this.form || this.formTouched()) {
+            this.load();
+        } else {
+            this.onInteraction = () => this.load();
+            INTERACTION_EVENTS.forEach((type) =>
+                this.form.addEventListener(type, this.onInteraction, { passive: true }),
+            );
+        }
 
         this.handleEvent("turnstile:refresh", (event) => {
             if (!event.id || event.id === this.el.id) {
-                waitForTurnstile(() => {
-                    if (this._turnstileDestroyed || !this.el?.isConnected) return;
-                    turnstile.reset(this.el);
-                });
+                this.withWidget((turnstile) => turnstile.reset(this.el));
             }
         });
 
         this.handleEvent("turnstile:remove", (event) => {
             if (!event.id || event.id === this.el.id) {
-                waitForTurnstile(() => {
-                    if (this._turnstileDestroyed || !this.el?.isConnected) return;
-                    turnstile.remove(this.el);
-                });
+                this.withWidget((turnstile) => turnstile.remove(this.el));
             }
         });
     },
 
     destroyed() {
         this._turnstileDestroyed = true;
+        this.stopListeningForInteraction();
+        if (this.form && this.onSubmit) {
+            this.form.removeEventListener("submit", this.onSubmit, true);
+        }
+        clearTimeout(this.holdTimer);
+    },
+
+    // Typed or focused before the hook mounted (static render, slow socket).
+    formTouched() {
+        if (this.form.contains(document.activeElement)) return true;
+        return Array.from(this.form.elements).some(
+            (el) => el.type !== "hidden" && typeof el.value === "string" && el.value !== "",
+        );
+    },
+
+    stopListeningForInteraction() {
+        if (!this.form || !this.onInteraction) return;
+        INTERACTION_EVENTS.forEach((type) =>
+            this.form.removeEventListener(type, this.onInteraction),
+        );
+        this.onInteraction = null;
+    },
+
+    load() {
+        this.stopListeningForInteraction();
+        if (this.loadPromise) return this.loadPromise;
+
+        this.loadPromise = loadScript("cf-turnstile-js", TURNSTILE_SRC)
+            .then(() => this.render())
+            .catch(() => {
+                console.error(
+                    "Turnstile library failed to load. Please check your internet connection and CSP settings.",
+                );
+                // Let the server decide rather than holding the submit forever.
+                this.releaseHeldSubmit();
+            });
+
+        return this.loadPromise;
+    },
+
+    render() {
+        if (this._turnstileDestroyed || !this.el?.isConnected || this.rendered) return;
+        if (typeof window.turnstile === "undefined") return;
+
+        const releaseThen = (fn) => (payload) => {
+            this.releaseHeldSubmit();
+            fn(payload);
+        };
+
+        window.turnstile.render(this.el, {
+            theme: "light",
+            callback: releaseThen(callbackEvent(this, "success")),
+            "error-callback": releaseThen(callbackEvent(this, "error")),
+            "expired-callback": callbackEvent(this, "expired"),
+            "before-interactive-callback": callbackEvent(
+                this,
+                "beforeInteractive",
+                "before-interactive",
+            ),
+            "after-interactive-callback": callbackEvent(
+                this,
+                "afterInteractive",
+                "after-interactive",
+            ),
+            "unsupported-callback": releaseThen(callbackEvent(this, "unsupported")),
+            "timeout-callback": releaseThen(callbackEvent(this, "timeout")),
+        });
+        this.rendered = true;
+    },
+
+    // Refresh/remove are no-ops until the widget exists; a lazily rendered
+    // widget starts fresh anyway.
+    withWidget(fn) {
+        if (this._turnstileDestroyed || !this.el?.isConnected) return;
+        if (!this.rendered || typeof window.turnstile === "undefined") return;
+        fn(window.turnstile);
+    },
+
+    hasToken() {
+        const input = this.el.querySelector('input[name="cf-turnstile-response"]');
+        return !!(input && input.value);
+    },
+
+    holdSubmitUntilToken(e) {
+        if (this.releasing || this.hasToken()) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const submitter = e.submitter;
+        this.heldSubmit = () => {
+            if (!this.form?.isConnected) return;
+            const stillInForm = submitter && this.form.contains(submitter);
+            this.releasing = true;
+            try {
+                this.form.requestSubmit(stillInForm ? submitter : undefined);
+            } finally {
+                this.releasing = false;
+            }
+        };
+
+        clearTimeout(this.holdTimer);
+        this.holdTimer = setTimeout(() => this.releaseHeldSubmit(), SUBMIT_HOLD_MS);
+        this.load();
+    },
+
+    releaseHeldSubmit() {
+        clearTimeout(this.holdTimer);
+        const held = this.heldSubmit;
+        this.heldSubmit = null;
+        // Next tick, so Turnstile has filled its hidden input before we re-submit.
+        if (held) setTimeout(() => !this._turnstileDestroyed && held(), 0);
     },
 };
 
