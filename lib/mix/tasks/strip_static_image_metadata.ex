@@ -28,6 +28,9 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
   @vp8x_exif_flag 0x08
   @vp8x_xmp_flag 0x04
 
+  # Chunks that carry the actual image (still, lossless, or animated)
+  @webp_image_chunks ["VP8 ", "VP8L", "ANIM"]
+
   @png_signature <<137, "PNG", 13, 10, 26, 10>>
   @png_metadata_chunks ["eXIf", "tEXt", "zTXt", "iTXt"]
 
@@ -87,18 +90,29 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
   defp strip_file(path) do
     with {:ok, data} <- File.read(path),
          {:ok, stripped} <- strip(data, extension(path)) do
-      tmp = Path.rootname(path) <> ".strip_tmp" <> Path.extname(path)
-      File.write!(tmp, stripped)
-      File.rename!(tmp, path)
-
-      Mix.shell().info(
-        "  ✓ Stripped metadata: #{path} (#{byte_size(data)} → #{byte_size(stripped)} bytes)"
-      )
+      replace_file(path, data, stripped)
     else
       :unchanged ->
         :ok
 
       {:error, reason} ->
+        Mix.shell().error("  ✗ Skipped #{path}: #{inspect(reason)}")
+    end
+  end
+
+  # Writes to a temp file then renames, so a failure never leaves a partial
+  # image. Errors are logged and skipped rather than aborting the asset build.
+  defp replace_file(path, original, stripped) do
+    tmp = Path.rootname(path) <> ".strip_tmp" <> Path.extname(path)
+
+    with :ok <- File.write(tmp, stripped),
+         :ok <- File.rename(tmp, path) do
+      Mix.shell().info(
+        "  ✓ Stripped metadata: #{path} (#{byte_size(original)} → #{byte_size(stripped)} bytes)"
+      )
+    else
+      {:error, reason} ->
+        _ = File.rm(tmp)
         Mix.shell().error("  ✗ Skipped #{path}: #{inspect(reason)}")
     end
   end
@@ -112,9 +126,12 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
   defp strip_jpeg(_data), do: {:error, :invalid_jpeg}
 
   defp strip_jpeg_segments(<<0xFF, 0xDA, _::binary>> = scan, acc, stripped?) do
-    if stripped?,
-      do: {:ok, IO.iodata_to_binary(Enum.reverse([scan | acc]))},
-      else: :unchanged
+    cond do
+      not Enum.any?(acc, &jpeg_frame_header?/1) -> {:error, :invalid_jpeg}
+      not jpeg_scan_complete?(scan) -> {:error, :invalid_jpeg}
+      stripped? -> {:ok, IO.iodata_to_binary(Enum.reverse([scan | acc]))}
+      true -> :unchanged
+    end
   end
 
   # Fill bytes: any marker may be preceded by extra 0xFF padding.
@@ -141,10 +158,33 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
   defp strip_jpeg_segments(_data, _acc, _stripped?),
     do: {:error, :invalid_jpeg}
 
+  # SOFn markers (0xC0-0xCF) except DHT (C4), JPG (C8) and DAC (CC).
+  defp jpeg_frame_header?(<<0xFF, marker, _::binary>>),
+    do: marker in 0xC0..0xCF and marker not in [0xC4, 0xC8, 0xCC]
+
+  defp jpeg_frame_header?(_segment), do: false
+
+  # SOS header, then entropy-coded data, then EOI. 0xFF bytes inside scan data
+  # are always stuffed or restart markers, so FF D9 can only be EOI.
+  defp jpeg_scan_complete?(<<0xFF, 0xDA, length::16, rest::binary>>)
+       when byte_size(rest) > length do
+    header_size = length - 2
+    <<_header::binary-size(^header_size), scan_data::binary>> = rest
+
+    case :binary.match(scan_data, <<0xFF, 0xD9>>) do
+      {pos, 2} -> pos > 0
+      :nomatch -> false
+    end
+  end
+
+  defp jpeg_scan_complete?(_scan), do: false
+
   # WebP: drop the EXIF and XMP RIFF chunks and clear their VP8X feature flags.
 
-  defp strip_webp(<<"RIFF", _size::little-32, "WEBP", body::binary>>) do
-    with {:ok, chunks} <- parse_riff_chunks(body, []) do
+  defp strip_webp(<<"RIFF", size::little-32, "WEBP", body::binary>>)
+       when size == byte_size(body) + 4 do
+    with {:ok, chunks} <- parse_riff_chunks(body, []),
+         :ok <- validate_webp(chunks) do
       kept =
         Enum.reject(chunks, fn {fourcc, _} -> fourcc in ["EXIF", "XMP "] end)
 
@@ -163,6 +203,12 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
   end
 
   defp strip_webp(_data), do: {:error, :invalid_webp}
+
+  defp validate_webp(chunks) do
+    if Enum.any?(chunks, fn {fourcc, _} -> fourcc in @webp_image_chunks end),
+      do: :ok,
+      else: {:error, :invalid_webp}
+  end
 
   defp parse_riff_chunks(<<>>, acc), do: {:ok, Enum.reverse(acc)}
 
@@ -200,7 +246,8 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
   # PNG: drop EXIF and textual chunks (XMP lives in iTXt). iCCP is kept.
 
   defp strip_png(<<@png_signature, body::binary>>) do
-    with {:ok, chunks, trailer} <- parse_png_chunks(body, []) do
+    with {:ok, chunks, trailer} <- parse_png_chunks(body, []),
+         :ok <- validate_png(chunks) do
       kept =
         Enum.reject(chunks, fn {type, _raw} -> type in @png_metadata_chunks end)
 
@@ -214,6 +261,14 @@ defmodule Mix.Tasks.StripStaticImageMetadata do
   end
 
   defp strip_png(_data), do: {:error, :invalid_png}
+
+  defp validate_png([{"IHDR", _} | _] = chunks) do
+    if Enum.any?(chunks, &match?({"IDAT", _}, &1)),
+      do: :ok,
+      else: {:error, :invalid_png}
+  end
+
+  defp validate_png(_chunks), do: {:error, :invalid_png}
 
   defp parse_png_chunks(
          <<length::32, type::binary-4, rest::binary>> = data,

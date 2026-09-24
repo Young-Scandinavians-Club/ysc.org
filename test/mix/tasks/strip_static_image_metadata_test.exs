@@ -53,6 +53,70 @@ defmodule Mix.Tasks.StripStaticImageMetadataTest do
       assert {:error, :invalid_webp} =
                StripStaticImageMetadata.strip(truncated, ".webp")
     end
+
+    test "rejects a JPEG whose scan has no end-of-image marker" do
+      jpeg = encode_with_xmp(".jpg")
+      no_eoi = binary_part(jpeg, 0, byte_size(jpeg) - 2)
+
+      assert {:error, :invalid_jpeg} =
+               StripStaticImageMetadata.strip(no_eoi, ".jpg")
+    end
+
+    test "rejects a JPEG with no frame header before the scan" do
+      xmp = "http://ns.adobe.com/xap/1.0/" <> <<0>> <> @xmp
+      sos_header = <<1, 1, 0, 0, 63, 0>>
+
+      jpeg =
+        <<0xFF, 0xD8, 0xFF, 0xE1, byte_size(xmp) + 2::16, xmp::binary, 0xFF,
+          0xDA, byte_size(sos_header) + 2::16, sos_header::binary, 1, 2, 3,
+          0xFF, 0xD9>>
+
+      assert {:error, :invalid_jpeg} =
+               StripStaticImageMetadata.strip(jpeg, ".jpg")
+    end
+
+    test "rejects a WebP whose RIFF size does not match the file" do
+      webp = encode_with_xmp(".webp") <> <<0, 0>>
+
+      assert {:error, :invalid_webp} =
+               StripStaticImageMetadata.strip(webp, ".webp")
+    end
+
+    test "rejects a WebP with no image chunk" do
+      xmp_chunk = <<"XMP ", byte_size(@xmp)::little-32, @xmp::binary>>
+
+      xmp_chunk =
+        if rem(byte_size(@xmp), 2) == 1, do: xmp_chunk <> <<0>>, else: xmp_chunk
+
+      webp =
+        <<"RIFF", byte_size(xmp_chunk) + 4::little-32, "WEBP",
+          xmp_chunk::binary>>
+
+      assert {:error, :invalid_webp} =
+               StripStaticImageMetadata.strip(webp, ".webp")
+    end
+
+    test "rejects a PNG without IHDR first or without IDAT" do
+      <<signature::binary-8, ihdr::binary-25, _::binary>> =
+        png = encode_with_xmp(".png")
+
+      iend = binary_part(png, byte_size(png) - 12, 12)
+      text = png_chunk("tEXt", "Comment" <> <<0>> <> "hi")
+
+      assert {:error, :invalid_png} =
+               StripStaticImageMetadata.strip(
+                 signature <> ihdr <> text <> iend,
+                 ".png"
+               )
+
+      assert {:error, :invalid_png} =
+               StripStaticImageMetadata.strip(signature <> text <> iend, ".png")
+    end
+  end
+
+  defp png_chunk(type, data) do
+    crc = :erlang.crc32(type <> data)
+    <<byte_size(data)::32, type::binary, data::binary, crc::32>>
   end
 
   defp encode_with_xmp(ext) do
