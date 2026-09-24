@@ -4574,6 +4574,15 @@ defmodule YscWeb.AdminBookingsLive do
              )}
         end
 
+      {:error, :hold_payment_already_succeeded} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :info,
+           "This hold already had a succeeded Stripe payment, so it was confirmed instead of deleted.",
+           title: "Booking"
+         )}
+
       {:error, reason} ->
         {:noreply,
          YscWeb.Flash.put_toast(
@@ -6429,7 +6438,16 @@ defmodule YscWeb.AdminBookingsLive do
   # first leaves it permanently stuck as held/booked with no booking left to
   # explain it.
   defp release_inventory_before_delete(%{status: :hold} = booking) do
-    normalize_release_result(BookingLocker.release_hold(booking.id))
+    case BookingLocker.release_hold_with_stripe_reconcile(booking.id) do
+      {:ok, _booking} ->
+        :ok
+
+      {:confirmed, _booking} ->
+        {:error, :hold_payment_already_succeeded}
+
+      {:error, reason} ->
+        normalize_release_result({:error, reason})
+    end
   end
 
   defp release_inventory_before_delete(%{status: :complete} = booking) do
@@ -6458,8 +6476,9 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp release_booking_availability_after_refund(%{status: :hold} = booking) do
-    case BookingLocker.release_hold(booking.id) do
+    case BookingLocker.release_hold_with_stripe_reconcile(booking.id) do
       {:ok, _booking} -> :ok
+      {:confirmed, _booking} -> {:error, :hold_payment_already_succeeded}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -6913,8 +6932,22 @@ defmodule YscWeb.AdminBookingsLive do
          _room_id,
          _rooms
        ) do
-    BookingLocker.release_hold(booking.id)
-    |> handle_admin_cancel_result(socket, booking, :canceled)
+    case BookingLocker.release_hold_with_stripe_reconcile(booking.id) do
+      {:ok, canceled} ->
+        handle_admin_cancel_result({:ok, canceled}, socket, booking, :canceled)
+
+      {:confirmed, confirmed} ->
+        {:noreply,
+         socket
+         |> assign(:booking, confirmed)
+         |> admin_booking_save_success(
+           "updated",
+           "This hold already had a succeeded Stripe payment, so it was confirmed instead of canceled."
+         )}
+
+      {:error, reason} ->
+        handle_admin_cancel_result({:error, reason}, socket, booking, :canceled)
+    end
   end
 
   defp cancel_or_refund_existing_admin_booking(

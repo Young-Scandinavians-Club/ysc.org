@@ -290,6 +290,14 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.cancel_refund_error({:cancellation_failed, nil}) =~
              "couldn't cancel your booking"
 
+    assert BookingUserMessages.cancel_refund_error(
+             {:cancellation_failed, :payment_in_progress}
+           ) =~
+             "still processing"
+
+    assert BookingUserMessages.hold_cancel_payment_already_confirmed() =~
+             "payment already went through"
+
     refute BookingUserMessages.cancel_refund_error({:payment_not_found, nil}) =~
              "reservation"
 

@@ -4,10 +4,10 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
   paid/granted ticket order for the event so they can refund whoever hasn't
   been refunded yet, without hunting through the Tickets tab order by order.
 
-  Orders that can't be refunded here (already refunded, free/no payment
-  collected, paid in person, or cancelled with no refund on record) are shown
-  with a status badge explaining why instead of a checkbox, so the admin can
-  see at a glance who still needs action.
+  Orders that can't be refunded here (already fully refunded, only partially
+  refunded, free/no payment collected, paid in person, or cancelled with no
+  refund on record) are shown with a status badge explaining why instead of a
+  checkbox, so the admin can see at a glance who still needs action.
   """
   use YscWeb, :live_component
 
@@ -102,6 +102,9 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
                 <.badge :if={entry.state == :refunded} type="green">
                   Refunded
                 </.badge>
+                <.badge :if={entry.state == :partially_refunded} type="red">
+                  Partially refunded — check manually
+                </.badge>
                 <.badge :if={entry.state == :no_payment} type="zinc">
                   No payment — nothing to refund
                 </.badge>
@@ -183,14 +186,20 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
       socket.assigns.event_id
       |> Tickets.list_orders_for_event_refund()
 
-    refunded_payment_ids =
+    # Sum of ledger refunds per payment — existence alone is not enough: a
+    # partial Money-tab refund that also released tickets would otherwise look
+    # fully "Refunded" while money remained on the charge.
+    refund_totals_by_payment_id =
       raw_orders
       |> cancelled_paid_payment_ids()
-      |> Ledgers.payment_ids_with_refunds()
+      |> Ledgers.refund_totals_by_payment_id()
 
     orders =
       Enum.map(raw_orders, fn order ->
-        Map.merge(%{order: order}, classify_order(order, refunded_payment_ids))
+        Map.merge(
+          %{order: order},
+          classify_order(order, refund_totals_by_payment_id)
+        )
       end)
 
     refundable_order_ids =
@@ -228,7 +237,7 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
   #   can't be resolved to a refundable ticket set
   # - `:refundable` otherwise, carrying the still-active ticket ids and the
   #   amount a refund of all of them would issue
-  defp classify_order(order, refunded_payment_ids) do
+  defp classify_order(order, refund_totals_by_payment_id) do
     active_ticket_ids =
       order.tickets
       |> Enum.filter(&(&1.status in [:confirmed, :pending]))
@@ -243,7 +252,7 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
         }
 
       active_ticket_ids == [] ->
-        classify_cancelled_order(order, refunded_payment_ids)
+        classify_cancelled_order(order, refund_totals_by_payment_id)
 
       is_nil(order.payment_id) || is_nil(order.total_amount) ||
           Money.zero?(order.total_amount) ->
@@ -270,25 +279,50 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
 
   # An order with no active tickets left either never collected any money
   # (free/admin grant, or an abandoned unpaid checkout -- `payment_id` is nil
-  # either way) or was fully refunded. `Tickets.refund_tickets/3` cancels
-  # tickets without itself touching Stripe or the ledger, so don't infer
-  # "refunded" just from the tickets being gone -- every current caller
-  # refunds via `Tickets.refund_via_stripe/4` (which records a
-  # `Ysc.Ledgers.Refund`) first, but trusting that call order would silently
-  # hide a real gap if that ever changed. Check the ledger instead, and flag
-  # a cancelled order with money on file but no recorded refund for manual
-  # follow-up rather than mislabeling it "Refunded".
-  defp classify_cancelled_order(%{payment_id: nil}, _refunded_payment_ids) do
+  # either way) or was cancelled after a refund. `Tickets.refund_tickets/3`
+  # cancels tickets without itself touching Stripe or the ledger, so don't
+  # infer "refunded" just from the tickets being gone. Require ledger refunds
+  # that cover the order total — a *partial* refund (e.g. Money-tab amount
+  # refund + "release tickets") must not hide the remaining balance behind a
+  # green "Refunded" badge.
+  defp classify_cancelled_order(%{payment_id: nil}, _refund_totals) do
     %{state: :no_payment, active_ticket_ids: [], amount: nil}
   end
 
-  defp classify_cancelled_order(%{payment_id: payment_id}, refunded_payment_ids) do
-    if MapSet.member?(refunded_payment_ids, payment_id) do
-      %{state: :refunded, active_ticket_ids: [], amount: nil}
-    else
-      %{state: :unrefunded_cancelled, active_ticket_ids: [], amount: nil}
+  defp classify_cancelled_order(
+         %{payment_id: payment_id, total_amount: total_amount},
+         refund_totals
+       ) do
+    case Map.get(refund_totals, payment_id) do
+      nil ->
+        %{state: :unrefunded_cancelled, active_ticket_ids: [], amount: nil}
+
+      refunded ->
+        cond do
+          refund_covers_order?(refunded, total_amount) ->
+            %{state: :refunded, active_ticket_ids: [], amount: nil}
+
+          Money.positive?(refunded) ->
+            %{state: :partially_refunded, active_ticket_ids: [], amount: nil}
+
+          true ->
+            %{state: :unrefunded_cancelled, active_ticket_ids: [], amount: nil}
+        end
     end
   end
+
+  defp refund_covers_order?(_refunded, nil), do: false
+
+  defp refund_covers_order?(refunded, %Money{} = total_amount) do
+    # Money.cmp/2 returns -1 / 0 / 1 (not :lt/:eq/:gt).
+    case Money.cmp(refunded, total_amount) do
+      n when is_integer(n) and n < 0 -> false
+      n when is_integer(n) -> true
+      _ -> false
+    end
+  end
+
+  defp refund_covers_order?(_, _), do: false
 
   defp offline_payment_label("cash"), do: "cash"
   defp offline_payment_label("check"), do: "check"

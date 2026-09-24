@@ -4032,6 +4032,74 @@ defmodule Ysc.LedgersTest do
       refute MapSet.member?(found, without_refund.id)
     end
 
+    test "refund_totals_by_payment_id/1 sums refunds per payment in one query",
+         %{user: user} do
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_refund_totals_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {other, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(5_000, :USD),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_refund_totals_other_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, _} =
+               Ledgers.process_refund(%{
+                 payment_id: payment.id,
+                 refund_amount: Money.new(2_000, :USD),
+                 reason: "First",
+                 external_refund_id:
+                   "re_totals_a_#{System.unique_integer([:positive])}"
+               })
+
+      assert {:ok, _} =
+               Ledgers.process_refund(%{
+                 payment_id: payment.id,
+                 refund_amount: Money.new(3_000, :USD),
+                 reason: "Second",
+                 external_refund_id:
+                   "re_totals_b_#{System.unique_integer([:positive])}"
+               })
+
+      {totals, refund_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.refund_totals_by_payment_id([payment.id, other.id, nil])
+          end,
+          pattern: ~r/FROM "refunds"/i,
+          caller_pids: [self()]
+        )
+
+      assert refund_queries == 1
+
+      assert Money.equal?(
+               Map.fetch!(totals, payment.id),
+               Money.new(5_000, :USD)
+             )
+
+      refute Map.has_key?(totals, other.id)
+      assert Ledgers.refund_totals_by_payment_id([]) == %{}
+    end
+
     test "list_ledger_entries_for_payment/1 slims account copy", %{user: user} do
       {:ok, {payment, _, _}} =
         Ledgers.process_payment(%{
@@ -8148,6 +8216,9 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
 
       assert %Ecto.Query{} =
                Ledgers.ci_query_explain_payment_ids_with_refunds_query()
+
+      assert %Ecto.Query{} =
+               Ledgers.ci_query_explain_refund_totals_by_payment_id_query()
 
       assert %Ecto.Query{} =
                Ledgers.ci_query_explain_list_ledger_entries_for_payment_query()
