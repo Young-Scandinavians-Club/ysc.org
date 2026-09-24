@@ -3,7 +3,8 @@ defmodule YscWeb.GuestTurnstile do
   Shared Cloudflare Turnstile verification for public forms.
 
   Contact, volunteer, and conduct-report LiveViews skip the widget for
-  signed-in members. Registration always verifies. Failed checks toast the
+  signed-in members. Registration always verifies. Contact and volunteer also
+  reject a missing token (`require_token: true`). Failed checks toast the
   same copy and refresh the widget. Guest newsletter signups use
   `verify_token/2` and `refresh/1` directly to show their own inline error.
 
@@ -22,6 +23,11 @@ defmodule YscWeb.GuestTurnstile do
       GuestTurnstile.verify(socket, params,
         title: "Registration",
         required: true
+      )
+
+      GuestTurnstile.verify(socket, params,
+        title: "Contact",
+        require_token: true
       )
   """
 
@@ -50,14 +56,17 @@ defmodule YscWeb.GuestTurnstile do
     * `:title` — required toast title on failure
     * `:required` — when `true`, always verify (registration). When `false`
       (default), signed-in members skip the check.
+    * `:require_token` — when `true`, a missing or blank token fails the check
+      without calling Cloudflare (see `verify_token/2`). Default `false`.
   """
   def verify(socket, params, opts) when is_map(params) and is_list(opts) do
     title = Keyword.fetch!(opts, :title)
     required? = Keyword.get(opts, :required, false)
+    require_token? = Keyword.get(opts, :require_token, false)
 
     if required? or not signed_in?(socket) do
-      case module().verify(params, socket.assigns.remote_ip) do
-        {:ok, _} -> :ok
+      case check(params, socket.assigns.remote_ip, require_token?) do
+        :ok -> :ok
         {:error, _} -> {:error, reject(socket, title)}
       end
     else
@@ -90,6 +99,15 @@ defmodule YscWeb.GuestTurnstile do
   Resets the Turnstile widget on the client after a failed check.
   """
   def refresh(socket), do: module().refresh(socket)
+
+  defp check(params, remote_ip, true), do: verify_token(params, remote_ip)
+
+  defp check(params, remote_ip, false) do
+    case module().verify(params, remote_ip) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   defp reject(socket, title) do
     socket

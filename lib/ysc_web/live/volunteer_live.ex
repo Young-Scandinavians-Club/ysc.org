@@ -183,7 +183,10 @@ defmodule YscWeb.VolunteerLive do
       |> Ysc.Forms.Volunteer.changeset(volunteer_params)
       |> Ysc.Forms.put_submitter(socket.assigns[:current_user])
 
-    case YscWeb.GuestTurnstile.verify(socket, values, title: "Volunteer") do
+    case YscWeb.GuestTurnstile.verify(socket, values,
+           title: "Volunteer",
+           require_token: true
+         ) do
       :ok ->
         case Ysc.Forms.create_volunteer(changeset) do
           {:ok, _volunteer} ->
