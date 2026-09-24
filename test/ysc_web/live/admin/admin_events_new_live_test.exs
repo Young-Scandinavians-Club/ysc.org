@@ -524,6 +524,29 @@ defmodule YscWeb.AdminEventsNewLiveTest do
              "expected a single agenda stream item (no duplicate PubSub + handler insert)"
     end
 
+    test "delete-agenda from another event is refused and toasts", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_a =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Owner A"})
+
+      event_b =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Owner B"})
+
+      {:ok, agenda_b} =
+        Agendas.create_agenda(event_b, %{title: "Victim Day"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/edit")
+
+      html = render_click(view, "delete-agenda", %{"id" => agenda_b.id})
+
+      assert html =~ "That agenda does not belong to this event."
+      assert Agendas.get_agenda!(agenda_b.id).id == agenda_b.id
+      assert [%{id: id}] = Agendas.list_agendas_for_event(event_b.id)
+      assert id == agenda_b.id
+    end
+
     test "shows Hosts section on edit tab", %{conn: conn, admin: admin} do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
