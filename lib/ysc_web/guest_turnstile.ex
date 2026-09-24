@@ -3,8 +3,11 @@ defmodule YscWeb.GuestTurnstile do
   Shared Cloudflare Turnstile verification for public forms.
 
   Contact, volunteer, and conduct-report LiveViews skip the widget for
-  signed-in members. Registration always verifies. Failed checks toast the
-  same copy and refresh the widget.
+  signed-in members. Registration always verifies. A missing or blank token
+  fails without calling Cloudflare, so clients can't bypass the check by
+  omitting the field. Failed checks toast the same copy and refresh the
+  widget. Guest newsletter signups use `verify_token/2` and `refresh/1`
+  directly to show their own inline error.
 
   Resolves the Turnstile module from `:phoenix_turnstile, :turnstile_module`
   so tests can stub `TurnstileMock`.
@@ -23,6 +26,8 @@ defmodule YscWeb.GuestTurnstile do
         required: true
       )
   """
+
+  @token_param "cf-turnstile-response"
 
   @error_message "We couldn't verify you're a real person. Please try submitting again. If this keeps happening, refresh the page or try a different browser."
 
@@ -53,8 +58,8 @@ defmodule YscWeb.GuestTurnstile do
     required? = Keyword.get(opts, :required, false)
 
     if required? or not signed_in?(socket) do
-      case module().verify(params, socket.assigns.remote_ip) do
-        {:ok, _} -> :ok
+      case verify_token(params, socket.assigns.remote_ip) do
+        :ok -> :ok
         {:error, _} -> {:error, reject(socket, title)}
       end
     else
@@ -62,10 +67,36 @@ defmodule YscWeb.GuestTurnstile do
     end
   end
 
+  @doc """
+  Verifies the `"cf-turnstile-response"` token in `params`.
+
+  A missing or blank token is rejected without calling Cloudflare, so clients
+  can't bypass the check by omitting the field.
+
+  Returns `:ok` or `{:error, reason}`.
+  """
+  def verify_token(params, remote_ip) when is_map(params) do
+    case Map.get(params, @token_param) do
+      token when is_binary(token) and token != "" ->
+        case module().verify(params, remote_ip) do
+          {:ok, _} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      _ ->
+        {:error, :missing_token}
+    end
+  end
+
+  @doc """
+  Resets the Turnstile widget on the client after a failed check.
+  """
+  def refresh(socket), do: module().refresh(socket)
+
   defp reject(socket, title) do
     socket
     |> YscWeb.Flash.put_toast(:error, @error_message, title: title)
-    |> module().refresh()
+    |> refresh()
   end
 
   defp signed_in?(socket), do: socket.assigns[:logged_in?] == true

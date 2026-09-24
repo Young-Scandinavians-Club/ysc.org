@@ -8,6 +8,9 @@ defmodule YscWeb.VolunteerLiveTest do
   alias Ysc.Forms.Volunteer
   alias Ysc.Repo
 
+  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
+  @turnstile_params %{"cf-turnstile-response" => "test-token"}
+
   describe "mount/3 - unauthenticated" do
     test "loads volunteer page successfully", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/volunteer")
@@ -456,12 +459,58 @@ defmodule YscWeb.VolunteerLiveTest do
             "interest_events" => "true"
           }
         )
-        |> render_submit()
+        |> render_submit(@turnstile_params)
 
       assert html =~ "verify you"
       assert html =~ "real person"
       refute html =~ "Välkommen"
       assert has_element?(view, "#volunteer-form")
+    end
+
+    test "blocks guest submit when the Turnstile token is missing", %{
+      conn: conn
+    } do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+      email = "guest.vol.no_token#{System.unique_integer()}@example.com"
+
+      html =
+        view
+        |> form("#volunteer-form",
+          volunteer: %{
+            "name" => "Guest Volunteer",
+            "email" => email,
+            "interest_events" => "true"
+          }
+        )
+        |> render_submit()
+
+      assert html =~ "real person"
+      refute html =~ "Välkommen"
+      refute Repo.exists?(from v in Volunteer, where: v.email == ^email)
+    end
+
+    test "submits a guest volunteer application with a valid Turnstile token",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+      email = "guest.vol.ok#{System.unique_integer()}@example.com"
+
+      html =
+        view
+        |> form("#volunteer-form",
+          volunteer: %{
+            "name" => "Guest Volunteer",
+            "email" => email,
+            "interest_events" => "true"
+          }
+        )
+        |> render_submit(@turnstile_params)
+
+      assert html =~ "Välkommen"
+      assert Repo.exists?(from v in Volunteer, where: v.email == ^email)
     end
   end
 end
