@@ -418,9 +418,12 @@ defmodule YscWeb.HomeLive do
             <div class="relative z-10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transform lg:rotate-2">
               <img
                 src={~p"/images/ysc_75th.webp"}
+                srcset={"#{~p"/images/ysc_75th-480.webp"} 480w, #{~p"/images/ysc_75th.webp"} 800w"}
+                sizes="(min-width: 1280px) 690px, (min-width: 1024px) 55vw, 100vw"
                 alt="YSC 75th Anniversary"
                 class="w-full h-64 sm:h-80 lg:h-96 object-cover"
                 loading="lazy"
+                decoding="async"
               />
             </div>
             <div class="hidden lg:block absolute -bottom-12 -left-20 z-20 w-64 h-64 rounded-3xl overflow-hidden shadow-2xl border-8 border-white transform -rotate-6">
@@ -460,6 +463,10 @@ defmodule YscWeb.HomeLive do
             <div class="relative h-full min-h-[280px] sm:min-h-[340px] md:min-h-[400px]">
               <img
                 src={~p"/images/clear_lake_midsummer.webp"}
+                srcset={"#{~p"/images/clear_lake_midsummer-640.webp"} 640w, #{~p"/images/clear_lake_midsummer.webp"} 1024w"}
+                sizes="(min-width: 1280px) 604px, (min-width: 768px) 50vw, 100vw"
+                loading="lazy"
+                decoding="async"
                 alt="Midsummer at Clear Lake"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
@@ -479,6 +486,10 @@ defmodule YscWeb.HomeLive do
             <div class="relative aspect-video">
               <img
                 src={~p"/images/ysc_bonfire_2024.webp"}
+                srcset={"#{~p"/images/ysc_bonfire_2024-480.webp"} 480w, #{~p"/images/ysc_bonfire_2024.webp"} 800w"}
+                sizes="(min-width: 1280px) 604px, (min-width: 768px) 50vw, 100vw"
+                loading="lazy"
+                decoding="async"
                 alt="YSC Bonfire 2024"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
@@ -496,8 +507,13 @@ defmodule YscWeb.HomeLive do
           <%!-- Cultural connection card --%>
           <div class="md:col-span-1 bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group">
             <div class="relative aspect-square">
+              <%!-- Square card cropping a ~1.46:1 image, so it renders ~1.46x the card width --%>
               <img
                 src={~p"/images/flags.webp"}
+                srcset={"#{~p"/images/flags-480.webp"} 480w, #{~p"/images/flags-800.webp"} 800w, #{~p"/images/flags.webp"} 1200w"}
+                sizes="(min-width: 1280px) 424px, (min-width: 768px) 36vw, 146vw"
+                loading="lazy"
+                decoding="async"
                 alt="Nordic country flags"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
@@ -597,6 +613,10 @@ defmodule YscWeb.HomeLive do
               <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
                 <img
                   src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+                  srcset={"#{~p"/images/tahoe/tahoe_cabin_main-480.webp"} 480w, #{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+                  sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
+                  loading="lazy"
+                  decoding="async"
                   alt="Lake Tahoe Cabin"
                   class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 />
@@ -612,6 +632,10 @@ defmodule YscWeb.HomeLive do
               <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
                 <img
                   src={~p"/images/clear_lake/clear_lake_dock.webp"}
+                  srcset={"#{~p"/images/clear_lake/clear_lake_dock-480.webp"} 480w, #{~p"/images/clear_lake/clear_lake_dock-900.webp"} 900w, #{~p"/images/clear_lake/clear_lake_dock.webp"} 1280w"}
+                  sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
+                  loading="lazy"
+                  decoding="async"
                   alt="Clear Lake Cabin"
                   class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 />

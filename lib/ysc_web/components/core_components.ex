@@ -5596,13 +5596,16 @@ defmodule YscWeb.CoreComponents do
       <div class="hero-media-stage">
         <.hero_flag_grid :if={@flag_grid} id={@flag_grid_id} />
 
+        <%!-- Lazy: the bleed is display:none below 1921px. Eager would let the
+             preload scanner request the shared poster URL from here first at
+             low priority, defeating fetchpriority="high" on the LCP image. --%>
         <div :if={@bleed_src} class="hero-media-stage__bleed" aria-hidden="true">
           <img
             src={@bleed_src}
             srcset={@bleed_srcset}
             sizes="100vw"
             alt=""
-            loading="eager"
+            loading="lazy"
             decoding="async"
           />
         </div>
@@ -5629,14 +5632,16 @@ defmodule YscWeb.CoreComponents do
           />
           <%!-- No HTML autoplay: LiveView morphdom calls video.play() on autoplay
                nodes without catching NotAllowedError (common on iOS Safari). Playback
-               is started by HeroVideoControls with a caught promise instead. --%>
+               is started by HeroVideoControls with a caught promise instead.
+               No poster attribute: the responsive poster <img> above already
+               shows through until the first frame, and a poster here would
+               download a second, full-size copy. --%>
           <video
             :if={@video}
             id="hero-video"
             muted
             loop
             playsinline
-            poster={@poster}
             preload="auto"
           >
             <source src={@video} type="video/mp4" />

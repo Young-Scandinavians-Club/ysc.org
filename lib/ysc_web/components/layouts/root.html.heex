@@ -154,7 +154,8 @@
       window.currentUser = null;
       <% end %>
     </script>
-    <Turnstile.script nonce={@csp_nonce} />
+    <%!-- No <Turnstile.script>: the Turnstile hook (assets/js/phoenix_turnstile.js)
+         loads it on demand, so pages without a guest form don't pay for it. --%>
   </head>
   <body class="antialiased bg-white">
     <.impersonation_banner
