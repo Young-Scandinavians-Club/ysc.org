@@ -4622,11 +4622,14 @@ defmodule Ysc.Bookings do
       ) do
     alias Ysc.Bookings.{BookingLocker, PendingRefund}
 
-    # First, always cancel the booking and free up inventory
+    # First, always cancel the booking and free up inventory.
+    # Holds must Stripe-reconcile *before* `release_hold/1`: a succeeded
+    # PaymentIntent is treated as `:ok` by `StripeService.cancel_payment_intent/1`,
+    # which would orphan the charge, clear the entitlement, and skip HoldExpiryWorker.
     cancel_result =
       case booking.status do
         :hold ->
-          BookingLocker.release_hold(booking.id)
+          BookingLocker.release_hold_with_stripe_reconcile(booking.id)
 
         :complete ->
           BookingLocker.cancel_complete_booking(booking.id)
@@ -4637,6 +4640,12 @@ defmodule Ysc.Bookings do
       end
 
     case cancel_result do
+      {:confirmed, confirmed_booking} ->
+        # Member tried to cancel an unpaid-looking hold whose PaymentIntent had
+        # already captured (LiveView died before payment-success). Confirm +
+        # ledger instead of orphaning the charge — same as checkout Cancel.
+        {:ok, confirmed_booking, Money.new(0, :USD), :hold_payment_confirmed}
+
       {:ok, canceled_booking} ->
         # Get the original payment for this booking first
         case get_booking_payment(canceled_booking) do
