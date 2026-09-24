@@ -187,10 +187,7 @@ defmodule YscWeb.ContactLive do
       |> Ysc.Forms.ContactForm.changeset(params)
       |> Ysc.Forms.put_submitter(socket.assigns[:current_user])
 
-    case YscWeb.GuestTurnstile.verify(socket, values,
-           title: "Contact",
-           require_token: true
-         ) do
+    case YscWeb.GuestTurnstile.verify(socket, values, title: "Contact") do
       :ok ->
         case Ysc.Forms.create_contact_form(changeset) do
           {:ok, _contact_form} ->

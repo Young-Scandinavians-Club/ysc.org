@@ -7,6 +7,8 @@ defmodule YscWeb.GuestTurnstileTest do
 
   setup :verify_on_exit!
 
+  @token_params %{"cf-turnstile-response" => "token"}
+
   defp socket(assigns) do
     %Phoenix.LiveView.Socket{
       assigns:
@@ -123,7 +125,9 @@ defmodule YscWeb.GuestTurnstileTest do
       end)
 
       assert {:error, socket} =
-               GuestTurnstile.verify(socket(%{}), %{}, title: "Volunteer")
+               GuestTurnstile.verify(socket(%{}), @token_params,
+                 title: "Volunteer"
+               )
 
       assert_received :turnstile_refreshed
       assert Phoenix.Flash.get(socket.assigns.flash, :error) =~ "real person"
@@ -138,7 +142,7 @@ defmodule YscWeb.GuestTurnstileTest do
       end)
 
       assert :ok =
-               GuestTurnstile.verify(socket(%{logged_in?: true}), %{},
+               GuestTurnstile.verify(socket(%{logged_in?: true}), @token_params,
                  title: "Registration",
                  required: true
                )
@@ -152,7 +156,7 @@ defmodule YscWeb.GuestTurnstileTest do
       stub(TurnstileMock, :refresh, fn socket -> socket end)
 
       assert {:error, socket} =
-               GuestTurnstile.verify(socket(%{logged_in?: true}), %{},
+               GuestTurnstile.verify(socket(%{logged_in?: true}), @token_params,
                  title: "Registration",
                  required: true
                )
@@ -160,7 +164,7 @@ defmodule YscWeb.GuestTurnstileTest do
       assert Phoenix.Flash.get(socket.assigns.flash, :error) =~ "real person"
     end
 
-    test "require_token: true rejects a missing token without calling Cloudflare" do
+    test "rejects a missing token without calling Cloudflare" do
       test_pid = self()
 
       stub(TurnstileMock, :verify, fn _params, _ip ->
@@ -173,39 +177,23 @@ defmodule YscWeb.GuestTurnstileTest do
       end)
 
       assert {:error, socket} =
-               GuestTurnstile.verify(socket(%{}), %{},
-                 title: "Contact",
-                 require_token: true
-               )
+               GuestTurnstile.verify(socket(%{}), %{}, title: "Contact")
 
       assert_received :turnstile_refreshed
       assert Phoenix.Flash.get(socket.assigns.flash, :error) =~ "real person"
     end
 
-    test "require_token: true verifies a present token" do
-      stub(TurnstileMock, :verify, fn params, _ip ->
-        assert params == %{"cf-turnstile-response" => "token"}
-        {:ok, %{"success" => true}}
-      end)
-
-      assert :ok =
-               GuestTurnstile.verify(
-                 socket(%{}),
-                 %{"cf-turnstile-response" => "token"},
-                 title: "Contact",
-                 require_token: true
-               )
-    end
-
-    test "require_token: true still skips signed-in members" do
+    test "required: true rejects a missing token for signed-in sockets" do
       stub(TurnstileMock, :verify, fn _params, _ip ->
-        flunk("Turnstile.verify must not run for signed-in members")
+        flunk("Turnstile.verify must not run without a token")
       end)
 
-      assert :ok =
+      stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+      assert {:error, _socket} =
                GuestTurnstile.verify(socket(%{logged_in?: true}), %{},
-                 title: "Volunteer",
-                 require_token: true
+                 title: "Registration",
+                 required: true
                )
     end
   end
