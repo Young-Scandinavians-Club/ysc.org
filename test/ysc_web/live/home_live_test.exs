@@ -28,6 +28,22 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ "Young Scandinavians Club"
       assert has_element?(view, "#newsletter-heading")
       assert has_element?(view, "#newsletter-email")
+      assert has_element?(view, "#home-cabin-tahoe")
+
+      assert has_element?(
+               view,
+               "#home-cabin-tahoe-cta",
+               "Learn More About Tahoe"
+             )
+
+      assert has_element?(
+               view,
+               "#home-cabin-clear-lake-cta",
+               "Learn More About Clear Lake"
+             )
+
+      assert has_element?(view, "#home-cabin-tahoe-image")
+      refute has_element?(view, "#home-quick-actions")
     end
 
     test "accepts query params on initial load", %{conn: conn} do
@@ -243,7 +259,11 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ user.first_name
       assert has_element?(view, "#home-quick-action-tahoe", "Book a stay")
       assert has_element?(view, "#home-quick-action-clear-lake", "Book a stay")
+      assert has_element?(view, "#home-quick-action-events", "Browse Events")
+      assert has_element?(view, "#home-quick-action-settings", "Preferences")
+      refute has_element?(view, "#home-quick-action-expenses")
       refute has_element?(view, "#home-quick-actions", "Reserve Cabin")
+      refute has_element?(view, "#home-cabin-tahoe")
     end
 
     test "toggles newsletter subscription from the member dashboard", %{
@@ -382,6 +402,8 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "Expenses"
       assert html =~ "View reports"
+      assert has_element?(view, "#home-quick-action-expenses", "View reports")
+      refute has_element?(view, "#home-quick-action-events")
     end
 
     test "shows expense report launcher for admin users", %{conn: conn} do
@@ -395,6 +417,8 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "Expenses"
       assert html =~ "View reports"
+      assert has_element?(view, "#home-quick-action-expenses", "View reports")
+      refute has_element?(view, "#home-quick-action-events")
     end
 
     test "lists upcoming events in the member community section", %{conn: conn} do
