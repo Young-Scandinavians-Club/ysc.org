@@ -174,7 +174,7 @@ defmodule YscWeb.EventsLive do
                   navigate={~p"/events/#{event.id}"}
                   class="block w-full h-full"
                 >
-                  <div class="w-full h-full overflow-hidden rounded-xl relative">
+                  <div class="w-full h-full overflow-hidden rounded-lg relative">
                     <.live_component
                       id={"past-event-image-#{event.id}"}
                       module={YscWeb.Components.Image}
