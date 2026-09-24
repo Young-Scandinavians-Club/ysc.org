@@ -18,6 +18,9 @@ defmodule YscWeb.HomeLiveTest do
   alias Ysc.Repo
   alias YscWeb.NewsletterSubscribe
 
+  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
+  @turnstile_params %{"cf-turnstile-response" => "test-token"}
+
   describe "guest" do
     test "renders marketing home with hero and newsletter section", %{
       conn: conn
@@ -146,7 +149,7 @@ defmodule YscWeb.HomeLiveTest do
 
       view
       |> form("form[phx-submit=subscribe_newsletter]", %{"email" => email})
-      |> render_submit()
+      |> render_submit(@turnstile_params)
 
       html = render(view)
       # Double opt-in: the anonymous signup form no longer subscribes
@@ -1175,7 +1178,7 @@ defmodule YscWeb.HomeLiveTest do
          } do
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{"email" => "notvalid"})
+      submit_newsletter(view, %{"email" => "notvalid"})
 
       assert has_element?(view, "#newsletter-error")
       assert render(view) =~ "Please enter a valid email address."
@@ -1186,7 +1189,7 @@ defmodule YscWeb.HomeLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{
+      submit_newsletter(view, %{
         "email" => "test@mailinator.com"
       })
 
@@ -1202,7 +1205,7 @@ defmodule YscWeb.HomeLiveTest do
 
       domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
 
-      render_submit(view, "subscribe_newsletter", %{"email" => "user@#{domain}"})
+      submit_newsletter(view, %{"email" => "user@#{domain}"})
 
       assert has_element?(view, "#newsletter-error")
       assert render(view) =~ "email domain appears to be invalid"
@@ -1214,7 +1217,7 @@ defmodule YscWeb.HomeLiveTest do
       email = "nl_branch_ok_#{System.unique_integer([:positive])}@example.com"
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{"email" => email})
+      submit_newsletter(view, %{"email" => email})
 
       html = render(view)
       refute Newsletter.get_subscriber_by_email(email).subscribed
@@ -1227,12 +1230,62 @@ defmodule YscWeb.HomeLiveTest do
       email = "nl_rate_#{System.unique_integer([:positive])}@example.com"
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{"email" => email})
-      html = render_submit(view, "subscribe_newsletter", %{"email" => email})
+      submit_newsletter(view, %{"email" => email})
+      html = submit_newsletter(view, %{"email" => email})
 
       assert has_element?(view, "#newsletter-error")
       assert html =~ "Too many subscription attempts"
     end
+
+    test "subscribe_newsletter rejects a submit without a Turnstile token", %{
+      conn: conn
+    } do
+      test_pid = self()
+      email = "nl_no_token_#{System.unique_integer([:positive])}@example.com"
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket ->
+        send(test_pid, :turnstile_refreshed)
+        socket
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html =
+        render_submit(view, "subscribe_newsletter", %{"email" => email})
+
+      assert has_element?(view, "#newsletter-error")
+      assert html =~ NewsletterSubscribe.guest_error(:turnstile)
+      assert_received :turnstile_refreshed
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
+    end
+
+    test "subscribe_newsletter rejects a failed Turnstile check", %{conn: conn} do
+      email = "nl_bad_token_#{System.unique_integer([:positive])}@example.com"
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html = submit_newsletter(view, %{"email" => email})
+
+      assert has_element?(view, "#newsletter-error")
+      assert html =~ NewsletterSubscribe.guest_error(:turnstile)
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
+    end
+  end
+
+  defp submit_newsletter(view, params) do
+    render_submit(
+      view,
+      "subscribe_newsletter",
+      Map.merge(@turnstile_params, params)
+    )
   end
 
   defp draft_upcoming_published_events! do

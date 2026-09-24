@@ -35,6 +35,54 @@ defmodule YscWeb.GuestTurnstileTest do
     end
   end
 
+  describe "verify_token/2" do
+    test "rejects a missing or blank token without calling Cloudflare" do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      assert {:error, :missing_token} =
+               GuestTurnstile.verify_token(%{}, {127, 0, 0, 1})
+
+      assert {:error, :missing_token} =
+               GuestTurnstile.verify_token(
+                 %{"cf-turnstile-response" => ""},
+                 {127, 0, 0, 1}
+               )
+
+      assert {:error, :missing_token} =
+               GuestTurnstile.verify_token(
+                 %{"cf-turnstile-response" => ["token"]},
+                 {127, 0, 0, 1}
+               )
+    end
+
+    test "returns :ok when Cloudflare accepts the token" do
+      stub(TurnstileMock, :verify, fn params, ip ->
+        assert params == %{"cf-turnstile-response" => "token"}
+        assert ip == {127, 0, 0, 1}
+        {:ok, %{"success" => true}}
+      end)
+
+      assert :ok =
+               GuestTurnstile.verify_token(
+                 %{"cf-turnstile-response" => "token"},
+                 {127, 0, 0, 1}
+               )
+    end
+
+    test "returns the error when Cloudflare rejects the token" do
+      reason = %{"error-codes" => ["invalid-input-response"]}
+      stub(TurnstileMock, :verify, fn _params, _ip -> {:error, reason} end)
+
+      assert {:error, ^reason} =
+               GuestTurnstile.verify_token(
+                 %{"cf-turnstile-response" => "bad"},
+                 {127, 0, 0, 1}
+               )
+    end
+  end
+
   describe "verify/3" do
     test "skips Turnstile for signed-in members" do
       stub(TurnstileMock, :verify, fn _params, _ip ->

@@ -17,8 +17,11 @@ defmodule YscWeb.NewsletterSubscribe do
       end
   """
 
+  require Ysc.Logging
+
   alias Ysc.Newsletter
   alias Ysc.NewsletterRateLimit
+  alias YscWeb.GuestTurnstile
 
   @rate_limited_message "Too many subscription attempts. Please try again later."
   @turnstile_message "Please complete the verification to continue."
@@ -125,19 +128,20 @@ defmodule YscWeb.NewsletterSubscribe do
     end
   end
 
+  # Turnstile is mandatory: a missing token is rejected like a failed check.
   defp verify_and_subscribe(socket, params, email) do
-    if Map.has_key?(params, "cf-turnstile-response") do
-      case Turnstile.verify(params, socket.assigns.remote_ip) do
-        {:ok, _} ->
-          subscribe_guest(socket, email)
+    case GuestTurnstile.verify_token(params, socket.assigns.remote_ip) do
+      :ok ->
+        subscribe_guest(socket, email)
 
-        {:error, _} ->
-          socket
-          |> assign_guest_error(email, guest_error(:turnstile))
-          |> Turnstile.refresh()
-      end
-    else
-      subscribe_guest(socket, email)
+      {:error, reason} ->
+        Ysc.Logging.info("Newsletter guest signup rejected by Turnstile",
+          extra: %{reason: inspect(reason)}
+        )
+
+        socket
+        |> assign_guest_error(email, guest_error(:turnstile))
+        |> GuestTurnstile.refresh()
     end
   end
 
