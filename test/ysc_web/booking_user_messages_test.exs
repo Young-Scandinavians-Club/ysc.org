@@ -74,6 +74,31 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.unavailable_blackout_dates() =~ "blackout"
   end
 
+  test "Tahoe review-before-checkout copy does not say the stay is confirmed" do
+    assert BookingUserMessages.tahoe_review_booking_button() == "Review booking"
+
+    assert BookingUserMessages.tahoe_review_modal_title() ==
+             "Review your booking"
+
+    intro = BookingUserMessages.tahoe_review_modal_intro()
+    assert intro =~ "not booked yet"
+    assert intro =~ "add guest names and pay"
+    refute intro =~ "confirming"
+    refute intro =~ "Confirm"
+
+    assert BookingUserMessages.tahoe_review_modal_continue_button() ==
+             "Continue to payment"
+
+    assert BookingUserMessages.tahoe_review_modal_back_button() == "Go back"
+    refute BookingUserMessages.tahoe_review_modal_back_button() == "Cancel"
+
+    toast = BookingUserMessages.tahoe_hold_created_toast()
+    assert toast =~ "held for a short time"
+    assert toast =~ "Add guest names and pay"
+    assert toast =~ "confirm your booking"
+    refute toast =~ "Booking created"
+  end
+
   test "checkout step copy" do
     assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~
              "everyone else staying with you"
