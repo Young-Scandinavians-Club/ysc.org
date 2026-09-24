@@ -65,6 +65,34 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def tahoe_review_booking_button do
+    "Review booking"
+  end
+
+  def tahoe_review_modal_title do
+    "Review your booking"
+  end
+
+  def tahoe_review_modal_intro do
+    trim("""
+    Your stay is not booked yet. Check the boxes below, then continue. Next you'll add guest names and pay to confirm these dates.
+    """)
+  end
+
+  def tahoe_review_modal_continue_button do
+    "Continue to payment"
+  end
+
+  def tahoe_review_modal_back_button do
+    "Go back"
+  end
+
+  def tahoe_hold_created_toast do
+    trim("""
+    These dates are held for a short time. Add guest names and pay on the next page to confirm your booking.
+    """)
+  end
+
   def checkout_guest_info_step_enter_guests do
     "Enter the names of everyone else staying with you. You're already included in the booking — only list the other people below."
   end
