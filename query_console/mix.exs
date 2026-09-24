@@ -36,7 +36,11 @@ defmodule QueryConsole.MixProject do
       {:phoenix, "~> 1.8.0"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
-      {:postgrex, ">= 0.0.0"},
+      # 0.22.4: Escape comments on Postgrex.stream/4 (EEF-CVE-2026-66838).
+      # We use Postgrex.query/start_link and AnalyticsRepo.query, not stream/4
+      # or the :comment option. Public query APIs and BinaryExtension are
+      # unchanged. Pin the patched floor.
+      {:postgrex, "~> 0.22.4"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
