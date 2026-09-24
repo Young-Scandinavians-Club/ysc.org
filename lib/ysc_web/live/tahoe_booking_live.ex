@@ -112,9 +112,16 @@ defmodule YscWeb.TahoeBookingLive do
             do: Accounts.preload_user_subscriptions_for_booking(user),
             else: nil
 
+        family_user_ids =
+          if user, do: Accounts.get_family_group_user_ids(user), else: []
+
         # Load active bookings for the entire family group (needed for eligibility check)
         active_bookings =
-          if user, do: get_family_group_active_bookings(user), else: []
+          if user do
+            Bookings.list_active_tahoe_bookings_for_family(family_user_ids)
+          else
+            []
+          end
 
         # Check if user can book (pass user_with_subs to avoid re-fetching subscriptions)
         {can_book, booking_error_title, booking_disabled_reason} =
@@ -169,9 +176,6 @@ defmodule YscWeb.TahoeBookingLive do
           Bookings.get_active_refund_policy(:tahoe, :buyout)
 
         room_refund_policy = Bookings.get_active_refund_policy(:tahoe, :room)
-
-        family_user_ids =
-          if user, do: get_family_group_user_ids(user), else: []
 
         {user_with_subs, active_bookings, can_book, booking_error_title,
          booking_disabled_reason, active_tab, membership_type,
@@ -7173,14 +7177,8 @@ defmodule YscWeb.TahoeBookingLive do
   # Get active bookings for the entire family group (primary user + all sub-accounts)
   defp get_family_group_active_bookings(user, limit \\ 10) do
     user
-    |> get_family_group_user_ids()
+    |> Accounts.get_family_group_user_ids()
     |> Bookings.list_active_tahoe_bookings_for_family(limit: limit)
-  end
-
-  # Get all user IDs in the family group (primary user + all sub-accounts)
-  defp get_family_group_user_ids(user) do
-    family_group = Accounts.get_family_group(user)
-    Enum.map(family_group, & &1.id)
   end
 
   defp past_checkout_time? do

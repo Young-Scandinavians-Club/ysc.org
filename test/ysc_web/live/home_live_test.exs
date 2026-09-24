@@ -1092,6 +1092,27 @@ defmodule YscWeb.HomeLiveTest do
   end
 
   describe "logged-in user — family and bookings" do
+    test "shows other household members in the Your Family section", %{
+      conn: conn
+    } do
+      primary = Ysc.TestDataFactory.user_with_membership(:lifetime)
+
+      sub =
+        user_fixture(%{first_name: "FamilyKid"})
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      conn = log_in_user(conn, primary)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+
+      assert has_element?(view, "#home-family", "Your Family")
+      assert has_element?(view, "#home-family-member-#{sub.id}", "FamilyKid")
+    end
+
     test "shows Clear Lake upcoming booking on the itinerary", %{conn: conn} do
       user = Ysc.TestDataFactory.user_with_membership(:lifetime)
 

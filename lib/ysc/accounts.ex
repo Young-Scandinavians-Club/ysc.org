@@ -3521,14 +3521,45 @@ defmodule Ysc.Accounts do
     end
   end
 
-  # Guest pickers only need identity + name. Skip password hashes, bios,
-  # Stripe ids, and notification flags that `get_family_group/1` loads.
-  @guest_picker_user_fields [:id, :first_name, :last_name]
+  # Guest pickers / ticket registration only need identity + name + email.
+  # Skip password hashes, bios, Stripe ids, and notification flags that
+  # `get_family_group/1` loads.
+  @guest_picker_user_fields [:id, :first_name, :last_name, :email]
+
+  # Home "Your Family" + board-pause notice. Name, relationship, avatar,
+  # and board_position only.
+  @household_dashboard_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :family_relationship,
+    :most_connected_country,
+    :current_avatar_id,
+    :board_position,
+    :primary_user_id
+  ]
+
+  @household_dashboard_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+
+  @household_board_member_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :board_position
+  ]
 
   @doc """
-  Household members for Tahoe guest-info dropdowns.
+  Household members for Tahoe guest-info dropdowns and event ticket
+  registration.
 
-  One SELECT of `id`/`first_name`/`last_name` for the primary user and
+  One SELECT of `id`/`first_name`/`last_name`/`email` for the primary user and
   sub-accounts. Does not replace `get_family_group/1` for billing/board checks.
   """
   def list_household_guest_picker_users(%User{} = user) do
@@ -3537,9 +3568,39 @@ defmodule Ysc.Accounts do
   end
 
   defp list_household_guest_picker_users_query(primary_id) do
+    household_users_query(primary_id, @guest_picker_user_fields)
+  end
+
+  @doc """
+  Household members for the home dashboard family section and board-pause notice.
+
+  One SELECT of name, relationship, country, avatar, and board position — not
+  the full User row `get_family_group/1` loads.
+  """
+  def list_household_dashboard_users(%User{} = user) do
+    list_household_dashboard_users_query(user.primary_user_id || user.id)
+    |> Repo.all()
+  end
+
+  defp list_household_dashboard_users_query(primary_id) do
+    avatar_query =
+      from(a in Ysc.Avatars.Avatar,
+        select: struct(a, ^@household_dashboard_avatar_fields)
+      )
+
     from(u in User,
       where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
-      select: struct(u, ^@guest_picker_user_fields)
+      select: struct(u, ^@household_dashboard_user_fields),
+      preload: [current_avatar: ^avatar_query],
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
+  end
+
+  defp household_users_query(primary_id, fields) do
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      select: struct(u, ^fields),
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
     )
   end
 
@@ -3551,8 +3612,18 @@ defmodule Ysc.Accounts do
   due to board volunteer service.
   """
   def household_board_member(user) do
-    get_family_group(user)
-    |> Enum.find(&(&1.board_position != nil))
+    household_board_member_query(user.primary_user_id || user.id)
+    |> Repo.one()
+  end
+
+  defp household_board_member_query(primary_id) do
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      where: not is_nil(u.board_position),
+      select: struct(u, ^@household_board_member_fields),
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id],
+      limit: 1
+    )
   end
 
   @doc """
@@ -3601,10 +3672,20 @@ defmodule Ysc.Accounts do
   @doc """
   Gets all user IDs in a family group.
   Useful for querying bookings across the family.
+
+  One SELECT of `users.id` — does not load full User rows.
   """
   def get_family_group_user_ids(user) do
-    get_family_group(user)
-    |> Enum.map(& &1.id)
+    household_user_ids_query(user.primary_user_id || user.id)
+    |> Repo.all()
+  end
+
+  defp household_user_ids_query(primary_id) do
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      select: u.id,
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
   end
 
   @doc """
@@ -4954,6 +5035,21 @@ defmodule Ysc.Accounts do
     list_household_guest_picker_users_query(
       Ysc.Ci.QueryExplain.Fixtures.user().id
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_household_dashboard_users_query do
+    list_household_dashboard_users_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_household_board_member_query do
+    household_board_member_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_household_user_ids_query do
+    household_user_ids_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
 
   @doc false
