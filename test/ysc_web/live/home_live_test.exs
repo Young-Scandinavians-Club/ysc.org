@@ -444,16 +444,34 @@ defmodule YscWeb.HomeLiveTest do
     test "shows upcoming event tickets when user has confirmed tickets", %{
       conn: conn
     } do
-      data = Ysc.TestDataFactory.complete_ticket_order()
+      unique = System.unique_integer([:positive])
+      event_title = "Home Slim Event #{unique}"
+      tier_name = "HomeSlimTier #{unique}"
+
+      data =
+        Ysc.TestDataFactory.complete_ticket_order(
+          ticket_count: 1,
+          event_attrs: %{title: event_title}
+        )
+
+      hd(data.tiers)
+      |> Ecto.Changeset.change(%{name: tier_name})
+      |> Repo.update!()
+
+      Enum.each(data.tickets, fn ticket ->
+        ticket
+        |> Ticket.status_changeset(%{status: :confirmed})
+        |> Repo.update!()
+      end)
+
       conn = log_in_user(conn, data.user)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
       render_async(view, 5_000)
-      html = render(view)
 
-      assert html =~ "Event Tickets"
-      assert html =~ data.event.title
+      assert has_element?(view, "h3", event_title)
+      assert has_element?(view, "span", tier_name)
     end
 
     test "hides event tickets for events that already started today", %{
