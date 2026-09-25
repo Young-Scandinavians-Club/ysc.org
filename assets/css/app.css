@@ -758,42 +758,40 @@ body:not(:has(#rootNavbar))
   background-color: #f4f4f5;
 }
 
-/* Mobile menu dropdown styling */
+/* Mobile menu dropdown styling: expands inline as an accordion section of the sheet */
 
 .mobile-menu-content > ul > li > .relative > button {
-  justify-content: flex-start !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   text-align: left;
   width: 100%;
   padding: 0.75rem 1rem;
 }
 
 .mobile-menu-content .dropdown-content {
-  position: static !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  border: none !important;
-  padding-left: 1rem;
-  margin-top: 0.25rem;
+  margin: 0.125rem 0 0.25rem 1rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--color-zinc-200);
 }
 
 .mobile-menu-content .dropdown-content ul {
-  background: #f9fafb;
-  border-radius: 0.5rem;
-  padding: 0.5rem;
+  padding: 0;
+  gap: 0.125rem;
 }
 
 .mobile-menu-content .dropdown-content a {
   display: block;
   padding: 0.625rem 0.75rem;
   color: var(--color-zinc-700);
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 
 .mobile-menu-content .dropdown-content a:hover {
-  background-color: #e4e4e7;
-  color: #18181b;
+  background-color: var(--color-zinc-100);
+  color: var(--color-zinc-900);
 }
 
 /* Prevent body scroll when menu is open */
@@ -829,8 +827,8 @@ body.overflow-hidden {
 
 .mobile-menu-panel .dropdown-content a:hover,
 #site-header.hero-mode .mobile-menu-panel .dropdown-content a:hover {
-  background-color: #e4e4e7 !important;
-  color: #18181b !important;
+  background-color: var(--color-zinc-100) !important;
+  color: var(--color-zinc-900) !important;
 }
 
 .pagination-link,
