@@ -6,11 +6,14 @@ defmodule YscWeb.GuestTurnstile do
   signed-in members. Registration always verifies. A missing or blank token
   fails without calling Cloudflare, so clients can't bypass the check by
   omitting the field. Failed checks toast the same copy and refresh the
-  widget. Guest newsletter signups use `verify_token/2` and `refresh/1`
+  widget. Guest newsletter signups use `verify_token/3` and `refresh/1`
   directly to show their own inline error.
 
   Resolves the Turnstile module from `:phoenix_turnstile, :turnstile_module`
   so tests can stub `TurnstileMock`.
+
+  Every rejection logs a warning with the form and the reason
+  (`missing_token` or Cloudflare's error codes).
 
   ## Examples
 
@@ -26,6 +29,8 @@ defmodule YscWeb.GuestTurnstile do
         required: true
       )
   """
+
+  require Ysc.Logging
 
   @token_param "cf-turnstile-response"
 
@@ -58,7 +63,7 @@ defmodule YscWeb.GuestTurnstile do
     required? = Keyword.get(opts, :required, false)
 
     if required? or not signed_in?(socket) do
-      case verify_token(params, socket.assigns.remote_ip) do
+      case verify_token(params, socket.assigns.remote_ip, form: title) do
         :ok -> :ok
         {:error, _} -> {:error, reject(socket, title)}
       end
@@ -73,25 +78,49 @@ defmodule YscWeb.GuestTurnstile do
   A missing or blank token is rejected without calling Cloudflare, so clients
   can't bypass the check by omitting the field.
 
-  Returns `:ok` or `{:error, reason}`.
+  Returns `:ok` or `{:error, reason}`, and logs a warning on rejection.
+
+  ## Options
+
+    * `:form` — label for the log line (e.g. `"Contact"`)
   """
-  def verify_token(params, remote_ip) when is_map(params) do
+  def verify_token(params, remote_ip, opts \\ [])
+      when is_map(params) and is_list(opts) do
     case Map.get(params, @token_param) do
       token when is_binary(token) and token != "" ->
         case module().verify(params, remote_ip) do
           {:ok, _} -> :ok
-          {:error, reason} -> {:error, reason}
+          {:error, reason} -> log_rejection(reason, opts)
         end
 
       _ ->
-        {:error, :missing_token}
+        log_rejection(:missing_token, opts)
     end
   end
+
+  @doc """
+  Short, log-friendly description of a `verify_token/3` failure reason.
+  """
+  def rejection_reason(:missing_token), do: "missing_token"
+
+  def rejection_reason(%{"error-codes" => [_ | _] = codes}),
+    do: Enum.join(codes, ",")
+
+  def rejection_reason(reason), do: inspect(reason, limit: 20)
 
   @doc """
   Resets the Turnstile widget on the client after a failed check.
   """
   def refresh(socket), do: module().refresh(socket)
+
+  defp log_rejection(reason, opts) do
+    Ysc.Logging.warning("Turnstile check failed",
+      form: Keyword.get(opts, :form),
+      turnstile_reason: rejection_reason(reason)
+    )
+
+    {:error, reason}
+  end
 
   defp reject(socket, title) do
     socket
