@@ -22,6 +22,7 @@ defmodule Ysc.TelemetryMetricsUpgradeTest do
     end
 
     test "counter, summary, last_value, distribution, and sum still exist" do
+      assert {:module, _} = Code.ensure_loaded(Telemetry.Metrics)
       assert function_exported?(Telemetry.Metrics, :counter, 1)
       assert function_exported?(Telemetry.Metrics, :counter, 2)
       assert function_exported?(Telemetry.Metrics, :summary, 2)

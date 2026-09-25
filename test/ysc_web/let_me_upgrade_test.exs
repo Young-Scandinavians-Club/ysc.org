@@ -36,6 +36,7 @@ defmodule YscWeb.LetMeUpgradeTest do
     end
 
     test "authorize, authorize?, and expression helpers we use still exist" do
+      assert {:module, _} = Code.ensure_loaded(Policy)
       assert function_exported?(Policy, :authorize, 2)
       assert function_exported?(Policy, :authorize, 3)
       assert function_exported?(Policy, :authorize, 4)

@@ -45,6 +45,7 @@ defmodule Ysc.NestedFilterUpgradeTest do
     end
 
     test "drop, take, compact, and engine APIs passbook and 2.2.0 use still exist" do
+      assert {:module, _} = Code.ensure_loaded(NestedFilter)
       assert function_exported?(NestedFilter, :drop_by_key, 2)
       assert function_exported?(NestedFilter, :drop_by_key, 3)
       assert function_exported?(NestedFilter, :drop_by_value, 2)
