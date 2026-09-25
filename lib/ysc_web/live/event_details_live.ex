@@ -1535,7 +1535,7 @@ defmodule YscWeb.EventDetailsLive do
                             <%= if has_discount do %>
                               <.badge
                                 type="green"
-                                class="inline-flex items-center gap-1 ml-2 py-0.5 rounded-full border border-green-200 text-green-700 me-0"
+                                class="inline-flex items-center gap-1 ml-2 py-0.5 rounded-full! border border-green-200 text-green-700 me-0"
                               >
                                 <.icon name="hero-tag" class="w-3 h-3" />
                                 {reservation_info.discount_percentage
