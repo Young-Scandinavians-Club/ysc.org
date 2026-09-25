@@ -2509,17 +2509,11 @@ defmodule YscWeb.TahoeBookingLive do
                                   <% room_adult_price =
                                     room.adult_price_per_night ||
                                       fallback_adult_price %>
+                                  <% {:ok, nightly_min} =
+                                    Money.mult(room_adult_price, min_required) %>
                                   {YscWeb.BookingUserMessages.room_below_min_charge_body(
                                     min_required,
-                                    MoneyHelper.format_money!(
-                                      case Money.mult(
-                                             room_adult_price,
-                                             min_required
-                                           ) do
-                                        {:ok, total} -> total
-                                        _ -> room_adult_price
-                                      end
-                                    )
+                                    MoneyHelper.format_money!(nightly_min)
                                   )}
                                 </p>
                               </div>
