@@ -44,7 +44,10 @@ defmodule QueryConsole.MixProject do
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
-      {:lazy_html, ">= 0.1.0", only: :test},
+      # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
+      # SVG and MathML on to_html/2 (mutation XSS). We use lazy_html only in
+      # tests via LiveViewTest; pin the patched floor.
+      {:lazy_html, "~> 0.1.13", only: :test},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:heroicons,

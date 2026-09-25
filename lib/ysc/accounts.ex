@@ -3616,6 +3616,28 @@ defmodule Ysc.Accounts do
     |> Repo.one()
   end
 
+  @active_board_member_fields [:id, :email, :first_name, :last_name]
+
+  @doc """
+  Returns the active user currently holding `board_position`, or `nil`.
+
+  Selects `id` / `email` / `first_name` / `last_name` only — used by
+  cancellation emails and expense-report treasurer contact, not billing.
+  """
+  def get_active_board_member(position)
+      when is_atom(position) or is_binary(position) do
+    active_board_member_query(position)
+    |> Repo.one()
+  end
+
+  defp active_board_member_query(position) do
+    from(u in User,
+      where: u.board_position == ^position and u.state == :active,
+      select: struct(u, ^@active_board_member_fields),
+      limit: 1
+    )
+  end
+
   defp household_board_member_query(primary_id) do
     from(u in User,
       where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
@@ -5045,6 +5067,11 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_household_board_member_query do
     household_board_member_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_active_board_member_query do
+    active_board_member_query(:treasurer)
   end
 
   @doc false
