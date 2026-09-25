@@ -45,7 +45,8 @@ defmodule Ysc.Bookings do
     PropertyInventory,
     CheckIn,
     CheckInVehicle,
-    CheckInBooking
+    CheckInBooking,
+    CabinMaster
   }
 
   # Check-in and check-out times
@@ -6037,40 +6038,13 @@ defmodule Ysc.Bookings do
          reason
        ) do
     require Ysc.Logging
-    import Ecto.Query
 
     try do
       booking = ensure_booking_with_user(booking)
 
       if booking && booking.user do
-        # Get cabin master for the property
-        cabin_master_position =
-          case booking.property do
-            :tahoe -> "tahoe_cabin_master"
-            :clear_lake -> "clear_lake_cabin_master"
-            _ -> nil
-          end
-
-        cabin_master =
-          if cabin_master_position do
-            from(u in Ysc.Accounts.User,
-              where:
-                u.board_position == ^cabin_master_position and
-                  u.state == :active,
-              limit: 1
-            )
-            |> Repo.one()
-          else
-            nil
-          end
-
-        # Get treasurer
-        treasurer =
-          from(u in Ysc.Accounts.User,
-            where: u.board_position == "treasurer" and u.state == :active,
-            limit: 1
-          )
-          |> Repo.one()
+        cabin_master = CabinMaster.get_active(booking.property)
+        treasurer = Accounts.get_active_board_member(:treasurer)
 
         # Send email to cabin master if found
         if cabin_master && cabin_master.email do
