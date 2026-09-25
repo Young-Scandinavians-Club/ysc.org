@@ -45,7 +45,8 @@ defmodule Ysc.Bookings do
     PropertyInventory,
     CheckIn,
     CheckInVehicle,
-    CheckInBooking
+    CheckInBooking,
+    CabinMaster
   }
 
   # Check-in and check-out times
@@ -4622,11 +4623,14 @@ defmodule Ysc.Bookings do
       ) do
     alias Ysc.Bookings.{BookingLocker, PendingRefund}
 
-    # First, always cancel the booking and free up inventory
+    # First, always cancel the booking and free up inventory.
+    # Holds must Stripe-reconcile *before* `release_hold/1`: a succeeded
+    # PaymentIntent is treated as `:ok` by `StripeService.cancel_payment_intent/1`,
+    # which would orphan the charge, clear the entitlement, and skip HoldExpiryWorker.
     cancel_result =
       case booking.status do
         :hold ->
-          BookingLocker.release_hold(booking.id)
+          BookingLocker.release_hold_with_stripe_reconcile(booking.id)
 
         :complete ->
           BookingLocker.cancel_complete_booking(booking.id)
@@ -4637,6 +4641,12 @@ defmodule Ysc.Bookings do
       end
 
     case cancel_result do
+      {:confirmed, confirmed_booking} ->
+        # Member tried to cancel an unpaid-looking hold whose PaymentIntent had
+        # already captured (LiveView died before payment-success). Confirm +
+        # ledger instead of orphaning the charge — same as checkout Cancel.
+        {:ok, confirmed_booking, Money.new(0, :USD), :hold_payment_confirmed}
+
       {:ok, canceled_booking} ->
         # Get the original payment for this booking first
         case get_booking_payment(canceled_booking) do
@@ -6028,40 +6038,13 @@ defmodule Ysc.Bookings do
          reason
        ) do
     require Ysc.Logging
-    import Ecto.Query
 
     try do
       booking = ensure_booking_with_user(booking)
 
       if booking && booking.user do
-        # Get cabin master for the property
-        cabin_master_position =
-          case booking.property do
-            :tahoe -> "tahoe_cabin_master"
-            :clear_lake -> "clear_lake_cabin_master"
-            _ -> nil
-          end
-
-        cabin_master =
-          if cabin_master_position do
-            from(u in Ysc.Accounts.User,
-              where:
-                u.board_position == ^cabin_master_position and
-                  u.state == :active,
-              limit: 1
-            )
-            |> Repo.one()
-          else
-            nil
-          end
-
-        # Get treasurer
-        treasurer =
-          from(u in Ysc.Accounts.User,
-            where: u.board_position == "treasurer" and u.state == :active,
-            limit: 1
-          )
-          |> Repo.one()
+        cabin_master = CabinMaster.get_active(booking.property)
+        treasurer = Accounts.get_active_board_member(:treasurer)
 
         # Send email to cabin master if found
         if cabin_master && cabin_master.email do

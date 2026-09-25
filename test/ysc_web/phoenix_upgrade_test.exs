@@ -31,6 +31,7 @@ defmodule YscWeb.PhoenixUpgradeTest do
 
     test "companion phoenix_pubsub lock is 2.3.0 with the APIs we use" do
       assert to_string(Application.spec(:phoenix_pubsub, :vsn)) == "2.3.0"
+      assert {:module, _} = Code.ensure_loaded(Phoenix.PubSub)
       assert function_exported?(Phoenix.PubSub, :subscribe, 2)
       assert function_exported?(Phoenix.PubSub, :broadcast, 3)
       assert function_exported?(Phoenix.PubSub, :unsubscribe, 2)

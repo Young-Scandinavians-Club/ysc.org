@@ -18,19 +18,33 @@ defmodule Ysc.Bookings.CabinMaster do
   alias Ysc.Extensions.PhoneNumber
   alias Ysc.Repo
 
+  # Name, mailbox, and phone for emails/API. Skip hashes, bios, Stripe ids.
+  @contact_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :phone_number,
+    :board_position
+  ]
+
   @doc """
   Returns the most recently updated user assigned as cabin master for `property`.
 
   Accepts `:tahoe` / `:clear_lake` atoms or `"tahoe"` / `"clear_lake"` strings.
+  Selects contact columns only — not `hashed_password` / `board_bio`.
   """
   def get(property) do
-    case board_position(property) do
-      nil ->
-        nil
+    lookup(property, active_only?: false)
+  end
 
-      position ->
-        Repo.one(cabin_master_query(position))
-    end
+  @doc """
+  Like `get/1`, but only an `:active` cabin master.
+
+  Booking modification and cancellation emails skip suspended/deleted holders.
+  """
+  def get_active(property) do
+    lookup(property, active_only?: true)
   end
 
   @doc """
@@ -51,8 +65,16 @@ defmodule Ysc.Bookings.CabinMaster do
   `name` and `phone` are `nil` when no user is found.
   """
   def contact(property) do
-    user = get(property)
+    contact_from_user(get(property), property)
+  end
 
+  @doc """
+  Builds the contact map from an already-loaded cabin-master user.
+
+  Use this when the caller already ran `get/1` or `get_active/1` so the
+  properties API does not issue a second `users` SELECT.
+  """
+  def contact_from_user(user, property) do
     %{
       name: display_name(user),
       email: email(property),
@@ -65,12 +87,35 @@ defmodule Ysc.Bookings.CabinMaster do
     cabin_master_query(:tahoe_cabin_master)
   end
 
-  defp cabin_master_query(board_position) do
-    from(u in User,
-      where: u.board_position == ^board_position,
-      order_by: [desc: u.updated_at],
-      limit: 1
-    )
+  @doc false
+  def ci_query_explain_active_query do
+    cabin_master_query(:tahoe_cabin_master, active_only?: true)
+  end
+
+  defp lookup(property, opts) do
+    case board_position(property) do
+      nil ->
+        nil
+
+      position ->
+        Repo.one(cabin_master_query(position, opts))
+    end
+  end
+
+  defp cabin_master_query(board_position, opts \\ []) do
+    query =
+      from(u in User,
+        where: u.board_position == ^board_position,
+        select: struct(u, ^@contact_fields),
+        order_by: [desc: u.updated_at],
+        limit: 1
+      )
+
+    if Keyword.get(opts, :active_only?, false) do
+      from(u in query, where: u.state == :active)
+    else
+      query
+    end
   end
 
   defp board_position(property) do

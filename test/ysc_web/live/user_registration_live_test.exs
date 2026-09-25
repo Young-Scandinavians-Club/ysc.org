@@ -11,6 +11,9 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
   alias Ysc.Accounts
 
+  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
+  @turnstile_token "test-token"
+
   defp user_with_lifetime_membership(attrs \\ %{}) do
     user_fixture(attrs)
     |> Ecto.Changeset.change(
@@ -142,6 +145,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       # Submit the complete form
       # Since successful submission redirects to account setup, we just ensure it doesn't error
       render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
         "user" =>
           Map.merge(step_0_params, Map.merge(step_1_params, step_2_params))
       })
@@ -409,6 +413,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       })
 
       render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
         "user" => Map.merge(Map.merge(step_0, step_1), step_2)
       })
 
@@ -620,7 +625,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       render_change(form, %{"user" => user_params})
-      render_submit(form, %{"user" => user_params})
+
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => user_params
+      })
 
       {path, _flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
@@ -657,7 +666,12 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       render_change(form, %{"user" => merged})
-      render_submit(form, %{"user" => merged})
+
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => merged
+      })
+
       assert render(lv) =~ "already registered"
 
       new_email = "fresh#{System.unique_integer()}@example.com"
@@ -725,7 +739,12 @@ defmodule YscWeb.UserRegistrationLiveTest do
         }
       }
 
-      html = render_submit(lv, "save", %{"user" => bad_params})
+      html =
+        render_submit(lv, "save", %{
+          "cf-turnstile-response" => @turnstile_token,
+          "user" => bad_params
+        })
+
       assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Previous step"
     end
@@ -880,7 +899,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       render_change(form, %{"user" => user_params})
-      render_submit(form, %{"user" => user_params})
+
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => user_params
+      })
 
       assert {path, _flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
@@ -947,7 +970,10 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       render_change(form, %{"user" => base})
 
-      render_submit(form, %{"user" => base})
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => base
+      })
 
       assert {path, _flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
@@ -984,7 +1010,12 @@ defmodule YscWeb.UserRegistrationLiveTest do
         }
       }
 
-      html = render_submit(lv, "save", %{"user" => bad_params})
+      html =
+        render_submit(lv, "save", %{
+          "cf-turnstile-response" => @turnstile_token,
+          "user" => bad_params
+        })
+
       assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Eligibility"
     end
@@ -1056,7 +1087,12 @@ defmodule YscWeb.UserRegistrationLiveTest do
         }
       }
 
-      html = render_submit(lv, "save", %{"user" => bad_params})
+      html =
+        render_submit(lv, "save", %{
+          "cf-turnstile-response" => @turnstile_token,
+          "user" => bad_params
+        })
+
       assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Additional Questions" or html =~ "Questions"
     end
@@ -1106,7 +1142,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
         Map.put(@valid_params, "email", "turnstile_ok#{uniq}@example.com")
 
       render_change(form, %{"user" => params})
-      render_submit(form, %{"user" => params})
+
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => params
+      })
 
       {path, flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
@@ -1129,7 +1169,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
       form = form(lv, "#registration_form")
 
       render_change(form, %{"user" => @valid_params})
-      render_submit(form, %{"user" => @valid_params})
+
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => @valid_params
+      })
 
       html = render(lv)
       assert html =~ "verify you"
@@ -1153,7 +1197,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
       form = form(lv, "#registration_form")
 
       render_change(form, %{"user" => @valid_params})
-      render_submit(form, %{"user" => @valid_params})
+
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => @valid_params
+      })
 
       assert_received :turnstile_refreshed
     end
@@ -1175,8 +1223,32 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       params = Map.put(@valid_params, "email", email)
       render_change(form, %{"user" => params})
+
+      render_submit(form, %{
+        "cf-turnstile-response" => @turnstile_token,
+        "user" => params
+      })
+
+      refute Accounts.get_user_by_email(email)
+    end
+
+    test "does not register the user when the Turnstile token is missing", %{
+      conn: conn
+    } do
+      email = "no_token#{System.unique_integer()}@example.com"
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      params = Map.put(@valid_params, "email", email)
+      render_change(form, %{"user" => params})
       render_submit(form, %{"user" => params})
 
+      assert render(lv) =~ "real person"
       refute Accounts.get_user_by_email(email)
     end
   end

@@ -10,6 +10,10 @@ const SUBMIT_HOLD_MS = 15000;
 // Interaction that means someone is filling in the form.
 const INTERACTION_EVENTS = ["focusin", "pointerdown", "input"];
 
+// Shown while a submit waits for a token, so the form doesn't look stuck.
+const HOLD_NOTICE =
+    "Checking that you're not a bot. If a checkbox appears, tick it and your form will send.";
+
 function callbackEvent(self, name, eventName) {
     return (payload) => {
         if (self._turnstileDestroyed || !self.el?.isConnected) return;
@@ -32,13 +36,15 @@ function callbackEvent(self, name, eventName) {
  * layout.
  *
  * A submit that happens before a token exists (fast typing, password-manager
- * autofill) is held and re-sent once Turnstile returns a token, errors out, or
- * SUBMIT_HOLD_MS passes.
+ * autofill, an unticked checkbox) is held and re-sent once Turnstile returns a
+ * token, errors out, or SUBMIT_HOLD_MS passes. While it's held, a notice under
+ * the widget says what's happening.
  */
 export const Turnstile = {
     mounted() {
         this._turnstileDestroyed = false;
         this.form = this.el.closest("form");
+        this.createHoldNotice();
 
         const interactionOnly = this.el.dataset.appearance === "interaction-only";
 
@@ -140,6 +146,25 @@ export const Turnstile = {
             "timeout-callback": releaseThen(callbackEvent(this, "timeout")),
         });
         this.rendered = true;
+        // Keep the notice under the widget Turnstile just appended.
+        this.el.append(this.holdNotice);
+    },
+
+    // Lives inside the phx-update="ignore" widget element so LiveView patches
+    // (e.g. phx-change while typing) don't remove it.
+    createHoldNotice() {
+        this.holdNotice = document.createElement("p");
+        this.holdNotice.className = "mt-2 text-sm text-zinc-600";
+        this.holdNotice.setAttribute("role", "status");
+        this.holdNotice.hidden = true;
+        this.el.append(this.holdNotice);
+    },
+
+    setHoldNotice(visible) {
+        if (!this.holdNotice) return;
+        this.holdNotice.hidden = !visible;
+        // Set text only when showing so screen readers announce the change.
+        this.holdNotice.textContent = visible ? HOLD_NOTICE : "";
     },
 
     // Refresh/remove are no-ops until the widget exists; a lazily rendered
@@ -175,11 +200,13 @@ export const Turnstile = {
 
         clearTimeout(this.holdTimer);
         this.holdTimer = setTimeout(() => this.releaseHeldSubmit(), SUBMIT_HOLD_MS);
+        this.setHoldNotice(true);
         this.load();
     },
 
     releaseHeldSubmit() {
         clearTimeout(this.holdTimer);
+        this.setHoldNotice(false);
         const held = this.heldSubmit;
         this.heldSubmit = null;
         // Next tick, so Turnstile has filled its hidden input before we re-submit.

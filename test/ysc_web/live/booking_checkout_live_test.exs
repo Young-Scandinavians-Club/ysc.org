@@ -1625,6 +1625,35 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "go back on the calendar"
     end
 
+    test "lists slim-loaded household names in the guest picker", %{
+      conn: conn,
+      user: user,
+      booking: booking
+    } do
+      unique = System.unique_integer([:positive])
+
+      household_guest =
+        user_fixture(%{
+          first_name: "PickerKid",
+          last_name: "Household#{unique}"
+        })
+
+      household_guest
+      |> change(%{})
+      |> Ecto.Changeset.put_change(:primary_user_id, user.id)
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert has_element?(view, "#guest-1-attendee-select")
+
+      assert has_element?(
+               view,
+               "#guest-1-attendee-select",
+               "PickerKid Household#{unique}"
+             )
+    end
+
     test "validate-guest-info with invalid guest data collects errors", %{
       conn: conn,
       booking: booking

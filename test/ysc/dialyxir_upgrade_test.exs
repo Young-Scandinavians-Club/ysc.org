@@ -46,7 +46,9 @@ defmodule Ysc.DialyxirUpgradeTest do
     end
 
     test "mix tasks we invoke still exist" do
+      assert {:module, _} = Code.ensure_loaded(Mix.Tasks.Dialyzer)
       assert function_exported?(Mix.Tasks.Dialyzer, :run, 1)
+      assert {:module, _} = Code.ensure_loaded(Mix.Tasks.Dialyzer.Explain)
       assert function_exported?(Mix.Tasks.Dialyzer.Explain, :run, 1)
     end
 

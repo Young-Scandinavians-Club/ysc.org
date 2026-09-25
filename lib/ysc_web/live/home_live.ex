@@ -200,18 +200,9 @@ defmodule YscWeb.HomeLive do
   defp load_user_with_subscriptions(user_id, just_logged_in) do
     preloads =
       if just_logged_in do
-        [
-          :passkeys,
-          :sub_accounts,
-          primary_user: :sub_accounts,
-          subscriptions: :subscription_items
-        ]
+        [:passkeys, subscriptions: :subscription_items]
       else
-        [
-          :sub_accounts,
-          primary_user: :sub_accounts,
-          subscriptions: :subscription_items
-        ]
+        [subscriptions: :subscription_items]
       end
 
     user_with_subs =
@@ -220,28 +211,26 @@ defmodule YscWeb.HomeLive do
 
     is_sub_account = Accounts.sub_account?(user_with_subs)
 
-    primary_user =
-      if is_sub_account,
-        do: Accounts.get_primary_user(user_with_subs),
-        else: nil
+    household = Accounts.list_household_dashboard_users(user_with_subs)
 
-    # For family/lifetime members, get family group (primary + sub-accounts)
-    user_for_family = primary_user || user_with_subs
-
-    family_group = Accounts.get_family_group(user_for_family)
-
-    # Same household set as Accounts.household_board_member/1 (single DB path vs. extra async task)
     membership_paused_by_board =
-      Enum.find(family_group, fn member -> member.board_position != nil end)
+      Enum.find(household, fn member -> member.board_position != nil end)
 
-    # Get active plan type for showing "Your Family" section
+    primary_user =
+      if is_sub_account do
+        Enum.find(household, &(&1.id == user_with_subs.primary_user_id))
+      else
+        nil
+      end
+
+    # MembershipCache already follows sub-accounts to the primary user.
     active_plan_type =
-      Ysc.Accounts.MembershipCache.get_membership_plan_type(user_for_family)
+      Ysc.Accounts.MembershipCache.get_membership_plan_type(user_with_subs)
 
     # Only show family section for primary users with family/lifetime and linked members
     other_family_members =
       if active_plan_type in [:family, :lifetime] and not is_sub_account do
-        Enum.reject(family_group, &(&1.id == user_with_subs.id))
+        Enum.reject(household, &(&1.id == user_with_subs.id))
       else
         []
       end
@@ -1859,7 +1848,10 @@ defmodule YscWeb.HomeLive do
               </section>
 
               <%!-- Your Family Section (family/lifetime members with linked users) --%>
-              <section :if={@async_data_loaded && @other_family_members != []}>
+              <section
+                :if={@async_data_loaded && @other_family_members != []}
+                id="home-family"
+              >
                 <div class="flex items-center justify-between mb-6">
                   <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
                     Your Family
@@ -1874,6 +1866,7 @@ defmodule YscWeb.HomeLive do
                 <div class="flex flex-wrap gap-x-3 gap-y-4">
                   <%= for member <- @other_family_members do %>
                     <div
+                      id={"home-family-member-#{member.id}"}
                       class="flex flex-col items-center w-16 text-center"
                       title={"#{member.first_name} #{member.last_name} · #{FamilyDisplay.relationship_label(member.family_relationship)}"}
                     >

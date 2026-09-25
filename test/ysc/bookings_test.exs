@@ -5490,6 +5490,13 @@ defmodule Ysc.BookingsTest do
   end
 
   describe "cancel_booking/3 hold booking and release_hold" do
+    setup :verify_on_exit!
+
+    setup do
+      allow_far_future_booking_dates()
+      :ok
+    end
+
     test "returns cancellation_failed when buyout hold cannot clear inventory" do
       user = user_fixture()
 
@@ -5515,6 +5522,130 @@ defmodule Ysc.BookingsTest do
       assert {:error,
               {:cancellation_failed, {:error, :inventory_update_failed}}} =
                Bookings.cancel_booking(booking)
+    end
+
+    test "confirms instead of canceling when hold PaymentIntent already succeeded" do
+      user = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(423)
+
+      assert {:ok, hold} =
+               Ysc.Bookings.BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_cancel_booking_succeeded_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        assert {:ok, confirmed, refund_amount, :hold_payment_confirmed} =
+                 Bookings.cancel_booking(hold)
+
+        assert confirmed.status == :complete
+        assert Money.zero?(refund_amount)
+
+        payment = Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "does not release a hold while PaymentIntent is still processing" do
+      user = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(424)
+
+      assert {:ok, hold} =
+               Ysc.Bookings.BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_cancel_booking_processing_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => hold.id}
+           }}
+        end)
+
+        assert {:error, {:cancellation_failed, :payment_in_progress}} =
+                 Bookings.cancel_booking(hold)
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
     end
   end
 

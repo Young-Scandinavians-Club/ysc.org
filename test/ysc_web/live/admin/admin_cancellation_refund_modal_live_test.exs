@@ -301,6 +301,52 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
              )
     end
 
+    test "a partially refunded cancelled order is not labeled fully Refunded",
+         %{conn: conn} do
+      event = event_fixture(%{state: :published})
+
+      %{ticket_order: order, tickets: tickets, payment: payment} =
+        completed_ticket_order_with_payment!(event: event, quantity: 2)
+
+      [first | rest] = tickets
+
+      assert {:ok, partial} =
+               Tickets.calculate_refund_amount(order, [first.id])
+
+      # Mirrors Money-tab: refund only part of the charge, then release every
+      # ticket via cancel_ticket_order. Any-refund classification used to show
+      # a green "Refunded" badge and hide the remaining balance.
+      assert {:ok, {_refund, _transaction, _entries}} =
+               Tickets.refund_via_stripe(
+                 payment,
+                 partial,
+                 "Partial money-tab refund",
+                 ticket_ids: [first.id]
+               )
+
+      assert {:ok, _canceled} =
+               Tickets.cancel_ticket_order(
+                 order,
+                 "Release after partial refund",
+                 from_statuses: [:completed]
+               )
+
+      for ticket <- [first | rest] do
+        assert Repo.get!(Ticket, ticket.id).status == :cancelled
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      row = "#cancellation-refund-order-#{order.id}"
+
+      assert has_element?(view, row, "Partially refunded")
+      refute has_element?(view, "#{row} input[type=checkbox]")
+    end
+
     test "a free/complimentary order shows a no-payment badge and cannot be selected",
          %{conn: conn, admin: admin} do
       event = event_fixture(%{state: :published})

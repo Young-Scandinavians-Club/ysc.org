@@ -72,6 +72,32 @@ defmodule YscWeb.UserBookingDetailLive do
     case Policy.authorize(:booking_cancel, user, booking) do
       :ok ->
         case Bookings.cancel_booking(booking, Date.utc_today(), reason) do
+          {:ok, updated_booking, _refund_amount, :hold_payment_confirmed} ->
+            updated_booking =
+              Bookings.get_user_booking_for_member_detail(
+                booking.id,
+                user.id
+              ) || updated_booking
+
+            {:noreply,
+             socket
+             |> assign(:booking, updated_booking)
+             |> assign(
+               :can_cancel,
+               BookingActions.can_cancel_booking?(updated_booking)
+             )
+             |> assign(
+               :can_change,
+               BookingActions.can_change_booking?(updated_booking)
+             )
+             |> assign(:show_cancel_modal, false)
+             |> YscWeb.Flash.put_toast(
+               :info,
+               YscWeb.BookingUserMessages.hold_cancel_payment_already_confirmed(),
+               title: "Booking"
+             )
+             |> push_navigate(to: ~p"/bookings/#{updated_booking.id}/receipt")}
+
           {:ok, updated_booking, refund_amount, refund_result} ->
             updated_booking =
               Bookings.get_user_booking_for_member_detail(

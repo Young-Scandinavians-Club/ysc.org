@@ -39,6 +39,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
   alias Ysc.Bookings.{
     Booking,
+    CabinMaster,
     Entitlements,
     PropertyInventory,
     RoomInventory,
@@ -2241,7 +2242,164 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   @doc """
+  Stripe-first hold release for member/admin cancel paths.
+
+  `release_hold/1` then `StripeService.cancel_payment_intent/1` treats a
+  succeeded Intent as `:ok`, which orphans a captured charge against a
+  `:canceled` hold, clears `applied_booking_entitlement_id`, and leaves
+  HoldExpiryWorker with nothing to confirm (`status != :hold`). Same
+  invariant as HoldExpiryWorker / checkout Cancel / sibling-hold cleanup.
+
+  Returns:
+  - `{:ok, canceled_booking}` when Stripe cancelled (or no PI) and the hold
+    was released
+  - `{:confirmed, confirmed_booking}` when Stripe already captured — the hold
+    is confirmed + ledgered instead of released
+  - `{:error, :payment_in_progress}` while Stripe is processing / unreachable
+  - `{:error, reason}` on release failure
+  """
+  def release_hold_with_stripe_reconcile(booking_id)
+      when is_binary(booking_id) do
+    booking = Repo.get!(Booking, booking_id)
+
+    case reconcile_hold_payment_for_release(booking) do
+      :release ->
+        release_hold(booking_id)
+
+      :confirmed ->
+        confirmed =
+          Repo.get!(Booking, booking_id) |> Repo.preload([:rooms, :user])
+
+        {:confirmed, confirmed}
+
+      :skip ->
+        {:error, :payment_in_progress}
+    end
+  end
+
+  defp reconcile_hold_payment_for_release(
+         %Booking{payment_intent_id: payment_intent_id} = booking
+       )
+       when is_binary(payment_intent_id) and payment_intent_id != "" do
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           payment_intent_id,
+           "release_hold_with_stripe_reconcile"
+         ) do
+      {:cancel, _payment_intent} ->
+        :release
+
+      {:already_succeeded, payment_intent} ->
+        confirm_succeeded_hold_for_release(booking, payment_intent)
+
+      {:in_progress, _payment_intent} ->
+        Ysc.Logging.info(
+          "Skipped releasing hold while checkout payment is in flight",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent_id
+        )
+
+        :skip
+
+      {:error, stripe_error} ->
+        Ysc.Logging.warning(
+          "Could not reconcile hold payment with Stripe, not releasing hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent_id,
+          error: inspect(stripe_error)
+        )
+
+        :skip
+    end
+  end
+
+  defp reconcile_hold_payment_for_release(_booking), do: :release
+
+  defp confirm_succeeded_hold_for_release(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case Bookings.verify_booking_payment_intent(payment_intent, booking) do
+      :ok ->
+        confirm_verified_hold_for_release(booking, payment_intent)
+
+      {:error, :payment_amount_mismatch} = error ->
+        Ysc.Logging.error(
+          "Payment succeeded on hold release but amount did not match the hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(error)
+        )
+
+        Bookings.maybe_refund_unfulfilled_checkout_payment(
+          booking,
+          payment_intent,
+          :payment_amount_mismatch
+        )
+
+        :release
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on hold release but could not be verified",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
+  end
+
+  defp confirm_verified_hold_for_release(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case confirm_booking(booking.id) do
+      {:ok, confirmed} ->
+        case Bookings.record_hold_checkout_ledger_payment(
+               confirmed,
+               payment_intent
+             ) do
+          :ok ->
+            :ok
+
+          {:error, ledger_reason} ->
+            Ysc.Logging.error(
+              "Hold confirmed after payment succeeded during release reconcile but ledger payment recording failed",
+              booking_id: confirmed.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(ledger_reason)
+            )
+        end
+
+        Ysc.Logging.info(
+          "Confirmed hold after payment succeeded during release reconcile",
+          booking_id: confirmed.id,
+          reference_id: confirmed.reference_id,
+          payment_intent_id: payment_intent.id
+        )
+
+        :confirmed
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on hold release but booking could not be confirmed",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
+  end
+
+  @doc """
   Releases a hold (cancels a :hold booking) and updates inventory accordingly.
+
+  Prefer `release_hold_with_stripe_reconcile/1` for member/admin cancel paths
+  that may race a captured PaymentIntent. Callers that already Stripe-reconciled
+  (HoldExpiryWorker, checkout Cancel, sibling-hold cleanup) may call this
+  directly after a successful cancel.
 
   ## Parameters:
   - `booking_id`: The booking to release
@@ -3731,9 +3889,7 @@ defmodule Ysc.Bookings.BookingLocker do
     require Ysc.Logging
 
     try do
-      booking =
-        Repo.get(Booking, booking.id)
-        |> Repo.preload([:user, :rooms])
+      booking = ensure_booking_assocs(booking, [:user, :rooms])
 
       if booking && booking.user do
         email_data =
@@ -3792,12 +3948,10 @@ defmodule Ysc.Bookings.BookingLocker do
     require Ysc.Logging
 
     try do
-      booking =
-        Repo.get(Booking, booking.id)
-        |> Repo.preload([:user, :rooms])
+      booking = ensure_booking_assocs(booking, [:user])
 
       if booking && booking.user do
-        cabin_master = find_active_cabin_master(booking.property)
+        cabin_master = CabinMaster.get_active(booking.property)
 
         if cabin_master && cabin_master.email do
           email_data =
@@ -3856,21 +4010,15 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  defp find_active_cabin_master(property) do
-    cabin_master_position =
-      case property do
-        :tahoe -> "tahoe_cabin_master"
-        :clear_lake -> "clear_lake_cabin_master"
-        _ -> nil
-      end
+  defp ensure_booking_assocs(%Booking{} = booking, assocs) do
+    needed =
+      Enum.reject(assocs, fn assoc ->
+        Ecto.assoc_loaded?(Map.fetch!(booking, assoc))
+      end)
 
-    if cabin_master_position do
-      from(u in Ysc.Accounts.User,
-        where:
-          u.board_position == ^cabin_master_position and u.state == :active,
-        limit: 1
-      )
-      |> Repo.one()
+    case needed do
+      [] -> booking
+      _ -> Repo.preload(booking, needed)
     end
   end
 

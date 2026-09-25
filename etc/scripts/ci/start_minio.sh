@@ -3,8 +3,10 @@
 #
 # GitHub-hosted runners get "pull access denied" for minio/minio on
 # Docker Hub (exit 125, run 34650037512 / job 103431213495, 2026-09-11).
-# The same pinned digests are still on quay.io. Pull with retries,
-# preferring quay.io then docker.io.
+# The same pinned official digests were on quay.io, but anonymous pulls
+# of quay.io/minio/* started returning 401 (PR #1409 Tests, run 36029304503,
+# 2026-09-24). Fall back to bitnamilegacy/minio, which still pulls from
+# Docker Hub and ships both the server and `mc`.
 #
 # Usage:
 #   ./etc/scripts/ci/start_minio.sh
@@ -17,6 +19,8 @@ MINIO_TAG="${MINIO_TAG:-RELEASE.2025-03-12T18-04-18Z}"
 MC_TAG="${MC_TAG:-RELEASE.2025-03-12T17-29-24Z}"
 MINIO_DIGEST="${MINIO_DIGEST:-sha256:46b3009bf7041eefbd90bd0d2b38c6ddc24d20a35d609551a1802c558c1c958f}"
 MC_DIGEST="${MC_DIGEST:-sha256:470f5546b596e16c7816b9c3fa7a78ce4076bb73c2c73f7faeec0c8043923123}"
+BITNAMI_MINIO_TAG="${BITNAMI_MINIO_TAG:-2025.7.23-debian-12-r5}"
+BITNAMI_MINIO_DIGEST="${BITNAMI_MINIO_DIGEST:-sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20}"
 MINIO_PULL_ATTEMPTS="${MINIO_PULL_ATTEMPTS:-8}"
 MINIO_RETRY_DELAY_SECONDS="${MINIO_RETRY_DELAY_SECONDS:-2}"
 MINIO_HEALTH_ATTEMPTS="${MINIO_HEALTH_ATTEMPTS:-60}"
@@ -43,16 +47,22 @@ retry() {
   done
 }
 
+bitnami_minio_ref() {
+  printf '%s\n' "docker.io/bitnamilegacy/minio:${BITNAMI_MINIO_TAG}@${BITNAMI_MINIO_DIGEST}"
+}
+
 minio_image_refs() {
   printf '%s\n' \
     "quay.io/minio/minio:${MINIO_TAG}@${MINIO_DIGEST}" \
-    "docker.io/minio/minio:${MINIO_TAG}@${MINIO_DIGEST}"
+    "docker.io/minio/minio:${MINIO_TAG}@${MINIO_DIGEST}" \
+    "$(bitnami_minio_ref)"
 }
 
 mc_image_refs() {
   printf '%s\n' \
     "quay.io/minio/mc:${MC_TAG}@${MC_DIGEST}" \
-    "docker.io/minio/mc:${MC_TAG}@${MC_DIGEST}"
+    "docker.io/minio/mc:${MC_TAG}@${MC_DIGEST}" \
+    "$(bitnami_minio_ref)"
 }
 
 docker_pull() {
@@ -116,7 +126,12 @@ start_minio() {
   mc_ref="$(pull_from_registries mc_image_refs)"
 
   docker rm -f "${MINIO_CONTAINER_NAME}" 2>/dev/null || true
+  # Official minio images already run as root with entrypoint `minio`.
+  # bitnamilegacy/minio uses a non-root Bitnami wrapper that cannot write
+  # /data unless we override both.
   docker run -d --name "${MINIO_CONTAINER_NAME}" -p 9000:9000 \
+    --user root \
+    --entrypoint minio \
     -e MINIO_ROOT_USER=minioadmin \
     -e MINIO_ROOT_PASSWORD=minioadmin \
     "${minio_ref}" \
@@ -128,7 +143,7 @@ start_minio() {
 }
 
 self_test() {
-  local tmp n out first second refs
+  local tmp n out first second third refs
 
   tmp="$(mktemp)"
   echo 0 >"${tmp}"
@@ -149,6 +164,7 @@ self_test() {
   mapfile -t refs < <(minio_image_refs)
   first="${refs[0]}"
   second="${refs[1]}"
+  third="${refs[2]}"
   if [[ "${first}" != quay.io/minio/minio:*@${MINIO_DIGEST} ]]; then
     echo "start_minio.sh: expected quay.io minio ref first, got ${first}" >&2
     return 1
@@ -157,16 +173,25 @@ self_test() {
     echo "start_minio.sh: expected docker.io minio ref second, got ${second}" >&2
     return 1
   fi
+  if [[ "${third}" != docker.io/bitnamilegacy/minio:*@${BITNAMI_MINIO_DIGEST} ]]; then
+    echo "start_minio.sh: expected bitnamilegacy minio ref third, got ${third}" >&2
+    return 1
+  fi
 
   mapfile -t refs < <(mc_image_refs)
   first="${refs[0]}"
   second="${refs[1]}"
+  third="${refs[2]}"
   if [[ "${first}" != quay.io/minio/mc:*@${MC_DIGEST} ]]; then
     echo "start_minio.sh: expected quay.io mc ref first, got ${first}" >&2
     return 1
   fi
   if [[ "${second}" != docker.io/minio/mc:*@${MC_DIGEST} ]]; then
     echo "start_minio.sh: expected docker.io mc ref second, got ${second}" >&2
+    return 1
+  fi
+  if [[ "${third}" != docker.io/bitnamilegacy/minio:*@${BITNAMI_MINIO_DIGEST} ]]; then
+    echo "start_minio.sh: expected bitnamilegacy mc ref third, got ${third}" >&2
     return 1
   fi
 
@@ -196,6 +221,20 @@ self_test() {
   out="$(MINIO_PULL_ATTEMPTS=2 MINIO_RETRY_DELAY_SECONDS=0 pull_from_registries minio_image_refs)"
   if [[ "${out}" != docker.io/minio/minio:*@${MINIO_DIGEST} ]]; then
     echo "start_minio.sh: expected docker.io fallback, got ${out}" >&2
+    return 1
+  fi
+
+  docker_pull() {
+    case "$1" in
+      quay.io/*) return 1 ;;
+      docker.io/minio/*) return 1 ;;
+      docker.io/bitnamilegacy/minio:*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  out="$(MINIO_PULL_ATTEMPTS=2 MINIO_RETRY_DELAY_SECONDS=0 pull_from_registries minio_image_refs)"
+  if [[ "${out}" != docker.io/bitnamilegacy/minio:*@${BITNAMI_MINIO_DIGEST} ]]; then
+    echo "start_minio.sh: expected bitnamilegacy fallback, got ${out}" >&2
     return 1
   fi
 

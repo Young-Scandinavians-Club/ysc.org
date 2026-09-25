@@ -112,9 +112,16 @@ defmodule YscWeb.TahoeBookingLive do
             do: Accounts.preload_user_subscriptions_for_booking(user),
             else: nil
 
+        family_user_ids =
+          if user, do: Accounts.get_family_group_user_ids(user), else: []
+
         # Load active bookings for the entire family group (needed for eligibility check)
         active_bookings =
-          if user, do: get_family_group_active_bookings(user), else: []
+          if user do
+            Bookings.list_active_tahoe_bookings_for_family(family_user_ids)
+          else
+            []
+          end
 
         # Check if user can book (pass user_with_subs to avoid re-fetching subscriptions)
         {can_book, booking_error_title, booking_disabled_reason} =
@@ -169,9 +176,6 @@ defmodule YscWeb.TahoeBookingLive do
           Bookings.get_active_refund_policy(:tahoe, :buyout)
 
         room_refund_policy = Bookings.get_active_refund_policy(:tahoe, :room)
-
-        family_user_ids =
-          if user, do: get_family_group_user_ids(user), else: []
 
         {user_with_subs, active_bookings, can_book, booking_error_title,
          booking_disabled_reason, active_tab, membership_type,
@@ -2750,6 +2754,7 @@ defmodule YscWeb.TahoeBookingLive do
                   <!-- Submit Button -->
                   <div class="pt-2">
                     <.button
+                      id="tahoe-review-booking-desktop"
                       phx-click="show-confirm-modal"
                       phx-disable-with="Loading..."
                       disabled={!can_submit_booking?(assigns)}
@@ -2762,7 +2767,7 @@ defmodule YscWeb.TahoeBookingLive do
                       }
                     >
                       <span class="flex items-center justify-center gap-2">
-                        <.icon name="hero-check-circle-solid" class="w-5 h-5" />Review booking
+                        <.icon name="hero-check-circle-solid" class="w-5 h-5" />{YscWeb.BookingUserMessages.tahoe_review_booking_button()}
                       </span>
                     </.button>
                     <p
@@ -2776,9 +2781,10 @@ defmodule YscWeb.TahoeBookingLive do
               </div>
             </aside>
           </div>
-          <!-- Confirmation Modal (Interstitial) -->
+          <!-- Review acknowledgments before checkout (stay is not booked yet) -->
           <div
             :if={Map.get(assigns, :show_confirm_modal, false)}
+            id="tahoe-review-booking-modal"
             class="fixed inset-0 z-50 overflow-y-auto"
             phx-click-away="close-confirm-modal"
           >
@@ -2808,12 +2814,18 @@ defmodule YscWeb.TahoeBookingLive do
                       />
                     </div>
                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                      <h3 class="text-lg leading-6 font-medium text-zinc-900 mb-4">
-                        Confirm Your Booking
+                      <h3
+                        id="tahoe-review-booking-modal-title"
+                        class="text-lg leading-6 font-medium text-zinc-900 mb-4"
+                      >
+                        {YscWeb.BookingUserMessages.tahoe_review_modal_title()}
                       </h3>
                       <div class="mt-2 flex flex-col gap-4">
-                        <p class="text-sm text-zinc-500">
-                          Before confirming, please acknowledge the following requirements:
+                        <p
+                          id="tahoe-review-booking-modal-intro"
+                          class="text-sm text-zinc-500"
+                        >
+                          {YscWeb.BookingUserMessages.tahoe_review_modal_intro()}
                         </p>
                         <label class="flex items-start gap-3 cursor-pointer p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
                           <input
@@ -2893,6 +2905,7 @@ defmodule YscWeb.TahoeBookingLive do
                 </div>
                 <div class="bg-zinc-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <.button
+                    id="tahoe-review-booking-continue"
                     phx-click="create-booking"
                     disabled={
                       !Map.get(assigns, :linens_confirmed, false) ||
@@ -2916,14 +2929,15 @@ defmodule YscWeb.TahoeBookingLive do
                       |> Enum.join(" ")
                     }
                   >
-                    Confirm Booking
+                    {YscWeb.BookingUserMessages.tahoe_review_modal_continue_button()}
                   </.button>
                   <button
                     type="button"
+                    id="tahoe-review-booking-go-back"
                     phx-click="close-confirm-modal"
                     class="mt-3 w-full sm:mt-0 sm:w-auto px-4 py-2 text-sm font-semibold text-zinc-700 bg-white border border-zinc-300 rounded-sm hover:bg-zinc-50"
                   >
-                    Cancel
+                    {YscWeb.BookingUserMessages.tahoe_review_modal_back_button()}
                   </button>
                 </div>
               </div>
@@ -4586,6 +4600,7 @@ defmodule YscWeb.TahoeBookingLive do
               </div>
               <.button
                 :if={@can_book}
+                id="tahoe-review-booking-mobile"
                 phx-click="show-confirm-modal"
                 disabled={!can_submit_booking?(assigns)}
                 class={
@@ -4596,7 +4611,7 @@ defmodule YscWeb.TahoeBookingLive do
                   end
                 }
               >
-                Confirm Booking
+                {YscWeb.BookingUserMessages.tahoe_review_booking_button()}
               </.button>
             </div>
           </div>
@@ -5133,7 +5148,7 @@ defmodule YscWeb.TahoeBookingLive do
              )
              |> YscWeb.Flash.put_toast(
                :info,
-               "Booking created! Please complete payment to confirm.",
+               YscWeb.BookingUserMessages.tahoe_hold_created_toast(),
                title: "Booking",
                icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
              )
@@ -7173,14 +7188,8 @@ defmodule YscWeb.TahoeBookingLive do
   # Get active bookings for the entire family group (primary user + all sub-accounts)
   defp get_family_group_active_bookings(user, limit \\ 10) do
     user
-    |> get_family_group_user_ids()
+    |> Accounts.get_family_group_user_ids()
     |> Bookings.list_active_tahoe_bookings_for_family(limit: limit)
-  end
-
-  # Get all user IDs in the family group (primary user + all sub-accounts)
-  defp get_family_group_user_ids(user) do
-    family_group = Accounts.get_family_group(user)
-    Enum.map(family_group, & &1.id)
   end
 
   defp past_checkout_time? do

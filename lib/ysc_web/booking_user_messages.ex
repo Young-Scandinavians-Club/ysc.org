@@ -65,6 +65,34 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def tahoe_review_booking_button do
+    "Review booking"
+  end
+
+  def tahoe_review_modal_title do
+    "Review your booking"
+  end
+
+  def tahoe_review_modal_intro do
+    trim("""
+    Your stay is not booked yet. Check the boxes below, then continue. Next you'll add guest names and pay to confirm these dates.
+    """)
+  end
+
+  def tahoe_review_modal_continue_button do
+    "Continue to payment"
+  end
+
+  def tahoe_review_modal_back_button do
+    "Go back"
+  end
+
+  def tahoe_hold_created_toast do
+    trim("""
+    These dates are held for a short time. Add guest names and pay on the next page to confirm your booking.
+    """)
+  end
+
   def checkout_guest_info_step_enter_guests do
     "Enter the names of everyone else staying with you. You're already included in the booking — only list the other people below."
   end
@@ -280,6 +308,10 @@ defmodule YscWeb.BookingUserMessages do
     " #{modification_after_payment_recovery_body()}"
   end
 
+  def hold_cancel_payment_already_confirmed do
+    "Your payment already went through, so we confirmed this booking instead of cancelling it. You can cancel the confirmed stay from this page if you still want to."
+  end
+
   def cancel_refund_error(reason) do
     support = "Email info@ysc.org with #{booking_reference_support_phrase()}"
 
@@ -295,6 +327,9 @@ defmodule YscWeb.BookingUserMessages do
 
       {:pending_refund_failed, _} ->
         "We cancelled your booking, but we couldn't submit your refund for review. #{support} and we'll follow up."
+
+      {:cancellation_failed, :payment_in_progress} ->
+        "Your payment is still processing, so we couldn't cancel this booking yet. Please wait a moment and try again, or email info@ysc.org if it stays stuck."
 
       {:cancellation_failed, _} ->
         "We couldn't cancel your booking. Please try again, or email info@ysc.org if the problem continues."

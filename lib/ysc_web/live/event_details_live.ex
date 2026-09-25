@@ -4779,7 +4779,10 @@ defmodule YscWeb.EventDetailsLive do
       get_tickets_requiring_registration(ticket_order.tickets)
 
     # Load family members for the current user
-    family_members = Ysc.Accounts.get_family_group(socket.assigns.current_user)
+    family_members =
+      Ysc.Accounts.list_household_guest_picker_users(
+        socket.assigns.current_user
+      )
 
     registration_assigns =
       init_ticket_registration_assigns(
@@ -8639,7 +8642,10 @@ defmodule YscWeb.EventDetailsLive do
       get_tickets_requiring_registration(ticket_order.tickets)
 
     # Load family members for the current user
-    family_members = Ysc.Accounts.get_family_group(socket.assigns.current_user)
+    family_members =
+      Ysc.Accounts.list_household_guest_picker_users(
+        socket.assigns.current_user
+      )
 
     %{
       ticket_details_form: ticket_details_form,

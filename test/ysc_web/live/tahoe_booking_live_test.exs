@@ -173,6 +173,72 @@ defmodule YscWeb.TahoeBookingLiveTest do
       refute has_element?(view, "#door-code-access", "Unique to your booking")
     end
 
+    test "review-before-checkout copy does not say Confirm Booking", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-desktop",
+               "Review booking"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-mobile",
+               "Review booking"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-review-booking-mobile",
+               "Confirm Booking"
+             )
+
+      render_click(view, "show-confirm-modal", %{})
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-modal-title",
+               "Review your booking"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-modal-intro",
+               "not booked yet"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-continue",
+               "Continue to payment"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-go-back",
+               "Go back"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-review-booking-modal",
+               "Confirm Your Booking"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-review-booking-continue",
+               "Confirm Booking"
+             )
+    end
+
     test "uses book, not rent or reserve, for the entire-cabin option", %{
       conn: conn
     } do

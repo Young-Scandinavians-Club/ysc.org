@@ -14,10 +14,14 @@ services:
       timeout: 5s
       retries: 5
 
-  # quay.io: Docker Hub denied minio/minio pulls on GHA (run 34650037512).
+  # Official minio/minio was removed from Docker Hub (2026-09-11). Anonymous
+  # quay.io/minio pulls started returning 401 (2026-09-24). bitnamilegacy still
+  # publishes a pullable image that includes both the server and `mc`.
   # Digest must stay in sync with etc/scripts/ci/start_minio.sh.
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-03-12T18-04-18Z@sha256:46b3009bf7041eefbd90bd0d2b38c6ddc24d20a35d609551a1802c558c1c958f
+    image: docker.io/bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
+    user: root
+    entrypoint: ["minio"]
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
@@ -32,7 +36,7 @@ services:
       retries: 5
 
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-03-12T17-29-24Z@sha256:470f5546b596e16c7816b9c3fa7a78ce4076bb73c2c73f7faeec0c8043923123
+    image: docker.io/bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
     depends_on:
       minio:
         condition: service_healthy

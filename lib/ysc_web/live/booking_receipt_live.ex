@@ -105,6 +105,26 @@ defmodule YscWeb.BookingReceiptLive do
 
     if can_cancel_booking?(booking) do
       case Bookings.cancel_booking(booking, get_today_pst(), reason) do
+        {:ok, confirmed_booking, _refund_amount, :hold_payment_confirmed} ->
+          {:noreply,
+           socket
+           |> assign(:show_cancel_modal, false)
+           |> assign(:booking, confirmed_booking)
+           |> assign(
+             :can_cancel,
+             BookingActions.can_cancel_booking?(confirmed_booking)
+           )
+           |> assign(
+             :can_change,
+             BookingActions.can_change_booking?(confirmed_booking)
+           )
+           |> YscWeb.Flash.put_toast(
+             :info,
+             YscWeb.BookingUserMessages.hold_cancel_payment_already_confirmed(),
+             title: "Booking"
+           )
+           |> push_navigate(to: ~p"/bookings/#{confirmed_booking.id}/receipt")}
+
         {:ok, _canceled_booking, refund_amount, refund_result} ->
           # Check if refund_result is a PendingRefund (partial refund) or LedgerTransaction (full refund)
           is_pending_refund =

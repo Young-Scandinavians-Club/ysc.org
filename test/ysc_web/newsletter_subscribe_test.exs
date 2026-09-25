@@ -73,4 +73,102 @@ defmodule YscWeb.NewsletterSubscribeTest do
       assert NewsletterSubscribe.guest_error("nope") =~ "info@ysc.org"
     end
   end
+
+  describe "request_guest/2 Turnstile" do
+    setup do
+      # Unique IP per test so the shared Hammer IP bucket can't rate-limit us.
+      ip = {10, 0, 0, rem(System.unique_integer([:positive]), 250) + 1}
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}, flash: %{}, remote_ip: ip}
+      }
+
+      email = "nl_turnstile_#{System.unique_integer([:positive])}@example.com"
+      %{socket: socket, email: email, ip: ip}
+    end
+
+    test "rejects a missing token without calling Cloudflare", %{
+      socket: socket,
+      email: email
+    } do
+      test_pid = self()
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket ->
+        send(test_pid, :turnstile_refreshed)
+        socket
+      end)
+
+      socket = NewsletterSubscribe.request_guest(socket, %{"email" => email})
+
+      assert socket.assigns.newsletter_error ==
+               NewsletterSubscribe.guest_error(:turnstile)
+
+      assert_received :turnstile_refreshed
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
+    end
+
+    test "rejects a blank token", %{socket: socket, email: email} do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run with a blank token")
+      end)
+
+      socket =
+        NewsletterSubscribe.request_guest(socket, %{
+          "email" => email,
+          "cf-turnstile-response" => ""
+        })
+
+      assert socket.assigns.newsletter_error ==
+               NewsletterSubscribe.guest_error(:turnstile)
+
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
+    end
+
+    test "rejects a failed Turnstile check", %{socket: socket, email: email} do
+      test_pid = self()
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket ->
+        send(test_pid, :turnstile_refreshed)
+        socket
+      end)
+
+      socket =
+        NewsletterSubscribe.request_guest(socket, %{
+          "email" => email,
+          "cf-turnstile-response" => "bad-token"
+        })
+
+      assert socket.assigns.newsletter_error ==
+               NewsletterSubscribe.guest_error(:turnstile)
+
+      assert_received :turnstile_refreshed
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
+    end
+
+    test "subscribes after a successful Turnstile check", %{
+      socket: socket,
+      email: email,
+      ip: ip
+    } do
+      params = %{"email" => email, "cf-turnstile-response" => "good-token"}
+
+      expect(TurnstileMock, :verify, fn ^params, ^ip ->
+        {:ok, %{"success" => true}}
+      end)
+
+      socket = NewsletterSubscribe.request_guest(socket, params)
+
+      assert socket.assigns.newsletter_submitted
+      assert is_nil(socket.assigns.newsletter_error)
+      refute Newsletter.get_subscriber_by_email(email).subscribed
+    end
+  end
 end

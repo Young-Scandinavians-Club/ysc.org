@@ -49,6 +49,7 @@ defmodule Ysc.SwooshUpgradeTest do
     end
 
     test "Email, Mailer, and AmazonSES APIs we use still exist" do
+      assert {:module, _} = Code.ensure_loaded(Swoosh.Email)
       assert function_exported?(Swoosh.Email, :new, 0)
       assert function_exported?(Swoosh.Email, :to, 2)
       assert function_exported?(Swoosh.Email, :from, 2)
@@ -57,6 +58,7 @@ defmodule Ysc.SwooshUpgradeTest do
       assert function_exported?(Swoosh.Email, :html_body, 2)
       assert function_exported?(Swoosh.Email, :text_body, 2)
       assert function_exported?(Swoosh.Email, :put_provider_option, 3)
+      assert {:module, _} = Code.ensure_loaded(Swoosh.Adapters.AmazonSES)
       assert function_exported?(Swoosh.Adapters.AmazonSES, :deliver, 2)
       {:module, Mailer} = Code.ensure_loaded(Mailer)
       # `use Swoosh.Mailer` defines deliver/2 with a default config;
