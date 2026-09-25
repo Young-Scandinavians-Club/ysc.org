@@ -39,6 +39,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
   alias Ysc.Bookings.{
     Booking,
+    CabinMaster,
     Entitlements,
     PropertyInventory,
     RoomInventory,
@@ -3921,9 +3922,7 @@ defmodule Ysc.Bookings.BookingLocker do
     require Ysc.Logging
 
     try do
-      booking =
-        Repo.get(Booking, booking.id)
-        |> Repo.preload([:user, :rooms])
+      booking = ensure_booking_assocs(booking, [:user, :rooms])
 
       if booking && booking.user do
         email_data =
@@ -3982,12 +3981,10 @@ defmodule Ysc.Bookings.BookingLocker do
     require Ysc.Logging
 
     try do
-      booking =
-        Repo.get(Booking, booking.id)
-        |> Repo.preload([:user, :rooms])
+      booking = ensure_booking_assocs(booking, [:user])
 
       if booking && booking.user do
-        cabin_master = find_active_cabin_master(booking.property)
+        cabin_master = CabinMaster.get_active(booking.property)
 
         if cabin_master && cabin_master.email do
           email_data =
@@ -4046,21 +4043,15 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  defp find_active_cabin_master(property) do
-    cabin_master_position =
-      case property do
-        :tahoe -> "tahoe_cabin_master"
-        :clear_lake -> "clear_lake_cabin_master"
-        _ -> nil
-      end
+  defp ensure_booking_assocs(%Booking{} = booking, assocs) do
+    needed =
+      Enum.reject(assocs, fn assoc ->
+        Ecto.assoc_loaded?(Map.fetch!(booking, assoc))
+      end)
 
-    if cabin_master_position do
-      from(u in Ysc.Accounts.User,
-        where:
-          u.board_position == ^cabin_master_position and u.state == :active,
-        limit: 1
-      )
-      |> Repo.one()
+    case needed do
+      [] -> booking
+      _ -> Repo.preload(booking, needed)
     end
   end
 

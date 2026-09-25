@@ -13,11 +13,9 @@ defmodule YscWeb.ExpenseReportLive do
   alias Ysc.Accounts
   alias Ysc.Accounts.User
   alias Ysc.Events
-  alias Ysc.Repo
   alias YscWeb.DateDisplay
   alias YscWeb.Validators.FileValidator
 
-  import Ecto.Query
   require Ysc.Logging
 
   @impl true
@@ -4395,11 +4393,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp present?(_), do: true
 
   defp get_treasurer do
-    from(u in User,
-      where: u.board_position == "treasurer" and u.state == :active,
-      limit: 1
-    )
-    |> Repo.one()
+    Accounts.get_active_board_member(:treasurer)
   end
 
   defp expense_upload_error_message(reason) do

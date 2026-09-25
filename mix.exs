@@ -330,6 +330,13 @@ defmodule Ysc.MixProject do
       # LiveComponent asyncs on removal; HTMLFormatter early-close gate.
       {:phoenix_live_view, "~> 1.2.12"},
       {:phoenix_test, "~> 0.12", only: :test, runtime: false},
+      # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
+      # SVG and MathML on to_html/2 so a parse/serialize round-trip cannot
+      # turn encoded markup into live tags (mutation XSS). Phoenix.LiveView.Test.DOM
+      # serializes with LazyHTML.to_html/2; we query HTML in tests and do not
+      # sanitize untrusted HTML with lazy_html (that's html_sanitize_ex).
+      # phoenix_live_view lists it optional ~> 0.1.0; pin the patched floor.
+      {:lazy_html, "~> 0.1.13", only: :test},
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+.
       # 1.8.12: clear return_to after login; drop channel messages without a join_ref.
