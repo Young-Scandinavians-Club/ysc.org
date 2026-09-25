@@ -1,6 +1,7 @@
 defmodule YscWeb.GuestTurnstileTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
   import Mox
 
   alias YscWeb.GuestTurnstile
@@ -37,7 +38,13 @@ defmodule YscWeb.GuestTurnstileTest do
     end
   end
 
-  describe "verify_token/2" do
+  # Formats captured logs with the metadata GuestTurnstile attaches.
+  @log_format [
+    format: "$message $metadata",
+    metadata: [:form, :turnstile_reason]
+  ]
+
+  describe "verify_token/3" do
     test "rejects a missing or blank token without calling Cloudflare" do
       stub(TurnstileMock, :verify, fn _params, _ip ->
         flunk("Turnstile.verify must not run without a token")
@@ -82,6 +89,65 @@ defmodule YscWeb.GuestTurnstileTest do
                  %{"cf-turnstile-response" => "bad"},
                  {127, 0, 0, 1}
                )
+    end
+
+    test "logs the form and Cloudflare's error codes on rejection" do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response", "bad-request"]}}
+      end)
+
+      log =
+        capture_log(@log_format, fn ->
+          GuestTurnstile.verify_token(
+            %{"cf-turnstile-response" => "bad"},
+            {127, 0, 0, 1},
+            form: "Contact"
+          )
+        end)
+
+      assert log =~ "Turnstile check failed"
+      assert log =~ "form=Contact"
+      assert log =~ "turnstile_reason=invalid-input-response,bad-request"
+    end
+
+    test "logs a missing token" do
+      log =
+        capture_log(@log_format, fn ->
+          GuestTurnstile.verify_token(%{}, {127, 0, 0, 1}, form: "Newsletter")
+        end)
+
+      assert log =~ "form=Newsletter"
+      assert log =~ "turnstile_reason=missing_token"
+    end
+
+    test "does not log a successful check" do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:ok, %{"success" => true}}
+      end)
+
+      log =
+        capture_log(@log_format, fn ->
+          GuestTurnstile.verify_token(
+            %{"cf-turnstile-response" => "token"},
+            {127, 0, 0, 1},
+            form: "SuccessCheck"
+          )
+        end)
+
+      refute log =~ "form=SuccessCheck"
+    end
+  end
+
+  describe "rejection_reason/1" do
+    test "summarizes reasons for the log line" do
+      assert GuestTurnstile.rejection_reason(:missing_token) == "missing_token"
+
+      assert GuestTurnstile.rejection_reason(%{
+               "error-codes" => ["timeout-or-duplicate"]
+             }) == "timeout-or-duplicate"
+
+      assert GuestTurnstile.rejection_reason({:failed_connect, []}) ==
+               "{:failed_connect, []}"
     end
   end
 
@@ -134,6 +200,18 @@ defmodule YscWeb.GuestTurnstileTest do
 
       assert Phoenix.Flash.get(socket.assigns.flash, "error_toast_title") ==
                "Volunteer"
+    end
+
+    test "logs the rejection under the toast title" do
+      stub(TurnstileMock, :refresh, fn socket -> socket end)
+
+      log =
+        capture_log(@log_format, fn ->
+          GuestTurnstile.verify(socket(%{}), %{}, title: "Volunteer")
+        end)
+
+      assert log =~ "form=Volunteer"
+      assert log =~ "turnstile_reason=missing_token"
     end
 
     test "required: true verifies even when logged_in? is true" do

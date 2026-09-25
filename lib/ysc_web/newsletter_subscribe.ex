@@ -17,8 +17,6 @@ defmodule YscWeb.NewsletterSubscribe do
       end
   """
 
-  require Ysc.Logging
-
   alias Ysc.Newsletter
   alias Ysc.NewsletterRateLimit
   alias YscWeb.GuestTurnstile
@@ -130,15 +128,13 @@ defmodule YscWeb.NewsletterSubscribe do
 
   # Turnstile is mandatory: a missing token is rejected like a failed check.
   defp verify_and_subscribe(socket, params, email) do
-    case GuestTurnstile.verify_token(params, socket.assigns.remote_ip) do
+    case GuestTurnstile.verify_token(params, socket.assigns.remote_ip,
+           form: "Newsletter"
+         ) do
       :ok ->
         subscribe_guest(socket, email)
 
-      {:error, reason} ->
-        Ysc.Logging.info("Newsletter guest signup rejected by Turnstile",
-          extra: %{reason: inspect(reason)}
-        )
-
+      {:error, _reason} ->
         socket
         |> assign_guest_error(email, guest_error(:turnstile))
         |> GuestTurnstile.refresh()
