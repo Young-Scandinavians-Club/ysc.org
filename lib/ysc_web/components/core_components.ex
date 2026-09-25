@@ -2057,17 +2057,19 @@ defmodule YscWeb.CoreComponents do
         {render_slot(@button_block)}
       </button>
       <!-- Dropdown menu -->
+      <%!-- Mobile renders inline as an accordion inside the slide-in sheet (styled via .dropdown-content in app.css) --%>
       <div
         id={@id}
         class={[
-          "z-110 hidden font-normal bg-white divide-y rounded-sm divide-zinc-100 shadow-sm w-52 wide:w-72",
-          @drop_up && "bottom-full mb-1",
-          !@drop_up && "mt-1",
-          @right && "right-0",
-          !@right && "left-0",
-          @mobile && "block lg:absolute shadow-none lg:shadow-sm",
-          !@mobile && "absolute shadow-sm",
-          @wide && "wide"
+          "hidden font-normal",
+          @mobile && "dropdown-content",
+          !@mobile &&
+            "absolute z-110 bg-white divide-y rounded-sm divide-zinc-100 shadow-sm w-52 wide:w-72",
+          !@mobile && @drop_up && "bottom-full mb-1",
+          !@mobile && !@drop_up && "mt-1",
+          !@mobile && @right && "right-0",
+          !@mobile && !@right && "left-0",
+          !@mobile && @wide && "wide"
         ]}
       >
         {render_slot(@inner_block)}
