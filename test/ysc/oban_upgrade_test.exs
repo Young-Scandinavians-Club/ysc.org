@@ -147,7 +147,9 @@ defmodule Ysc.ObanUpgradeTest do
 
   describe "snooze API" do
     test "Worker still documents {:snooze, period} and Engine.snooze_job/3 exists" do
+      assert {:module, _} = Code.ensure_loaded(Oban.Engine)
       assert function_exported?(Oban.Engine, :snooze_job, 3)
+      assert {:module, _} = Code.ensure_loaded(Oban.Period)
       assert function_exported?(Oban.Period, :to_seconds, 1)
 
       # Rate-limit snoozes in EmailNotifier / NewsletterSender stay {:snooze, seconds}.

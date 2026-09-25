@@ -15,6 +15,7 @@ defmodule YscWeb.FlopPhoenixUpgradeTest do
     end
 
     test "table, pagination, and path helpers we use still exist" do
+      assert {:module, _} = Code.ensure_loaded(Flop.Phoenix)
       assert function_exported?(Flop.Phoenix, :table, 1)
       assert function_exported?(Flop.Phoenix, :pagination, 1)
       assert function_exported?(Flop.Phoenix, :filter_fields, 1)

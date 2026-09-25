@@ -40,6 +40,7 @@ defmodule Ysc.FlopUpgradeTest do
     end
 
     test "validate_and_run/3 and run/3 still exist" do
+      assert {:module, _} = Code.ensure_loaded(Flop)
       assert function_exported?(Flop, :validate_and_run, 3)
       assert function_exported?(Flop, :validate, 2)
       assert function_exported?(Flop, :run, 3)
@@ -47,6 +48,7 @@ defmodule Ysc.FlopUpgradeTest do
       assert function_exported?(Flop, :cursor_fields, 2)
       assert function_exported?(Flop, :allowed_fields, 2)
       assert function_exported?(Flop, :get_option, 3)
+      assert {:module, _} = Code.ensure_loaded(Flop.Schema)
       assert function_exported?(Flop.Schema, :flop_schema!, 1)
     end
   end
@@ -54,6 +56,7 @@ defmodule Ysc.FlopUpgradeTest do
   describe "Flop.Schema 0.29 behaviour" do
     test "schemas we paginate implement the behaviour via __flop_schema__/0" do
       for schema <- @paginated_schemas do
+        assert {:module, _} = Code.ensure_loaded(schema)
         assert function_exported?(schema, :__flop_schema__, 0)
         config = Flop.Schema.flop_schema!(schema)
         assert is_map(config)

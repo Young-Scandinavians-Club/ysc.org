@@ -54,6 +54,7 @@ defmodule Ysc.H2UpgradeTest do
     end
 
     test "client APIs hackney and webtransport use still exist" do
+      assert {:module, _} = Code.ensure_loaded(:h2)
       assert function_exported?(:h2, :connect, 2)
       assert function_exported?(:h2, :connect, 3)
       assert function_exported?(:h2, :wait_connected, 1)
@@ -67,6 +68,7 @@ defmodule Ysc.H2UpgradeTest do
       assert function_exported?(:h2, :cancel, 2)
       assert function_exported?(:h2, :cancel, 3)
 
+      assert {:module, _} = Code.ensure_loaded(:h2_connection)
       assert function_exported?(:h2_connection, :start_link, 3)
       assert function_exported?(:h2_connection, :start_link, 4)
       assert function_exported?(:h2_connection, :activate, 1)
@@ -81,6 +83,7 @@ defmodule Ysc.H2UpgradeTest do
     end
 
     test "0.12.0 serve_socket/2 is still exported and requires a handler" do
+      assert {:module, _} = Code.ensure_loaded(:h2)
       assert function_exported?(:h2, :serve_socket, 2)
 
       assert {:error, {:missing_required_option, [:handler]}} =
