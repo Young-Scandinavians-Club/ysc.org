@@ -770,6 +770,41 @@ defmodule Ysc.AccountsTest do
       assert is_nil(Accounts.household_board_member(user_fixture()))
     end
 
+    test "get_active_board_member slims contact fields without password hashes",
+         %{} do
+      treasurer =
+        user_fixture(%{
+          phone_number: "+14159098370",
+          first_name: "Tess",
+          last_name: "Treasurer"
+        })
+        |> Ecto.Changeset.change(%{
+          board_position: :treasurer,
+          board_bio: "treasurer must not load this bio"
+        })
+        |> Repo.update!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_active_board_member(:treasurer) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert loaded.id == treasurer.id
+      assert loaded.first_name == "Tess"
+      assert loaded.email == treasurer.email
+      assert is_nil(loaded.hashed_password)
+      assert is_nil(loaded.board_bio)
+
+      treasurer
+      |> Ecto.Changeset.change(%{state: :suspended})
+      |> Repo.update!()
+
+      assert is_nil(Accounts.get_active_board_member(:treasurer))
+    end
+
     test "get_family_group_user_ids returns all family user ids", %{} do
       primary = user_fixture(%{phone_number: "+14159098296"})
       sub = user_fixture(%{phone_number: "+14159098297"})
