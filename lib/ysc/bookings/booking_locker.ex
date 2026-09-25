@@ -2259,11 +2259,38 @@ defmodule Ysc.Bookings.BookingLocker do
   """
   def release_hold_with_stripe_reconcile(booking_id)
       when is_binary(booking_id) do
+    reconcile_then_release_hold(
+      booking_id,
+      &release_hold/1,
+      "release_hold_with_stripe_reconcile"
+    )
+  end
+
+  @doc """
+  Stripe-first hold revert to draft for admin status changes.
+
+  Same invariant as `release_hold_with_stripe_reconcile/1`: a succeeded
+  PaymentIntent must confirm the stay instead of dropping the booking to
+  `:draft`, which would clear inventory, entitlement, and skip
+  HoldExpiryWorker (`status != :hold`).
+  """
+  def revert_hold_to_draft_with_stripe_reconcile(booking_id)
+      when is_binary(booking_id) do
+    reconcile_then_release_hold(
+      booking_id,
+      &revert_hold_to_draft/1,
+      "revert_hold_to_draft_with_stripe_reconcile"
+    )
+  end
+
+  defp reconcile_then_release_hold(booking_id, on_release, context)
+       when is_binary(booking_id) and is_function(on_release, 1) and
+              is_binary(context) do
     booking = Repo.get!(Booking, booking_id)
 
-    case reconcile_hold_payment_for_release(booking) do
+    case reconcile_hold_payment_for_release(booking, context) do
       :release ->
-        release_hold(booking_id)
+        on_release.(booking_id)
 
       :confirmed ->
         confirmed =
@@ -2277,12 +2304,14 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp reconcile_hold_payment_for_release(
-         %Booking{payment_intent_id: payment_intent_id} = booking
+         %Booking{payment_intent_id: payment_intent_id} = booking,
+         context
        )
-       when is_binary(payment_intent_id) and payment_intent_id != "" do
+       when is_binary(payment_intent_id) and payment_intent_id != "" and
+              is_binary(context) do
     case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
            payment_intent_id,
-           "release_hold_with_stripe_reconcile"
+           context
          ) do
       {:cancel, _payment_intent} ->
         :release
@@ -2311,7 +2340,7 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  defp reconcile_hold_payment_for_release(_booking), do: :release
+  defp reconcile_hold_payment_for_release(_booking, _context), do: :release
 
   defp confirm_succeeded_hold_for_release(
          %Booking{} = booking,
@@ -2494,6 +2523,10 @@ defmodule Ysc.Bookings.BookingLocker do
   Reverts a hold booking to `:draft` and releases held inventory.
 
   Like `release_hold/1`, but leaves the booking in draft instead of canceled.
+
+  Prefer `revert_hold_to_draft_with_stripe_reconcile/1` for admin hold→draft
+  paths that may race a captured PaymentIntent. Callers that already
+  Stripe-reconciled may call this directly after a successful cancel.
   """
   def revert_hold_to_draft(booking_id) do
     Repo.transaction(fn ->
