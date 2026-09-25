@@ -199,7 +199,7 @@ defmodule YscWeb.Components.DateRangePicker do
                 id={date_picker_tooltip_id(@id, day)}
                 role="tooltip"
                 class={[
-                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-100 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded-sm tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
+                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-100 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
                   "max-w-[400px]",
                   "text-left"
                 ]}

@@ -305,7 +305,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 <div class="text-sm text-zinc-600 mb-0.5">Status</div>
                 <.badge
                   type={BookingDisplay.status_badge_type(@booking.status)}
-                  class="text-sm"
+                  class="text-sm!"
                 >
                   {BookingDisplay.status_label(@booking.status)}
                 </.badge>

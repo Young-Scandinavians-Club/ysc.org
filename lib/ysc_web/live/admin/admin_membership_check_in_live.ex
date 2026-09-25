@@ -38,7 +38,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
         <%!-- Actions --%>
         <div class="shrink-0 flex items-center gap-2">
           <%= if @session.closed_at do %>
-            <.badge type="zinc" class="hidden sm:inline-block">
+            <.badge type="zinc" class="max-sm:hidden">
               <.icon
                 name="hero-lock-closed"
                 class="w-3 h-3 inline -mt-0.5 me-0.5"

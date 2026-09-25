@@ -2117,7 +2117,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         right={true}
         drop_up={@drop_up}
-        class="min-w-0 w-auto! shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+        class="min-w-0 w-auto! shrink-0 rounded-md! px-1! py-1! text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
       >
         <:button_block>
           <span class="sr-only">{@label}</span>

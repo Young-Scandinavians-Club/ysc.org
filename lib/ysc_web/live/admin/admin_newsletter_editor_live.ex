@@ -1050,7 +1050,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             <.badge
               :if={@edition}
               type={newsletter_edition_status_badge_type(@edition.status)}
-              class="hidden sm:inline-block shrink-0"
+              class="max-sm:hidden shrink-0"
             >
               {newsletter_edition_status_label_with_progress(@edition)}
             </.badge>
