@@ -68,6 +68,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 70 (MEDIUM)   Volunteers could force tickets_tbd on events that already have live ticket tiers
   Finding 71 (HIGH)     Password reset LiveView never re-checked the token on submit, so a still-open tab could take over the account after expiry or after the victim already reset
   Finding 72 (HIGH)     Family sub-accounts inherited the primary's Stripe subscription and could cancel/resume/change it via hidden LiveView events
+  Finding 73 (HIGH)     SES webhook Notifications accepted any TopicArn when SNS_TOPIC_ARN allowlist was empty (forged bounce → mail suppression)
   Finding 74 (MEDIUM)   Volunteers could soft-delete any scheduled event (including others') via the list and editor; Finding 59 only blocked published/cancelled
   Finding 76 (MEDIUM)   Volunteers could read other members' expense reports (submitter, purpose, status, net cost) on the event Statistics tab, bypassing LetMe expense_report :read (admin or own_resource) and the full-admin Money page
 
@@ -2533,6 +2534,56 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert conn.status == 403
       refute Ysc.Newsletter.hard_bounced?(email)
+    end
+  end
+
+  describe "Finding 73: SES webhook Notifications fail closed without topic allowlist" do
+    test "empty SNS_TOPIC_ARN allowlist cannot inject a hard bounce", %{
+      conn: conn
+    } do
+      prev = Application.get_env(:ysc, :sns_allowed_topic_arns)
+      Application.put_env(:ysc, :sns_allowed_topic_arns, [])
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :sns_allowed_topic_arns, prev)
+      end)
+
+      email = "finding73-#{System.unique_integer([:positive])}@example.com"
+      {:ok, _subscriber} = Newsletter.subscribe(email)
+
+      # Use the same TopicArn shape as a legitimate SES topic — without an
+      # allowlist the old code accepted every Notification TopicArn.
+      payload =
+        %{
+          "Type" => "Notification",
+          "MessageId" => "finding-73",
+          "TopicArn" => "arn:aws:sns:us-west-1:123456789012:ses-events",
+          "Message" =>
+            Jason.encode!(%{
+              "eventType" => "Bounce",
+              "mail" => %{
+                "destination" => [email],
+                "timestamp" => "2026-03-19T12:00:00.000Z",
+                "tags" => %{"env" => ["test"]}
+              },
+              "bounce" => %{
+                "bounceType" => "Permanent",
+                "bounceSubType" => "General"
+              }
+            }),
+          "Timestamp" => "2026-03-19T12:00:00.000Z",
+          "SigningCertURL" => "https://sns.amazonaws.com/cert.pem",
+          "Signature" => "test-signature"
+        }
+
+      conn =
+        conn
+        |> put_req_header("x-amz-sns-message-type", "Notification")
+        |> put_req_header("content-type", "application/json")
+        |> post("/webhooks/ses", payload)
+
+      assert conn.status == 403
+      refute Newsletter.hard_bounced?(email)
     end
   end
 
