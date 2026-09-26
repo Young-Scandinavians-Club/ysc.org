@@ -2943,6 +2943,27 @@ defmodule Ysc.Stripe.WebhookHandler do
     end
   end
 
+  # Booking/ticket payments are keyed by payment intent ID; subscription
+  # payments are keyed by the invoice the payment intent paid.
+  defp find_payment_for_refund(payment_intent_id) do
+    Ledgers.get_payment_by_external_id(payment_intent_id) ||
+      case Ysc.Stripe.InvoiceHelpers.invoice_id_for_payment_intent(
+             payment_intent_id
+           ) do
+        invoice_id when is_binary(invoice_id) ->
+          Ledgers.get_payment_by_external_id(invoice_id)
+
+        nil ->
+          nil
+      end
+  end
+
+  defp default_refund_reason(payment, payment_intent_id) do
+    if payment.external_payment_id == payment_intent_id,
+      do: "Booking cancellation refund",
+      else: "Membership refund"
+  end
+
   # Process refund from Stripe refund object (can be struct or map)
   defp process_refund_from_refund_object(%Stripe.Refund{} = refund) do
     # Convert struct to map for unified processing
@@ -2985,8 +3006,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
 
     if payment_intent_id do
-      # Find the payment by external_payment_id
-      payment = Ledgers.get_payment_by_external_id(payment_intent_id)
+      payment = find_payment_for_refund(payment_intent_id)
 
       if payment do
         # Convert refund amount from cents to dollars
@@ -2997,7 +3017,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           case metadata do
             %{"reason" => reason} when is_binary(reason) -> reason
             %{reason: reason} when is_binary(reason) -> reason
-            _ -> "Booking cancellation refund"
+            _ -> default_refund_reason(payment, payment_intent_id)
           end
 
         # Process refund in ledger
