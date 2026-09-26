@@ -350,7 +350,6 @@ defmodule Ysc.MixProject do
       {:plug_cowboy, "~> 2.9"},
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
-      {:remote_ip, "~> 1.2"},
       {:req, "~> 0.7"},
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing

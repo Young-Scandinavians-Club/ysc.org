@@ -471,12 +471,8 @@ defmodule YscWeb.UserRegistrationLive do
     """
   end
 
-  def mount(params, _session, socket) do
-    remote_ip =
-      case get_connect_info(socket, :peer_data) do
-        %{address: address} -> address
-        _ -> nil
-      end
+  def mount(params, session, socket) do
+    remote_ip = YscWeb.ClientIP.from_socket(socket, session)
 
     browser_timezone = YscWeb.TimeZone.from_connect_params(socket)
 

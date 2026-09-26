@@ -126,8 +126,8 @@ defmodule YscWeb.ContactLive do
   end
 
   @impl true
-  def mount(params, _session, socket) do
-    remote_ip = get_connect_info(socket, :peer_data).address
+  def mount(params, session, socket) do
+    remote_ip = YscWeb.ClientIP.from_socket(socket, session)
     current_user = socket.assigns[:current_user]
 
     base_params = starting_params(current_user)
