@@ -29,6 +29,21 @@ defmodule YscWeb.Emails.HelpersTest do
     end
   end
 
+  describe "member_full_name/1" do
+    test "joins first and last name and trims missing parts" do
+      assert Helpers.member_full_name(%{first_name: "Anna", last_name: "Berg"}) ==
+               "Anna Berg"
+
+      assert Helpers.member_full_name(%{first_name: "Anna", last_name: nil}) ==
+               "Anna"
+
+      assert Helpers.member_full_name(%{first_name: nil, last_name: "Berg"}) ==
+               "Berg"
+
+      assert Helpers.member_full_name(%{}) == ""
+    end
+  end
+
   describe "attendee_greeting_name/1" do
     test "reads atom- or string-keyed first_name" do
       assert Helpers.attendee_greeting_name(%{first_name: "Alex"}) == "Alex"
@@ -74,6 +89,24 @@ defmodule YscWeb.Emails.HelpersTest do
                origin <> "/users/notifications"
 
       assert Helpers.tahoe_booking_url() == origin <> "/bookings/tahoe"
+
+      assert Helpers.booking_receipt_url("bkg-id-123") ==
+               origin <> "/bookings/bkg-id-123/receipt"
+
+      assert Helpers.admin_booking_url("bkg-id-123") ==
+               origin <> "/admin/bookings/bkg-id-123"
+
+      assert Helpers.admin_pending_refunds_url(:tahoe) ==
+               origin <>
+                 "/admin/bookings?section=pending_refunds&property=tahoe"
+
+      assert Helpers.admin_pending_refunds_url(:clear_lake) ==
+               origin <>
+                 "/admin/bookings?section=pending_refunds&property=clear_lake"
+
+      assert Helpers.admin_pending_refunds_url(:other) ==
+               origin <>
+                 "/admin/bookings?section=pending_refunds&property=other"
 
       assert Helpers.payment_methods_url() ==
                origin <> "/users/membership/payment-method"
@@ -177,6 +210,13 @@ defmodule YscWeb.Emails.HelpersTest do
       assert Helpers.format_date("2026-01-15") == "January 15, 2026"
       assert Helpers.format_date("not-a-date") == "N/A"
       assert Helpers.format_date("invalid") == "N/A"
+    end
+  end
+
+  describe "format_weekend_range/2" do
+    test "formats weekday names with an en dash and year on the checkout date" do
+      assert Helpers.format_weekend_range(~D[2026-05-01], ~D[2026-05-03]) ==
+               "Friday, May 1 – Sunday, May 3, 2026"
     end
   end
 
@@ -298,6 +338,25 @@ defmodule YscWeb.Emails.HelpersTest do
     test "returns default for nil and non-money values" do
       assert Helpers.format_membership_money(nil) == "N/A"
       assert Helpers.format_membership_money(:invalid) == "N/A"
+    end
+  end
+
+  describe "booking_room_names/1" do
+    test "joins room names and returns nil when there are none" do
+      assert Helpers.booking_room_names(%{
+               rooms: [%{name: "Pine"}, %{name: "Loft"}]
+             }) == "Pine, Loft"
+
+      assert Helpers.booking_room_names(%{rooms: []}) == nil
+      assert Helpers.booking_room_names(%{}) == nil
+    end
+  end
+
+  describe "property_as_string/1" do
+    test "normalizes atoms, binaries, and other values" do
+      assert Helpers.property_as_string(:tahoe) == "tahoe"
+      assert Helpers.property_as_string("clear_lake") == "clear_lake"
+      assert Helpers.property_as_string(41) == "41"
     end
   end
 

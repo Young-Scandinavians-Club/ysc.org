@@ -9,9 +9,15 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, member_greeting_name: 1, format_date: 1]
+    only: [
+      booking_receipt_url: 1,
+      booking_room_names: 1,
+      ensure_booking: 2,
+      member_greeting_name: 1,
+      format_date: 1,
+      property_as_string: 1
+    ]
 
-  alias Ysc.Repo
   alias Ysc.Bookings
   alias Ysc.Bookings.{BookingModeDisplay, CabinMaster, PropertyDisplay}
   alias YscWeb.BookingDisplay
@@ -25,9 +31,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     "Your #{property_name} Check-In Instructions - YSC Cabin Stay 🏡"
   end
 
-  def booking_url(booking_id) do
-    absolute_url("/bookings/#{booking_id}/receipt")
-  end
+  def booking_url(booking_id), do: booking_receipt_url(booking_id)
 
   @doc """
   Prepares booking check-in reminder email data.
@@ -39,94 +43,27 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
   - Map with all necessary data for the email template
   """
   def prepare_email_data(booking) do
-    # Validate input
-    if is_nil(booking) do
-      raise ArgumentError, "Booking cannot be nil"
-    end
-
-    if is_nil(booking.id) do
-      raise ArgumentError, "Booking missing id: #{inspect(booking)}"
-    end
-
-    # Ensure we have all necessary preloaded data
-    booking =
-      if Ecto.assoc_loaded?(booking.user) && Ecto.assoc_loaded?(booking.rooms) do
-        booking
-      else
-        case Repo.get(Ysc.Bookings.Booking, booking.id)
-             |> Repo.preload([:user, :rooms]) do
-          nil ->
-            raise ArgumentError, "Booking not found: #{booking.id}"
-
-          loaded_booking ->
-            loaded_booking
-        end
-      end
-
-    # Validate required associations
-    if is_nil(booking.user) do
-      raise ArgumentError, "Booking missing user association: #{booking.id}"
-    end
-
-    # Get active door code for the property
+    booking = ensure_booking(booking, [:user, :rooms])
     door_code = Bookings.get_active_door_code(booking.property)
-
-    # Get property information
-    property_name = PropertyDisplay.short_name(booking.property)
-    property_address = PropertyDisplay.address(booking.property)
-
     contact = CabinMaster.contact(booking.property)
-
-    # Format dates
-    checkin_date = format_date(booking.checkin_date)
-    checkout_date = format_date(booking.checkout_date)
-
-    # Calculate days until check-in (using PST timezone)
     today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-    days_until_checkin = Date.diff(booking.checkin_date, today_pst)
-
-    # Get booking mode description
-    booking_mode_description = BookingModeDisplay.label(booking.booking_mode)
-
-    # Get room names if applicable
-    room_names =
-      if booking.rooms && booking.rooms != [] do
-        Enum.map_join(booking.rooms, ", ", & &1.name)
-      else
-        nil
-      end
-
-    # Calculate number of nights
-    nights = Date.diff(booking.checkout_date, booking.checkin_date)
-
-    # Check if this is a buyout booking
-    is_buyout = BookingModeDisplay.buyout?(booking.booking_mode)
-
-    # Normalize property to string for consistent comparison in templates
-    # Email templates may serialize atoms to strings, so we normalize here
-    property_string =
-      case booking.property do
-        atom when is_atom(atom) -> Atom.to_string(atom)
-        string when is_binary(string) -> string
-        _ -> to_string(booking.property)
-      end
 
     %{
       first_name: member_greeting_name(booking.user),
       door_code: if(door_code, do: door_code.code, else: "Not Available"),
-      property: property_string,
-      property_name: property_name,
-      property_address: property_address,
-      checkin_date: checkin_date,
-      checkout_date: checkout_date,
+      property: property_as_string(booking.property),
+      property_name: PropertyDisplay.short_name(booking.property),
+      property_address: PropertyDisplay.address(booking.property),
+      checkin_date: format_date(booking.checkin_date),
+      checkout_date: format_date(booking.checkout_date),
       checkin_time: BookingDisplay.checkin_time_label(),
       checkout_time: BookingDisplay.checkout_time_label(),
-      days_until_checkin: days_until_checkin,
+      days_until_checkin: Date.diff(booking.checkin_date, today_pst),
       booking_reference_id: booking.reference_id,
-      booking_mode: booking_mode_description,
-      room_names: room_names,
-      nights: nights,
-      is_buyout: is_buyout,
+      booking_mode: BookingModeDisplay.label(booking.booking_mode),
+      room_names: booking_room_names(booking),
+      nights: Date.diff(booking.checkout_date, booking.checkin_date),
+      is_buyout: BookingModeDisplay.buyout?(booking.booking_mode),
       guests_count: booking.guests_count,
       children_count: booking.children_count || 0,
       cabin_master_name: contact.name,
