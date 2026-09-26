@@ -4328,6 +4328,190 @@ defmodule YscWeb.CoreComponents do
   defp nearby_destination_badge_class(:teal), do: "bg-teal-100 text-teal-700"
 
   @doc """
+  Split image + copy showcase for a cabin property on the public homepage.
+
+  Pass `accent={:emerald}` and `image_side={:left}` for Clear Lake; Tahoe uses
+  the default blue accent with the image on the right at the `lg` breakpoint.
+
+  ## Examples
+
+      <.cabin_showcase
+        id="home-cabin-tahoe"
+        location="Lake Tahoe, CA"
+        title="The Alpine Retreat"
+        navigate={~p"/bookings/tahoe"}
+        cta="Learn More About Tahoe"
+        image_src="/images/tahoe/tahoe_cabin_main.webp"
+        image_srcset="/images/tahoe/tahoe_cabin_main-480.webp 480w"
+        image_sizes="(min-width: 1280px) 700px, 100vw"
+        image_alt="Lake Tahoe Cabin"
+      >
+        Ski in winter, hike in summer, and relax year-round.
+        <:feature>Minutes from world-class ski resorts & hiking trails</:feature>
+        <:feature>
+          Member-only rates: <strong>$45.00 / night</strong>
+        </:feature>
+      </.cabin_showcase>
+  """
+  attr :id, :string, required: true
+  attr :location, :string, required: true
+  attr :title, :string, required: true
+  attr :navigate, :any, required: true
+  attr :cta, :string, required: true
+  attr :image_src, :string, required: true
+  attr :image_srcset, :string, required: true
+  attr :image_sizes, :string, required: true
+  attr :image_alt, :string, required: true
+
+  attr :accent, :atom,
+    default: :blue,
+    values: [:blue, :emerald],
+    doc: ":blue for Tahoe; :emerald for Clear Lake"
+
+  attr :image_side, :atom,
+    default: :right,
+    values: [:left, :right],
+    doc: "Desktop image column. Mobile always shows the image first."
+
+  slot :inner_block, required: true, doc: "Property description"
+
+  slot :feature,
+    required: true,
+    doc: "Bullet under the description (check-circle prefix is added)"
+
+  def cabin_showcase(assigns) do
+    ~H"""
+    <div id={@id} class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
+      <div class={[
+        "lg:col-span-7",
+        @image_side == :right && "lg:order-2"
+      ]}>
+        <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
+          <img
+            id={"#{@id}-image"}
+            src={@image_src}
+            srcset={@image_srcset}
+            sizes={@image_sizes}
+            loading="lazy"
+            decoding="async"
+            alt={@image_alt}
+            class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
+          />
+          <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
+          </div>
+        </div>
+      </div>
+      <div class={[
+        "lg:col-span-5",
+        @image_side == :right && "lg:order-1"
+      ]}>
+        <div class={[
+          "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6",
+          cabin_showcase_badge_class(@accent)
+        ]}>
+          <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> {@location}
+        </div>
+        <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
+          {@title}
+        </h3>
+        <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
+          {render_slot(@inner_block)}
+        </p>
+        <ul class="space-y-4 mb-8">
+          <li
+            :for={feature <- @feature}
+            class="flex items-start gap-3 text-zinc-700 text-sm"
+          >
+            <.icon
+              name="hero-check-circle"
+              class="w-5 h-5 text-teal-500 shrink-0"
+            />
+            <span>{render_slot(feature)}</span>
+          </li>
+        </ul>
+        <.link
+          id={"#{@id}-cta"}
+          navigate={@navigate}
+          class={[
+            "inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2",
+            cabin_showcase_cta_class(@accent)
+          ]}
+        >
+          {@cta}
+        </.link>
+      </div>
+    </div>
+    """
+  end
+
+  defp cabin_showcase_badge_class(:blue), do: "bg-blue-50 text-blue-700"
+
+  defp cabin_showcase_badge_class(:emerald),
+    do: "bg-emerald-50 text-emerald-700"
+
+  defp cabin_showcase_cta_class(:blue), do: "hover:bg-blue-700"
+  defp cabin_showcase_cta_class(:emerald), do: "hover:bg-emerald-700"
+
+  @doc """
+  Compact dashboard shortcut card used on the signed-in homepage.
+
+  ## Examples
+
+      <.quick_action_card
+        id="home-quick-action-tahoe"
+        navigate={~p"/bookings/tahoe"}
+        icon="hero-home"
+        tone={:blue}
+        title="Lake Tahoe"
+        subtitle="Book a stay"
+      />
+  """
+  attr :id, :string, required: true
+  attr :navigate, :any, required: true
+  attr :icon, :string, required: true
+  attr :title, :string, required: true
+  attr :subtitle, :string, required: true
+
+  attr :tone, :atom,
+    required: true,
+    values: [:blue, :emerald, :orange, :purple, :zinc],
+    doc: "Icon well background and icon color"
+
+  def quick_action_card(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      navigate={@navigate}
+      class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+    >
+      <div class={[
+        "w-8 h-8 lg:w-10 lg:h-10 rounded-md flex items-center justify-center mb-2 lg:mb-4",
+        quick_action_card_well_class(@tone)
+      ]}>
+        <.icon
+          name={@icon}
+          class={["w-4 h-4 lg:w-5 lg:h-5", quick_action_card_icon_class(@tone)]}
+        />
+      </div>
+      <p class="font-bold text-sm lg:text-base text-zinc-900">{@title}</p>
+      <p class="text-xs lg:text-sm text-zinc-500">{@subtitle}</p>
+    </.link>
+    """
+  end
+
+  defp quick_action_card_well_class(:blue), do: "bg-blue-50"
+  defp quick_action_card_well_class(:emerald), do: "bg-emerald-50"
+  defp quick_action_card_well_class(:orange), do: "bg-orange-50"
+  defp quick_action_card_well_class(:purple), do: "bg-purple-50"
+  defp quick_action_card_well_class(:zinc), do: "bg-zinc-50"
+
+  defp quick_action_card_icon_class(:blue), do: "text-blue-600"
+  defp quick_action_card_icon_class(:emerald), do: "text-emerald-600"
+  defp quick_action_card_icon_class(:orange), do: "text-orange-600"
+  defp quick_action_card_icon_class(:purple), do: "text-purple-600"
+  defp quick_action_card_icon_class(:zinc), do: "text-zinc-600"
+
+  @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
 
   For `:info`, a default information icon is shown unless `:icon` is set to another

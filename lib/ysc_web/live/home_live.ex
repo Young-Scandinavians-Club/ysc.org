@@ -559,115 +559,47 @@ defmodule YscWeb.HomeLive do
         </div>
 
         <div class="space-y-20 sm:space-y-24 lg:space-y-32">
-          <%!-- Lake Tahoe --%>
-          <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
-            <div class="lg:col-span-5 order-2 lg:order-1">
-              <div class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6">
-                <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Lake Tahoe, CA
-              </div>
-              <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
-                The Alpine Retreat
-              </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
-                Ski in winter, hike in summer, and relax year-round. Perfectly positioned for alpine adventures and cozy
-                <em>hygge</em>
-                evenings by the fire.
-              </p>
-              <ul class="space-y-4 mb-8">
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>Minutes from world-class ski resorts & hiking trails</span>
-                </li>
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>
-                    Member-only rates: <strong>$45.00 / night</strong>
-                  </span>
-                </li>
-              </ul>
-              <.link
-                navigate={~p"/bookings/tahoe"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold hover:bg-blue-700 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-              >
-                Learn More About Tahoe
-              </.link>
-            </div>
-            <div class="lg:col-span-7 order-1 lg:order-2">
-              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
-                <img
-                  src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-                  srcset={"#{~p"/images/tahoe/tahoe_cabin_main-480.webp"} 480w, #{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
-                  sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Lake Tahoe Cabin"
-                  class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                />
-                <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
-                </div>
-              </div>
-            </div>
-          </div>
+          <.cabin_showcase
+            id="home-cabin-tahoe"
+            location="Lake Tahoe, CA"
+            title="The Alpine Retreat"
+            navigate={~p"/bookings/tahoe"}
+            cta="Learn More About Tahoe"
+            image_src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+            image_srcset={"#{~p"/images/tahoe/tahoe_cabin_main-480.webp"} 480w, #{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+            image_sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
+            image_alt="Lake Tahoe Cabin"
+          >
+            Ski in winter, hike in summer, and relax year-round. Perfectly positioned for alpine adventures and cozy
+            <em>hygge</em>
+            evenings by the fire.
+            <:feature>
+              Minutes from world-class ski resorts & hiking trails
+            </:feature>
+            <:feature>
+              Member-only rates: <strong>$45.00 / night</strong>
+            </:feature>
+          </.cabin_showcase>
 
-          <%!-- Clear Lake --%>
-          <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
-            <div class="lg:col-span-7">
-              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
-                <img
-                  src={~p"/images/clear_lake/clear_lake_dock.webp"}
-                  srcset={"#{~p"/images/clear_lake/clear_lake_dock-480.webp"} 480w, #{~p"/images/clear_lake/clear_lake_dock-900.webp"} 900w, #{~p"/images/clear_lake/clear_lake_dock.webp"} 1280w"}
-                  sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Clear Lake Cabin"
-                  class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                />
-                <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
-                </div>
-              </div>
-            </div>
-            <div class="lg:col-span-5">
-              <div class="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6">
-                <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Clear Lake, CA
-              </div>
-              <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
-                The Waterfront Sanctuary
-              </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
-                Our social heart since 1963. Swim, boat, and unwind at California's largest natural lake. A sun-drenched escape from the city.
-              </p>
-              <ul class="space-y-4 mb-8">
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>Private dock access for swimming & boating</span>
-                </li>
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>
-                    Member-only rates: <strong>$25.00 / night</strong>
-                  </span>
-                </li>
-              </ul>
-              <.link
-                navigate={~p"/bookings/clear-lake"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold hover:bg-emerald-700 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-              >
-                Learn More About Clear Lake
-              </.link>
-            </div>
-          </div>
+          <.cabin_showcase
+            id="home-cabin-clear-lake"
+            location="Clear Lake, CA"
+            title="The Waterfront Sanctuary"
+            navigate={~p"/bookings/clear-lake"}
+            cta="Learn More About Clear Lake"
+            image_src={~p"/images/clear_lake/clear_lake_dock.webp"}
+            image_srcset={"#{~p"/images/clear_lake/clear_lake_dock-480.webp"} 480w, #{~p"/images/clear_lake/clear_lake_dock-900.webp"} 900w, #{~p"/images/clear_lake/clear_lake_dock.webp"} 1280w"}
+            image_sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
+            image_alt="Clear Lake Cabin"
+            accent={:emerald}
+            image_side={:left}
+          >
+            Our social heart since 1963. Swim, boat, and unwind at California's largest natural lake. A sun-drenched escape from the city.
+            <:feature>Private dock access for swimming & boating</:feature>
+            <:feature>
+              Member-only rates: <strong>$25.00 / night</strong>
+            </:feature>
+          </.cabin_showcase>
         </div>
       </div>
     </section>
@@ -1152,73 +1084,49 @@ defmodule YscWeb.HomeLive do
             phx-hook="InteractScrollbar"
             class="flex overflow-x-auto snap-x scroll-smooth thin-scrollbar lg:grid lg:grid-cols-4 gap-3 lg:gap-4 pb-2 lg:pb-4 -mx-4 px-4 lg:mx-0 lg:px-0 mb-12 mt-4 lg:mt-0"
           >
-            <.link
+            <.quick_action_card
               id="home-quick-action-tahoe"
               navigate={~p"/bookings/tahoe"}
-              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-blue-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon name="hero-home" class="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Lake Tahoe</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Book a stay</p>
-            </.link>
-            <.link
+              icon="hero-home"
+              tone={:blue}
+              title="Lake Tahoe"
+              subtitle="Book a stay"
+            />
+            <.quick_action_card
               id="home-quick-action-clear-lake"
               navigate={~p"/bookings/clear-lake"}
-              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon
-                  name="hero-home"
-                  class="w-4 h-4 lg:w-5 lg:h-5 text-emerald-600"
-                />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Clear Lake</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Book a stay</p>
-            </.link>
+              icon="hero-home"
+              tone={:emerald}
+              title="Clear Lake"
+              subtitle="Book a stay"
+            />
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
-              <.link
+              <.quick_action_card
+                id="home-quick-action-expenses"
                 navigate={~p"/expensereports"}
-                class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-              >
-                <div class="w-8 h-8 lg:w-10 lg:h-10 bg-orange-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                  <.icon
-                    name="hero-receipt-refund"
-                    class="w-4 h-4 lg:w-5 lg:h-5 text-orange-600"
-                  />
-                </div>
-                <p class="font-bold text-sm lg:text-base text-zinc-900">Expenses</p>
-                <p class="text-xs lg:text-sm text-zinc-500">View reports</p>
-              </.link>
+                icon="hero-receipt-refund"
+                tone={:orange}
+                title="Expenses"
+                subtitle="View reports"
+              />
             <% else %>
-              <.link
+              <.quick_action_card
+                id="home-quick-action-events"
                 navigate={~p"/events"}
-                class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-              >
-                <div class="w-8 h-8 lg:w-10 lg:h-10 bg-purple-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                  <.icon
-                    name="hero-calendar-days"
-                    class="w-4 h-4 lg:w-5 lg:h-5 text-purple-600"
-                  />
-                </div>
-                <p class="font-bold text-sm lg:text-base text-zinc-900">Events</p>
-                <p class="text-xs lg:text-sm text-zinc-500">Browse Events</p>
-              </.link>
+                icon="hero-calendar-days"
+                tone={:purple}
+                title="Events"
+                subtitle="Browse Events"
+              />
             <% end %>
-            <.link
+            <.quick_action_card
+              id="home-quick-action-settings"
               navigate={~p"/users/settings"}
-              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon
-                  name="hero-cog-6-tooth"
-                  class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-600"
-                />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Settings</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Preferences</p>
-            </.link>
+              icon="hero-cog-6-tooth"
+              tone={:zinc}
+              title="Settings"
+              subtitle="Preferences"
+            />
           </div>
 
           <%!-- Main Content Grid --%>
