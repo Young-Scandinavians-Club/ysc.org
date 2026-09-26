@@ -526,6 +526,39 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert has_element?(view, "#article-body[phx-hook=GLightboxHook]")
       assert has_element?(view, "#article-body[phx-update=ignore]")
     end
+
+    test "renders event update bodies with post-render image styling and lightbox",
+         %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Updates Lightbox Event"}
+        )
+
+      body =
+        ~s(<div>Parking map below<figure class="attachment attachment--preview"><img src="https://example.com/map.webp"></figure></div>)
+
+      {:ok, update} =
+        Ysc.Events.create_event_update(event, %{
+          title: "Parking",
+          raw_body: body,
+          rendered_body: body,
+          show_on_event_page: true
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      selector = "#event-update-body-#{update.id}"
+
+      assert has_element?(
+               view,
+               "#{selector}.post-render[phx-hook=GLightboxHook]"
+             )
+
+      assert has_element?(view, "#{selector}[phx-update=ignore]")
+      assert has_element?(view, "#{selector} figure.attachment img")
+    end
   end
 
   describe "unauthenticated user interactions" do
