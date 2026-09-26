@@ -26,15 +26,17 @@ defmodule Ysc.Accounts.AuthServiceTest do
   alias Ysc.Accounts.{AuthService, AuthEvent}
   alias Ysc.Repo
 
-  # Helper to create a mock connection
+  # Helper to create a mock connection. `remote_ip` is the real client IP
+  # (resolved upstream by YscWeb.Plugs.ClientIP); the X-Forwarded-For /
+  # X-Real-IP headers carry a spoofed address that must never be used.
   defp mock_conn(attrs \\ %{}) do
     default_attrs = %{
-      remote_ip: {127, 0, 0, 1},
+      remote_ip: {203, 0, 113, 1},
       req_headers: [
         {"user-agent",
          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
-        {"x-forwarded-for", "203.0.113.1"},
-        {"x-real-ip", "203.0.113.1"},
+        {"x-forwarded-for", "192.0.2.66"},
+        {"x-real-ip", "192.0.2.66"},
         {"origin", "https://example.com"},
         {"referer", "https://example.com/login"}
       ]
@@ -47,6 +49,12 @@ defmodule Ysc.Accounts.AuthServiceTest do
       req_headers: attrs.req_headers,
       private: %{}
     }
+  end
+
+  defp mock_conn_with_oversized_session_id do
+    mock_conn()
+    |> Plug.Test.init_test_session(%{})
+    |> put_session(:user_token, String.duplicate("x", 200))
   end
 
   describe "log_login_success/3" do
@@ -63,7 +71,7 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert auth_event.user_agent != nil
     end
 
-    test "extracts IP from x-forwarded-for header" do
+    test "records conn.remote_ip, not the x-forwarded-for header" do
       user = user_fixture()
       conn = mock_conn()
 
@@ -137,15 +145,9 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
     test "returns error tuple when the auth event changeset is invalid" do
       user = user_fixture()
-      # ip_address has a max length of 45; a bare (no comma) x-forwarded-for
-      # value longer than that survives get_client_ip untruncated and fails
-      # changeset validation.
-      too_long_ip = String.duplicate("9", 50)
-
-      conn =
-        mock_conn(%{
-          req_headers: [{"x-forwarded-for", too_long_ip}]
-        })
+      # session_id has a max length of 255; a 200-byte session token
+      # Base64-encodes to 268 characters and fails changeset validation.
+      conn = mock_conn_with_oversized_session_id()
 
       assert {:error, changeset} = AuthService.log_login_success(user, conn)
       refute changeset.valid?
@@ -210,12 +212,7 @@ defmodule Ysc.Accounts.AuthServiceTest do
     end
 
     test "returns error tuple when the auth event changeset is invalid" do
-      too_long_ip = String.duplicate("8", 50)
-
-      conn =
-        mock_conn(%{
-          req_headers: [{"x-forwarded-for", too_long_ip}]
-        })
+      conn = mock_conn_with_oversized_session_id()
 
       assert {:error, changeset} =
                AuthService.log_login_failure("bad_ip@example.com", conn)
@@ -401,18 +398,28 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert auth_data.ip_address == "203.0.113.1"
     end
 
-    test "uses default loopback IP for LiveView socket without embedded conn" do
+    test "uses the :remote_ip assigned by a LiveView socket" do
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{remote_ip: {198, 51, 100, 7}}
+      }
+
+      auth_data = AuthService.extract_auth_data(socket)
+
+      assert auth_data.ip_address == "198.51.100.7"
+    end
+
+    test "records no IP for a LiveView socket without a :remote_ip assign" do
       socket = %Phoenix.LiveView.Socket{assigns: %{}}
 
       auth_data = AuthService.extract_auth_data(socket)
 
-      assert auth_data.ip_address == "127.0.0.1"
+      assert auth_data.ip_address == nil
     end
 
-    test "falls back to loopback IP, nil session, and nil headers for a plain map" do
+    test "falls back to nil IP, nil session, and nil headers for a plain map" do
       auth_data = AuthService.extract_auth_data(%{})
 
-      assert auth_data.ip_address == "127.0.0.1"
+      assert auth_data.ip_address == nil
       assert auth_data.user_agent == nil
       assert auth_data.session_id == nil
     end
@@ -584,11 +591,10 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       unfamiliar_conn =
         mock_conn(%{
+          remote_ip: {198, 51, 100, 1},
           req_headers: [
             {"user-agent",
              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
-            {"x-forwarded-for", "198.51.100.1"},
-            {"x-real-ip", "198.51.100.1"},
             {"origin", "https://example.com"},
             {"referer", "https://example.com/login"}
           ]
@@ -762,11 +768,10 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       unfamiliar_conn =
         mock_conn(%{
+          remote_ip: {198, 51, 100, 1},
           req_headers: [
             {"user-agent",
              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
-            {"x-forwarded-for", "198.51.100.1"},
-            {"x-real-ip", "198.51.100.1"},
             {"origin", "https://example.com"},
             {"referer", "https://example.com/login"}
           ]
@@ -1257,9 +1262,10 @@ defmodule Ysc.Accounts.AuthServiceTest do
   end
 
   describe "IP address extraction" do
-    test "extracts IP from x-forwarded-for header" do
+    test "ignores a client-supplied x-forwarded-for header" do
       conn =
         mock_conn(%{
+          remote_ip: {198, 51, 100, 1},
           req_headers: [
             {"x-forwarded-for", "203.0.113.5, 198.51.100.1"}
           ]
@@ -1267,13 +1273,13 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       auth_data = AuthService.extract_auth_data(conn)
 
-      # Should use first IP from comma-separated list
-      assert auth_data.ip_address == "203.0.113.5"
+      assert auth_data.ip_address == "198.51.100.1"
     end
 
-    test "falls back to x-real-ip when x-forwarded-for is missing" do
+    test "ignores a client-supplied x-real-ip header" do
       conn =
         mock_conn(%{
+          remote_ip: {198, 51, 100, 1},
           req_headers: [
             {"x-real-ip", "203.0.113.10"}
           ]
@@ -1281,10 +1287,10 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
       auth_data = AuthService.extract_auth_data(conn)
 
-      assert auth_data.ip_address == "203.0.113.10"
+      assert auth_data.ip_address == "198.51.100.1"
     end
 
-    test "falls back to remote_ip when headers are missing" do
+    test "uses remote_ip when headers are missing" do
       conn =
         mock_conn(%{
           remote_ip: {192, 168, 1, 1},
@@ -1294,6 +1300,57 @@ defmodule Ysc.Accounts.AuthServiceTest do
       auth_data = AuthService.extract_auth_data(conn)
 
       assert auth_data.ip_address == "192.168.1.1"
+    end
+
+    test "formats an IPv6 remote_ip" do
+      conn =
+        mock_conn(%{
+          remote_ip: {0x2001, 0xDB8, 0, 0, 0, 0, 0, 1},
+          req_headers: []
+        })
+
+      auth_data = AuthService.extract_auth_data(conn)
+
+      assert auth_data.ip_address == "2001:db8::1"
+    end
+
+    test "records no IP for an invalid remote_ip tuple" do
+      conn = mock_conn(%{remote_ip: {999, 0, 0, 0}, req_headers: []})
+
+      auth_data = AuthService.extract_auth_data(conn)
+
+      assert auth_data.ip_address == nil
+    end
+
+    test "records no IP for a LiveView socket with a nil :remote_ip assign" do
+      socket = %Phoenix.LiveView.Socket{assigns: %{remote_ip: nil}}
+
+      auth_data = AuthService.extract_auth_data(socket)
+
+      assert auth_data.ip_address == nil
+    end
+
+    test "keeps the raw proxy headers in metadata for auditing" do
+      conn =
+        mock_conn(%{
+          remote_ip: {198, 51, 100, 1},
+          req_headers: [
+            {"x-forwarded-for", "203.0.113.5, 198.51.100.1"},
+            {"x-real-ip", "203.0.113.10"}
+          ]
+        })
+
+      auth_data = AuthService.extract_auth_data(conn)
+
+      assert auth_data.metadata.forwarded_for == "203.0.113.5, 198.51.100.1"
+      assert auth_data.metadata.real_ip == "203.0.113.10"
+    end
+
+    test "login failure without a resolvable IP skips IP correlation" do
+      assert {:ok, auth_event} =
+               AuthService.log_login_failure("no_ip@example.com", %{})
+
+      assert auth_event.ip_address == nil
     end
   end
 
