@@ -48,4 +48,10 @@ defmodule Ysc.StripeClient do
 
   def create_setup_intent(params),
     do: stripe_retry(fn -> Stripe.SetupIntent.create(params) end)
+
+  def retrieve_invoice(id, params),
+    do: stripe_retry(fn -> Stripe.Invoice.retrieve(id, params) end)
+
+  def list_invoice_payments(params, opts \\ []),
+    do: stripe_retry(fn -> Stripe.InvoicePayment.list(params, opts) end)
 end

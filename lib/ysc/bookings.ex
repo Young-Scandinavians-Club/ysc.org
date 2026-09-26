@@ -25,6 +25,7 @@ defmodule Ysc.Bookings do
   alias Ysc.Repo
   alias Stripe
   alias Ysc.Ledgers
+  alias Ysc.Stripe.InvoiceHelpers
   alias Ysc.Stripe.PaymentIntentHelpers
 
   alias Ysc.Bookings.{
@@ -6332,17 +6333,50 @@ defmodule Ysc.Bookings do
     create_stripe_refund(payment_intent_id, amount_cents, reason, opts)
   end
 
-  # Creates a refund in Stripe for a payment intent.
+  # Creates a refund in Stripe for a ledger payment's external payment ID.
   #
   # ## Parameters
-  # - `payment_intent_id`: The Stripe payment intent ID
+  # - `external_payment_id`: The Stripe payment intent ID, or the invoice ID
+  #   for subscription payments (resolved to the invoice's payment intent)
   # - `amount_cents`: The refund amount in cents
   # - `reason`: Reason for the refund
   #
   # ## Returns
   # - `{:ok, %Stripe.Refund{}}` on success
   # - `{:error, reason}` on failure
-  defp create_stripe_refund(payment_intent_id, amount_cents, reason, opts \\ []) do
+  defp create_stripe_refund(
+         external_payment_id,
+         amount_cents,
+         reason,
+         opts \\ []
+       ) do
+    require Ysc.Logging
+
+    case InvoiceHelpers.refundable_payment_intent_id(external_payment_id) do
+      {:ok, payment_intent_id} ->
+        create_stripe_refund_for_payment_intent(
+          payment_intent_id,
+          amount_cents,
+          reason,
+          opts
+        )
+
+      {:error, resolve_error} ->
+        Ysc.Logging.warning("Failed to resolve payment intent for refund",
+          external_payment_id: external_payment_id,
+          error: inspect(resolve_error)
+        )
+
+        {:error, "Failed to resolve payment intent for invoice"}
+    end
+  end
+
+  defp create_stripe_refund_for_payment_intent(
+         payment_intent_id,
+         amount_cents,
+         reason,
+         opts
+       ) do
     require Ysc.Logging
 
     # First, retrieve the payment intent to get the charge ID
