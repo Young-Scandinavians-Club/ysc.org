@@ -521,7 +521,7 @@ defmodule YscWeb.UserRegistrationLive do
   end
 
   # Turnstile is off for the application form until the sandbox issues are
-  # fixed; see YscWeb.GuestTurnstile to turn it back on.
+  # fixed; YscWeb.GuestTurnstile's docs list the steps to turn it back on.
   @spec handle_event(<<_::32, _::_*32>>, map(), any()) :: {:noreply, any()}
   def handle_event("save", %{"user" => user_params}, socket) do
     reg_form_updated =
