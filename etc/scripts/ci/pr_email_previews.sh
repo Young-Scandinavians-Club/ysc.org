@@ -76,8 +76,12 @@ while IFS= read -r file; do
       ;;
     lib/ysc_web/emails/*.ex)
       base="$(basename "$file" .ex)"
+      # Skip shared modules that are not themselves previewable templates.
+      # `*_helpers` covers helpers.ex and extracted modules like
+      # expense_report_helpers.ex (CI would otherwise try to render them
+      # and fail with :unknown).
       case "$base" in
-        notifier | helpers | base_layout | header | footer | notification_settings_footer) ;;
+        notifier | helpers | *_helpers | base_layout | header | footer | notification_settings_footer) ;;
         *)
           templates+=("$base")
           ;;
