@@ -722,7 +722,14 @@ defmodule YscWeb.EventDetailsLive do
                       </span>
                     </div>
                     <article class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none text-zinc-600 leading-relaxed">
-                      {raw(update.rendered_body)}
+                      <div
+                        id={"event-update-body-#{update.id}"}
+                        class="post-render"
+                        phx-hook="GLightboxHook"
+                        phx-update="ignore"
+                      >
+                        {raw(update.rendered_body)}
+                      </div>
                     </article>
                     <p :if={update.sent_by} class="mt-4 text-sm text-zinc-400">
                       Posted by {update.sent_by.first_name} {update.sent_by.last_name}
