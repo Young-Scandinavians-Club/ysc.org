@@ -833,7 +833,10 @@ defmodule YscWeb.BookingChangeLiveTest do
        }}
     end)
 
-    expect(StripeMock, :cancel_payment_intent, fn ^pi_first, _opts ->
+    # Remount Stripe-cancels the stored Intent, then `place_modification_hold/3`
+    # preserves that id so a concurrent tab cannot wipe it. Attaching PI-B
+    # therefore cancels the same (already canceled) Intent a second time.
+    expect(StripeMock, :cancel_payment_intent, 2, fn ^pi_first, _opts ->
       {:ok, %Stripe.PaymentIntent{id: pi_first, status: "canceled"}}
     end)
 

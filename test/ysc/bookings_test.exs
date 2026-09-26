@@ -6812,6 +6812,60 @@ defmodule Ysc.BookingsTest do
       end
     end
 
+    test "refuses to overwrite while the previous modification PaymentIntent is in flight" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0,
+            "payment_intent_id" => "pi_mod_processing"
+          }
+        })
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn "pi_mod_processing",
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn "pi_mod_processing",
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{id: "pi_mod_processing", status: "processing"}}
+        end)
+
+        assert {:error, :modification_payment_in_progress} =
+                 Bookings.attach_modification_payment_intent(
+                   booking,
+                   "pi_mod_replacement"
+                 )
+
+        reloaded = Repo.reload!(booking)
+
+        assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+                 "pi_mod_processing"
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
     test "returns an error when no modification hold attrs are present" do
       booking = booking_fixture(%{status: :complete})
 
