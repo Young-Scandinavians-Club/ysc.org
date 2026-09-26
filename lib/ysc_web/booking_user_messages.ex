@@ -153,6 +153,31 @@ defmodule YscWeb.BookingUserMessages do
     "You already have a room booked. For a second booking you can pick one room — uncheck the current room if you want a different one."
   end
 
+  def room_min_charge_badge(min_occupancy)
+      when is_integer(min_occupancy) and min_occupancy > 1 do
+    "Priced for #{min_occupancy}+ guests"
+  end
+
+  def room_minimum_price_caption(min_occupancy)
+      when is_integer(min_occupancy) do
+    "(charged for #{min_occupancy} #{guest_word(min_occupancy)})"
+  end
+
+  def room_below_min_charge_title(room_name, min_required)
+      when is_binary(room_name) and is_integer(min_required) do
+    "#{room_name} is billed for at least #{min_required} #{guest_word(min_required)}"
+  end
+
+  def room_below_min_charge_body(min_required, formatted_nightly_min)
+      when is_integer(min_required) and is_binary(formatted_nightly_min) do
+    "You can still book with fewer people. You'll be charged for #{min_required} #{guest_word(min_required)} (#{formatted_nightly_min}/night)."
+  end
+
+  def room_minimum_pricing_applied(billable_people)
+      when is_integer(billable_people) do
+    "You're being charged for #{billable_people} #{guest_word(billable_people)} because this room has a #{billable_people}-guest minimum price."
+  end
+
   def room_too_small_for_group(capacity, people) do
     "This room sleeps #{capacity} #{person_word(capacity)}, and your group has #{people}. Choose a larger room or reduce your group size."
   end
@@ -346,6 +371,9 @@ defmodule YscWeb.BookingUserMessages do
 
   defp person_word(1), do: "person"
   defp person_word(_count), do: "people"
+
+  defp guest_word(1), do: "guest"
+  defp guest_word(_count), do: "guests"
 
   defp trim(string), do: String.trim(string)
 end

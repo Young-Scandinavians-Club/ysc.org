@@ -239,6 +239,65 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
     end
 
+    test "family-room minimum is billed guests, not a booking block", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      room = create_tahoe_room!(min_billable_occupancy: 2, capacity_max: 5)
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room",
+        "guests_count" => "1"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+
+      assert has_element?(view, "#room-#{room.id}")
+
+      assert has_element?(
+               view,
+               "#room-#{room.id}-min-charge-badge",
+               "Priced for 2+ guests"
+             )
+
+      refute has_element?(
+               view,
+               "#room-#{room.id}-min-charge-badge",
+               "Min 2 Guests"
+             )
+
+      render_click(view, "room-changed", %{"room-id" => room.id})
+
+      assert has_element?(
+               view,
+               "#tahoe-room-min-charge-notice-#{room.id}",
+               "is billed for at least 2 guests"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-room-min-charge-notice-#{room.id}",
+               "You can still book with fewer people"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-room-min-charge-notice-#{room.id}",
+               "requires minimum of"
+             )
+
+      html = render(view)
+      refute html =~ "Minimum occupancy pricing applied"
+      refute html =~ "Min 2 Guests"
+    end
+
     test "uses book, not rent or reserve, for the entire-cabin option", %{
       conn: conn
     } do
@@ -2007,6 +2066,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
   defp create_tahoe_room!(opts) when is_list(opts) do
     suffix = Keyword.get(opts, :suffix, "default")
     capacity_max = Keyword.get(opts, :capacity_max, 4)
+    min_billable_occupancy = Keyword.get(opts, :min_billable_occupancy, 1)
 
     {:ok, category} =
       %RoomCategory{}
@@ -2021,7 +2081,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
         name: "Tahoe calendar test room #{System.unique_integer([:positive])}",
         property: :tahoe,
         room_category_id: category.id,
-        capacity_max: capacity_max
+        capacity_max: capacity_max,
+        min_billable_occupancy: min_billable_occupancy
       })
 
     RoomsListCache.invalidate()

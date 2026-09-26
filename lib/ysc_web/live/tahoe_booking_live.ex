@@ -2120,9 +2120,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </span>
                               <span
                                 :if={room.min_billable_occupancy > 1}
+                                id={"room-#{room.id}-min-charge-badge"}
                                 class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
                               >
-                                Min {room.min_billable_occupancy} Guests
+                                {YscWeb.BookingUserMessages.room_min_charge_badge(
+                                  room.min_billable_occupancy
+                                )}
                               </span>
                             </div>
                             <!-- Room Features: Compact Badges -->
@@ -2169,7 +2172,9 @@ defmodule YscWeb.TahoeBookingLive do
                                 <div :if={room.minimum_price}>
                                   {MoneyHelper.format_money!(room.minimum_price)} min
                                   <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    ({room.min_billable_occupancy} guest)
+                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
+                                      room.min_billable_occupancy
+                                    )}
                                   </span>
                                 </div>
                                 <div :if={!room.minimum_price}>
@@ -2285,9 +2290,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </span>
                               <span
                                 :if={room.min_billable_occupancy > 1}
+                                id={"room-#{room.id}-min-charge-badge"}
                                 class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
                               >
-                                Min {room.min_billable_occupancy} Guests
+                                {YscWeb.BookingUserMessages.room_min_charge_badge(
+                                  room.min_billable_occupancy
+                                )}
                               </span>
                             </div>
                             <!-- Room Features: Compact Badges -->
@@ -2334,7 +2342,9 @@ defmodule YscWeb.TahoeBookingLive do
                                 <div :if={room.minimum_price}>
                                   {MoneyHelper.format_money!(room.minimum_price)} min
                                   <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    ({room.min_billable_occupancy} guest)
+                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
+                                      room.min_billable_occupancy
+                                    )}
                                   </span>
                                 </div>
                                 <div :if={!room.minimum_price}>
@@ -2472,18 +2482,22 @@ defmodule YscWeb.TahoeBookingLive do
                           <% min_required = room.min_billable_occupancy || 1 %>
                           <div
                             :if={total_people < min_required}
-                            class="p-2 bg-red-50 border border-red-200 rounded-sm"
+                            id={"tahoe-room-min-charge-notice-#{room.id}"}
+                            class="p-2 bg-amber-50 border border-amber-200 rounded-sm"
                           >
                             <div class="flex items-start gap-2">
                               <.icon
-                                name="hero-exclamation-triangle-solid"
-                                class="w-4 h-4 text-red-600 shrink-0 mt-0.5"
+                                name="hero-information-circle"
+                                class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
                               />
                               <div class="flex-1">
-                                <p class="text-xs font-semibold text-red-900">
-                                  {room.name} requires minimum of {min_required} guests
+                                <p class="text-xs font-semibold text-amber-900">
+                                  {YscWeb.BookingUserMessages.room_below_min_charge_title(
+                                    room.name,
+                                    min_required
+                                  )}
                                 </p>
-                                <p class="text-xs text-red-800 mt-0.5">
+                                <p class="text-xs text-amber-800 mt-0.5">
                                   <% season =
                                     Season.find_season_for_date(
                                       @seasons,
@@ -2494,12 +2508,13 @@ defmodule YscWeb.TahoeBookingLive do
                                     get_default_adult_price(@property, season_id) %>
                                   <% room_adult_price =
                                     room.adult_price_per_night ||
-                                      fallback_adult_price %> ({MoneyHelper.format_money!(
-                                    case Money.mult(room_adult_price, min_required) do
-                                      {:ok, total} -> total
-                                      _ -> room_adult_price
-                                    end
-                                  )}/night minimum)
+                                      fallback_adult_price %>
+                                  <% {:ok, nightly_min} =
+                                    Money.mult(room_adult_price, min_required) %>
+                                  {YscWeb.BookingUserMessages.room_below_min_charge_body(
+                                    min_required,
+                                    MoneyHelper.format_money!(nightly_min)
+                                  )}
                                 </p>
                               </div>
                             </div>
@@ -2597,6 +2612,7 @@ defmodule YscWeb.TahoeBookingLive do
                       <div :if={@selected_booking_mode == :room}>
                         <div
                           :if={@price_breakdown[:using_minimum_pricing]}
+                          id="tahoe-minimum-pricing-applied"
                           class="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-sm"
                         >
                           <div class="flex items-start gap-2">
@@ -2605,7 +2621,11 @@ defmodule YscWeb.TahoeBookingLive do
                               class="w-3 h-3 text-amber-600 shrink-0 mt-0.5"
                             />
                             <p class="text-xs text-amber-800 leading-tight">
-                              Minimum occupancy pricing applied
+                              {YscWeb.BookingUserMessages.room_minimum_pricing_applied(
+                                @price_breakdown[:billable_people] ||
+                                  @price_breakdown[:guests_count] ||
+                                  0
+                              )}
                             </p>
                           </div>
                         </div>

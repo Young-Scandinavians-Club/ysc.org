@@ -99,6 +99,32 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute toast =~ "Booking created"
   end
 
+  test "Tahoe room minimum charge copy is about price, not a guest requirement" do
+    assert BookingUserMessages.room_min_charge_badge(2) ==
+             "Priced for 2+ guests"
+
+    assert BookingUserMessages.room_minimum_price_caption(2) ==
+             "(charged for 2 guests)"
+
+    assert BookingUserMessages.room_minimum_price_caption(1) ==
+             "(charged for 1 guest)"
+
+    title = BookingUserMessages.room_below_min_charge_title("Room 4", 2)
+    assert title =~ "Room 4 is billed for at least 2 guests"
+    refute title =~ "requires minimum"
+
+    body = BookingUserMessages.room_below_min_charge_body(2, "$80.00")
+    assert body =~ "You can still book with fewer people"
+    assert body =~ "charged for 2 guests"
+    assert body =~ "$80.00/night"
+    refute body =~ "requires"
+
+    applied = BookingUserMessages.room_minimum_pricing_applied(2)
+    assert applied =~ "You're being charged for 2 guests"
+    assert applied =~ "2-guest minimum price"
+    refute applied =~ "occupancy"
+  end
+
   test "checkout step copy" do
     assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~
              "everyone else staying with you"
