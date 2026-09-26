@@ -12,6 +12,7 @@ defmodule YscWeb.UserRegistrationLive do
     UserDisplay
   }
 
+  alias Ysc.RegistrationRateLimit
   alias YscWeb.Workers.CreateStripeCustomerWorker
 
   def render(assigns) do
@@ -469,7 +470,7 @@ defmodule YscWeb.UserRegistrationLive do
     """
   end
 
-  def mount(params, _session, socket) do
+  def mount(params, session, socket) do
     browser_timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     # Today in user's timezone for date input max (so "today" is correct for their locale)
@@ -509,6 +510,7 @@ defmodule YscWeb.UserRegistrationLive do
       |> assign(:show_family_input, false)
       |> assign(:browser_timezone, browser_timezone)
       |> assign(:today_max, today_max)
+      |> assign(:remote_ip, YscWeb.ClientIP.from_socket(socket, session))
       |> assign(
         trigger_submit: false,
         check_errors: false,
@@ -522,8 +524,113 @@ defmodule YscWeb.UserRegistrationLive do
 
   # Turnstile is off for the application form until the sandbox issues are
   # fixed; YscWeb.GuestTurnstile's docs list the steps to turn it back on.
+  # Every submit is rate limited per client IP instead.
   @spec handle_event(<<_::32, _::_*32>>, map(), any()) :: {:noreply, any()}
   def handle_event("save", %{"user" => user_params}, socket) do
+    case RegistrationRateLimit.check_ip(socket.assigns.remote_ip) do
+      :ok ->
+        save_application(socket, user_params)
+
+      {:error, :rate_limited, retry_after_seconds} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           rate_limited_message(retry_after_seconds),
+           title: "Application"
+         )}
+    end
+  end
+
+  def handle_event("validate", %{"user" => user_params}, socket) do
+    form_data =
+      User.registration_changeset(
+        %User{},
+        user_params,
+        hash_password: false,
+        validate_email: false
+      )
+
+    re_val =
+      assign_form(socket, Map.put(form_data, :action, :validate))
+      |> assign(:email_already_taken, false)
+
+    {:noreply, re_val |> evaluate_steps() |> show_family_input?(user_params)}
+  end
+
+  def handle_event("recover_wizard", %{"user" => user_params}, socket) do
+    # Custom recovery handler for multi-step wizard form
+    # Restores both form data and determines the appropriate step based on filled fields
+    form_data =
+      User.registration_changeset(
+        %User{},
+        user_params,
+        hash_password: false,
+        validate_email: false
+      )
+
+    # Determine which step the user should be on based on filled fields
+    current_step = determine_step_from_params(user_params)
+
+    re_val =
+      socket
+      |> assign_form(Map.put(form_data, :action, :validate))
+      |> assign(:current_step, current_step)
+      |> evaluate_steps()
+      |> show_family_input?(user_params)
+
+    {:noreply, re_val}
+  end
+
+  def handle_event("set-step", %{"step" => step}, socket) do
+    assigns = socket.assigns
+    int_step = String.to_integer(step)
+    current_step = assigns.current_step
+
+    new_step =
+      case int_step do
+        1 ->
+          if assigns.step_0_invalid, do: current_step, else: int_step
+
+        2 ->
+          if assigns.step_0_invalid || assigns.step_1_invalid,
+            do: current_step,
+            else: int_step
+
+        _ ->
+          int_step
+      end
+
+    {:noreply,
+     socket
+     |> assign(:current_step, new_step)
+     |> push_event("scroll-to-top", %{})
+     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
+  end
+
+  def handle_event("prev-step", _value, socket) do
+    new_step = max(socket.assigns.current_step - 1, 0)
+
+    {:noreply,
+     socket
+     |> assign(:current_step, new_step)
+     |> push_event("scroll-to-top", %{})
+     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
+  end
+
+  def handle_event("next-step", _values, socket) do
+    current_step = socket.assigns.current_step
+
+    new_step = current_step + 1
+
+    {:noreply,
+     socket
+     |> assign(:current_step, new_step)
+     |> push_event("scroll-to-top", %{})
+     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
+  end
+
+  defp save_application(socket, user_params) do
     reg_form_updated =
       user_params["registration_form"]
       |> Map.put("started", socket.assigns[:started])
@@ -622,92 +729,12 @@ defmodule YscWeb.UserRegistrationLive do
     end
   end
 
-  def handle_event("validate", %{"user" => user_params}, socket) do
-    form_data =
-      User.registration_changeset(
-        %User{},
-        user_params,
-        hash_password: false,
-        validate_email: false
-      )
+  defp rate_limited_message(retry_after_seconds) do
+    minutes = max(1, div(retry_after_seconds + 59, 60))
 
-    re_val =
-      assign_form(socket, Map.put(form_data, :action, :validate))
-      |> assign(:email_already_taken, false)
-
-    {:noreply, re_val |> evaluate_steps() |> show_family_input?(user_params)}
-  end
-
-  def handle_event("recover_wizard", %{"user" => user_params}, socket) do
-    # Custom recovery handler for multi-step wizard form
-    # Restores both form data and determines the appropriate step based on filled fields
-    form_data =
-      User.registration_changeset(
-        %User{},
-        user_params,
-        hash_password: false,
-        validate_email: false
-      )
-
-    # Determine which step the user should be on based on filled fields
-    current_step = determine_step_from_params(user_params)
-
-    re_val =
-      socket
-      |> assign_form(Map.put(form_data, :action, :validate))
-      |> assign(:current_step, current_step)
-      |> evaluate_steps()
-      |> show_family_input?(user_params)
-
-    {:noreply, re_val}
-  end
-
-  def handle_event("set-step", %{"step" => step}, socket) do
-    assigns = socket.assigns
-    int_step = String.to_integer(step)
-    current_step = assigns.current_step
-
-    new_step =
-      case int_step do
-        1 ->
-          if assigns.step_0_invalid, do: current_step, else: int_step
-
-        2 ->
-          if assigns.step_0_invalid || assigns.step_1_invalid,
-            do: current_step,
-            else: int_step
-
-        _ ->
-          int_step
-      end
-
-    {:noreply,
-     socket
-     |> assign(:current_step, new_step)
-     |> push_event("scroll-to-top", %{})
-     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
-  end
-
-  def handle_event("prev-step", _value, socket) do
-    new_step = max(socket.assigns.current_step - 1, 0)
-
-    {:noreply,
-     socket
-     |> assign(:current_step, new_step)
-     |> push_event("scroll-to-top", %{})
-     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
-  end
-
-  def handle_event("next-step", _values, socket) do
-    current_step = socket.assigns.current_step
-
-    new_step = current_step + 1
-
-    {:noreply,
-     socket
-     |> assign(:current_step, new_step)
-     |> push_event("scroll-to-top", %{})
-     |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
+    "We've received several applications from your network recently. " <>
+      "Please try again in #{minutes} #{if minutes == 1, do: "minute", else: "minutes"}, " <>
+      "or email info@ysc.org if you need help."
   end
 
   defp registration_form_base_messages(%Phoenix.HTML.Form{
