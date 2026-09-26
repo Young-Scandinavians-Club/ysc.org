@@ -51,21 +51,13 @@ defmodule YscWeb.Emails.BookingConfirmation do
       raise ArgumentError, "Booking missing id: #{inspect(booking)}"
     end
 
-    # Ensure we have all necessary preloaded data
-    # Reload booking with associations if not already loaded
+    # Callers load missing associations. Never `Repo.get` the booking again —
+    # that would re-SELECT `hashed_password` / `board_bio` even when `:user`
+    # is already in memory.
     booking =
-      if Ecto.assoc_loaded?(booking.user) && Ecto.assoc_loaded?(booking.rooms) do
-        booking
-      else
-        case Repo.get(Ysc.Bookings.Booking, booking.id)
-             |> Repo.preload([:user, :rooms]) do
-          nil ->
-            raise ArgumentError, "Booking not found: #{booking.id}"
-
-          loaded_booking ->
-            loaded_booking
-        end
-      end
+      booking
+      |> maybe_preload_assoc(:user)
+      |> maybe_preload_assoc(:rooms)
 
     # Validate required associations
     if is_nil(booking.user) do
@@ -120,5 +112,13 @@ defmodule YscWeb.Emails.BookingConfirmation do
       booking_url: booking_url(booking.id),
       cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
     }
+  end
+
+  defp maybe_preload_assoc(booking, assoc) do
+    if Ecto.assoc_loaded?(Map.fetch!(booking, assoc)) do
+      booking
+    else
+      Repo.preload(booking, assoc)
+    end
   end
 end
