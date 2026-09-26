@@ -11,9 +11,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
   alias Ysc.Accounts
 
-  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
-  @turnstile_token "test-token"
-
   defp user_with_lifetime_membership(attrs \\ %{}) do
     user_fixture(attrs)
     |> Ecto.Changeset.change(
@@ -145,7 +142,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
       # Submit the complete form
       # Since successful submission redirects to account setup, we just ensure it doesn't error
       render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
         "user" =>
           Map.merge(step_0_params, Map.merge(step_1_params, step_2_params))
       })
@@ -413,7 +409,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
       })
 
       render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
         "user" => Map.merge(Map.merge(step_0, step_1), step_2)
       })
 
@@ -627,7 +622,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_change(form, %{"user" => user_params})
 
       render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
         "user" => user_params
       })
 
@@ -668,7 +662,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_change(form, %{"user" => merged})
 
       render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
         "user" => merged
       })
 
@@ -741,7 +734,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       html =
         render_submit(lv, "save", %{
-          "cf-turnstile-response" => @turnstile_token,
           "user" => bad_params
         })
 
@@ -901,7 +893,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_change(form, %{"user" => user_params})
 
       render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
         "user" => user_params
       })
 
@@ -971,7 +962,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_change(form, %{"user" => base})
 
       render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
         "user" => base
       })
 
@@ -1012,7 +1002,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       html =
         render_submit(lv, "save", %{
-          "cf-turnstile-response" => @turnstile_token,
           "user" => bad_params
         })
 
@@ -1089,7 +1078,6 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       html =
         render_submit(lv, "save", %{
-          "cf-turnstile-response" => @turnstile_token,
           "user" => bad_params
         })
 
@@ -1098,7 +1086,8 @@ defmodule YscWeb.UserRegistrationLiveTest do
     end
   end
 
-  describe "Turnstile verification" do
+  # Turnstile is off for the application form for now (see YscWeb.GuestTurnstile).
+  describe "Turnstile" do
     @valid_params %{
       "email" => "turnstile@example.com",
       "first_name" => "Tur",
@@ -1120,125 +1109,17 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
     }
 
-    test "renders the Turnstile widget inside the registration form", %{
-      conn: conn
-    } do
+    test "does not render the Turnstile widget", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
 
-      assert has_element?(lv, "#cf-turnstile")
+      refute has_element?(lv, "#cf-turnstile")
     end
 
-    test "allows submission when Turnstile verification succeeds", %{conn: conn} do
-      uniq = System.unique_integer()
+    test "registers without a token and never calls Cloudflare", %{conn: conn} do
+      email = "no_turnstile#{System.unique_integer()}@example.com"
 
       stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:ok, %{"success" => true}}
-      end)
-
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-      form = form(lv, "#registration_form")
-
-      params =
-        Map.put(@valid_params, "email", "turnstile_ok#{uniq}@example.com")
-
-      render_change(form, %{"user" => params})
-
-      render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
-        "user" => params
-      })
-
-      {path, flash} = assert_redirect(lv)
-      assert path =~ "/account/setup"
-
-      assert flash["info"] =~ "Application received!"
-      assert flash["info"] =~ "6-digit code"
-    end
-
-    test "blocks submission and shows error when Turnstile verification fails",
-         %{
-           conn: conn
-         } do
-      stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:error, %{"error-codes" => ["invalid-input-response"]}}
-      end)
-
-      stub(TurnstileMock, :refresh, fn socket -> socket end)
-
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-      form = form(lv, "#registration_form")
-
-      render_change(form, %{"user" => @valid_params})
-
-      render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
-        "user" => @valid_params
-      })
-
-      html = render(lv)
-      assert html =~ "verify you"
-      assert html =~ "real person"
-      refute_redirected(lv)
-    end
-
-    test "calls Turnstile.refresh after a failed verification", %{conn: conn} do
-      test_pid = self()
-
-      stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:error, %{"error-codes" => ["invalid-input-response"]}}
-      end)
-
-      stub(TurnstileMock, :refresh, fn socket ->
-        send(test_pid, :turnstile_refreshed)
-        socket
-      end)
-
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-      form = form(lv, "#registration_form")
-
-      render_change(form, %{"user" => @valid_params})
-
-      render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
-        "user" => @valid_params
-      })
-
-      assert_received :turnstile_refreshed
-    end
-
-    test "does not register the user when Turnstile verification fails", %{
-      conn: conn
-    } do
-      uniq = System.unique_integer()
-      email = "blocked#{uniq}@example.com"
-
-      stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:error, %{"error-codes" => ["invalid-input-response"]}}
-      end)
-
-      stub(TurnstileMock, :refresh, fn socket -> socket end)
-
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-      form = form(lv, "#registration_form")
-
-      params = Map.put(@valid_params, "email", email)
-      render_change(form, %{"user" => params})
-
-      render_submit(form, %{
-        "cf-turnstile-response" => @turnstile_token,
-        "user" => params
-      })
-
-      refute Accounts.get_user_by_email(email)
-    end
-
-    test "does not register the user when the Turnstile token is missing", %{
-      conn: conn
-    } do
-      email = "no_token#{System.unique_integer()}@example.com"
-
-      stub(TurnstileMock, :verify, fn _params, _ip ->
-        flunk("Turnstile.verify must not run without a token")
+        flunk("Turnstile.verify must not run for the application form")
       end)
 
       {:ok, lv, _html} = live(conn, ~p"/users/register")
@@ -1248,8 +1129,10 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_change(form, %{"user" => params})
       render_submit(form, %{"user" => params})
 
-      assert render(lv) =~ "real person"
-      refute Accounts.get_user_by_email(email)
+      {path, flash} = assert_redirect(lv)
+      assert path =~ "/account/setup"
+      assert flash["info"] =~ "Application received!"
+      assert Accounts.get_user_by_email(email)
     end
   end
 end

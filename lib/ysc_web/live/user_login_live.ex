@@ -27,7 +27,7 @@ defmodule YscWeb.UserLoginLive do
           type="button"
           disabled={@passkey_loading}
           class={
-            "w-full flex items-center justify-center gap-2 h-10" <>
+            "w-full flex items-center justify-center gap-2 h-10 max-sm:min-h-12!" <>
               if(@passkey_loading, do: " opacity-50 cursor-not-allowed", else: "")
           }
           phx-click="sign_in_with_passkey"
@@ -135,11 +135,13 @@ defmodule YscWeb.UserLoginLive do
         <.oauth_button
           provider={:google}
           label="Sign in with Google"
+          class="max-sm:min-h-12!"
           phx-click="sign_in_with_google"
         />
         <.oauth_button
           provider={:facebook}
           label="Sign in with Facebook"
+          class="max-sm:min-h-12!"
           phx-click="sign_in_with_facebook"
         />
       </div>
@@ -222,37 +224,44 @@ defmodule YscWeb.UserLoginLive do
           value={@mobile_redirect_uri || ""}
         />
         <.input type="hidden" name="code_challenge" value={@code_challenge || ""} />
-        <div class="space-y-4">
-          <.input
-            field={@form[:email]}
-            type="email"
-            label="Email"
-            required
-            autofocus
-          />
-          <.input
-            field={@form[:password]}
-            type="password-toggle"
-            label="Password"
-            required
-          />
-        </div>
-
-        <:actions>
-          <div class="flex flex-col gap-3 w-full pb-2">
-            <.button phx-disable-with="Signing in..." class="w-full">
-              Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1" />
-            </.button>
-            <div class="text-center">
-              <.link
-                href={~p"/users/reset-password"}
-                class="text-sm font-semibold hover:underline text-blue-600"
-              >
-                Forgot your password?
-              </.link>
+        <div class="space-y-6">
+          <div class="space-y-4 max-sm:[&_input]:min-h-12">
+            <.input
+              field={@form[:email]}
+              type="email"
+              label="Email"
+              required
+              autofocus
+            />
+            <div>
+              <div class="flex items-center justify-between gap-2">
+                <.label for={@form[:password].id}>Password</.label>
+                <.link
+                  id="login-forgot-password-link"
+                  href={~p"/users/reset-password"}
+                  tabindex="-1"
+                  class="text-sm font-semibold leading-6 hover:underline text-blue-600"
+                >
+                  Forgot your password?
+                </.link>
+              </div>
+              <.input
+                field={@form[:password]}
+                type="password-toggle"
+                required
+              />
             </div>
           </div>
-        </:actions>
+
+          <div class="pb-2">
+            <.button
+              phx-disable-with="Signing in..."
+              class="w-full max-sm:min-h-12!"
+            >
+              Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1" />
+            </.button>
+          </div>
+        </div>
       </.simple_form>
     </div>
     """

@@ -409,8 +409,6 @@ defmodule YscWeb.UserRegistrationLive do
               </.inputs_for>
             </div>
 
-            <Turnstile.widget appearance="interaction-only" theme="light" />
-
             <div
               id="registration-actions"
               class="sticky bottom-0 z-10 flex flex-row justify-between items-center -mx-6 px-6 sm:mx-0 sm:px-0 py-3 bg-white border-t border-zinc-100 mt-2"
@@ -471,9 +469,7 @@ defmodule YscWeb.UserRegistrationLive do
     """
   end
 
-  def mount(params, session, socket) do
-    remote_ip = YscWeb.ClientIP.from_socket(socket, session)
-
+  def mount(params, _session, socket) do
     browser_timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     # Today in user's timezone for date input max (so "today" is correct for their locale)
@@ -513,7 +509,6 @@ defmodule YscWeb.UserRegistrationLive do
       |> assign(:show_family_input, false)
       |> assign(:browser_timezone, browser_timezone)
       |> assign(:today_max, today_max)
-      |> assign(:remote_ip, remote_ip)
       |> assign(
         trigger_submit: false,
         check_errors: false,
@@ -525,112 +520,105 @@ defmodule YscWeb.UserRegistrationLive do
     {:ok, socket, temporary_assigns: [form: nil]}
   end
 
+  # Turnstile is off for the application form until the sandbox issues are
+  # fixed; YscWeb.GuestTurnstile's docs list the steps to turn it back on.
   @spec handle_event(<<_::32, _::_*32>>, map(), any()) :: {:noreply, any()}
-  def handle_event("save", %{"user" => user_params} = values, socket) do
-    case YscWeb.GuestTurnstile.verify(socket, values,
-           title: "Registration",
-           required: true
-         ) do
-      {:error, socket} ->
-        {:noreply, socket}
+  def handle_event("save", %{"user" => user_params}, socket) do
+    reg_form_updated =
+      user_params["registration_form"]
+      |> Map.put("started", socket.assigns[:started])
+      |> Map.put("browser_timezone", socket.assigns[:browser_timezone])
 
-      :ok ->
-        reg_form_updated =
-          user_params["registration_form"]
-          |> Map.put("started", socket.assigns[:started])
-          |> Map.put("browser_timezone", socket.assigns[:browser_timezone])
+    # Filter out empty family members (those without first_name, last_name, or birth_date)
+    # Handle both map and list formats - Phoenix forms can return maps with numeric string keys
+    family_members_list =
+      case user_params["family_members"] do
+        nil -> []
+        %{} = map -> Map.values(map)
+        list when is_list(list) -> list
+      end
 
-        # Filter out empty family members (those without first_name, last_name, or birth_date)
-        # Handle both map and list formats - Phoenix forms can return maps with numeric string keys
-        family_members_list =
-          case user_params["family_members"] do
-            nil -> []
-            %{} = map -> Map.values(map)
-            list when is_list(list) -> list
-          end
+    filtered_family_members =
+      family_members_list
+      |> Enum.filter(fn fm ->
+        first_name = Map.get(fm, "first_name", "") || ""
+        last_name = Map.get(fm, "last_name", "") || ""
+        birth_date = Map.get(fm, "birth_date", "") || ""
 
-        filtered_family_members =
-          family_members_list
-          |> Enum.filter(fn fm ->
-            first_name = Map.get(fm, "first_name", "") || ""
-            last_name = Map.get(fm, "last_name", "") || ""
-            birth_date = Map.get(fm, "birth_date", "") || ""
+        String.trim(first_name) != "" &&
+          String.trim(last_name) != "" &&
+          String.trim(birth_date) != ""
+      end)
 
-            String.trim(first_name) != "" &&
-              String.trim(last_name) != "" &&
-              String.trim(birth_date) != ""
-          end)
+    reg_form_with_invite =
+      if family_invite = socket.assigns[:family_invite] do
+        Map.put(reg_form_updated, "family_invite_id", family_invite.id)
+      else
+        reg_form_updated
+      end
 
-        reg_form_with_invite =
-          if family_invite = socket.assigns[:family_invite] do
-            Map.put(reg_form_updated, "family_invite_id", family_invite.id)
-          else
-            reg_form_updated
-          end
+    updated_user_params =
+      user_params
+      |> Map.replace("registration_form", reg_form_with_invite)
+      |> Map.put("family_members", filtered_family_members)
+      |> Map.put(
+        "most_connected_country",
+        reg_form_updated["most_connected_nordic_country"]
+      )
 
-        updated_user_params =
-          user_params
-          |> Map.replace("registration_form", reg_form_with_invite)
-          |> Map.put("family_members", filtered_family_members)
-          |> Map.put(
-            "most_connected_country",
-            reg_form_updated["most_connected_nordic_country"]
-          )
+    case Accounts.register_user(updated_user_params) do
+      {:ok, user} ->
+        Accounts.deliver_application_submitted_notification(user)
 
-        case Accounts.register_user(updated_user_params) do
-          {:ok, user} ->
-            Accounts.deliver_application_submitted_notification(user)
+        # Create Stripe customer in background so it's ready when user visits settings
+        %{"user_id" => user.id}
+        |> CreateStripeCustomerWorker.new()
+        |> Oban.insert()
 
-            # Create Stripe customer in background so it's ready when user visits settings
-            %{"user_id" => user.id}
-            |> CreateStripeCustomerWorker.new()
-            |> Oban.insert()
+        YscWeb.Emails.Notifier.schedule_email_to_board(
+          "#{user.id}",
+          "New Membership Application Received - Action Needed",
+          "admin_application_submitted",
+          %{
+            applicant_name: UserDisplay.full_name(user),
+            submission_date:
+              Timex.format!(
+                Timex.now("America/Los_Angeles"),
+                "{Mshort} {D}, {YYYY} at {h12}:{m} {AM}"
+              ),
+            review_url:
+              YscWeb.Endpoint.url() <> "/admin/users/#{user.id}/review"
+          }
+        )
 
-            YscWeb.Emails.Notifier.schedule_email_to_board(
-              "#{user.id}",
-              "New Membership Application Received - Action Needed",
-              "admin_application_submitted",
-              %{
-                applicant_name: UserDisplay.full_name(user),
-                submission_date:
-                  Timex.format!(
-                    Timex.now("America/Los_Angeles"),
-                    "{Mshort} {D}, {YYYY} at {h12}:{m} {AM}"
-                  ),
-                review_url:
-                  YscWeb.Endpoint.url() <> "/admin/users/#{user.id}/review"
-              }
-            )
+        # After successful registration, redirect to account setup flow
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Application received! Check your email for a 6-digit code to finish setting up your account.",
+           title: "Application submitted"
+         )
+         |> redirect(
+           to:
+             YscWeb.AccountSetupAccess.setup_path(user.id, %{
+               "from_signup" => "true"
+             })
+         )}
 
-            # After successful registration, redirect to account setup flow
-            {:noreply,
-             socket
-             |> YscWeb.Flash.put_toast(
-               :info,
-               "Application received! Check your email for a 6-digit code to finish setting up your account.",
-               title: "Application submitted"
-             )
-             |> redirect(
-               to:
-                 YscWeb.AccountSetupAccess.setup_path(user.id, %{
-                   "from_signup" => "true"
-                 })
-             )}
+      {:error, %Ecto.Changeset{} = changeset} ->
+        email_taken? = email_already_taken_error?(changeset)
+        step_with_error = step_with_first_error(changeset)
+        show_family = show_family_input_from_changeset?(changeset)
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            email_taken? = email_already_taken_error?(changeset)
-            step_with_error = step_with_first_error(changeset)
-            show_family = show_family_input_from_changeset?(changeset)
-
-            {:noreply,
-             socket
-             |> assign(check_errors: true, email_already_taken: email_taken?)
-             |> assign(:current_step, step_with_error)
-             |> assign(:show_family_input, show_family)
-             |> assign_form(changeset)
-             |> evaluate_steps()
-             |> push_event("scroll-to-top", %{})}
-        end
+        {:noreply,
+         socket
+         |> assign(check_errors: true, email_already_taken: email_taken?)
+         |> assign(:current_step, step_with_error)
+         |> assign(:show_family_input, show_family)
+         |> assign_form(changeset)
+         |> evaluate_steps()
+         |> push_event("scroll-to-top", %{})}
     end
   end
 
