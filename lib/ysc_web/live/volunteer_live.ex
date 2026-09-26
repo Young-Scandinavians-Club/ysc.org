@@ -144,8 +144,8 @@ defmodule YscWeb.VolunteerLive do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
-    remote_ip = get_connect_info(socket, :peer_data).address
+  def mount(_params, session, socket) do
+    remote_ip = YscWeb.ClientIP.from_socket(socket, session)
     current_user = socket.assigns[:current_user]
 
     params = starting_params(current_user)

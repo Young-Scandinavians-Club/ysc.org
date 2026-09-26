@@ -50,7 +50,11 @@ defmodule YscWeb.HomeLive do
     else
       # Guest user: load data synchronously for SEO
       # Search engines need to see content in the initial HTML response
-      socket = mount_guest_with_data(socket)
+      socket =
+        mount_guest_with_data(
+          socket,
+          YscWeb.ClientIP.from_socket(socket, session)
+        )
 
       socket =
         if connected?(socket) do
@@ -101,7 +105,7 @@ defmodule YscWeb.HomeLive do
 
   # Guest user: load data synchronously for SEO-friendly initial render
   # Search engines and social media crawlers need to see actual content
-  defp mount_guest_with_data(socket) do
+  defp mount_guest_with_data(socket, remote_ip) do
     # Determine hero video and captions based on season (no DB query)
     {hero_video, hero_poster, hero_poster_srcset, hero_captions} =
       case Season.for_date(
@@ -140,9 +144,6 @@ defmodule YscWeb.HomeLive do
       |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
         Map.put(acc, key, value)
       end)
-
-    # Get remote IP for Turnstile verification
-    remote_ip = get_connect_info(socket, :peer_data).address
 
     assign(socket,
       page_title: "Home",
