@@ -3,11 +3,17 @@ defmodule YscWeb.GuestTurnstile do
   Shared Cloudflare Turnstile verification for public forms.
 
   Contact, volunteer, and conduct-report LiveViews skip the widget for
-  signed-in members. Registration always verifies. A missing or blank token
-  fails without calling Cloudflare, so clients can't bypass the check by
-  omitting the field. Failed checks toast the same copy and refresh the
-  widget. Guest newsletter signups use `verify_token/3` and `refresh/1`
-  directly to show their own inline error.
+  signed-in members. A missing or blank token fails without calling
+  Cloudflare, so clients can't bypass the check by omitting the field. Failed
+  checks toast the same copy and refresh the widget. Guest newsletter signups
+  use `verify_token/3` and `refresh/1` directly to show their own inline
+  error.
+
+  The membership application (`UserRegistrationLive`) doesn't use Turnstile
+  for now. To turn it back on: assign `:remote_ip` in its `mount/3` (which
+  `verify/3` reads), render the widget in its form, call `verify/3` with
+  `required: true` in its save handler, and restore its tests for a failed
+  check.
 
   Resolves the Turnstile module from `:phoenix_turnstile, :turnstile_module`
   so tests can stub `TurnstileMock`.
@@ -55,8 +61,8 @@ defmodule YscWeb.GuestTurnstile do
   ## Options
 
     * `:title` — required toast title on failure
-    * `:required` — when `true`, always verify (registration). When `false`
-      (default), signed-in members skip the check.
+    * `:required` — when `true`, verify signed-in sockets too (meant for
+      registration). When `false` (default), signed-in members skip the check.
   """
   def verify(socket, params, opts) when is_map(params) and is_list(opts) do
     title = Keyword.fetch!(opts, :title)
