@@ -178,6 +178,23 @@ defmodule YscWeb.BookingUserMessages do
     "You're being charged for #{billable_people} #{guest_word(billable_people)} because this room has a #{billable_people}-guest minimum price."
   end
 
+  def room_base_price_people_label(billable_people, guests_count)
+      when is_integer(billable_people) and is_integer(guests_count) do
+    if billable_people > guests_count do
+      "charged for #{billable_people} #{guest_word(billable_people)}"
+    else
+      adult_count_label(billable_people)
+    end
+  end
+
+  def room_base_price_people_label(billable_people, _guests_count)
+      when is_integer(billable_people) do
+    adult_count_label(billable_people)
+  end
+
+  def room_base_price_people_label(_billable_people, _guests_count),
+    do: adult_count_label(0)
+
   def room_too_small_for_group(capacity, people) do
     "This room sleeps #{capacity} #{person_word(capacity)}, and your group has #{people}. Choose a larger room or reduce your group size."
   end
@@ -374,6 +391,13 @@ defmodule YscWeb.BookingUserMessages do
 
   defp guest_word(1), do: "guest"
   defp guest_word(_count), do: "guests"
+
+  defp adult_count_label(1), do: "1 adult"
+
+  defp adult_count_label(count) when is_integer(count) and count >= 0,
+    do: "#{count} adults"
+
+  defp adult_count_label(_count), do: "0 adults"
 
   defp trim(string), do: String.trim(string)
 end

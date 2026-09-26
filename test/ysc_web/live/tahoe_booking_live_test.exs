@@ -245,6 +245,17 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
       room = create_tahoe_room!(min_billable_occupancy: 2, capacity_max: 5)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(80, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
       {checkin, checkout} = tahoe_booking_dates(30)
 
       params = %{
@@ -296,6 +307,14 @@ defmodule YscWeb.TahoeBookingLiveTest do
       html = render(view)
       refute html =~ "Minimum occupancy pricing applied"
       refute html =~ "Min 2 Guests"
+
+      refute has_element?(view, "#tahoe-base-price-people", "2 adults")
+
+      assert has_element?(
+               view,
+               "#tahoe-minimum-pricing-applied",
+               "You're being charged for 2 guests"
+             )
     end
 
     test "uses book, not rent or reserve, for the entire-cabin option", %{

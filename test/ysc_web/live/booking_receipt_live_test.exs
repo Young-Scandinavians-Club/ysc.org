@@ -3171,6 +3171,67 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "Base Price"
     end
 
+    test "labels minimum-price billing as charged guests, not extra adults", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :room,
+          guests_count: 1,
+          children_count: 0
+        })
+
+      room_item = %{
+        "type" => "room",
+        "room_id" => "r1",
+        "room_name" => "Pine",
+        "nights" => 2,
+        "guests_count" => 1,
+        "children_count" => 0,
+        "base" => %{"amount" => "200", "currency" => "USD"},
+        "adult_price_per_night" => %{"amount" => "100", "currency" => "USD"},
+        "billable_people" => 2
+      }
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "room",
+            "nights" => 2,
+            "guests_count" => 1,
+            "children_count" => 0,
+            "rooms" => [room_item]
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(20_000, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+
+      refute has_element?(view, "#receipt-base-price-people", "2 adults")
+
+      assert has_element?(
+               view,
+               "#receipt-base-price-people",
+               "charged for 2 guests"
+             )
+
+      assert has_element?(
+               view,
+               "#receipt-minimum-pricing-applied",
+               "You're being charged for 2 guests"
+             )
+    end
+
     test "renders per-guest line when pricing_items type is per_guest", %{
       conn: conn
     } do
