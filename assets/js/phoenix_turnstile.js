@@ -7,6 +7,10 @@ const TURNSTILE_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?ren
 // then rejects it and refreshes the widget).
 const SUBMIT_HOLD_MS = 15000;
 
+// Tokens are valid for 300 s. Past this age a submit fetches a fresh one first,
+// leaving margin for the round trip to the server and on to Cloudflare.
+const TOKEN_MAX_AGE_MS = 240000;
+
 // Interaction that means someone is filling in the form.
 const INTERACTION_EVENTS = ["focusin", "pointerdown", "input"];
 
@@ -39,12 +43,31 @@ function callbackEvent(self, name, eventName) {
  * autofill, an unticked checkbox) is held and re-sent once Turnstile returns a
  * token, errors out, or SUBMIT_HOLD_MS passes. While it's held, a notice under
  * the widget says what's happening.
+ *
+ * Tokens are single-use and expire, so a submit also waits for a fresh token
+ * when the current one was already sent (e.g. the server rejected the form for
+ * a validation error after checking Turnstile) or is close to expiring (e.g.
+ * a long form, or a background tab that delayed Turnstile's auto-refresh).
+ * The widget resets, which is usually invisible and takes a second or two.
+ * Coming back to a background tab refreshes a stale token straight away, so
+ * the submit usually doesn't have to wait.
  */
 export const Turnstile = {
     mounted() {
         this._turnstileDestroyed = false;
         this.form = this.el.closest("form");
+        // Bumped for every token Turnstile issues; compared with sentTokenSeq
+        // so a token is only ever sent once. Values can't be compared: test
+        // keys always issue the same dummy token.
+        this.tokenSeq = 0;
+        this.sentTokenSeq = 0;
+        this.tokenIssuedAt = 0;
         this.createHoldNotice();
+
+        this.onVisibilityChange = () => {
+            if (document.visibilityState === "visible") this.refreshStaleToken();
+        };
+        document.addEventListener("visibilitychange", this.onVisibilityChange);
 
         const interactionOnly = this.el.dataset.appearance === "interaction-only";
 
@@ -83,6 +106,7 @@ export const Turnstile = {
             this.form.removeEventListener("submit", this.onSubmit, true);
         }
         clearTimeout(this.holdTimer);
+        document.removeEventListener("visibilitychange", this.onVisibilityChange);
     },
 
     // Typed or focused before the hook mounted (static render, slow socket).
@@ -127,9 +151,15 @@ export const Turnstile = {
             fn(payload);
         };
 
+        const onToken = (fn) => (payload) => {
+            this.tokenSeq += 1;
+            this.tokenIssuedAt = Date.now();
+            fn(payload);
+        };
+
         window.turnstile.render(this.el, {
             theme: "light",
-            callback: releaseThen(callbackEvent(this, "success")),
+            callback: onToken(releaseThen(callbackEvent(this, "success"))),
             "error-callback": releaseThen(callbackEvent(this, "error")),
             "expired-callback": callbackEvent(this, "expired"),
             "before-interactive-callback": callbackEvent(
@@ -180,11 +210,37 @@ export const Turnstile = {
         return !!(input && input.value);
     },
 
+    // A token Cloudflare will still accept: present, never sent, not expiring.
+    hasUsableToken() {
+        return (
+            this.hasToken() &&
+            this.tokenSeq !== this.sentTokenSeq &&
+            Date.now() - this.tokenIssuedAt < TOKEN_MAX_AGE_MS
+        );
+    },
+
+    refreshStaleToken() {
+        if (this.hasToken() && Date.now() - this.tokenIssuedAt >= TOKEN_MAX_AGE_MS) {
+            this.withWidget((turnstile) => turnstile.reset(this.el));
+        }
+    },
+
     holdSubmitUntilToken(e) {
-        if (this.releasing || this.hasToken()) return;
+        // A released held submit goes through with whatever token exists; if
+        // it's missing the server rejects it and refreshes the widget.
+        if (this.releasing || this.hasUsableToken()) {
+            this.sentTokenSeq = this.tokenSeq;
+            return;
+        }
 
         e.preventDefault();
         e.stopImmediatePropagation();
+
+        // Spent or stale token: ask Turnstile for a new one. reset() clears the
+        // hidden input, and the success callback releases the submit.
+        if (this.hasToken()) {
+            this.withWidget((turnstile) => turnstile.reset(this.el));
+        }
 
         const submitter = e.submitter;
         this.heldSubmit = () => {
