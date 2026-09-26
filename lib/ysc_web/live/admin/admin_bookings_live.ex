@@ -6994,8 +6994,22 @@ defmodule YscWeb.AdminBookingsLive do
          socket,
          %{status: :hold} = booking
        ) do
-    BookingLocker.revert_hold_to_draft(booking.id)
-    |> handle_admin_cancel_result(socket, booking, :draft)
+    case BookingLocker.revert_hold_to_draft_with_stripe_reconcile(booking.id) do
+      {:ok, reverted} ->
+        handle_admin_cancel_result({:ok, reverted}, socket, booking, :draft)
+
+      {:confirmed, confirmed} ->
+        {:noreply,
+         socket
+         |> assign(:booking, confirmed)
+         |> admin_booking_save_success(
+           "updated",
+           "This hold already had a succeeded Stripe payment, so it was confirmed instead of reverted to draft."
+         )}
+
+      {:error, reason} ->
+        handle_admin_cancel_result({:error, reason}, socket, booking, :draft)
+    end
   end
 
   defp revert_existing_admin_booking_to_draft(
