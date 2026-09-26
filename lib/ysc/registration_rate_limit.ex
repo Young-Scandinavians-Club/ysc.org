@@ -14,13 +14,14 @@ defmodule Ysc.RegistrationRateLimit do
   that fail validation (e.g. a typo or an email already in use) don't use up
   the limit.
 
-  Two counters per IP and hour, both only ever incremented: reservations and
-  releases. A reservation is allowed while `reserved - released` stays within
-  the limit; each reservation gets a unique count from the atomic increment,
-  so the check holds under concurrency. Windows are fixed clock hours; a
-  reservation remembers its window, and releasing it after the window ended
-  does nothing (the slot expired with it) rather than freeing a slot in the
-  next hour.
+  Two counters per IP and clock hour, both only ever incremented:
+  reservations and releases. A reservation is allowed while
+  `reserved - released` stays within the limit; each reservation gets a
+  unique count from the atomic increment, so the check holds under
+  concurrency. The hour is part of each counter's key and a reservation
+  carries it, so a release always updates its own hour's counter. One that
+  arrives after the hour ended touches a counter nothing reads anymore; it
+  can't free a slot in the next hour.
 
   Keyed by the client IP from `YscWeb.ClientIP.from_socket/2`. Counts are kept
   in ETS per app instance, like the other limiters. Override the limit with
@@ -52,53 +53,55 @@ defmodule Ysc.RegistrationRateLimit do
   if the IP already has `ip_limit/0` applications this hour.
   """
   def reserve_application(ip) when is_tuple(ip) or is_binary(ip) do
-    limit = ip_limit()
-    # Taken before the increment: if the hour rolls over in between, a later
-    # release finds a different window and skips, which errs on the safe side.
-    reservation = {RateLimit.normalize_ip(ip), current_window()}
-    reserved = inc(reserved_key(ip), @ip_scale_ms)
+    reserve(RateLimit.normalize_ip(ip), ip_limit())
+  end
 
-    if reserved - get(released_key(ip), @ip_scale_ms) <= limit do
-      {:ok, reservation}
-    else
-      # Denied attempts don't hold a slot.
-      release_application(reservation)
+  defp reserve(ip, limit) do
+    window = current_window()
+    reserved = inc(reserved_key(ip, window), @ip_scale_ms)
 
-      Ysc.Logging.warning("Membership application rate limit exceeded by IP",
-        ip: RateLimit.normalize_ip(ip),
-        limit: limit
-      )
+    cond do
+      # The hour rolled over around the increment, which then landed in a
+      # counter nothing reads; take the slot in the new hour instead.
+      current_window() != window ->
+        reserve(ip, limit)
 
-      {:error, :rate_limited, retry_after_seconds(ip)}
+      reserved - get(released_key(ip, window), @ip_scale_ms) <= limit ->
+        {:ok, {ip, window}}
+
+      true ->
+        # Denied attempts don't hold a slot.
+        release_application({ip, window})
+
+        Ysc.Logging.warning("Membership application rate limit exceeded by IP",
+          ip: ip,
+          limit: limit
+        )
+
+        {:error, :rate_limited, retry_after_seconds(window)}
     end
   end
 
   @doc """
   Gives back a slot taken by `reserve_application/1` when the application
-  wasn't created (e.g. it failed validation). A no-op once the reservation's
-  hour has ended.
+  wasn't created (e.g. it failed validation). Has no effect once the
+  reservation's hour has ended.
   """
-  def release_application({ip, window}) when is_binary(ip) do
-    if window == current_window() do
-      inc(released_key(ip), @ip_scale_ms)
-    end
-
+  def release_application({ip, window})
+      when is_binary(ip) and is_integer(window) do
+    inc(released_key(ip, window), @ip_scale_ms)
     :ok
   end
 
   # Same window numbering as Hammer's :fix_window algorithm.
   defp current_window, do: div(System.system_time(:millisecond), @ip_scale_ms)
 
-  defp reserved_key(ip),
-    do: "registration:reserved:" <> RateLimit.normalize_ip(ip)
+  defp reserved_key(ip, window), do: "registration:reserved:#{ip}:#{window}"
+  defp released_key(ip, window), do: "registration:released:#{ip}:#{window}"
 
-  defp released_key(ip),
-    do: "registration:released:" <> RateLimit.normalize_ip(ip)
-
-  defp retry_after_seconds(ip) do
+  defp retry_after_seconds(window) do
     remaining_ms =
-      expires_at(reserved_key(ip), @ip_scale_ms) -
-        System.system_time(:millisecond)
+      (window + 1) * @ip_scale_ms - System.system_time(:millisecond)
 
     max(1, div(remaining_ms + 999, 1000))
   end

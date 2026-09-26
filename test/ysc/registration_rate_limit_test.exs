@@ -112,8 +112,8 @@ defmodule Ysc.RegistrationRateLimitTest do
       {:ok, {normalized_ip, window}} =
         RegistrationRateLimit.reserve_application(ip)
 
-      # A late release (after the hour rolled over) must not free a slot in
-      # the current hour.
+      # Counters are keyed by the reservation's hour, so a release that
+      # arrives after that hour ended can't free a slot in the current one.
       assert :ok =
                RegistrationRateLimit.release_application(
                  {normalized_ip, window - 1}
