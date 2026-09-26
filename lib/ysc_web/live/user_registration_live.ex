@@ -524,11 +524,12 @@ defmodule YscWeb.UserRegistrationLive do
 
   # Turnstile is off for the application form until the sandbox issues are
   # fixed; YscWeb.GuestTurnstile's docs list the steps to turn it back on.
-  # Applications are rate limited per client IP instead (only successful ones
-  # count, so fixing a validation error doesn't use up the limit).
+  # Applications are rate limited per client IP instead: a slot is reserved
+  # before saving and released if validation fails, so only successful
+  # applications count.
   @spec handle_event(<<_::32, _::_*32>>, map(), any()) :: {:noreply, any()}
   def handle_event("save", %{"user" => user_params}, socket) do
-    case RegistrationRateLimit.check_ip(socket.assigns.remote_ip) do
+    case RegistrationRateLimit.reserve_application(socket.assigns.remote_ip) do
       :ok ->
         save_application(socket, user_params)
 
@@ -676,7 +677,6 @@ defmodule YscWeb.UserRegistrationLive do
 
     case Accounts.register_user(updated_user_params) do
       {:ok, user} ->
-        RegistrationRateLimit.record_application(socket.assigns.remote_ip)
         Accounts.deliver_application_submitted_notification(user)
 
         # Create Stripe customer in background so it's ready when user visits settings
@@ -716,6 +716,8 @@ defmodule YscWeb.UserRegistrationLive do
          )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        # No account was created, so this submit doesn't count toward the limit.
+        RegistrationRateLimit.release_application(socket.assigns.remote_ip)
         email_taken? = email_already_taken_error?(changeset)
         step_with_error = step_with_first_error(changeset)
         show_family = show_family_input_from_changeset?(changeset)

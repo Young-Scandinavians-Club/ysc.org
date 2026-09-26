@@ -5,15 +5,23 @@ defmodule Ysc.RegistrationRateLimit do
   Each accepted application creates a user, sends a confirmation email,
   queues Stripe customer creation, and emails the board. The route-level
   `YscWeb.Plugs.AuthRateLimitPlug` only covers the initial page load, so
-  `YscWeb.UserRegistrationLive` checks this limiter on every `save` event.
+  `YscWeb.UserRegistrationLive` reserves a slot here on every `save` event.
 
-  Only successful applications count: `check_ip/1` reads the count and
-  `record_application/1` adds to it after the account is created. A person
-  applies once, so the limit is low, but submits that fail validation (e.g.
-  a typo or an email already in use) don't use it up.
+  `reserve_application/1` takes a slot atomically before the application is
+  saved, so simultaneous submits can't all slip under the limit, and
+  `release_application/1` gives it back if the application isn't created.
+  So only successful applications count: a person applies once, and submits
+  that fail validation (e.g. a typo or an email already in use) don't use up
+  the limit.
 
-  Keyed by the client IP from `YscWeb.ClientIP.from_socket/2`. Override the
-  limit with `config :ysc, Ysc.RegistrationRateLimit, ip_limit: n`.
+  Two counters per IP and hour, both only ever incremented: reservations and
+  releases. A reservation is allowed while `reserved - released` stays within
+  the limit; each reservation gets a unique count from the atomic increment,
+  so the check holds under concurrency.
+
+  Keyed by the client IP from `YscWeb.ClientIP.from_socket/2`. Counts are kept
+  in ETS per app instance, like the other limiters. Override the limit with
+  `config :ysc, Ysc.RegistrationRateLimit, ip_limit: n`.
   """
   use Hammer, backend: :ets
 
@@ -33,41 +41,51 @@ defmodule Ysc.RegistrationRateLimit do
   end
 
   @doc """
-  Checks whether `ip` may submit another application. Doesn't count the
-  attempt; call `record_application/1` once the application is saved.
+  Reserves one application slot for `ip`. Call before saving the application,
+  and `release_application/1` if it isn't created.
 
-  Returns `:ok` if allowed, or `{:error, :rate_limited, retry_after_seconds}`
-  if the IP already has `ip_limit/0` applications this hour.
+  Returns `:ok` if a slot was reserved, or
+  `{:error, :rate_limited, retry_after_seconds}` if the IP already has
+  `ip_limit/0` applications this hour.
   """
-  def check_ip(ip) when is_tuple(ip) or is_binary(ip) do
-    key = key(ip)
+  def reserve_application(ip) when is_tuple(ip) or is_binary(ip) do
     limit = ip_limit()
+    reserved = inc(reserved_key(ip), @ip_scale_ms)
 
-    if get(key, @ip_scale_ms) < limit do
+    if reserved - get(released_key(ip), @ip_scale_ms) <= limit do
       :ok
     else
+      # Denied attempts don't hold a slot.
+      release_application(ip)
+
       Ysc.Logging.warning("Membership application rate limit exceeded by IP",
         ip: RateLimit.normalize_ip(ip),
         limit: limit
       )
 
-      {:error, :rate_limited, retry_after_seconds(key)}
+      {:error, :rate_limited, retry_after_seconds(ip)}
     end
   end
 
   @doc """
-  Counts a successful application from `ip` against its limit.
+  Gives back a slot taken by `reserve_application/1` when the application
+  wasn't created (e.g. it failed validation).
   """
-  def record_application(ip) when is_tuple(ip) or is_binary(ip) do
-    inc(key(ip), @ip_scale_ms)
+  def release_application(ip) when is_tuple(ip) or is_binary(ip) do
+    inc(released_key(ip), @ip_scale_ms)
     :ok
   end
 
-  defp key(ip), do: "registration:ip:" <> RateLimit.normalize_ip(ip)
+  defp reserved_key(ip),
+    do: "registration:reserved:" <> RateLimit.normalize_ip(ip)
 
-  defp retry_after_seconds(key) do
+  defp released_key(ip),
+    do: "registration:released:" <> RateLimit.normalize_ip(ip)
+
+  defp retry_after_seconds(ip) do
     remaining_ms =
-      expires_at(key, @ip_scale_ms) - System.system_time(:millisecond)
+      expires_at(reserved_key(ip), @ip_scale_ms) -
+        System.system_time(:millisecond)
 
     max(1, div(remaining_ms + 999, 1000))
   end

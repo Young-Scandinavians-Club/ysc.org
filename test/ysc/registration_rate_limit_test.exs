@@ -11,9 +11,9 @@ defmodule Ysc.RegistrationRateLimitTest do
     {10, rem(div(n, 256 * 256), 254) + 1, rem(div(n, 256), 256), rem(n, 256)}
   end
 
-  defp record_up_to_limit!(ip) do
+  defp reserve_up_to_limit!(ip) do
     for _ <- 1..RegistrationRateLimit.ip_limit() do
-      assert :ok = RegistrationRateLimit.record_application(ip)
+      assert :ok = RegistrationRateLimit.reserve_application(ip)
     end
   end
 
@@ -24,62 +24,76 @@ defmodule Ysc.RegistrationRateLimitTest do
     end
   end
 
-  describe "check_ip/1" do
-    test "doesn't count checks, only recorded applications" do
+  describe "reserve_application/1" do
+    test "reserves up to the limit, then rate limits" do
       ip = unique_test_ip()
-
-      for _ <- 1..(RegistrationRateLimit.ip_limit() + 5) do
-        assert :ok = RegistrationRateLimit.check_ip(ip)
-      end
-    end
-
-    test "rate limits once the IP has used up its applications" do
-      ip = unique_test_ip()
-      record_up_to_limit!(ip)
+      reserve_up_to_limit!(ip)
 
       assert {:error, :rate_limited, retry_after_seconds} =
-               RegistrationRateLimit.check_ip(ip)
+               RegistrationRateLimit.reserve_application(ip)
 
       assert retry_after_seconds in 1..3600
     end
 
-    test "allows the last application under the limit" do
+    test "simultaneous reservations can't exceed the limit" do
       ip = unique_test_ip()
+      limit = RegistrationRateLimit.ip_limit()
 
-      for _ <- 1..(RegistrationRateLimit.ip_limit() - 1) do
-        RegistrationRateLimit.record_application(ip)
-      end
+      results =
+        1..(limit + 50)
+        |> Task.async_stream(
+          fn _ -> RegistrationRateLimit.reserve_application(ip) end,
+          max_concurrency: System.schedulers_online() * 4,
+          timeout: :infinity
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
 
-      assert :ok = RegistrationRateLimit.check_ip(ip)
+      assert Enum.count(results, &(&1 == :ok)) == limit
     end
 
     test "limits each IP separately" do
       ip = unique_test_ip()
-      record_up_to_limit!(ip)
+      reserve_up_to_limit!(ip)
 
-      assert {:error, :rate_limited, _} = RegistrationRateLimit.check_ip(ip)
-      assert :ok = RegistrationRateLimit.check_ip(unique_test_ip())
+      assert {:error, :rate_limited, _} =
+               RegistrationRateLimit.reserve_application(ip)
+
+      assert :ok = RegistrationRateLimit.reserve_application(unique_test_ip())
     end
 
     test "treats string and tuple forms of an IP as the same bucket" do
       ip = unique_test_ip()
-      record_up_to_limit!(ip |> :inet.ntoa() |> to_string())
+      reserve_up_to_limit!(ip |> :inet.ntoa() |> to_string())
 
-      assert {:error, :rate_limited, _} = RegistrationRateLimit.check_ip(ip)
+      assert {:error, :rate_limited, _} =
+               RegistrationRateLimit.reserve_application(ip)
     end
 
     test "logs a warning with the IP when over the limit" do
       ip = unique_test_ip()
-      record_up_to_limit!(ip)
+      reserve_up_to_limit!(ip)
 
       log =
         capture_log(
           [format: "$message $metadata", metadata: [:ip, :limit]],
-          fn -> RegistrationRateLimit.check_ip(ip) end
+          fn -> RegistrationRateLimit.reserve_application(ip) end
         )
 
       assert log =~ "Membership application rate limit exceeded by IP"
       assert log =~ "ip=#{:inet.ntoa(ip)}"
+    end
+  end
+
+  describe "release_application/1" do
+    test "gives back a reserved slot" do
+      ip = unique_test_ip()
+      reserve_up_to_limit!(ip)
+
+      assert :ok = RegistrationRateLimit.release_application(ip)
+      assert :ok = RegistrationRateLimit.reserve_application(ip)
+
+      assert {:error, :rate_limited, _} =
+               RegistrationRateLimit.reserve_application(ip)
     end
   end
 end

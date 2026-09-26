@@ -1144,14 +1144,14 @@ defmodule YscWeb.UserRegistrationLiveTest do
       {10, rem(div(n, 256 * 256), 254) + 1, rem(div(n, 256), 256), rem(n, 256)}
     end
 
-    defp record_applications!(ip, count) do
+    defp reserve_applications!(ip, count) do
       for _ <- 1..count do
-        :ok = Ysc.RegistrationRateLimit.record_application(ip)
+        :ok = Ysc.RegistrationRateLimit.reserve_application(ip)
       end
     end
 
     defp exhaust_registration_limit!(ip),
-      do: record_applications!(ip, Ysc.RegistrationRateLimit.ip_limit())
+      do: reserve_applications!(ip, Ysc.RegistrationRateLimit.ip_limit())
 
     test "blocks the application before creating an account once the IP is over the limit",
          %{conn: conn} do
@@ -1193,7 +1193,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
     test "a successful application counts toward the limit", %{conn: conn} do
       ip = unique_client_ip()
-      record_applications!(ip, Ysc.RegistrationRateLimit.ip_limit() - 1)
+      reserve_applications!(ip, Ysc.RegistrationRateLimit.ip_limit() - 1)
       email = "last_allowed#{System.unique_integer()}@example.com"
 
       {:ok, lv, _html} = live(%{conn | remote_ip: ip}, ~p"/users/register")
@@ -1207,14 +1207,14 @@ defmodule YscWeb.UserRegistrationLiveTest do
       assert path =~ "/account/setup"
 
       assert {:error, :rate_limited, _} =
-               Ysc.RegistrationRateLimit.check_ip(ip)
+               Ysc.RegistrationRateLimit.reserve_application(ip)
     end
 
     test "a submit that fails validation doesn't count toward the limit", %{
       conn: conn
     } do
       ip = unique_client_ip()
-      record_applications!(ip, Ysc.RegistrationRateLimit.ip_limit() - 1)
+      reserve_applications!(ip, Ysc.RegistrationRateLimit.ip_limit() - 1)
 
       {:ok, lv, _html} = live(%{conn | remote_ip: ip}, ~p"/users/register")
 
@@ -1227,7 +1227,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
       html = render_submit(lv, "save", %{"user" => bad_params})
 
       assert html =~ "Some required information is missing or incorrect"
-      assert :ok = Ysc.RegistrationRateLimit.check_ip(ip)
+      # The failed submit gave its slot back, so exactly one is left.
+      assert :ok = Ysc.RegistrationRateLimit.reserve_application(ip)
+
+      assert {:error, :rate_limited, _} =
+               Ysc.RegistrationRateLimit.reserve_application(ip)
     end
   end
 end
