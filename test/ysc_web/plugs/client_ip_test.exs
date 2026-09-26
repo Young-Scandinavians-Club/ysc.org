@@ -32,4 +32,9 @@ defmodule YscWeb.Plugs.ClientIPTest do
 
     assert Logger.metadata()[:remote_ip] == "2001:db8::7"
   end
+
+  test "passes the conn through untouched when no IP can be resolved" do
+    conn = %{build_conn() | remote_ip: nil}
+    assert ClientIP.call(conn, ClientIP.init([])) == conn
+  end
 end

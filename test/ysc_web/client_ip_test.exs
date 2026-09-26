@@ -142,6 +142,10 @@ defmodule YscWeb.ClientIPTest do
       assert ClientIP.from_socket(socket, session) == {203, 0, 113, 7}
     end
 
+    test "stores nothing when the conn has no remote_ip" do
+      assert ClientIP.live_session(%{build_conn() | remote_ip: nil}) == %{}
+    end
+
     test "falls back to the socket peer, then 0.0.0.0" do
       assert ClientIP.from_socket(socket_with_peer({127, 0, 0, 1}), %{}) ==
                {127, 0, 0, 1}
