@@ -37,6 +37,84 @@ defmodule Ysc.Stripe.InvoiceHelpers do
 
   def payment_intent_id(_), do: nil
 
+  @doc """
+  Resolves the payment intent to refund for a ledger payment's
+  `external_payment_id`.
+
+  Subscription payments are stored under their invoice ID (`in_...`), which
+  Stripe cannot refund directly, so those resolve to the payment intent that
+  paid the invoice. Any other ID is assumed to already be a payment intent.
+  """
+  @spec refundable_payment_intent_id(binary()) ::
+          {:ok, binary()} | {:error, term()}
+  def refundable_payment_intent_id("in_" <> _ = invoice_id) do
+    case call_stripe_client(:retrieve_invoice, [
+           invoice_id,
+           %{expand: ["payments"]}
+         ]) do
+      {:ok, invoice} ->
+        case paid_payment_intent_id(invoice) do
+          pi_id when is_binary(pi_id) -> {:ok, pi_id}
+          nil -> {:error, :no_paid_payment_intent_for_invoice}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def refundable_payment_intent_id(payment_intent_id)
+      when is_binary(payment_intent_id),
+      do: {:ok, payment_intent_id}
+
+  @doc """
+  Returns the ID of the invoice paid by `payment_intent_id`, or nil when the
+  payment intent did not pay an invoice (or the lookup fails).
+
+  Used to map refunds on subscription charges back to ledger payments, which
+  are keyed by invoice ID rather than payment intent ID.
+  """
+  @spec invoice_id_for_payment_intent(term()) :: binary() | nil
+  def invoice_id_for_payment_intent(payment_intent_id)
+      when is_binary(payment_intent_id) do
+    params = %{
+      payment: %{type: "payment_intent", payment_intent: payment_intent_id},
+      limit: 1
+    }
+
+    case call_stripe_client(:list_invoice_payments, [params, []]) do
+      {:ok, %{data: [invoice_payment | _]}} ->
+        WebhookHandler.extract_id_from_expandable(
+          field(invoice_payment, :invoice)
+        )
+
+      _ ->
+        nil
+    end
+  end
+
+  def invoice_id_for_payment_intent(_), do: nil
+
+  defp paid_payment_intent_id(invoice) do
+    invoice
+    |> invoice_payments()
+    |> Enum.find_value(fn payment ->
+      if field(payment, :status) == "paid",
+        do: payment_intent_id_from_payment(payment)
+    end)
+  end
+
+  defp call_stripe_client(fun, args) do
+    client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+    if Code.ensure_loaded?(client) and
+         function_exported?(client, fun, length(args)) do
+      apply(client, fun, args)
+    else
+      {:error, {:stripe_client_missing, fun}}
+    end
+  end
+
   defp charge_id_from_payments(invoice) do
     case payment_intent_id(invoice) do
       pi_id when is_binary(pi_id) ->
