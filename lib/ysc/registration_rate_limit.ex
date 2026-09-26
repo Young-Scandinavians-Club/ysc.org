@@ -17,7 +17,10 @@ defmodule Ysc.RegistrationRateLimit do
   Two counters per IP and hour, both only ever incremented: reservations and
   releases. A reservation is allowed while `reserved - released` stays within
   the limit; each reservation gets a unique count from the atomic increment,
-  so the check holds under concurrency.
+  so the check holds under concurrency. Windows are fixed clock hours; a
+  reservation remembers its window, and releasing it after the window ended
+  does nothing (the slot expired with it) rather than freeing a slot in the
+  next hour.
 
   Keyed by the client IP from `YscWeb.ClientIP.from_socket/2`. Counts are kept
   in ETS per app instance, like the other limiters. Override the limit with
@@ -42,21 +45,24 @@ defmodule Ysc.RegistrationRateLimit do
 
   @doc """
   Reserves one application slot for `ip`. Call before saving the application,
-  and `release_application/1` if it isn't created.
+  and `release_application/1` with the returned reservation if it isn't
+  created.
 
-  Returns `:ok` if a slot was reserved, or
-  `{:error, :rate_limited, retry_after_seconds}` if the IP already has
-  `ip_limit/0` applications this hour.
+  Returns `{:ok, reservation}`, or `{:error, :rate_limited, retry_after_seconds}`
+  if the IP already has `ip_limit/0` applications this hour.
   """
   def reserve_application(ip) when is_tuple(ip) or is_binary(ip) do
     limit = ip_limit()
+    # Taken before the increment: if the hour rolls over in between, a later
+    # release finds a different window and skips, which errs on the safe side.
+    reservation = {RateLimit.normalize_ip(ip), current_window()}
     reserved = inc(reserved_key(ip), @ip_scale_ms)
 
     if reserved - get(released_key(ip), @ip_scale_ms) <= limit do
-      :ok
+      {:ok, reservation}
     else
       # Denied attempts don't hold a slot.
-      release_application(ip)
+      release_application(reservation)
 
       Ysc.Logging.warning("Membership application rate limit exceeded by IP",
         ip: RateLimit.normalize_ip(ip),
@@ -69,12 +75,19 @@ defmodule Ysc.RegistrationRateLimit do
 
   @doc """
   Gives back a slot taken by `reserve_application/1` when the application
-  wasn't created (e.g. it failed validation).
+  wasn't created (e.g. it failed validation). A no-op once the reservation's
+  hour has ended.
   """
-  def release_application(ip) when is_tuple(ip) or is_binary(ip) do
-    inc(released_key(ip), @ip_scale_ms)
+  def release_application({ip, window}) when is_binary(ip) do
+    if window == current_window() do
+      inc(released_key(ip), @ip_scale_ms)
+    end
+
     :ok
   end
+
+  # Same window numbering as Hammer's :fix_window algorithm.
+  defp current_window, do: div(System.system_time(:millisecond), @ip_scale_ms)
 
   defp reserved_key(ip),
     do: "registration:reserved:" <> RateLimit.normalize_ip(ip)

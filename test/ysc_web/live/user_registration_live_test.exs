@@ -1146,7 +1146,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
     defp reserve_applications!(ip, count) do
       for _ <- 1..count do
-        :ok = Ysc.RegistrationRateLimit.reserve_application(ip)
+        {:ok, _} = Ysc.RegistrationRateLimit.reserve_application(ip)
       end
     end
 
@@ -1228,7 +1228,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       assert html =~ "Some required information is missing or incorrect"
       # The failed submit gave its slot back, so exactly one is left.
-      assert :ok = Ysc.RegistrationRateLimit.reserve_application(ip)
+      assert {:ok, _} = Ysc.RegistrationRateLimit.reserve_application(ip)
 
       assert {:error, :rate_limited, _} =
                Ysc.RegistrationRateLimit.reserve_application(ip)

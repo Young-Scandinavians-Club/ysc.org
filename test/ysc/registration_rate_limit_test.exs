@@ -13,7 +13,7 @@ defmodule Ysc.RegistrationRateLimitTest do
 
   defp reserve_up_to_limit!(ip) do
     for _ <- 1..RegistrationRateLimit.ip_limit() do
-      assert :ok = RegistrationRateLimit.reserve_application(ip)
+      assert {:ok, _reservation} = RegistrationRateLimit.reserve_application(ip)
     end
   end
 
@@ -48,7 +48,7 @@ defmodule Ysc.RegistrationRateLimitTest do
         )
         |> Enum.map(fn {:ok, result} -> result end)
 
-      assert Enum.count(results, &(&1 == :ok)) == limit
+      assert Enum.count(results, &match?({:ok, _}, &1)) == limit
     end
 
     test "limits each IP separately" do
@@ -58,7 +58,8 @@ defmodule Ysc.RegistrationRateLimitTest do
       assert {:error, :rate_limited, _} =
                RegistrationRateLimit.reserve_application(ip)
 
-      assert :ok = RegistrationRateLimit.reserve_application(unique_test_ip())
+      assert {:ok, _} =
+               RegistrationRateLimit.reserve_application(unique_test_ip())
     end
 
     test "treats string and tuple forms of an IP as the same bucket" do
@@ -87,10 +88,36 @@ defmodule Ysc.RegistrationRateLimitTest do
   describe "release_application/1" do
     test "gives back a reserved slot" do
       ip = unique_test_ip()
-      reserve_up_to_limit!(ip)
 
-      assert :ok = RegistrationRateLimit.release_application(ip)
-      assert :ok = RegistrationRateLimit.reserve_application(ip)
+      for _ <- 1..(RegistrationRateLimit.ip_limit() - 1) do
+        RegistrationRateLimit.reserve_application(ip)
+      end
+
+      {:ok, reservation} = RegistrationRateLimit.reserve_application(ip)
+
+      assert :ok = RegistrationRateLimit.release_application(reservation)
+      assert {:ok, _} = RegistrationRateLimit.reserve_application(ip)
+
+      assert {:error, :rate_limited, _} =
+               RegistrationRateLimit.reserve_application(ip)
+    end
+
+    test "does nothing for a reservation from an earlier hour" do
+      ip = unique_test_ip()
+
+      for _ <- 1..(RegistrationRateLimit.ip_limit() - 1) do
+        RegistrationRateLimit.reserve_application(ip)
+      end
+
+      {:ok, {normalized_ip, window}} =
+        RegistrationRateLimit.reserve_application(ip)
+
+      # A late release (after the hour rolled over) must not free a slot in
+      # the current hour.
+      assert :ok =
+               RegistrationRateLimit.release_application(
+                 {normalized_ip, window - 1}
+               )
 
       assert {:error, :rate_limited, _} =
                RegistrationRateLimit.reserve_application(ip)

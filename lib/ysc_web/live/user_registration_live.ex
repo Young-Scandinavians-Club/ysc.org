@@ -530,8 +530,8 @@ defmodule YscWeb.UserRegistrationLive do
   @spec handle_event(<<_::32, _::_*32>>, map(), any()) :: {:noreply, any()}
   def handle_event("save", %{"user" => user_params}, socket) do
     case RegistrationRateLimit.reserve_application(socket.assigns.remote_ip) do
-      :ok ->
-        save_application(socket, user_params)
+      {:ok, reservation} ->
+        save_application(socket, user_params, reservation)
 
       {:error, :rate_limited, retry_after_seconds} ->
         {:noreply,
@@ -632,7 +632,7 @@ defmodule YscWeb.UserRegistrationLive do
      |> push_event("focus-first-input", %{id: "step-#{new_step}-content"})}
   end
 
-  defp save_application(socket, user_params) do
+  defp save_application(socket, user_params, reservation) do
     reg_form_updated =
       user_params["registration_form"]
       |> Map.put("started", socket.assigns[:started])
@@ -717,7 +717,7 @@ defmodule YscWeb.UserRegistrationLive do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         # No account was created, so this submit doesn't count toward the limit.
-        RegistrationRateLimit.release_application(socket.assigns.remote_ip)
+        RegistrationRateLimit.release_application(reservation)
         email_taken? = email_already_taken_error?(changeset)
         step_with_error = step_with_first_error(changeset)
         show_family = show_family_input_from_changeset?(changeset)
