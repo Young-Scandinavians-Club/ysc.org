@@ -3406,10 +3406,70 @@ defmodule Ysc.AccountsTest do
       assert after_stats.current_ytd_joins == before.current_ytd_joins
     end
 
+    test "get_membership_joins_ytd_comparison dates joins by Stripe start_date, not row insertion" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+
+      imported_member =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(imported_member, %{review_outcome: "approved"})
+
+      [subscription] = Subscriptions.list_subscriptions(imported_member)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      # A long-standing member whose row was only just inserted by a bulk
+      # Stripe import: Stripe says they started years ago, and their annual
+      # period rolled over this year.
+      Repo.update_all(
+        from(s in Ysc.Subscriptions.Subscription,
+          where: s.id == ^subscription.id
+        ),
+        set: [
+          start_date: Timex.shift(now, years: -5),
+          current_period_start: DateTime.add(now, -1, :day),
+          inserted_at: DateTime.add(now, -2, :second)
+        ]
+      )
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.current_ytd_joins == before.current_ytd_joins
+      assert after_stats.renewals_ytd == before.renewals_ytd + 1
+    end
+
+    test "get_membership_joins_ytd_comparison only counts joins with an approved application" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      no_application = user_fixture(%{phone_number: unique_user_phone()})
+      not_approved = user_fixture(%{phone_number: unique_user_phone()})
+      approved = user_fixture(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(not_approved, %{review_outcome: nil})
+      signup_application_fixture(approved, %{review_outcome: "approved"})
+
+      for user <- [no_application, not_approved, approved] do
+        {:ok, _subscription} =
+          Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_gate_#{System.unique_integer()}",
+            stripe_status: "active",
+            name: "Single Membership",
+            start_date: DateTime.add(now, -1, :minute),
+            current_period_end: DateTime.add(now, 365, :day)
+          })
+      end
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.current_ytd_joins == before.current_ytd_joins + 1
+    end
+
     test "get_membership_joins_ytd_comparison subtracts a same-year join-and-lapse from net new" do
       before = Accounts.get_membership_joins_ytd_comparison()
 
       user = user_fixture(%{phone_number: unique_user_phone()})
+      signup_application_fixture(user, %{review_outcome: "approved"})
 
       # `inserted_at` must be strictly before the comparison's `now` so the
       # first-subscription join lands in `[year_start, now)`.

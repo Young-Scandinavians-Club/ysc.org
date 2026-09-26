@@ -4579,13 +4579,28 @@ defmodule Ysc.Accounts do
 
   - had `lifetime_membership_awarded_at` fall in the half-open interval
     `[range_start, range_end)`, or
-  - had their **first** ever `Subscription` that reached a paid status
-    (i.e. excluding "incomplete"/"incomplete_expired" checkout attempts
-    that never converted) fall in that interval, by `inserted_at`.
+  - have an **approved** `SignupApplication` and had their **first** ever
+    `Subscription` that reached a paid status (i.e. excluding
+    "incomplete"/"incomplete_expired" checkout attempts that never
+    converted) fall in that interval, by Stripe's `start_date` (falling
+    back to `inserted_at` when it's missing).
+
+  Only approved applicants can become members, so the approval is a
+  gate — it keeps legacy accounts that never went through the application
+  process (and whose subscription was re-created during the Stripe
+  migration) out of the join count. It is deliberately *not* the join
+  date: legacy `reviewed_at` values were frequently re-stamped years after
+  the original application, whereas the first payment is when the member
+  actually joined (the app only lets approved users subscribe).
+
+  `start_date` rather than `inserted_at` matters: the bulk Stripe import
+  (July 2026) inserted a row for every existing and long-lapsed member at
+  once, so `inserted_at` would count the whole historical membership as
+  having "joined" that year.
 
   These never double-count renewals: a recurring subscription's row is
   reused across billing cycles (see `Subscriptions.create_subscription_from_stripe/3`),
-  so only its original `inserted_at` can ever land in a join window.
+  so only its original start can ever land in a join window.
 
   `current_ytd_losses`/`prior_ytd_losses` count distinct primary users
   whose subscription lapsed (`stripe_status` of "canceled"/"cancelled"/
@@ -4692,17 +4707,30 @@ defmodule Ysc.Accounts do
     first_subs =
       from(s in Subscription,
         join: u in User,
+        as: :user,
         on: s.user_id == u.id,
         where: is_nil(u.primary_user_id),
         where: u.state == :active,
         where: s.stripe_status not in ["incomplete", "incomplete_expired"],
+        where:
+          exists(
+            from(a in SignupApplication,
+              where:
+                a.user_id == parent_as(:user).id and
+                  a.review_outcome == :approved,
+              select: 1
+            )
+          ),
         group_by: s.user_id,
         having:
-          (min(s.inserted_at) >= ^current_start and
-             min(s.inserted_at) < ^current_end) or
-            (min(s.inserted_at) >= ^prior_start and
-               min(s.inserted_at) < ^prior_end),
-        select: %{user_id: s.user_id, joined_at: min(s.inserted_at)}
+          (min(coalesce(s.start_date, s.inserted_at)) >= ^current_start and
+             min(coalesce(s.start_date, s.inserted_at)) < ^current_end) or
+            (min(coalesce(s.start_date, s.inserted_at)) >= ^prior_start and
+               min(coalesce(s.start_date, s.inserted_at)) < ^prior_end),
+        select: %{
+          user_id: s.user_id,
+          joined_at: min(coalesce(s.start_date, s.inserted_at))
+        }
       )
 
     from(j in subquery(union_all(lifetime, ^first_subs)),
@@ -4767,10 +4795,11 @@ defmodule Ysc.Accounts do
 
   # Distinct primary users whose subscription entered a **new billing
   # period** starting in `[start_dt, end_dt)`, for a subscription that isn't
-  # brand new — i.e. `current_period_start` is after the row's own
-  # `inserted_at`, which only happens once Stripe has pushed the period
-  # forward at least once (an initial subscribe's first period starts at
-  # or before the row is inserted). This is the renewal counterpart to
+  # brand new — i.e. `current_period_start` is after the subscription's own
+  # Stripe `start_date` (or `inserted_at` when missing), which only happens
+  # once Stripe has pushed the period forward at least once. Comparing
+  # against `inserted_at` alone would miss every renewal that happened before
+  # the July 2026 bulk import inserted the row. This is the renewal counterpart to
   # `membership_joins_ytd_query/4`'s first-ever-subscription check.
   defp membership_renewals_ytd_query(
          %DateTime{} = start_dt,
@@ -4785,7 +4814,7 @@ defmodule Ysc.Accounts do
       where: not is_nil(s.current_period_start),
       where:
         s.current_period_start >= ^start_dt and s.current_period_start < ^end_dt,
-      where: s.current_period_start > s.inserted_at,
+      where: s.current_period_start > coalesce(s.start_date, s.inserted_at),
       select: count(s.user_id, :distinct)
     )
   end
