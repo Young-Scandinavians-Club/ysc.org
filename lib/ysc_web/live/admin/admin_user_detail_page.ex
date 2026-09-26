@@ -1901,7 +1901,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               <div
                 id="panel-resizer-left-edge"
                 phx-update="ignore"
-                class="shrink-0 w-6 cursor-ew-resize z-10 flex items-center justify-center pointer-events-auto"
+                class="shrink-0 w-10 sm:w-6 cursor-ew-resize touch-none z-10 flex items-center justify-center pointer-events-auto"
               >
                 <.icon
                   name="hero-arrows-right-left"
