@@ -1,17 +1,22 @@
+import { pushEventIfConnected } from "./live_view_safe_push";
+
+// Resizes the right-hand panel by dragging its left edge. Uses Pointer Events so
+// mouse, touch, and pen input all work; the edge element sets `touch-action: none`
+// so a horizontal swipe resizes instead of scrolling the page.
 const PanelResizer = {
     mounted() {
         this.tracking = false;
+        this.pointerId = null;
         this.startWidth = null;
-        this.startCursorScreenX = null;
-        this.handleWidth = 8; // 8px for the resizer
-        this.resizeTarget = null;
-        this.parentElement = null;
+        this.startClientX = null;
         this.maxWidth = null;
         this.minWidth = null;
 
-        // Bind methods to preserve 'this' context
+        this.startResize = this.startResize.bind(this);
         this.doResize = this.doResize.bind(this);
         this.stopResize = this.stopResize.bind(this);
+        this.handlePointerEnter = this.handlePointerEnter.bind(this);
+        this.handlePointerLeave = this.handlePointerLeave.bind(this);
 
         this.setupResizer();
     },
@@ -23,40 +28,15 @@ const PanelResizer = {
         }
     },
 
+    destroyed() {
+        this.detachEdgeListeners();
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+    },
+
     setupResizer() {
-        const handleElement = this.el;
-        if (!handleElement) {
-            console.warn("PanelResizer: Handle element not found");
-            return;
-        }
-
-        // Remove existing event listeners if any
-        if (this.mousedownHandler) {
-            handleElement.removeEventListener("mousedown", this.mousedownHandler);
-        }
-        if (this.mouseenterHandler) {
-            handleElement.removeEventListener("mouseenter", this.mouseenterHandler);
-        }
-        if (this.mouseleaveHandler) {
-            handleElement.removeEventListener("mouseleave", this.mouseleaveHandler);
-        }
-
-        const parentElement = handleElement.parentElement;
-        if (!parentElement) {
-            console.warn("PanelResizer: Parent element not found");
-            return;
-        }
-
-        // The handle element IS the resize target (the right panel)
-        // We're making the left edge of the panel itself draggable
-        const targetElement = handleElement;
-
-        // Store references
-        this.parentElement = parentElement;
-        this.resizeTarget = targetElement;
-
-        // Find the left edge div by ID (defined in LiveView template)
-        const leftEdgeId = handleElement.getAttribute("data-left-edge-id") || "panel-resizer-left-edge";
+        const leftEdgeId =
+            this.el.getAttribute("data-left-edge-id") || "panel-resizer-left-edge";
         const leftEdge = document.getElementById(leftEdgeId);
 
         if (!leftEdge) {
@@ -64,150 +44,127 @@ const PanelResizer = {
             return;
         }
 
+        if (leftEdge === this.leftEdge) return;
+
+        this.detachEdgeListeners();
         this.leftEdge = leftEdge;
 
-        const startResize = (event) => {
-            if (event.button !== 0) {
-                return; // Only handle left mouse button
-            }
+        leftEdge.addEventListener("pointerdown", this.startResize);
+        leftEdge.addEventListener("pointermove", this.doResize);
+        leftEdge.addEventListener("pointerup", this.stopResize);
+        leftEdge.addEventListener("pointercancel", this.stopResize);
+        leftEdge.addEventListener("lostpointercapture", this.stopResize);
+        leftEdge.addEventListener("pointerenter", this.handlePointerEnter);
+        leftEdge.addEventListener("pointerleave", this.handlePointerLeave);
+    },
 
-            // Only handle if clicking on the left edge div or within the first 24px (w-6) of the panel
-            const panelRect = this.resizeTarget.getBoundingClientRect();
-            const clickX = event.clientX - panelRect.left;
-            const isLeftEdge = event.target === this.leftEdge || event.target.closest("#panel-resizer-left-edge") || clickX < 24;
+    detachEdgeListeners() {
+        const leftEdge = this.leftEdge;
+        if (!leftEdge) return;
 
-            if (!isLeftEdge) {
-                return; // Only allow dragging from the left edge
-            }
+        leftEdge.removeEventListener("pointerdown", this.startResize);
+        leftEdge.removeEventListener("pointermove", this.doResize);
+        leftEdge.removeEventListener("pointerup", this.stopResize);
+        leftEdge.removeEventListener("pointercancel", this.stopResize);
+        leftEdge.removeEventListener("lostpointercapture", this.stopResize);
+        leftEdge.removeEventListener("pointerenter", this.handlePointerEnter);
+        leftEdge.removeEventListener("pointerleave", this.handlePointerLeave);
+        this.leftEdge = null;
+    },
 
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
+    setHighlight(state) {
+        const border = { idle: "border-zinc-300", hover: "border-blue-400", active: "border-blue-500" };
+        const text = { idle: "text-zinc-400", hover: "text-blue-400", active: "text-blue-500" };
 
-            const targetRect = this.resizeTarget.getBoundingClientRect();
-            this.startWidth = targetRect.width;
-            this.startCursorScreenX = event.screenX;
+        this.el.classList.remove(...Object.values(border));
+        this.el.classList.add(border[state]);
 
-            const parentRect = this.parentElement.getBoundingClientRect();
-            this.minWidth = parentRect.width * 0.2; // 20% minimum
-            this.maxWidth = parentRect.width * 0.8; // 80% maximum
-
-            this.tracking = true;
-
-            // Add global event listeners
-            document.addEventListener("mousemove", this.doResize);
-            document.addEventListener("mouseup", this.stopResize);
-
-            // Change cursor
-            document.body.style.cursor = "col-resize";
-            document.body.style.userSelect = "none";
-
-            // Disable transitions and add highlight
-            this.resizeTarget.style.transition = "none";
-            this.resizeTarget.classList.add("border-blue-500");
-            this.resizeTarget.classList.remove("border-zinc-300");
-
-            // Update icon color
-            const icon = this.resizeTarget.querySelector(".hero-arrows-right-left");
-            if (icon) {
-                icon.classList.remove("text-zinc-400");
-                icon.classList.add("text-blue-500");
-            }
-        };
-
-        const handleMouseEnter = () => {
-            if (!this.tracking) {
-                this.resizeTarget.classList.add("border-blue-400");
-                this.resizeTarget.classList.remove("border-zinc-300");
-
-                // Update icon color on hover
-                const icon = this.resizeTarget.querySelector(".hero-arrows-right-left");
-                if (icon) {
-                    icon.classList.remove("text-zinc-400");
-                    icon.classList.add("text-blue-400");
-                }
-            }
-        };
-
-        const handleMouseLeave = () => {
-            if (!this.tracking) {
-                this.resizeTarget.classList.remove("border-blue-400");
-                this.resizeTarget.classList.add("border-zinc-300");
-
-                // Reset icon color
-                const icon = this.resizeTarget.querySelector(".hero-arrows-right-left");
-                if (icon) {
-                    icon.classList.remove("text-blue-400");
-                    icon.classList.add("text-zinc-400");
-                }
-            }
-        };
-
-        this.mousedownHandler = startResize;
-        this.mouseenterHandler = handleMouseEnter;
-        this.mouseleaveHandler = handleMouseLeave;
-
-        // Listen on the left edge and the panel itself
-        if (this.leftEdge) {
-            this.leftEdge.addEventListener("mousedown", startResize);
+        const icon = this.el.querySelector(".hero-arrows-right-left");
+        if (icon) {
+            icon.classList.remove(...Object.values(text));
+            icon.classList.add(text[state]);
         }
-        handleElement.addEventListener("mousedown", startResize);
-        handleElement.addEventListener("mouseenter", handleMouseEnter);
-        handleElement.addEventListener("mouseleave", handleMouseLeave);
+    },
+
+    handlePointerEnter(event) {
+        if (!this.tracking && event.pointerType === "mouse") {
+            this.setHighlight("hover");
+        }
+    },
+
+    handlePointerLeave(event) {
+        if (!this.tracking && event.pointerType === "mouse") {
+            this.setHighlight("idle");
+        }
+    },
+
+    startResize(event) {
+        // Only the primary mouse button; touch and pen report button 0 too
+        if (this.tracking || !event.isPrimary || event.button !== 0) return;
+
+        const parentElement = this.el.parentElement;
+        if (!parentElement) return;
+
+        event.preventDefault();
+
+        this.startWidth = this.el.getBoundingClientRect().width;
+        this.startClientX = event.clientX;
+
+        const parentWidth = parentElement.getBoundingClientRect().width;
+        this.minWidth = parentWidth * 0.2; // 20% minimum
+        this.maxWidth = parentWidth * 0.8; // 80% maximum
+
+        this.tracking = true;
+        this.pointerId = event.pointerId;
+
+        // Capture keeps pointermove flowing to the edge even when the finger or
+        // cursor passes over the email preview iframe or outside the window.
+        try {
+            this.leftEdge.setPointerCapture(event.pointerId);
+        } catch (_) {}
+
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+
+        this.el.style.transition = "none";
+        this.setHighlight("active");
     },
 
     doResize(event) {
-        if (!this.tracking) return;
+        if (!this.tracking || event.pointerId !== this.pointerId) return;
 
-        const cursorScreenXDelta = event.screenX - this.startCursorScreenX;
-        // When dragging right (positive delta), the right panel should get narrower (subtract)
-        // When dragging left (negative delta), the right panel should get wider (add)
-        let newWidth = this.startWidth - cursorScreenXDelta;
+        event.preventDefault();
 
-        // Constrain the width
-        newWidth = Math.max(this.minWidth, Math.min(this.maxWidth, newWidth));
+        // Dragging right (positive delta) narrows the right panel; left widens it
+        const delta = event.clientX - this.startClientX;
+        const newWidth = Math.max(this.minWidth, Math.min(this.maxWidth, this.startWidth - delta));
 
-        // Set the width directly
-        this.resizeTarget.style.width = `${newWidth}px`;
-        this.resizeTarget.style.flexShrink = "0";
+        this.el.style.width = `${newWidth}px`;
+        this.el.style.flexShrink = "0";
     },
 
     stopResize(event) {
-        if (!this.tracking) return;
+        if (!this.tracking || event.pointerId !== this.pointerId) return;
 
         this.tracking = false;
+        this.pointerId = null;
 
-        // Remove global event listeners
-        document.removeEventListener("mousemove", this.doResize);
-        document.removeEventListener("mouseup", this.stopResize);
+        try {
+            if (this.leftEdge?.hasPointerCapture(event.pointerId)) {
+                this.leftEdge.releasePointerCapture(event.pointerId);
+            }
+        } catch (_) {}
 
-        // Reset cursor
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
 
-        // Re-enable transitions and remove highlight
-        this.resizeTarget.style.transition = "";
-        this.resizeTarget.classList.remove("border-blue-500");
-        this.resizeTarget.classList.add("border-zinc-300");
-
-        // Reset icon color
-        const icon = this.resizeTarget.querySelector(".hero-arrows-right-left");
-        if (icon) {
-            icon.classList.remove("text-blue-500");
-            icon.classList.add("text-zinc-400");
-        }
+        this.el.style.transition = "";
+        this.setHighlight("idle");
 
         // Save the width to server
-        const width = this.resizeTarget.style.width;
+        const width = this.el.style.width;
         if (width) {
-            if (!this.el.isConnected) return;
-            try {
-                const view = this.__view();
-                if (!view || !view.isConnected()) return;
-            } catch (_) {
-                return;
-            }
-            this.pushEvent("resize_panel", { width: width });
+            pushEventIfConnected(this, "resize_panel", { width: width });
         }
     },
 };
