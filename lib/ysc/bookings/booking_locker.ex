@@ -2647,10 +2647,13 @@ defmodule Ysc.Bookings.BookingLocker do
               |> DateTime.add(hold_minutes, :minute)
               |> DateTime.truncate(:second)
 
-            # Rebuilds attrs from the new dates. Does not keep
-            # `payment_intent_id` from a prior hold — callers that might
-            # replace a paid hold must Stripe-reconcile first
-            # (`BookingChangeLive.proceed_after_modification_details/3`).
+            # Rebuilds attrs from the new dates. Keeps any previously stored
+            # `payment_intent_id` so a concurrent tab cannot wipe the id that
+            # HoldExpiryWorker / remount-resubmit reconcile against. Callers
+            # that replace a paid hold must still Stripe-reconcile first
+            # (`BookingChangeLive.proceed_after_modification_details/3`);
+            # `attach_modification_payment_intent/2` cancels the previous
+            # Intent before overwriting.
             hold_attrs =
               encode_modification_hold_attrs(booking, attrs, hold_data, opts)
 
@@ -2974,6 +2977,15 @@ defmodule Ysc.Bookings.BookingLocker do
       "overlap_extra_guests" => overlap_extra_guests,
       "booking_mode" => Atom.to_string(booking.booking_mode)
     }
+
+    base =
+      case Bookings.modification_hold_payment_intent_id(booking) do
+        payment_intent_id when is_binary(payment_intent_id) ->
+          Map.put(base, "payment_intent_id", payment_intent_id)
+
+        _ ->
+          base
+      end
 
     case Keyword.get(opts, :guest_params) do
       guest_params when is_map(guest_params) and map_size(guest_params) > 0 ->

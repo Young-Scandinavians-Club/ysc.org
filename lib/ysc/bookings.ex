@@ -1153,6 +1153,11 @@ defmodule Ysc.Bookings do
   Checkout already has `payment_intent_id` (unique, the original stay charge).
   Modification payments must not overwrite that column. The expiry worker reads
   this hold-attrs id to Stripe-reconcile before releasing extra nights.
+
+  When replacing a previously stored Intent, Stripe-cancels it first via
+  `CheckoutCancel` — the same atomic abandon as hold expiry / remount resubmit.
+  Blind overwrite would leave a displaced Intent open for a concurrent tab to
+  pay while the DB and expiry worker only know about the replacement.
   """
   def attach_modification_payment_intent(booking_id, payment_intent_id)
 
@@ -1171,20 +1176,73 @@ defmodule Ysc.Bookings do
 
     case booking.modification_hold_attrs do
       %{} = attrs ->
-        booking
-        |> Booking.changeset(
-          %{
-            modification_hold_attrs:
-              Map.put(attrs, "payment_intent_id", payment_intent_id)
-          },
-          skip_validation: true
-        )
-        |> Repo.update()
+        previous_id = modification_hold_payment_intent_id(booking)
+
+        case reconcile_previous_modification_payment_intent(
+               previous_id,
+               payment_intent_id,
+               booking.id
+             ) do
+          :ok ->
+            booking
+            |> Booking.changeset(
+              %{
+                modification_hold_attrs:
+                  Map.put(attrs, "payment_intent_id", payment_intent_id)
+              },
+              skip_validation: true
+            )
+            |> Repo.update()
+
+          {:error, _} = error ->
+            error
+        end
 
       _ ->
         {:error, :no_modification_hold}
     end
   end
+
+  defp reconcile_previous_modification_payment_intent(
+         previous_id,
+         payment_intent_id,
+         booking_id
+       )
+       when is_binary(previous_id) and previous_id != "" and
+              previous_id != payment_intent_id do
+    case Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           previous_id,
+           "attach_modification_payment_intent"
+         ) do
+      {:cancel, _payment_intent} ->
+        :ok
+
+      {:already_succeeded, _payment_intent} ->
+        {:error, {:modification_payment_already_succeeded, previous_id}}
+
+      {:in_progress, _payment_intent} ->
+        require Ysc.Logging
+
+        Ysc.Logging.info(
+          "Skipped replacing modification PaymentIntent while payment is in flight",
+          booking_id: booking_id,
+          previous_payment_intent_id: previous_id,
+          new_payment_intent_id: payment_intent_id
+        )
+
+        {:error, :modification_payment_in_progress}
+
+      {:error, reason} ->
+        {:error, {:stripe_reconcile_failed, reason}}
+    end
+  end
+
+  defp reconcile_previous_modification_payment_intent(
+         _previous_id,
+         _payment_intent_id,
+         _booking_id
+       ),
+       do: :ok
 
   @doc """
   PaymentIntent id stored on an in-progress modification hold, if any.
