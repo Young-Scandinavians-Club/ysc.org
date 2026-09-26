@@ -11,9 +11,9 @@ defmodule Ysc.RegistrationRateLimitTest do
     {10, rem(div(n, 256 * 256), 254) + 1, rem(div(n, 256), 256), rem(n, 256)}
   end
 
-  defp exhaust!(ip) do
+  defp record_up_to_limit!(ip) do
     for _ <- 1..RegistrationRateLimit.ip_limit() do
-      assert :ok = RegistrationRateLimit.check_ip(ip)
+      assert :ok = RegistrationRateLimit.record_application(ip)
     end
   end
 
@@ -25,32 +25,52 @@ defmodule Ysc.RegistrationRateLimitTest do
   end
 
   describe "check_ip/1" do
-    test "allows submits up to the limit, then rate limits" do
+    test "doesn't count checks, only recorded applications" do
       ip = unique_test_ip()
-      exhaust!(ip)
+
+      for _ <- 1..(RegistrationRateLimit.ip_limit() + 5) do
+        assert :ok = RegistrationRateLimit.check_ip(ip)
+      end
+    end
+
+    test "rate limits once the IP has used up its applications" do
+      ip = unique_test_ip()
+      record_up_to_limit!(ip)
 
       assert {:error, :rate_limited, retry_after_seconds} =
                RegistrationRateLimit.check_ip(ip)
 
-      assert retry_after_seconds > 0
+      assert retry_after_seconds in 1..3600
+    end
+
+    test "allows the last application under the limit" do
+      ip = unique_test_ip()
+
+      for _ <- 1..(RegistrationRateLimit.ip_limit() - 1) do
+        RegistrationRateLimit.record_application(ip)
+      end
+
+      assert :ok = RegistrationRateLimit.check_ip(ip)
     end
 
     test "limits each IP separately" do
       ip = unique_test_ip()
-      exhaust!(ip)
+      record_up_to_limit!(ip)
 
       assert {:error, :rate_limited, _} = RegistrationRateLimit.check_ip(ip)
       assert :ok = RegistrationRateLimit.check_ip(unique_test_ip())
     end
 
-    test "accepts string IPs" do
-      assert :ok =
-               RegistrationRateLimit.check_ip("10.200.1.#{:rand.uniform(250)}")
+    test "treats string and tuple forms of an IP as the same bucket" do
+      ip = unique_test_ip()
+      record_up_to_limit!(ip |> :inet.ntoa() |> to_string())
+
+      assert {:error, :rate_limited, _} = RegistrationRateLimit.check_ip(ip)
     end
 
     test "logs a warning with the IP when over the limit" do
       ip = unique_test_ip()
-      exhaust!(ip)
+      record_up_to_limit!(ip)
 
       log =
         capture_log(

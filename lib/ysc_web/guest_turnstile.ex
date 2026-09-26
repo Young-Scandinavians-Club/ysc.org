@@ -10,7 +10,7 @@ defmodule YscWeb.GuestTurnstile do
   error.
 
   The membership application (`UserRegistrationLive`) doesn't use Turnstile
-  for now; its submits are rate limited per client IP by
+  for now; applications are rate limited per client IP by
   `Ysc.RegistrationRateLimit` instead. To turn Turnstile back on, render the
   widget in its form, call `verify/3` with `required: true` in its save
   handler, and restore its tests for a failed check.
