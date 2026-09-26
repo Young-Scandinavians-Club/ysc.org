@@ -1314,6 +1314,22 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert auth_data.ip_address == "2001:db8::1"
     end
 
+    test "records no IP for an invalid remote_ip tuple" do
+      conn = mock_conn(%{remote_ip: {999, 0, 0, 0}, req_headers: []})
+
+      auth_data = AuthService.extract_auth_data(conn)
+
+      assert auth_data.ip_address == nil
+    end
+
+    test "records no IP for a LiveView socket with a nil :remote_ip assign" do
+      socket = %Phoenix.LiveView.Socket{assigns: %{remote_ip: nil}}
+
+      auth_data = AuthService.extract_auth_data(socket)
+
+      assert auth_data.ip_address == nil
+    end
+
     test "keeps the raw proxy headers in metadata for auditing" do
       conn =
         mock_conn(%{
