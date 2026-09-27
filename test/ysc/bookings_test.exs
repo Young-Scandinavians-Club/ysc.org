@@ -6866,6 +6866,47 @@ defmodule Ysc.BookingsTest do
       end
     end
 
+    test "refuses to overwrite when Stripe times out cancelling the previous modification PaymentIntent" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0,
+            "payment_intent_id" => "pi_mod_timeout"
+          }
+        })
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn "pi_mod_timeout",
+                                                          _opts ->
+          {:error, :timeout}
+        end)
+
+        assert {:error, {:stripe_reconcile_failed, :timeout}} =
+                 Bookings.attach_modification_payment_intent(
+                   booking,
+                   "pi_mod_replacement"
+                 )
+
+        reloaded = Repo.reload!(booking)
+
+        assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+                 "pi_mod_timeout"
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
     test "returns an error when no modification hold attrs are present" do
       booking = booking_fixture(%{status: :complete})
 
