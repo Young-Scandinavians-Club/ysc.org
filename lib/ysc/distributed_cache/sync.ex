@@ -1,8 +1,8 @@
 defmodule Ysc.DistributedCache.Sync do
   @moduledoc """
   Subscribes to `Ysc.DistributedCache` writes broadcast by other nodes and
-  applies them to this node's local `Cachex` store, keeping cache state
-  converged across the cluster.
+  applies them to this node's local `Cachex` store (or, for counter updates,
+  its local ETS table), keeping cache state converged across the cluster.
   """
   use GenServer
 
@@ -28,5 +28,24 @@ defmodule Ysc.DistributedCache.Sync do
     end
 
     {:noreply, state}
+  end
+
+  def handle_info(
+        {:distributed_counter_update, from_node, table, key, op, default},
+        state
+      ) do
+    if from_node != node() do
+      apply_counter_update(table, key, op, default)
+    end
+
+    {:noreply, state}
+  end
+
+  defp apply_counter_update(table, key, op, default) do
+    :ets.update_counter(table, key, op, default)
+  rescue
+    # The table isn't up yet on this node (e.g. it's still booting). Losing
+    # the update beats crashing and dropping everything queued behind it.
+    ArgumentError -> :ok
   end
 end
