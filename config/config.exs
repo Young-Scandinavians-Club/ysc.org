@@ -176,7 +176,9 @@ config :ysc, Oban,
       {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker},
       {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
       # 17:00 UTC = 9:00 AM PST (UTC-8) / 10:00 AM PDT (UTC-7)
-      {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker}
+      {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker},
+      # March 1, 17:00 UTC = 9:00 AM PST — yearly admin/volunteer access review
+      {"0 17 1 3 *", YscWeb.Workers.AnnualAccessReviewWorker}
     ]
   ]
 
@@ -226,6 +228,7 @@ config :ysc, :emails,
   membership_email: "memberships@ysc.org",
   board_email: "board@ysc.org",
   volunteer_email: "volunteer@ysc.org",
+  webtech_email: "webtech@ysc.org",
   tahoe_email: "tahoe@ysc.org",
   clear_lake_email: "cl@ysc.org"
 

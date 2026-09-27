@@ -11,6 +11,33 @@
       submission_date: "January 15, 2026",
       review_url: "http://localhost:4000/admin/applications/preview"
     },
+    "admin_access_review" => %{
+      year: 2026,
+      admin_count: 1,
+      volunteer_count: 1,
+      has_users: true,
+      users: [
+        %{
+          name: "Astrid Lindqvist",
+          email: "astrid@example.com",
+          role: "Admin",
+          board_position: "President",
+          state: "Active",
+          last_sign_in: "February 14, 2026 at 09:12 AM PST",
+          edit_url: "http://localhost:4000/admin/users/01HZXAMPLE"
+        },
+        %{
+          name: "Erik Hansen",
+          email: "erik@example.com",
+          role: "Volunteer",
+          board_position: "—",
+          state: "Active",
+          last_sign_in: "Never",
+          edit_url: "http://localhost:4000/admin/users/01HZXAMPLE2"
+        }
+      ],
+      admin_users_url: "http://localhost:4000/admin/users"
+    },
     "admin_membership_report" => %{
       date_from: "2026-01-01",
       date_to: "2026-01-31",
