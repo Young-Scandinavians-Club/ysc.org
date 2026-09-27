@@ -206,11 +206,14 @@ defmodule Ysc.Messages.Requeue do
       "category" => get_in(job.args, ["category"])
     }
 
-    job_attrs =
-      case get_in(job.args, ["reply_to"]) do
-        nil -> base_attrs
-        reply_to -> Map.put(base_attrs, "reply_to", reply_to)
-      end
+    # Carry over optional delivery headers so a requeued email keeps its
+    # Reply-To and CC recipients
+    optional_attrs =
+      job.args
+      |> Map.take(["reply_to", "cc"])
+      |> Map.reject(fn {_key, value} -> is_nil(value) end)
+
+    job_attrs = Map.merge(base_attrs, optional_attrs)
 
     # Create the Oban job struct
     new_job = YscWeb.Workers.EmailNotifier.new(job_attrs)
