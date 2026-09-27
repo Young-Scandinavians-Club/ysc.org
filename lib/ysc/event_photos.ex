@@ -134,7 +134,7 @@ defmodule Ysc.EventPhotos do
         reminder_date = Date.add(end_date, 1)
 
         reminder_date
-        |> DateTime.new!(~T[09:00:00], @timezone)
+        |> DateTime.new!(~T[10:00:00], @timezone)
         |> DateTime.shift_zone!("Etc/UTC")
     end
   end
