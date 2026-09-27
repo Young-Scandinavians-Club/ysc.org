@@ -1960,7 +1960,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </h2>
                     </div>
                     <p class="text-teal-100 mb-6 leading-relaxed">
-                      Sent via email <strong>{YscWeb.BookingUserMessages.door_code_email_timing_phrase()}</strong>, and shown on your booking confirmation page within 48 hours of check-in or while your stay is active.
+                      {YscWeb.BookingUserMessages.cabin_access_info_tab_body()}
                     </p>
                     <div class="bg-teal-700/50 border border-white/10 rounded-xl p-4 text-sm">
                       <p class="font-semibold text-teal-50 mb-2">Important:</p>

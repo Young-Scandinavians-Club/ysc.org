@@ -173,7 +173,38 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.cabin_access_receipt_body() =~
              BookingUserMessages.door_code_email_timing_phrase()
 
+    assert BookingUserMessages.cabin_access_receipt_body() =~
+             "48 hours before check-in"
+
+    assert BookingUserMessages.cabin_access_receipt_body() =~
+             "top of this page"
+
     refute BookingUserMessages.cabin_access_receipt_body() =~ "24 hours"
+    refute BookingUserMessages.cabin_access_receipt_body() =~ "within 48 hours"
+
+    assert BookingUserMessages.cabin_access_receipt_body_when_visible() =~
+             "at the top of this page"
+
+    refute BookingUserMessages.cabin_access_receipt_body_when_visible() =~
+             "within 48 hours"
+
+    assert BookingUserMessages.cabin_access_info_link_label() ==
+             "How cabin access works"
+
+    refute BookingUserMessages.cabin_access_info_link_label() =~
+             "Door Code Info"
+
+    assert BookingUserMessages.cabin_access_info_tab_body() =~
+             BookingUserMessages.door_code_email_timing_phrase()
+
+    assert BookingUserMessages.cabin_access_info_tab_body() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    assert BookingUserMessages.cabin_access_info_tab_body() =~
+             "booking confirmation page"
+
+    refute BookingUserMessages.cabin_access_info_tab_body() =~ "within 48 hours"
+    refute BookingUserMessages.cabin_access_info_tab_body() =~ "24 hours"
 
     assert BookingUserMessages.checkout_manage_booking_step() =~
              "My Bookings & Payments"
@@ -286,6 +317,12 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.checkout_payment_confirmation_failed() =~
              "not charged twice"
+
+    assert BookingUserMessages.checkout_payment_confirmation_failed() =~
+             "If you see a charge,"
+
+    refute BookingUserMessages.checkout_payment_confirmation_failed() =~
+             "on your card"
 
     refute BookingUserMessages.checkout_payment_confirmation_failed() =~
              "contact us"
