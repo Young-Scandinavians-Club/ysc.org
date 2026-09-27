@@ -4086,13 +4086,13 @@ defmodule Ysc.Accounts do
       Keyword.get(opts, :lookback_days, @aged_out_default_lookback_days)
 
     # Born on or before this date => already 18 today.
-    latest_dob = Date.shift(today, year: -@family_child_age_limit)
+    latest_dob = latest_adult_birth_date(today)
 
     # Born after this date => turned 18 within the lookback window.
     earliest_dob_exclusive =
       today
       |> Date.add(-lookback_days)
-      |> Date.shift(year: -@family_child_age_limit)
+      |> latest_adult_birth_date()
 
     from(u in User,
       where: not is_nil(u.primary_user_id),
@@ -4102,6 +4102,22 @@ defmodule Ysc.Accounts do
       where: u.date_of_birth > ^earliest_dob_exclusive,
       order_by: [asc: u.date_of_birth, asc: u.id]
     )
+  end
+
+  # Latest birth date of someone who is #{@family_child_age_limit} on `date`.
+  # Someone counts as 18 from `Date.shift(birth_date, year: 18)`, the same rule
+  # the family invite age check uses, so Feb 29 birthdays turn 18 on Feb 28 in
+  # non-leap years. Shifting `date` back instead would push them to Mar 1.
+  defp latest_adult_birth_date(date) do
+    shifted = Date.shift(date, year: -@family_child_age_limit)
+    next_day = Date.add(shifted, 1)
+
+    if Date.compare(Date.shift(next_day, year: @family_child_age_limit), date) ==
+         :gt do
+      shifted
+    else
+      next_day
+    end
   end
 
   @doc """

@@ -75,6 +75,33 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
       assert id == child.id
     end
 
+    test "Feb 29 birthdays turn 18 on Feb 28 in non-leap years", %{
+      primary: primary
+    } do
+      child = user_fixture() |> link(primary, %{date_of_birth: ~D[2008-02-29]})
+
+      assert [] = Accounts.list_aged_out_family_members(~D[2026-02-27])
+
+      assert [%User{id: id}] =
+               Accounts.list_aged_out_family_members(~D[2026-02-28])
+
+      assert id == child.id
+
+      # Still inside the window the day after, and gone once it has passed.
+      assert [_] = Accounts.list_aged_out_family_members(~D[2026-03-01])
+      assert [] = Accounts.list_aged_out_family_members(~D[2026-03-08])
+    end
+
+    test "on Feb 29, someone born Feb 28 eighteen years earlier is 18", %{
+      primary: primary
+    } do
+      user_fixture() |> link(primary, %{date_of_birth: ~D[2010-02-28]})
+      user_fixture() |> link(primary, %{date_of_birth: ~D[2010-03-01]})
+
+      assert [%User{date_of_birth: ~D[2010-02-28]}] =
+               Accounts.list_aged_out_family_members(~D[2028-02-29])
+    end
+
     test "excludes spouses", %{primary: primary} do
       user_fixture()
       |> link(primary, %{
