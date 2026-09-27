@@ -21,8 +21,7 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorker do
       event_id: event_id
     )
 
-    case Repo.get(Event, event_id)
-         |> Repo.preload([:organizer, :cover_image]) do
+    case Repo.get(Event, event_id) do
       nil ->
         Ysc.Logging.warning("Event not found for save-the-date notification",
           event_id: event_id

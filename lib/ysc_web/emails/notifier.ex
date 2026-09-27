@@ -33,6 +33,7 @@ defmodule YscWeb.Emails.Notifier do
     "email_changed" => YscWeb.Emails.EmailChanged,
     "admin_application_submitted" => YscWeb.Emails.AdminApplicationSubmitted,
     "admin_membership_report" => YscWeb.Emails.AdminMembershipReport,
+    "admin_access_review" => YscWeb.Emails.AdminAccessReview,
     "conduct_violation_confirmation" =>
       YscWeb.Emails.ConductViolationConfirmation,
     "conduct_violation_board_notification" =>
@@ -88,6 +89,8 @@ defmodule YscWeb.Emails.Notifier do
     "booking_cancellation_confirmation" =>
       YscWeb.Emails.BookingCancellationConfirmation,
     "event_update_notification" => YscWeb.Emails.EventUpdateNotification,
+    "event_cancellation_notification" =>
+      YscWeb.Emails.EventCancellationNotification,
     "event_photo_upload_reminder" => YscWeb.Emails.EventPhotoUploadReminder,
     "newsletter_stats_snapshot" => YscWeb.Emails.NewsletterStatsSnapshot,
     "newsletter_confirmation" => YscWeb.Emails.NewsletterConfirmation

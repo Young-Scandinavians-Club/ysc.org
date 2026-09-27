@@ -1640,11 +1640,56 @@ defmodule Ysc.Events do
     end
   end
 
+  @doc """
+  Cancels an event and, on the transition into `:cancelled`, emails every
+  current ticket holder.
+
+  The recipient list is snapshotted and the notification job inserted in the
+  same transaction as the state change: refunds issued right after
+  cancelling mark tickets `:cancelled`, which would otherwise drop those
+  attendees from a later query. Re-cancelling an already-cancelled event
+  does not notify again.
+  """
+  @dialyzer {:nowarn_function, cancel_event: 2}
   def cancel_event(%Event{} = event, opts \\ []) do
     with :ok <- require_full_admin_lifecycle(opts) do
-      event
-      |> Event.changeset(%{state: "cancelled"})
-      |> Repo.update()
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:current, fn repo, _changes ->
+        # Lock so a double-submitted cancel only notifies once.
+        case repo.get(from(e in Event, lock: "FOR UPDATE"), event.id) do
+          nil -> {:error, :not_found}
+          current -> {:ok, current}
+        end
+      end)
+      |> Ecto.Multi.update(:event, fn %{current: current} ->
+        Event.changeset(current, %{state: "cancelled"})
+      end)
+      |> Ecto.Multi.run(:notify_ticket_holders, fn _repo,
+                                                   %{
+                                                     current: current,
+                                                     event: cancelled
+                                                   } ->
+        if current.state == :cancelled do
+          {:ok, nil}
+        else
+          cancelled
+          |> YscWeb.Workers.EventCancellationNotificationWorker.new_for_event(
+            list_event_update_recipients(cancelled.id),
+            cancelled.updated_at
+          )
+          |> Oban.insert()
+        end
+      end)
+      |> Repo.transaction()
+      |> case do
+        # The locked row has no associations loaded; restore the ones the
+        # admin editor renders (it assigns this event and the broadcast).
+        {:ok, %{event: cancelled}} ->
+          {:ok, Repo.preload(cancelled, [:organizer, :updated_by])}
+
+        {:error, _step, reason, _changes} ->
+          {:error, reason}
+      end
       |> finalize_lifecycle_broadcast()
     end
   end

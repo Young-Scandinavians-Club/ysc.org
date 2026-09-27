@@ -767,7 +767,8 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       end
     end
 
-    test "raises when booking id is not found", %{booking: booking} do
+    test "preloads user from in-memory foreign keys when the booking row is missing",
+         %{booking: booking} do
       missing =
         struct!(Booking, %{
           id: Ecto.ULID.generate(),
@@ -781,13 +782,10 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
           total_price: Money.new(100, :USD)
         })
 
-      assert_raise ArgumentError, ~r/Booking not found/, fn ->
-        Ysc.Test.Invoke.call(
-          BookingCancellationConfirmation,
-          :prepare_email_data,
-          [missing]
-        )
-      end
+      data = BookingCancellationConfirmation.prepare_email_data(missing)
+
+      assert data.first_name == (booking.user.first_name || "Valued Member")
+      assert data.booking.reference_id == "BKG-MISS"
     end
 
     test "reloads booking when user association is not loaded", %{

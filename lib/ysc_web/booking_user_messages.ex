@@ -178,6 +178,23 @@ defmodule YscWeb.BookingUserMessages do
     "You're being charged for #{billable_people} #{guest_word(billable_people)} because this room has a #{billable_people}-guest minimum price."
   end
 
+  def room_base_price_people_label(billable_people, guests_count)
+      when is_integer(billable_people) and is_integer(guests_count) do
+    if billable_people > guests_count do
+      "charged for #{billable_people} #{guest_word(billable_people)}"
+    else
+      adult_count_label(billable_people)
+    end
+  end
+
+  def room_base_price_people_label(billable_people, _guests_count)
+      when is_integer(billable_people) do
+    adult_count_label(billable_people)
+  end
+
+  def room_base_price_people_label(_billable_people, _guests_count),
+    do: adult_count_label(0)
+
   def room_too_small_for_group(capacity, people) do
     "This room sleeps #{capacity} #{person_word(capacity)}, and your group has #{people}. Choose a larger room or reduce your group size."
   end
@@ -225,12 +242,28 @@ defmodule YscWeb.BookingUserMessages do
     "about 3 days before check-in"
   end
 
+  def door_code_page_timing_phrase do
+    "starting 48 hours before check-in"
+  end
+
   def checkout_cabin_access_step do
     "You'll receive cabin access details (door code or key instructions) by email #{door_code_email_timing_phrase()}"
   end
 
   def cabin_access_receipt_body do
-    "We'll email you the door code and key instructions #{door_code_email_timing_phrase()}. The code also appears on this page within 48 hours of check-in."
+    "We'll email the door code #{door_code_email_timing_phrase()}. Starting 48 hours before check-in, the same code also appears at the top of this page."
+  end
+
+  def cabin_access_receipt_body_when_visible do
+    "Your door code is at the top of this page. Save it before you leave home — cell service can be limited at the cabin."
+  end
+
+  def cabin_access_info_link_label do
+    "How cabin access works"
+  end
+
+  def cabin_access_info_tab_body do
+    "We'll email the door code #{door_code_email_timing_phrase()}. The same code also appears on your booking confirmation page #{door_code_page_timing_phrase()}, and stays visible during your stay."
   end
 
   def checkout_manage_booking_step do
@@ -251,7 +284,7 @@ defmodule YscWeb.BookingUserMessages do
 
   def checkout_payment_confirmation_failed do
     trim("""
-    Something went wrong while confirming your booking. If you see a charge on your card, email info@ysc.org with the date and amount before trying to pay again — we'll make sure you're not charged twice.
+    Something went wrong while confirming your booking. If you see a charge, email info@ysc.org with the date and amount before trying to pay again — we'll make sure you're not charged twice.
     """)
   end
 
@@ -374,6 +407,13 @@ defmodule YscWeb.BookingUserMessages do
 
   defp guest_word(1), do: "guest"
   defp guest_word(_count), do: "guests"
+
+  defp adult_count_label(1), do: "1 adult"
+
+  defp adult_count_label(count) when is_integer(count) and count >= 0,
+    do: "#{count} adults"
+
+  defp adult_count_label(_count), do: "0 adults"
 
   defp trim(string), do: String.trim(string)
 end

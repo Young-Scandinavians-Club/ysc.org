@@ -1438,12 +1438,13 @@ defmodule YscWeb.BookingChangeLive do
       YscWeb.BookingUserMessages.modification_after_payment_recovery_suffix()
   end
 
-  # `place_modification_hold/3` rebuilds `modification_hold_attrs` and does
-  # not keep a previously attached PaymentIntent. Creating a new Intent
-  # (idempotency includes a unique integer) would overwrite that id, so a
-  # refresh-and-resubmit after a captured charge would orphan PI-A or
-  # double-charge via PI-B. Stripe-first the stored Intent before replacing
-  # the hold — same invariant as Edit changes / hold expiry.
+  # Creating a new Intent uses a unique integer in the Stripe idempotency
+  # key (required: after a true unpaid cancel, a stable key would return the
+  # *canceled* Intent). Every submit therefore mints PI-B unless the stored
+  # PI is reconciled first — same invariant as Edit changes / hold expiry.
+  # `attach_modification_payment_intent/2` also Stripe-cancels any previous
+  # stored Intent before overwrite so a concurrent tab cannot leave PI-A
+  # open while the DB points at unpaid PI-B.
   defp proceed_after_modification_details(socket, params, preview) do
     if Money.positive?(preview.delta) do
       booking =
@@ -1520,6 +1521,15 @@ defmodule YscWeb.BookingChangeLive do
        |> assign(:stripe_payment_element_ready, false)
        |> assign(:payment_error, nil)}
     else
+      {:error, {:modification_payment_already_succeeded, payment_intent_id}} ->
+        {:already_succeeded, payment_intent_id}
+
+      {:error, :modification_payment_in_progress} ->
+        {:error, put_modification_abandon_in_progress_toast(socket)}
+
+      {:error, {:stripe_reconcile_failed, reason}} ->
+        {:error, put_modification_abandon_failed_toast(socket, reason)}
+
       {:error, _reason} ->
         Bookings.release_modification_hold(booking.id)
 

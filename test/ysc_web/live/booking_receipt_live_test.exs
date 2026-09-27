@@ -229,8 +229,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert has_element?(
                view,
-               ~s(a[href="/bookings/tahoe?tab=information&info_tab=general#door-code-access"]),
-               "View Door Code Info"
+               ~s(a#cabin-access-info-link[href="/bookings/tahoe?tab=information&info_tab=general#door-code-access"]),
+               "How cabin access works"
              )
 
       assert has_element?(
@@ -256,8 +256,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert has_element?(
                view,
-               ~s(a[href="/bookings/clear-lake?tab=information#door-code-access"]),
-               "View Door Code Info"
+               ~s(a#cabin-access-info-link[href="/bookings/clear-lake?tab=information#door-code-access"]),
+               "How cabin access works"
              )
 
       assert has_element?(
@@ -889,7 +889,20 @@ defmodule YscWeb.BookingReceiptLiveTest do
                "about 3 days before check-in"
              )
 
+      assert has_element?(
+               view,
+               "#cabin-access-timing",
+               "Starting 48 hours before check-in"
+             )
+
       refute has_element?(view, "#cabin-access-timing", "24 hours")
+      refute has_element?(view, "#cabin-access-timing", "within 48 hours")
+
+      refute has_element?(
+               view,
+               "#cabin-access-info-link",
+               "View Door Code Info"
+             )
     end
 
     test "does not show door code for cancelled bookings", %{conn: conn} do
@@ -920,6 +933,63 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       html = render(view)
       refute html =~ "Your Door Code"
+    end
+
+    test "cabin access card points to the banner when the door code is visible",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      today = YscWeb.BookingActions.get_today_pst()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe,
+          checkin_date: today,
+          checkout_date: Date.add(today, 2)
+        })
+
+      suffix =
+        System.unique_integer([:positive])
+        |> Integer.to_string()
+        |> String.slice(-2, 2)
+
+      {:ok, door_code} =
+        Bookings.create_door_code(%{
+          property: :tahoe,
+          code: "A#{suffix}9"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      assert has_element?(view, "#booking-receipt", "Your Door Code")
+      assert has_element?(view, "#booking-receipt", door_code.code)
+
+      assert has_element?(
+               view,
+               "#cabin-access-timing",
+               "Your door code is at the top of this page"
+             )
+
+      refute has_element?(view, "#cabin-access-timing", "Starting 48 hours")
+
+      refute has_element?(
+               view,
+               "#cabin-access-info-link",
+               "View Door Code Info"
+             )
+
+      assert has_element?(
+               view,
+               "#cabin-access-info-link",
+               "How cabin access works"
+             )
     end
   end
 
@@ -3169,6 +3239,67 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert html =~ "Children"
       assert html =~ "Base Price"
+    end
+
+    test "labels minimum-price billing as charged guests, not extra adults", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :room,
+          guests_count: 1,
+          children_count: 0
+        })
+
+      room_item = %{
+        "type" => "room",
+        "room_id" => "r1",
+        "room_name" => "Pine",
+        "nights" => 2,
+        "guests_count" => 1,
+        "children_count" => 0,
+        "base" => %{"amount" => "200", "currency" => "USD"},
+        "adult_price_per_night" => %{"amount" => "100", "currency" => "USD"},
+        "billable_people" => 2
+      }
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "room",
+            "nights" => 2,
+            "guests_count" => 1,
+            "children_count" => 0,
+            "rooms" => [room_item]
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(20_000, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+
+      refute has_element?(view, "#receipt-base-price-people", "2 adults")
+
+      assert has_element?(
+               view,
+               "#receipt-base-price-people",
+               "charged for 2 guests"
+             )
+
+      assert has_element?(
+               view,
+               "#receipt-minimum-pricing-applied",
+               "You're being charged for 2 guests"
+             )
     end
 
     test "renders per-guest line when pricing_items type is per_guest", %{

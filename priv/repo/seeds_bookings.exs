@@ -154,7 +154,7 @@ _tahoe_rooms =
           # Family room
           %{
             name: name,
-            description: "Spacious family room with 1 queen bed and 3 single beds. Accommodates up to 5 guests. Minimum 2 guests required.",
+            description: "Spacious family room with 1 queen bed and 3 single beds. Accommodates up to 5 guests. Priced for 2 or more guests.",
             property: :tahoe,
             capacity_max: 5,
             min_billable_occupancy: 2,

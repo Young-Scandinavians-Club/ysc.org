@@ -783,6 +783,62 @@ defmodule Ysc.FormsTest do
       end)
     end
   end
+
+  describe "board notification reply-to" do
+    test "volunteer board notification replies to the submitter", %{
+      user: user
+    } do
+      changeset =
+        Volunteer.changeset(%Volunteer{}, %{
+          email: "volunteer-reply@example.com",
+          name: "Reply Volunteer",
+          interest_events: true,
+          user_id: user.id
+        })
+
+      assert {:ok, _} = Forms.create_volunteer(changeset)
+
+      board_email =
+        find_sent_email(YscWeb.Emails.VolunteerBoardNotification.get_subject())
+
+      assert board_email.reply_to == {"", "volunteer-reply@example.com"}
+    end
+
+    test "contact form board notification replies to the submitter", %{
+      user: user
+    } do
+      changeset =
+        ContactForm.changeset(%ContactForm{}, %{
+          name: "Reply Contact",
+          email: "contact-reply@example.com",
+          subject: "Reply-To Check",
+          message: "Please reply to me directly from the board inbox.",
+          user_id: user.id
+        })
+
+      assert {:ok, _} = Forms.create_contact_form(changeset)
+
+      board_email = find_sent_email("New Contact Form: Reply-To Check")
+      assert board_email.reply_to == {"", "contact-reply@example.com"}
+    end
+  end
+
+  defp find_sent_email(subject) do
+    sent = collect_sent_emails([])
+
+    Enum.find(sent, &(&1.subject == subject)) ||
+      flunk(
+        "no email with subject #{inspect(subject)} sent; got #{inspect(Enum.map(sent, & &1.subject))}"
+      )
+  end
+
+  defp collect_sent_emails(acc) do
+    receive do
+      {:email, email} -> collect_sent_emails([email | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
 end
 
 defmodule Ysc.FormsTest.EmailScheduleErrorPaths do

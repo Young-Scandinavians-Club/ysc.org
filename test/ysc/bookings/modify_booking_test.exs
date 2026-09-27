@@ -850,6 +850,40 @@ defmodule Ysc.Bookings.ModifyBookingTest do
                guest_params
     end
 
+    test "place_modification_hold preserves a previously attached payment_intent_id",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(120)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+      # Extend by 1 night only so the Tahoe weekend rule is not newly triggered.
+      extended_checkout = Date.add(checkout, 1)
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: booking.guests_count,
+        children_count: booking.children_count || 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, attrs)
+
+      assert {:ok, held_booking} =
+               Bookings.attach_modification_payment_intent(
+                 held_booking,
+                 "pi_mod_preserve"
+               )
+
+      # Re-placing the same hold must keep the stored Intent id so a concurrent
+      # tab cannot wipe the id HoldExpiryWorker reconciles against.
+      assert {:ok, re_held} =
+               Bookings.place_modification_hold(held_booking, attrs)
+
+      assert Bookings.modification_hold_payment_intent_id(re_held) ==
+               "pi_mod_preserve"
+    end
+
     test "place_modification_hold reserves newly added calendar days", %{
       user: user
     } do

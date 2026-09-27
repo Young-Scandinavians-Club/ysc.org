@@ -58,7 +58,13 @@ defmodule Ysc.Accounts.FamilyLinkConcurrencyTest do
 
       invite_email = unique_user_email()
       {:ok, invite} = FamilyInvites.create_invite(primary, invite_email)
-      invitee = user_fixture(%{email: invite_email})
+
+      invitee =
+        user_fixture(%{
+          email: invite_email,
+          date_of_birth: Date.shift(Date.utc_today(), year: -10)
+        })
+
       admin_target = user_fixture()
 
       results =

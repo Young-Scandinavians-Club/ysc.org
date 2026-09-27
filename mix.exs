@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.41.1",
+      version: "2.42.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -349,13 +349,15 @@ defmodule Ysc.MixProject do
       # 1.8.14: LongPoll fetch timer leak (we use websocket only); VerifiedRoutes
       # :router must be a compile-time module; local path validation is shared
       # across redirect, static_path, and ~p (also rejects CR/LF in paths).
-      {:phoenix, "~> 1.8.14"},
+      # 1.8.15: phoenix.js does not let an async transport close tear down the
+      # replacement transport; phx.gen.cert Chromium cert and phx.new Tailwind
+      # 4.3.3 are unused (we already ship Tailwind 4.3.3).
+      {:phoenix, "~> 1.8.15"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
-      {:remote_ip, "~> 1.2"},
       {:req, "~> 0.7"},
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing

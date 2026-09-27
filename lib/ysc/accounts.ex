@@ -510,8 +510,38 @@ defmodule Ysc.Accounts do
              user_id: id
            }) do
       Repo.get_by!(SignupApplication, user_id: id)
-      |> Repo.preload(preloads)
+      |> preload_signup_application(preloads)
     end
+  end
+
+  # Reviewer card only needs name, email, country, and avatar thumbs — not
+  # password hashes, bios, or Stripe ids.
+  @signup_application_reviewer_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :most_connected_country,
+    :current_avatar_id
+  ]
+
+  defp preload_signup_application(application, reviewed_by: :current_avatar) do
+    Repo.preload(application,
+      reviewed_by: signup_application_reviewer_query()
+    )
+  end
+
+  defp preload_signup_application(application, preloads) do
+    Repo.preload(application, preloads)
+  end
+
+  defp signup_application_reviewer_query do
+    avatar_query = admin_list_avatar_preload_query()
+
+    from(u in User,
+      select: struct(u, ^@signup_application_reviewer_fields),
+      preload: [current_avatar: ^avatar_query]
+    )
   end
 
   ## User registration
@@ -1402,10 +1432,31 @@ defmodule Ysc.Accounts do
     from u in User, where: u.state == :pending_approval
   end
 
+  # Dashboard preview cards: name, default-avatar country, and application
+  # wait time / plan. Skip hashes, bios, and long-text application answers.
+  @pending_approval_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :state,
+    :most_connected_country,
+    :current_avatar_id,
+    :inserted_at
+  ]
+
   defp pending_approval_users_query do
-    pending_approval_users_base_query()
-    |> preload([:registration_form, :current_avatar])
-    |> order_by([u], asc: u.inserted_at, asc: u.id)
+    avatar_query = admin_list_avatar_preload_query()
+    form_query = admin_list_registration_form_query()
+
+    from(u in pending_approval_users_base_query(),
+      select: struct(u, ^@pending_approval_user_fields),
+      preload: [
+        current_avatar: ^avatar_query,
+        registration_form: ^form_query
+      ],
+      order_by: [asc: u.inserted_at, asc: u.id]
+    )
   end
 
   defp maybe_limit_pending_approval_users(query, nil), do: query
@@ -2853,8 +2904,14 @@ defmodule Ysc.Accounts do
   end
 
   # Helper function to preload only active subscriptions
+  # Inherited-membership lookup only needs the primary's id and lifetime
+  # timestamp; subscriptions are attached below.
+  @admin_list_primary_user_fields [:id, :lifetime_membership_awarded_at]
+
   defp preload_active_subscriptions(users) do
-    users = Repo.preload(users, :current_avatar)
+    users =
+      Repo.preload(users, current_avatar: admin_list_avatar_preload_query())
+
     user_ids = Enum.map(users, & &1.id)
 
     # Get active subscriptions for all users in one query
@@ -2882,7 +2939,11 @@ defmodule Ysc.Accounts do
       if primary_user_ids != [] do
         # Get primary users with their active subscriptions
         primary_users =
-          from(u in User, where: u.id in ^primary_user_ids) |> Repo.all()
+          from(u in User,
+            where: u.id in ^primary_user_ids,
+            select: struct(u, ^@admin_list_primary_user_fields)
+          )
+          |> Repo.all()
 
         # Get subscriptions for primary users
         primary_user_subscriptions =
@@ -3416,8 +3477,40 @@ defmodule Ysc.Accounts do
     %{meta | flop: updated_flop}
   end
 
+  # Applied column / dashboard wait time + plan. Skip long-text answers
+  # (`hear_about_the_club`, `link_to_scandinavia`, …) on every list page.
+  @admin_list_registration_form_fields [
+    :id,
+    :user_id,
+    :completed,
+    :reviewed_at,
+    :membership_type
+  ]
+
+  @admin_list_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+
   defp preload_registration_forms(users),
-    do: Repo.preload(users, :registration_form)
+    do:
+      Repo.preload(users,
+        registration_form: admin_list_registration_form_query()
+      )
+
+  defp admin_list_registration_form_query do
+    from(sa in SignupApplication,
+      select: struct(sa, ^@admin_list_registration_form_fields)
+    )
+  end
+
+  defp admin_list_avatar_preload_query do
+    from(a in Ysc.Avatars.Avatar, select: struct(a, ^@admin_list_avatar_fields))
+  end
 
   @doc """
   Marks a user's email as verified by setting the email_verified_at timestamp.
@@ -4579,13 +4672,28 @@ defmodule Ysc.Accounts do
 
   - had `lifetime_membership_awarded_at` fall in the half-open interval
     `[range_start, range_end)`, or
-  - had their **first** ever `Subscription` that reached a paid status
-    (i.e. excluding "incomplete"/"incomplete_expired" checkout attempts
-    that never converted) fall in that interval, by `inserted_at`.
+  - have an **approved** `SignupApplication` and had their **first** ever
+    `Subscription` that reached a paid status (i.e. excluding
+    "incomplete"/"incomplete_expired" checkout attempts that never
+    converted) fall in that interval, by Stripe's `start_date` (falling
+    back to `inserted_at` when it's missing).
+
+  Only approved applicants can become members, so the approval is a
+  gate — it keeps legacy accounts that never went through the application
+  process (and whose subscription was re-created during the Stripe
+  migration) out of the join count. It is deliberately *not* the join
+  date: legacy `reviewed_at` values were frequently re-stamped years after
+  the original application, whereas the first payment is when the member
+  actually joined (the app only lets approved users subscribe).
+
+  `start_date` rather than `inserted_at` matters: the bulk Stripe import
+  (July 2026) inserted a row for every existing and long-lapsed member at
+  once, so `inserted_at` would count the whole historical membership as
+  having "joined" that year.
 
   These never double-count renewals: a recurring subscription's row is
   reused across billing cycles (see `Subscriptions.create_subscription_from_stripe/3`),
-  so only its original `inserted_at` can ever land in a join window.
+  so only its original start can ever land in a join window.
 
   `current_ytd_losses`/`prior_ytd_losses` count distinct primary users
   whose subscription lapsed (`stripe_status` of "canceled"/"cancelled"/
@@ -4692,17 +4800,30 @@ defmodule Ysc.Accounts do
     first_subs =
       from(s in Subscription,
         join: u in User,
+        as: :user,
         on: s.user_id == u.id,
         where: is_nil(u.primary_user_id),
         where: u.state == :active,
         where: s.stripe_status not in ["incomplete", "incomplete_expired"],
+        where:
+          exists(
+            from(a in SignupApplication,
+              where:
+                a.user_id == parent_as(:user).id and
+                  a.review_outcome == :approved,
+              select: 1
+            )
+          ),
         group_by: s.user_id,
         having:
-          (min(s.inserted_at) >= ^current_start and
-             min(s.inserted_at) < ^current_end) or
-            (min(s.inserted_at) >= ^prior_start and
-               min(s.inserted_at) < ^prior_end),
-        select: %{user_id: s.user_id, joined_at: min(s.inserted_at)}
+          (min(coalesce(s.start_date, s.inserted_at)) >= ^current_start and
+             min(coalesce(s.start_date, s.inserted_at)) < ^current_end) or
+            (min(coalesce(s.start_date, s.inserted_at)) >= ^prior_start and
+               min(coalesce(s.start_date, s.inserted_at)) < ^prior_end),
+        select: %{
+          user_id: s.user_id,
+          joined_at: min(coalesce(s.start_date, s.inserted_at))
+        }
       )
 
     from(j in subquery(union_all(lifetime, ^first_subs)),
@@ -4767,10 +4888,11 @@ defmodule Ysc.Accounts do
 
   # Distinct primary users whose subscription entered a **new billing
   # period** starting in `[start_dt, end_dt)`, for a subscription that isn't
-  # brand new — i.e. `current_period_start` is after the row's own
-  # `inserted_at`, which only happens once Stripe has pushed the period
-  # forward at least once (an initial subscribe's first period starts at
-  # or before the row is inserted). This is the renewal counterpart to
+  # brand new — i.e. `current_period_start` is after the subscription's own
+  # Stripe `start_date` (or `inserted_at` when missing), which only happens
+  # once Stripe has pushed the period forward at least once. Comparing
+  # against `inserted_at` alone would miss every renewal that happened before
+  # the July 2026 bulk import inserted the row. This is the renewal counterpart to
   # `membership_joins_ytd_query/4`'s first-ever-subscription check.
   defp membership_renewals_ytd_query(
          %DateTime{} = start_dt,
@@ -4785,7 +4907,7 @@ defmodule Ysc.Accounts do
       where: not is_nil(s.current_period_start),
       where:
         s.current_period_start >= ^start_dt and s.current_period_start < ^end_dt,
-      where: s.current_period_start > s.inserted_at,
+      where: s.current_period_start > coalesce(s.start_date, s.inserted_at),
       select: count(s.user_id, :distinct)
     )
   end
@@ -5126,6 +5248,21 @@ defmodule Ysc.Accounts do
       membership_ytd_windows(Ysc.Ci.QueryExplain.Fixtures.now())
 
     membership_renewals_ytd_query(current_start, current_end)
+  end
+
+  @doc false
+  def ci_query_explain_signup_application_reviewer_query do
+    signup_application_reviewer_query()
+  end
+
+  @doc false
+  def ci_query_explain_admin_list_registration_form_query do
+    admin_list_registration_form_query()
+  end
+
+  @doc false
+  def ci_query_explain_pending_approval_users_query do
+    pending_approval_users_query()
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do

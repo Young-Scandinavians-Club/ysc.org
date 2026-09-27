@@ -21,7 +21,10 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
   alias Ysc.Accounts.FamilyInvite
   alias Ysc.Accounts.FamilyInvites
+  alias Ysc.Accounts.User
   alias Ysc.Repo
+
+  defp child_birth_date, do: Date.shift(Date.utc_today(), year: -10)
 
   # Helper to create a valid family invite
   defp create_family_invite(attrs \\ %{}) do
@@ -237,6 +240,67 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
     end
   end
 
+  describe "adult accepting a child invite" do
+    test "shows a date of birth error and does not create the account", %{
+      conn: conn
+    } do
+      {invite, _primary_user} = create_family_invite()
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      params = %{
+        email: invite.email,
+        first_name: "Grown",
+        last_name: "Up",
+        date_of_birth:
+          Date.utc_today() |> Date.shift(year: -18) |> Date.to_iso8601(),
+        password: "securepassword123",
+        password_confirmation: "securepassword123"
+      }
+
+      html =
+        view
+        |> form("#accept-invite-form", user: params)
+        |> render_change()
+
+      assert html =~ "under 18"
+
+      html =
+        view
+        |> form("#accept-invite-form", user: params)
+        |> render_submit()
+
+      assert html =~ "under 18"
+      assert has_element?(view, "form#accept-invite-form")
+      assert Ysc.Accounts.get_user_by_email(invite.email) == nil
+    end
+
+    test "logged-in adult sees a notice instead of the join button", %{
+      conn: conn
+    } do
+      {invite, _primary} = create_family_invite()
+
+      invited_user =
+        user_fixture(%{email: invite.email})
+        |> Ecto.Changeset.change(date_of_birth: ~D[1990-01-01])
+        |> Repo.update!()
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert has_element?(view, "#adult-child-blocked-notice")
+      refute has_element?(view, "button", "Join Family Membership")
+
+      # A crafted link_existing event (button is hidden) is still refused.
+      render_hook(view, "link_existing", %{})
+
+      assert is_nil(
+               Repo.get!(Ysc.Accounts.User, invited_user.id).primary_user_id
+             )
+    end
+  end
+
   describe "handle_event save - success" do
     test "accepts invite and creates user account", %{conn: conn} do
       {invite, _primary_user} = create_family_invite()
@@ -250,7 +314,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
           email: invite.email,
           first_name: "John",
           last_name: "Doe",
-          date_of_birth: "1990-01-01",
+          date_of_birth:
+            Date.utc_today() |> Date.shift(year: -10) |> Date.to_iso8601(),
           password: "securepassword123",
           password_confirmation: "securepassword123"
         }
@@ -414,14 +479,16 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
   describe "handle_event link_existing" do
     test "links matching user and redirects home", %{conn: conn} do
       {invite, _primary} = create_family_invite()
-      invited_user = user_fixture(%{email: invite.email})
+
+      invited_user =
+        user_fixture(%{email: invite.email, date_of_birth: child_birth_date()})
 
       conn = log_in_user(conn, invited_user)
 
       {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
 
       view
-      |> element("button", "Join Family Membership")
+      |> element("#link-existing-button")
       |> render_click()
 
       assert_redirected(view, "/")
@@ -429,7 +496,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
     test "shows error when invite was deleted before link", %{conn: conn} do
       {invite, _primary} = create_family_invite()
-      invited_user = user_fixture(%{email: invite.email})
+
+      invited_user =
+        user_fixture(%{email: invite.email, date_of_birth: child_birth_date()})
 
       conn = log_in_user(conn, invited_user)
 
@@ -439,7 +508,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       assert {:error, {:redirect, %{to: "/"}}} =
                view
-               |> element("button", "Join Family Membership")
+               |> element("#link-existing-button")
                |> render_click()
     end
 
@@ -447,7 +516,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       conn: conn
     } do
       {invite, _primary} = create_family_invite()
-      invited_user = user_fixture(%{email: invite.email})
+
+      invited_user =
+        user_fixture(%{email: invite.email, date_of_birth: child_birth_date()})
 
       conn = log_in_user(conn, invited_user)
 
@@ -457,7 +528,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       html =
         view
-        |> element("button", "Join Family Membership")
+        |> element("#link-existing-button")
         |> render_click()
 
       assert html =~ "sign in with the email address that was invited"
@@ -482,10 +553,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
 
-      html =
-        view
-        |> element("button", "Join Family Membership")
-        |> render_click()
+      html = render_hook(view, "link_existing", %{})
 
       assert html =~ "because you sent it"
       assert html =~ "Ask your family member"
@@ -519,6 +587,71 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       assert Phoenix.Flash.get(socket.assigns.flash, :error) =~
                "one family membership at a time"
+    end
+
+    test "asks an account with no date of birth for one before linking", %{
+      conn: conn
+    } do
+      {invite, _primary} = create_family_invite()
+      invited_user = user_fixture(%{email: invite.email})
+      assert is_nil(invited_user.date_of_birth)
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert has_element?(view, "#link-existing-form")
+      refute has_element?(view, "#link-existing-button")
+
+      html =
+        view
+        |> form("#link-existing-form", link: %{date_of_birth: ""})
+        |> render_submit()
+
+      assert html =~ "can&#39;t be blank"
+      assert is_nil(Repo.get!(User, invited_user.id).primary_user_id)
+
+      adult_dob = Date.utc_today() |> Date.shift(year: -18) |> Date.to_iso8601()
+
+      assert view
+             |> form("#link-existing-form", link: %{date_of_birth: adult_dob})
+             |> render_change() =~ "under 18"
+
+      assert view
+             |> form("#link-existing-form", link: %{date_of_birth: adult_dob})
+             |> render_submit() =~ "under 18"
+
+      assert is_nil(Repo.get!(User, invited_user.id).primary_user_id)
+
+      child_dob = child_birth_date()
+
+      view
+      |> form("#link-existing-form",
+        link: %{date_of_birth: Date.to_iso8601(child_dob)}
+      )
+      |> render_submit()
+
+      assert_redirected(view, "/")
+
+      linked = Repo.get!(User, invited_user.id)
+      assert linked.primary_user_id == invite.primary_user_id
+      assert linked.date_of_birth == child_dob
+    end
+
+    test "does not ask for a date of birth on a spouse invite", %{conn: conn} do
+      {invite, _primary} = create_family_invite(%{relationship: :spouse})
+      invited_user = user_fixture(%{email: invite.email})
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      refute has_element?(view, "#link-existing-form")
+
+      view
+      |> element("#link-existing-button")
+      |> render_click()
+
+      assert_redirected(view, "/")
     end
   end
 

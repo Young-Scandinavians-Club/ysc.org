@@ -2692,6 +2692,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               "#{email} (#{name}) already has an account. You can link them from Family in Account settings."
           }
 
+        {:error, :child_is_adult} ->
+          %{ok: false, message: FamilyInvites.child_is_adult_message(name)}
+
         {:error, :max_sub_accounts_reached} ->
           %{ok: false, message: "Maximum number of family members reached."}
 

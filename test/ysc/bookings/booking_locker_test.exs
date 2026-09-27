@@ -802,6 +802,99 @@ defmodule Ysc.Bookings.BookingLockerTest do
       end)
     end
 
+    test "confirmation email does not re-SELECT bookings/users/rooms", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(417)
+
+      skip_attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      {checkin2, checkout2} = locker_buyout_dates(418)
+
+      email_attrs = %{
+        user_id: user.id,
+        property: :clear_lake,
+        checkin_date: checkin2,
+        checkout_date: checkout2,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {_ok, bookings_without_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(skip_attrs,
+                skip_email: true,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "bookings"/i,
+            caller_pids: [self()]
+          )
+
+        {_ok, bookings_with_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(email_attrs,
+                skip_email: false,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "bookings"/i,
+            caller_pids: [self()]
+          )
+
+        {skip_checkin2, skip_checkout2} = locker_buyout_dates_after(checkout)
+
+        {_ok, users_without_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(
+                Map.merge(skip_attrs, %{
+                  checkin_date: skip_checkin2,
+                  checkout_date: skip_checkout2
+                }),
+                skip_email: true,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "users"/i,
+            caller_pids: [self()]
+          )
+
+        {email_checkin2, email_checkout2} = locker_buyout_dates_after(checkout2)
+
+        {_ok, users_with_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(
+                Map.merge(email_attrs, %{
+                  checkin_date: email_checkin2,
+                  checkout_date: email_checkout2
+                }),
+                skip_email: false,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "users"/i,
+            caller_pids: [self()]
+          )
+
+        assert bookings_with_email == bookings_without_email
+        assert users_with_email == users_without_email
+      end)
+    end
+
     test "schedules check-in and checkout reminder Oban jobs when skip_reminders is false",
          %{user: user} do
       {checkin, checkout} = locker_future_buyout_dates(14)
@@ -2875,6 +2968,42 @@ defmodule Ysc.Bookings.BookingLockerTest do
             "idempotency_key" => "booking_confirmation_#{confirmed.id}",
             "reply_to" => cabin_master_email,
             "cc" => cabin_master_email
+          }
+        )
+      end)
+    end
+
+    test "does not re-SELECT the booking to schedule the confirmation email",
+         %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(419)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {{:ok, confirmed}, booking_selects} =
+          Ysc.QueryCounter.with_query_counter(
+            fn -> BookingLocker.confirm_booking(hold.id) end,
+            pattern: ~r/FROM "bookings"/i,
+            caller_pids: [self()]
+          )
+
+        assert confirmed.status == :complete
+
+        # get! + sibling-hold lookup. Email must not `Repo.get` the booking again.
+        assert booking_selects == 2
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "booking_confirmation",
+            "idempotency_key" => "booking_confirmation_#{confirmed.id}"
           }
         )
       end)

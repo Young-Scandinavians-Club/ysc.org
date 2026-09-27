@@ -707,13 +707,12 @@ defmodule Ysc.Tickets do
   without ticket fulfillment.
 
   Pass `reconcile_with_stripe: false` (default `true`) to skip the atomic
-  Stripe PaymentIntent cancel and just cancel the local order. Stripe-driven
-  callers (e.g. `StripeService.handle_failed_payment/2`, reacting to a
-  `payment_intent.payment_failed`/`canceled` webhook) must use this: Stripe has
-  already decided that PaymentIntent's fate, and a card decline typically
-  leaves it in `requires_payment_method` so the customer can retry with a
-  different payment method against the same PaymentIntent - actively
-  cancelling it here would foreclose that retry.
+  Stripe PaymentIntent cancel and just cancel the local order. Do not use
+  this on user-facing abandonment paths: a card decline typically leaves the
+  PaymentIntent in `requires_payment_method`, and redirect wallets can still
+  capture after `/payment/success` reports failure. `StripeService.handle_failed_payment/2`
+  keeps the order pending for inline retries (`keep_retryable_order: true`)
+  and Stripe-cancels before releasing seats on the failure-redirect path.
   """
   def cancel_ticket_order(ticket_order, reason \\ "User cancelled", opts \\ []) do
     from_statuses = Keyword.get(opts, :from_statuses, [:pending])

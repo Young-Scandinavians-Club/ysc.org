@@ -5,11 +5,16 @@ defmodule YscWeb.Emails.Helpers do
   and display formatting for money and dates.
   """
 
+  import Ecto.Query, warn: false
+
   alias HtmlSanitizeEx
+  alias Ysc.Accounts.User
   alias Ysc.Bookings.Booking
   alias Ysc.Events.Event
   alias Ysc.Media.Image
   alias Ysc.Repo
+
+  @event_email_organizer_fields [:id, :first_name, :last_name]
 
   @member_default "Valued Member"
   @attendee_default "there"
@@ -337,10 +342,10 @@ defmodule YscWeb.Emails.Helpers do
   end
 
   @doc """
-  Reloads the event with `associations` when any of them are not loaded.
+  Preloads `associations` that are not already loaded on `event`.
 
-  Defaults to `:organizer` and `:cover_image`. Raises if the event row no
-  longer exists.
+  Defaults to `:organizer` and `:cover_image`. Does not re-`Repo.get` the
+  event row. Organizer is loaded as name columns only.
   """
   def preload_event_associations(
         event,
@@ -349,21 +354,35 @@ defmodule YscWeb.Emails.Helpers do
 
   def preload_event_associations(%Event{} = event, associations)
       when is_list(associations) do
-    if Enum.all?(associations, &Ecto.assoc_loaded?(Map.fetch!(event, &1))) do
-      event
-    else
-      case Repo.get(Event, event.id) |> Repo.preload(associations) do
-        nil -> raise ArgumentError, "Event not found: #{event.id}"
-        loaded -> loaded
-      end
+    missing =
+      Enum.reject(associations, &Ecto.assoc_loaded?(Map.fetch!(event, &1)))
+
+    case missing do
+      [] -> event
+      _ -> Repo.preload(event, event_email_preload_spec(missing))
     end
   end
 
-  @doc """
-  Ensures a booking exists and has `associations` loaded.
+  defp event_email_preload_spec(associations) do
+    Enum.map(associations, fn
+      :organizer -> {:organizer, event_email_organizer_query()}
+      other -> other
+    end)
+  end
 
-  Raises `ArgumentError` when the booking is nil, missing an id, is not found,
-  or has a nil `:user` when `:user` is among the associations.
+  defp event_email_organizer_query do
+    from(u in User, select: struct(u, ^@event_email_organizer_fields))
+  end
+
+  @doc """
+  Ensures a booking has `associations` loaded.
+
+  Raises `ArgumentError` when the booking is nil, missing an id, or has a nil
+  `:user` when `:user` is among the associations.
+
+  Does not re-`Repo.get` the booking row — that would re-SELECT
+  `hashed_password` / `board_bio` even when `:user` is already in memory.
+  Missing associations are loaded with `Repo.preload/2`.
 
   Defaults to `[:user]`. Pass `[:user, :rooms]` for emails that list room names.
   """
@@ -380,14 +399,13 @@ defmodule YscWeb.Emails.Helpers do
   def ensure_booking(%Booking{} = booking, associations)
       when is_list(associations) do
     booking =
-      if Enum.all?(associations, &Ecto.assoc_loaded?(Map.fetch!(booking, &1))) do
-        booking
-      else
-        case Repo.get(Booking, booking.id) |> Repo.preload(associations) do
-          nil -> raise ArgumentError, "Booking not found: #{booking.id}"
-          loaded -> loaded
+      Enum.reduce(associations, booking, fn assoc, acc ->
+        if Ecto.assoc_loaded?(Map.fetch!(acc, assoc)) do
+          acc
+        else
+          Repo.preload(acc, assoc)
         end
-      end
+      end)
 
     if :user in associations and is_nil(booking.user) do
       raise ArgumentError, "Booking missing user association: #{booking.id}"

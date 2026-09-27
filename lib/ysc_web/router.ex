@@ -235,6 +235,7 @@ defmodule YscWeb.Router do
     get "/up/dbs", UpController, :databases
 
     live_session :mount_site_settings,
+      session: {YscWeb.ClientIP, :live_session, []},
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.Plugs.TimeZone, :assign_timezone},
@@ -318,6 +319,7 @@ defmodule YscWeb.Router do
     ]
 
     live_session :redirect_if_user_is_authenticated,
+      session: {YscWeb.ClientIP, :live_session, []},
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.Plugs.TimeZone, :assign_timezone},
@@ -405,6 +407,7 @@ defmodule YscWeb.Router do
     ]
 
     live_session :password_reset,
+      session: {YscWeb.ClientIP, :live_session, []},
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
         {YscWeb.Plugs.TimeZone, :assign_timezone},

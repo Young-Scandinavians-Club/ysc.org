@@ -16,6 +16,20 @@ defmodule YscWeb.Emails.HelpersBookingTest do
       assert Helpers.ensure_booking(booking) == booking
     end
 
+    test "does not re-select the booking row when associations are already loaded" do
+      user = user_fixture()
+      booking = booking_fixture(%{user_id: user.id}) |> Repo.preload([:user])
+
+      {_result, booking_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Helpers.ensure_booking(booking) end,
+          pattern: ~r/FROM "bookings"/i,
+          caller_pids: [self()]
+        )
+
+      assert booking_selects == 0
+    end
+
     test "loads user when it is not loaded" do
       user = user_fixture()
       booking = booking_fixture(%{user_id: user.id})
@@ -50,14 +64,27 @@ defmodule YscWeb.Emails.HelpersBookingTest do
       end
     end
 
-    test "raises when the booking row no longer exists" do
+    test "preloads from in-memory foreign keys when the booking row was deleted" do
       user = user_fixture()
       booking = booking_fixture(%{user_id: user.id})
       Repo.delete!(booking)
 
-      assert_raise ArgumentError, "Booking not found: #{booking.id}", fn ->
-        Helpers.ensure_booking(booking)
-      end
+      loaded = Helpers.ensure_booking(booking)
+
+      assert Ecto.assoc_loaded?(loaded.user)
+      assert loaded.user.id == user.id
+    end
+
+    test "raises when the user association is nil" do
+      user = user_fixture()
+      booking = booking_fixture(%{user_id: user.id}) |> Repo.preload([:user])
+      booking = %{booking | user: nil}
+
+      assert_raise ArgumentError,
+                   "Booking missing user association: #{booking.id}",
+                   fn ->
+                     Helpers.ensure_booking(booking)
+                   end
     end
   end
 end

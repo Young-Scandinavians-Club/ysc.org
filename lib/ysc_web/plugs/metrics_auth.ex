@@ -6,10 +6,9 @@ defmodule YscWeb.Plugs.MetricsAuth do
   (e.g. Fly.io private network 172.16.0.0/12 and fdaa::/16). In development, all requests are allowed.
   Returns 404 for disallowed IPs to avoid leaking that the endpoint exists.
 
-  `conn.remote_ip` is set by `plug RemoteIp` in `YscWeb.Endpoint` so it reflects the
-  end client when the deployment terminates TLS and forwards `X-Forwarded-For` correctly
-  (e.g. behind Fly, Cloudflare). If metrics were reachable from the public IP, re-check
-  proxy/trusted-IP settings for your host.
+  `conn.remote_ip` is set by `YscWeb.Plugs.ClientIP` in `YscWeb.Endpoint`: requests via
+  Fly Proxy carry the public client address from `Fly-Client-IP`, while scrapes over
+  Fly's private network have no such header and keep their private peer address.
   """
   import Bitwise
   import Plug.Conn

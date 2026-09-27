@@ -46,8 +46,11 @@ defmodule Ysc.Bookings.BookingLocker do
     Room
   }
 
+  alias Ysc.Accounts.User
   alias Ysc.Bookings
   alias Ysc.Tickets.CheckoutCancel
+
+  @booking_email_room_fields [:id, :name]
 
   @hold_duration_minutes 30
 
@@ -2018,10 +2021,9 @@ defmodule Ysc.Bookings.BookingLocker do
     require Ysc.Logging
 
     try do
-      # Reload booking with associations
-      booking =
-        Repo.get(Ysc.Bookings.Booking, booking.id)
-        |> Repo.preload([:user, :rooms])
+      # Callers already load rooms (confirm) or rooms+user (admin create).
+      # Only preload what is still missing — never `Repo.get` the booking again.
+      booking = ensure_booking_assocs(booking, [:user, :rooms])
 
       if booking && booking.user do
         # Prepare email data
@@ -2647,10 +2649,13 @@ defmodule Ysc.Bookings.BookingLocker do
               |> DateTime.add(hold_minutes, :minute)
               |> DateTime.truncate(:second)
 
-            # Rebuilds attrs from the new dates. Does not keep
-            # `payment_intent_id` from a prior hold — callers that might
-            # replace a paid hold must Stripe-reconcile first
-            # (`BookingChangeLive.proceed_after_modification_details/3`).
+            # Rebuilds attrs from the new dates. Keeps any previously stored
+            # `payment_intent_id` so a concurrent tab cannot wipe the id that
+            # HoldExpiryWorker / remount-resubmit reconcile against. Callers
+            # that replace a paid hold must still Stripe-reconcile first
+            # (`BookingChangeLive.proceed_after_modification_details/3`);
+            # `attach_modification_payment_intent/2` cancels the previous
+            # Intent before overwriting.
             hold_attrs =
               encode_modification_hold_attrs(booking, attrs, hold_data, opts)
 
@@ -2974,6 +2979,15 @@ defmodule Ysc.Bookings.BookingLocker do
       "overlap_extra_guests" => overlap_extra_guests,
       "booking_mode" => Atom.to_string(booking.booking_mode)
     }
+
+    base =
+      case Bookings.modification_hold_payment_intent_id(booking) do
+        payment_intent_id when is_binary(payment_intent_id) ->
+          Map.put(base, "payment_intent_id", payment_intent_id)
+
+        _ ->
+          base
+      end
 
     case Keyword.get(opts, :guest_params) do
       guest_params when is_map(guest_params) and map_size(guest_params) > 0 ->
@@ -4044,15 +4058,51 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   defp ensure_booking_assocs(%Booking{} = booking, assocs) do
-    needed =
-      Enum.reject(assocs, fn assoc ->
-        Ecto.assoc_loaded?(Map.fetch!(booking, assoc))
-      end)
+    Enum.reduce(assocs, booking, fn
+      :user, acc -> ensure_booking_email_user(acc)
+      :rooms, acc -> ensure_booking_email_rooms(acc)
+    end)
+  end
 
-    case needed do
-      [] -> booking
-      _ -> Repo.preload(booking, needed)
+  # Direct SELECT of identity columns — `Repo.preload/2` custom queries still
+  # emit `hashed_password` / `board_bio` in some Ecto preload plans.
+  defp ensure_booking_email_user(%Booking{} = booking) do
+    if Ecto.assoc_loaded?(booking.user) do
+      booking
+    else
+      user =
+        from(u in User,
+          where: u.id == ^booking.user_id,
+          select: {u.id, u.email, u.first_name, u.last_name}
+        )
+        |> Repo.one()
+        |> booking_email_user_struct()
+
+      %{booking | user: user}
     end
+  end
+
+  defp booking_email_user_struct(nil), do: nil
+
+  defp booking_email_user_struct({id, email, first_name, last_name}) do
+    %User{
+      id: id,
+      email: email,
+      first_name: first_name,
+      last_name: last_name
+    }
+  end
+
+  defp ensure_booking_email_rooms(%Booking{} = booking) do
+    if Ecto.assoc_loaded?(booking.rooms) do
+      booking
+    else
+      Repo.preload(booking, rooms: booking_email_rooms_query())
+    end
+  end
+
+  defp booking_email_rooms_query do
+    from(r in Room, select: struct(r, ^@booking_email_room_fields))
   end
 
   @doc """

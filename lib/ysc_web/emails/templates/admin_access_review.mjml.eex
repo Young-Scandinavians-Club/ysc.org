@@ -1,0 +1,48 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding="48px 48px 24px 48px">
+  <mj-column padding="0">
+    <mj-text color="#000000" font-size="28px" line-height="1.25" padding="0px">
+      <strong>Annual Access Review <%= @year %></strong>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text font-size="16px" line-height="1.5" color="#3f3f46" padding="0px">
+      These accounts currently have admin or volunteer access to the YSC website. Please review the list and revoke access for anyone who has left the board or no longer needs it by changing their role to Member.
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text font-size="16px" color="#3f3f46" padding="0px">
+      <strong><%= @admin_count %></strong> admins · <strong><%= @volunteer_count %></strong> volunteers
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<%= if @has_users do %>
+<%= for user <- @users do %>
+<mj-section background-color="#fff" padding="0px 48px 12px 48px">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="15px" line-height="1.5" padding="14px 16px" color="#334155" container-background-color="#f8fafc">
+      <strong style="font-size: 16px; color: #0f172a;"><%= user[:name] %></strong> · <%= user[:role] %><br />
+      <a href="mailto:<%= user[:email] %>" style="color: #64748b; word-break: break-all;"><%= user[:email] %></a><br />
+      Board position: <%= user[:board_position] %><br />
+      Account status: <%= user[:state] %><br />
+      Last sign-in: <%= user[:last_sign_in] %><br />
+      <a href="<%= user[:edit_url] %>" style="color: #1447e6; text-decoration: underline;">Edit user →</a>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<% end %>
+<% else %>
+<mj-section background-color="#fff" padding="0px 48px 12px 48px">
+  <mj-column padding="0">
+    <mj-text font-size="15px" color="#52525b" padding="0px">
+      No accounts currently have admin or volunteer access.
+    </mj-text>
+  </mj-column>
+</mj-section>
+<% end %>
+
+<mj-section background-color="#fff" padding="24px 48px 48px 48px">
+  <mj-column padding="0">
+    <mj-button href="<%= @admin_users_url %>" background-color="#1447e6" color="#ffffff" align="center" font-size="16px" border-radius="4px" inner-padding="12px 24px">
+      Open User Admin →
+    </mj-button>
+  </mj-column>
+</mj-section>

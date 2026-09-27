@@ -2630,13 +2630,17 @@ defmodule YscWeb.TahoeBookingLive do
                           </div>
                         </div>
                         <div class="flex justify-between text-sm">
-                          <span class="text-zinc-600">
+                          <span id="tahoe-base-price-people" class="text-zinc-600">
                             Base Price
                             <%= if @price_breakdown.nights && @price_breakdown[:adult_price_per_night] do %>
-                              <% adult_count =
+                              <% billable_people =
                                 @price_breakdown[:billable_people] ||
                                   @price_breakdown[:guests_count] ||
-                                  0 %> ({BookingDisplay.adults_label(adult_count)} × {BookingDisplay.nights_label(
+                                  0 %>
+                              <% guests_count = @price_breakdown[:guests_count] || 0 %> ({YscWeb.BookingUserMessages.room_base_price_people_label(
+                                billable_people,
+                                guests_count
+                              )} × {BookingDisplay.nights_label(
                                 @price_breakdown.nights
                               )})
                             <% end %>
@@ -3565,7 +3569,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </h2>
                     </div>
                     <p class="text-blue-100 mb-6 leading-relaxed">
-                      Sent via email <strong>{YscWeb.BookingUserMessages.door_code_email_timing_phrase()}</strong>, and shown on your booking confirmation page within 48 hours of check-in or while your stay is active.
+                      {YscWeb.BookingUserMessages.cabin_access_info_tab_body()}
                     </p>
                     <div class="bg-blue-700/50 border border-white/10 rounded-xl p-4 text-sm">
                       <p class="font-semibold text-blue-50 mb-2">Important:</p>

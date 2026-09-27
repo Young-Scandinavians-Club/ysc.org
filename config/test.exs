@@ -142,6 +142,9 @@ config :ysc,
 config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
 config :ysc, Ysc.MobileAPIRateLimit, ip_limit: 10_000
 
+# Every LiveView test submits from 127.0.0.1; tests that exercise the limit use a unique IP.
+config :ysc, Ysc.RegistrationRateLimit, ip_limit: 10_000
+
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 

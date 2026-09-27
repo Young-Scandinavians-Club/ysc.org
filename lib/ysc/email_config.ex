@@ -55,6 +55,13 @@ defmodule Ysc.EmailConfig do
   end
 
   @doc """
+  Returns the WebTech team email address.
+  """
+  def webtech_email do
+    Application.get_env(:ysc, :emails)[:webtech_email] || "webtech@ysc.org"
+  end
+
+  @doc """
   Returns the Tahoe cabin email address.
   """
   def tahoe_email do

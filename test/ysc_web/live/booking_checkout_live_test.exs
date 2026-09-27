@@ -655,6 +655,67 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
 
+    test "price details charge for minimum guests, not extra adults", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, category} =
+        %RoomCategory{}
+        |> RoomCategory.changeset(%{
+          name: "Min Occ Copy Cat #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Min Occ Copy Room #{System.unique_integer([:positive])}",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4,
+          min_billable_occupancy: 2
+        })
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      assert {:ok, booking} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 1,
+                 children_count: 0
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      html = render(view)
+
+      assert html =~ "1 adult"
+      refute has_element?(view, "#checkout-base-price-people", "2 adults")
+
+      assert has_element?(
+               view,
+               "#checkout-base-price-people",
+               "charged for 2 guests"
+             )
+
+      assert has_element?(
+               view,
+               "#checkout-minimum-pricing-applied",
+               "You're being charged for 2 guests"
+             )
+    end
+
     test "creates payment intent idempotency key from synced checkout price", %{
       conn: conn,
       user: user

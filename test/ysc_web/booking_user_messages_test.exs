@@ -123,6 +123,13 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert applied =~ "You're being charged for 2 guests"
     assert applied =~ "2-guest minimum price"
     refute applied =~ "occupancy"
+
+    assert BookingUserMessages.room_base_price_people_label(2, 1) ==
+             "charged for 2 guests"
+
+    assert BookingUserMessages.room_base_price_people_label(2, 2) == "2 adults"
+    assert BookingUserMessages.room_base_price_people_label(1, 1) == "1 adult"
+    refute BookingUserMessages.room_base_price_people_label(2, 1) =~ "adult"
   end
 
   test "checkout step copy" do
@@ -166,7 +173,38 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.cabin_access_receipt_body() =~
              BookingUserMessages.door_code_email_timing_phrase()
 
+    assert BookingUserMessages.cabin_access_receipt_body() =~
+             "48 hours before check-in"
+
+    assert BookingUserMessages.cabin_access_receipt_body() =~
+             "top of this page"
+
     refute BookingUserMessages.cabin_access_receipt_body() =~ "24 hours"
+    refute BookingUserMessages.cabin_access_receipt_body() =~ "within 48 hours"
+
+    assert BookingUserMessages.cabin_access_receipt_body_when_visible() =~
+             "at the top of this page"
+
+    refute BookingUserMessages.cabin_access_receipt_body_when_visible() =~
+             "within 48 hours"
+
+    assert BookingUserMessages.cabin_access_info_link_label() ==
+             "How cabin access works"
+
+    refute BookingUserMessages.cabin_access_info_link_label() =~
+             "Door Code Info"
+
+    assert BookingUserMessages.cabin_access_info_tab_body() =~
+             BookingUserMessages.door_code_email_timing_phrase()
+
+    assert BookingUserMessages.cabin_access_info_tab_body() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    assert BookingUserMessages.cabin_access_info_tab_body() =~
+             "booking confirmation page"
+
+    refute BookingUserMessages.cabin_access_info_tab_body() =~ "within 48 hours"
+    refute BookingUserMessages.cabin_access_info_tab_body() =~ "24 hours"
 
     assert BookingUserMessages.checkout_manage_booking_step() =~
              "My Bookings & Payments"
@@ -279,6 +317,12 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.checkout_payment_confirmation_failed() =~
              "not charged twice"
+
+    assert BookingUserMessages.checkout_payment_confirmation_failed() =~
+             "If you see a charge,"
+
+    refute BookingUserMessages.checkout_payment_confirmation_failed() =~
+             "on your card"
 
     refute BookingUserMessages.checkout_payment_confirmation_failed() =~
              "contact us"

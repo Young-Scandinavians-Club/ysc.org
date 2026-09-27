@@ -162,6 +162,19 @@ defmodule YscWeb.PaymentSuccessLive do
              )
              |> redirect(to: redirect_path)}
 
+          {:fulfilled, redirect_path} ->
+            {:ok, redirect(socket, to: redirect_path)}
+
+          {:in_progress, redirect_path} ->
+            {:ok,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Your payment is still processing. If you were charged, your tickets will appear shortly. Please don't pay again.",
+               title: "Payment"
+             )
+             |> redirect(to: redirect_path)}
+
           {:error, reason} ->
             Ysc.Logging.error("Failed to redirect from payment failure",
               payment_intent_id: payment_intent_id,
@@ -379,6 +392,13 @@ defmodule YscWeb.PaymentSuccessLive do
                   :ok ->
                     {:ok, ~p"/events/#{event_id}?payment_failed=1"}
 
+                  {:fulfilled, ticket_order} ->
+                    {:fulfilled,
+                     ~p"/orders/#{ticket_order.id}/confirmation?confetti=true"}
+
+                  :in_progress ->
+                    {:in_progress, ~p"/events/#{event_id}"}
+
                   {:error, reason} ->
                     {:error, {:ticket_order_release_failed, reason}}
                 end
@@ -435,8 +455,14 @@ defmodule YscWeb.PaymentSuccessLive do
            payment_intent_id,
            cancellation_reason
          ) do
+      {:ok, %{status: :completed} = ticket_order} ->
+        {:fulfilled, ticket_order}
+
       {:ok, _ticket_order} ->
         :ok
+
+      {:error, :checkout_payment_in_progress} ->
+        :in_progress
 
       {:error, reason} ->
         Ysc.Logging.warning(

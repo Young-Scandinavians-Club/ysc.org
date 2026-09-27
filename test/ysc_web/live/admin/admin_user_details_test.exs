@@ -1032,6 +1032,44 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     end
   end
 
+  describe "application tab reviewed by" do
+    test "shows the reviewer with a link to their user page",
+         %{conn: conn, user: admin} do
+      user = user_fixture(%{state: :active})
+
+      signup_application_fixture(user, %{
+        review_outcome: "approved",
+        reviewed_at: DateTime.utc_now(),
+        reviewed_by_user_id: admin.id
+      })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
+
+      assert has_element?(view, "#admin-application-reviewed-by", admin.email)
+
+      assert has_element?(
+               view,
+               ~s|#admin-application-reviewed-by-link[href="/admin/users/#{admin.id}/details"]|
+             )
+    end
+
+    test "hides the reviewer section for unreviewed applications",
+         %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval})
+      signup_application_fixture(user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
+
+      refute has_element?(view, "#admin-application-reviewed-by")
+    end
+  end
+
   describe "rejection override - application tab display" do
     test "shows override banner on application tab when rejection was overridden",
          %{conn: conn, user: admin} do

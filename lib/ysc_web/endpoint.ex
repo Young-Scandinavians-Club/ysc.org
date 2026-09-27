@@ -108,7 +108,8 @@ defmodule YscWeb.Endpoint do
     url_scrubber: {Ysc.SentryScrubber, :scrub_url},
     body_scrubber: {Ysc.SentryScrubber, :scrub_params}
 
-  plug RemoteIp
+  # Real client IP behind Fly Proxy / Cloudflare (see YscWeb.ClientIP)
+  plug YscWeb.Plugs.ClientIP
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
