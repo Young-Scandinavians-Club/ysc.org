@@ -1402,6 +1402,15 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                )
     end
 
+    test "create_invite/3 ignores a family_member_id that is not a ULID" do
+      primary_user = create_user_with_lifetime_membership()
+
+      assert {:ok, _invite} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 family_member_id: "not-a-ulid"
+               )
+    end
+
     test "create_invite/3 allows an adult spouse" do
       primary_user = create_user_with_lifetime_membership()
 

@@ -288,6 +288,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       assert has_element?(view, "#adult-child-blocked-notice")
       refute has_element?(view, "button", "Join Family Membership")
+
+      # A crafted link_existing event (button is hidden) is still refused.
+      render_hook(view, "link_existing", %{})
+
+      assert is_nil(
+               Repo.get!(Ysc.Accounts.User, invited_user.id).primary_user_id
+             )
     end
   end
 

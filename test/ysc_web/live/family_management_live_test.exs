@@ -293,6 +293,17 @@ defmodule YscWeb.FamilyManagementLiveTest do
       render_hook(view, "open_invite_modal", %{"id" => member.id})
 
       refute has_element?(view, "#invite-family-member-modal")
+
+      # A crafted submit (button is hidden) is still refused by the context.
+      render_hook(view, "invite_family_member", %{
+        "invite" => %{
+          "email" => unique_user_email(),
+          "family_member_id" => member.id
+        }
+      })
+
+      refute has_element?(view, "#pending-invites-table")
+      assert FamilyInvites.list_invites(user) == []
     end
 
     test "adult spouse can still be invited", %{conn: conn} do
