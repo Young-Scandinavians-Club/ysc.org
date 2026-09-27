@@ -9,9 +9,14 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, member_greeting_name: 1, format_date: 1]
+    only: [
+      booking_receipt_url: 1,
+      ensure_booking: 2,
+      member_greeting_name: 1,
+      format_date: 1,
+      property_as_string: 1
+    ]
 
-  alias Ysc.Repo
   alias Ysc.Bookings.{CabinMaster, PropertyDisplay}
   alias YscWeb.BookingDisplay
 
@@ -23,9 +28,7 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
     "Leaving tomorrow — cabin check-out reminder 🏡"
   end
 
-  def booking_url(booking_id) do
-    absolute_url("/bookings/#{booking_id}/receipt")
-  end
+  def booking_url(booking_id), do: booking_receipt_url(booking_id)
 
   @doc """
   Prepares booking checkout reminder email data.
@@ -37,59 +40,15 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
   - Map with all necessary data for the email template
   """
   def prepare_email_data(booking) do
-    # Validate input
-    if is_nil(booking) do
-      raise ArgumentError, "Booking cannot be nil"
-    end
-
-    if is_nil(booking.id) do
-      raise ArgumentError, "Booking missing id: #{inspect(booking)}"
-    end
-
-    # Ensure we have all necessary preloaded data
-    booking =
-      if Ecto.assoc_loaded?(booking.user) && Ecto.assoc_loaded?(booking.rooms) do
-        booking
-      else
-        case Repo.get(Ysc.Bookings.Booking, booking.id)
-             |> Repo.preload([:user, :rooms]) do
-          nil ->
-            raise ArgumentError, "Booking not found: #{booking.id}"
-
-          loaded_booking ->
-            loaded_booking
-        end
-      end
-
-    # Validate required associations
-    if is_nil(booking.user) do
-      raise ArgumentError, "Booking missing user association: #{booking.id}"
-    end
-
-    # Get property information
-    property_name = PropertyDisplay.short_name(booking.property)
-    property_address = PropertyDisplay.address(booking.property)
-
+    booking = ensure_booking(booking, [:user, :rooms])
     contact = CabinMaster.contact(booking.property)
-
-    # Format dates
-    checkout_date = format_date(booking.checkout_date)
-
-    # Normalize property to string for consistent comparison in templates
-    # Email templates may serialize atoms to strings, so we normalize here
-    property_string =
-      case booking.property do
-        atom when is_atom(atom) -> Atom.to_string(atom)
-        string when is_binary(string) -> string
-        _ -> to_string(booking.property)
-      end
 
     %{
       first_name: member_greeting_name(booking.user),
-      property: property_string,
-      property_name: property_name,
-      property_address: property_address,
-      checkout_date: checkout_date,
+      property: property_as_string(booking.property),
+      property_name: PropertyDisplay.short_name(booking.property),
+      property_address: PropertyDisplay.address(booking.property),
+      checkout_date: format_date(booking.checkout_date),
       checkout_time: BookingDisplay.checkout_time_label(),
       booking_reference_id: booking.reference_id,
       cabin_master_name: contact.name,

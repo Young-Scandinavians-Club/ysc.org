@@ -14,7 +14,8 @@ defmodule YscWeb.Emails.TahoeWinterWeekendAvailable do
   import YscWeb.Emails.Helpers,
     only: [
       member_greeting_name: 1,
-      tahoe_booking_url: 0
+      tahoe_booking_url: 0,
+      format_weekend_range: 2
     ]
 
   def get_template_name, do: "tahoe_winter_weekend_available"
@@ -36,9 +37,5 @@ defmodule YscWeb.Emails.TahoeWinterWeekendAvailable do
       weekend_range: format_weekend_range(weekend_checkin, weekend_checkout),
       booking_url: tahoe_booking_url()
     }
-  end
-
-  defp format_weekend_range(checkin, checkout) do
-    "#{Calendar.strftime(checkin, "%A, %B %-d")} – #{Calendar.strftime(checkout, "%A, %B %-d, %Y")}"
   end
 end

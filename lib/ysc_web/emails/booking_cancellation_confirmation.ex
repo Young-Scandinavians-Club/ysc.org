@@ -10,15 +10,14 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
 
   import YscWeb.Emails.Helpers,
     only: [
-      absolute_url: 1,
+      booking_receipt_url: 1,
+      ensure_booking: 1,
       member_greeting_name: 1,
       format_date: 1,
       format_datetime: 1,
       format_money: 1
     ]
 
-  alias Ysc.Repo
-  alias Ysc.Bookings.Booking
   alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name() do
@@ -29,9 +28,7 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
     "Your booking is cancelled"
   end
 
-  def booking_url(booking_id) do
-    absolute_url("/bookings/#{booking_id}/receipt")
-  end
+  def booking_url(booking_id), do: booking_receipt_url(booking_id)
 
   @doc """
   Prepares booking cancellation confirmation email data.
@@ -53,7 +50,7 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
         is_pending_refund \\ false,
         reason \\ nil
       ) do
-    booking = validate_and_load_booking(booking)
+    booking = ensure_booking(booking)
     formatted_dates = format_booking_dates(booking)
     formatted_amounts = format_payment_amounts(payment, refund_amount)
     property_name = PropertyDisplay.short_name(booking.property)
@@ -67,34 +64,6 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
       is_pending_refund,
       reason
     )
-  end
-
-  defp validate_and_load_booking(booking) do
-    if is_nil(booking) do
-      raise ArgumentError, "Booking cannot be nil"
-    end
-
-    booking = ensure_user_loaded(booking)
-
-    if is_nil(booking.user) do
-      raise ArgumentError, "Booking missing user association: #{booking.id}"
-    end
-
-    booking
-  end
-
-  defp ensure_user_loaded(booking) do
-    if Ecto.assoc_loaded?(booking.user) do
-      booking
-    else
-      case Repo.get(Booking, booking.id) |> Repo.preload(:user) do
-        nil ->
-          raise ArgumentError, "Booking not found: #{booking.id}"
-
-        loaded_booking ->
-          loaded_booking
-      end
-    end
   end
 
   defp format_booking_dates(booking) do

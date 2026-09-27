@@ -11,7 +11,8 @@ defmodule YscWeb.Emails.BookingRefundPending do
 
   import YscWeb.Emails.Helpers,
     only: [
-      absolute_url: 1,
+      booking_receipt_url: 1,
+      ensure_booking: 1,
       member_greeting_name: 1,
       format_date: 1,
       format_datetime: 1,
@@ -28,9 +29,7 @@ defmodule YscWeb.Emails.BookingRefundPending do
     "We're reviewing your cabin booking refund"
   end
 
-  def booking_url(booking_id) do
-    absolute_url("/bookings/#{booking_id}/receipt")
-  end
+  def booking_url(booking_id), do: booking_receipt_url(booking_id)
 
   @doc """
   Prepares booking refund pending email data.
@@ -44,35 +43,11 @@ defmodule YscWeb.Emails.BookingRefundPending do
   - Map with all necessary data for the email template
   """
   def prepare_email_data(pending_refund, booking, payment) do
-    # Validate input
     if is_nil(pending_refund) do
       raise ArgumentError, "Pending refund cannot be nil"
     end
 
-    if is_nil(booking) do
-      raise ArgumentError, "Booking cannot be nil"
-    end
-
-    # Ensure we have all necessary preloaded data
-    # Reload booking with user association if not already loaded
-    booking =
-      if Ecto.assoc_loaded?(booking.user) do
-        booking
-      else
-        case Ysc.Repo.get(Ysc.Bookings.Booking, booking.id)
-             |> Ysc.Repo.preload(:user) do
-          nil ->
-            raise ArgumentError, "Booking not found: #{booking.id}"
-
-          loaded_booking ->
-            loaded_booking
-        end
-      end
-
-    # Validate required associations
-    if is_nil(booking.user) do
-      raise ArgumentError, "Booking missing user association: #{booking.id}"
-    end
+    booking = ensure_booking(booking)
 
     # Format dates
     checkin_date = format_date(booking.checkin_date)

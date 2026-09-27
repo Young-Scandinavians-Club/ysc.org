@@ -62,7 +62,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
     end
 
     test "raises when booking is nil" do
-      assert_raise ArgumentError, ~r/Booking with user is required/, fn ->
+      assert_raise ArgumentError, ~r/Booking cannot be nil/, fn ->
         Ysc.Test.Invoke.call(
           BookingModificationConfirmation,
           :prepare_email_data,

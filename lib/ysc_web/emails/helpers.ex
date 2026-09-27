@@ -1,14 +1,15 @@
 defmodule YscWeb.Emails.Helpers do
   @moduledoc """
   Shared helpers for MJML email modules: public URLs, salutation names,
-  event cover images / association preloading, and display formatting
-  for money and dates.
+  event cover images / association preloading, booking payload loading,
+  and display formatting for money and dates.
   """
 
   import Ecto.Query, warn: false
 
   alias HtmlSanitizeEx
   alias Ysc.Accounts.User
+  alias Ysc.Bookings.Booking
   alias Ysc.Events.Event
   alias Ysc.Media.Image
   alias Ysc.Repo
@@ -52,6 +53,16 @@ defmodule YscWeb.Emails.Helpers do
   end
 
   def member_greeting_name(_), do: @member_default
+
+  @doc """
+  Returns a trimmed `"First Last"` display name.
+
+  Used by staff-facing booking emails. Empty names collapse to `""`.
+  """
+  def member_full_name(%{} = user) do
+    "#{Map.get(user, :first_name) || ""} #{Map.get(user, :last_name) || ""}"
+    |> String.trim()
+  end
 
   @doc """
   Returns a first name for attendee-facing greetings (ticket holders).
@@ -102,6 +113,34 @@ defmodule YscWeb.Emails.Helpers do
   Absolute URL for Tahoe cabin booking.
   """
   def tahoe_booking_url, do: absolute_url("/bookings/tahoe")
+
+  @doc """
+  Absolute URL for a member booking receipt.
+  """
+  def booking_receipt_url(booking_id),
+    do: absolute_url("/bookings/#{booking_id}/receipt")
+
+  @doc """
+  Absolute URL for the admin booking detail page.
+  """
+  def admin_booking_url(booking_id),
+    do: absolute_url("/admin/bookings/#{booking_id}")
+
+  @doc """
+  Absolute URL for the admin pending-refunds list, filtered by property.
+  """
+  def admin_pending_refunds_url(property) do
+    property_param =
+      case property do
+        :tahoe -> "tahoe"
+        :clear_lake -> "clear_lake"
+        _ -> to_string(property)
+      end
+
+    absolute_url(
+      "/admin/bookings?section=pending_refunds&property=#{property_param}"
+    )
+  end
 
   @doc """
   Absolute URL for the member page where a card or bank account can be saved.
@@ -239,6 +278,13 @@ defmodule YscWeb.Emails.Helpers do
   def format_date(_, default), do: default
 
   @doc """
+  Formats a Friday→Sunday (or similar) stay as `"Friday, May 1 – Sunday, May 3, 2026"`.
+  """
+  def format_weekend_range(checkin, checkout) do
+    "#{Calendar.strftime(checkin, "%A, %B %-d")} – #{Calendar.strftime(checkout, "%A, %B %-d, %Y")}"
+  end
+
+  @doc """
   Formats a datetime in Pacific time for email copy.
 
   Returns `default` when the value is nil or not a datetime.
@@ -327,6 +373,62 @@ defmodule YscWeb.Emails.Helpers do
   defp event_email_organizer_query do
     from(u in User, select: struct(u, ^@event_email_organizer_fields))
   end
+
+  @doc """
+  Ensures a booking has `associations` loaded.
+
+  Raises `ArgumentError` when the booking is nil, missing an id, or has a nil
+  `:user` when `:user` is among the associations.
+
+  Does not re-`Repo.get` the booking row — that would re-SELECT
+  `hashed_password` / `board_bio` even when `:user` is already in memory.
+  Missing associations are loaded with `Repo.preload/2`.
+
+  Defaults to `[:user]`. Pass `[:user, :rooms]` for emails that list room names.
+  """
+  def ensure_booking(booking, associations \\ [:user])
+
+  def ensure_booking(nil, _associations) do
+    raise ArgumentError, "Booking cannot be nil"
+  end
+
+  def ensure_booking(%Booking{id: nil} = booking, _associations) do
+    raise ArgumentError, "Booking missing id: #{inspect(booking)}"
+  end
+
+  def ensure_booking(%Booking{} = booking, associations)
+      when is_list(associations) do
+    booking =
+      Enum.reduce(associations, booking, fn assoc, acc ->
+        if Ecto.assoc_loaded?(Map.fetch!(acc, assoc)) do
+          acc
+        else
+          Repo.preload(acc, assoc)
+        end
+      end)
+
+    if :user in associations and is_nil(booking.user) do
+      raise ArgumentError, "Booking missing user association: #{booking.id}"
+    end
+
+    booking
+  end
+
+  @doc """
+  Joins loaded booking room names, or `nil` when none are present.
+  """
+  def booking_room_names(%{rooms: rooms}) when is_list(rooms) and rooms != [] do
+    Enum.map_join(rooms, ", ", & &1.name)
+  end
+
+  def booking_room_names(_), do: nil
+
+  @doc """
+  Normalizes a booking property atom or string for MJML template comparison.
+  """
+  def property_as_string(atom) when is_atom(atom), do: Atom.to_string(atom)
+  def property_as_string(string) when is_binary(string), do: string
+  def property_as_string(other), do: to_string(other)
 
   @doc """
   Strips HTML tags and decodes entities for plain-text email copy.

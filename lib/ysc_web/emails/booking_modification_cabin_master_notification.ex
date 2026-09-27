@@ -10,10 +10,14 @@ defmodule YscWeb.Emails.BookingModificationCabinMasterNotification do
       "templates/booking_modification_cabin_master_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, format_date: 1]
+  import YscWeb.Emails.Helpers,
+    only: [
+      admin_booking_url: 1,
+      ensure_booking: 1,
+      format_date: 1,
+      member_full_name: 1
+    ]
 
-  alias Ysc.Repo
-  alias Ysc.Bookings.Booking
   alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name(), do: "booking_modification_cabin_master_notification"
@@ -32,32 +36,13 @@ defmodule YscWeb.Emails.BookingModificationCabinMasterNotification do
   - Map with all necessary data for the email template
   """
   def prepare_email_data(booking, previous_details) do
-    if is_nil(booking) do
-      raise ArgumentError, "Booking cannot be nil"
-    end
-
-    booking =
-      if Ecto.assoc_loaded?(booking.user) do
-        booking
-      else
-        case Repo.get(Booking, booking.id) |> Repo.preload(:user) do
-          nil -> raise ArgumentError, "Booking not found: #{booking.id}"
-          loaded_booking -> loaded_booking
-        end
-      end
-
-    if is_nil(booking.user) do
-      raise ArgumentError, "Booking missing user association: #{booking.id}"
-    end
-
+    booking = ensure_booking(booking)
     previous = normalize_previous_details(previous_details)
-
-    property_name = PropertyDisplay.short_name(booking.property)
 
     %{
       booking: %{
         reference_id: booking.reference_id,
-        property: property_name,
+        property: PropertyDisplay.short_name(booking.property),
         checkin_date: format_date(booking.checkin_date),
         checkout_date: format_date(booking.checkout_date),
         guests_count: booking.guests_count,
@@ -76,12 +61,10 @@ defmodule YscWeb.Emails.BookingModificationCabinMasterNotification do
         previous.guests_count != booking.guests_count or
           previous.children_count != (booking.children_count || 0),
       user: %{
-        name:
-          "#{booking.user.first_name || ""} #{booking.user.last_name || ""}"
-          |> String.trim(),
+        name: member_full_name(booking.user),
         email: booking.user.email
       },
-      booking_url: booking_url(booking.id)
+      booking_url: admin_booking_url(booking.id)
     }
   end
 
@@ -97,9 +80,5 @@ defmodule YscWeb.Emails.BookingModificationCabinMasterNotification do
         Map.get(details, :children_count) || Map.get(details, "children_count") ||
           0
     }
-  end
-
-  defp booking_url(booking_id) do
-    absolute_url("/admin/bookings/#{booking_id}")
   end
 end

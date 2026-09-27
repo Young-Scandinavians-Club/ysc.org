@@ -10,10 +10,16 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, format_date: 1, format_datetime: 1, format_money: 1]
+    only: [
+      admin_booking_url: 1,
+      admin_pending_refunds_url: 1,
+      ensure_booking: 1,
+      format_date: 1,
+      format_datetime: 1,
+      format_money: 1,
+      member_full_name: 1
+    ]
 
-  alias Ysc.Repo
-  alias Ysc.Bookings.Booking
   alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name() do
@@ -28,18 +34,7 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
     end
   end
 
-  def admin_bookings_url(property) do
-    property_param =
-      case property do
-        :tahoe -> "tahoe"
-        :clear_lake -> "clear_lake"
-        _ -> to_string(property)
-      end
-
-    absolute_url(
-      "/admin/bookings?section=pending_refunds&property=#{property_param}"
-    )
-  end
+  def admin_bookings_url(property), do: admin_pending_refunds_url(property)
 
   @doc """
   Prepares booking cancellation treasurer notification email data.
@@ -59,29 +54,7 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
         pending_refund \\ nil,
         reason \\ nil
       ) do
-    # Validate input
-    if is_nil(booking) do
-      raise ArgumentError, "Booking cannot be nil"
-    end
-
-    # Ensure we have all necessary preloaded data
-    booking =
-      if Ecto.assoc_loaded?(booking.user) do
-        booking
-      else
-        case Repo.get(Booking, booking.id) |> Repo.preload(:user) do
-          nil ->
-            raise ArgumentError, "Booking not found: #{booking.id}"
-
-          loaded_booking ->
-            loaded_booking
-        end
-      end
-
-    # Validate required associations
-    if is_nil(booking.user) do
-      raise ArgumentError, "Booking missing user association: #{booking.id}"
-    end
+    booking = ensure_booking(booking)
 
     # Format dates
     checkin_date = format_date(booking.checkin_date)
@@ -115,9 +88,7 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
         children_count: booking.children_count || 0
       },
       user: %{
-        name:
-          "#{booking.user.first_name || ""} #{booking.user.last_name || ""}"
-          |> String.trim(),
+        name: member_full_name(booking.user),
         email: booking.user.email
       },
       cancellation: %{
@@ -153,11 +124,7 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
         ),
       requires_review: requires_review,
       review_url: review_url,
-      booking_url: booking_url(booking.id)
+      booking_url: admin_booking_url(booking.id)
     }
-  end
-
-  defp booking_url(booking_id) do
-    absolute_url("/admin/bookings/#{booking_id}")
   end
 end
