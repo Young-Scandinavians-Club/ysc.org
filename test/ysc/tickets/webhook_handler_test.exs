@@ -216,6 +216,16 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
            }}
         end)
 
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "canceled",
+             metadata: %{"ticket_order_id" => ticket_order.id}
+           }}
+        end)
+
         pin_stripe_mock!()
 
         assert :ok =
