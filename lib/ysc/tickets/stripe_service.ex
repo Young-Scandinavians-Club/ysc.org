@@ -214,8 +214,12 @@ defmodule Ysc.Tickets.StripeService do
 
   Callers with no inline retry UI (e.g. the dedicated payment-failure
   redirect page, where the customer is sent back to pick tickets again
-  rather than retry the same PaymentIntent) should leave this `false` to
-  keep releasing the order unconditionally, as before.
+  rather than retry the same PaymentIntent) should leave this `false`.
+  That path still cancels the local order so seats are freed, but it must
+  Stripe-cancel the PaymentIntent first: otherwise a redirect wallet
+  (Cash App, Amazon Pay, bank) can capture after `/payment/success` has
+  already released the cart, and `process_ticket_order_payment/2` will
+  not fulfill a `:cancelled` order.
 
   ## Parameters:
   - `payment_intent_id`: The Stripe payment intent ID
@@ -256,15 +260,11 @@ defmodule Ysc.Tickets.StripeService do
           {:ok, ticket_order}
 
         true ->
-          # Stripe (via this webhook) already decided this PaymentIntent's
-          # fate - a decline typically leaves it in requires_payment_method so
-          # the customer can retry with a different card against the same
-          # PaymentIntent. Skip the atomic Stripe-cancel reconciliation (that's
-          # only for closing the abandonment race) so we don't foreclose that
-          # retry; just cancel the local order.
-          Tickets.cancel_ticket_order(ticket_order, failure_reason,
-            reconcile_with_stripe: false
-          )
+          # The customer is not retrying this PaymentIntent inline (failure
+          # redirect, or Stripe has terminally canceled it). Cancel the
+          # Intent atomically before releasing seats so a later succeeded
+          # webhook cannot charge a cancelled cart.
+          Tickets.cancel_ticket_order(ticket_order, failure_reason)
       end
     end
   end

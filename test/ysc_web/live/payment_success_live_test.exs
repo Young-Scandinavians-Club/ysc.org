@@ -416,12 +416,93 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         })
 
       {:ok, order} =
-        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+        end)
+
+      cancel_timeout_jobs_for_order!(order.id)
 
       payment_intent_id = "pi_ticket_failed_#{order.id}"
 
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
       client_module =
-        stripe_client_module(%{"ticket_order_id" => order.id}, status: "failed")
+        stripe_client_module(%{"ticket_order_id" => order.id},
+          status: "requires_payment_method",
+          notify: self()
+        )
+
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        redirect =
+          conn
+          |> log_in_user(user)
+          |> live(
+            ~p"/payment/success?redirect_status=failed&payment_intent=#{payment_intent_id}"
+          )
+
+        {:ok, conn} = follow_redirect(redirect, conn)
+
+        assert_received {:cancel_payment_intent, ^payment_intent_id}
+        assert conn.request_path == "/events/#{event.id}"
+        assert conn.query_params["payment_failed"] == "1"
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Payment failed"
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "info@ysc.org"
+        assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :cancelled
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+      end
+    end
+
+    test "keeps the ticket order pending when failure redirect hits a processing PaymentIntent",
+         %{conn: conn} do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      {:ok, event} =
+        Ysc.Events.create_event(%{
+          title: "Processing payment event #{System.unique_integer()}",
+          description: "Test",
+          state: :published,
+          organizer_id: user_fixture().id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          max_attendees: 100,
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+        end)
+
+      cancel_timeout_jobs_for_order!(order.id)
+
+      payment_intent_id = "pi_ticket_processing_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      client_module =
+        stripe_client_module(%{"ticket_order_id" => order.id},
+          status: "processing"
+        )
 
       original_client = Application.get_env(:ysc, :stripe_client)
       Application.put_env(:ysc, :stripe_client, client_module)
@@ -437,10 +518,84 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         {:ok, conn} = follow_redirect(redirect, conn)
 
         assert conn.request_path == "/events/#{event.id}"
-        assert conn.query_params["payment_failed"] == "1"
-        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Payment failed"
-        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "info@ysc.org"
-        assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :cancelled
+        refute Map.has_key?(conn.query_params, "payment_failed")
+
+        assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
+                 "still processing"
+
+        assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :pending
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+      end
+    end
+
+    test "redirects to order confirmation when failure redirect finds a succeeded PaymentIntent",
+         %{conn: conn} do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      {:ok, event} =
+        Ysc.Events.create_event(%{
+          title: "Succeeded-on-failure event #{System.unique_integer()}",
+          description: "Test",
+          state: :published,
+          organizer_id: user_fixture().id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          max_attendees: 100,
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+        end)
+
+      cancel_timeout_jobs_for_order!(order.id)
+
+      payment_intent_id = "pi_ticket_failed_succeeded_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      client_module =
+        stripe_client_module(
+          %{"ticket_order_id" => order.id, "user_id" => user.id},
+          status: "succeeded",
+          amount_cents: 5000
+        )
+
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        redirect =
+          conn
+          |> log_in_user(user)
+          |> live(
+            ~p"/payment/success?redirect_status=failed&payment_intent=#{payment_intent_id}"
+          )
+
+        {:ok, conn} = follow_redirect(redirect, conn)
+
+        assert conn.request_path == "/orders/#{order.id}/confirmation"
+        assert conn.query_params["confetti"] == "true"
+
+        assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status ==
+                 :completed
       after
         Application.put_env(:ysc, :stripe_client, original_client)
       end
@@ -505,6 +660,14 @@ defmodule YscWeb.PaymentSuccessLiveTest do
     status = Keyword.get(opts, :status, "succeeded")
     amount_cents = Keyword.get(opts, :amount_cents)
     unique = System.unique_integer([:positive])
+
+    notify_name =
+      if Keyword.get(opts, :notify) do
+        name = :"payment_success_stripe_cancel_#{unique}"
+        Process.register(self(), name)
+        name
+      end
+
     module_name = Module.concat(__MODULE__, :"StripeClient#{unique}")
 
     Module.create(
@@ -514,11 +677,39 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         @metadata unquote(Macro.escape(metadata))
         @status unquote(status)
         @amount_cents unquote(amount_cents)
+        @notify unquote(notify_name)
 
         def create_payment_intent(_params, _opts),
           do: {:error, :not_implemented}
 
-        def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+        def cancel_payment_intent(id, _opts) do
+          if @notify do
+            send(@notify, {:cancel_payment_intent, id})
+          end
+
+          if @status in [
+               "succeeded",
+               "processing",
+               "requires_action",
+               "requires_confirmation"
+             ] do
+            {:error,
+             %Stripe.Error{
+               source: :stripe,
+               code: :payment_intent_unexpected_state,
+               message: "cannot cancel",
+               extra: %{}
+             }}
+          else
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: id,
+               metadata: @metadata,
+               status: "canceled"
+             }}
+          end
+        end
+
         def create_customer(_params), do: {:error, :not_implemented}
         def update_customer(_id, _params), do: {:error, :not_implemented}
         def retrieve_payment_method(_id), do: {:error, :not_implemented}
