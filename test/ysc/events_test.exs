@@ -4206,6 +4206,40 @@ defmodule Ysc.EventsTest do
       assert cancelled.state == :cancelled
     end
 
+    test "cancel_event enqueues a cancellation notice with a snapshot of ticket holders",
+         %{event: event} do
+      {:ok, published} = Events.publish_event(event)
+      tier = ticket_tier_fixture(%{event_id: published.id, type: :paid})
+
+      holder = user_fixture(%{first_name: "Astrid"})
+      insert_ticket!(published, tier, holder, :confirmed)
+      insert_ticket!(published, tier, user_fixture(), :expired)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, cancelled} = Events.cancel_event(published)
+
+        assert [job] =
+                 all_enqueued(
+                   worker: YscWeb.Workers.EventCancellationNotificationWorker
+                 )
+
+        assert job.args["event_id"] == cancelled.id
+        assert job.args["cancelled_at"]
+
+        assert job.args["recipients"] == [
+                 %{"email" => holder.email, "first_name" => "Astrid"}
+               ]
+
+        # Re-cancelling an already-cancelled event must not notify again.
+        assert {:ok, _} = Events.cancel_event(cancelled)
+
+        assert [_only_job] =
+                 all_enqueued(
+                   worker: YscWeb.Workers.EventCancellationNotificationWorker
+                 )
+      end)
+    end
+
     test "unpublish_event and cancel_event refuse volunteer acting_role", %{
       event: event
     } do
@@ -5653,5 +5687,20 @@ defmodule Ysc.EventsTest do
       assert %Ecto.Query{} =
                Events.ci_query_explain_event_stripe_fees_total_query()
     end
+  end
+
+  defp insert_ticket!(event, tier, user, status) do
+    %Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: event.id,
+      user_id: user.id,
+      ticket_tier_id: tier.id,
+      status: status,
+      expires_at:
+        DateTime.utc_now()
+        |> DateTime.add(1, :day)
+        |> DateTime.truncate(:second)
+    }
+    |> Repo.insert!()
   end
 end

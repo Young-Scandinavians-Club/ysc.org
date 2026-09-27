@@ -357,6 +357,18 @@
       upload_url: "http://localhost:4000/events/preview/photos",
       notification_settings_url: "http://localhost:4000/users/notifications"
     },
+    "event_cancellation_notification" => %{
+      first_name: "Astrid",
+      event: %{
+        title: "Midsummer Picnic",
+        location_name: "Golden Gate Park",
+        address: "123 Main St, San Francisco, CA"
+      },
+      event_date_time: "Jun 21, 2026 at 2:00 PM",
+      event_image_url: nil,
+      upcoming_events_url: "http://localhost:4000/events",
+      events_email: "events@ysc.org"
+    },
     "event_update_notification" => %{
       first_name: "Astrid",
       event: %{
