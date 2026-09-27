@@ -11,7 +11,7 @@ defmodule YscWeb.Emails.EventCancellationNotification do
       attendee_greeting_name: 1,
       event_cover_image_url: 1,
       format_event_start_datetime: 2,
-      preload_event_associations: 1,
+      preload_event_associations: 2,
       upcoming_events_url: 0
     ]
 
@@ -42,7 +42,7 @@ defmodule YscWeb.Emails.EventCancellationNotification do
   def prepare_shared_email_data(event) do
     if is_nil(event), do: raise(ArgumentError, "Event cannot be nil")
 
-    event = preload_event_associations(event)
+    event = preload_event_associations(event, [:cover_image])
 
     %{
       event: %{

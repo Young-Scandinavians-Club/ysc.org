@@ -20,6 +20,23 @@ defmodule YscWeb.Emails.HelpersEventAssociationsTest do
       assert Helpers.preload_event_associations(loaded) == loaded
     end
 
+    test "does not re-select the event row when associations are already loaded" do
+      organizer = user_fixture()
+      event = event_fixture(%{organizer_id: organizer.id})
+
+      loaded =
+        Repo.get!(Event, event.id) |> Repo.preload([:organizer, :cover_image])
+
+      {_result, event_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Helpers.preload_event_associations(loaded) end,
+          pattern: ~r/FROM "events"/i,
+          caller_pids: [self()]
+        )
+
+      assert event_selects == 0
+    end
+
     test "loads organizer and cover_image when they are not loaded" do
       organizer = user_fixture()
       event = event_fixture(%{organizer_id: organizer.id})
@@ -32,6 +49,28 @@ defmodule YscWeb.Emails.HelpersEventAssociationsTest do
       assert Ecto.assoc_loaded?(loaded.cover_image)
       assert loaded.organizer.id == organizer.id
       assert loaded.cover_image == nil
+    end
+
+    test "slims organizer to name columns without password hashes" do
+      organizer =
+        user_fixture(%{first_name: "Org", last_name: "Anizer"})
+        |> Ecto.Changeset.change(%{board_bio: "must not load this bio"})
+        |> Repo.update!()
+
+      event = event_fixture(%{organizer_id: organizer.id})
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Helpers.preload_event_associations(event) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert loaded.organizer.first_name == "Org"
+      assert loaded.organizer.last_name == "Anizer"
+      assert is_nil(loaded.organizer.hashed_password)
+      assert is_nil(loaded.organizer.board_bio)
     end
 
     test "loads only the requested associations" do
@@ -58,14 +97,15 @@ defmodule YscWeb.Emails.HelpersEventAssociationsTest do
       assert loaded.cover_image.id == image.id
     end
 
-    test "raises when the event row no longer exists" do
+    test "preloads from in-memory foreign keys when the event row was deleted" do
       organizer = user_fixture()
       event = event_fixture(%{organizer_id: organizer.id})
       Repo.delete!(event)
 
-      assert_raise ArgumentError, "Event not found: #{event.id}", fn ->
-        Helpers.preload_event_associations(event)
-      end
+      loaded = Helpers.preload_event_associations(event)
+
+      assert Ecto.assoc_loaded?(loaded.organizer)
+      assert loaded.organizer.id == organizer.id
     end
   end
 end

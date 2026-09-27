@@ -510,8 +510,38 @@ defmodule Ysc.Accounts do
              user_id: id
            }) do
       Repo.get_by!(SignupApplication, user_id: id)
-      |> Repo.preload(preloads)
+      |> preload_signup_application(preloads)
     end
+  end
+
+  # Reviewer card only needs name, email, country, and avatar thumbs — not
+  # password hashes, bios, or Stripe ids.
+  @signup_application_reviewer_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :most_connected_country,
+    :current_avatar_id
+  ]
+
+  defp preload_signup_application(application, reviewed_by: :current_avatar) do
+    Repo.preload(application,
+      reviewed_by: signup_application_reviewer_query()
+    )
+  end
+
+  defp preload_signup_application(application, preloads) do
+    Repo.preload(application, preloads)
+  end
+
+  defp signup_application_reviewer_query do
+    avatar_query = admin_list_avatar_preload_query()
+
+    from(u in User,
+      select: struct(u, ^@signup_application_reviewer_fields),
+      preload: [current_avatar: ^avatar_query]
+    )
   end
 
   ## User registration
@@ -1402,10 +1432,31 @@ defmodule Ysc.Accounts do
     from u in User, where: u.state == :pending_approval
   end
 
+  # Dashboard preview cards: name, default-avatar country, and application
+  # wait time / plan. Skip hashes, bios, and long-text application answers.
+  @pending_approval_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :state,
+    :most_connected_country,
+    :current_avatar_id,
+    :inserted_at
+  ]
+
   defp pending_approval_users_query do
-    pending_approval_users_base_query()
-    |> preload([:registration_form, :current_avatar])
-    |> order_by([u], asc: u.inserted_at, asc: u.id)
+    avatar_query = admin_list_avatar_preload_query()
+    form_query = admin_list_registration_form_query()
+
+    from(u in pending_approval_users_base_query(),
+      select: struct(u, ^@pending_approval_user_fields),
+      preload: [
+        current_avatar: ^avatar_query,
+        registration_form: ^form_query
+      ],
+      order_by: [asc: u.inserted_at, asc: u.id]
+    )
   end
 
   defp maybe_limit_pending_approval_users(query, nil), do: query
@@ -2853,8 +2904,14 @@ defmodule Ysc.Accounts do
   end
 
   # Helper function to preload only active subscriptions
+  # Inherited-membership lookup only needs the primary's id and lifetime
+  # timestamp; subscriptions are attached below.
+  @admin_list_primary_user_fields [:id, :lifetime_membership_awarded_at]
+
   defp preload_active_subscriptions(users) do
-    users = Repo.preload(users, :current_avatar)
+    users =
+      Repo.preload(users, current_avatar: admin_list_avatar_preload_query())
+
     user_ids = Enum.map(users, & &1.id)
 
     # Get active subscriptions for all users in one query
@@ -2882,7 +2939,11 @@ defmodule Ysc.Accounts do
       if primary_user_ids != [] do
         # Get primary users with their active subscriptions
         primary_users =
-          from(u in User, where: u.id in ^primary_user_ids) |> Repo.all()
+          from(u in User,
+            where: u.id in ^primary_user_ids,
+            select: struct(u, ^@admin_list_primary_user_fields)
+          )
+          |> Repo.all()
 
         # Get subscriptions for primary users
         primary_user_subscriptions =
@@ -3416,8 +3477,40 @@ defmodule Ysc.Accounts do
     %{meta | flop: updated_flop}
   end
 
+  # Applied column / dashboard wait time + plan. Skip long-text answers
+  # (`hear_about_the_club`, `link_to_scandinavia`, …) on every list page.
+  @admin_list_registration_form_fields [
+    :id,
+    :user_id,
+    :completed,
+    :reviewed_at,
+    :membership_type
+  ]
+
+  @admin_list_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+
   defp preload_registration_forms(users),
-    do: Repo.preload(users, :registration_form)
+    do:
+      Repo.preload(users,
+        registration_form: admin_list_registration_form_query()
+      )
+
+  defp admin_list_registration_form_query do
+    from(sa in SignupApplication,
+      select: struct(sa, ^@admin_list_registration_form_fields)
+    )
+  end
+
+  defp admin_list_avatar_preload_query do
+    from(a in Ysc.Avatars.Avatar, select: struct(a, ^@admin_list_avatar_fields))
+  end
 
   @doc """
   Marks a user's email as verified by setting the email_verified_at timestamp.
@@ -5155,6 +5248,21 @@ defmodule Ysc.Accounts do
       membership_ytd_windows(Ysc.Ci.QueryExplain.Fixtures.now())
 
     membership_renewals_ytd_query(current_start, current_end)
+  end
+
+  @doc false
+  def ci_query_explain_signup_application_reviewer_query do
+    signup_application_reviewer_query()
+  end
+
+  @doc false
+  def ci_query_explain_admin_list_registration_form_query do
+    admin_list_registration_form_query()
+  end
+
+  @doc false
+  def ci_query_explain_pending_approval_users_query do
+    pending_approval_users_query()
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do
