@@ -57,7 +57,8 @@ defmodule YscWeb.FamilyManagementLiveTest do
           "id" => "",
           "first_name" => "Alex",
           "last_name" => "Wong",
-          "birth_date" => "1990-04-07",
+          "birth_date" =>
+            Date.utc_today() |> Date.shift(year: -10) |> Date.to_iso8601(),
           "relationship" => "child"
         },
         attrs
@@ -268,6 +269,58 @@ defmodule YscWeb.FamilyManagementLiveTest do
       html = render(view)
       assert html =~ "Alexandra Wong"
       refute has_element?(view, "#family-member-modal")
+    end
+
+    test "adult child cannot be invited to the family membership", %{
+      conn: conn
+    } do
+      user = lifetime_member()
+
+      member =
+        add_roster_member(user, %{
+          "birth_date" =>
+            Date.utc_today() |> Date.shift(year: -18) |> Date.to_iso8601()
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+
+      assert has_element?(view, "#family-member-row-#{member.id}")
+      refute has_element?(view, "#invite-family-member-button-#{member.id}")
+
+      render_hook(view, "open_invite_modal", %{"id" => member.id})
+
+      refute has_element?(view, "#invite-family-member-modal")
+
+      # A crafted submit (button is hidden) is still refused by the context.
+      render_hook(view, "invite_family_member", %{
+        "invite" => %{
+          "email" => unique_user_email(),
+          "family_member_id" => member.id
+        }
+      })
+
+      refute has_element?(view, "#pending-invites-table")
+      assert FamilyInvites.list_invites(user) == []
+    end
+
+    test "adult spouse can still be invited", %{conn: conn} do
+      user = lifetime_member()
+
+      member =
+        add_roster_member(user, %{
+          "birth_date" => "1990-04-07",
+          "relationship" => "spouse"
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+
+      assert has_element?(view, "#invite-family-member-button-#{member.id}")
     end
 
     test "validate_invite updates invite modal email field", %{conn: conn} do
