@@ -4218,6 +4218,10 @@ defmodule Ysc.EventsTest do
       Oban.Testing.with_testing_mode(:manual, fn ->
         assert {:ok, cancelled} = Events.cancel_event(published)
 
+        # The admin editor renders these straight from the returned event.
+        assert %User{} = cancelled.organizer
+        refute match?(%Ecto.Association.NotLoaded{}, cancelled.updated_by)
+
         assert [job] =
                  all_enqueued(
                    worker: YscWeb.Workers.EventCancellationNotificationWorker

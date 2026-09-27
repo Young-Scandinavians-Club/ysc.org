@@ -26,10 +26,21 @@ defmodule YscWeb.Workers.EventCancellationNotificationWorker do
       "cancelled_at" => DateTime.to_iso8601(cancelled_at),
       "recipients" =>
         Enum.map(recipients, fn recipient ->
-          %{"email" => recipient.email, "first_name" => recipient.first_name}
+          %{
+            "email" => recipient.email,
+            "first_name" => blank_to_nil(recipient.first_name)
+          }
         end)
     })
   end
+
+  # Ticket details can carry an empty first name; nil makes the greeting fall
+  # back to "there" instead of rendering "Hej ,".
+  defp blank_to_nil(name) when is_binary(name) do
+    if String.trim(name) == "", do: nil, else: name
+  end
+
+  defp blank_to_nil(_name), do: nil
 
   @impl Oban.Worker
   def perform(%Oban.Job{

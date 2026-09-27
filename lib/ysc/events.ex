@@ -1682,8 +1682,13 @@ defmodule Ysc.Events do
       end)
       |> Repo.transaction()
       |> case do
-        {:ok, %{event: cancelled}} -> {:ok, cancelled}
-        {:error, _step, reason, _changes} -> {:error, reason}
+        # The locked row has no associations loaded; restore the ones the
+        # admin editor renders (it assigns this event and the broadcast).
+        {:ok, %{event: cancelled}} ->
+          {:ok, Repo.preload(cancelled, [:organizer, :updated_by])}
+
+        {:error, _step, reason, _changes} ->
+          {:error, reason}
       end
       |> finalize_lifecycle_broadcast()
     end
