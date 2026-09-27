@@ -4123,7 +4123,8 @@ defmodule Ysc.Accounts do
   @doc """
   Detaches a child family member who has turned #{@family_child_age_limit} from
   their family membership and emails them that they need their own membership
-  to stay a member.
+  to stay a member. The family's membership holder is emailed too, so they know
+  why the member is no longer on their membership.
 
   The row is re-read under lock so a member who already left (or was moved to
   another family) since being listed is left untouched.
@@ -4138,8 +4139,6 @@ defmodule Ysc.Accounts do
     if is_nil(primary_user_id) do
       {:error, :not_sub_account}
     else
-      primary_user = Repo.get(User, primary_user_id)
-
       multi =
         Ecto.Multi.new()
         |> Ecto.Multi.run(:locked_user, fn repo, _changes ->
@@ -4154,6 +4153,11 @@ defmodule Ysc.Accounts do
             _ ->
               {:error, :not_sub_account}
           end
+        end)
+        # The member row is locked and still points at the primary, and the FK
+        # nilifies on delete, so the primary is guaranteed to exist here.
+        |> Ecto.Multi.run(:primary_user, fn repo, _changes ->
+          {:ok, repo.get!(User, primary_user_id)}
         end)
         |> Ecto.Multi.update(:sub_account, fn %{locked_user: locked} ->
           Ecto.Changeset.change(locked, %{
@@ -4174,13 +4178,19 @@ defmodule Ysc.Accounts do
         )
         |> YscWeb.Emails.Notifier.schedule_email_multi(
           :family_member_aged_out_email,
-          fn %{locked_user: locked} ->
+          fn %{locked_user: locked, primary_user: primary_user} ->
             family_member_aged_out_email_args(locked, primary_user)
+          end
+        )
+        |> YscWeb.Emails.Notifier.schedule_email_multi(
+          :family_member_aged_out_primary_email,
+          fn %{locked_user: locked, primary_user: primary_user} ->
+            family_member_aged_out_primary_email_args(locked, primary_user)
           end
         )
 
       case Repo.transaction(multi) do
-        {:ok, %{sub_account: updated_sub_account}} ->
+        {:ok, %{sub_account: updated_sub_account, primary_user: primary_user}} ->
           MembershipCache.invalidate_user(updated_sub_account.id)
 
           invalidate_family_link_profile_caches(
@@ -4188,12 +4198,10 @@ defmodule Ysc.Accounts do
             primary_user_id
           )
 
-          if primary_user do
-            sync_board_volunteer_billing_after_family_change(
-              primary_user,
-              updated_sub_account
-            )
-          end
+          sync_board_volunteer_billing_after_family_change(
+            primary_user,
+            updated_sub_account
+          )
 
           {:ok, updated_sub_account}
 
@@ -4206,8 +4214,7 @@ defmodule Ysc.Accounts do
   defp family_member_aged_out_email_args(user, primary_user) do
     first_name = user.first_name || "there"
 
-    primary_name =
-      (primary_user && primary_user.first_name) || "the primary account holder"
+    primary_name = primary_user.first_name || "the primary account holder"
 
     membership_url = YscWeb.Emails.FamilyMemberAgedOut.membership_url()
 
@@ -4237,6 +4244,52 @@ defmodule Ysc.Accounts do
       ==============================
       """,
       user_id: user.id,
+      opts: []
+    }
+  end
+
+  defp family_member_aged_out_primary_email_args(member, primary_user) do
+    primary_first_name = primary_user.first_name || "there"
+
+    member_name =
+      [member.first_name, member.last_name]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.join(" ")
+      |> case do
+        "" -> "Your family member"
+        name -> name
+      end
+
+    family_management_url =
+      YscWeb.Emails.FamilyMemberAgedOutPrimary.family_management_url()
+
+    %{
+      recipient: primary_user.email,
+      idempotency_key:
+        "family_member_aged_out_primary_#{member.id}_#{primary_user.id}",
+      subject: YscWeb.Emails.FamilyMemberAgedOutPrimary.get_subject(),
+      template: YscWeb.Emails.FamilyMemberAgedOutPrimary.get_template_name(),
+      variables: %{
+        primary_first_name: primary_first_name,
+        member_name: member_name,
+        family_management_url: family_management_url
+      },
+      text_body: """
+      ==============================
+
+      Hi #{primary_first_name},
+
+      #{member_name} has turned 18. Family memberships cover children under 18, so #{member_name} is no longer part of your family membership.
+
+      Your membership and your other family members are not affected.
+
+      We have emailed #{member_name} about getting their own membership so they can keep booking cabins and buying member event tickets.
+
+      View your family: #{family_management_url}
+
+      ==============================
+      """,
+      user_id: primary_user.id,
       opts: []
     }
   end

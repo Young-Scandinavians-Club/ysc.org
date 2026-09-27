@@ -71,6 +71,8 @@ defmodule YscWeb.Emails.Notifier do
     "family_invite_cancelled" => YscWeb.Emails.FamilyInviteCancelled,
     "family_member_removed" => YscWeb.Emails.FamilyMemberRemoved,
     "family_member_aged_out" => YscWeb.Emails.FamilyMemberAgedOut,
+    "family_member_aged_out_primary" =>
+      YscWeb.Emails.FamilyMemberAgedOutPrimary,
     "booking_checkin_reminder" => YscWeb.Emails.BookingCheckinReminder,
     "booking_checkout_reminder" => YscWeb.Emails.BookingCheckoutReminder,
     "tahoe_winter_weekend_available" =>

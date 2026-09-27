@@ -9,7 +9,7 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
   alias Ysc.Accounts
   alias Ysc.Accounts.{User, UserEvent}
   alias Ysc.Repo
-  alias YscWeb.Emails.FamilyMemberAgedOut
+  alias YscWeb.Emails.{FamilyMemberAgedOut, FamilyMemberAgedOutPrimary}
   alias YscWeb.Workers.FamilyMemberAgeOutWorker
 
   @today ~D[2026-09-26]
@@ -29,6 +29,16 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
     Repo.all(
       from(j in Oban.Job,
         where: j.args["idempotency_key"] == ^"family_member_aged_out_#{user.id}"
+      )
+    )
+  end
+
+  defp aged_out_primary_email_jobs(user, primary) do
+    Repo.all(
+      from(j in Oban.Job,
+        where:
+          j.args["idempotency_key"] ==
+            ^"family_member_aged_out_primary_#{user.id}_#{primary.id}"
       )
     )
   end
@@ -129,11 +139,11 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
   end
 
   describe "detach_aged_out_family_member/1" do
-    test "detaches the child, records an event, and schedules the email" do
+    test "detaches the child, records an event, and emails the child and holder" do
       primary = user_fixture(%{first_name: "Astrid"})
 
       child =
-        user_fixture(%{first_name: "Freja"})
+        user_fixture(%{first_name: "Freja", last_name: "Berg"})
         |> link(primary, %{date_of_birth: ~D[2008-09-26]})
 
       Oban.Testing.with_testing_mode(:manual, fn ->
@@ -148,6 +158,21 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
         assert job.args["params"]["primary_user_name"] == "Astrid"
         assert job.args["params"]["membership_url"] =~ "/users/membership"
         assert job.args["text_body"] =~ "your own membership"
+
+        assert [holder_job] = aged_out_primary_email_jobs(child, primary)
+
+        assert holder_job.args["template"] ==
+                 FamilyMemberAgedOutPrimary.get_template_name()
+
+        assert holder_job.args["recipient"] == primary.email
+        assert holder_job.args["user_id"] == primary.id
+        assert holder_job.args["params"]["primary_first_name"] == "Astrid"
+        assert holder_job.args["params"]["member_name"] == "Freja Berg"
+
+        assert holder_job.args["params"]["family_management_url"] =~
+                 "/users/settings/family"
+
+        assert holder_job.args["text_body"] =~ "Freja Berg has turned 18"
       end)
 
       assert Repo.exists?(
@@ -157,6 +182,24 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
                      e.from == ^primary.id and e.to == "none"
                )
              )
+    end
+
+    test "holder email falls back to a generic name when the member has none" do
+      primary = user_fixture()
+
+      child =
+        user_fixture()
+        |> link(primary, %{
+          date_of_birth: ~D[2008-09-26],
+          first_name: nil,
+          last_name: ""
+        })
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _} = Accounts.detach_aged_out_family_member(child)
+        assert [holder_job] = aged_out_primary_email_jobs(child, primary)
+        assert holder_job.args["params"]["member_name"] == "Your family member"
+      end)
     end
 
     test "does nothing when the member already left the family" do
@@ -172,6 +215,7 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
                  Accounts.detach_aged_out_family_member(child)
 
         assert [] = aged_out_email_jobs(child)
+        assert [] = aged_out_primary_email_jobs(child, primary)
       end)
     end
 

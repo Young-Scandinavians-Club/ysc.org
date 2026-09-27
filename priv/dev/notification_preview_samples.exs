@@ -527,6 +527,11 @@
       primary_user_name: "Astrid",
       membership_url: "http://localhost:4000/users/membership"
     },
+    "family_member_aged_out_primary" => %{
+      primary_first_name: "Astrid",
+      member_name: "Freja Berg",
+      family_management_url: "http://localhost:4000/users/settings/family"
+    },
     "membership_ended" => %{
       first_name: "Astrid",
       end_date: "August 1, 2026",
