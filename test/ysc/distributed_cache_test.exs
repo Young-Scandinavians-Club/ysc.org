@@ -38,6 +38,29 @@ defmodule Ysc.DistributedCacheTest do
     end
   end
 
+  describe "update_counter/4" do
+    test "updates the local counter and broadcasts the op" do
+      table = new_counter_table()
+      Phoenix.PubSub.subscribe(Ysc.PubSub, DistributedCache.topic())
+
+      on_exit(fn ->
+        Phoenix.PubSub.unsubscribe(Ysc.PubSub, DistributedCache.topic())
+      end)
+
+      assert DistributedCache.update_counter(table, :k, {2, 3}, {:k, 0}) == 3
+      assert DistributedCache.update_counter(table, :k, {2, -1}, {:k, 0}) == 2
+      assert :ets.lookup(table, :k) == [{:k, 2}]
+
+      this_node = node()
+
+      assert_receive {:distributed_counter_update, ^this_node, ^table, :k,
+                      {2, 3}, {:k, 0}}
+
+      assert_receive {:distributed_counter_update, ^this_node, ^table, :k,
+                      {2, -1}, {:k, 0}}
+    end
+  end
+
   describe "Sync" do
     test "applies writes broadcast from another node to the local cache", %{
       key: key
@@ -70,5 +93,52 @@ defmodule Ysc.DistributedCacheTest do
 
       assert {:ok, "local value"} = Cachex.get(@cache_name, key)
     end
+
+    test "applies counter updates broadcast from another node" do
+      table = new_counter_table()
+
+      for _ <- 1..2 do
+        send(
+          Ysc.DistributedCache.Sync,
+          {:distributed_counter_update, :other@nohost, table, :k, {2, 1},
+           {:k, 0}}
+        )
+      end
+
+      :sys.get_state(Ysc.DistributedCache.Sync)
+
+      assert :ets.lookup(table, :k) == [{:k, 2}]
+    end
+
+    test "ignores counter updates tagged with this node" do
+      table = new_counter_table()
+
+      send(
+        Ysc.DistributedCache.Sync,
+        {:distributed_counter_update, node(), table, :k, {2, 1}, {:k, 0}}
+      )
+
+      :sys.get_state(Ysc.DistributedCache.Sync)
+
+      assert :ets.lookup(table, :k) == []
+    end
+
+    test "skips counter updates for a table this node doesn't have" do
+      sync = Process.whereis(Ysc.DistributedCache.Sync)
+
+      send(
+        Ysc.DistributedCache.Sync,
+        {:distributed_counter_update, :other@nohost, :no_such_counter_table, :k,
+         {2, 1}, {:k, 0}}
+      )
+
+      :sys.get_state(Ysc.DistributedCache.Sync)
+
+      assert Process.whereis(Ysc.DistributedCache.Sync) == sync
+    end
   end
+
+  # Public so Sync (another process) can update it; owned by the test
+  # process, so it goes away with the test.
+  defp new_counter_table, do: :ets.new(:distributed_counter_test, [:public])
 end

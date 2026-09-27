@@ -14,24 +14,32 @@ defmodule Ysc.RegistrationRateLimit do
   the limit.
 
   One counter per IP and clock hour holds the number of slots taken. A
-  reservation reads and increments it in a single atomic ETS update that
-  never takes it above the limit, and succeeds only if the increment went
-  through. So simultaneous submits can't slip past the limit, and a denied
-  attempt never touches the counter, so it has nothing to give back. A
-  release decrements it, never below zero. The hour is part of the
-  counter's key and a reservation carries it, so a release always updates
-  its own hour's counter. One that arrives after the hour ended touches a
-  counter nothing reads anymore; it can't free a slot in the next hour.
+  reservation adds one to it with an atomic ETS increment and gets a slot
+  only if its own result is within the limit; otherwise it takes the one
+  back. Each result is unique, so simultaneous submits on a node can't slip
+  past the limit, and a denied attempt never holds a slot. A release takes
+  one off, never going below zero. The hour is part of the counter's key and
+  a reservation carries it, so a release always updates its own hour's
+  counter. One that arrives after the hour ended touches a counter nothing
+  reads anymore; it can't free a slot in the next hour.
 
-  Keyed by the client IP from `YscWeb.ClientIP.from_socket/2`. Counts are kept
-  in ETS per app instance, like the other limiters, in this module's Hammer
-  table so its cleanup removes expired hours. Override the limit with
+  The limit is cluster-wide. Each kept slot and each release goes out
+  through `Ysc.DistributedCache` as a +1 or -1 that every other node adds
+  to its own counter, so each node's counter converges on the total across
+  the cluster. Within a node the limit is strict; two submits that land on
+  different nodes within the few milliseconds a broadcast takes can both
+  get in. A node that joins mid-hour starts that hour from zero.
+
+  Keyed by the client IP from `YscWeb.ClientIP.from_socket/2`. Each node
+  keeps its copy of the counts in this module's Hammer ETS table, so
+  Hammer's cleanup removes expired hours. Override the limit with
   `config :ysc, Ysc.RegistrationRateLimit, ip_limit: n`.
   """
   use Hammer, backend: :ets
 
   require Ysc.Logging
 
+  alias Ysc.DistributedCache
   alias Ysc.RateLimit
 
   # Per IP: 3 successful applications per hour
@@ -40,6 +48,9 @@ defmodule Ysc.RegistrationRateLimit do
 
   # Position of the count in Hammer's `{{key, window}, count, expires_at}` rows.
   @count_pos 2
+  @take_slot {@count_pos, 1}
+  # Never below zero, e.g. for a counter whose hour was already cleaned up.
+  @give_back_slot {@count_pos, -1, 0, 0}
 
   @doc """
   Current per-IP limit (successful applications per hour).
@@ -62,22 +73,31 @@ defmodule Ysc.RegistrationRateLimit do
 
   defp reserve(ip, limit) do
     window = current_window()
-
-    # Reads the count, then adds one unless that would exceed the limit, in
-    # one atomic update. The count went up only if a slot was free.
-    [before, after_inc] =
-      update_count(ip, window, [{@count_pos, 0}, {@count_pos, 1, limit, limit}])
+    key = counter_key(ip, window)
+    count = :ets.update_counter(__MODULE__, key, @take_slot, new_counter(key))
 
     cond do
-      # The hour rolled over around the update, which then landed in a
+      # The hour rolled over around the increment, which then landed in a
       # counter nothing reads; take the slot in the new hour instead.
       current_window() != window ->
         reserve(ip, limit)
 
-      after_inc > before ->
+      count <= limit ->
+        # Keep the slot and count it on the other nodes too.
+        DistributedCache.broadcast_counter_update(
+          __MODULE__,
+          key,
+          @take_slot,
+          new_counter(key)
+        )
+
         {:ok, {ip, window}}
 
       true ->
+        # Denied attempts don't hold a slot. Only this call's own increment
+        # decided that, so taking it back can't let anyone else in.
+        :ets.update_counter(__MODULE__, key, {@count_pos, -1}, new_counter(key))
+
         Ysc.Logging.warning("Membership application rate limit exceeded by IP",
           ip: ip,
           limit: limit
@@ -89,23 +109,28 @@ defmodule Ysc.RegistrationRateLimit do
 
   @doc """
   Gives back a slot taken by `reserve_application/1` when the application
-  wasn't created (e.g. it failed validation). Has no effect once the
-  reservation's hour has ended.
+  wasn't created (e.g. it failed validation), on every node. Has no effect
+  once the reservation's hour has ended.
   """
   def release_application({ip, window})
       when is_binary(ip) and is_integer(window) do
-    update_count(ip, window, {@count_pos, -1, 0, 0})
+    key = counter_key(ip, window)
+
+    DistributedCache.update_counter(
+      __MODULE__,
+      key,
+      @give_back_slot,
+      new_counter(key)
+    )
+
     :ok
   end
 
-  defp update_count(ip, window, ops) do
-    Hammer.ETS.update_counter(
-      __MODULE__,
-      {"registration:#{ip}", window},
-      ops,
-      window_end_ms(window)
-    )
-  end
+  defp counter_key(ip, window), do: {"registration:#{ip}", window}
+
+  # An empty counter in Hammer's `{{key, window}, count, expires_at}` row
+  # format, so Hammer's cleanup removes it once its hour has ended.
+  defp new_counter({_ip_key, window} = key), do: {key, 0, window_end_ms(window)}
 
   # Same window numbering as Hammer's :fix_window algorithm.
   defp current_window, do: div(System.system_time(:millisecond), @ip_scale_ms)

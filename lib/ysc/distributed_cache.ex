@@ -19,6 +19,13 @@ defmodule Ysc.DistributedCache do
 
   Reads stay a plain local `Cachex.get/2` — no need to route those through
   PubSub.
+
+  Counters are different: replicating a whole value loses counts when two
+  nodes write at the same time (both go from 1 to 2 and send "2"). So
+  `update_counter/4` broadcasts the delta instead, and each node applies it
+  to its own copy of the counter with `:ets.update_counter/4`. Deltas add up
+  in any order, so every node converges on the cluster-wide total. Used by
+  `Ysc.RegistrationRateLimit`.
   """
 
   @pubsub Ysc.PubSub
@@ -45,5 +52,33 @@ defmodule Ysc.DistributedCache do
     )
 
     result
+  end
+
+  @doc """
+  Applies `op` to the counter at `key` in the public ETS `table` locally
+  (inserting `default` if the key is missing, as `:ets.update_counter/4`
+  does), then broadcasts it so every other node applies the same op to its
+  own copy of the table. Returns the local result.
+
+  Use plain increments and decrements (or ones clamped at a floor), which
+  add up to the same total whatever order nodes receive them in.
+  """
+  def update_counter(table, key, op, default) do
+    result = :ets.update_counter(table, key, op, default)
+    broadcast_counter_update(table, key, op, default)
+    result
+  end
+
+  @doc """
+  Broadcasts a counter update that was already applied locally, so every
+  other node applies it too. For callers that update locally first and only
+  replicate the update once they decide to keep it.
+  """
+  def broadcast_counter_update(table, key, op, default) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      @topic,
+      {:distributed_counter_update, node(), table, key, op, default}
+    )
   end
 end
