@@ -4181,11 +4181,8 @@ defmodule Ysc.Accounts do
 
           {:ok, updated_sub_account}
 
-        {:error, :locked_user, :not_sub_account, _} ->
-          {:error, :not_sub_account}
-
-        {:error, _, changeset, _} ->
-          {:error, changeset}
+        {:error, _step, reason, _changes} ->
+          {:error, reason}
       end
     end
   end

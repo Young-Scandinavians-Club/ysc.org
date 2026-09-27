@@ -38,37 +38,20 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorker do
       count: length(members)
     )
 
-    results = Enum.map(members, &detach/1)
+    results =
+      Enum.map(members, &Accounts.detach_aged_out_family_member/1)
+
+    # Members who left their family since being listed come back as
+    # {:error, :not_sub_account}; unexpected DB errors raise and Oban retries.
+    detached_count = Enum.count(results, &match?({:ok, _}, &1))
+    skipped_count = length(results) - detached_count
 
     Ysc.Logging.info("Family member age-out check complete",
-      detached_count: Enum.count(results, &(&1 == :ok)),
-      error_count: Enum.count(results, &match?({:error, _}, &1)),
-      total: length(members)
+      detached_count: detached_count,
+      skipped_count: skipped_count
     )
 
     :ok
-  end
-
-  defp detach(user) do
-    case Accounts.detach_aged_out_family_member(user) do
-      {:ok, _user} ->
-        Ysc.Logging.info("Detached family member who turned 18",
-          user_id: user.id
-        )
-
-        :ok
-
-      {:error, :not_sub_account} ->
-        :skipped
-
-      {:error, reason} ->
-        Ysc.Logging.error("Failed to detach family member who turned 18",
-          error: reason,
-          extra: %{user_id: user.id}
-        )
-
-        {:error, reason}
-    end
   end
 
   defp club_today do
