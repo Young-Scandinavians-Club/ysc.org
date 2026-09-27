@@ -34,8 +34,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
       event_id: event_id
     )
 
-    case Repo.get(Event, event_id)
-         |> Repo.preload([:organizer, :cover_image]) do
+    case Repo.get(Event, event_id) do
       nil ->
         Ysc.Logging.warning("Event not found for notification",
           event_id: event_id
