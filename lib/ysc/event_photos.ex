@@ -123,7 +123,7 @@ defmodule Ysc.EventPhotos do
   end
 
   @doc """
-  UTC datetime for 9:00 AM America/Los_Angeles on the calendar day after the event ends.
+  UTC datetime for 10:00 AM America/Los_Angeles on the calendar day after the event ends.
   """
   def photo_reminder_scheduled_at(%Event{} = event) do
     case effective_end_date(event) do
