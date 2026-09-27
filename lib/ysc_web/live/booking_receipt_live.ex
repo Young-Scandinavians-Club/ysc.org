@@ -625,13 +625,18 @@ defmodule YscWeb.BookingReceiptLive do
                   <.icon name="hero-key" class="w-5 h-5" /> Cabin Access
                 </h3>
                 <p id="cabin-access-timing" class="text-sm text-zinc-600 mb-4">
-                  {YscWeb.BookingUserMessages.cabin_access_receipt_body()}
+                  <%= if @show_door_code && @door_code do %>
+                    {YscWeb.BookingUserMessages.cabin_access_receipt_body_when_visible()}
+                  <% else %>
+                    {YscWeb.BookingUserMessages.cabin_access_receipt_body()}
+                  <% end %>
                 </p>
                 <a
+                  id="cabin-access-info-link"
                   href={get_cabin_access_url(@booking.property)}
                   class="text-sm font-semibold text-blue-600 hover:underline"
                 >
-                  View Door Code Info →
+                  {YscWeb.BookingUserMessages.cabin_access_info_link_label()} →
                 </a>
               </div>
               <!-- Cabin Rules -->
