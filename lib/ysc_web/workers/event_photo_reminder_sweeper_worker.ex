@@ -2,6 +2,10 @@ defmodule YscWeb.Workers.EventPhotoReminderSweeperWorker do
   @moduledoc """
   Daily safety net: sends photo reminders for published events that ended on or before
   yesterday (America/Los_Angeles) but were not scheduled or sent.
+
+  Cron runs this at 18:30 UTC so it always fires after the scheduled 10:00 AM
+  America/Los_Angeles reminder (10:30 AM PST / 11:30 AM PDT) and never emails
+  attendees in the middle of the night.
   """
   require Ysc.Logging
 
