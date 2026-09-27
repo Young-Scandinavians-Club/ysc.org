@@ -66,6 +66,9 @@ defmodule Ysc.Accounts.EmailCategories do
     "ticket_purchase_confirmation" => :account,
     "ticket_reservation_created" => :account,
     "ticket_order_refund" => :account,
+    # Cancellation notices must reach every ticket holder, so they ignore
+    # event notification preferences.
+    "event_cancellation_notification" => :account,
     "outage_notification" => :account,
     "event_notification" => :event,
     "event_update_notification" => :event,
