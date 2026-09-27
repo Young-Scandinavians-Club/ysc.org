@@ -1394,6 +1394,19 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert FamilyInvites.list_invites(primary_user) == []
     end
 
+    test "create_invite/3 uses the roster member's type over the relationship option" do
+      primary_user = create_user_with_lifetime_membership()
+
+      member =
+        insert_family_member(primary_user, %{birth_date: adult_birth_date()})
+
+      assert {:error, :child_is_adult} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 relationship: :spouse,
+                 family_member_id: member.id
+               )
+    end
+
     test "create_invite/3 allows a child under 18" do
       primary_user = create_user_with_lifetime_membership()
 

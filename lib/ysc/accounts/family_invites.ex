@@ -132,14 +132,22 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   ## Options
   - `family_member_id` - Optional ID of a family member from registration form to include in email
-  - `relationship` - Required. Either :spouse or :child. Max 1 spouse per family.
+  - `relationship` - Either :spouse or :child (default). Max 1 spouse per family.
+    Ignored when `family_member_id` matches a roster member; their stored type is used.
   """
   @dialyzer {:nowarn_function, create_invite: 3}
   def create_invite(primary_user, email, opts \\ []) do
     family_member_id = Keyword.get(opts, :family_member_id)
-    relationship = Keyword.get(opts, :relationship, :child)
-
     family_member = get_family_member(primary_user, family_member_id)
+
+    # A roster member's stored type wins over the option, so a caller can't
+    # invite an adult child as a "spouse" to skip the age check.
+    relationship =
+      case family_member do
+        %FamilyMember{type: :spouse} -> :spouse
+        %FamilyMember{} -> :child
+        nil -> Keyword.get(opts, :relationship, :child)
+      end
 
     with :ok <- validate_primary_user_eligibility(primary_user),
          :ok <- validate_child_not_adult(relationship, family_member),
