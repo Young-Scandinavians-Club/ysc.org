@@ -14,17 +14,22 @@ defmodule Ysc.Messages.RequeueTest do
 
   import Ysc.AccountsFixtures
 
-  defp insert_discarded_email_job(user_id, email) do
-    args = %{
-      "recipient" => email,
-      "idempotency_key" => "requeue_test_#{System.unique_integer([:positive])}",
-      "subject" => "Requeue test",
-      "template" => "booking_confirmation",
-      "params" => %{"x" => 1},
-      "text_body" => "hello",
-      "user_id" => user_id,
-      "category" => "bookings"
-    }
+  defp insert_discarded_email_job(user_id, email, extra_args \\ %{}) do
+    args =
+      Map.merge(
+        %{
+          "recipient" => email,
+          "idempotency_key" =>
+            "requeue_test_#{System.unique_integer([:positive])}",
+          "subject" => "Requeue test",
+          "template" => "booking_confirmation",
+          "params" => %{"x" => 1},
+          "text_body" => "hello",
+          "user_id" => user_id,
+          "category" => "bookings"
+        },
+        extra_args
+      )
 
     {:ok, job} =
       args
@@ -123,6 +128,29 @@ defmodule Ysc.Messages.RequeueTest do
       job = insert_discarded_email_job(user.id, user.email)
 
       assert {:ok, %Oban.Job{}} = Requeue.requeue_job_by_id(job.id)
+    end
+
+    test "keeps reply_to and cc when requeuing" do
+      user = user_fixture()
+
+      job =
+        insert_discarded_email_job(user.id, user.email, %{
+          "reply_to" => "submitter@example.com",
+          "cc" => "department@example.com"
+        })
+
+      assert {:ok, %Oban.Job{args: args}} = Requeue.requeue_job_by_id(job.id)
+      assert args["reply_to"] == "submitter@example.com"
+      assert args["cc"] == "department@example.com"
+    end
+
+    test "omits reply_to and cc when the original job had none" do
+      user = user_fixture()
+      job = insert_discarded_email_job(user.id, user.email)
+
+      assert {:ok, %Oban.Job{args: args}} = Requeue.requeue_job_by_id(job.id)
+      refute Map.has_key?(args, "reply_to")
+      refute Map.has_key?(args, "cc")
     end
 
     test "returns not_an_email_job when worker is not EmailNotifier" do
