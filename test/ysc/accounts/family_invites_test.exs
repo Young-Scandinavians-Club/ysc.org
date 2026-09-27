@@ -481,6 +481,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -1131,6 +1132,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -1170,6 +1172,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -1236,6 +1239,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Board",
           last_name: "Invitee"
@@ -1277,6 +1281,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture_fast(%{
+          date_of_birth: child_birth_date(),
           email: "family.link.member+inbox@gmail.com",
           first_name: "Invitee",
           last_name: "Alias"
@@ -1484,6 +1489,84 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert is_nil(Repo.get!(User, invitee.id).primary_user_id)
     end
 
+    test "link_existing_user/3 requires a date of birth on a child invite when none is on file" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      invitee = user_fixture(%{email: email})
+      assert is_nil(invitee.date_of_birth)
+
+      assert FamilyInvites.date_of_birth_required_to_link?(invitee, invite)
+
+      assert {:error, :date_of_birth_required} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert {:error, :date_of_birth_required} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 "date_of_birth" => ""
+               })
+
+      assert is_nil(Repo.get!(User, invitee.id).primary_user_id)
+      assert is_nil(Repo.get!(FamilyInvite, invite.id).accepted_at)
+    end
+
+    test "link_existing_user/3 saves a supplied under-18 date of birth and links" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      invitee = user_fixture(%{email: email})
+      dob = child_birth_date()
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 "date_of_birth" => Date.to_iso8601(dob)
+               })
+
+      assert linked.primary_user_id == primary_user.id
+      assert Repo.get!(User, invitee.id).date_of_birth == dob
+    end
+
+    test "link_existing_user/3 rejects a supplied adult or invalid date of birth" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      invitee = user_fixture(%{email: email})
+
+      assert {:error, %Ecto.Changeset{} = adult} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 date_of_birth: adult_birth_date()
+               })
+
+      assert %{date_of_birth: [message]} = errors_on(adult)
+      assert message =~ "under 18"
+
+      assert {:error, %Ecto.Changeset{} = future} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 date_of_birth: Date.add(Date.utc_today(), 1)
+               })
+
+      assert %{date_of_birth: ["cannot be in the future"]} = errors_on(future)
+
+      reloaded = Repo.get!(User, invitee.id)
+      assert is_nil(reloaded.primary_user_id)
+      assert is_nil(reloaded.date_of_birth)
+    end
+
+    test "link_existing_user/3 does not ask for a date of birth on a spouse invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, email, relationship: :spouse)
+
+      invitee = user_fixture(%{email: email})
+
+      refute FamilyInvites.date_of_birth_required_to_link?(invitee, invite)
+
+      assert {:ok, _linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+    end
+
     test "link_existing_user/2 lets an adult join via a spouse invite" do
       primary_user = create_user_with_lifetime_membership()
       email = unique_user_email()
@@ -1626,6 +1709,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -1674,7 +1758,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
 
-      invitee = user_fixture(%{email: email})
+      invitee = user_fixture(%{email: email, date_of_birth: child_birth_date()})
       warm_primary_family_caches(primary_user)
 
       assert {:ok, linked} =

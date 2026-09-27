@@ -87,6 +87,18 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
                FamilyInvites.child_invite?(invite) &&
                FamilyInvites.adult?(current_user.date_of_birth)
            )
+           |> assign(
+             :link_dob_required,
+             can_link_existing &&
+               FamilyInvites.date_of_birth_required_to_link?(
+                 current_user,
+                 invite
+               )
+           )
+           |> assign(
+             :link_form,
+             can_link_existing && link_form(current_user, invite, %{}, nil)
+           )
            |> assign(:page_title, "Accept Family Invitation")
            |> assign(
              :meta_description,
@@ -114,11 +126,28 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
     {:noreply, assign(socket, form: to_form(changeset, as: "user"))}
   end
 
-  def handle_event("link_existing", _params, socket) do
+  def handle_event("validate_link", %{"link" => link_params}, socket) do
+    form =
+      link_form(
+        socket.assigns.current_user,
+        socket.assigns.invite,
+        link_params,
+        :validate
+      )
+
+    {:noreply, assign(socket, :link_form, form)}
+  end
+
+  def handle_event("link_existing", params, socket) do
     invite = socket.assigns.invite
     current_user = socket.assigns.current_user
+    link_params = Map.get(params, "link", %{})
 
-    case FamilyInvites.link_existing_user(invite.token, current_user) do
+    case FamilyInvites.link_existing_user(
+           invite.token,
+           current_user,
+           link_params
+         ) do
       {:ok, _user} ->
         {:noreply,
          socket
@@ -173,6 +202,21 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
            FamilyInvites.child_is_adult_message(),
            title: "Invitation"
          )}
+
+      {:error, :date_of_birth_required} ->
+        {:noreply,
+         socket
+         |> assign(:link_dob_required, true)
+         |> assign(
+           :link_form,
+           link_form(current_user, invite, link_params, :validate)
+         )}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         socket
+         |> assign(:link_dob_required, true)
+         |> assign(:link_form, to_form(changeset, as: "link"))}
 
       {:error, :cannot_link_self} ->
         {:noreply,
@@ -231,6 +275,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
     end
   end
 
+  defp link_form(current_user, invite, params, action) do
+    current_user
+    |> FamilyInvites.link_date_of_birth_changeset(invite, params)
+    |> Map.put(:action, action)
+    |> to_form(as: "link")
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -265,13 +316,41 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
             <p class="text-blue-800 mb-4">
               You're signed in as <strong>{@current_user.email}</strong>. Click below to join <strong>{@invite.primary_user.first_name}</strong>'s family membership.
             </p>
-            <.button
-              phx-click="link_existing"
-              phx-disable-with="Joining..."
-              class="w-full"
-            >
-              Join Family Membership
-            </.button>
+            <%= if @link_dob_required do %>
+              <.form
+                for={@link_form}
+                id="link-existing-form"
+                phx-change="validate_link"
+                phx-submit="link_existing"
+                class="space-y-4"
+              >
+                <p class="text-sm text-blue-800">
+                  Family memberships include children under 18. Please confirm your date of birth to join.
+                </p>
+                <.input
+                  field={@link_form[:date_of_birth]}
+                  type="date"
+                  label="Date of Birth"
+                  required
+                />
+                <.button
+                  type="submit"
+                  phx-disable-with="Joining..."
+                  class="w-full"
+                >
+                  Join Family Membership
+                </.button>
+              </.form>
+            <% else %>
+              <.button
+                id="link-existing-button"
+                phx-click="link_existing"
+                phx-disable-with="Joining..."
+                class="w-full"
+              >
+                Join Family Membership
+              </.button>
+            <% end %>
           </.callout>
         </div>
 

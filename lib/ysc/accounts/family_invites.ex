@@ -86,6 +86,27 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   @doc """
+  Changeset for the date of birth an existing account must give before
+  linking to a child invite (required, plausible, and under #{@adult_age}).
+  """
+  def link_date_of_birth_changeset(
+        %User{} = user,
+        %FamilyInvite{} = invite,
+        attrs \\ %{}
+      ) do
+    user
+    |> User.date_of_birth_changeset(attrs)
+    |> validate_child_age(invite)
+  end
+
+  @doc """
+  True when `user` must supply a date of birth before linking to `invite`:
+  child invites need one so the under-#{@adult_age} rule can be checked.
+  """
+  def date_of_birth_required_to_link?(%User{} = user, %FamilyInvite{} = invite),
+    do: child_invite?(invite) and is_nil(user.date_of_birth)
+
+  @doc """
   Returns true when the invite adds the invitee as a child (the default).
   """
   def child_invite?(%FamilyInvite{relationship: relationship}),
@@ -362,9 +383,16 @@ defmodule Ysc.Accounts.FamilyInvites do
   Links an existing user to a family membership via invite.
 
   The user must be logged in and their email must match the invite.
-  Returns {:ok, user} or {:error, reason}.
+
+  Child invites are only for under-#{@adult_age}s. When the account has no
+  date of birth on file, pass one in `attrs` (`"date_of_birth"`); it is
+  validated and saved on the account as part of the link.
+
+  Returns {:ok, user} or {:error, reason}, where reason may be
+  `:date_of_birth_required`, `:child_is_adult`, or an `Ecto.Changeset` with a
+  `:date_of_birth` error.
   """
-  def link_existing_user(token, current_user) do
+  def link_existing_user(token, current_user, attrs \\ %{}) do
     invite = get_invite_by_token(token)
 
     cond do
@@ -383,65 +411,106 @@ defmodule Ysc.Accounts.FamilyInvites do
       current_user.id == invite.primary_user_id ->
         {:error, :cannot_link_self}
 
-      child_invite?(invite) and adult?(current_user.date_of_birth) ->
-        {:error, :child_is_adult}
-
       true ->
-        Repo.transaction(fn ->
-          relationship = invite.relationship || :child
-          primary_user_id = invite.primary_user_id
+        case link_date_of_birth_changes(current_user, invite, attrs) do
+          {:ok, dob_changes} ->
+            do_link_existing_user(invite, current_user, dob_changes)
 
-          case validate_invite_acceptance(Repo, invite) do
-            :ok -> :ok
-            {:error, reason} -> Repo.rollback(reason)
-          end
-
-          updated_user =
-            current_user
-            |> Ecto.Changeset.change(%{
-              primary_user_id: primary_user_id,
-              family_relationship: relationship
-            })
-            |> Repo.update!()
-
-          invite
-          |> FamilyInvite.accept_changeset()
-          |> Repo.update!()
-
-          # Create UserEvent to track family addition
-          %UserEvent{}
-          |> UserEvent.new_user_event_changeset(%{
-            user_id: updated_user.id,
-            updated_by_user_id: invite.primary_user_id,
-            type: :family_added,
-            from: "none",
-            to: "#{invite.primary_user_id}"
-          })
-          |> Repo.insert!()
-
-          schedule_invite_accepted_email!(invite, updated_user)
-
-          updated_user
-        end)
-        |> case do
-          {:ok, updated_user} = ok ->
-            Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
-
-            invalidate_family_link_profile_caches(
-              updated_user.id,
-              invite.primary_user_id
-            )
-
-            sync_board_volunteer_billing_after_family_change(
-              invite.primary_user_id,
-              updated_user.id
-            )
-
-            ok
-
-          error ->
+          {:error, _reason} = error ->
             error
         end
+    end
+  end
+
+  defp link_date_of_birth_changes(current_user, invite, attrs) do
+    cond do
+      not child_invite?(invite) ->
+        {:ok, %{}}
+
+      adult?(current_user.date_of_birth) ->
+        {:error, :child_is_adult}
+
+      not date_of_birth_required_to_link?(current_user, invite) ->
+        {:ok, %{}}
+
+      blank_date_of_birth?(attrs) ->
+        {:error, :date_of_birth_required}
+
+      true ->
+        changeset = link_date_of_birth_changeset(current_user, invite, attrs)
+
+        if changeset.valid? do
+          {:ok,
+           %{
+             date_of_birth: Ecto.Changeset.get_field(changeset, :date_of_birth)
+           }}
+        else
+          {:error, Map.put(changeset, :action, :validate)}
+        end
+    end
+  end
+
+  defp blank_date_of_birth?(attrs) do
+    (attrs["date_of_birth"] || attrs[:date_of_birth]) in [nil, ""]
+  end
+
+  defp do_link_existing_user(invite, current_user, dob_changes) do
+    Repo.transaction(fn ->
+      relationship = invite.relationship || :child
+      primary_user_id = invite.primary_user_id
+
+      case validate_invite_acceptance(Repo, invite) do
+        :ok -> :ok
+        {:error, reason} -> Repo.rollback(reason)
+      end
+
+      updated_user =
+        current_user
+        |> Ecto.Changeset.change(
+          Map.merge(dob_changes, %{
+            primary_user_id: primary_user_id,
+            family_relationship: relationship
+          })
+        )
+        |> Repo.update!()
+
+      invite
+      |> FamilyInvite.accept_changeset()
+      |> Repo.update!()
+
+      # Create UserEvent to track family addition
+      %UserEvent{}
+      |> UserEvent.new_user_event_changeset(%{
+        user_id: updated_user.id,
+        updated_by_user_id: invite.primary_user_id,
+        type: :family_added,
+        from: "none",
+        to: "#{invite.primary_user_id}"
+      })
+      |> Repo.insert!()
+
+      schedule_invite_accepted_email!(invite, updated_user)
+
+      updated_user
+    end)
+    |> case do
+      {:ok, updated_user} = ok ->
+        Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
+
+        invalidate_family_link_profile_caches(
+          updated_user.id,
+          invite.primary_user_id
+        )
+
+        sync_board_volunteer_billing_after_family_change(
+          invite.primary_user_id,
+          updated_user.id
+        )
+
+        ok
+
+      error ->
+        error
     end
   end
 

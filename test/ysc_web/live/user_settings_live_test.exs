@@ -2419,6 +2419,47 @@ defmodule YscWeb.UserSettingsLiveTest do
     end
   end
 
+  describe "family invite acceptance — date of birth" do
+    test "accept-family-invite sends an account with no date of birth to the acceptance page",
+         %{conn: conn} do
+      primary = primary_user_with_lifetime_for_family_invite()
+      invite_email = Ysc.AccountsFixtures.unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary, invite_email)
+
+      invitee = user_fixture(%{email: invite_email})
+      conn = log_in_user(conn, invitee)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "accept-family-invite", %{"token" => invite.token})
+
+      assert_redirect(view, ~p"/family-invite/#{invite.token}/accept")
+      assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
+    end
+
+    test "accept-family-invite refuses an adult on a child invite", %{
+      conn: conn
+    } do
+      primary = primary_user_with_lifetime_for_family_invite()
+      invite_email = Ysc.AccountsFixtures.unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary, invite_email)
+
+      invitee =
+        user_fixture(%{email: invite_email, date_of_birth: ~D[1990-01-01]})
+
+      conn = log_in_user(conn, invitee)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "accept-family-invite", %{"token" => invite.token})
+
+      assert render(view) =~ "18 or older"
+      assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
+    end
+  end
+
   describe "settings page — handle_info and membership edge cases" do
     test "phone verification with invalid token patches back to settings with error toast",
          %{conn: conn} do
