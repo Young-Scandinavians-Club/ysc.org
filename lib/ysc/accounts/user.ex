@@ -359,6 +359,16 @@ defmodule Ysc.Accounts.User do
   end
 
   @doc """
+  A changeset that only sets a required, plausible `:date_of_birth`.
+  """
+  def date_of_birth_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:date_of_birth])
+    |> validate_required([:date_of_birth])
+    |> validate_date_of_birth()
+  end
+
+  @doc """
   A user changeset for updating profile information.
   """
   def profile_changeset(user, attrs, opts \\ []) do

@@ -5,10 +5,15 @@ defmodule YscWeb.Emails.Helpers do
   for money and dates.
   """
 
+  import Ecto.Query, warn: false
+
   alias HtmlSanitizeEx
+  alias Ysc.Accounts.User
   alias Ysc.Events.Event
   alias Ysc.Media.Image
   alias Ysc.Repo
+
+  @event_email_organizer_fields [:id, :first_name, :last_name]
 
   @member_default "Valued Member"
   @attendee_default "there"
@@ -291,10 +296,10 @@ defmodule YscWeb.Emails.Helpers do
   end
 
   @doc """
-  Reloads the event with `associations` when any of them are not loaded.
+  Preloads `associations` that are not already loaded on `event`.
 
-  Defaults to `:organizer` and `:cover_image`. Raises if the event row no
-  longer exists.
+  Defaults to `:organizer` and `:cover_image`. Does not re-`Repo.get` the
+  event row. Organizer is loaded as name columns only.
   """
   def preload_event_associations(
         event,
@@ -303,14 +308,24 @@ defmodule YscWeb.Emails.Helpers do
 
   def preload_event_associations(%Event{} = event, associations)
       when is_list(associations) do
-    if Enum.all?(associations, &Ecto.assoc_loaded?(Map.fetch!(event, &1))) do
-      event
-    else
-      case Repo.get(Event, event.id) |> Repo.preload(associations) do
-        nil -> raise ArgumentError, "Event not found: #{event.id}"
-        loaded -> loaded
-      end
+    missing =
+      Enum.reject(associations, &Ecto.assoc_loaded?(Map.fetch!(event, &1)))
+
+    case missing do
+      [] -> event
+      _ -> Repo.preload(event, event_email_preload_spec(missing))
     end
+  end
+
+  defp event_email_preload_spec(associations) do
+    Enum.map(associations, fn
+      :organizer -> {:organizer, event_email_organizer_query()}
+      other -> other
+    end)
+  end
+
+  defp event_email_organizer_query do
+    from(u in User, select: struct(u, ^@event_email_organizer_fields))
   end
 
   @doc """

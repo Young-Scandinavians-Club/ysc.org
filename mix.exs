@@ -349,7 +349,10 @@ defmodule Ysc.MixProject do
       # 1.8.14: LongPoll fetch timer leak (we use websocket only); VerifiedRoutes
       # :router must be a compile-time module; local path validation is shared
       # across redirect, static_path, and ~p (also rejects CR/LF in paths).
-      {:phoenix, "~> 1.8.14"},
+      # 1.8.15: phoenix.js does not let an async transport close tear down the
+      # replacement transport; phx.gen.cert Chromium cert and phx.new Tailwind
+      # 4.3.3 are unused (we already ship Tailwind 4.3.3).
+      {:phoenix, "~> 1.8.15"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},

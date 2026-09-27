@@ -131,15 +131,15 @@ defmodule YscWeb.AdminUsersLive do
                 Review Application
               </.admin_page_title>
               <p class="text-sm text-zinc-500 mt-0.5">
-                {if @selected_user.state == :pending_approval do
-                  "Submitted " <>
-                    Timex.from_now(@selected_user_application.completed)
-                else
+                {if @selected_user.state != :pending_approval &&
+                      @selected_user_application.reviewed_at do
                   "Reviewed " <>
                     DateTimeDisplay.format_utc_date(
                       @selected_user_application.reviewed_at
-                    ) <>
-                    " by " <> @selected_user_application.reviewed_by.email
+                    )
+                else
+                  "Submitted " <>
+                    Timex.from_now(@selected_user_application.completed)
                 end}
               </p>
             </div>
@@ -158,12 +158,22 @@ defmodule YscWeb.AdminUsersLive do
                   @selected_user_application.review_outcome
                 )
               }>
-                {@selected_user_application.review_outcome}
+                {String.capitalize("#{@selected_user_application.review_outcome}")}
               </.badge>
             </span>
           </div>
 
           <div class="space-y-6">
+            <.admin_application_reviewer
+              :if={
+                @selected_user.state != :pending_approval &&
+                  @selected_user_application.reviewed_at &&
+                  @selected_user_application.reviewed_by
+              }
+              id="review-application-reviewed-by"
+              reviewer={@selected_user_application.reviewed_by}
+            />
+
             <section>
               <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
                 Applicant Details
@@ -308,6 +318,17 @@ defmodule YscWeb.AdminUsersLive do
                   </p>
                   <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
                     {@selected_user_application.spoken_languages}
+                  </div>
+                </div>
+                <div class="pt-1">
+                  <p class="text-sm font-semibold text-zinc-600 mb-1">
+                    How did you hear about the club?
+                  </p>
+                  <div
+                    id="review-application-hear-about-the-club"
+                    class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10"
+                  >
+                    {@selected_user_application.hear_about_the_club}
                   </div>
                 </div>
               </div>
@@ -1293,9 +1314,9 @@ defmodule YscWeb.AdminUsersLive do
 
     application =
       if socket.assigns.live_action == :review do
-        Accounts.get_signup_application_from_user_id!(id, current_user, [
-          :reviewed_by
-        ])
+        Accounts.get_signup_application_from_user_id!(id, current_user,
+          reviewed_by: :current_avatar
+        )
       else
         nil
       end

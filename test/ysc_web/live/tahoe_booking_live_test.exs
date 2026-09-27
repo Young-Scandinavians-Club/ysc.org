@@ -169,7 +169,14 @@ defmodule YscWeb.TahoeBookingLiveTest do
                "about 3 days before check-in"
              )
 
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "starting 48 hours before check-in"
+             )
+
       refute has_element?(view, "#door-code-access", "24 hours")
+      refute has_element?(view, "#door-code-access", "within 48 hours")
       refute has_element?(view, "#door-code-access", "Unique to your booking")
     end
 

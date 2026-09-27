@@ -240,7 +240,7 @@ defmodule Ysc.EventPhotosTest do
   end
 
   describe "photo_reminder_scheduled_at/1" do
-    test "returns 9 AM America/Los_Angeles on the day after the event ends", %{
+    test "returns 10 AM America/Los_Angeles on the day after the event ends", %{
       event: event
     } do
       # Matches how the admin date-range picker actually stores a picked calendar
@@ -258,7 +258,7 @@ defmodule Ysc.EventPhotosTest do
       assert scheduled_at ==
                ~D[2026-06-10]
                |> Date.add(1)
-               |> DateTime.new!(~T[09:00:00], "America/Los_Angeles")
+               |> DateTime.new!(~T[10:00:00], "America/Los_Angeles")
                |> DateTime.shift_zone!("Etc/UTC")
     end
 

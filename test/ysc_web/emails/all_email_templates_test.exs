@@ -17,6 +17,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ApplicationApprovedFamilyLinked,
     ApplicationRejected,
     ApplicationSubmitted,
+    AdminAccessReview,
     AdminApplicationSubmitted,
     ChangeEmail,
     ResetPassword,
@@ -646,6 +647,37 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
                "booking_cancellation_treasurer_notification"
     end
 
+    test "AdminAccessReview renders", %{user: user} do
+      privileged = [
+        %{
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          role: :admin,
+          state: :active,
+          board_position: :vice_president,
+          last_sign_in_at: ~U[2026-02-14 17:12:00Z]
+        }
+      ]
+
+      html =
+        AdminAccessReview.render(
+          AdminAccessReview.build_assigns(privileged, 2026)
+        )
+
+      assert html =~ user.email
+      assert html =~ "Vice President"
+
+      empty_html =
+        AdminAccessReview.render(AdminAccessReview.build_assigns([], 2026))
+
+      assert empty_html =~
+               "No accounts currently have admin or volunteer access"
+
+      assert AdminAccessReview.get_template_name() == "admin_access_review"
+    end
+
     test "VolunteerConfirmation renders", %{user: user} do
       assigns = %{
         name: "#{user.first_name} #{user.last_name}",
@@ -1160,6 +1192,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "change_email" => ChangeEmail,
         "email_changed" => EmailChanged,
         "admin_application_submitted" => AdminApplicationSubmitted,
+        "admin_access_review" => AdminAccessReview,
         "conduct_violation_confirmation" => ConductViolationConfirmation,
         "conduct_violation_board_notification" =>
           ConductViolationBoardNotification,

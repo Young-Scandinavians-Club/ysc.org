@@ -1,13 +1,20 @@
 defmodule YscWeb.PhoenixUpgradeTest do
   @moduledoc """
-  Guards the Phoenix 1.8.13 → 1.8.14 upgrade.
+  Guards the Phoenix 1.8.14 → 1.8.15 upgrade.
 
-  1.8.14 is a patch: LongPoll `fetch` timers are cleared after success or
-  abort (we only mount the LiveView websocket, not longpoll), `use
-  Phoenix.VerifiedRoutes` requires a compile-time `:router` module, and
-  local-path checks are shared via `Phoenix.URL` so redirects, static
-  paths, and `~p` all reject CR/LF in addition to tabs and backslashes.
-  `host_to_binary/1` still treats a nil endpoint host as `"localhost"`.
+  1.8.15 is a patch. `replaceTransport` noops the old connection's
+  handlers before `close()` so an asynchronous transport close cannot
+  tear down the replacement (we import `phoenix` via esbuild
+  `NODE_PATH=deps` and only mount the LiveView websocket). `phx.gen.cert`
+  Chromium acceptance and `phx.new` Tailwind 4.3.3 are unused — we
+  already ship Tailwind 4.3.3 and do not generate certs.
+
+  1.8.14 remains: LongPoll `fetch` timers are cleared after success or
+  abort, `use Phoenix.VerifiedRoutes` requires a compile-time `:router`
+  module, and local-path checks are shared via `Phoenix.URL` so
+  redirects, static paths, and `~p` all reject CR/LF in addition to tabs
+  and backslashes. `host_to_binary/1` still treats a nil endpoint host
+  as `"localhost"`.
   """
   use ExUnit.Case, async: true
 
@@ -20,13 +27,21 @@ defmodule YscWeb.PhoenixUpgradeTest do
                        "../../deps/phoenix/assets/js/phoenix/socket.js",
                        __DIR__
                      )
+  @phoenix_changelog Path.expand("../../deps/phoenix/CHANGELOG.md", __DIR__)
+  @phoenix_cert Path.expand(
+                  "../../deps/phoenix/lib/mix/tasks/phx.gen.cert.ex",
+                  __DIR__
+                )
   @app_js Path.expand("../../assets/js/app.js", __DIR__)
   @endpoint_ex Path.expand("../../lib/ysc_web/endpoint.ex", __DIR__)
   @ysc_web_ex Path.expand("../../lib/ysc_web.ex", __DIR__)
+  @mix_exs Path.expand("../../mix.exs", __DIR__)
+  @config_exs Path.expand("../../config/config.exs", __DIR__)
 
-  describe "1.8.14 lock and JS client" do
-    test "locks the Hex package to 1.8.14" do
-      assert to_string(Application.spec(:phoenix, :vsn)) == "1.8.14"
+  describe "1.8.15 lock and JS client" do
+    test "locks the Hex package to 1.8.15" do
+      assert to_string(Application.spec(:phoenix, :vsn)) == "1.8.15"
+      assert File.read!(@mix_exs) =~ ~s({:phoenix, "~> 1.8.15"})
     end
 
     test "companion phoenix_pubsub lock is 2.3.0 with the APIs we use" do
@@ -63,6 +78,93 @@ defmodule YscWeb.PhoenixUpgradeTest do
 
       assert {:module, Phoenix.LiveView.Socket} =
                Code.ensure_loaded(Phoenix.LiveView.Socket)
+    end
+  end
+
+  describe "1.8.15 replaceTransport does not tear down the replacement" do
+    test "changelog documents the async transport-close fix" do
+      changelog = File.read!(@phoenix_changelog)
+
+      assert changelog =~ "## v1.8.15 (2026-09-25)"
+
+      assert changelog =~
+               "Fix asynchronous transport close tearing down the replacement transport"
+
+      assert changelog =~ "#6852"
+    end
+
+    test "source detaches old handlers before close so late events stay off the new conn" do
+      source = File.read!(@phoenix_socket_js)
+
+      assert source =~ "replaceTransport(newTransport)"
+
+      assert source =~
+               "the old conn closes asynchronously, so detach its handlers"
+
+      assert source =~ "belonged to the new transport"
+      assert source =~ "const wasOpen = this.isConnected()"
+      assert source =~ "this.conn.onopen = function (){ } // noop"
+      assert source =~ "this.conn.onerror = function (){ } // noop"
+      assert source =~ "this.conn.onmessage = function (){ } // noop"
+      assert source =~ "this.conn.onclose = function (){ } // noop"
+      assert source =~ "this.conn.close()"
+      assert source =~ "this.conn = null"
+      assert source =~ "this.clearHeartbeats()"
+
+      assert source =~
+               ~s|if(wasOpen){ this.triggerChanError("connection_closed") }|
+    end
+
+    test "bundled phoenix.js ships the same detach-before-close replaceTransport" do
+      js = File.read!(@phoenix_js)
+
+      assert js =~ "replaceTransport(newTransport)"
+      assert js =~ "const wasOpen = this.isConnected()"
+      assert js =~ "this.conn.onopen = function()"
+      assert js =~ "this.conn.onerror = function()"
+      assert js =~ "this.conn.onmessage = function()"
+      assert js =~ "this.conn.onclose = function()"
+      assert js =~ "this.conn.close()"
+      assert js =~ "this.clearHeartbeats()"
+      assert js =~ ~s|this.triggerChanError("connection_closed")|
+    end
+
+    test "app.js loads phoenix from deps and still reconnects after disconnect settles" do
+      app = File.read!(@app_js)
+      config = File.read!(@config_exs)
+
+      assert app =~ ~s|import { Socket } from "phoenix"|
+      assert config =~ ~s|"NODE_PATH" => Path.expand("../deps", __DIR__)|
+
+      # We do not call replaceTransport; LiveView uses websocket only.
+      # forceReconnect still waits a tick after disconnect() so the old
+      # socket can close before connect() opens the replacement.
+      refute app =~ "replaceTransport"
+      assert app =~ "function forceReconnect()"
+      assert app =~ "liveSocket.disconnect();"
+      assert app =~ "setTimeout(() => liveSocket.connect(), 100)"
+    end
+  end
+
+  describe "1.8.15 unused generator changes" do
+    test "phx.gen.cert is unused; Chromium SAN extensions stay in the task" do
+      cert = File.read!(@phoenix_cert)
+      mix_exs = File.read!(@mix_exs)
+
+      # mix.exs documents the unused generator in a comment; aliases do not run it.
+      refute mix_exs =~ ~s|"phx.gen.cert"|
+      refute mix_exs =~ "Mix.Tasks.Phx.Gen.Cert"
+      assert cert =~ "@subjectAlternativeName"
+      assert cert =~ "@extendedKeyUsage"
+      assert cert =~ "@serverAuth"
+    end
+
+    test "phx.new Tailwind 4.3.3 is already the app Tailwind version" do
+      changelog = File.read!(@phoenix_changelog)
+      config = File.read!(@config_exs)
+
+      assert changelog =~ "Update Tailwind version to 4.3.3"
+      assert config =~ ~s|version: "4.3.3"|
     end
   end
 

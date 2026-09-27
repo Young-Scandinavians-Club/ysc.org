@@ -4259,6 +4259,20 @@ defmodule YscWeb.UserSettingsLive do
            title: "Membership"
          )}
 
+      {:error, :date_of_birth_required} ->
+        # The acceptance page collects the date of birth before linking.
+        {:noreply,
+         push_navigate(socket, to: ~p"/family-invite/#{token}/accept")}
+
+      {:error, :child_is_adult} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           FamilyInvites.child_is_adult_message(),
+           title: "Membership"
+         )}
+
       {:error, _} ->
         {:noreply,
          YscWeb.Flash.put_toast(

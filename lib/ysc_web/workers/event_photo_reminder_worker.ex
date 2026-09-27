@@ -2,7 +2,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   @moduledoc """
   Sends post-event photo upload reminder emails to ticket holders the day after an event ends.
 
-  Scheduled for 9:00 AM America/Los_Angeles on the calendar day after the event's effective end date.
+  Scheduled for 10:00 AM America/Los_Angeles on the calendar day after the event's effective end date.
   """
   require Ysc.Logging
 

@@ -81,6 +81,7 @@ config :ysc, :emails,
   membership_email: System.get_env("EMAIL_MEMBERSHIP") || "memberships@ysc.org",
   board_email: System.get_env("EMAIL_BOARD") || "board@ysc.org",
   volunteer_email: System.get_env("EMAIL_VOLUNTEER") || "volunteer@ysc.org",
+  webtech_email: System.get_env("EMAIL_WEBTECH") || "webtech@ysc.org",
   tahoe_email: System.get_env("EMAIL_TAHOE") || "tahoe@ysc.org",
   clear_lake_email: System.get_env("EMAIL_CLEAR_LAKE") || "cl@ysc.org"
 

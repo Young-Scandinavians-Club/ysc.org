@@ -1191,6 +1191,47 @@ defmodule Ysc.AccountsTest do
       assert meta.page_size == 10
     end
 
+    test "slims registration forms without long-text application answers" do
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          first_name: "Slimform",
+          last_name: "Applicant"
+        })
+
+      completed = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      signup_application_fixture(user, %{
+        completed: completed,
+        hear_about_the_club: "must not load this answer",
+        link_to_scandinavia: "must not load this essay"
+      })
+
+      {users, essay_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, {users, _meta}} =
+              Accounts.list_paginated_users(
+                %{page: 1, page_size: 50},
+                "Slimform"
+              )
+
+            users
+          end,
+          pattern:
+            ~r/hear_about_the_club|link_to_scandinavia|lived_in_scandinavia/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(users, &(&1.id == user.id))
+      assert found
+      assert found.registration_form.completed == completed
+      assert is_nil(found.registration_form.hear_about_the_club)
+      assert is_nil(found.registration_form.link_to_scandinavia)
+      assert Ecto.assoc_loaded?(found.current_avatar)
+      assert essay_cols == 0
+    end
+
     test "filters by search term" do
       user = user_fixture(%{first_name: "John", phone_number: "+14159098268"})
       _other = user_fixture(%{first_name: "Jane", phone_number: "+14159098269"})
@@ -2771,6 +2812,46 @@ defmodule Ysc.AccountsTest do
 
       assert Accounts.count_pending_approval_users() >= 2
       assert length(Accounts.list_pending_approval_users(limit: 1)) == 1
+    end
+
+    test "slims pending users, avatars, and registration forms" do
+      pending =
+        oauth_user_fixture(%{
+          phone_number: unique_user_phone(),
+          first_name: "Pend",
+          last_name: "Ing",
+          state: :pending_approval
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "pending list must not load this bio"
+        })
+        |> Repo.update!()
+
+      signup_application_fixture(pending, %{
+        membership_type: "family",
+        hear_about_the_club: "must not load this answer",
+        link_to_scandinavia: "must not load this essay",
+        completed: DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+
+      {preview, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_pending_approval_users(limit: 10) end,
+          pattern:
+            ~r/hashed_password|board_bio|hear_about_the_club|link_to_scandinavia/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(preview, &(&1.id == pending.id))
+      assert found
+      assert found.first_name == "Pend"
+      assert found.registration_form.membership_type == :family
+      assert found.registration_form.completed
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert is_nil(found.registration_form.hear_about_the_club)
+      assert Ecto.assoc_loaded?(found.current_avatar)
+      assert password_cols == 0
     end
   end
 
@@ -4442,6 +4523,49 @@ defmodule Ysc.AccountsTest do
                  []
                )
     end
+
+    test "get_signup_application_from_user_id!/3 slims reviewer without password hashes" do
+      subject = user_fixture(%{phone_number: unique_user_phone()})
+
+      reviewer =
+        user_fixture(%{
+          role: :admin,
+          phone_number: unique_user_phone(),
+          first_name: "Rene",
+          last_name: "Viewer"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "reviewer must not load this bio"
+        })
+        |> Repo.update!()
+
+      signup_application_fixture(subject, %{
+        reviewed_by_user_id: reviewer.id,
+        reviewed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        review_outcome: "approved"
+      })
+
+      {app, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Accounts.get_signup_application_from_user_id!(
+              subject.id,
+              reviewer,
+              reviewed_by: :current_avatar
+            )
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert app.reviewed_by.id == reviewer.id
+      assert app.reviewed_by.email == reviewer.email
+      assert app.reviewed_by.first_name == "Rene"
+      assert is_nil(app.reviewed_by.hashed_password)
+      assert is_nil(app.reviewed_by.board_bio)
+      assert Ecto.assoc_loaded?(app.reviewed_by.current_avatar)
+    end
   end
 
   describe "deliver_application_submitted_notification/1" do
@@ -4757,6 +4881,7 @@ defmodule Ysc.AccountsTest do
         assert %User{} = found.primary_user
         assert found.primary_user.id == primary.id
         assert Ecto.assoc_loaded?(found.primary_user.subscriptions)
+        assert is_nil(found.primary_user.hashed_password)
       end
     end
   end

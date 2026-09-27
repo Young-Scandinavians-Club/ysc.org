@@ -42,6 +42,21 @@ defmodule YscWeb.Emails.EventCancellationNotificationTest do
     assert html =~ event.title
   end
 
+  test "does not load organizer users when preparing shared data", %{
+    event: event
+  } do
+    {_data, user_selects} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          EventCancellationNotification.prepare_shared_email_data(event)
+        end,
+        pattern: ~r/FROM "users"/i,
+        caller_pids: [self()]
+      )
+
+    assert user_selects == 0
+  end
+
   test "falls back to a generic greeting without a first name", %{event: event} do
     data =
       EventCancellationNotification.prepare_email_data(event, %{

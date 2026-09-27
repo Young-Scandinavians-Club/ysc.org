@@ -35,9 +35,7 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
         :ok
 
       update ->
-        event =
-          Repo.get!(Ysc.Events.Event, update.event_id)
-          |> Repo.preload([:organizer, :cover_image])
+        event = Repo.get!(Ysc.Events.Event, update.event_id)
 
         send_update_notifications(event, update)
     end
