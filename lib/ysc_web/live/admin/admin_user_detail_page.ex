@@ -800,9 +800,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <%= if @selected_user_application.reviewed_at do %>
                       Reviewed {DateTimeDisplay.format_utc_date(
                         @selected_user_application.reviewed_at
-                      )} by {if @selected_user_application.reviewed_by,
-                        do: @selected_user_application.reviewed_by.email,
-                        else: "—"}
+                      )}
                     <% else %>
                       Submitted {if @selected_user_application.completed,
                         do: Timex.from_now(@selected_user_application.completed),
@@ -826,10 +824,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                     @selected_user_application.review_outcome
                   )
                 }>
-                  {@selected_user_application.review_outcome}
+                  {String.capitalize("#{@selected_user_application.review_outcome}")}
                 </.badge>
               </span>
             </div>
+
+            <.admin_application_reviewer
+              :if={
+                @selected_user_application.reviewed_at &&
+                  @selected_user_application.reviewed_by
+              }
+              id="admin-application-reviewed-by"
+              reviewer={@selected_user_application.reviewed_by}
+            />
 
             <%!-- Override banner: shown when rejection was overridden and user is now active --%>
             <div
@@ -4186,9 +4193,9 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp fetch_application(user_id, current_user) do
     try do
-      Accounts.get_signup_application_from_user_id!(user_id, current_user, [
-        :reviewed_by
-      ])
+      Accounts.get_signup_application_from_user_id!(user_id, current_user,
+        reviewed_by: :current_avatar
+      )
     rescue
       Ecto.NoResultsError -> nil
     end

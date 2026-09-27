@@ -4154,6 +4154,42 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_application_reviewer
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Linked card showing the admin who reviewed a membership application.
+
+  Preload the reviewer's `:current_avatar` so their uploaded avatar is shown.
+  """
+  attr :id, :string, required: true
+  attr :reviewer, :map, required: true, doc: "The reviewing `%User{}`"
+
+  def admin_application_reviewer(assigns) do
+    ~H"""
+    <section id={@id}>
+      <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+        Reviewed by
+      </h3>
+      <.link
+        id={"#{@id}-link"}
+        navigate={~p"/admin/users/#{@reviewer.id}/details"}
+        class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
+      >
+        <.user_avatar_image user={@reviewer} class="w-10 h-10 rounded-full" />
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-zinc-900 truncate">
+            {@reviewer.first_name} {@reviewer.last_name}
+          </div>
+          <div class="text-sm text-zinc-600 truncate">{@reviewer.email}</div>
+        </div>
+        <.icon name="hero-chevron-right" class="w-4 h-4 text-zinc-400 shrink-0" />
+      </.link>
+    </section>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # phone_mockup
   # ---------------------------------------------------------------------------
 
