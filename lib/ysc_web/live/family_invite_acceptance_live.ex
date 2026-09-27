@@ -81,6 +81,12 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
            |> assign(:form, form)
            |> assign(:existing_user, existing_user)
            |> assign(:can_link_existing, can_link_existing)
+           |> assign(
+             :adult_child_blocked,
+             can_link_existing &&
+               FamilyInvites.child_invite?(invite) &&
+               FamilyInvites.adult?(current_user.date_of_birth)
+           )
            |> assign(:page_title, "Accept Family Invitation")
            |> assign(
              :meta_description,
@@ -102,6 +108,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         hash_password: false,
         validate_email: false
       )
+      |> FamilyInvites.validate_child_age(invite)
       |> Map.put(:action, :validate)
 
     {:noreply, assign(socket, form: to_form(changeset, as: "user"))}
@@ -155,6 +162,15 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          |> YscWeb.Flash.put_toast(
            :error,
            "You can only be on one family membership at a time. Leave your current family first (go to Settings > Family > Leave family membership), then come back and accept this invitation.",
+           title: "Invitation"
+         )}
+
+      {:error, :child_is_adult} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           FamilyInvites.child_is_adult_message(),
            title: "Invitation"
          )}
 
@@ -238,7 +254,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         </p>
 
         <%!-- Logged in with matching email: show Join button --%>
-        <div :if={@can_link_existing} class="mt-8">
+        <div :if={@can_link_existing && @adult_child_blocked} class="mt-8">
+          <.callout type="error" class="p-6" id="adult-child-blocked-notice">
+            <p>{FamilyInvites.child_is_adult_message()}</p>
+          </.callout>
+        </div>
+
+        <div :if={@can_link_existing && !@adult_child_blocked} class="mt-8">
           <.callout type="info" class="p-6">
             <p class="text-blue-800 mb-4">
               You're signed in as <strong>{@current_user.email}</strong>. Click below to join <strong>{@invite.primary_user.first_name}</strong>'s family membership.

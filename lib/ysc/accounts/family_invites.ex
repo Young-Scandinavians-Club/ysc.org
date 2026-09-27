@@ -8,12 +8,22 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   alias Ysc.Repo
   alias Ecto.Multi
-  alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent, UserProfileCache}
+
+  alias Ysc.Accounts.{
+    Email,
+    User,
+    FamilyInvite,
+    FamilyMember,
+    UserEvent,
+    UserProfileCache
+  }
+
   alias Ysc.Subscriptions.BoardVolunteerBilling
   alias YscWeb.Emails.Notifier
 
   @max_sub_accounts 10
   @max_spouses 1
+  @adult_age 18
 
   @doc """
   Toast shown when an invitation token does not match a current invite.
@@ -26,6 +36,65 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   @doc """
+  Returns true when someone born on `birth_date` is #{@adult_age} or older on `today`.
+
+  Children who are adults cannot join a family membership; they need their own
+  account and membership. Unknown birth dates are not treated as adult.
+  """
+  def adult?(birth_date, today \\ Date.utc_today())
+
+  def adult?(%Date{} = birth_date, %Date{} = today) do
+    Date.compare(Date.shift(birth_date, year: @adult_age), today) != :gt
+  end
+
+  def adult?(_birth_date, _today), do: false
+
+  @doc """
+  Message shown when a child invite is refused because the child is an adult.
+  """
+  def child_is_adult_message(name \\ nil)
+
+  def child_is_adult_message(name) when is_binary(name) and name != "" do
+    "#{name} is #{@adult_age} or older, so they can't be added to a family membership. " <>
+      "Adults need their own YSC account and membership."
+  end
+
+  def child_is_adult_message(_name) do
+    "Children who are #{@adult_age} or older can't be added to a family membership. " <>
+      "Adults need their own YSC account and membership."
+  end
+
+  @doc """
+  Adds a `:date_of_birth` error to a sub-account registration changeset when a
+  child invite is being accepted by someone who is #{@adult_age} or older.
+  """
+  def validate_child_age(
+        %Ecto.Changeset{} = changeset,
+        %FamilyInvite{} = invite
+      ) do
+    date_of_birth = Ecto.Changeset.get_field(changeset, :date_of_birth)
+
+    if child_invite?(invite) and adult?(date_of_birth) do
+      Ecto.Changeset.add_error(
+        changeset,
+        :date_of_birth,
+        "must be under #{@adult_age} to join as a child. Adults need their own YSC account and membership"
+      )
+    else
+      changeset
+    end
+  end
+
+  @doc """
+  Returns true when the invite adds the invitee as a child (the default).
+  """
+  def child_invite?(%FamilyInvite{relationship: relationship}),
+    do: child_relationship?(relationship)
+
+  defp child_relationship?(relationship),
+    do: relationship not in [:spouse, "spouse"]
+
+  @doc """
   Creates a family invite for the given primary user.
 
   Validates that:
@@ -33,6 +102,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   - Primary user has family or lifetime membership
   - Primary user has less than 10 sub-accounts
   - Max 1 spouse (when relationship is :spouse)
+  - A child listed in the family roster (`family_member_id`) is under 18
   - Email doesn't have a pending invite from this primary user
   - Email is not already registered to another user (use Accounts.admin_link_user_to_family/3
     for directly linking existing users without an invite)
@@ -48,7 +118,10 @@ defmodule Ysc.Accounts.FamilyInvites do
     family_member_id = Keyword.get(opts, :family_member_id)
     relationship = Keyword.get(opts, :relationship, :child)
 
+    family_member = get_family_member(primary_user, family_member_id)
+
     with :ok <- validate_primary_user_eligibility(primary_user),
+         :ok <- validate_child_not_adult(relationship, family_member),
          :ok <- validate_relationship_limits(primary_user, relationship),
          :ok <- validate_email_not_registered(email, primary_user.id),
          :ok <- validate_no_pending_invite(email, primary_user.id) do
@@ -62,15 +135,10 @@ defmodule Ysc.Accounts.FamilyInvites do
         relationship: relationship
       }
 
-      email_opts =
-        if family_member_id,
-          do: [family_member_id: family_member_id],
-          else: []
-
       Multi.new()
       |> Multi.insert(:invite, FamilyInvite.changeset(%FamilyInvite{}, attrs))
       |> Notifier.schedule_email_multi(:invite_email, fn %{invite: invite} ->
-        invite_email_attrs(invite, primary_user, email_opts)
+        invite_email_attrs(invite, primary_user, family_member)
       end)
       |> Repo.transaction()
       |> case do
@@ -156,6 +224,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                  hash_password: true,
                  validate_email: true
                )
+               |> validate_child_age(invite)
                |> Repo.insert() do
             {:ok, user} ->
               # Set family_relationship from invite
@@ -313,6 +382,9 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       current_user.id == invite.primary_user_id ->
         {:error, :cannot_link_self}
+
+      child_invite?(invite) and adult?(current_user.date_of_birth) ->
+        {:error, :child_is_adult}
 
       true ->
         Repo.transaction(fn ->
@@ -769,6 +841,18 @@ defmodule Ysc.Accounts.FamilyInvites do
     end
   end
 
+  defp validate_child_not_adult(relationship, %FamilyMember{
+         birth_date: birth_date
+       }) do
+    if child_relationship?(relationship) and adult?(birth_date) do
+      {:error, :child_is_adult}
+    else
+      :ok
+    end
+  end
+
+  defp validate_child_not_adult(_relationship, _family_member), do: :ok
+
   defp validate_email_not_registered(email, primary_user_id) do
     normalized = Email.normalize(email)
 
@@ -798,18 +882,15 @@ defmodule Ysc.Accounts.FamilyInvites do
     end
   end
 
-  defp invite_email_attrs(invite, primary_user, opts) do
-    family_member_id = Keyword.get(opts, :family_member_id)
-
-    # Get family member info if provided
+  defp invite_email_attrs(invite, primary_user, family_member) do
     family_member_name =
-      if family_member_id && family_member_id != "" do
-        case get_family_member_name(primary_user, family_member_id) do
-          {:ok, name} -> name
-          _ -> nil
-        end
-      else
-        nil
+      case family_member do
+        %FamilyMember{first_name: first_name, last_name: last_name}
+        when is_binary(first_name) ->
+          format_family_member_name(first_name, last_name)
+
+        _ ->
+          nil
       end
 
     invite_url =
@@ -864,31 +945,16 @@ defmodule Ysc.Accounts.FamilyInvites do
     }
   end
 
-  defp get_family_member_name(primary_user, family_member_id) do
-    # Load user with family members
-    user =
-      if Ecto.assoc_loaded?(primary_user.family_members) do
-        primary_user
-      else
-        Ysc.Accounts.get_user!(primary_user.id, [:family_members])
-      end
+  defp get_family_member(_primary_user, family_member_id)
+       when family_member_id in [nil, ""],
+       do: nil
 
-    if Ecto.assoc_loaded?(user.family_members) do
-      find_and_format_family_member_name(user.family_members, family_member_id)
-    else
-      {:error, :family_members_not_loaded}
-    end
-  end
-
-  defp find_and_format_family_member_name(family_members, family_member_id) do
-    case Enum.find(family_members, &(&1.id == family_member_id)) do
-      %Ysc.Accounts.FamilyMember{first_name: first_name, last_name: last_name}
-      when not is_nil(first_name) ->
-        name = format_family_member_name(first_name, last_name)
-        {:ok, name}
-
-      _ ->
-        {:error, :not_found}
+  # Always read from the DB: callers may hold a stale `family_members` preload
+  # (e.g. onboarding upserts the member right before inviting).
+  defp get_family_member(primary_user, family_member_id) do
+    case Ecto.ULID.cast(family_member_id) do
+      {:ok, id} -> Repo.get_by(FamilyMember, id: id, user_id: primary_user.id)
+      :error -> nil
     end
   end
 

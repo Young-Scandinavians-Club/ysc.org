@@ -89,16 +89,27 @@ defmodule YscWeb.FamilyManagementLive do
         to_string(fm.id) == to_string(id)
       end)
 
-    if member do
-      {:noreply,
-       socket
-       |> assign(:invite_target, member)
-       |> assign(:invite_form, invite_form_for_member(member))}
-    else
-      {:noreply,
-       YscWeb.Flash.put_toast(socket, :error, "Family member not found.",
-         title: "Family"
-       )}
+    cond do
+      is_nil(member) ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Family member not found.",
+           title: "Family"
+         )}
+
+      adult_child?(member) ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           FamilyInvites.child_is_adult_message(member_name(member)),
+           title: "Family"
+         )}
+
+      true ->
+        {:noreply,
+         socket
+         |> assign(:invite_target, member)
+         |> assign(:invite_form, invite_form_for_member(member))}
     end
   end
 
@@ -899,7 +910,7 @@ defmodule YscWeb.FamilyManagementLive do
     ~H"""
     <div class="inline-flex items-center justify-end gap-2">
       <.button
-        :if={@row.kind == :roster}
+        :if={@row.kind == :roster and @row.can_invite}
         type="button"
         variant="outline"
         color="blue"
@@ -1013,10 +1024,27 @@ defmodule YscWeb.FamilyManagementLive do
            title: "Family"
          )}
 
+      {:error, :child_is_adult} ->
+        {:noreply,
+         socket
+         |> assign(:invite_target, nil)
+         |> assign(:invite_form, empty_invite_form())
+         |> YscWeb.Flash.put_toast(
+           :error,
+           FamilyInvites.child_is_adult_message(member && member_name(member)),
+           title: "Family"
+         )}
+
       {:error, reason} ->
         {:noreply, invite_error(socket, reason)}
     end
   end
+
+  defp adult_child?(%FamilyMember{type: type, birth_date: birth_date}),
+    do: type != :spouse and FamilyInvites.adult?(birth_date)
+
+  defp member_name(%FamilyMember{first_name: first_name, last_name: last_name}),
+    do: String.trim("#{first_name} #{last_name}")
 
   defp active_member_rows(sub_accounts, family_members) do
     linked_rows =
@@ -1030,7 +1058,8 @@ defmodule YscWeb.FamilyManagementLive do
           relationship:
             FamilyDisplay.relationship_label(sub_account.family_relationship),
           status_label: "Can sign in",
-          badge_type: "green"
+          badge_type: "green",
+          can_invite: false
         }
       end)
 
@@ -1045,6 +1074,13 @@ defmodule YscWeb.FamilyManagementLive do
               "Details saved"
           end
 
+        {status_label, badge_type, can_invite} =
+          if adult_child?(member) do
+            {"18+ needs own membership", "red", false}
+          else
+            {"No account yet", "yellow", true}
+          end
+
         %{
           kind: :roster,
           id: member.id,
@@ -1052,8 +1088,9 @@ defmodule YscWeb.FamilyManagementLive do
           name: "#{member.first_name} #{member.last_name}",
           subtitle: subtitle,
           relationship: FamilyDisplay.relationship_label(member.type),
-          status_label: "No account yet",
-          badge_type: "yellow"
+          status_label: status_label,
+          badge_type: badge_type,
+          can_invite: can_invite
         }
       end)
 

@@ -237,6 +237,60 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
     end
   end
 
+  describe "adult accepting a child invite" do
+    test "shows a date of birth error and does not create the account", %{
+      conn: conn
+    } do
+      {invite, _primary_user} = create_family_invite()
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      params = %{
+        email: invite.email,
+        first_name: "Grown",
+        last_name: "Up",
+        date_of_birth:
+          Date.utc_today() |> Date.shift(year: -18) |> Date.to_iso8601(),
+        password: "securepassword123",
+        password_confirmation: "securepassword123"
+      }
+
+      html =
+        view
+        |> form("#accept-invite-form", user: params)
+        |> render_change()
+
+      assert html =~ "under 18"
+
+      html =
+        view
+        |> form("#accept-invite-form", user: params)
+        |> render_submit()
+
+      assert html =~ "under 18"
+      assert has_element?(view, "form#accept-invite-form")
+      assert Ysc.Accounts.get_user_by_email(invite.email) == nil
+    end
+
+    test "logged-in adult sees a notice instead of the join button", %{
+      conn: conn
+    } do
+      {invite, _primary} = create_family_invite()
+
+      invited_user =
+        user_fixture(%{email: invite.email})
+        |> Ecto.Changeset.change(date_of_birth: ~D[1990-01-01])
+        |> Repo.update!()
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert has_element?(view, "#adult-child-blocked-notice")
+      refute has_element?(view, "button", "Join Family Membership")
+    end
+  end
+
   describe "handle_event save - success" do
     test "accepts invite and creates user account", %{conn: conn} do
       {invite, _primary_user} = create_family_invite()
@@ -250,7 +304,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
           email: invite.email,
           first_name: "John",
           last_name: "Doe",
-          date_of_birth: "1990-01-01",
+          date_of_birth:
+            Date.utc_today() |> Date.shift(year: -10) |> Date.to_iso8601(),
           password: "securepassword123",
           password_confirmation: "securepassword123"
         }
