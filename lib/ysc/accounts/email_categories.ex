@@ -17,6 +17,7 @@ defmodule Ysc.Accounts.EmailCategories do
                                    "family_invite_accepted",
                                    "family_invite_cancelled",
                                    "family_member_removed",
+                                   "family_member_aged_out",
                                    "membership_payment_confirmation",
                                    "membership_payment_failure",
                                    "membership_payment_reminder_7day",
@@ -85,6 +86,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "family_invite_accepted" => :account,
     "family_invite_cancelled" => :account,
     "family_member_removed" => :account,
+    "family_member_aged_out" => :account,
     # Double opt-in confirmation — must always send regardless of newsletter
     # preference, since it's what grants that preference in the first place.
     "newsletter_confirmation" => :account,
