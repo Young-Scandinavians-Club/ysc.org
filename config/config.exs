@@ -178,6 +178,8 @@ config :ysc, Oban,
       # America/Los_Angeles reminder (EventPhotos.photo_reminder_scheduled_at/1)
       # year-round: 18:30 UTC = 10:30 AM PST (UTC-8) / 11:30 AM PDT (UTC-7).
       {"30 18 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
+      # 16:00 UTC = 8:00 AM PST (UTC-8) / 9:00 AM PDT (UTC-7)
+      {"0 16 * * *", YscWeb.Workers.FamilyMemberAgeOutWorker},
       # 17:00 UTC = 9:00 AM PST (UTC-8) / 10:00 AM PDT (UTC-7)
       {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker},
       # March 1, 17:00 UTC = 9:00 AM PST — yearly admin/volunteer access review

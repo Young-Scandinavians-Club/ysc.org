@@ -17,6 +17,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     FamilyInvite,
     FamilyInviteAccepted,
     FamilyInviteCancelled,
+    FamilyMemberAgedOut,
+    FamilyMemberAgedOutPrimary,
     FamilyMemberRemoved,
     MembershipPaymentConfirmation,
     MembershipPaymentFailure,
@@ -230,6 +232,52 @@ defmodule YscWeb.Emails.EmailCoverageTest do
                "Removed from Family Membership - YSC"
 
       assert FamilyMemberRemoved.membership_url() =~ "/users/membership"
+    end
+  end
+
+  describe "FamilyMemberAgedOut" do
+    test "renders and exposes template metadata" do
+      assigns = %{
+        first_name: "Jane",
+        primary_user_name: "John",
+        membership_url: "https://example.com/users/membership"
+      }
+
+      html = FamilyMemberAgedOut.render(assigns)
+      assert html =~ "Jane"
+      assert html =~ "John"
+      assert html =~ "children under 18"
+      assert html =~ "Get your own membership"
+      assert html =~ "https://example.com/users/membership"
+
+      assert FamilyMemberAgedOut.get_template_name() == "family_member_aged_out"
+      assert FamilyMemberAgedOut.get_subject() =~ "own YSC membership"
+      assert FamilyMemberAgedOut.membership_url() =~ "/users/membership"
+    end
+  end
+
+  describe "FamilyMemberAgedOutPrimary" do
+    test "renders and exposes template metadata" do
+      assigns = %{
+        primary_first_name: "John",
+        member_name: "Jane Doe",
+        family_management_url: "https://example.com/users/settings/family"
+      }
+
+      html = FamilyMemberAgedOutPrimary.render(assigns)
+      assert html =~ "John"
+      assert html =~ "Jane Doe"
+      assert html =~ "children under 18"
+      assert html =~ "View your family"
+      assert html =~ "https://example.com/users/settings/family"
+
+      assert FamilyMemberAgedOutPrimary.get_template_name() ==
+               "family_member_aged_out_primary"
+
+      assert FamilyMemberAgedOutPrimary.get_subject() =~ "aged out"
+
+      assert FamilyMemberAgedOutPrimary.family_management_url() =~
+               "/users/settings/family"
     end
   end
 

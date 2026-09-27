@@ -4149,6 +4149,244 @@ defmodule Ysc.Accounts do
     end
   end
 
+  # Family memberships cover the primary holder, their spouse/partner, and
+  # children under this age.
+  @family_child_age_limit 18
+
+  # Only children whose 18th birthday falls within this many days are picked
+  # up by the daily sweep, so a missed run still catches them without
+  # sweeping up adult children who were linked before this rule existed.
+  @aged_out_default_lookback_days 7
+
+  @doc """
+  Lists child family members (sub-accounts) who turned #{@family_child_age_limit}
+  within the lookback window ending on `today`.
+
+  Spouses are never included. Deleted accounts are skipped.
+
+  ## Options
+  - `:lookback_days` - how many days back to look for 18th birthdays
+    (default: #{@aged_out_default_lookback_days})
+  """
+  def list_aged_out_family_members(%Date{} = today, opts \\ []) do
+    today
+    |> aged_out_family_members_query(opts)
+    |> Repo.all()
+  end
+
+  defp aged_out_family_members_query(today, opts) do
+    lookback_days =
+      Keyword.get(opts, :lookback_days, @aged_out_default_lookback_days)
+
+    # Born on or before this date => already 18 today.
+    latest_dob = latest_adult_birth_date(today)
+
+    # Born after this date => turned 18 within the lookback window.
+    earliest_dob_exclusive =
+      today
+      |> Date.add(-lookback_days)
+      |> latest_adult_birth_date()
+
+    from(u in User,
+      where: not is_nil(u.primary_user_id),
+      where: u.family_relationship == "child" or is_nil(u.family_relationship),
+      where: u.state != :deleted,
+      where: u.date_of_birth <= ^latest_dob,
+      where: u.date_of_birth > ^earliest_dob_exclusive,
+      order_by: [asc: u.date_of_birth, asc: u.id]
+    )
+  end
+
+  # Latest birth date of someone who is #{@family_child_age_limit} on `date`.
+  # Someone counts as 18 from `Date.shift(birth_date, year: 18)`, the same rule
+  # the family invite age check uses, so Feb 29 birthdays turn 18 on Feb 28 in
+  # non-leap years. Shifting `date` back instead would push them to Mar 1.
+  defp latest_adult_birth_date(date) do
+    shifted = Date.shift(date, year: -@family_child_age_limit)
+    next_day = Date.add(shifted, 1)
+
+    if Date.compare(Date.shift(next_day, year: @family_child_age_limit), date) ==
+         :gt do
+      shifted
+    else
+      next_day
+    end
+  end
+
+  @doc """
+  Detaches a child family member who has turned #{@family_child_age_limit} from
+  their family membership and emails them that they need their own membership
+  to stay a member. The family's membership holder is emailed too, so they know
+  why the member is no longer on their membership.
+
+  The row is re-read under lock so a member who already left (or was moved to
+  another family) since being listed is left untouched.
+
+  Returns `{:ok, updated_user}`, `{:error, :not_sub_account}` when the user is
+  no longer linked to the same family, or `{:error, changeset}`.
+  """
+  @dialyzer {:nowarn_function, detach_aged_out_family_member: 1}
+  def detach_aged_out_family_member(%User{} = user) do
+    primary_user_id = user.primary_user_id
+
+    if is_nil(primary_user_id) do
+      {:error, :not_sub_account}
+    else
+      multi =
+        Ecto.Multi.new()
+        |> Ecto.Multi.run(:locked_user, fn repo, _changes ->
+          locked =
+            from(u in User, where: u.id == ^user.id, lock: "FOR UPDATE")
+            |> repo.one()
+
+          case locked do
+            %User{primary_user_id: ^primary_user_id} = locked ->
+              {:ok, locked}
+
+            _ ->
+              {:error, :not_sub_account}
+          end
+        end)
+        # The member row is locked and still points at the primary, and the FK
+        # nilifies on delete, so the primary is guaranteed to exist here.
+        |> Ecto.Multi.run(:primary_user, fn repo, _changes ->
+          {:ok, repo.get!(User, primary_user_id)}
+        end)
+        |> Ecto.Multi.update(:sub_account, fn %{locked_user: locked} ->
+          Ecto.Changeset.change(locked, %{
+            primary_user_id: nil,
+            family_relationship: nil
+          })
+        end)
+        |> Ecto.Multi.insert(
+          :user_event,
+          UserEvent.new_user_event_changeset(%UserEvent{}, %{
+            user_id: user.id,
+            # No system actor exists; attribute the change to the member.
+            updated_by_user_id: user.id,
+            type: :family_removed,
+            from: "#{primary_user_id}",
+            to: "none"
+          })
+        )
+        |> YscWeb.Emails.Notifier.schedule_email_multi(
+          :family_member_aged_out_email,
+          fn %{locked_user: locked, primary_user: primary_user} ->
+            family_member_aged_out_email_args(locked, primary_user)
+          end
+        )
+        |> YscWeb.Emails.Notifier.schedule_email_multi(
+          :family_member_aged_out_primary_email,
+          fn %{locked_user: locked, primary_user: primary_user} ->
+            family_member_aged_out_primary_email_args(locked, primary_user)
+          end
+        )
+
+      case Repo.transaction(multi) do
+        {:ok, %{sub_account: updated_sub_account, primary_user: primary_user}} ->
+          MembershipCache.invalidate_user(updated_sub_account.id)
+
+          invalidate_family_link_profile_caches(
+            updated_sub_account.id,
+            primary_user_id
+          )
+
+          sync_board_volunteer_billing_after_family_change(
+            primary_user,
+            updated_sub_account
+          )
+
+          {:ok, updated_sub_account}
+
+        {:error, _step, reason, _changes} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp family_member_aged_out_email_args(user, primary_user) do
+    first_name = user.first_name || "there"
+
+    primary_name = primary_user.first_name || "the primary account holder"
+
+    membership_url = YscWeb.Emails.FamilyMemberAgedOut.membership_url()
+
+    %{
+      recipient: user.email,
+      idempotency_key: "family_member_aged_out_#{user.id}",
+      subject: YscWeb.Emails.FamilyMemberAgedOut.get_subject(),
+      template: YscWeb.Emails.FamilyMemberAgedOut.get_template_name(),
+      variables: %{
+        first_name: first_name,
+        primary_user_name: primary_name,
+        membership_url: membership_url
+      },
+      text_body: """
+      ==============================
+
+      Hi #{first_name},
+
+      Congratulations on turning 18!
+
+      Family memberships cover children under 18, so you are no longer part of #{primary_name}'s family membership.
+
+      Your account stays open. To keep booking cabins, buying member event tickets, and enjoying other member benefits, you will need your own membership:
+
+      #{membership_url}
+
+      ==============================
+      """,
+      user_id: user.id,
+      opts: []
+    }
+  end
+
+  defp family_member_aged_out_primary_email_args(member, primary_user) do
+    primary_first_name = primary_user.first_name || "there"
+
+    member_name =
+      [member.first_name, member.last_name]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.join(" ")
+      |> case do
+        "" -> "Your family member"
+        name -> name
+      end
+
+    family_management_url =
+      YscWeb.Emails.FamilyMemberAgedOutPrimary.family_management_url()
+
+    %{
+      recipient: primary_user.email,
+      idempotency_key:
+        "family_member_aged_out_primary_#{member.id}_#{primary_user.id}",
+      subject: YscWeb.Emails.FamilyMemberAgedOutPrimary.get_subject(),
+      template: YscWeb.Emails.FamilyMemberAgedOutPrimary.get_template_name(),
+      variables: %{
+        primary_first_name: primary_first_name,
+        member_name: member_name,
+        family_management_url: family_management_url
+      },
+      text_body: """
+      ==============================
+
+      Hi #{primary_first_name},
+
+      #{member_name} has turned 18. Family memberships cover children under 18, so #{member_name} is no longer part of your family membership.
+
+      Your membership and your other family members are not affected.
+
+      We have emailed #{member_name} about getting their own membership so they can keep booking cabins and buying member event tickets.
+
+      View your family: #{family_management_url}
+
+      ==============================
+      """,
+      user_id: primary_user.id,
+      opts: []
+    }
+  end
+
   defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
     invalidate_user_profile_cache(user_id)
     invalidate_user_profile_cache(primary_user_id)
@@ -5172,6 +5410,11 @@ defmodule Ysc.Accounts do
       order_by: [asc: u.last_name, asc: u.first_name],
       limit: 50
     )
+  end
+
+  @doc false
+  def ci_query_explain_aged_out_family_members_query do
+    aged_out_family_members_query(Ysc.Ci.QueryExplain.Fixtures.today(), [])
   end
 
   @doc false
