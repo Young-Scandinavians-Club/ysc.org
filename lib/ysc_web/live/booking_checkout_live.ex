@@ -2541,6 +2541,15 @@ defmodule YscWeb.BookingCheckoutLive do
           else
             adult_price_per_night
           end %>
+        <div
+          :if={billable_people > guests_count}
+          id="checkout-minimum-pricing-applied"
+          class="mb-2 p-2 bg-amber-900/40 border border-amber-700 rounded-sm"
+        >
+          <p class="text-xs text-amber-100 leading-tight">
+            {BookingUserMessages.room_minimum_pricing_applied(billable_people)}
+          </p>
+        </div>
         <!-- Adults pricing -->
         <%= if billable_people > 0 && (base_total || adult_price_per_night) do %>
           <% final_base_total =
@@ -2556,8 +2565,11 @@ defmodule YscWeb.BookingCheckoutLive do
                    nil
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-            <div class="text-zinc-400">
-              {BookingDisplay.adults_label(billable_people)}
+            <div id="checkout-base-price-people" class="text-zinc-400">
+              {BookingUserMessages.room_base_price_people_label(
+                billable_people,
+                guests_count
+              )}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
               <%= if adult_price_per_night do %>

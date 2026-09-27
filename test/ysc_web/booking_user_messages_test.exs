@@ -123,6 +123,13 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert applied =~ "You're being charged for 2 guests"
     assert applied =~ "2-guest minimum price"
     refute applied =~ "occupancy"
+
+    assert BookingUserMessages.room_base_price_people_label(2, 1) ==
+             "charged for 2 guests"
+
+    assert BookingUserMessages.room_base_price_people_label(2, 2) == "2 adults"
+    assert BookingUserMessages.room_base_price_people_label(1, 1) == "1 adult"
+    refute BookingUserMessages.room_base_price_people_label(2, 1) =~ "adult"
   end
 
   test "checkout step copy" do

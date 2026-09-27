@@ -2630,13 +2630,17 @@ defmodule YscWeb.TahoeBookingLive do
                           </div>
                         </div>
                         <div class="flex justify-between text-sm">
-                          <span class="text-zinc-600">
+                          <span id="tahoe-base-price-people" class="text-zinc-600">
                             Base Price
                             <%= if @price_breakdown.nights && @price_breakdown[:adult_price_per_night] do %>
-                              <% adult_count =
+                              <% billable_people =
                                 @price_breakdown[:billable_people] ||
                                   @price_breakdown[:guests_count] ||
-                                  0 %> ({BookingDisplay.adults_label(adult_count)} × {BookingDisplay.nights_label(
+                                  0 %>
+                              <% guests_count = @price_breakdown[:guests_count] || 0 %> ({YscWeb.BookingUserMessages.room_base_price_people_label(
+                                billable_people,
+                                guests_count
+                              )} × {BookingDisplay.nights_label(
                                 @price_breakdown.nights
                               )})
                             <% end %>

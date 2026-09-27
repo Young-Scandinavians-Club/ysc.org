@@ -4,6 +4,7 @@ defmodule YscWeb.BookingReceiptLive do
   alias YscWeb.BookingGuestForm
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
+  alias YscWeb.BookingUserMessages
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
@@ -827,28 +828,42 @@ defmodule YscWeb.BookingReceiptLive do
                     <% :room -> %>
                       <%= if @price_breakdown.nights do %>
                         <%= if @price_breakdown[:base] do %>
+                          <div
+                            :if={
+                              (@price_breakdown[:billable_people] || 0) >
+                                (@price_breakdown[:guests_count] || 0)
+                            }
+                            id="receipt-minimum-pricing-applied"
+                            class="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-sm"
+                          >
+                            <p class="text-xs text-amber-800 leading-tight">
+                              {BookingUserMessages.room_minimum_pricing_applied(
+                                @price_breakdown[:billable_people]
+                              )}
+                            </p>
+                          </div>
                           <div class="flex justify-between">
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-600",
-                                else: "text-zinc-400"
-                              )
-                            }>
+                            <span
+                              id="receipt-base-price-people"
+                              class={
+                                if(@booking.status == :canceled,
+                                  do: "text-zinc-600",
+                                  else: "text-zinc-400"
+                                )
+                              }
+                            >
                               Base Price
                               <%= if @price_breakdown[:adult_price_per_night] do %>
-                                <% adult_count =
+                                <% billable_people =
                                   @price_breakdown[:billable_people] ||
-                                    @price_breakdown[:guests_count] || 0 %> ({adult_count} {if adult_count ==
-                                                                                                 1,
-                                                                                               do:
-                                                                                                 "adult",
-                                                                                               else:
-                                                                                                 "adults"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                                                                                             1,
-                                                                                                                                           do:
-                                                                                                                                             "night",
-                                                                                                                                           else:
-                                                                                                                                             "nights"})
+                                    @price_breakdown[:guests_count] || 0 %>
+                                <% guests_count =
+                                  @price_breakdown[:guests_count] || 0 %> ({BookingUserMessages.room_base_price_people_label(
+                                  billable_people,
+                                  guests_count
+                                )} × {BookingDisplay.nights_label(
+                                  @price_breakdown.nights
+                                )})
                               <% end %>
                             </span>
                             <span class={
