@@ -33,7 +33,15 @@ defmodule QueryConsole.MixProject do
 
   defp deps do
     [
-      {:phoenix, "~> 1.8.0"},
+      # 1.8.15: phoenix.js replaceTransport noops old conn handlers before
+      # close so an async transport close cannot tear down the replacement
+      # (#6852). 1.8.14: LongPoll fetch timers are cleared after success or
+      # abort (#6811); VerifiedRoutes :router must be a compile-time module;
+      # local path validation is shared. We enable longpoll on the LiveView
+      # socket (app.js longPollFallbackMs: 2500). 1.8.13: phoenix.js
+      # reconnects after Chrome freeze/resume. 1.8.10: longpoll POST timeout
+      # close-and-retry. phx.gen.auth / phx.gen.cert / phx.new unused.
+      {:phoenix, "~> 1.8.15"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
       # 0.22.4: Escape comments on Postgrex.stream/4 (EEF-CVE-2026-66838).
