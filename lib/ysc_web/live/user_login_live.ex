@@ -249,7 +249,10 @@ defmodule YscWeb.UserLoginLive do
               <.link
                 id="login-forgot-password-link"
                 href={~p"/users/reset-password"}
-                class="col-start-2 row-start-1 text-sm font-semibold leading-6 hover:underline text-blue-600"
+                class={[
+                  "col-start-2 row-start-1 rounded-sm text-sm font-semibold leading-6 text-blue-600 hover:underline",
+                  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                ]}
               >
                 Forgot your password?
               </.link>
