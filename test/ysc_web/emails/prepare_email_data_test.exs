@@ -227,6 +227,27 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       assert data.children_count == 0
       assert data.checkin_time == YscWeb.BookingDisplay.checkin_time_label()
       assert data.checkout_time == YscWeb.BookingDisplay.checkout_time_label()
+      assert data.door_code == nil
+    end
+
+    test "uses the active door code when one exists", %{booking: booking} do
+      suffix =
+        System.unique_integer([:positive])
+        |> Integer.to_string()
+        |> String.slice(-2, 2)
+
+      {:ok, door_code} =
+        Ysc.Bookings.create_door_code(%{
+          property: booking.property,
+          code: "C#{suffix}8"
+        })
+
+      data =
+        booking
+        |> Repo.preload([:user, :rooms], force: true)
+        |> BookingCheckinReminder.prepare_email_data()
+
+      assert data.door_code == door_code.code
     end
 
     test "reloads when associations are not preloaded", %{booking: booking} do

@@ -1091,6 +1091,37 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assert html =~ "555-1234"
     end
 
+    test "BookingCheckinReminder without a door code" do
+      assigns = %{
+        first_name: "John",
+        door_code: nil,
+        property: "tahoe",
+        property_name: "Tahoe",
+        property_address: "2685 Cedar Lane",
+        checkin_date: "December 1, 2024",
+        checkout_date: "December 3, 2024",
+        checkin_time: "3:00 PM",
+        checkout_time: "11:00 AM",
+        days_until_checkin: 2,
+        booking_reference_id: "BK-123",
+        booking_mode: "Individual room(s)",
+        room_names: "Room 1",
+        nights: 2,
+        is_buyout: false,
+        guests_count: 2,
+        children_count: 0,
+        cabin_master_name: "Jane Smith",
+        cabin_master_email: "jane@example.com",
+        cabin_master_phone: "555-1234",
+        booking_url: "https://example.com/bookings/123"
+      }
+
+      html = BookingCheckinReminder.render(assigns)
+      assert html =~ "Door code not ready yet"
+      refute html =~ "Not Available"
+      refute html =~ "Please save this code"
+    end
+
     test "BookingCheckoutReminder with cabin master" do
       assigns = %{
         first_name: "John",

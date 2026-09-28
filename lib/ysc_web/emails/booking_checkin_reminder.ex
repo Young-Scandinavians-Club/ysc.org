@@ -50,7 +50,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
 
     %{
       first_name: member_greeting_name(booking.user),
-      door_code: if(door_code, do: door_code.code, else: "Not Available"),
+      door_code: if(door_code, do: door_code.code, else: nil),
       property: property_as_string(booking.property),
       property_name: PropertyDisplay.short_name(booking.property),
       property_address: PropertyDisplay.address(booking.property),

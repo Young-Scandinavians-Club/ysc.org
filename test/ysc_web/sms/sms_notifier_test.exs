@@ -155,7 +155,8 @@ defmodule YscWeb.Sms.SmsNotifierTest do
       assert is_binary(message)
       assert String.contains?(message, "Valued Member")
       assert String.contains?(message, "Property")
-      assert String.contains?(message, "Not Available")
+      assert String.contains?(message, "isn't ready yet")
+      refute String.contains?(message, "Not Available")
     end
 
     test "trims and normalizes whitespace in rendered message" do
