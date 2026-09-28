@@ -4129,22 +4129,6 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
          }}
       end)
 
-      # Refund linking expands charge via retrieve_charge
-      stub(Ysc.StripeMock, :retrieve_charge, fn charge_id, _opts ->
-        case charge_id do
-          ^ticket_ch ->
-            {:ok,
-             %Stripe.Charge{
-               id: ticket_ch,
-               payment_intent: ticket_pi,
-               amount: 5000
-             }}
-
-          _ ->
-            {:error, :unexpected_charge}
-        end
-      end)
-
       payout_map = %{
         "id" => stripe_payout_id,
         "amount" => 36_594,
@@ -4388,6 +4372,153 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       assert payout != nil
       assert Enum.any?(payout.payments, &(&1.id == membership_payment.id))
+    end
+
+    # Regression: po_1UKS44IZd8GkARoBVvD9couK - a refunded membership payment
+    # (stored under its invoice ID) was linked to the payout, but its refund
+    # was skipped because refund linking only looked the payment up by
+    # charge.payment_intent, leaving the payout and its QuickBooks Deposit $45
+    # short of Stripe.
+    test "links refund of a subscription payment keyed by invoice id" do
+      uniq = System.unique_integer([:positive])
+      stripe_payout_id = "po_req_invoice_refund_#{uniq}"
+      inv_id = "in_req_refund_#{uniq}"
+      charge_id = "ch_req_refund_#{uniq}"
+      stripe_refund_id = "re_req_refund_#{uniq}"
+      user = user_with_stripe_id()
+
+      {:ok, {membership_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "45.00"),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: inv_id,
+          stripe_fee: Money.new(:USD, "2.28"),
+          description: "Subscription creation - membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {membership_refund, _, _}} =
+        Ledgers.process_refund(%{
+          payment_id: membership_payment.id,
+          refund_amount: Money.new(:USD, "45.00"),
+          reason: "Member requested full refund",
+          external_refund_id: stripe_refund_id
+        })
+
+      balance_transactions = [
+        %Stripe.BalanceTransaction{
+          id: "txn_membership_#{uniq}",
+          object: "balance_transaction",
+          type: "payment",
+          reporting_category: "charge",
+          amount: 4500,
+          fee: 228,
+          net: 4272,
+          currency: "usd",
+          description: "Subscription creation - membership",
+          source: %Stripe.Charge{
+            id: charge_id,
+            object: "charge",
+            amount: 4500,
+            payment_intent: "pi_req_refund_#{uniq}"
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_refund_#{uniq}",
+          object: "balance_transaction",
+          type: "payment_refund",
+          reporting_category: "refund",
+          amount: -4500,
+          fee: 0,
+          net: -4500,
+          currency: "usd",
+          source: %Stripe.Refund{
+            id: stripe_refund_id,
+            object: "refund",
+            amount: 4500,
+            charge: charge_id,
+            payment_intent: "pi_req_refund_#{uniq}",
+            status: "succeeded"
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_payout_#{uniq}",
+          object: "balance_transaction",
+          type: "payout",
+          reporting_category: "payout",
+          amount: -228,
+          fee: 0,
+          net: -228,
+          currency: "usd",
+          description: "STRIPE PAYOUT",
+          source: stripe_payout_id
+        }
+      ]
+
+      stub(Ysc.StripeMock, :retrieve_payout, fn ^stripe_payout_id, _opts ->
+        {:ok,
+         %Stripe.Payout{
+           id: stripe_payout_id,
+           object: "payout",
+           amount: -228,
+           currency: "usd",
+           status: "paid",
+           balance_transaction: %Stripe.BalanceTransaction{
+             id: "txn_payout_#{uniq}",
+             type: "payout",
+             fee: 0,
+             amount: -228,
+             net: -228,
+             currency: "usd"
+           }
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :list_balance_transactions, fn params, _opts ->
+        assert params.payout == stripe_payout_id
+
+        {:ok,
+         %Stripe.List{
+           object: "list",
+           data: balance_transactions,
+           has_more: false,
+           url: "/v1/balance_transactions"
+         }}
+      end)
+
+      Req.Test.stub(@charge_req_stub, fn conn ->
+        assert conn.request_path == "/v1/charges/#{charge_id}"
+
+        Req.Test.json(conn, %{
+          "id" => charge_id,
+          "object" => "charge",
+          "invoice" => inv_id
+        })
+      end)
+
+      payout_map = %{
+        "id" => stripe_payout_id,
+        "amount" => 228,
+        "currency" => "usd",
+        "status" => "paid",
+        "arrival_date" => System.os_time(:second),
+        "description" => "STRIPE PAYOUT",
+        "metadata" => %{},
+        "fees" => nil
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      payout =
+        Ledgers.get_payout_by_stripe_id(stripe_payout_id)
+        |> Ysc.Repo.preload([:payments, :refunds])
+
+      assert Enum.map(payout.payments, & &1.id) == [membership_payment.id]
+      assert Enum.map(payout.refunds, & &1.id) == [membership_refund.id]
     end
   end
 
