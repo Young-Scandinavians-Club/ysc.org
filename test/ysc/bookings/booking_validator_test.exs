@@ -205,7 +205,10 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
   # Buyout is summer-only. `today + 7` then next Monday can land in Winter
   # (2026-09-22 → Oct 5), so inserting a buyout fixture fails with winter-nights
-  # instead of exercising exclusivity (CI 2026-09-22).
+  # instead of exercising exclusivity (CI 2026-09-22). After late September the
+  # next Summer Monday is next May, which is past Summer's 180-day window
+  # (2026-09-28 → 2027-05-03, latest check-in Mar 27). Seed with
+  # `skip_validation: true` when using these dates as an upcoming-buyout fixture.
   defp next_test_summer_monday_wednesday do
     today = Ysc.Bookings.SeasonHelpers.cabin_today()
     checkin = next_test_summer_monday_beyond(today, 0)
@@ -1208,8 +1211,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       user = create_subscription(user, :family)
 
       {buyout_checkin, buyout_checkout} = next_test_summer_monday_wednesday()
-      room_checkin = Date.add(buyout_checkin, 21)
-      room_checkout = Date.add(buyout_checkin, 23)
+      {room_checkin, room_checkout} = booking_dates_monday_wednesday(1)
 
       {:ok, _buyout} =
         %Booking{}
@@ -1224,6 +1226,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
             status: :complete,
             total_price: Money.new(2000, :USD)
           },
+          skip_validation: true,
           user: user
         )
         |> Repo.insert()
