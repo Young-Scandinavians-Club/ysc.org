@@ -742,6 +742,12 @@ defmodule YscWeb.CoreComponents do
       "a form field struct retrieved from the form, for example: @form[:email]"
 
   attr :errors, :list, default: []
+
+  attr :toggle_button, :boolean,
+    default: true,
+    doc:
+      "password-toggle only: false to render `password_toggle_button/1` yourself (e.g. to control tab order)"
+
   attr :checked, :boolean, doc: "the checked flag for checkbox inputs"
   attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
 
@@ -1148,23 +1154,46 @@ defmodule YscWeb.CoreComponents do
           {@rest}
         />
 
-        <button
-          :if={@is_password_toggle}
-          type="button"
-          class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer password-toggle-btn"
-          data-target={"##{@id}"}
-          aria-label="Show password"
-          aria-pressed="false"
-          aria-controls={@id}
-        >
-          <.icon
-            name="hero-eye-solid"
-            class="h-5 w-5 text-zinc-400 hover:text-zinc-600"
-          />
-        </button>
+        <.password_toggle_button
+          :if={@is_password_toggle && @toggle_button}
+          target_id={@id}
+          class="absolute inset-y-0 right-0"
+        />
       </div>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
+    """
+  end
+
+  @doc """
+  Show/hide button for a `type="password-toggle"` input.
+
+  Rendered automatically by `input/1`. Pass `toggle_button={false}` to the
+  input and render this yourself when the button must come later in the DOM
+  (and so the tab order) than the input, positioning it over the field with
+  `class`.
+  """
+  attr :target_id, :string, required: true, doc: "id of the password input"
+  attr :class, :any, default: nil, doc: "positioning classes"
+
+  def password_toggle_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={[
+        "flex items-center pr-3 cursor-pointer password-toggle-btn",
+        @class
+      ]}
+      data-target={"##{@target_id}"}
+      aria-label="Show password"
+      aria-pressed="false"
+      aria-controls={@target_id}
+    >
+      <.icon
+        name="hero-eye-solid"
+        class="h-5 w-5 text-zinc-400 hover:text-zinc-600"
+      />
+    </button>
     """
   end
 

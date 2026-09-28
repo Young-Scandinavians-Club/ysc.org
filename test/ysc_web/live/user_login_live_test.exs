@@ -22,17 +22,35 @@ defmodule YscWeb.UserLoginLiveTest do
       refute has_element?(lv, "[autofocus]")
     end
 
-    test "keeps the forgot password link keyboard reachable after the password field",
+    test "tabs from the password field to sign in before the show password toggle and forgot link",
          %{conn: conn} do
       {:ok, lv, html} = live(conn, ~p"/users/log-in")
 
       assert has_element?(lv, "#login-forgot-password-link")
       refute has_element?(lv, "#login-forgot-password-link[tabindex='-1']")
 
-      # DOM (and so tab) order: password input, then the forgot password link
-      {password_pos, _} = :binary.match(html, ~s(id="user_password"))
-      {link_pos, _} = :binary.match(html, ~s(id="login-forgot-password-link"))
-      assert password_pos < link_pos
+      assert has_element?(
+               lv,
+               "button.password-toggle-btn[aria-controls='user_password']"
+             )
+
+      # DOM (and so tab) order; grid placement keeps the visual layout
+      positions =
+        Enum.map(
+          [
+            ~s(id="user_email"),
+            ~s(id="user_password"),
+            ~s(id="login-submit-button"),
+            "password-toggle-btn",
+            ~s(id="login-forgot-password-link")
+          ],
+          fn marker ->
+            {pos, _} = :binary.match(html, marker)
+            pos
+          end
+        )
+
+      assert positions == Enum.sort(positions)
     end
 
     test "wires the submit button loading state via a CSP-safe hook", %{

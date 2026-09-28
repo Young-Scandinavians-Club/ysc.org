@@ -72,5 +72,37 @@ defmodule YscWeb.Components.HomeLogoLinkTest do
       assert html =~ ~s(aria-controls="user_password")
       assert html =~ ~s(aria-pressed="false")
     end
+
+    test "omits the built-in toggle button when toggle_button is false" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.input
+          type="password-toggle"
+          name="user[password]"
+          id="user_password"
+          value=""
+          toggle_button={false}
+        />
+        """)
+
+      assert html =~ ~s(id="user_password")
+      assert html =~ "pr-10"
+      refute html =~ "password-toggle-btn"
+    end
+
+    test "password_toggle_button/1 targets the given input" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.password_toggle_button target_id="user_password" class="col-start-2" />
+        """)
+
+      assert html =~ ~s(data-target="#user_password")
+      assert html =~ ~s(aria-controls="user_password")
+      assert html =~ "col-start-2"
+    end
   end
 end

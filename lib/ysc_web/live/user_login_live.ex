@@ -224,48 +224,52 @@ defmodule YscWeb.UserLoginLive do
           value={@mobile_redirect_uri || ""}
         />
         <.input type="hidden" name="code_challenge" value={@code_challenge || ""} />
-        <div class="space-y-6">
-          <div class="space-y-4 max-sm:[&_input]:min-h-12">
-            <.input
-              field={@form[:email]}
-              type="email"
-              label="Email"
-              required
-            />
-            <%!-- The forgot password link sits next to the label visually, but
-                  comes after the input in the DOM so tab order goes password
-                  field first, then the link. --%>
-            <div class="grid grid-cols-[1fr_auto] items-center gap-x-2">
-              <div class="col-start-1 row-start-1">
-                <.label for={@form[:password].id}>Password</.label>
-              </div>
-              <div class="col-span-2 row-start-2">
-                <.input
-                  field={@form[:password]}
-                  type="password-toggle"
-                  required
-                />
-              </div>
-              <.link
-                id="login-forgot-password-link"
-                href={~p"/users/reset-password"}
-                class={[
-                  "col-start-2 row-start-1 rounded-sm text-sm font-semibold leading-6 text-blue-600 hover:underline",
-                  "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
-                ]}
-              >
-                Forgot your password?
-              </.link>
+        <div class="space-y-4 pb-2 max-sm:[&_input]:min-h-12">
+          <.input
+            field={@form[:email]}
+            type="email"
+            label="Email"
+            required
+          />
+          <%!-- Grid placement keeps the visual layout (forgot link beside the
+                label, show password toggle inside the field) while the DOM
+                order sets the tab order: password → sign in → show password →
+                forgot password. --%>
+          <div class="grid grid-cols-[1fr_auto] items-center gap-x-2">
+            <div class="col-start-1 row-start-1">
+              <.label for={@form[:password].id}>Password</.label>
             </div>
-          </div>
-
-          <div class="pb-2">
-            <.button
-              phx-disable-with="Signing in..."
-              class="w-full max-sm:min-h-12!"
+            <div class="col-span-2 col-start-1 row-start-2">
+              <.input
+                field={@form[:password]}
+                type="password-toggle"
+                toggle_button={false}
+                required
+              />
+            </div>
+            <div class="col-span-2 col-start-1 row-start-3 mt-6">
+              <.button
+                id="login-submit-button"
+                phx-disable-with="Signing in..."
+                class="w-full max-sm:min-h-12!"
+              >
+                Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1" />
+              </.button>
+            </div>
+            <.password_toggle_button
+              target_id={@form[:password].id}
+              class="col-start-2 row-start-2 mt-2 justify-self-end self-stretch"
+            />
+            <.link
+              id="login-forgot-password-link"
+              href={~p"/users/reset-password"}
+              class={[
+                "col-start-2 row-start-1 rounded-sm text-sm font-semibold leading-6 text-blue-600 hover:underline",
+                "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              ]}
             >
-              Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1" />
-            </.button>
+              Forgot your password?
+            </.link>
           </div>
         </div>
       </.simple_form>
