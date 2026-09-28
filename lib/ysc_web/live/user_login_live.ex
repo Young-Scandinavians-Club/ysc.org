@@ -232,22 +232,27 @@ defmodule YscWeb.UserLoginLive do
               label="Email"
               required
             />
-            <div>
-              <.input
-                field={@form[:password]}
-                type="password-toggle"
-                label="Password"
-                required
-              />
-              <div class="mt-2 flex justify-end">
-                <.link
-                  id="login-forgot-password-link"
-                  href={~p"/users/reset-password"}
-                  class="text-sm font-semibold leading-6 hover:underline text-blue-600"
-                >
-                  Forgot your password?
-                </.link>
+            <%!-- The forgot password link sits next to the label visually, but
+                  comes after the input in the DOM so tab order goes password
+                  field first, then the link. --%>
+            <div class="grid grid-cols-[1fr_auto] items-center gap-x-2">
+              <div class="col-start-1 row-start-1">
+                <.label for={@form[:password].id}>Password</.label>
               </div>
+              <div class="col-span-2 row-start-2">
+                <.input
+                  field={@form[:password]}
+                  type="password-toggle"
+                  required
+                />
+              </div>
+              <.link
+                id="login-forgot-password-link"
+                href={~p"/users/reset-password"}
+                class="col-start-2 row-start-1 text-sm font-semibold leading-6 hover:underline text-blue-600"
+              >
+                Forgot your password?
+              </.link>
             </div>
           </div>
 
