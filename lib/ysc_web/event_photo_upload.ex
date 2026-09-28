@@ -10,8 +10,7 @@ defmodule YscWeb.EventPhotoUpload do
   """
 
   alias Ysc.GooglePhotos.Limits
-  alias Ysc.S3Config
-  alias YscWeb.S3.SimpleS3Upload
+  alias YscWeb.S3.DirectUpload
 
   @doc """
   Presigns a direct event photo/video upload for the given collection.
@@ -20,33 +19,12 @@ defmodule YscWeb.EventPhotoUpload do
     ext = entry.client_name |> Path.extname() |> String.downcase()
     key = "event_photo_uploads/#{collection_id}/#{Ecto.ULID.generate()}#{ext}"
 
-    config = %{
-      region: S3Config.region(),
-      access_key_id: S3Config.aws_access_key_id(),
-      secret_access_key: S3Config.aws_secret_access_key()
-    }
-
-    max_file_size = socket.assigns.uploads.photos.max_file_size
-
-    {:ok, fields} =
-      SimpleS3Upload.sign_form_upload(config, S3Config.bucket_name(),
-        key: key,
-        content_type: Limits.content_type_for_filename(entry.client_name),
-        max_file_size: max_file_size,
-        expires_in: :timer.hours(2),
-        server_side_encryption: S3Config.server_side_encryption?()
-      )
-
-    upload_url = S3Config.upload_url()
-    :ok = S3Config.assert_direct_upload_url!(upload_url, :media)
-
-    meta = %{
-      uploader: "S3",
+    DirectUpload.presign(socket,
+      kind: :media,
       key: key,
-      url: upload_url,
-      fields: fields
-    }
-
-    {:ok, meta, socket}
+      content_type: Limits.content_type_for_filename(entry.client_name),
+      max_file_size: socket.assigns.uploads.photos.max_file_size,
+      expires_in: :timer.hours(2)
+    )
   end
 end

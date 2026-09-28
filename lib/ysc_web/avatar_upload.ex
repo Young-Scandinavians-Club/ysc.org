@@ -8,7 +8,7 @@ defmodule YscWeb.AvatarUpload do
   alias Ysc.Accounts.User
   alias Ysc.Avatars
   alias Ysc.S3Config
-  alias YscWeb.S3.SimpleS3Upload
+  alias YscWeb.S3.DirectUpload
 
   @allowed_extensions ~w(.jpg .jpeg .png .webp .gif .svg)
 
@@ -28,34 +28,12 @@ defmodule YscWeb.AvatarUpload do
 
     key = "#{user.id}/#{avatar_id}/original#{ext}"
 
-    config = %{
-      region: S3Config.region(),
-      access_key_id: S3Config.aws_access_key_id(),
-      secret_access_key: S3Config.aws_secret_access_key()
-    }
-
-    max_file_size = socket.assigns.uploads[upload_name].max_file_size
-
-    {:ok, fields} =
-      SimpleS3Upload.sign_form_upload(config, S3Config.avatars_bucket_name(),
-        key: key,
-        content_type: Avatars.content_type_for_extension(ext),
-        max_file_size: max_file_size,
-        expires_in: :timer.hours(1),
-        server_side_encryption: S3Config.server_side_encryption?()
-      )
-
-    upload_url = S3Config.avatars_upload_url()
-    :ok = S3Config.assert_direct_upload_url!(upload_url, :avatars)
-
-    meta = %{
-      uploader: "S3",
+    DirectUpload.presign(socket,
+      kind: :avatars,
       key: key,
-      url: upload_url,
-      fields: fields
-    }
-
-    {:ok, meta, socket}
+      content_type: Avatars.content_type_for_extension(ext),
+      max_file_size: socket.assigns.uploads[upload_name].max_file_size
+    )
   end
 
   @doc """
