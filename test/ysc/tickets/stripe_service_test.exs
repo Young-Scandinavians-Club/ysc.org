@@ -660,6 +660,43 @@ defmodule Ysc.Tickets.StripeServiceTest do
       end)
     end
 
+    test "does not cancel the order when Stripe cancel times out on the failure-redirect path" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        payment_intent_id = "pi_fail_timeout_#{ticket_order.id}"
+
+        cancel_timeout_jobs_for_order!(ticket_order.id)
+
+        assert {:ok, ticket_order} =
+                 Ysc.Tickets.update_payment_intent(
+                   ticket_order,
+                   payment_intent_id
+                 )
+
+        payment_intent =
+          failed_payment_intent_for_order(ticket_order, id: payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, payment_intent}
+        end)
+
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error, :timeout}
+        end)
+
+        assert {:error, :checkout_payment_in_progress} =
+                 StripeService.handle_failed_payment(
+                   payment_intent_id,
+                   "Payment failed"
+                 )
+
+        assert Ysc.Repo.get!(Ysc.Tickets.TicketOrder, ticket_order.id).status ==
+                 :pending
+      end)
+    end
+
     test "fulfills the order when Stripe-cancel reveals the PaymentIntent already succeeded" do
       Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
 
