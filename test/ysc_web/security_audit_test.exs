@@ -70,6 +70,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 72 (HIGH)     Family sub-accounts inherited the primary's Stripe subscription and could cancel/resume/change it via hidden LiveView events
   Finding 74 (MEDIUM)   Volunteers could soft-delete any scheduled event (including others') via the list and editor; Finding 59 only blocked published/cancelled
   Finding 76 (MEDIUM)   Volunteers could read other members' expense reports (submitter, purpose, status, net cost) on the event Statistics tab, bypassing LetMe expense_report :read (admin or own_resource) and the full-admin Money page
+  Finding 77 (MEDIUM)   Open redirect: valid_internal_redirect?/1 allowed backslash and %5c paths that browsers treat as protocol-relative (ticket QR href + post-login Location)
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -95,6 +96,7 @@ defmodule YscWeb.SecurityAuditTest do
   alias Ysc.Repo
   alias Ysc.Test.KioskAPIKeyHelper
   alias YscWeb.AuthController
+  alias YscWeb.UserAuth
 
   import Ysc.AccountsFixtures
 
@@ -4913,6 +4915,65 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert has_element?(view, "#event-expense-reports-section")
       assert has_element?(view, "#expense-report-#{report.id}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 77 (MEDIUM): Backslash / %5c open redirect via return_to
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 77: backslash-smuggled protocol-relative redirects are rejected" do
+    import Ysc.EventsFixtures
+
+    test "valid_internal_redirect?/1 rejects raw and encoded backslash hosts" do
+      refute UserAuth.valid_internal_redirect?("/\\evil.com")
+      refute UserAuth.valid_internal_redirect?("/%5cevil.com")
+      refute UserAuth.valid_internal_redirect?("/%5Cevil.com")
+      refute UserAuth.valid_internal_redirect?("/%255cevil.com")
+      assert UserAuth.valid_internal_redirect?("/events/123")
+    end
+
+    test "log_in_user ignores encoded-backslash redirect_to" do
+      user = user_fixture()
+      {:ok, user} = Accounts.mark_email_verified(user)
+
+      conn =
+        build_conn()
+        |> init_test_session(%{})
+        |> UserAuth.log_in_user(user, %{}, "/%5cevil.com")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "ticket QR back link does not emit a backslash href" do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+      order = ticket_order_fixture(%{user: member, event: event})
+
+      conn = log_in_user(build_conn(), member)
+
+      # Inspect the connected-mount HTML only. Unconfirmed fixture tickets
+      # cause a later push_navigate that shuts the LiveView down, so a
+      # second has_element?/2 round-trip would raise :noproc.
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/tickets/#{order.id}/qr" <> "?return_to=/%5cevil.example.com"
+        )
+
+      assert html =~ ~s(id="back-link")
+      assert html =~ ~s(href="/users/tickets")
+      refute html =~ "evil.example.com"
     end
   end
 
