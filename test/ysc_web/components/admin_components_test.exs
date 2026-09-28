@@ -758,4 +758,131 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ ~s(aria-hidden="true")
     end
   end
+
+  describe "admin_quoted_answer/1" do
+    test "renders label, body, and optional id" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_quoted_answer id="quoted-answer-link" label="Link to Scandinavia">
+          Family in Oslo
+        </.admin_quoted_answer>
+        """)
+
+      assert html =~ "Link to Scandinavia"
+      assert html =~ "Family in Oslo"
+      assert html =~ ~s(id="quoted-answer-link")
+      assert html =~ "italic"
+      assert html =~ "border-zinc-200"
+    end
+  end
+
+  describe "admin_signup_application/1" do
+    defp sample_application_assigns(overrides) do
+      user = %{
+        first_name: "Ada",
+        last_name: "Lovelace",
+        email: "ada@example.com",
+        family_members: []
+      }
+
+      application = %{
+        birth_date: ~D[1990-06-15],
+        membership_type: :single,
+        membership_eligibility: [:citizen_of_scandinavia],
+        occupation: "Engineer",
+        place_of_birth: "SE",
+        citizenship: "NO",
+        most_connected_nordic_country: "FI",
+        link_to_scandinavia: "Family in Oslo",
+        lived_in_scandinavia: "Two years in Stockholm",
+        spoken_languages: "Swedish, English",
+        hear_about_the_club: "A friend at Midsummer"
+      }
+
+      %{
+        user: Map.merge(user, Map.get(overrides, :user, %{})),
+        application:
+          Map.merge(application, Map.get(overrides, :application, %{}))
+      }
+    end
+
+    test "renders applicant details, answers, and stable country ids" do
+      assigns = sample_application_assigns(%{})
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_signup_application user={@user} application={@application} />
+        """)
+
+      assert html =~ ~s(id="admin-signup-application-details")
+      assert html =~ ~s(id="admin-signup-application-answers")
+      assert html =~ "Applicant Details"
+      assert html =~ "Ada"
+      assert html =~ "Lovelace"
+      assert html =~ "ada@example.com"
+      assert html =~ "Jun 15, 1990"
+      refute html =~ "Family members"
+      assert html =~ "Answers"
+      assert html =~ "Single"
+      assert html =~ "I am a citizen of a Scandinavian country"
+      assert html =~ "Engineer"
+      assert html =~ ~s(id="application-place-of-birth")
+      assert html =~ "Sweden"
+      assert html =~ "fi-se"
+      assert html =~ ~s(id="application-citizenship")
+      assert html =~ "Norway"
+      assert html =~ ~s(id="application-most-connected-nordic-country")
+      assert html =~ "Finland"
+      assert html =~ "Family in Oslo"
+      assert html =~ "Two years in Stockholm"
+      assert html =~ "Swedish, English"
+      assert html =~ ~s(id="review-application-hear-about-the-club")
+      assert html =~ "A friend at Midsummer"
+    end
+
+    test "lists family members and uses the family membership badge" do
+      assigns =
+        sample_application_assigns(%{
+          user: %{
+            family_members: [
+              %{
+                first_name: "Kid",
+                last_name: "Lovelace",
+                type: :child,
+                birth_date: ~D[2015-03-01]
+              }
+            ]
+          },
+          application: %{membership_type: :family}
+        })
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_signup_application user={@user} application={@application} />
+        """)
+
+      assert html =~ "Family members"
+      assert html =~ "Child"
+      assert html =~ "Kid"
+      assert html =~ "Lovelace"
+      assert html =~ "Mar 01, 2015"
+      assert html =~ "bg-green-100"
+    end
+
+    test "omits family members when the association is not loaded" do
+      assigns =
+        sample_application_assigns(%{
+          user: %{family_members: :not_loaded}
+        })
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_signup_application user={@user} application={@application} />
+        """)
+
+      refute html =~ "Family members"
+    end
+  end
 end
