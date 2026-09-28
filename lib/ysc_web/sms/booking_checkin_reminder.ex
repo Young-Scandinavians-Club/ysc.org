@@ -8,6 +8,7 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
   alias Ysc.Bookings
   alias Ysc.Bookings.PropertyDisplay
   alias YscWeb.BookingDisplay
+  alias YscWeb.BookingUserMessages
   alias YscWeb.Emails.Helpers
   alias YscWeb.Sms.Template
 
@@ -41,13 +42,20 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
     first_name = Template.first_name(variables)
     property_name = Map.get(variables, :property_name, "Property")
     checkin_date = Map.get(variables, :checkin_date, "")
-    door_code = Map.get(variables, :door_code, "Not Available")
+    door_code = Map.get(variables, :door_code)
 
     checkin_time =
       Map.get(variables, :checkin_time, BookingDisplay.checkin_time_label())
 
+    door_code_sentence =
+      if BookingUserMessages.door_code_present?(door_code) do
+        "Your door code is: #{door_code}."
+      else
+        BookingUserMessages.door_code_not_ready_sms_phrase()
+      end
+
     Template.format(
-      "Hej #{first_name}! Your check-in at #{property_name} is on #{checkin_date} at #{checkin_time}. Your door code is: #{door_code}. See you soon!"
+      "Hej #{first_name}! Your check-in at #{property_name} is on #{checkin_date} at #{checkin_time}. #{door_code_sentence} See you soon!"
     )
   end
 
@@ -69,7 +77,7 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
       first_name: booking.user.first_name || "Valued Member",
       property_name: PropertyDisplay.short_name(booking.property),
       checkin_date: format_date(booking.checkin_date),
-      door_code: if(door_code, do: door_code.code, else: "Not Available"),
+      door_code: if(door_code, do: door_code.code, else: nil),
       checkin_time: BookingDisplay.checkin_time_label()
     }
   end

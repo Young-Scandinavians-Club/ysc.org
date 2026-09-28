@@ -206,6 +206,36 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.cabin_access_info_tab_body() =~ "within 48 hours"
     refute BookingUserMessages.cabin_access_info_tab_body() =~ "24 hours"
 
+    assert BookingUserMessages.door_code_present?("1234")
+    refute BookingUserMessages.door_code_present?(nil)
+    refute BookingUserMessages.door_code_present?("")
+    refute BookingUserMessages.door_code_present?("Not Available")
+    refute BookingUserMessages.door_code_present?("  Not Available  ")
+
+    assert BookingUserMessages.door_code_not_ready_title() ==
+             "Door code not ready yet"
+
+    assert BookingUserMessages.door_code_not_ready_email_body() =~
+             "isn't ready yet"
+
+    assert BookingUserMessages.door_code_not_ready_email_body() =~
+             "View Booking Details"
+
+    assert BookingUserMessages.door_code_not_ready_email_body() =~
+             "Cabin Master"
+
+    refute BookingUserMessages.door_code_not_ready_email_body() =~
+             "Not Available"
+
+    assert BookingUserMessages.door_code_not_ready_sms_phrase() =~
+             "isn't ready yet"
+
+    assert BookingUserMessages.door_code_not_ready_sms_phrase() =~
+             "Cabin Master"
+
+    refute BookingUserMessages.door_code_not_ready_sms_phrase() =~
+             "Not Available"
+
     assert BookingUserMessages.checkout_manage_booking_step() =~
              "My Bookings & Payments"
   end

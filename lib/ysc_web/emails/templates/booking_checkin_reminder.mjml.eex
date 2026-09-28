@@ -15,11 +15,18 @@
     <mj-spacer height="24px"></mj-spacer>
     <!-- Door Code Notice - Very Prominent -->
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <%= if YscWeb.BookingUserMessages.door_code_present?(@door_code) do %>
       <div class="door-code-box">
         <strong class="door-code-title">Your Door Code</strong>
         <span class="door-code-value"><%= @door_code %></span>
         <span class="door-code-note">Please save this code — you'll need it to get into the cabin.</span>
       </div>
+      <% else %>
+      <div class="door-code-box">
+        <strong class="door-code-title"><%= YscWeb.BookingUserMessages.door_code_not_ready_title() %></strong>
+        <span class="door-code-note"><%= YscWeb.BookingUserMessages.door_code_not_ready_email_body() %></span>
+      </div>
+      <% end %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Cabin location -->

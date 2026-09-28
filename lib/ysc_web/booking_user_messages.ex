@@ -266,6 +266,25 @@ defmodule YscWeb.BookingUserMessages do
     "We'll email the door code #{door_code_email_timing_phrase()}. The same code also appears on your booking confirmation page #{door_code_page_timing_phrase()}, and stays visible during your stay."
   end
 
+  def door_code_present?(code) when is_binary(code) do
+    trimmed = String.trim(code)
+    trimmed != "" and trimmed != "Not Available"
+  end
+
+  def door_code_present?(_code), do: false
+
+  def door_code_not_ready_title do
+    "Door code not ready yet"
+  end
+
+  def door_code_not_ready_email_body do
+    "Your door code isn't ready yet. Open your booking page with View Booking Details below — if the code still isn't there, contact the Cabin Master (details at the bottom of this email)."
+  end
+
+  def door_code_not_ready_sms_phrase do
+    "Your door code isn't ready yet. Check your booking page, or contact the Cabin Master."
+  end
+
   def checkout_manage_booking_step do
     "View or change your booking anytime from My Bookings & Payments (click your name in the top-right corner), or use the link in your confirmation email"
   end
