@@ -38,6 +38,28 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorkerTest do
       assert result == :ok
     end
 
+    test "does not SELECT password hashes when sending reminders", %{
+      booking: booking
+    } do
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckoutReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> BookingCheckoutReminderWorker.perform(job) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+    end
+
     test "skips reminder for cancelled booking", %{user: user} do
       # Create booking using changeset directly with skip_validation
       checkin = Date.utc_today() |> Date.add(7)

@@ -61,6 +61,39 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorkerTest do
       assert result == :ok
     end
 
+    test "does not SELECT password hashes when sending reminders" do
+      user =
+        user_fixture(%{
+          email: "checkin-slim@example.com",
+          phone_number: "+#{@sms_test_phone}"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "must not load this bio",
+          account_notifications_sms: true
+        })
+        |> Repo.update!()
+
+      booking = create_complete_booking(user)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"booking_id" => booking.id},
+        worker: "YscWeb.Workers.BookingCheckinReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> BookingCheckinReminderWorker.perform(job) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+    end
+
     test "sends both email and SMS when user has phone number and SMS enabled" do
       user =
         user_fixture(%{

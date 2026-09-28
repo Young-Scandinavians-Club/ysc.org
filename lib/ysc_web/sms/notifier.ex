@@ -170,7 +170,7 @@ defmodule YscWeb.Sms.Notifier do
 
     # Check user preferences if user_id is provided
     if user_id do
-      case Ysc.Accounts.get_user(user_id) do
+      case Ysc.Accounts.get_user_notification_profile(user_id) do
         nil ->
           Ysc.Logging.warning(
             "SMS scheduled without user validation - user not found",

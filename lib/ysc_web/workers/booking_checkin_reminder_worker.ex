@@ -19,7 +19,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
 
   alias Ysc.Repo
   alias Ysc.Bookings.Booking
-  alias YscWeb.Emails.{Notifier, BookingCheckinReminder}
+  alias YscWeb.Emails.{Notifier, BookingCheckinReminder, Helpers}
   alias YscWeb.Sms.Notifier, as: SmsNotifier
   alias YscWeb.Sms.BookingCheckinReminder, as: SmsBookingCheckinReminder
 
@@ -29,7 +29,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
       booking_id: booking_id
     )
 
-    case Repo.get(Booking, booking_id) |> Repo.preload([:user, :rooms]) do
+    case load_reminder_booking(booking_id) do
       nil ->
         Ysc.Logging.warning("Booking not found for check-in reminder",
           booking_id: booking_id
@@ -248,8 +248,9 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
         checkin_date: checkin_date
       )
 
-      # Load booking and send email immediately
-      case Repo.get(Booking, booking_id) |> Repo.preload([:user, :rooms]) do
+      # Load booking and send email immediately. Associations are slim-loaded
+      # via `ensure_booking/2` (identity + SMS prefs, room names).
+      case load_reminder_booking(booking_id) do
         nil ->
           Ysc.Logging.warning(
             "Booking not found for immediate check-in reminder",
@@ -273,6 +274,16 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
             :ok
           end
       end
+    end
+  end
+
+  defp load_reminder_booking(booking_id) do
+    case Repo.get(Booking, booking_id) do
+      nil ->
+        nil
+
+      booking ->
+        Helpers.ensure_booking(booking, [:user, :rooms])
     end
   end
 end

@@ -211,6 +211,38 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @notification_profile_fields [
+    :id,
+    :email,
+    :phone_number,
+    :account_notifications_sms,
+    :event_notifications_sms,
+    :event_notifications,
+    :state
+  ]
+
+  @doc """
+  Loads the columns needed to decide whether to send email or SMS.
+
+  Used by the email and SMS workers instead of `get_user/1` / `Repo.get/2`,
+  so those paths do not SELECT `hashed_password` / `board_bio`.
+  Returns `nil` when no row matches.
+  """
+  def get_user_notification_profile(nil), do: nil
+
+  def get_user_notification_profile(user_id) do
+    user_id
+    |> user_notification_profile_query()
+    |> Repo.one()
+  end
+
+  defp user_notification_profile_query(user_id) do
+    from(u in User,
+      where: u.id == ^user_id,
+      select: struct(u, ^@notification_profile_fields)
+    )
+  end
+
   @doc """
   Returns whether the user has a password set in the database.
 
@@ -5491,6 +5523,11 @@ defmodule Ysc.Accounts do
       membership_ytd_windows(Ysc.Ci.QueryExplain.Fixtures.now())
 
     membership_renewals_ytd_query(current_start, current_end)
+  end
+
+  @doc false
+  def ci_query_explain_user_notification_profile_query do
+    user_notification_profile_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
 
   @doc false
