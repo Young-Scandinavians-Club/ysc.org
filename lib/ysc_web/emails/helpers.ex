@@ -9,12 +9,18 @@ defmodule YscWeb.Emails.Helpers do
 
   alias HtmlSanitizeEx
   alias Ysc.Accounts.User
-  alias Ysc.Bookings.Booking
+  alias Ysc.Bookings.{Booking, Room}
   alias Ysc.Events.Event
   alias Ysc.Media.Image
   alias Ysc.Repo
 
   @event_email_organizer_fields [:id, :first_name, :last_name]
+
+  # Phone/SMS prefs are included so check-in reminder SMS can reuse this
+  # load instead of SELECT *. Direct tuple SELECT — `Repo.preload/2`
+  # custom queries still emit `hashed_password` / `board_bio` in some
+  # Ecto preload plans.
+  @booking_email_room_fields [:id, :name]
 
   @member_default "Valued Member"
   @attendee_default "there"
@@ -382,7 +388,8 @@ defmodule YscWeb.Emails.Helpers do
 
   Does not re-`Repo.get` the booking row — that would re-SELECT
   `hashed_password` / `board_bio` even when `:user` is already in memory.
-  Missing associations are loaded with `Repo.preload/2`.
+  Missing `:user` / `:rooms` are loaded with identity (plus SMS gating)
+  columns only.
 
   Defaults to `[:user]`. Pass `[:user, :rooms]` for emails that list room names.
   """
@@ -403,7 +410,11 @@ defmodule YscWeb.Emails.Helpers do
         if Ecto.assoc_loaded?(Map.fetch!(acc, assoc)) do
           acc
         else
-          Repo.preload(acc, assoc)
+          case assoc do
+            :user -> ensure_booking_email_user(acc)
+            :rooms -> ensure_booking_email_rooms(acc)
+            other -> Repo.preload(acc, other)
+          end
         end
       end)
 
@@ -412,6 +423,50 @@ defmodule YscWeb.Emails.Helpers do
     end
 
     booking
+  end
+
+  defp ensure_booking_email_user(%Booking{user_id: nil} = booking) do
+    %{booking | user: nil}
+  end
+
+  defp ensure_booking_email_user(%Booking{} = booking) do
+    user =
+      from(u in User,
+        where: u.id == ^booking.user_id,
+        select:
+          {u.id, u.email, u.first_name, u.last_name, u.phone_number,
+           u.account_notifications_sms, u.event_notifications_sms, u.state}
+      )
+      |> Repo.one()
+      |> booking_email_user_struct()
+
+    %{booking | user: user}
+  end
+
+  defp booking_email_user_struct(nil), do: nil
+
+  defp booking_email_user_struct(
+         {id, email, first_name, last_name, phone_number, account_sms,
+          event_sms, state}
+       ) do
+    %User{
+      id: id,
+      email: email,
+      first_name: first_name,
+      last_name: last_name,
+      phone_number: phone_number,
+      account_notifications_sms: account_sms,
+      event_notifications_sms: event_sms,
+      state: state
+    }
+  end
+
+  defp ensure_booking_email_rooms(%Booking{} = booking) do
+    Repo.preload(booking, rooms: booking_email_rooms_query())
+  end
+
+  defp booking_email_rooms_query do
+    from(r in Room, select: struct(r, ^@booking_email_room_fields))
   end
 
   @doc """

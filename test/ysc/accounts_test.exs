@@ -340,6 +340,11 @@ defmodule Ysc.AccountsTest do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_household_user_ids_query()
     end
+
+    test "ci_query_explain_user_notification_profile_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_user_notification_profile_query()
+    end
   end
 
   describe "get_user_by_phone_number/1" do
@@ -970,6 +975,46 @@ defmodule Ysc.AccountsTest do
       user = user_fixture(%{phone_number: "+14159098268"})
       found = Accounts.get_user(user.id, [:subscriptions])
       assert Ecto.assoc_loaded?(found.subscriptions)
+    end
+  end
+
+  describe "get_user_notification_profile/1" do
+    test "returns notification columns without password hashes" do
+      user =
+        user_fixture(%{phone_number: "+14159098268"})
+        |> Ecto.Changeset.change(%{
+          board_bio: "must not load this bio",
+          account_notifications_sms: true,
+          event_notifications_sms: false,
+          event_notifications: false
+        })
+        |> Repo.update!()
+
+      {found, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_user_notification_profile(user.id) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert found.id == user.id
+      assert found.email == user.email
+      assert found.phone_number == user.phone_number
+      assert found.account_notifications_sms == true
+      assert found.event_notifications_sms == false
+      assert found.event_notifications == false
+      assert found.state == user.state
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert password_cols == 0
+    end
+
+    test "returns nil for a missing user" do
+      refute Accounts.get_user_notification_profile(Ecto.ULID.generate())
+    end
+
+    test "returns nil for nil" do
+      refute Accounts.get_user_notification_profile(nil)
     end
   end
 

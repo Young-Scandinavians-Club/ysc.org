@@ -527,7 +527,7 @@ defmodule YscWeb.Workers.EmailNotifier do
   end
 
   defp check_user_email_preferences(user_id, template, category, recipient) do
-    case Ysc.Repo.get(Ysc.Accounts.User, user_id) do
+    case Ysc.Accounts.get_user_notification_profile(user_id) do
       nil ->
         Ysc.Logging.warning("User not found for email notification",
           user_id: user_id,
