@@ -768,6 +768,17 @@ defmodule YscWeb.UserAuthTest do
       refute UserAuth.valid_internal_redirect?("/%0d/evil.com")
     end
 
+    test "rejects backslash-smuggled protocol-relative paths (Finding 77)" do
+      # Browsers treat `\` as `/` in special URLs, so "/\evil.com" becomes
+      # "//evil.com". Encoded forms survive Phoenix.Controller.redirect/2
+      # because it only looks for a raw backslash.
+      refute UserAuth.valid_internal_redirect?("/\\evil.com")
+      refute UserAuth.valid_internal_redirect?("/%5cevil.com")
+      refute UserAuth.valid_internal_redirect?("/%5Cevil.com")
+      refute UserAuth.valid_internal_redirect?("/%255cevil.com")
+      refute UserAuth.valid_internal_redirect?("/foo\\bar")
+    end
+
     test "rejects URL-encoded protocol-relative paths (open redirect bypass)" do
       refute UserAuth.valid_internal_redirect?("/%2f%2fevil.com")
       refute UserAuth.valid_internal_redirect?("/%252f%252fevil.com")
@@ -847,6 +858,17 @@ defmodule YscWeb.UserAuthTest do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       conn = UserAuth.log_in_user(conn, user, %{}, "/%2f%2fevil.com")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "ignores backslash-smuggled redirect_to (Finding 77)", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+
+      conn = UserAuth.log_in_user(conn, user, %{}, "/%5cevil.com")
 
       assert redirected_to(conn) == ~p"/"
     end
