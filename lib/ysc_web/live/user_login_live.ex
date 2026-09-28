@@ -231,25 +231,23 @@ defmodule YscWeb.UserLoginLive do
               type="email"
               label="Email"
               required
-              autofocus
             />
             <div>
-              <div class="flex items-center justify-between gap-2">
-                <.label for={@form[:password].id}>Password</.label>
+              <.input
+                field={@form[:password]}
+                type="password-toggle"
+                label="Password"
+                required
+              />
+              <div class="mt-2 flex justify-end">
                 <.link
                   id="login-forgot-password-link"
                   href={~p"/users/reset-password"}
-                  tabindex="-1"
                   class="text-sm font-semibold leading-6 hover:underline text-blue-600"
                 >
                   Forgot your password?
                 </.link>
               </div>
-              <.input
-                field={@form[:password]}
-                type="password-toggle"
-                required
-              />
             </div>
           </div>
 

@@ -15,6 +15,26 @@ defmodule YscWeb.UserLoginLiveTest do
       assert has_element?(lv, "a[href='/users/reset-password']")
     end
 
+    test "does not autofocus any field so other sign-in methods are not de-emphasized",
+         %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      refute has_element?(lv, "[autofocus]")
+    end
+
+    test "keeps the forgot password link keyboard reachable after the password field",
+         %{conn: conn} do
+      {:ok, lv, html} = live(conn, ~p"/users/log-in")
+
+      assert has_element?(lv, "#login-forgot-password-link")
+      refute has_element?(lv, "#login-forgot-password-link[tabindex='-1']")
+
+      # DOM (and so tab) order: password input, then the forgot password link
+      {password_pos, _} = :binary.match(html, ~s(id="user_password"))
+      {link_pos, _} = :binary.match(html, ~s(id="login-forgot-password-link"))
+      assert password_pos < link_pos
+    end
+
     test "wires the submit button loading state via a CSP-safe hook", %{
       conn: conn
     } do

@@ -1155,6 +1155,7 @@ defmodule YscWeb.CoreComponents do
           data-target={"##{@id}"}
           aria-label="Show password"
           aria-pressed="false"
+          aria-controls={@id}
         >
           <.icon
             name="hero-eye-solid"
@@ -2490,7 +2491,13 @@ defmodule YscWeb.CoreComponents do
           class="flex items-center gap-3"
           phx-click={hide_mobile_menu(@toggle_id)}
         >
-          <.ysc_logo no_circle={true} class="h-14 w-14" width={56} height={56} />
+          <.ysc_logo
+            no_circle={true}
+            class="h-14 w-14"
+            width={56}
+            height={56}
+            decorative
+          />
           <span class="text-lg font-bold text-zinc-900">YSC.org</span>
         </.link>
         <button
@@ -3004,14 +3011,26 @@ defmodule YscWeb.CoreComponents do
   attr :width, :integer, required: true
   attr :height, :integer, required: true
 
+  attr :decorative, :boolean,
+    default: false,
+    doc:
+      "Render with an empty `alt` when the surrounding link already has an accessible name (aria-label or visible text)"
+
   def ysc_logo(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :alt,
+        if(assigns.decorative, do: "", else: "The Young Scandinavian Club Logo")
+      )
+
     ~H"""
     <picture :if={!@no_circle}>
       <source srcset={~p"/images/ysc_logo.webp"} type="image/webp" />
       <img
         class={["object-contain", @class]}
         src={~p"/images/ysc_logo.png"}
-        alt="The Young Scandinavian Club Logo"
+        alt={@alt}
         width={@width}
         height={@height}
         fetchpriority={@fetchpriority}
@@ -3021,7 +3040,7 @@ defmodule YscWeb.CoreComponents do
       :if={@no_circle}
       class={["object-contain", @class]}
       src={~p"/images/ysc_logo_no_circle.svg"}
-      alt="The Young Scandinavian Club Logo"
+      alt={@alt}
       width={@width}
       height={@height}
       fetchpriority={@fetchpriority}
@@ -3058,7 +3077,13 @@ defmodule YscWeb.CoreComponents do
       ]}
       aria-label="Young Scandinavians Club home"
     >
-      <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
+      <.ysc_logo
+        class="h-28"
+        width={112}
+        height={112}
+        fetchpriority="high"
+        decorative
+      />
     </.link>
     """
   end
