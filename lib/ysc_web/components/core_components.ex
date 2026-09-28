@@ -742,6 +742,12 @@ defmodule YscWeb.CoreComponents do
       "a form field struct retrieved from the form, for example: @form[:email]"
 
   attr :errors, :list, default: []
+
+  attr :toggle_button, :boolean,
+    default: true,
+    doc:
+      "password-toggle only: false to render `password_toggle_button/1` yourself (e.g. to control tab order)"
+
   attr :checked, :boolean, doc: "the checked flag for checkbox inputs"
   attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
 
@@ -1148,22 +1154,46 @@ defmodule YscWeb.CoreComponents do
           {@rest}
         />
 
-        <button
-          :if={@is_password_toggle}
-          type="button"
-          class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer password-toggle-btn"
-          data-target={"##{@id}"}
-          aria-label="Show password"
-          aria-pressed="false"
-        >
-          <.icon
-            name="hero-eye-solid"
-            class="h-5 w-5 text-zinc-400 hover:text-zinc-600"
-          />
-        </button>
+        <.password_toggle_button
+          :if={@is_password_toggle && @toggle_button}
+          target_id={@id}
+          class="absolute inset-y-0 right-0"
+        />
       </div>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
+    """
+  end
+
+  @doc """
+  Show/hide button for a `type="password-toggle"` input.
+
+  Rendered automatically by `input/1`. Pass `toggle_button={false}` to the
+  input and render this yourself when the button must come later in the DOM
+  (and so the tab order) than the input, positioning it over the field with
+  `class`.
+  """
+  attr :target_id, :string, required: true, doc: "id of the password input"
+  attr :class, :any, default: nil, doc: "positioning classes"
+
+  def password_toggle_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={[
+        "flex items-center pr-3 cursor-pointer password-toggle-btn",
+        @class
+      ]}
+      data-target={"##{@target_id}"}
+      aria-label="Show password"
+      aria-pressed="false"
+      aria-controls={@target_id}
+    >
+      <.icon
+        name="hero-eye-solid"
+        class="h-5 w-5 text-zinc-400 hover:text-zinc-600"
+      />
+    </button>
     """
   end
 
@@ -2490,7 +2520,13 @@ defmodule YscWeb.CoreComponents do
           class="flex items-center gap-3"
           phx-click={hide_mobile_menu(@toggle_id)}
         >
-          <.ysc_logo no_circle={true} class="h-14 w-14" width={56} height={56} />
+          <.ysc_logo
+            no_circle={true}
+            class="h-14 w-14"
+            width={56}
+            height={56}
+            decorative
+          />
           <span class="text-lg font-bold text-zinc-900">YSC.org</span>
         </.link>
         <button
@@ -3004,14 +3040,26 @@ defmodule YscWeb.CoreComponents do
   attr :width, :integer, required: true
   attr :height, :integer, required: true
 
+  attr :decorative, :boolean,
+    default: false,
+    doc:
+      "Render with an empty `alt` when the surrounding link already has an accessible name (aria-label or visible text)"
+
   def ysc_logo(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :alt,
+        if(assigns.decorative, do: "", else: "The Young Scandinavian Club Logo")
+      )
+
     ~H"""
     <picture :if={!@no_circle}>
       <source srcset={~p"/images/ysc_logo.webp"} type="image/webp" />
       <img
         class={["object-contain", @class]}
         src={~p"/images/ysc_logo.png"}
-        alt="The Young Scandinavian Club Logo"
+        alt={@alt}
         width={@width}
         height={@height}
         fetchpriority={@fetchpriority}
@@ -3021,7 +3069,7 @@ defmodule YscWeb.CoreComponents do
       :if={@no_circle}
       class={["object-contain", @class]}
       src={~p"/images/ysc_logo_no_circle.svg"}
-      alt="The Young Scandinavian Club Logo"
+      alt={@alt}
       width={@width}
       height={@height}
       fetchpriority={@fetchpriority}
@@ -3058,7 +3106,13 @@ defmodule YscWeb.CoreComponents do
       ]}
       aria-label="Young Scandinavians Club home"
     >
-      <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
+      <.ysc_logo
+        class="h-28"
+        width={112}
+        height={112}
+        fetchpriority="high"
+        decorative
+      />
     </.link>
     """
   end

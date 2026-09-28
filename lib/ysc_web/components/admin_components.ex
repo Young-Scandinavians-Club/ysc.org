@@ -3045,7 +3045,7 @@ defmodule YscWeb.AdminComponents do
           <div id="admin-nav-logo-expanded">
             <.link navigate="/" class="items-center group ps-2.5 inline-block">
               <div class="flex items-center gap-2">
-                <.ysc_logo class="h-20 me-3" width={80} height={80} />
+                <.ysc_logo class="h-20 me-3" width={80} height={80} decorative />
                 <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded-sm">
                   ADMIN
                 </span>
@@ -3062,7 +3062,7 @@ defmodule YscWeb.AdminComponents do
             class="hidden flex-col items-center justify-center pt-2 pb-1 gap-1"
           >
             <.link navigate="/" aria-label="Go to site">
-              <.ysc_logo width={36} height={36} />
+              <.ysc_logo width={36} height={36} decorative />
             </.link>
           </div>
 
