@@ -17,6 +17,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.Subscriptions
   alias Ysc.Tickets.DonationDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
+  alias Ysc.Tickets.ReservationDiscount
 
   alias Ysc.Agendas
   alias YscWeb.DateDisplay
@@ -8391,53 +8392,42 @@ defmodule YscWeb.EventDetailsLive do
         if remaining_to_cover <= 0 do
           {:halt, {discount_acc, max_pct, covered_qty}}
         else
-          reservation_qty = reservation.quantity
-
           reservation_discount_pct =
             reservation.discount_percentage || Decimal.new(0)
 
-          if Decimal.gt?(reservation_discount_pct, 0) do
-            tickets_from_reservation = min(reservation_qty, remaining_to_cover)
+          tickets_from_reservation =
+            min(reservation.quantity, remaining_to_cover)
 
-            reservation_tier_total =
-              case Money.mult(tier.price, tickets_from_reservation) do
-                {:ok, total} -> total
-                {:error, _} -> Money.new(0, :USD)
-              end
+          discount_amount =
+            ReservationDiscount.amount(
+              tier.price,
+              tickets_from_reservation,
+              reservation_discount_pct
+            )
 
-            discount_pct_decimal =
-              Decimal.div(reservation_discount_pct, Decimal.new(100))
+          new_discount =
+            case Money.add(discount_acc, discount_amount) do
+              {:ok, total} -> total
+              {:error, _} -> discount_acc
+            end
 
-            discount_amount =
-              case Money.mult(reservation_tier_total, discount_pct_decimal) do
-                {:ok, discount} -> discount
-                {:error, _} -> Money.new(0, :USD)
-              end
+          new_max_pct =
+            if Decimal.gt?(reservation_discount_pct, 0) do
+              pct_float = Decimal.to_float(reservation_discount_pct)
 
-            new_discount =
-              case Money.add(discount_acc, discount_amount) do
-                {:ok, total} -> total
-                {:error, _} -> discount_acc
-              end
-
-            # Track the maximum discount percentage for display
-            pct_float = Decimal.to_float(reservation_discount_pct)
-
-            new_max_pct =
               if max_pct == nil || pct_float > max_pct,
                 do: pct_float,
                 else: max_pct
-
-            new_covered = covered_qty + tickets_from_reservation
-
-            if new_covered >= requested_quantity do
-              {:halt, {new_discount, new_max_pct, new_covered}}
             else
-              {:cont, {new_discount, new_max_pct, new_covered}}
+              max_pct
             end
+
+          new_covered = covered_qty + tickets_from_reservation
+
+          if new_covered >= requested_quantity do
+            {:halt, {new_discount, new_max_pct, new_covered}}
           else
-            new_covered = covered_qty + min(reservation_qty, remaining_to_cover)
-            {:cont, {discount_acc, max_pct, new_covered}}
+            {:cont, {new_discount, new_max_pct, new_covered}}
           end
         end
       end)
@@ -8477,22 +8467,11 @@ defmodule YscWeb.EventDetailsLive do
 
       # Calculate discount savings
       discount_savings =
-        if max_discount_pct && tier_price do
-          original_total =
-            case Money.mult(tier_price, reserved_quantity) do
-              {:ok, total} -> total
-              {:error, _} -> Money.new(0, :USD)
-            end
-
-          discount_pct_decimal = Decimal.div(max_discount_pct, Decimal.new(100))
-
-          case Money.mult(original_total, discount_pct_decimal) do
-            {:ok, discount} -> discount
-            {:error, _} -> Money.new(0, :USD)
-          end
-        else
-          Money.new(0, :USD)
-        end
+        ReservationDiscount.amount(
+          tier_price,
+          reserved_quantity,
+          max_discount_pct
+        )
 
       %{
         discount_percentage:
