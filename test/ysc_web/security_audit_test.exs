@@ -71,6 +71,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 74 (MEDIUM)   Volunteers could soft-delete any scheduled event (including others') via the list and editor; Finding 59 only blocked published/cancelled
   Finding 76 (MEDIUM)   Volunteers could read other members' expense reports (submitter, purpose, status, net cost) on the event Statistics tab, bypassing LetMe expense_report :read (admin or own_resource) and the full-admin Money page
   Finding 77 (MEDIUM)   Open redirect: valid_internal_redirect?/1 allowed backslash and %5c paths that browsers treat as protocol-relative (ticket QR href + post-login Location)
+  Finding 78 (MEDIUM)   Event partiful_link host check used String.ends_with?(host, "partiful.com"), accepting lookalikes (evilpartiful.com, not-partiful.com) that render as the trusted public "RSVP on Partiful" CTA
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -4974,6 +4975,39 @@ defmodule YscWeb.SecurityAuditTest do
       assert html =~ ~s(id="back-link")
       assert html =~ ~s(href="/users/tickets")
       refute html =~ "evil.example.com"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 78 (MEDIUM): partiful_link host suffix allowlist
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 78: partiful_link rejects lookalike hosts" do
+    test "suffix-matching hosts are rejected; real partiful.com still works" do
+      organizer = user_fixture(%{role: :admin, state: :active})
+
+      for host <- ["evilpartiful.com", "not-partiful.com"] do
+        cs =
+          Ysc.Events.Event.changeset(%Ysc.Events.Event{}, %{
+            state: :draft,
+            organizer_id: organizer.id,
+            title: "Partiful phishing",
+            partiful_link: "https://#{host}/e/phish"
+          })
+
+        refute cs.valid?
+        assert {"must be a partiful.com URL", _} = cs.errors[:partiful_link]
+      end
+
+      ok =
+        Ysc.Events.Event.changeset(%Ysc.Events.Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "Real Partiful",
+          partiful_link: "https://partiful.com/e/ok"
+        })
+
+      assert ok.valid?
     end
   end
 

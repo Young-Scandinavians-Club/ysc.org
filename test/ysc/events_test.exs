@@ -3618,6 +3618,25 @@ defmodule Ysc.EventsTest do
                errors_on(changeset)
     end
 
+    test "rejects lookalike hosts that only suffix-match partiful.com (Finding 78)",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Test",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      {:error, changeset} =
+        Events.update_event(event, %{
+          "partiful_link" => "https://evilpartiful.com/e/phish"
+        })
+
+      assert %{partiful_link: ["must be a partiful.com URL"]} =
+               errors_on(changeset)
+    end
+
     test "rejects invalid URL", %{user: user} do
       {:ok, event} =
         Events.create_event(%{
