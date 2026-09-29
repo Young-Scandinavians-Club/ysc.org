@@ -4555,7 +4555,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       Req.Test.stub(@charge_req_stub, fn conn ->
         assert conn.request_path == "/v1/charges/#{charge_id}"
-        Plug.Conn.send_resp(conn, 500, "stripe unavailable")
+        Plug.Conn.send_resp(conn, 404, "not found")
       end)
 
       assert :ok =
@@ -4610,7 +4610,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
         }
       )
 
-      Req.Test.stub(@charge_req_stub, fn conn ->
+      Req.Test.stub(@charge_req_stub, fn _conn ->
         flunk("charge retrieve should not run when invoice is already present")
       end)
 
