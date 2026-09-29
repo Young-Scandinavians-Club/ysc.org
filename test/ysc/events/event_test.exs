@@ -75,7 +75,11 @@ defmodule Ysc.Events.EventTest do
 
     test "rejects lookalike hosts that only suffix-match partiful.com (Finding 78)",
          %{organizer: organizer} do
-      for host <- ["evilpartiful.com", "not-partiful.com", "partiful.com.evil.com"] do
+      for host <- [
+            "evilpartiful.com",
+            "not-partiful.com",
+            "partiful.com.evil.com"
+          ] do
         cs =
           Event.changeset(%Event{}, %{
             state: :draft,
