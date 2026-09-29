@@ -34,6 +34,8 @@ defmodule YscWeb.Emails.Notifier do
     "admin_application_submitted" => YscWeb.Emails.AdminApplicationSubmitted,
     "admin_membership_report" => YscWeb.Emails.AdminMembershipReport,
     "admin_access_review" => YscWeb.Emails.AdminAccessReview,
+    "payout_reconciliation_mismatch" =>
+      YscWeb.Emails.PayoutReconciliationMismatch,
     "conduct_violation_confirmation" =>
       YscWeb.Emails.ConductViolationConfirmation,
     "conduct_violation_board_notification" =>

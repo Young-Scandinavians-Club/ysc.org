@@ -1,0 +1,46 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding="48px 48px 24px 48px">
+  <mj-column padding="0">
+    <mj-text color="#000000" font-size="28px" line-height="1.25" padding="0px">
+      <strong>Payout does not reconcile</strong>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text font-size="16px" line-height="1.5" color="#3f3f46" padding="0px">
+      The payments, refunds and fees linked to Stripe payout <strong><%= @stripe_payout_id %></strong> don't add up to the amount Stripe sent to the bank. The QuickBooks deposit for this payout is probably off by the same amount. Please review it before reconciling the bank account.
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#fff" padding="0px 48px 12px 48px">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="15px" line-height="1.8" padding="14px 16px" color="#334155" container-background-color="#f8fafc">
+      Payout date: <%= @payout_date %><br />
+      Linked payments (<%= @payments_count %>): <%= @payments_total %><br />
+      Linked refunds (<%= @refunds_count %>): −<%= @refunds_total %><br />
+      Stripe fees: −<%= @fee_total %><br />
+      Minimum-balance reserve: <%= @reserve_adjustment %><br />
+      <strong>Expected payout: <%= @computed_net %></strong><br />
+      <strong>Stripe payout: <%= @payout_amount %></strong><br />
+      <strong style="color: #b91c1c;">Difference: <%= @difference %></strong><br />
+      QuickBooks deposit: <%= @quickbooks_deposit_id %>
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#fff" padding="12px 48px 0px 48px">
+  <mj-column padding="0">
+    <mj-text font-size="15px" line-height="1.5" color="#52525b" padding="0px">
+      A difference usually means a payment or refund in the payout isn't linked to it yet. The web team can re-link the payout (see docs/REPROCESS_PAYOUTS.md).
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#fff" padding="24px 48px 48px 48px">
+  <mj-column padding="0">
+    <mj-button href="<%= @admin_money_url %>" background-color="#1447e6" color="#ffffff" align="center" font-size="16px" border-radius="4px" inner-padding="12px 24px">
+      Open Money Admin →
+    </mj-button>
+    <mj-text align="center" font-size="14px" padding="16px 0px 0px 0px">
+      <a href="<%= @stripe_payout_url %>" style="color: #1447e6; text-decoration: underline;">View payout in Stripe</a>
+    </mj-text>
+  </mj-column>
+</mj-section>
