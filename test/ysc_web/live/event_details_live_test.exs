@@ -1071,6 +1071,58 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert is_binary(result)
     end
+
+    test "free ticket confirmation asks who is going instead of using registration jargon",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_state(:upcoming, with_image: true)
+
+      free_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Member guest",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          requires_registration: true
+        })
+
+      event = Repo.preload(event, :ticket_tiers, force: true)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{
+        "tier-id" => free_tier.id
+      })
+
+      render_click(view, "proceed-to-checkout")
+
+      assert has_element?(view, "#free-ticket-confirmation-modal")
+      assert has_element?(view, "#free-ticket-whos-going")
+      assert has_element?(view, "#free-ticket-whos-going", "Who's going?")
+
+      assert has_element?(
+               view,
+               "#free-ticket-whos-going",
+               "Add a name and email for each person attending."
+             )
+
+      assert has_element?(view, "label", "Who is this ticket for?")
+
+      refute has_element?(
+               view,
+               "#free-ticket-whos-going",
+               "Ticket Registration"
+             )
+
+      refute has_element?(
+               view,
+               "#free-ticket-whos-going",
+               "ticket that requires registration"
+             )
+    end
   end
 
   describe "authenticated user - different membership types" do
@@ -1624,6 +1676,38 @@ defmodule YscWeb.EventDetailsLiveTest do
         })
 
       assert is_binary(html)
+    end
+
+    test "paid checkout asks who is going instead of using registration jargon",
+         %{
+           conn: conn,
+           event: event,
+           tier: tier
+         } do
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, "#checkout-whos-going")
+
+      assert has_element?(
+               view,
+               "#checkout-whos-going",
+               "Add a name and email for each person attending."
+             )
+
+      assert has_element?(view, "#checkout-whos-going", "Who's going?")
+      assert has_element?(view, "label", "Who is this ticket for?")
+      refute has_element?(view, "#checkout-whos-going", "Ticket Registration")
+
+      refute has_element?(
+               view,
+               "#checkout-whos-going",
+               "ticket that requires registration"
+             )
     end
   end
 
