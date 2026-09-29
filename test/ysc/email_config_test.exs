@@ -51,6 +51,12 @@ defmodule Ysc.EmailConfigTest do
     end
   end
 
+  describe "treasurer_email/0" do
+    test "returns configured treasurer email or default" do
+      assert EmailConfig.treasurer_email() == "treasurer@ysc.org"
+    end
+  end
+
   describe "volunteer_email/0" do
     test "returns configured volunteer email or default" do
       email = EmailConfig.volunteer_email()

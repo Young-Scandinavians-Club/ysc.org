@@ -4,7 +4,8 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
 
   This worker:
   - Runs comprehensive reconciliation checks
-  - Alerts on discrepancies
+  - Alerts on discrepancies (Discord; payouts that don't reconcile also email
+    the Treasurer)
   - Logs detailed reports
   - Can be triggered manually or scheduled
 
@@ -30,6 +31,8 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
   alias Ysc.Ledgers.Reconciliation
   alias Ysc.Alerts.Discord
   alias Ysc.Stripe.WebhookHandler
+  alias YscWeb.Emails.Notifier
+  alias YscWeb.Emails.PayoutReconciliationMismatch
 
   # Payout linking (payments/refunds -> payout) only runs once, when the
   # `payout.paid` webhook arrives. A charge that settles into a payout before
@@ -187,12 +190,64 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
     # Send Discord alert
     send_discord_alert(report)
 
+    notify_treasurer_of_payout_mismatches(report)
+
     # Additional integrations can be added here:
     # send_slack_notification(full_alert)
-    # send_email_alert(full_alert)
     # send_pagerduty_alert(report)
 
     :ok
+  end
+
+  # Emails the Treasurer about payouts whose linked payments/refunds/fees still
+  # don't add up to what Stripe wired, after autoheal_payout_links/0 has had its
+  # chance. This runs every night against every payout, so the idempotency key
+  # is what keeps it to one email per problem: delivered emails are never
+  # re-sent for the same key, and the key includes the discrepancy so a payout
+  # whose mismatch changes (e.g. partly fixed) is reported again.
+  defp notify_treasurer_of_payout_mismatches(report) do
+    case Map.get(report.checks, :payouts) do
+      %{discrepancies: discrepancies} ->
+        discrepancies
+        |> Enum.filter(&composition_mismatch?/1)
+        |> Enum.each(&notify_treasurer_of_payout_mismatch/1)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp notify_treasurer_of_payout_mismatch(%{payout_id: payout_id}) do
+    payout = Ledgers.get_payout!(payout_id)
+    composition = Reconciliation.payout_composition(payout)
+
+    difference =
+      composition.difference |> Money.to_decimal() |> Decimal.to_string()
+
+    case Notifier.schedule_email(
+           Ysc.EmailConfig.treasurer_email(),
+           "payout_reconciliation_mismatch_#{payout.id}_#{difference}",
+           PayoutReconciliationMismatch.get_subject(payout.stripe_payout_id),
+           PayoutReconciliationMismatch.get_template_name(),
+           PayoutReconciliationMismatch.build_assigns(payout, composition),
+           "",
+           nil
+         ) do
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to schedule payout mismatch Treasurer email",
+          payout_id: payout_id,
+          error: inspect(reason)
+        )
+
+      _job ->
+        :ok
+    end
+  rescue
+    error ->
+      Ysc.Logging.error("Failed to send payout mismatch Treasurer email",
+        payout_id: payout_id,
+        error: Exception.format(:error, error, __STACKTRACE__)
+      )
   end
 
   defp build_alert_sections(report) do

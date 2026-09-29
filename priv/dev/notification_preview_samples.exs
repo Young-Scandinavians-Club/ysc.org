@@ -11,6 +11,23 @@
       submission_date: "January 15, 2026",
       review_url: "http://localhost:4000/admin/applications/preview"
     },
+    "payout_reconciliation_mismatch" => %{
+      stripe_payout_id: "po_1UKS44IZd8GkARoBVvD9couK",
+      payout_date: "September 27, 2026 at 05:00 PM PDT",
+      payout_amount: "$498.10",
+      payments_count: 16,
+      payments_total: "$905.00",
+      refunds_count: 0,
+      refunds_total: "$0.00",
+      fee_total: "$37.32",
+      reserve_adjustment: "-$324.58",
+      computed_net: "$543.10",
+      difference: "-$45.00",
+      quickbooks_deposit_id: "43896",
+      stripe_payout_url:
+        "https://dashboard.stripe.com/payouts/po_1UKS44IZd8GkARoBVvD9couK",
+      admin_money_url: "http://localhost:4000/admin/money"
+    },
     "admin_access_review" => %{
       year: 2026,
       admin_count: 1,
