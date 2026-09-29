@@ -2247,25 +2247,29 @@ defmodule YscWeb.EventDetailsLive do
                         else
                           true
                         end %>
-                      <div class="flex items-center gap-2 mb-1">
-                        <span class={[
-                          "flex items-center justify-center w-6 h-6 rounded-full text-sm font-semibold",
-                          if(all_registrations_complete_for_step1,
-                            do: "bg-green-600 text-white",
-                            else: "bg-blue-600 text-white"
-                          )
-                        ]}>
-                          <%= if all_registrations_complete_for_step1 do %>
-                            <.icon name="hero-check" class="w-4 h-4" />
-                          <% else %>
-                            1
-                          <% end %>
-                        </span>
-                        <h3 class="font-semibold text-lg">Who's going?</h3>
+                      <div id="checkout-whos-going">
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class={[
+                            "flex items-center justify-center w-6 h-6 rounded-full text-sm font-semibold",
+                            if(all_registrations_complete_for_step1,
+                              do: "bg-green-600 text-white",
+                              else: "bg-blue-600 text-white"
+                            )
+                          ]}>
+                            <%= if all_registrations_complete_for_step1 do %>
+                              <.icon name="hero-check" class="w-4 h-4" />
+                            <% else %>
+                              1
+                            <% end %>
+                          </span>
+                          <h3 class="font-semibold text-lg">
+                            {attendee_details_heading()}
+                          </h3>
+                        </div>
+                        <p class="text-sm text-zinc-600 ml-8">
+                          {attendee_details_help()}
+                        </p>
                       </div>
-                      <p class="text-sm text-zinc-600 ml-8">
-                        Please provide details for each ticket that requires registration.
-                      </p>
                     </div>
                   </div>
 
@@ -2885,11 +2889,14 @@ defmodule YscWeb.EventDetailsLive do
     >
       <div class="flex flex-col space-y-6">
         <div class="text-center">
-          <h2 class="text-2xl font-semibold text-zinc-900 mb-2">
-            Ticket Registration
+          <h2
+            id="registration-modal-heading"
+            class="text-2xl font-semibold text-zinc-900 mb-2"
+          >
+            {attendee_details_heading()}
           </h2>
           <p class="text-zinc-600">
-            Please provide details for each ticket that requires registration.
+            {attendee_details_help()}
           </p>
         </div>
 
@@ -3053,10 +3060,13 @@ defmodule YscWeb.EventDetailsLive do
         <% tickets_requiring_registration =
           get_tickets_requiring_registration(@ticket_order.tickets || []) %>
         <%= if Enum.any?(tickets_requiring_registration) do %>
-          <div class="flex flex-col gap-3 border-t border-zinc-200 pt-6">
-            <h3 class="font-semibold text-lg">Ticket Registration</h3>
+          <div
+            id="free-ticket-whos-going"
+            class="flex flex-col gap-3 border-t border-zinc-200 pt-6"
+          >
+            <h3 class="font-semibold text-lg">{attendee_details_heading()}</h3>
             <p class="text-base text-zinc-600">
-              Please provide details for each ticket that requires registration.
+              {attendee_details_help()}
             </p>
 
             <%= for {ticket, index} <- Enum.with_index(tickets_requiring_registration) do %>
@@ -8523,6 +8533,12 @@ defmodule YscWeb.EventDetailsLive do
       _ ->
         ""
     end
+  end
+
+  defp attendee_details_heading, do: "Who's going?"
+
+  defp attendee_details_help do
+    "Add a name and email for each person attending."
   end
 
   # Helper function to get tickets that require registration
