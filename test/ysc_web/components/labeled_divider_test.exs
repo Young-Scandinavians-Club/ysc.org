@@ -44,5 +44,20 @@ defmodule YscWeb.Components.LabeledDividerTest do
       assert html =~ "uppercase tracking-wide"
       refute html =~ "border-zinc-200"
     end
+
+    test "omits the label when show_label is false" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.labeled_divider id="payment-add-new-divider" show_label={false}>
+          Add new
+        </.labeled_divider>
+        """)
+
+      assert html =~ ~s(id="payment-add-new-divider")
+      assert html =~ "border-zinc-200"
+      refute html =~ "Add new"
+    end
   end
 end

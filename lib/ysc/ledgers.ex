@@ -2519,23 +2519,41 @@ defmodule Ysc.Ledgers do
   Returns the subset of `payment_ids` that have at least one ledger refund.
 
   One `WHERE payment_id IN (...)` instead of N `list_refunds_for_payment/1`
-  round-trips. Used by the event-cancellation refund modal to label
-  already-refunded orders without loading refund rows or QuickBooks JSON.
+  round-trips. Prefer `refund_totals_by_payment_id/1` when callers need to
+  know *how much* was refunded (e.g. full vs partial).
   """
   def payment_ids_with_refunds([]), do: MapSet.new()
 
   def payment_ids_with_refunds(payment_ids) when is_list(payment_ids) do
+    payment_ids
+    |> refund_totals_by_payment_id()
+    |> Map.keys()
+    |> MapSet.new()
+  end
+
+  @doc """
+  Returns `%{payment_id => total_refunded_money}` for the given payment ids.
+
+  One grouped `refunds` query instead of N per-payment loads. Used by the
+  event-cancellation refund modal so a *partial* refund cannot be labeled
+  "Refunded" when money remains on the payment.
+  """
+  def refund_totals_by_payment_id([]), do: %{}
+
+  def refund_totals_by_payment_id(payment_ids) when is_list(payment_ids) do
     ids = Enum.reject(payment_ids, &is_nil/1)
 
     case ids do
       [] ->
-        MapSet.new()
+        %{}
 
       [_ | _] ->
         ids
-        |> payment_ids_with_refunds_query()
+        |> refund_totals_by_payment_id_query()
         |> Repo.all()
-        |> MapSet.new()
+        |> Map.new(fn {payment_id, sum} ->
+          {payment_id, Ysc.MoneyHelper.usd_from_db_sum(sum)}
+        end)
     end
   end
 
@@ -2544,6 +2562,14 @@ defmodule Ysc.Ledgers do
       where: r.payment_id in ^payment_ids,
       distinct: true,
       select: r.payment_id
+    )
+  end
+
+  defp refund_totals_by_payment_id_query(payment_ids) do
+    from(r in Refund,
+      where: r.payment_id in ^payment_ids,
+      group_by: r.payment_id,
+      select: {r.payment_id, sum(fragment("(?.amount).amount", r))}
     )
   end
 
@@ -4797,6 +4823,11 @@ defmodule Ysc.Ledgers do
   @doc false
   def ci_query_explain_payment_ids_with_refunds_query do
     payment_ids_with_refunds_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_refund_totals_by_payment_id_query do
+    refund_totals_by_payment_id_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 
   @doc false

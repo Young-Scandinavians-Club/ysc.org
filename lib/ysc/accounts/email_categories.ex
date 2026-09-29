@@ -17,6 +17,8 @@ defmodule Ysc.Accounts.EmailCategories do
                                    "family_invite_accepted",
                                    "family_invite_cancelled",
                                    "family_member_removed",
+                                   "family_member_aged_out",
+                                   "family_member_aged_out_primary",
                                    "membership_payment_confirmation",
                                    "membership_payment_failure",
                                    "membership_payment_reminder_7day",
@@ -57,6 +59,8 @@ defmodule Ysc.Accounts.EmailCategories do
     # Board/admin notifications (always sent, no user preference check)
     "admin_application_submitted" => :account,
     "admin_membership_report" => :account,
+    "admin_access_review" => :account,
+    "payout_reconciliation_mismatch" => :account,
     "conduct_violation_board_notification" => :account,
     "volunteer_board_notification" => :account,
     "contact_form_board_notification" => :account,
@@ -66,6 +70,9 @@ defmodule Ysc.Accounts.EmailCategories do
     "ticket_purchase_confirmation" => :account,
     "ticket_reservation_created" => :account,
     "ticket_order_refund" => :account,
+    # Cancellation notices must reach every ticket holder, so they ignore
+    # event notification preferences.
+    "event_cancellation_notification" => :account,
     "outage_notification" => :account,
     "event_notification" => :event,
     "event_update_notification" => :event,
@@ -82,6 +89,8 @@ defmodule Ysc.Accounts.EmailCategories do
     "family_invite_accepted" => :account,
     "family_invite_cancelled" => :account,
     "family_member_removed" => :account,
+    "family_member_aged_out" => :account,
+    "family_member_aged_out_primary" => :account,
     # Double opt-in confirmation — must always send regardless of newsletter
     # preference, since it's what grants that preference in the first place.
     "newsletter_confirmation" => :account,

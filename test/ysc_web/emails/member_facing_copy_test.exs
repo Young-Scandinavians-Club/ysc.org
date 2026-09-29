@@ -13,6 +13,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     ApplicationApproved,
     ApplicationApprovedFamilyLinked,
     ApplicationApprovedPaymentSuccess,
+    ApplicationSubmitted,
     BookingCancellationConfirmation,
     BookingCheckinReminder,
     BookingCheckoutReminder,
@@ -76,7 +77,15 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
                "Velkommen! (Welcome!) Your YSC Membership is Active! 🎉"
 
       assert text =~ "Velkommen! (Welcome!) Your Membership is Active"
+      assert text =~ "Your saved payment method has been charged"
       refute text =~ "Velkommen! Your Membership is Active"
+    end
+
+    test "application-submitted email says save a payment method, not card" do
+      html = ApplicationSubmitted.render(%{first_name: "Jane"})
+      text = html_text(html)
+
+      assert text =~ "option to save a payment method"
     end
 
     test "payment confirmation tells members they can book a stay at the cabins" do
@@ -131,13 +140,21 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "After you pay, you'll have access"
       assert text =~ "You just need to finish paying your dues"
       assert text =~ "Try paying again"
-      assert text =~ "If your card still works, try the payment again"
+
+      assert text =~
+               "If your card or bank account still works, try the payment again"
+
+      assert text =~ "Update your card or bank account"
+      assert text =~ "Expired or invalid card"
+      assert text =~ "Using a different card or bank account"
       assert text =~ "payment ID: in_123"
       assert text =~ "jane@example.com"
       refute text =~ "successfully processed"
       refute text =~ "complete the payment process"
       refute text =~ "payment reference"
       refute text =~ "Retry Payment Now"
+      refute text =~ "Update Payment Method"
+      refute text =~ "payment method"
     end
 
     test "renewal-failure email says after you pay, not once payment is processed" do
@@ -157,9 +174,12 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~
                "We couldn't take payment for your Family membership renewal"
 
-      assert text =~ "After you update your card and pay"
+      assert text =~ "After you update your card or bank account and pay"
+      assert text =~ "Update your card or bank account"
       refute text =~ "successfully processed"
       refute text =~ "couldn't process your"
+      refute text =~ "Update Payment Method"
+      refute text =~ "payment method"
     end
 
     test "renewal-success email says we received payment instead of processed" do
@@ -238,6 +258,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           "2027",
           user
         )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
+        )
         |> TahoeSummerBuyoutAvailable.render()
 
       text = html_text(html)
@@ -263,6 +287,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           ~D[2026-11-08],
           "2026/2027",
           user
+        )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
         )
         |> TahoeWinterWeekendAvailable.render()
 
@@ -375,6 +403,11 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Cabin:"
       assert text =~ "Individual room(s)"
       assert text =~ "Tahoe Cabin Master at tahoe@ysc.org"
+
+      assert text =~
+               "About 3 days before check-in, we'll email you the door code"
+
+      refute text =~ "24 hours before"
       refute text =~ "Room Booking"
       refute text =~ "Day Booking"
       refute text =~ "our Tahoe property"
@@ -424,6 +457,43 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "Property Location"
       refute text =~ "Guests & Reservations"
       refute text =~ "access the property"
+    end
+
+    test "check-in reminder missing door code tells members what to do next" do
+      html =
+        BookingCheckinReminder.render(%{
+          first_name: "Jane",
+          door_code: nil,
+          property: "tahoe",
+          property_name: "Tahoe",
+          property_address: "2685 Cedar Lane, Homewood, CA 96141",
+          checkin_date: "December 1, 2026",
+          checkout_date: "December 3, 2026",
+          checkin_time: "3:00 PM",
+          checkout_time: "11:00 AM",
+          days_until_checkin: 2,
+          booking_reference_id: "BK-TEST-123",
+          booking_mode: "Individual room(s)",
+          room_names: "Room 1",
+          nights: 2,
+          is_buyout: false,
+          guests_count: 2,
+          children_count: 0,
+          cabin_master_name: "Lars Berg",
+          cabin_master_email: "cabinmaster@ysc.org",
+          cabin_master_phone: "4155550199",
+          clear_lake_info_url: "https://example.com/bookings/clear-lake",
+          booking_url: "https://example.com/bookings/preview"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Door code not ready yet"
+      assert text =~ "isn't ready yet"
+      assert text =~ "View Booking Details"
+      assert text =~ "Cabin Master"
+      refute text =~ "Not Available"
+      refute text =~ "Please save this code"
     end
 
     test "checkout reminder uses cabin, not property" do
@@ -511,7 +581,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           event_date_time: "Dec 1, 2026 at 7:00 PM PST",
           event_url: "https://example.com/events/preview",
           event_image_url: nil,
-          notification_settings_url: "https://example.com/users/notifications"
+          unsubscribe_url:
+            "https://example.com/event-notifications/unsubscribe/token"
         })
 
       text = html_text(html)
@@ -524,7 +595,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
   end
 
   describe "membership renewal payment reminder" do
-    test "asks members to save a card instead of a payment method on file" do
+    test "asks members to add a payment method, not just a card" do
       html =
         MembershipRenewalPaymentMethodReminder.render(%{
           first_name: "Jane",
@@ -537,9 +608,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       text = html_text(html)
 
       assert MembershipRenewalPaymentMethodReminder.get_subject() ==
-               "Please add a card so your membership can renew"
+               "Please add a payment method so your membership can renew"
 
-      assert text =~ "Please add a card so your membership can renew"
+      assert text =~ "Please add a payment method so your membership can renew"
       assert text =~ "We don't have a card or bank account saved"
       assert text =~ "Add a card or bank account"
       assert text =~ "Click the button above"
@@ -830,6 +901,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "You don't need to do anything else"
       assert text =~ "Cabin Master"
       assert text =~ "money is on the way"
+      assert text =~ "same card or bank account you used"
+      refute text =~ "original payment method"
       assert text =~ "Payment number:"
       refute text =~ "Payment Reference"
       refute text =~ "refund request"
@@ -883,7 +956,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       completed_text = html_text(completed_html)
 
-      assert completed_text =~ "go back to your original payment method"
+      assert completed_text =~
+               "go back to the same card or bank account you used"
+
       assert completed_text =~ "Payment number:"
       refute completed_text =~ "Payment Reference"
       refute completed_text =~ "will be processed"

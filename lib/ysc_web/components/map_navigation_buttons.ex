@@ -13,7 +13,7 @@ defmodule YscWeb.Components.MapNavigationButtons do
   def map_navigation_buttons(assigns) do
     ~H"""
     <div class={@class}>
-      <ul class="flex flex-row items-center justify-center py-4 space-x-8 list-none w-full">
+      <ul class="flex flex-row items-center justify-center py-4 gap-8 list-none w-full">
         <li class="p-0 m-0">
           <.navigation_link
             href={"https://maps.google.com/?saddr=Current+Location&daddr=#{@latitude},#{@longitude}&dirflg=w"}

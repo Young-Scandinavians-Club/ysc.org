@@ -17,6 +17,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     FamilyInvite,
     FamilyInviteAccepted,
     FamilyInviteCancelled,
+    FamilyMemberAgedOut,
+    FamilyMemberAgedOutPrimary,
     FamilyMemberRemoved,
     MembershipPaymentConfirmation,
     MembershipPaymentFailure,
@@ -230,6 +232,52 @@ defmodule YscWeb.Emails.EmailCoverageTest do
                "Removed from Family Membership - YSC"
 
       assert FamilyMemberRemoved.membership_url() =~ "/users/membership"
+    end
+  end
+
+  describe "FamilyMemberAgedOut" do
+    test "renders and exposes template metadata" do
+      assigns = %{
+        first_name: "Jane",
+        primary_user_name: "John",
+        membership_url: "https://example.com/users/membership"
+      }
+
+      html = FamilyMemberAgedOut.render(assigns)
+      assert html =~ "Jane"
+      assert html =~ "John"
+      assert html =~ "children under 18"
+      assert html =~ "Get your own membership"
+      assert html =~ "https://example.com/users/membership"
+
+      assert FamilyMemberAgedOut.get_template_name() == "family_member_aged_out"
+      assert FamilyMemberAgedOut.get_subject() =~ "own YSC membership"
+      assert FamilyMemberAgedOut.membership_url() =~ "/users/membership"
+    end
+  end
+
+  describe "FamilyMemberAgedOutPrimary" do
+    test "renders and exposes template metadata" do
+      assigns = %{
+        primary_first_name: "John",
+        member_name: "Jane Doe",
+        family_management_url: "https://example.com/users/settings/family"
+      }
+
+      html = FamilyMemberAgedOutPrimary.render(assigns)
+      assert html =~ "John"
+      assert html =~ "Jane Doe"
+      assert html =~ "children under 18"
+      assert html =~ "View your family"
+      assert html =~ "https://example.com/users/settings/family"
+
+      assert FamilyMemberAgedOutPrimary.get_template_name() ==
+               "family_member_aged_out_primary"
+
+      assert FamilyMemberAgedOutPrimary.get_subject() =~ "aged out"
+
+      assert FamilyMemberAgedOutPrimary.family_management_url() =~
+               "/users/settings/family"
     end
   end
 
@@ -1043,6 +1091,37 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assert html =~ "555-1234"
     end
 
+    test "BookingCheckinReminder without a door code" do
+      assigns = %{
+        first_name: "John",
+        door_code: nil,
+        property: "tahoe",
+        property_name: "Tahoe",
+        property_address: "2685 Cedar Lane",
+        checkin_date: "December 1, 2024",
+        checkout_date: "December 3, 2024",
+        checkin_time: "3:00 PM",
+        checkout_time: "11:00 AM",
+        days_until_checkin: 2,
+        booking_reference_id: "BK-123",
+        booking_mode: "Individual room(s)",
+        room_names: "Room 1",
+        nights: 2,
+        is_buyout: false,
+        guests_count: 2,
+        children_count: 0,
+        cabin_master_name: "Jane Smith",
+        cabin_master_email: "jane@example.com",
+        cabin_master_phone: "555-1234",
+        booking_url: "https://example.com/bookings/123"
+      }
+
+      html = BookingCheckinReminder.render(assigns)
+      assert html =~ "Door code not ready yet"
+      refute html =~ "Not Available"
+      refute html =~ "Please save this code"
+    end
+
     test "BookingCheckoutReminder with cabin master" do
       assigns = %{
         first_name: "John",
@@ -1350,7 +1429,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: nil,
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url:
+          "https://example.com/event-notifications/unsubscribe/token"
       }
 
       html = EventNotification.render(assigns)

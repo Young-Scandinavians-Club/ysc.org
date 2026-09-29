@@ -130,7 +130,7 @@ defmodule YscWeb.AccountSetupLive do
             </.header>
           <% else %>
             <.header class="text-left">
-              Save Your Payment Method
+              Save your payment method
               <:subtitle>
                 Save a payment method so we can activate your membership if you're approved. You won't be charged until the board approves your application.
               </:subtitle>
@@ -154,7 +154,7 @@ defmodule YscWeb.AccountSetupLive do
             <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900 space-y-2">
               <p>
                 <strong>You're approved.</strong>
-                We'll charge your card now for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
+                We'll charge your payment method now for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal in account settings.
               </p>
             </div>
 
@@ -187,11 +187,11 @@ defmodule YscWeb.AccountSetupLive do
                   class="w-4 h-4 inline-block mr-1 -mt-0.5"
                 />
                 <strong>
-                  Your card will not be charged until your application is approved.
+                  Your payment method will not be charged until your application is approved.
                 </strong>
               </p>
               <p>
-                If your application is approved, we'll charge this card for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
+                If your application is approved, we'll charge this payment method for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal in account settings.
               </p>
             </div>
           <% end %>
@@ -220,9 +220,9 @@ defmodule YscWeb.AccountSetupLive do
                 >
                   <.icon name="hero-credit-card" class="w-4 h-4" />
                   <%= if @user.state == :active do %>
-                    Save Payment Method &amp; Activate
+                    Save payment method &amp; activate
                   <% else %>
-                    Save Payment Method &amp; Continue
+                    Save payment method &amp; continue
                   <% end %>
                 </.button>
               </div>
@@ -511,10 +511,10 @@ defmodule YscWeb.AccountSetupLive do
     steps
   end
 
-  # Pending applicants save a card without being charged; unpaid active members
+  # Pending applicants save a payment method without being charged; unpaid active members
   # pay dues on this step. The label must match the page body, not imply a charge.
   defp payment_stepper_label(%{state: :active}), do: "Payment"
-  defp payment_stepper_label(_), do: "Save card"
+  defp payment_stepper_label(_), do: "Save payment method"
 
   # Helper function to map current_step to stepper display step
   # Dynamically calculates position based on which steps are shown
@@ -1570,7 +1570,7 @@ defmodule YscWeb.AccountSetupLive do
     if not setup_owner?(socket) or socket.assigns.current_step != 1 do
       YscWeb.Flash.send_toast(
         :error,
-        "Cannot save payment method at this step.",
+        "We couldn't save your payment method at this step.",
         title: "Account setup"
       )
 
@@ -1615,7 +1615,7 @@ defmodule YscWeb.AccountSetupLive do
 
               YscWeb.Flash.send_toast(
                 :error,
-                "Failed to save payment method. Please try again.",
+                "We couldn't save your payment method. Please try again.",
                 title: "Payment"
               )
 
@@ -1735,7 +1735,8 @@ defmodule YscWeb.AccountSetupLive do
 
             socket = refresh_setup_user_and_needs(socket)
 
-            {socket, "Payment saved and your membership is now active!", true}
+            {socket, "Payment method saved and your membership is now active!",
+             true}
 
           {:error, _reason} ->
             socket = refresh_setup_user_and_needs(socket)

@@ -75,7 +75,7 @@ defmodule YscWeb.UserEventsListLive do
                 </p>
               </div>
               <div class="text-xs text-zinc-500">
-                <p>Ref: {ticket.reference_id}</p>
+                <p>Ticket number: {ticket.reference_id}</p>
               </div>
             </div>
           </div>

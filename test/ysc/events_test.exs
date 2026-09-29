@@ -1064,6 +1064,86 @@ defmodule Ysc.EventsTest do
       end
     end
 
+    test "list_events_paginated/1 slims organizer to name columns" do
+      organizer =
+        user_fixture(%{
+          first_name: "Astrid",
+          last_name: "Lindgren"
+        })
+
+      {:ok, event} =
+        create_event_fixture(%{
+          organizer_id: organizer.id,
+          title: "Organizer slim #{System.unique_integer([:positive])}"
+        })
+
+      params = %{page: 1, page_size: 50}
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_events_paginated(params) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_result, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_events_paginated(params) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, {events, _meta}} = Events.list_events_paginated(params)
+      loaded = Enum.find(events, &(&1.id == event.id))
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert loaded
+      assert Ecto.assoc_loaded?(loaded.organizer)
+      assert loaded.organizer.first_name == "Astrid"
+      assert loaded.organizer.last_name == "Lindgren"
+      assert loaded.organizer.hashed_password == nil
+      assert loaded.organizer.board_bio == nil
+      assert loaded.organizer.email == nil
+    end
+
+    test "list_events_paginated/2 search path slims organizer to name columns" do
+      title = "UniqueOrganizerSearch#{System.unique_integer([:positive])}"
+
+      organizer =
+        user_fixture(%{
+          first_name: "Selma",
+          last_name: "Lagerlof"
+        })
+
+      {:ok, event} =
+        create_event_fixture(%{
+          organizer_id: organizer.id,
+          title: title
+        })
+
+      params = %{page: 1, page_size: 20}
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_events_paginated(params, title) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, {events, _meta}} =
+               Events.list_events_paginated(params, title)
+
+      loaded = Enum.find(events, &(&1.id == event.id))
+
+      assert password_cols == 0
+      assert loaded
+      assert loaded.organizer.first_name == "Selma"
+      assert loaded.organizer.last_name == "Lagerlof"
+      assert loaded.organizer.hashed_password == nil
+      assert loaded.organizer.board_bio == nil
+    end
+
     test "list_events_paginated/1 capacity_info registrations exclude donation tickets" do
       user = user_fixture()
 
@@ -1950,6 +2030,79 @@ defmodule Ysc.EventsTest do
       assert returned_event_ids == Enum.take(event_ids, 2)
     end
 
+    test "list_upcoming_confirmed_tickets_for_user/2 slims tier and order columns" do
+      data = Ysc.TestDataFactory.complete_ticket_order()
+      user = data.user
+      event = data.event
+      order = data.order
+      tier = hd(data.tiers)
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>home tickets should not load this</p>",
+        rendered_details: "<p>home tickets should not load this</p>"
+      })
+      |> Repo.update!()
+
+      tier
+      |> Ecto.Changeset.change(%{
+        description: "toast copy the home tickets list must not load"
+      })
+      |> Repo.update!()
+
+      order
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes: "grant notes the home tickets list must not load",
+        cancellation_reason: "cancel copy the home tickets list must not load",
+        payment_intent_id: "pi_home_tickets_secret"
+      })
+      |> Repo.update!()
+
+      from(t in Ticket, where: t.ticket_order_id == ^order.id)
+      |> Repo.update_all(set: [status: :confirmed])
+
+      {_loaded, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Events.list_upcoming_confirmed_tickets_for_user(user.id,
+              after_now: true
+            )
+          end,
+          pattern: ~r/admin_grant_notes|cancellation_reason|payment_intent_id/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, description_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Events.list_upcoming_confirmed_tickets_for_user(user.id,
+              after_now: true
+            )
+          end,
+          pattern:
+            ~r/ticket_tiers.*description|t1\."description"|tt0\."description"/i,
+          caller_pids: [self()]
+        )
+
+      tickets =
+        Events.list_upcoming_confirmed_tickets_for_user(user.id,
+          after_now: true
+        )
+
+      loaded = Enum.find(tickets, &(&1.ticket_tier_id == tier.id))
+
+      assert notes_cols == 0
+      assert description_cols == 0
+      assert loaded
+      assert loaded.ticket_tier.name == tier.name
+      assert loaded.ticket_tier.description == nil
+      assert loaded.ticket_order.id == order.id
+      assert loaded.ticket_order.admin_grant_notes == nil
+      assert loaded.ticket_order.payment_intent_id == nil
+      assert loaded.event.raw_details == nil
+      assert loaded.event.rendered_details == nil
+    end
+
     test "list_events_by_ids/2 returns events in id order" do
       user = user_fixture()
       event_a = event_fixture(%{organizer_id: user.id})
@@ -2103,6 +2256,90 @@ defmodule Ysc.EventsTest do
       assert Map.get(data.ticket_counts, user1.id) == 1
       assert Map.get(data.ticket_counts, user2.id) == 2
       assert Enum.map(data.ticket_buyers, & &1.id) == [user1.id, user2.id]
+    end
+
+    test "attendee_ticket_data_for_event/1 slims buyers to name and avatar columns" do
+      {:ok, event} = create_event_fixture()
+
+      user =
+        user_fixture(%{
+          first_name: "Astrid",
+          last_name: "Buyer",
+          board_bio: "bio the event page must not load"
+        })
+
+      {:ok, tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed
+      })
+
+      {_data, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.attendee_ticket_data_for_event(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_data, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.attendee_ticket_data_for_event(event.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      data = Events.attendee_ticket_data_for_event(event.id)
+      [buyer] = data.ticket_buyers
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert buyer.first_name == "Astrid"
+      assert buyer.last_name == "Buyer"
+      assert buyer.hashed_password == nil
+      assert buyer.board_bio == nil
+      assert buyer.email == nil
+      assert Ecto.assoc_loaded?(buyer.current_avatar)
+    end
+
+    test "list_event_hosts_by_event_id/1 slims hosts to name and avatar columns" do
+      organizer =
+        user_fixture(%{
+          first_name: "Selma",
+          last_name: "Host",
+          board_bio: "bio the host chips must not load"
+        })
+
+      {:ok, event} = create_event_fixture(%{organizer_id: organizer.id})
+
+      {_hosts, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_event_hosts_by_event_id(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_hosts, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_event_hosts_by_event_id(event.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      [host] = Events.list_event_hosts_by_event_id(event.id)
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert host.id == organizer.id
+      assert host.first_name == "Selma"
+      assert host.last_name == "Host"
+      assert host.hashed_password == nil
+      assert host.board_bio == nil
+      assert host.email == nil
+      assert Ecto.assoc_loaded?(host.current_avatar)
     end
 
     test "attendee_ticket_data_for_event/1 orders buyers by ticket ULID when inserted_at ties on the same second" do
@@ -3381,6 +3618,25 @@ defmodule Ysc.EventsTest do
                errors_on(changeset)
     end
 
+    test "rejects lookalike hosts that only suffix-match partiful.com (Finding 78)",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Event",
+          description: "Test",
+          state: :draft,
+          organizer_id: user.id
+        })
+
+      {:error, changeset} =
+        Events.update_event(event, %{
+          "partiful_link" => "https://evilpartiful.com/e/phish"
+        })
+
+      assert %{partiful_link: ["must be a partiful.com URL"]} =
+               errors_on(changeset)
+    end
+
     test "rejects invalid URL", %{user: user} do
       {:ok, event} =
         Events.create_event(%{
@@ -3967,6 +4223,44 @@ defmodule Ysc.EventsTest do
       assert {:ok, published2} = Events.publish_event(draft)
       assert {:ok, cancelled} = Events.cancel_event(published2)
       assert cancelled.state == :cancelled
+    end
+
+    test "cancel_event enqueues a cancellation notice with a snapshot of ticket holders",
+         %{event: event} do
+      {:ok, published} = Events.publish_event(event)
+      tier = ticket_tier_fixture(%{event_id: published.id, type: :paid})
+
+      holder = user_fixture(%{first_name: "Astrid"})
+      insert_ticket!(published, tier, holder, :confirmed)
+      insert_ticket!(published, tier, user_fixture(), :expired)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, cancelled} = Events.cancel_event(published)
+
+        # The admin editor renders these straight from the returned event.
+        assert %User{} = cancelled.organizer
+        refute match?(%Ecto.Association.NotLoaded{}, cancelled.updated_by)
+
+        assert [job] =
+                 all_enqueued(
+                   worker: YscWeb.Workers.EventCancellationNotificationWorker
+                 )
+
+        assert job.args["event_id"] == cancelled.id
+        assert job.args["cancelled_at"]
+
+        assert job.args["recipients"] == [
+                 %{"email" => holder.email, "first_name" => "Astrid"}
+               ]
+
+        # Re-cancelling an already-cancelled event must not notify again.
+        assert {:ok, _} = Events.cancel_event(cancelled)
+
+        assert [_only_job] =
+                 all_enqueued(
+                   worker: YscWeb.Workers.EventCancellationNotificationWorker
+                 )
+      end)
     end
 
     test "unpublish_event and cancel_event refuse volunteer acting_role", %{
@@ -5416,5 +5710,20 @@ defmodule Ysc.EventsTest do
       assert %Ecto.Query{} =
                Events.ci_query_explain_event_stripe_fees_total_query()
     end
+  end
+
+  defp insert_ticket!(event, tier, user, status) do
+    %Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: event.id,
+      user_id: user.id,
+      ticket_tier_id: tier.id,
+      status: status,
+      expires_at:
+        DateTime.utc_now()
+        |> DateTime.add(1, :day)
+        |> DateTime.truncate(:second)
+    }
+    |> Repo.insert!()
   end
 end

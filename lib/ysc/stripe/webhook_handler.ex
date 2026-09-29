@@ -2943,6 +2943,27 @@ defmodule Ysc.Stripe.WebhookHandler do
     end
   end
 
+  # Booking/ticket payments are keyed by payment intent ID; subscription
+  # payments are keyed by the invoice the payment intent paid.
+  defp find_payment_for_refund(payment_intent_id) do
+    Ledgers.get_payment_by_external_id(payment_intent_id) ||
+      case Ysc.Stripe.InvoiceHelpers.invoice_id_for_payment_intent(
+             payment_intent_id
+           ) do
+        invoice_id when is_binary(invoice_id) ->
+          Ledgers.get_payment_by_external_id(invoice_id)
+
+        nil ->
+          nil
+      end
+  end
+
+  defp default_refund_reason(payment, payment_intent_id) do
+    if payment.external_payment_id == payment_intent_id,
+      do: "Booking cancellation refund",
+      else: "Membership refund"
+  end
+
   # Process refund from Stripe refund object (can be struct or map)
   defp process_refund_from_refund_object(%Stripe.Refund{} = refund) do
     # Convert struct to map for unified processing
@@ -2985,8 +3006,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       end
 
     if payment_intent_id do
-      # Find the payment by external_payment_id
-      payment = Ledgers.get_payment_by_external_id(payment_intent_id)
+      payment = find_payment_for_refund(payment_intent_id)
 
       if payment do
         # Convert refund amount from cents to dollars
@@ -2997,7 +3017,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           case metadata do
             %{"reason" => reason} when is_binary(reason) -> reason
             %{reason: reason} when is_binary(reason) -> reason
-            _ -> "Booking cancellation refund"
+            _ -> default_refund_reason(payment, payment_intent_id)
           end
 
         # Process refund in ledger
@@ -3688,8 +3708,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             link_charge_to_payout(payout, source, source_id)
 
           "refund" ->
-            # If source is expanded (Refund object), use it directly; otherwise fetch by ID
-            link_stripe_refund_to_payout(payout, source, source_id)
+            link_stripe_refund_to_payout(payout, source_id)
 
           _ ->
             # Other types (fees, adjustments, payout, etc.) - skip for now
@@ -3882,164 +3901,54 @@ defmodule Ysc.Stripe.WebhookHandler do
     end
   end
 
-  # stripity_stripe 3.x only generates `Stripe.Refund.retrieve/4` nested under a charge ID.
-  # Stripe still documents GET /v1/refunds/:id; `Stripe.Request` is the supported escape hatch.
-  @dialyzer {:nowarn_function, retrieve_refund_by_id: 1}
-  @dialyzer {:nowarn_function, retrieve_refund_by_id: 2}
-  defp retrieve_refund_by_id(refund_id, opts \\ []) do
-    Stripe.Request.new_request(opts)
-    |> Stripe.Request.put_endpoint("/v1/refunds/#{refund_id}")
-    |> Stripe.Request.put_method(:get)
-    |> Stripe.Request.make_request()
-  end
-
-  # Helper function to link a Stripe refund to a payout
-  # source may be an expanded Refund object or nil (if we need to fetch by ID)
-  defp link_stripe_refund_to_payout(payout, source, stripe_refund_id) do
+  # Helper function to link a Stripe refund to a payout.
+  #
+  # The local Refund row is looked up directly by its Stripe refund ID - it
+  # already knows its payment. Going via charge.payment_intent (as this used
+  # to) misses refunds of subscription payments, which are stored under their
+  # invoice ID, so those refunds silently dropped out of the payout.
+  defp link_stripe_refund_to_payout(payout, stripe_refund_id) do
     require Ysc.Logging
 
-    try do
-      # If source is already an expanded Refund object, use it directly
-      refund =
-        cond do
-          is_struct(source) ->
-            # Check if it has a charge field (expanded Refund object)
-            if Map.has_key?(source, :charge) || Map.has_key?(source, "charge") do
-              source
-            else
-              nil
-            end
+    db_refund =
+      is_binary(stripe_refund_id) &&
+        Ledgers.get_refund_by_external_id(stripe_refund_id)
 
-          is_map(source) &&
-              (Map.has_key?(source, :charge) || Map.has_key?(source, "charge")) ->
-            # Source is an expanded Refund map
-            source
+    if db_refund do
+      {:ok, _} = Ledgers.link_refund_to_payout(payout, db_refund)
 
-          is_binary(stripe_refund_id) ->
-            # Source is just an ID, fetch the refund
-            case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                   retrieve_refund_by_id(stripe_refund_id)
-                 end) do
-              {:ok, refund} ->
-                refund
+      Ysc.Logging.info("[Payout] Successfully linked refund to payout",
+        payout_id: payout.stripe_payout_id,
+        payout_db_id: payout.id,
+        refund_id: db_refund.id,
+        refund_reference_id: db_refund.reference_id,
+        refund_amount: Money.to_string!(db_refund.amount),
+        stripe_refund_id: stripe_refund_id,
+        payment_id: db_refund.payment_id
+      )
 
-              {:error, reason} ->
-                Ysc.Logging.warning("Failed to retrieve refund",
-                  stripe_refund_id: stripe_refund_id,
-                  error: inspect(reason)
-                )
+      :ok
+    else
+      Ysc.Logging.warning(
+        "[Payout] Refund not found for Stripe refund ID - cannot link to payout",
+        payout_id: payout.stripe_payout_id,
+        stripe_refund_id: stripe_refund_id,
+        note: "Refund may not exist in database"
+      )
 
-                nil
-            end
-
-          true ->
-            nil
-        end
-
-      if refund do
-        # charge may be a plain string ID or an expanded Stripe object
-        raw_charge =
-          if is_struct(refund) do
-            refund.charge
-          else
-            refund[:charge] || refund["charge"]
-          end
-
-        charge_id = extract_id_from_expandable(raw_charge)
-
-        if charge_id do
-          # Get the charge to find the payment intent
-          case stripe_client().retrieve_charge(charge_id, []) do
-            {:ok, charge} ->
-              # payment_intent may be a plain ID or an expanded struct;
-              payment_intent_id =
-                extract_id_from_expandable(charge.payment_intent)
-
-              if payment_intent_id do
-                # Find the payment
-                payment = Ledgers.get_payment_by_external_id(payment_intent_id)
-
-                if payment do
-                  # Find the Refund by external_refund_id
-                  db_refund =
-                    Ledgers.get_refund_by_external_id(stripe_refund_id)
-
-                  if db_refund do
-                    {:ok, _} = Ledgers.link_refund_to_payout(payout, db_refund)
-
-                    Ysc.Logging.info(
-                      "[Payout] Successfully linked refund to payout",
-                      payout_id: payout.stripe_payout_id,
-                      payout_db_id: payout.id,
-                      refund_id: db_refund.id,
-                      refund_reference_id: db_refund.reference_id,
-                      refund_amount: Money.to_string!(db_refund.amount),
-                      stripe_refund_id: stripe_refund_id,
-                      payment_id: payment.id
-                    )
-
-                    :ok
-                  else
-                    Ysc.Logging.warning(
-                      "[Payout] Refund not found for Stripe refund ID - cannot link to payout",
-                      payout_id: payout.stripe_payout_id,
-                      payment_id: payment.id,
-                      payment_reference_id: payment.reference_id,
-                      stripe_refund_id: stripe_refund_id,
-                      note: "Refund may not exist in database"
-                    )
-
-                    :skipped
-                  end
-                else
-                  Ysc.Logging.warning("[Payout] Payment not found for refund",
-                    payout_id: payout.stripe_payout_id,
-                    payment_intent_id: payment_intent_id,
-                    stripe_refund_id: stripe_refund_id
-                  )
-
-                  :skipped
-                end
-              else
-                Ysc.Logging.warning(
-                  "[Payout] Charge has no payment_intent for refund",
-                  payout_id: payout.stripe_payout_id,
-                  charge_id: charge_id,
-                  stripe_refund_id: stripe_refund_id
-                )
-
-                :skipped
-              end
-
-            {:error, reason} ->
-              Ysc.Logging.warning("Failed to retrieve charge for refund",
-                charge_id: charge_id,
-                error: inspect(reason)
-              )
-
-              :skipped
-          end
-        else
-          Ysc.Logging.warning("[Payout] Refund has no charge",
-            payout_id: payout.stripe_payout_id,
-            stripe_refund_id: stripe_refund_id
-          )
-
-          :skipped
-        end
-      else
-        :skipped
-      end
-    rescue
-      error ->
-        Ysc.Logging.error("Exception while linking refund to payout",
-          stripe_refund_id: stripe_refund_id,
-          error: error,
-          stacktrace: __STACKTRACE__
-        )
-
-        :skipped
+      :skipped
     end
+  rescue
+    error ->
+      require Ysc.Logging
+
+      Ysc.Logging.error("Exception while linking refund to payout",
+        stripe_refund_id: stripe_refund_id,
+        error: error,
+        stacktrace: __STACKTRACE__
+      )
+
+      :skipped
   end
 
   # Helper function to get membership type from subscription ID

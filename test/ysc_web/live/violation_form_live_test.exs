@@ -6,6 +6,9 @@ defmodule YscWeb.ViolationFormLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
+  @turnstile_params %{"cf-turnstile-response" => "test-token"}
+
   describe "page copy" do
     test "uses plain language on the concern report form", %{conn: conn} do
       user = user_fixture(%{phone_number: "+14155559999"})
@@ -161,12 +164,46 @@ defmodule YscWeb.ViolationFormLiveTest do
             "anonymous" => "false"
           }
         )
-        |> render_submit()
+        |> render_submit(@turnstile_params)
 
       assert html =~ "verify you"
       assert html =~ "real person"
       refute html =~ "Thank You for Your Report"
       assert has_element?(view, "#violation-form")
+    end
+
+    test "blocks guest submit when the Turnstile token is missing", %{
+      conn: conn
+    } do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/report-conduct-violation")
+      email = "sam.no_token#{System.unique_integer()}@example.com"
+
+      html =
+        view
+        |> form("#violation-form",
+          conduct_form: %{
+            "first_name" => "Sam",
+            "last_name" => "Case",
+            "email" => email,
+            "phone" => "555-123-4567",
+            "summary" =>
+              "This is a complete summary of what happened for the report.",
+            "anonymous" => "false"
+          }
+        )
+        |> render_submit()
+
+      assert html =~ "real person"
+      refute html =~ "Thank You for Your Report"
+
+      refute Ysc.Repo.exists?(
+               from r in Ysc.Forms.ConductViolationReport,
+                 where: r.email == ^email
+             )
     end
   end
 

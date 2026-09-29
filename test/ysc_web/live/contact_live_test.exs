@@ -8,6 +8,9 @@ defmodule YscWeb.ContactLiveTest do
   alias Ysc.Forms.ContactForm
   alias Ysc.Repo
 
+  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
+  @turnstile_params %{"cf-turnstile-response" => "test-token"}
+
   describe "mount/3 - unauthenticated" do
     test "loads contact page successfully", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/contact")
@@ -207,7 +210,7 @@ defmodule YscWeb.ContactLiveTest do
           message: "Hello from LiveView test message body."
         }
       )
-      |> render_submit()
+      |> render_submit(@turnstile_params)
 
       assert render(view) =~ "Thank you! Your message has been sent"
     end
@@ -231,7 +234,7 @@ defmodule YscWeb.ContactLiveTest do
           message: "Hello from LiveView test message body."
         }
       )
-      |> render_submit()
+      |> render_submit(@turnstile_params)
 
       html = render(view)
       assert html =~ "verify you"
@@ -243,6 +246,32 @@ defmodule YscWeb.ContactLiveTest do
                "span",
                "Thank you! Your message has been sent"
              )
+    end
+
+    test "blocks submission when the Turnstile token is missing", %{
+      conn: conn
+    } do
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/contact")
+      email = "guest.no_token#{System.unique_integer()}@example.com"
+
+      view
+      |> form("#contact-form",
+        contact_form: %{
+          name: "Guest Sender",
+          email: email,
+          subject: "General Inquiry",
+          message: "Hello from LiveView test message body."
+        }
+      )
+      |> render_submit()
+
+      assert render(view) =~ "real person"
+      assert has_element?(view, "#contact-form")
+      refute Repo.exists?(from c in ContactForm, where: c.email == ^email)
     end
   end
 

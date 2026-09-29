@@ -484,5 +484,34 @@ defmodule YscWeb.Api.PropertiesControllerTest do
       assert sections_text =~ "Master"
       assert sections_text =~ Ysc.EmailConfig.clear_lake_email()
     end
+
+    test "loads cabin master once without password hashes", %{conn: conn} do
+      user_fixture(%{first_name: "Riley", last_name: "Master"})
+      |> Ecto.Changeset.change(
+        board_position: :tahoe_cabin_master,
+        board_bio: "properties api must not load this bio"
+      )
+      |> Repo.update!()
+
+      {response, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> get(conn, ~p"/api/v1/mobile/properties/tahoe/info") end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert %{"data" => data} = json_response(response, 200)
+      assert data["property"] == "tahoe"
+      assert password_cols == 0
+
+      {_response, user_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> get(conn, ~p"/api/v1/mobile/properties/tahoe/info") end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      assert user_queries == 1
+    end
   end
 end

@@ -167,16 +167,16 @@ defmodule YscWeb.AdminScannerLive do
         <div
           :if={!@data_loaded?}
           id="scanner-session-detail-loading"
-          class="space-y-6"
+          class="flex flex-col gap-6"
           role="status"
           aria-live="polite"
         >
           <span class="sr-only">Loading session…</span>
-          <div class="flex items-center gap-2 mb-6">
+          <div class="flex items-center gap-2">
             <.skeleton_block class="h-5 w-5 rounded-sm shrink-0" />
             <.skeleton_block class="h-7 w-64 rounded-sm" />
           </div>
-          <.skeleton_block class="h-4 w-80 rounded-sm mb-6" />
+          <.skeleton_block class="h-4 w-80 rounded-sm" />
           <div class="divide-y divide-zinc-100 border-t border-zinc-100">
             <.skeleton_list_row
               :for={_ <- 1..5}

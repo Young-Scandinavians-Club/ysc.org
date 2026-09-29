@@ -266,6 +266,47 @@ defmodule YscWeb.AdminUsersLiveTest do
              )
     end
 
+    test "review modal shows how the applicant heard about the club", %{
+      conn: conn
+    } do
+      pending_user = user_fixture(%{state: "pending_approval"})
+
+      signup_application_fixture(pending_user, %{
+        hear_about_the_club: "A friend at the Midsummer party"
+      })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{pending_user.id}/review")
+
+      assert has_element?(
+               view,
+               "#review-application-hear-about-the-club",
+               "A friend at the Midsummer party"
+             )
+    end
+
+    test "review modal shows the reviewer of a reviewed application", %{
+      conn: conn,
+      admin: admin
+    } do
+      user = user_fixture(%{state: "active"})
+
+      signup_application_fixture(user, %{
+        review_outcome: "approved",
+        reviewed_at: DateTime.utc_now(),
+        reviewed_by_user_id: admin.id
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/review")
+
+      assert has_element?(view, "#review-application-reviewed-by", admin.email)
+
+      assert has_element?(
+               view,
+               ~s|#review-application-reviewed-by-link[href="/admin/users/#{admin.id}/details"]|
+             )
+    end
+
     test "lists pending users with a Pending Approval status badge", %{
       conn: conn
     } do

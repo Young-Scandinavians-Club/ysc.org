@@ -13,9 +13,9 @@ defmodule YscWeb.AdminBookingsLive do
   alias Ysc.Bookings.BookingLocker
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.MoneyHelper
-  alias Ysc.Accounts
   alias Ysc.Ledgers.{Payment, Refund}
   alias Ysc.Repo
+  alias YscWeb.AdminUserSearch
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
   alias YscWeb.AdminBadgeHelpers
@@ -1356,8 +1356,8 @@ defmodule YscWeb.AdminBookingsLive do
           Manage Refund Policy Rules
         </.header>
 
-        <div :if={@refund_policy} class="space-y-4">
-          <div class="bg-blue-50 rounded-sm border border-blue-200 p-4 mb-4">
+        <div :if={@refund_policy} class="flex flex-col gap-4">
+          <div class="bg-blue-50 rounded-sm border border-blue-200 p-4">
             <p class="text-sm font-semibold text-zinc-700 mb-1">
               {@refund_policy.name}
             </p>
@@ -1368,7 +1368,7 @@ defmodule YscWeb.AdminBookingsLive do
             </p>
           </div>
           <!-- Existing Rules -->
-          <div class="mb-6">
+          <div>
             <h3 class="text-md font-semibold text-zinc-800 mb-3">Current Rules</h3>
             <div
               :if={@refund_policy_rules == []}
@@ -1472,7 +1472,7 @@ defmodule YscWeb.AdminBookingsLive do
             </.simple_form>
           </div>
 
-          <div class="flex justify-end mt-6 pt-4 border-t border-zinc-200">
+          <div class="flex justify-end mt-2 pt-4 border-t border-zinc-200">
             <.button
               phx-click={
                 query_params =
@@ -3487,9 +3487,7 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:show_refund_modal, false)
       |> assign(:refund_form, nil)
       |> assign(:calendar_range_form, changeset)
-      |> assign(:user_search, "")
-      |> assign(:user_search_results, [])
-      |> assign(:selected_user, nil)
+      |> AdminUserSearch.assign_blank()
       |> assign(:date_selection_type, nil)
       |> assign(:date_selection_start, nil)
       |> assign(:date_selection_room_id, nil)
@@ -4157,9 +4155,7 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:booking_room_id, room_id)
     |> assign(:booking_payments, [])
     |> assign(:booking_refunds, [])
-    |> assign(:user_search, "")
-    |> assign(:user_search_results, [])
-    |> assign(:selected_user, nil)
+    |> AdminUserSearch.assign_blank()
   end
 
   defp apply_action(socket, :edit_booking, %{"id" => id}) do
@@ -4210,9 +4206,7 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:booking_room_id, room_id)
     |> assign(:booking_payments, [])
     |> assign(:booking_refunds, [])
-    |> assign(:user_search, "")
-    |> assign(:user_search_results, [])
-    |> assign(:selected_user, booking.user)
+    |> AdminUserSearch.assign_selected(booking.user)
   end
 
   defp apply_action(socket, :new_refund_policy, _params) do
@@ -4579,6 +4573,15 @@ defmodule YscWeb.AdminBookingsLive do
                "Failed to delete booking: #{inspect(reason)}"
              )}
         end
+
+      {:error, :hold_payment_already_succeeded} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :info,
+           "This hold already had a succeeded Stripe payment, so it was confirmed instead of deleted.",
+           title: "Booking"
+         )}
 
       {:error, reason} ->
         {:noreply,
@@ -5564,35 +5567,15 @@ defmodule YscWeb.AdminBookingsLive do
 
   # User autocomplete handlers for booking form
   def handle_event("search-booking-users", %{"value" => query}, socket) do
-    results =
-      if String.length(query) >= 2 do
-        Accounts.search_users(query, limit: 10)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:user_search, query)
-     |> assign(:user_search_results, results)}
+    {:noreply, AdminUserSearch.search(socket, query)}
   end
 
   def handle_event("select-booking-user", %{"id" => id}, socket) do
-    user = Accounts.get_user!(id)
-
-    {:noreply,
-     socket
-     |> assign(:selected_user, user)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+    {:noreply, AdminUserSearch.select(socket, id)}
   end
 
   def handle_event("clear-booking-user", _, socket) do
-    {:noreply,
-     socket
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+    {:noreply, AdminUserSearch.assign_blank(socket)}
   end
 
   def handle_event("save-booking", %{"booking" => booking_params}, socket) do
@@ -6455,7 +6438,16 @@ defmodule YscWeb.AdminBookingsLive do
   # first leaves it permanently stuck as held/booked with no booking left to
   # explain it.
   defp release_inventory_before_delete(%{status: :hold} = booking) do
-    normalize_release_result(BookingLocker.release_hold(booking.id))
+    case BookingLocker.release_hold_with_stripe_reconcile(booking.id) do
+      {:ok, _booking} ->
+        :ok
+
+      {:confirmed, _booking} ->
+        {:error, :hold_payment_already_succeeded}
+
+      {:error, reason} ->
+        normalize_release_result({:error, reason})
+    end
   end
 
   defp release_inventory_before_delete(%{status: :complete} = booking) do
@@ -6484,8 +6476,9 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp release_booking_availability_after_refund(%{status: :hold} = booking) do
-    case BookingLocker.release_hold(booking.id) do
+    case BookingLocker.release_hold_with_stripe_reconcile(booking.id) do
       {:ok, _booking} -> :ok
+      {:confirmed, _booking} -> {:error, :hold_payment_already_succeeded}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -6939,8 +6932,22 @@ defmodule YscWeb.AdminBookingsLive do
          _room_id,
          _rooms
        ) do
-    BookingLocker.release_hold(booking.id)
-    |> handle_admin_cancel_result(socket, booking, :canceled)
+    case BookingLocker.release_hold_with_stripe_reconcile(booking.id) do
+      {:ok, canceled} ->
+        handle_admin_cancel_result({:ok, canceled}, socket, booking, :canceled)
+
+      {:confirmed, confirmed} ->
+        {:noreply,
+         socket
+         |> assign(:booking, confirmed)
+         |> admin_booking_save_success(
+           "updated",
+           "This hold already had a succeeded Stripe payment, so it was confirmed instead of canceled."
+         )}
+
+      {:error, reason} ->
+        handle_admin_cancel_result({:error, reason}, socket, booking, :canceled)
+    end
   end
 
   defp cancel_or_refund_existing_admin_booking(
@@ -6987,8 +6994,22 @@ defmodule YscWeb.AdminBookingsLive do
          socket,
          %{status: :hold} = booking
        ) do
-    BookingLocker.revert_hold_to_draft(booking.id)
-    |> handle_admin_cancel_result(socket, booking, :draft)
+    case BookingLocker.revert_hold_to_draft_with_stripe_reconcile(booking.id) do
+      {:ok, reverted} ->
+        handle_admin_cancel_result({:ok, reverted}, socket, booking, :draft)
+
+      {:confirmed, confirmed} ->
+        {:noreply,
+         socket
+         |> assign(:booking, confirmed)
+         |> admin_booking_save_success(
+           "updated",
+           "This hold already had a succeeded Stripe payment, so it was confirmed instead of reverted to draft."
+         )}
+
+      {:error, reason} ->
+        handle_admin_cancel_result({:error, reason}, socket, booking, :draft)
+    end
   end
 
   defp revert_existing_admin_booking_to_draft(

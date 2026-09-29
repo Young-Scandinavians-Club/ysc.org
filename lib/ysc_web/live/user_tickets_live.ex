@@ -425,7 +425,7 @@ defmodule YscWeb.UserTicketsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This ticket purchase has expired or was already completed. Browse events to buy tickets again. If you see a charge on your card, email info@ysc.org with the date and amount.",
+             "This ticket purchase has expired or was already completed. Browse events to buy tickets again. If you see a charge, email info@ysc.org with the date and amount.",
              title: "Tickets"
            )}
         end

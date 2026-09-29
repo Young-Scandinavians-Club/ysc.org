@@ -2,7 +2,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   @moduledoc """
   Sends post-event photo upload reminder emails to ticket holders the day after an event ends.
 
-  Scheduled for 9:00 AM America/Los_Angeles on the calendar day after the event's effective end date.
+  Scheduled for 10:00 AM America/Los_Angeles on the calendar day after the event's effective end date.
   """
   require Ysc.Logging
 
@@ -63,7 +63,10 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
           {:error, :db_update_failed}
       end
     else
-      event = Repo.preload(event, [:organizer, :cover_image])
+      # Do not preload `[:organizer, :cover_image]` here. Organizer is unused
+      # on this template, and a fat preload would keep `hashed_password` /
+      # `board_bio` in memory. `prepare_shared_email_data/2` slim-loads
+      # `:cover_image` only.
       template = EventPhotoUploadReminder
       subject = template.get_subject(event)
       template_name = template.get_template_name()

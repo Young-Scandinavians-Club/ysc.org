@@ -27,7 +27,7 @@ defmodule YscWeb.UserLoginLive do
           type="button"
           disabled={@passkey_loading}
           class={
-            "w-full flex items-center justify-center gap-2 h-10" <>
+            "w-full flex items-center justify-center gap-2 h-10 max-sm:min-h-12!" <>
               if(@passkey_loading, do: " opacity-50 cursor-not-allowed", else: "")
           }
           phx-click="sign_in_with_passkey"
@@ -135,11 +135,13 @@ defmodule YscWeb.UserLoginLive do
         <.oauth_button
           provider={:google}
           label="Sign in with Google"
+          class="max-sm:min-h-12!"
           phx-click="sign_in_with_google"
         />
         <.oauth_button
           provider={:facebook}
           label="Sign in with Facebook"
+          class="max-sm:min-h-12!"
           phx-click="sign_in_with_facebook"
         />
       </div>
@@ -222,37 +224,54 @@ defmodule YscWeb.UserLoginLive do
           value={@mobile_redirect_uri || ""}
         />
         <.input type="hidden" name="code_challenge" value={@code_challenge || ""} />
-        <div class="space-y-4">
+        <div class="space-y-4 pb-2 max-sm:[&_input]:min-h-12">
           <.input
             field={@form[:email]}
             type="email"
             label="Email"
             required
-            autofocus
           />
-          <.input
-            field={@form[:password]}
-            type="password-toggle"
-            label="Password"
-            required
-          />
-        </div>
-
-        <:actions>
-          <div class="flex flex-col gap-3 w-full pb-2">
-            <.button phx-disable-with="Signing in..." class="w-full">
-              Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1" />
-            </.button>
-            <div class="text-center">
-              <.link
-                href={~p"/users/reset-password"}
-                class="text-sm font-semibold hover:underline text-blue-600"
-              >
-                Forgot your password?
-              </.link>
+          <%!-- Grid placement keeps the visual layout (forgot link beside the
+                label, show password toggle inside the field) while the DOM
+                order sets the tab order: password → sign in → show password →
+                forgot password. --%>
+          <div class="grid grid-cols-[1fr_auto] items-center gap-x-2">
+            <div class="col-start-1 row-start-1">
+              <.label for={@form[:password].id}>Password</.label>
             </div>
+            <div class="col-span-2 col-start-1 row-start-2">
+              <.input
+                field={@form[:password]}
+                type="password-toggle"
+                toggle_button={false}
+                required
+              />
+            </div>
+            <div class="col-span-2 col-start-1 row-start-3 mt-6">
+              <.button
+                id="login-submit-button"
+                phx-disable-with="Signing in..."
+                class="w-full max-sm:min-h-12!"
+              >
+                Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1" />
+              </.button>
+            </div>
+            <.password_toggle_button
+              target_id={@form[:password].id}
+              class="col-start-2 row-start-2 mt-2 justify-self-end self-stretch"
+            />
+            <.link
+              id="login-forgot-password-link"
+              href={~p"/users/reset-password"}
+              class={[
+                "col-start-2 row-start-1 rounded-sm text-sm font-semibold leading-6 text-blue-600 hover:underline",
+                "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              ]}
+            >
+              Forgot your password?
+            </.link>
           </div>
-        </:actions>
+        </div>
       </.simple_form>
     </div>
     """

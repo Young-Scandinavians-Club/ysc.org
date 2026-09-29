@@ -70,13 +70,13 @@ config :esbuild,
   version: "0.17.11",
   default: [
     args:
-      ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
+      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
   ],
   admin: [
     args:
-      ~w(js/admin.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --log-override:equals-nan=silent),
+      ~w(js/admin.js --bundle --target=es2022 --outdir=../priv/static/assets --external:/fonts/* --external:/images/* --log-override:equals-nan=silent),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
   ],
@@ -174,9 +174,16 @@ config :ysc, Oban,
       {"0 9 * * *", YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker},
       # 04:00 UTC = 8:00 PM PST (UTC-8) / 9:00 PM PDT (UTC-7)
       {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker},
-      {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
+      # Photo reminder safety net. Must run after the per-event 10:00 AM
+      # America/Los_Angeles reminder (EventPhotos.photo_reminder_scheduled_at/1)
+      # year-round: 18:30 UTC = 10:30 AM PST (UTC-8) / 11:30 AM PDT (UTC-7).
+      {"30 18 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
+      # 16:00 UTC = 8:00 AM PST (UTC-8) / 9:00 AM PDT (UTC-7)
+      {"0 16 * * *", YscWeb.Workers.FamilyMemberAgeOutWorker},
       # 17:00 UTC = 9:00 AM PST (UTC-8) / 10:00 AM PDT (UTC-7)
-      {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker}
+      {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker},
+      # March 1, 17:00 UTC = 9:00 AM PST — yearly admin/volunteer access review
+      {"0 17 1 3 *", YscWeb.Workers.AnnualAccessReviewWorker}
     ]
   ]
 
@@ -225,7 +232,9 @@ config :ysc, :emails,
   admin_email: "admin@ysc.org",
   membership_email: "memberships@ysc.org",
   board_email: "board@ysc.org",
+  treasurer_email: "treasurer@ysc.org",
   volunteer_email: "volunteer@ysc.org",
+  webtech_email: "webtech@ysc.org",
   tahoe_email: "tahoe@ysc.org",
   clear_lake_email: "cl@ysc.org"
 

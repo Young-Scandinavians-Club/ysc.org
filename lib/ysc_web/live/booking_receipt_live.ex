@@ -4,6 +4,7 @@ defmodule YscWeb.BookingReceiptLive do
   alias YscWeb.BookingGuestForm
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
+  alias YscWeb.BookingUserMessages
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
@@ -105,6 +106,26 @@ defmodule YscWeb.BookingReceiptLive do
 
     if can_cancel_booking?(booking) do
       case Bookings.cancel_booking(booking, get_today_pst(), reason) do
+        {:ok, confirmed_booking, _refund_amount, :hold_payment_confirmed} ->
+          {:noreply,
+           socket
+           |> assign(:show_cancel_modal, false)
+           |> assign(:booking, confirmed_booking)
+           |> assign(
+             :can_cancel,
+             BookingActions.can_cancel_booking?(confirmed_booking)
+           )
+           |> assign(
+             :can_change,
+             BookingActions.can_change_booking?(confirmed_booking)
+           )
+           |> YscWeb.Flash.put_toast(
+             :info,
+             YscWeb.BookingUserMessages.hold_cancel_payment_already_confirmed(),
+             title: "Booking"
+           )
+           |> push_navigate(to: ~p"/bookings/#{confirmed_booking.id}/receipt")}
+
         {:ok, _canceled_booking, refund_amount, refund_result} ->
           # Check if refund_result is a PendingRefund (partial refund) or LedgerTransaction (full refund)
           is_pending_refund =
@@ -168,8 +189,8 @@ defmodule YscWeb.BookingReceiptLive do
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
           <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
         </div>
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
-          <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3">
+          <.skeleton_block class="h-5 w-40 rounded-sm" />
           <div :for={_ <- 1..3} class="flex justify-between">
             <.skeleton_block class="h-4 w-28 rounded-sm" />
             <.skeleton_block class="h-4 w-20 rounded-sm" />
@@ -327,10 +348,10 @@ defmodule YscWeb.BookingReceiptLive do
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <!-- Left Column: Main Content -->
-        <div class="lg:col-span-2 space-y-8">
+        <div class="lg:col-span-2 flex flex-col gap-8">
           <%= if @booking.status == :canceled do %>
             <!-- Cancelled Booking Notice -->
-            <div class="bg-red-50 border-2 border-red-300 rounded-lg p-6 mb-6">
+            <div class="bg-red-50 border-2 border-red-300 rounded-lg p-6">
               <div class="flex items-start gap-4">
                 <.icon
                   name="hero-exclamation-triangle"
@@ -603,14 +624,19 @@ defmodule YscWeb.BookingReceiptLive do
                 <h3 class="font-bold text-zinc-900 mb-3 flex items-center gap-2">
                   <.icon name="hero-key" class="w-5 h-5" /> Cabin Access
                 </h3>
-                <p class="text-sm text-zinc-600 mb-4">
-                  Door codes and key instructions are sent via email 24 hours before your check-in.
+                <p id="cabin-access-timing" class="text-sm text-zinc-600 mb-4">
+                  <%= if @show_door_code && @door_code do %>
+                    {YscWeb.BookingUserMessages.cabin_access_receipt_body_when_visible()}
+                  <% else %>
+                    {YscWeb.BookingUserMessages.cabin_access_receipt_body()}
+                  <% end %>
                 </p>
                 <a
+                  id="cabin-access-info-link"
                   href={get_cabin_access_url(@booking.property)}
                   class="text-sm font-semibold text-blue-600 hover:underline"
                 >
-                  View Door Code Info →
+                  {YscWeb.BookingUserMessages.cabin_access_info_link_label()} →
                 </a>
               </div>
               <!-- Cabin Rules -->
@@ -807,28 +833,42 @@ defmodule YscWeb.BookingReceiptLive do
                     <% :room -> %>
                       <%= if @price_breakdown.nights do %>
                         <%= if @price_breakdown[:base] do %>
+                          <div
+                            :if={
+                              (@price_breakdown[:billable_people] || 0) >
+                                (@price_breakdown[:guests_count] || 0)
+                            }
+                            id="receipt-minimum-pricing-applied"
+                            class="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-sm"
+                          >
+                            <p class="text-xs text-amber-800 leading-tight">
+                              {BookingUserMessages.room_minimum_pricing_applied(
+                                @price_breakdown[:billable_people]
+                              )}
+                            </p>
+                          </div>
                           <div class="flex justify-between">
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-600",
-                                else: "text-zinc-400"
-                              )
-                            }>
+                            <span
+                              id="receipt-base-price-people"
+                              class={
+                                if(@booking.status == :canceled,
+                                  do: "text-zinc-600",
+                                  else: "text-zinc-400"
+                                )
+                              }
+                            >
                               Base Price
                               <%= if @price_breakdown[:adult_price_per_night] do %>
-                                <% adult_count =
+                                <% billable_people =
                                   @price_breakdown[:billable_people] ||
-                                    @price_breakdown[:guests_count] || 0 %> ({adult_count} {if adult_count ==
-                                                                                                 1,
-                                                                                               do:
-                                                                                                 "adult",
-                                                                                               else:
-                                                                                                 "adults"} × {@price_breakdown.nights} {if @price_breakdown.nights ==
-                                                                                                                                             1,
-                                                                                                                                           do:
-                                                                                                                                             "night",
-                                                                                                                                           else:
-                                                                                                                                             "nights"})
+                                    @price_breakdown[:guests_count] || 0 %>
+                                <% guests_count =
+                                  @price_breakdown[:guests_count] || 0 %> ({BookingUserMessages.room_base_price_people_label(
+                                  billable_people,
+                                  guests_count
+                                )} × {BookingDisplay.nights_label(
+                                  @price_breakdown.nights
+                                )})
                               <% end %>
                             </span>
                             <span class={
@@ -1185,7 +1225,7 @@ defmodule YscWeb.BookingReceiptLive do
               <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <div class="flex items-center gap-2 text-amber-800">
                   <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
-                  <p class="font-semibold">No Refund Available</p>
+                  <p class="font-semibold">No refund available</p>
                 </div>
                 <p class="text-sm text-amber-700 mt-2 pl-7">
                   This booking was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
@@ -1234,7 +1274,7 @@ defmodule YscWeb.BookingReceiptLive do
                 <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <div class="flex items-center gap-2 text-amber-800">
                     <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
-                    <p class="font-semibold">No Refund Available</p>
+                    <p class="font-semibold">No refund available</p>
                   </div>
                   <p class="text-sm text-amber-700 mt-2 pl-7">
                     Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.
@@ -1328,17 +1368,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp fetch_user_booking(booking_id, user) do
-    # SECURITY: Filter by user_id in the database query to prevent unauthorized access
-    # PERFORMANCE: Preload all associations in a single query to avoid N+1
-    from(b in Booking,
-      where: b.id == ^booking_id and b.user_id == ^user.id,
-      preload: [
-        {:user, :current_avatar},
-        :booking_guests,
-        rooms: :room_category
-      ]
-    )
-    |> Repo.one()
+    Bookings.get_user_booking_for_receipt(booking_id, user.id)
   end
 
   defp mount_receipt_with_stripe_redirect(socket, user, booking_id, params) do
@@ -1479,16 +1509,10 @@ defmodule YscWeb.BookingReceiptLive do
 
     booking =
       if booking_updated do
-        from(b in Booking,
-          where:
-            b.id == ^booking_id and b.user_id == ^socket.assigns.current_user.id,
-          preload: [
-            {:user, :current_avatar},
-            :booking_guests,
-            rooms: :room_category
-          ]
+        Bookings.get_user_booking_for_receipt!(
+          booking_id,
+          socket.assigns.current_user.id
         )
-        |> Repo.one!()
       else
         booking
       end
@@ -2693,8 +2717,8 @@ defmodule YscWeb.BookingReceiptLive do
   defp sync_booking_after_partial_cancel(socket, booking, reason) do
     if partial_cancel_post_booking_error?(reason) do
       updated_booking =
-        Repo.get!(Booking, booking.id)
-        |> Repo.preload([:user, :booking_guests, rooms: :room_category])
+        Bookings.get_user_booking_for_receipt(booking.id, booking.user_id) ||
+          booking
 
       socket
       |> assign(:booking, updated_booking)

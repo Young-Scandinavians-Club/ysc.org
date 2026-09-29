@@ -65,6 +65,34 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def tahoe_review_booking_button do
+    "Review booking"
+  end
+
+  def tahoe_review_modal_title do
+    "Review your booking"
+  end
+
+  def tahoe_review_modal_intro do
+    trim("""
+    Your stay is not booked yet. Check the boxes below, then continue. Next you'll add guest names and pay to confirm these dates.
+    """)
+  end
+
+  def tahoe_review_modal_continue_button do
+    "Continue to payment"
+  end
+
+  def tahoe_review_modal_back_button do
+    "Go back"
+  end
+
+  def tahoe_hold_created_toast do
+    trim("""
+    These dates are held for a short time. Add guest names and pay on the next page to confirm your booking.
+    """)
+  end
+
   def checkout_guest_info_step_enter_guests do
     "Enter the names of everyone else staying with you. You're already included in the booking — only list the other people below."
   end
@@ -125,6 +153,48 @@ defmodule YscWeb.BookingUserMessages do
     "You already have a room booked. For a second booking you can pick one room — uncheck the current room if you want a different one."
   end
 
+  def room_min_charge_badge(min_occupancy)
+      when is_integer(min_occupancy) and min_occupancy > 1 do
+    "Priced for #{min_occupancy}+ guests"
+  end
+
+  def room_minimum_price_caption(min_occupancy)
+      when is_integer(min_occupancy) do
+    "(charged for #{min_occupancy} #{guest_word(min_occupancy)})"
+  end
+
+  def room_below_min_charge_title(room_name, min_required)
+      when is_binary(room_name) and is_integer(min_required) do
+    "#{room_name} is billed for at least #{min_required} #{guest_word(min_required)}"
+  end
+
+  def room_below_min_charge_body(min_required, formatted_nightly_min)
+      when is_integer(min_required) and is_binary(formatted_nightly_min) do
+    "You can still book with fewer people. You'll be charged for #{min_required} #{guest_word(min_required)} (#{formatted_nightly_min}/night)."
+  end
+
+  def room_minimum_pricing_applied(billable_people)
+      when is_integer(billable_people) do
+    "You're being charged for #{billable_people} #{guest_word(billable_people)} because this room has a #{billable_people}-guest minimum price."
+  end
+
+  def room_base_price_people_label(billable_people, guests_count)
+      when is_integer(billable_people) and is_integer(guests_count) do
+    if billable_people > guests_count do
+      "charged for #{billable_people} #{guest_word(billable_people)}"
+    else
+      adult_count_label(billable_people)
+    end
+  end
+
+  def room_base_price_people_label(billable_people, _guests_count)
+      when is_integer(billable_people) do
+    adult_count_label(billable_people)
+  end
+
+  def room_base_price_people_label(_billable_people, _guests_count),
+    do: adult_count_label(0)
+
   def room_too_small_for_group(capacity, people) do
     "This room sleeps #{capacity} #{person_word(capacity)}, and your group has #{people}. Choose a larger room or reduce your group size."
   end
@@ -168,8 +238,51 @@ defmodule YscWeb.BookingUserMessages do
     "You'll get a confirmation email right away with your booking details"
   end
 
+  def door_code_email_timing_phrase do
+    "about 3 days before check-in"
+  end
+
+  def door_code_page_timing_phrase do
+    "starting 48 hours before check-in"
+  end
+
   def checkout_cabin_access_step do
-    "You'll receive cabin access details (door code or key instructions) by email before check-in"
+    "You'll receive cabin access details (door code or key instructions) by email #{door_code_email_timing_phrase()}"
+  end
+
+  def cabin_access_receipt_body do
+    "We'll email the door code #{door_code_email_timing_phrase()}. Starting 48 hours before check-in, the same code also appears at the top of this page."
+  end
+
+  def cabin_access_receipt_body_when_visible do
+    "Your door code is at the top of this page. Save it before you leave home — cell service can be limited at the cabin."
+  end
+
+  def cabin_access_info_link_label do
+    "How cabin access works"
+  end
+
+  def cabin_access_info_tab_body do
+    "We'll email the door code #{door_code_email_timing_phrase()}. The same code also appears on your booking confirmation page #{door_code_page_timing_phrase()}, and stays visible during your stay."
+  end
+
+  def door_code_present?(code) when is_binary(code) do
+    trimmed = String.trim(code)
+    trimmed != "" and trimmed != "Not Available"
+  end
+
+  def door_code_present?(_code), do: false
+
+  def door_code_not_ready_title do
+    "Door code not ready yet"
+  end
+
+  def door_code_not_ready_email_body do
+    "Your door code isn't ready yet. Open your booking page with View Booking Details below — if the code still isn't there, contact the Cabin Master (details at the bottom of this email)."
+  end
+
+  def door_code_not_ready_sms_phrase do
+    "Your door code isn't ready yet. Check your booking page, or contact the Cabin Master."
   end
 
   def checkout_manage_booking_step do
@@ -190,7 +303,7 @@ defmodule YscWeb.BookingUserMessages do
 
   def checkout_payment_confirmation_failed do
     trim("""
-    Something went wrong while confirming your booking. If you see a charge on your card, email info@ysc.org with the date and amount before trying to pay again — we'll make sure you're not charged twice.
+    Something went wrong while confirming your booking. If you see a charge, email info@ysc.org with the date and amount before trying to pay again — we'll make sure you're not charged twice.
     """)
   end
 
@@ -236,12 +349,12 @@ defmodule YscWeb.BookingUserMessages do
 
   def booking_creation_failed do
     trim("""
-    We couldn't complete your booking. Your card has not been charged. Please try again, or choose different dates. If the problem continues, email info@ysc.org with your dates and guest count.
+    We couldn't complete your booking. You have not been charged. Please try again, or choose different dates. If the problem continues, email info@ysc.org with your dates and guest count.
     """)
   end
 
   def booking_creation_failed_sidebar do
-    "Couldn't complete booking. Your card wasn't charged — try again."
+    "Couldn't complete booking. You weren't charged — try again."
   end
 
   def modification_redirect_hold_expired do
@@ -272,6 +385,10 @@ defmodule YscWeb.BookingUserMessages do
     " #{modification_after_payment_recovery_body()}"
   end
 
+  def hold_cancel_payment_already_confirmed do
+    "Your payment already went through, so we confirmed this booking instead of cancelling it. You can cancel the confirmed stay from this page if you still want to."
+  end
+
   def cancel_refund_error(reason) do
     support = "Email info@ysc.org with #{booking_reference_support_phrase()}"
 
@@ -288,6 +405,9 @@ defmodule YscWeb.BookingUserMessages do
       {:pending_refund_failed, _} ->
         "We cancelled your booking, but we couldn't submit your refund for review. #{support} and we'll follow up."
 
+      {:cancellation_failed, :payment_in_progress} ->
+        "Your payment is still processing, so we couldn't cancel this booking yet. Please wait a moment and try again, or email info@ysc.org if it stays stuck."
+
       {:cancellation_failed, _} ->
         "We couldn't cancel your booking. Please try again, or email info@ysc.org if the problem continues."
     end
@@ -303,6 +423,16 @@ defmodule YscWeb.BookingUserMessages do
 
   defp person_word(1), do: "person"
   defp person_word(_count), do: "people"
+
+  defp guest_word(1), do: "guest"
+  defp guest_word(_count), do: "guests"
+
+  defp adult_count_label(1), do: "1 adult"
+
+  defp adult_count_label(count) when is_integer(count) and count >= 0,
+    do: "#{count} adults"
+
+  defp adult_count_label(_count), do: "0 adults"
 
   defp trim(string), do: String.trim(string)
 end

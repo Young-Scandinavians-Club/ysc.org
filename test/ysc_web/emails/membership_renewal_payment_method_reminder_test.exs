@@ -24,9 +24,9 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
   end
 
   describe "get_subject/0" do
-    test "returns a plain-language subject asking the member to add a card" do
+    test "returns a plain-language subject asking the member to add a payment method" do
       assert MembershipRenewalPaymentMethodReminder.get_subject() ==
-               "Please add a card so your membership can renew"
+               "Please add a payment method so your membership can renew"
     end
   end
 

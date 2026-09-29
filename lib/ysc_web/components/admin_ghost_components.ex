@@ -1316,7 +1316,7 @@ defmodule YscWeb.AdminGhostComponents do
             <h4 class="font-bold text-zinc-900 text-base">{@name}</h4>
             <.badge
               type="green"
-              class="text-xs uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
+              class="text-xs uppercase tracking-wider font-bold! rounded-full! px-2 py-0.5 me-0"
             >
               {@status}
             </.badge>

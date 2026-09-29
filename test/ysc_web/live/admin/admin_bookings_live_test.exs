@@ -1633,6 +1633,7 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
 
   describe "Clear Lake day/spot booking create and edit" do
     setup [:create_admin]
+    setup :verify_on_exit!
 
     defp insert_clear_lake_day_booking_for_edit!(
            user_id,
@@ -1898,6 +1899,707 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert updated.status == :draft
       assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
       assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+    end
+
+    test "edit hold to draft confirms instead of reverting when Stripe payment already succeeded",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      Ysc.Ledgers.ensure_basic_accounts()
+      user = user_fixture(%{first_name: "Spot", last_name: "HoldDraftPaid"})
+
+      checkin = ~D[2037-06-10]
+      checkout = ~D[2037-06-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_draft_succeeded_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2037-06-01&to_date=2037-06-20"
+          )
+
+        html =
+          view
+          |> form("#booking-form", %{
+            "booking" => %{
+              "checkin_date" => "2037-06-10",
+              "checkout_date" => "2037-06-13",
+              "guests_count" => "2",
+              "children_count" => "0",
+              "booking_mode" => "day",
+              "status" => "draft"
+            }
+          })
+          |> render_submit()
+
+        assert html =~ "confirmed instead of reverted to draft"
+
+        updated = Bookings.get_booking!(hold.id)
+        assert updated.status == :complete
+        assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+
+        payment = Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "edit hold to draft keeps the hold while Stripe payment is still processing",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+
+      user =
+        user_fixture(%{first_name: "Spot", last_name: "HoldDraftProcessing"})
+
+      checkin = ~D[2037-07-10]
+      checkout = ~D[2037-07-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_draft_processing_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => hold.id}
+           }}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2037-07-01&to_date=2037-07-20"
+          )
+
+        view
+        |> form("#booking-form", %{
+          "booking" => %{
+            "checkin_date" => "2037-07-10",
+            "checkout_date" => "2037-07-13",
+            "guests_count" => "2",
+            "children_count" => "0",
+            "booking_mode" => "day",
+            "status" => "draft"
+          }
+        })
+        |> render_submit()
+
+        updated = Bookings.get_booking!(hold.id)
+        assert updated.status == :hold
+        assert updated.payment_intent_id == payment_intent_id
+        assert day_capacity_held_for(:clear_lake, stay_days) == [2, 2, 2]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "edit hold to canceled confirms instead of canceling when Stripe payment already succeeded",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      Ysc.Ledgers.ensure_basic_accounts()
+      user = user_fixture(%{first_name: "Spot", last_name: "HoldCancelPaid"})
+
+      checkin = ~D[2037-08-10]
+      checkout = ~D[2037-08-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_cancel_succeeded_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2037-08-01&to_date=2037-08-20"
+          )
+
+        html =
+          view
+          |> form("#booking-form", %{
+            "booking" => %{
+              "checkin_date" => "2037-08-10",
+              "checkout_date" => "2037-08-13",
+              "guests_count" => "2",
+              "children_count" => "0",
+              "booking_mode" => "day",
+              "status" => "canceled"
+            }
+          })
+          |> render_submit()
+
+        assert html =~ "confirmed instead of canceled"
+
+        updated = Bookings.get_booking!(hold.id)
+        assert updated.status == :complete
+        assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+
+        payment = Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "edit hold to canceled keeps the hold while Stripe payment is still processing",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+
+      user =
+        user_fixture(%{first_name: "Spot", last_name: "HoldCancelProcessing"})
+
+      checkin = ~D[2037-09-10]
+      checkout = ~D[2037-09-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_cancel_processing_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => hold.id}
+           }}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2037-09-01&to_date=2037-09-20"
+          )
+
+        view
+        |> form("#booking-form", %{
+          "booking" => %{
+            "checkin_date" => "2037-09-10",
+            "checkout_date" => "2037-09-13",
+            "guests_count" => "2",
+            "children_count" => "0",
+            "booking_mode" => "day",
+            "status" => "canceled"
+          }
+        })
+        |> render_submit()
+
+        updated = Bookings.get_booking!(hold.id)
+        assert updated.status == :hold
+        assert updated.payment_intent_id == payment_intent_id
+        assert day_capacity_held_for(:clear_lake, stay_days) == [2, 2, 2]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "edit hold to canceled refunds and releases when succeeded payment amount does not match",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      user =
+        user_fixture(%{first_name: "Spot", last_name: "HoldCancelMismatch"})
+
+      checkin = ~D[2038-03-10]
+      checkout = ~D[2038-03-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_cancel_mismatch_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(
+          Ysc.StripeMock,
+          :retrieve_payment_intent,
+          2,
+          fn ^payment_intent_id, _opts ->
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: payment_intent_id,
+               status: "succeeded",
+               amount: amount_cents + 500,
+               latest_charge: "ch_#{payment_intent_id}",
+               metadata: %{
+                 "booking_id" => hold.id,
+                 "user_id" => user.id
+               }
+             }}
+          end
+        )
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2038-03-01&to_date=2038-03-20"
+          )
+
+        html =
+          view
+          |> form("#booking-form", %{
+            "booking" => %{
+              "checkin_date" => "2038-03-10",
+              "checkout_date" => "2038-03-13",
+              "guests_count" => "2",
+              "children_count" => "0",
+              "booking_mode" => "day",
+              "status" => "canceled"
+            }
+          })
+          |> render_submit()
+
+        refute html =~ "confirmed instead of canceled"
+
+        updated = Bookings.get_booking!(hold.id)
+        assert updated.status == :canceled
+        assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+        refute Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "delete hold confirms instead of deleting when Stripe payment already succeeded",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      Ysc.Ledgers.ensure_basic_accounts()
+      user = user_fixture(%{first_name: "Spot", last_name: "HoldDeletePaid"})
+
+      checkin = ~D[2037-10-10]
+      checkout = ~D[2037-10-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_delete_succeeded_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2037-10-01&to_date=2037-10-20"
+          )
+
+        html =
+          view
+          |> element("button[phx-click='delete-booking']")
+          |> render_click()
+
+        assert html =~ "confirmed instead of deleted"
+
+        updated = Bookings.get_booking!(hold.id)
+        assert updated.status == :complete
+        assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [2, 2, 2]
+
+        payment = Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "delete hold keeps the hold while Stripe payment is still processing",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+
+      user =
+        user_fixture(%{first_name: "Spot", last_name: "HoldDeleteProcessing"})
+
+      checkin = ~D[2037-11-10]
+      checkout = ~D[2037-11-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_delete_processing_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => hold.id}
+           }}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2037-11-01&to_date=2037-11-20"
+          )
+
+        html =
+          view
+          |> element("button[phx-click='delete-booking']")
+          |> render_click()
+
+        assert html =~ "Failed to delete booking"
+
+        updated = Bookings.get_booking!(hold.id)
+        assert updated.status == :hold
+        assert updated.payment_intent_id == payment_intent_id
+        assert day_capacity_held_for(:clear_lake, stay_days) == [2, 2, 2]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+        refute Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "delete hold refunds and deletes when succeeded payment amount does not match",
+         %{conn: conn} do
+      ensure_clear_lake_pricing_rules!()
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      user =
+        user_fixture(%{first_name: "Spot", last_name: "HoldDeleteMismatch"})
+
+      checkin = ~D[2038-04-10]
+      checkout = ~D[2038-04-13]
+
+      {:ok, hold} =
+        Ysc.Bookings.BookingLocker.create_per_guest_booking(
+          user.id,
+          :clear_lake,
+          checkin,
+          checkout,
+          2
+        )
+
+      payment_intent_id =
+        "pi_admin_hold_delete_mismatch_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      stay_days = Date.range(checkin, Date.add(checkout, -1)) |> Enum.to_list()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(
+          Ysc.StripeMock,
+          :retrieve_payment_intent,
+          2,
+          fn ^payment_intent_id, _opts ->
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: payment_intent_id,
+               status: "succeeded",
+               amount: amount_cents + 500,
+               latest_charge: "ch_#{payment_intent_id}",
+               metadata: %{
+                 "booking_id" => hold.id,
+                 "user_id" => user.id
+               }
+             }}
+          end
+        )
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/admin/bookings/bookings/#{hold.id}/edit?property=clear_lake&from_date=2038-04-01&to_date=2038-04-20"
+          )
+
+        html =
+          view
+          |> element("button[phx-click='delete-booking']")
+          |> render_click()
+
+        refute html =~ "confirmed instead of deleted"
+
+        assert is_nil(Repo.get(Booking, hold.id))
+        assert day_capacity_held_for(:clear_lake, stay_days) == [0, 0, 0]
+        assert day_capacity_booked_for(:clear_lake, stay_days) == [0, 0, 0]
+        refute Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
     end
 
     test "edit complete day booking to draft releases capacity_booked inventory",

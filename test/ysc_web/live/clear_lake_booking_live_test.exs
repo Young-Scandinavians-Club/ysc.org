@@ -2592,6 +2592,14 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
                "about 3 days before check-in"
              )
 
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "starting 48 hours before check-in"
+             )
+
+      refute has_element?(view, "#door-code-access", "within 48 hours")
+
       refute has_element?(view, "#before-you-go", "1982")
       refute has_element?(view, "#clear-lake-at-a-glance", "12 Guests")
     end

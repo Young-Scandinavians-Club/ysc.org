@@ -40,9 +40,8 @@ defmodule YscWeb.UserForgotPasswordLive do
     """
   end
 
-  def mount(_params, _session, socket) do
-    remote_ip =
-      get_connect_info(socket, :peer_data) |> Map.get(:address, {0, 0, 0, 0})
+  def mount(_params, session, socket) do
+    remote_ip = YscWeb.ClientIP.from_socket(socket, session)
 
     {:ok,
      socket

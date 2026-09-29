@@ -419,6 +419,43 @@ defmodule Ysc.Tickets do
     |> Repo.all()
   end
 
+  # Member "Your Tickets" list: order identity + ticket cards. Omits Stripe
+  # payment-intent ids, grant notes, and cancellation copy the page never renders.
+  @member_upcoming_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :event_id,
+    :expires_at,
+    :total_amount
+  ]
+  @member_upcoming_ticket_fields [
+    :id,
+    :reference_id,
+    :status,
+    :ticket_tier_id,
+    :ticket_order_id,
+    :discount_amount
+  ]
+  @member_upcoming_ticket_tier_fields [:id, :name, :type, :price]
+
+  # Public event page + QR check-in: ticket identity, order grouping, and
+  # member-only counting. Omits payment ids, check-in columns, and tier
+  # description / sale-window columns.
+  @member_event_ticket_fields [
+    :id,
+    :reference_id,
+    :status,
+    :inserted_at,
+    :ticket_order_id,
+    :ticket_tier_id,
+    :user_id,
+    :event_id
+  ]
+  @member_event_ticket_tier_fields [:id, :name, :type, :member_only]
+  @member_event_ticket_order_fields [:id, :reference_id, :completed_at]
+  @member_event_registration_fields [:id, :ticket_id, :first_name, :last_name]
+
   @doc """
   Ticket orders for the member "Your Tickets" list: not cancelled, linked to an event,
   and the event start is strictly after `now` (same filter semantics as `UserTicketsLive`).
@@ -430,7 +467,24 @@ defmodule Ysc.Tickets do
     now = Keyword.get(opts, :now, DateTime.utc_now())
     limit = Keyword.get(opts, :limit, 50)
 
+    user_id
+    |> list_user_upcoming_ticket_orders_query(now, limit)
+    |> Repo.all()
+  end
+
+  defp list_user_upcoming_ticket_orders_query(user_id, now, limit) do
     event_query = event_summary_preload_query()
+
+    tier_query =
+      from(tt in TicketTier,
+        select: struct(tt, ^@member_upcoming_ticket_tier_fields)
+      )
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@member_upcoming_ticket_fields),
+        preload: [ticket_tier: ^tier_query]
+      )
 
     from(to in TicketOrder,
       where: to.user_id == ^user_id,
@@ -440,13 +494,12 @@ defmodule Ysc.Tickets do
       where: e.start_date > ^now,
       order_by: [desc: to.inserted_at],
       limit: ^limit,
+      select: struct(to, ^@member_upcoming_order_fields),
       preload: [
-        :tickets,
-        tickets: :ticket_tier,
+        tickets: ^ticket_query,
         event: ^event_query
       ]
     )
-    |> Repo.all()
   end
 
   @doc """
@@ -471,17 +524,34 @@ defmodule Ysc.Tickets do
     |> Repo.all()
   end
 
+  # Admin user-detail orders table: identity, amount, status, event title/date,
+  # and ticket ids for the count column. Omits payment (incl. QuickBooks JSON),
+  # grant notes, Stripe payment-intent ids, cancellation copy, event body HTML,
+  # and ticket tiers — that page never renders them.
+  @admin_user_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :event_id,
+    :total_amount,
+    :inserted_at,
+    :completed_at
+  ]
+  @admin_user_order_ticket_fields [:id, :ticket_order_id]
+  @admin_user_order_event_fields [:id, :title, :start_date]
+
   @doc """
   Gets paginated ticket orders for a user with Flop.
+
+  Used by the admin user-detail orders table. Keep `get_user_ticket_order/2`
+  and `get_ticket_order/1` fat for cancel/resume and confirmation emails.
   """
   def list_user_ticket_orders_paginated(user_id, params) do
-    base_query =
-      from(to in TicketOrder,
-        where: to.user_id == ^user_id,
-        preload: [:tickets, :event, :payment, tickets: :ticket_tier]
-      )
-
-    case Flop.validate_and_run(base_query, params, for: TicketOrder) do
+    case Flop.validate_and_run(
+           list_user_ticket_orders_paginated_query(user_id),
+           params,
+           for: TicketOrder
+         ) do
       {:ok, {orders, meta}} ->
         {:ok, {orders, meta}}
 
@@ -490,25 +560,118 @@ defmodule Ysc.Tickets do
     end
   end
 
+  defp list_user_ticket_orders_paginated_query(user_id) do
+    event_query =
+      from(e in Event, select: struct(e, ^@admin_user_order_event_fields))
+
+    ticket_query =
+      from(t in Ticket, select: struct(t, ^@admin_user_order_ticket_fields))
+
+    from(to in TicketOrder,
+      where: to.user_id == ^user_id,
+      select: struct(to, ^@admin_user_order_fields),
+      preload: [event: ^event_query, tickets: ^ticket_query]
+    )
+  end
+
   @doc """
   Gets all confirmed tickets for a user for a specific event.
+
+  Used by the QR check-in page. Selects event summary columns (no body HTML),
+  slim tiers, order identity, and registration names — not payment or
+  check-in columns.
   """
   def list_user_tickets_for_event(user_id, event_id) do
+    user_id
+    |> list_user_tickets_for_event_query(event_id)
+    |> Repo.all()
+  end
+
+  defp list_user_tickets_for_event_query(user_id, event_id) do
     event_query = event_summary_preload_query()
+
+    {tier_query, order_query, registration_query} =
+      member_event_ticket_preloads()
 
     from(t in Ticket,
       where:
         t.user_id == ^user_id and t.event_id == ^event_id and
           t.status == :confirmed,
       order_by: [desc: t.inserted_at],
+      select: struct(t, ^@member_event_ticket_fields),
       preload: [
-        :ticket_tier,
-        :ticket_order,
-        :registration,
+        ticket_tier: ^tier_query,
+        ticket_order: ^order_query,
+        registration: ^registration_query,
         event: ^event_query
       ]
     )
-    |> Repo.all()
+  end
+
+  @doc """
+  Tickets for the public event page "Your Tickets" card.
+
+  Returns `{confirmed_tickets, tickets_by_order}` in one tickets SELECT:
+  confirmed tickets the viewer holds, plus every ticket on those same orders
+  (cancelled siblings for refund / partial-refund badges). Previously the
+  LiveView issued a second `WHERE ticket_order_id IN (...)` query after this
+  list, doubling ticket/tier/order preloads.
+  """
+  def list_user_event_tickets_for_page(user_id, event_id) do
+    tickets =
+      user_id
+      |> list_user_event_tickets_for_page_query(event_id)
+      |> Repo.all()
+
+    confirmed_tickets =
+      Enum.filter(tickets, fn ticket ->
+        ticket.user_id == user_id and ticket.status == :confirmed
+      end)
+
+    {confirmed_tickets, Enum.group_by(tickets, & &1.ticket_order_id)}
+  end
+
+  defp list_user_event_tickets_for_page_query(user_id, event_id) do
+    {tier_query, order_query, _registration_query} =
+      member_event_ticket_preloads()
+
+    order_ids_query =
+      from(t in Ticket,
+        where:
+          t.user_id == ^user_id and t.event_id == ^event_id and
+            t.status == :confirmed and not is_nil(t.ticket_order_id),
+        distinct: true,
+        select: t.ticket_order_id
+      )
+
+    from(t in Ticket,
+      where: t.ticket_order_id in subquery(order_ids_query),
+      order_by: [desc: t.inserted_at],
+      select: struct(t, ^@member_event_ticket_fields),
+      preload: [
+        ticket_tier: ^tier_query,
+        ticket_order: ^order_query
+      ]
+    )
+  end
+
+  defp member_event_ticket_preloads do
+    tier_query =
+      from(tt in TicketTier,
+        select: struct(tt, ^@member_event_ticket_tier_fields)
+      )
+
+    order_query =
+      from(to in TicketOrder,
+        select: struct(to, ^@member_event_ticket_order_fields)
+      )
+
+    registration_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@member_event_registration_fields)
+      )
+
+    {tier_query, order_query, registration_query}
   end
 
   @doc """
@@ -544,13 +707,12 @@ defmodule Ysc.Tickets do
   without ticket fulfillment.
 
   Pass `reconcile_with_stripe: false` (default `true`) to skip the atomic
-  Stripe PaymentIntent cancel and just cancel the local order. Stripe-driven
-  callers (e.g. `StripeService.handle_failed_payment/2`, reacting to a
-  `payment_intent.payment_failed`/`canceled` webhook) must use this: Stripe has
-  already decided that PaymentIntent's fate, and a card decline typically
-  leaves it in `requires_payment_method` so the customer can retry with a
-  different payment method against the same PaymentIntent - actively
-  cancelling it here would foreclose that retry.
+  Stripe PaymentIntent cancel and just cancel the local order. Do not use
+  this on user-facing abandonment paths: a card decline typically leaves the
+  PaymentIntent in `requires_payment_method`, and redirect wallets can still
+  capture after `/payment/success` reports failure. `StripeService.handle_failed_payment/2`
+  keeps the order pending for inline retries (`keep_retryable_order: true`)
+  and Stripe-cancels before releasing seats on the failure-redirect path.
   """
   def cancel_ticket_order(ticket_order, reason \\ "User cancelled", opts \\ []) do
     from_statuses = Keyword.get(opts, :from_statuses, [:pending])
@@ -766,11 +928,22 @@ defmodule Ysc.Tickets do
               Repo.rollback(error_reason)
           end
 
-        # Cancel the tickets (this returns them to stock)
+        # Administrative cancel — skip purchase-time membership / event-in-past
+        # checks. `Ticket.changeset/2` is for buying tickets; using it here
+        # silently left tickets confirmed after a Stripe refund when the event
+        # had already started (the #1341 cancel-and-refund modal) or the
+        # purchaser's membership had lapsed. `Repo.update` errors were also
+        # dropped by `Enum.each`, so the transaction still returned `:ok`.
         Enum.each(tickets_to_refund, fn ticket ->
-          ticket
-          |> Ticket.changeset(%{status: :cancelled})
-          |> Repo.update()
+          case ticket
+               |> Ticket.status_changeset(%{status: :cancelled})
+               |> Repo.update() do
+            {:ok, _ticket} ->
+              :ok
+
+            {:error, changeset} ->
+              Repo.rollback(changeset)
+          end
         end)
 
         # Check if all tickets in the order are now cancelled
@@ -3074,24 +3247,32 @@ defmodule Ysc.Tickets do
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
 
-    user_id = Fixtures.ulid()
-    now = Fixtures.now()
-
-    event_query = event_summary_preload_query()
-
-    from(to in TicketOrder,
-      where: to.user_id == ^user_id,
-      where: to.status != ^:cancelled,
-      join: e in Event,
-      on: e.id == to.event_id,
-      where: e.start_date > ^now,
-      order_by: [desc: to.inserted_at],
-      preload: [
-        :tickets,
-        tickets: :ticket_tier,
-        event: ^event_query
-      ]
+    list_user_upcoming_ticket_orders_query(
+      Fixtures.ulid(),
+      Fixtures.now(),
+      50
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_user_tickets_for_event_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    ulid = Fixtures.ulid()
+    list_user_tickets_for_event_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_list_user_event_tickets_for_page_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    ulid = Fixtures.ulid()
+    list_user_event_tickets_for_page_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_list_user_ticket_orders_paginated_query do
+    list_user_ticket_orders_paginated_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

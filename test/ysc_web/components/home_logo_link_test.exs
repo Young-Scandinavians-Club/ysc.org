@@ -23,6 +23,9 @@ defmodule YscWeb.Components.HomeLogoLinkTest do
       assert html =~ ~s(height="112")
       assert html =~ ~s(fetchpriority="high")
       assert html =~ "hover:opacity-80"
+      # Link carries the accessible name, so the logo image is decorative
+      assert html =~ ~s(alt="")
+      refute html =~ "The Young Scandinavian Club Logo"
     end
 
     test "applies a custom id and extra link classes" do
@@ -36,6 +39,70 @@ defmodule YscWeb.Components.HomeLogoLinkTest do
       assert html =~ ~s(id="login-home-logo")
       assert html =~ "py-8"
       refute html =~ ~s(id="home-logo-link")
+    end
+  end
+
+  describe "ysc_logo/1" do
+    test "has descriptive alt text by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.ysc_logo width={40} height={40} />
+        """)
+
+      assert html =~ ~s(alt="The Young Scandinavian Club Logo")
+    end
+  end
+
+  describe "input/1 password-toggle" do
+    test "binds the toggle button to its input with aria-controls" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.input
+          type="password-toggle"
+          name="user[password]"
+          id="user_password"
+          value=""
+        />
+        """)
+
+      assert html =~ ~s(aria-controls="user_password")
+      assert html =~ ~s(aria-pressed="false")
+    end
+
+    test "omits the built-in toggle button when toggle_button is false" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.input
+          type="password-toggle"
+          name="user[password]"
+          id="user_password"
+          value=""
+          toggle_button={false}
+        />
+        """)
+
+      assert html =~ ~s(id="user_password")
+      assert html =~ "pr-10"
+      refute html =~ "password-toggle-btn"
+    end
+
+    test "password_toggle_button/1 targets the given input" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.password_toggle_button target_id="user_password" class="col-start-2" />
+        """)
+
+      assert html =~ ~s(data-target="#user_password")
+      assert html =~ ~s(aria-controls="user_password")
+      assert html =~ "col-start-2"
     end
   end
 end

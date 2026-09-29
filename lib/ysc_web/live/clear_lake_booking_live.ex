@@ -1255,7 +1255,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     :if={@calculated_price && @checkin_date && @checkout_date}
                     class="pt-4 border-t border-zinc-200"
                   >
-                    <div class="space-y-3">
+                    <div class="flex flex-col gap-3">
                       <!-- Price Breakdown -->
                       <div class="space-y-2 text-sm">
                         <span :if={@selected_booking_mode == :day}>
@@ -1396,7 +1396,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </span>
                       </div>
 
-                      <hr class="border-zinc-200 my-3" />
+                      <hr class="border-zinc-200" />
 
                       <div class="flex justify-between items-end">
                         <span class="text-lg font-bold text-zinc-900">Total</span>
@@ -1490,7 +1490,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       class="w-full text-lg py-4"
                       color="teal"
                     >
-                      Continue to Payment
+                      Continue to payment
                     </.button>
                     <.button
                       :if={@availability_error}
@@ -1547,7 +1547,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   end
                 }
               >
-                Continue to Payment
+                Continue to payment
               </.button>
             </div>
           </div>
@@ -1960,7 +1960,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </h2>
                     </div>
                     <p class="text-teal-100 mb-6 leading-relaxed">
-                      Sent via email <strong>about 3 days before check-in</strong>, and shown on your booking confirmation page within 48 hours of check-in or while your stay is active.
+                      {YscWeb.BookingUserMessages.cabin_access_info_tab_body()}
                     </p>
                     <div class="bg-teal-700/50 border border-white/10 rounded-xl p-4 text-sm">
                       <p class="font-semibold text-teal-50 mb-2">Important:</p>
@@ -2272,10 +2272,10 @@ defmodule YscWeb.ClearLakeBookingLive do
               <div
                 :if={Map.get(assigns, :info_tab, :general) == :rules}
                 id="cabin-rules"
-                class="space-y-16"
+                class="flex flex-col gap-16"
               >
                 <!-- Golden Rules Banner -->
-                <section class="bg-zinc-100 rounded-xl p-6 mb-12">
+                <section class="bg-zinc-100 rounded-xl p-6">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-xs">
                       <div class="text-4xl mb-3">🚫</div>
@@ -2320,7 +2320,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                 </section>
                 <!-- Your Stay, Your Way - Accordions -->
-                <section class="bg-zinc-50 rounded-xl p-8 lg:p-12 mb-4">
+                <section class="bg-zinc-50 rounded-xl p-8 lg:p-12">
                   <div class="max-w-3xl">
                     <h2 class="text-3xl font-bold text-zinc-900 mb-4">
                       Your Stay, Your Way
@@ -2404,7 +2404,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                 </section>
                 <!-- Booking Policies -->
-                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs mb-12">
+                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs">
                   <.icon_heading
                     id="clear-lake-booking-policies-heading"
                     class="text-zinc-900 mb-6"

@@ -6,10 +6,10 @@ defmodule Ysc.Posts.Post do
   for post data manipulation.
   """
   use Ecto.Schema
+  use Flop.Schema
   import Ecto.Changeset
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [
       :state,
       :user_id,
@@ -39,7 +39,7 @@ defmodule Ysc.Posts.Post do
         author_name: [:author_first, :author_last]
       ]
     ]
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID

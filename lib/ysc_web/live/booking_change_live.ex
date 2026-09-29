@@ -17,13 +17,11 @@ defmodule YscWeb.BookingChangeLive do
   }
 
   alias Ysc.MoneyHelper
-  alias Ysc.Repo
   alias Ysc.Tickets.CheckoutCancel
   alias YscWeb.BookingActions
   alias YscWeb.BookingGuestForm
   alias YscWeb.BookingDisplay
   import YscWeb.Components.BookingGuestInfoForm
-  import Ecto.Query
   require Ysc.Logging
 
   @payment_finalize_retry_attempts 5
@@ -262,16 +260,11 @@ defmodule YscWeb.BookingChangeLive do
              |> assign(:selected_family_members_for_guests, %{})
              |> assign(:show_payment_form, false)}
           else
-            case proceed_after_modification_details(socket, params, preview) do
-              {:payment, updated_socket} ->
-                {:noreply, updated_socket}
-
-              {:apply, updated_socket} ->
-                apply_modification_and_redirect(updated_socket, params, nil)
-
-              {:error, updated_socket} ->
-                {:noreply, updated_socket}
-            end
+            noreply_after_modification_proceed(
+              socket,
+              proceed_after_modification_details(socket, params, preview),
+              params
+            )
           end
 
         {:error, %Ecto.Changeset{} = changeset} ->
@@ -340,16 +333,11 @@ defmodule YscWeb.BookingChangeLive do
 
       socket = assign(socket, :pending_guest_params, merged)
 
-      case proceed_after_guest_info(socket) do
-        {:payment, updated_socket} ->
-          {:noreply, updated_socket}
-
-        {:apply, updated_socket} ->
-          apply_modification_and_redirect(updated_socket, params, nil)
-
-        {:error, updated_socket} ->
-          {:noreply, updated_socket}
-      end
+      noreply_after_modification_proceed(
+        socket,
+        proceed_after_guest_info(socket),
+        params
+      )
     else
       {:noreply, socket}
     end
@@ -882,13 +870,7 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp load_booking(booking_id, user) do
-    booking_query =
-      from(b in Booking,
-        where: b.id == ^booking_id and b.user_id == ^user.id,
-        preload: [rooms: :room_category, booking_guests: []]
-      )
-
-    case Repo.one(booking_query) do
+    case Bookings.get_user_booking_for_member_checkout(booking_id, user.id) do
       nil -> {:error, :not_found}
       booking -> {:ok, booking}
     end
@@ -1095,8 +1077,27 @@ defmodule YscWeb.BookingChangeLive do
       {:apply, apply_socket} ->
         apply_socket
 
+      {:already_succeeded, payment_intent_id} ->
+        assign_paid_modification_finalize(socket, payment_intent_id)
+
       {:error, error_socket} ->
         error_socket
+    end
+  end
+
+  defp noreply_after_modification_proceed(socket, result, apply_params) do
+    case result do
+      {:payment, updated_socket} ->
+        {:noreply, updated_socket}
+
+      {:apply, updated_socket} ->
+        apply_modification_and_redirect(updated_socket, apply_params, nil)
+
+      {:already_succeeded, payment_intent_id} ->
+        {:noreply, assign_paid_modification_finalize(socket, payment_intent_id)}
+
+      {:error, updated_socket} ->
+        {:noreply, updated_socket}
     end
   end
 
@@ -1141,8 +1142,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp assign_paid_modification_finalize(socket, payment_intent_id) do
     booking =
-      Repo.get!(Booking, socket.assigns.booking.id)
-      |> Repo.preload(:rooms)
+      Bookings.get_booking_for_member_checkout!(socket.assigns.booking.id)
 
     params = modification_params_for_payment_apply(socket, booking)
 
@@ -1438,43 +1438,107 @@ defmodule YscWeb.BookingChangeLive do
       YscWeb.BookingUserMessages.modification_after_payment_recovery_suffix()
   end
 
+  # Creating a new Intent uses a unique integer in the Stripe idempotency
+  # key (required: after a true unpaid cancel, a stable key would return the
+  # *canceled* Intent). Every submit therefore mints PI-B unless the stored
+  # PI is reconciled first — same invariant as Edit changes / hold expiry.
+  # `attach_modification_payment_intent/2` also Stripe-cancels any previous
+  # stored Intent before overwrite so a concurrent tab cannot leave PI-A
+  # open while the DB points at unpaid PI-B.
   defp proceed_after_modification_details(socket, params, preview) do
     if Money.positive?(preview.delta) do
-      booking = socket.assigns.booking
+      booking =
+        Bookings.get_booking_for_member_checkout!(socket.assigns.booking.id)
 
-      hold_opts = modification_hold_guest_opts(socket)
+      case reconcile_existing_modification_payment_for_new_attempt(booking) do
+        {:already_succeeded, payment_intent_id} ->
+          {:already_succeeded, payment_intent_id}
 
-      with {:ok, _booking} <-
-             Bookings.place_modification_hold(booking, preview.attrs, hold_opts),
-           {:ok, payment_intent} <-
-             create_delta_payment_intent(
-               booking,
-               preview.delta,
-               socket.assigns.current_user
-             ) do
-        {:payment,
-         socket
-         |> assign(:step, :edit)
-         |> assign(:pending_modification_params, params)
-         |> assign(:payment_intent, payment_intent)
-         |> assign(:payment_delta, preview.delta)
-         |> assign(:show_payment_form, true)
-         |> assign(:availability_snapshot, nil)
-         |> assign(:stripe_payment_element_ready, false)
-         |> assign(:payment_error, nil)}
-      else
-        {:error, _reason} ->
-          Bookings.release_modification_hold(booking.id)
+        :in_progress ->
+          {:error, put_modification_abandon_in_progress_toast(socket)}
 
-          {:error,
-           YscWeb.Flash.put_toast(
-             socket,
-             :error,
-             "We couldn't start the payment form for your date change. Please try again, or email info@ysc.org if this keeps happening."
-           )}
+        {:error, reason} ->
+          {:error, put_modification_abandon_failed_toast(socket, reason)}
+
+        :ok ->
+          start_modification_delta_payment(socket, booking, params, preview)
       end
     else
       {:apply, assign(socket, :pending_modification_params, params)}
+    end
+  end
+
+  defp reconcile_existing_modification_payment_for_new_attempt(booking) do
+    case Bookings.modification_hold_payment_intent_id(booking) do
+      nil ->
+        :ok
+
+      payment_intent_id ->
+        case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+               payment_intent_id,
+               "booking_modification_new_payment_attempt"
+             ) do
+          {:cancel, _payment_intent} ->
+            :ok
+
+          {:already_succeeded, _payment_intent} ->
+            {:already_succeeded, payment_intent_id}
+
+          {:in_progress, _payment_intent} ->
+            Ysc.Logging.info(
+              "Skipped booking modification new payment attempt while payment is in flight",
+              booking_id: booking.id,
+              payment_intent_id: payment_intent_id
+            )
+
+            :in_progress
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  defp start_modification_delta_payment(socket, booking, params, preview) do
+    hold_opts = modification_hold_guest_opts(socket)
+
+    with {:ok, _booking} <-
+           Bookings.place_modification_hold(booking, preview.attrs, hold_opts),
+         {:ok, payment_intent} <-
+           create_delta_payment_intent(
+             booking,
+             preview.delta,
+             socket.assigns.current_user
+           ) do
+      {:payment,
+       socket
+       |> assign(:step, :edit)
+       |> assign(:pending_modification_params, params)
+       |> assign(:payment_intent, payment_intent)
+       |> assign(:payment_delta, preview.delta)
+       |> assign(:show_payment_form, true)
+       |> assign(:availability_snapshot, nil)
+       |> assign(:stripe_payment_element_ready, false)
+       |> assign(:payment_error, nil)}
+    else
+      {:error, {:modification_payment_already_succeeded, payment_intent_id}} ->
+        {:already_succeeded, payment_intent_id}
+
+      {:error, :modification_payment_in_progress} ->
+        {:error, put_modification_abandon_in_progress_toast(socket)}
+
+      {:error, {:stripe_reconcile_failed, reason}} ->
+        {:error, put_modification_abandon_failed_toast(socket, reason)}
+
+      {:error, _reason} ->
+        Bookings.release_modification_hold(booking.id)
+
+        {:error,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "We couldn't start the payment form for your date change. Please try again, or email info@ysc.org if this keeps happening."
+         )}
     end
   end
 
@@ -1594,9 +1658,36 @@ defmodule YscWeb.BookingChangeLive do
         "booking_modification_#{booking.id}_#{amount_cents}_#{attempt_id}"
       )
 
-    stripe_client.create_payment_intent(payment_intent_params,
-      idempotency_key: idempotency_key
-    )
+    case stripe_client.create_payment_intent(payment_intent_params,
+           idempotency_key: idempotency_key
+         ) do
+      {:ok, payment_intent} ->
+        case Bookings.attach_modification_payment_intent(
+               booking.id,
+               payment_intent.id
+             ) do
+          {:ok, _booking} ->
+            {:ok, payment_intent}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Created booking modification PaymentIntent but could not persist it on the hold",
+              booking_id: booking.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(reason)
+            )
+
+            CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+              payment_intent.id,
+              "booking_modification_attach_failed"
+            )
+
+            {:error, reason}
+        end
+
+      other ->
+        other
+    end
   end
 
   defp format_changeset_errors(changeset) do

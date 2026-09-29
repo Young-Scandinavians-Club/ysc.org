@@ -13,11 +13,9 @@ defmodule YscWeb.ExpenseReportLive do
   alias Ysc.Accounts
   alias Ysc.Accounts.User
   alias Ysc.Events
-  alias Ysc.Repo
   alias YscWeb.DateDisplay
   alias YscWeb.Validators.FileValidator
 
-  import Ecto.Query
   require Ysc.Logging
 
   @impl true
@@ -3370,7 +3368,7 @@ defmodule YscWeb.ExpenseReportLive do
         <%= if @bank_account_form do %>
           <div class="fixed inset-0 z-200 overflow-y-auto" id="modal-backdrop">
             <div
-              class="fixed inset-0 transition-opacity bg-zinc-500 bg-opacity-75"
+              class="fixed inset-0 transition-opacity bg-zinc-500/75"
               phx-click="close-bank-account-modal"
               aria-hidden="true"
             >
@@ -3384,7 +3382,7 @@ defmodule YscWeb.ExpenseReportLive do
               </span>
 
               <div
-                class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
                 phx-click-away="close-bank-account-modal"
                 phx-click="noop"
               >
@@ -4395,11 +4393,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp present?(_), do: true
 
   defp get_treasurer do
-    from(u in User,
-      where: u.board_position == "treasurer" and u.state == :active,
-      limit: 1
-    )
-    |> Repo.one()
+    Accounts.get_active_board_member(:treasurer)
   end
 
   defp expense_upload_error_message(reason) do

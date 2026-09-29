@@ -20,6 +20,10 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
   alias Ysc.Subscriptions
   alias Ysc.Repo
 
+  # Child invites are only for under-18s, so accepted child sub-accounts need a
+  # birth date that stays under 18 no matter when the suite runs.
+  defp child_birth_date, do: Date.shift(Date.utc_today(), year: -10)
+
   defp create_user_with_lifetime_membership(attrs \\ %{}) do
     user_fixture_fast(attrs)
     |> Ecto.Changeset.change(
@@ -134,7 +138,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "User#{i}",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           primary_user.id,
           hash_password: true,
@@ -236,7 +240,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Sub",
           last_name: "User",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         })
 
       # After accepting an invite, the email is already registered, so creating a new invite should fail
@@ -327,7 +331,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         first_name: "Sub",
         last_name: "User",
         phone_number: "+14159098268",
-        date_of_birth: ~D[1990-01-01]
+        date_of_birth: child_birth_date()
       }
 
       assert {:ok, user} = FamilyInvites.accept_invite(invite.token, user_attrs)
@@ -366,7 +370,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "User#{i}",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           primary_user.id,
           hash_password: true,
@@ -387,7 +391,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Extra",
           last_name: "Sub",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         },
         primary_user.id,
         hash_password: true,
@@ -402,7 +406,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                  first_name: "Late",
                  last_name: "Invite",
                  phone_number: "+14159098268",
-                 date_of_birth: ~D[1990-01-01]
+                 date_of_birth: child_birth_date()
                })
     end
 
@@ -418,7 +422,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         first_name: "Sub",
         last_name: "User",
         phone_number: "+14159098268",
-        date_of_birth: ~D[1990-01-01]
+        date_of_birth: child_birth_date()
       }
 
       Oban.Testing.with_testing_mode(:manual, fn ->
@@ -448,7 +452,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         first_name: "Sub",
         last_name: "User",
         phone_number: "+14159098268",
-        date_of_birth: ~D[1990-01-01]
+        date_of_birth: child_birth_date()
       }
 
       Oban.Testing.with_testing_mode(:manual, fn ->
@@ -477,6 +481,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -549,7 +554,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "User#{i}",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           primary_user.id,
           hash_password: true,
@@ -584,7 +589,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Extra",
           last_name: "Sub",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         },
         primary_user.id,
         hash_password: true,
@@ -612,7 +617,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                  first_name: "Test",
                  last_name: "User",
                  phone_number: "+14159098268",
-                 date_of_birth: ~D[1990-01-01]
+                 date_of_birth: child_birth_date()
                })
     end
 
@@ -640,7 +645,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                  first_name: "Test",
                  last_name: "User",
                  phone_number: "+14159098268",
-                 date_of_birth: ~D[1990-01-01]
+                 date_of_birth: child_birth_date()
                })
     end
 
@@ -658,7 +663,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Sub",
           last_name: "User",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         })
 
       # Try to accept again
@@ -669,7 +674,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                  first_name: "Sub2",
                  last_name: "User2",
                  phone_number: "+14159098269",
-                 date_of_birth: ~D[1990-01-01]
+                 date_of_birth: child_birth_date()
                })
     end
 
@@ -686,7 +691,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                  first_name: "Sub",
                  last_name: "User",
                  phone_number: "+14159098268",
-                 date_of_birth: ~D[1990-01-01]
+                 date_of_birth: child_birth_date()
                })
     end
 
@@ -716,7 +721,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Sub",
           last_name: "User",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         })
 
       # Check that sub-account has billing address
@@ -746,7 +751,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Sub",
           last_name: "User",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         })
 
       assert sub_user.most_connected_country == "US"
@@ -769,7 +774,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         last_name: "User",
         phone_number: "+14159098268",
         most_connected_country: "SE",
-        date_of_birth: ~D[1990-01-01]
+        date_of_birth: child_birth_date()
       }
 
       {:ok, sub_user} = FamilyInvites.accept_invite(invite.token, user_attrs)
@@ -924,7 +929,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Sub",
           last_name: "User",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         })
 
       # Try to revoke
@@ -980,7 +985,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "User#{i}",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           user.id,
           hash_password: true,
@@ -1020,7 +1025,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "User#{i}",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           user.id,
           hash_password: true,
@@ -1044,7 +1049,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "User#{i}",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           primary_user.id,
           hash_password: true,
@@ -1127,6 +1132,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -1151,7 +1157,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "User#{i}",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           primary_user.id,
           hash_password: true,
@@ -1166,6 +1172,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -1180,7 +1187,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
           first_name: "Extra",
           last_name: "Sub",
           phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
+          date_of_birth: child_birth_date()
         },
         primary_user.id,
         hash_password: true,
@@ -1232,6 +1239,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Board",
           last_name: "Invitee"
@@ -1273,6 +1281,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture_fast(%{
+          date_of_birth: child_birth_date(),
           email: "family.link.member+inbox@gmail.com",
           first_name: "Invitee",
           last_name: "Alias"
@@ -1322,7 +1331,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             first_name: "Sub",
             last_name: "Account",
             phone_number: "+14159098268",
-            date_of_birth: ~D[1990-01-01]
+            date_of_birth: child_birth_date()
           },
           primary_a.id,
           hash_password: true,
@@ -1332,6 +1341,261 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       assert {:error, :already_linked_to_family} =
                FamilyInvites.link_existing_user(invite.token, sub)
+    end
+  end
+
+  describe "adult?/2" do
+    test "is true from the 18th birthday onward" do
+      today = ~D[2026-09-26]
+
+      assert FamilyInvites.adult?(~D[2008-09-26], today)
+      assert FamilyInvites.adult?(~D[1990-01-01], today)
+      refute FamilyInvites.adult?(~D[2008-09-27], today)
+      refute FamilyInvites.adult?(~D[2016-01-01], today)
+    end
+
+    test "treats a Feb 29 birthday as 18 on Feb 28 of a non-leap year" do
+      refute FamilyInvites.adult?(~D[2008-02-29], ~D[2026-02-27])
+      assert FamilyInvites.adult?(~D[2008-02-29], ~D[2026-02-28])
+    end
+
+    test "is false when the birth date is unknown" do
+      refute FamilyInvites.adult?(nil)
+    end
+  end
+
+  describe "adult children" do
+    defp insert_family_member(primary_user, attrs) do
+      %FamilyMember{}
+      |> FamilyMember.family_member_changeset(
+        Map.merge(
+          %{first_name: "Kid", last_name: "Member", type: "child"},
+          attrs
+        )
+      )
+      |> Ecto.Changeset.put_change(:user_id, primary_user.id)
+      |> Repo.insert!()
+    end
+
+    defp adult_birth_date, do: Date.shift(Date.utc_today(), year: -18)
+
+    test "create_invite/3 refuses a child who is 18 or older" do
+      primary_user = create_user_with_lifetime_membership()
+
+      member =
+        insert_family_member(primary_user, %{birth_date: adult_birth_date()})
+
+      assert {:error, :child_is_adult} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 relationship: :child,
+                 family_member_id: member.id
+               )
+
+      assert FamilyInvites.list_invites(primary_user) == []
+    end
+
+    test "create_invite/3 uses the roster member's type over the relationship option" do
+      primary_user = create_user_with_lifetime_membership()
+
+      member =
+        insert_family_member(primary_user, %{birth_date: adult_birth_date()})
+
+      assert {:error, :child_is_adult} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 relationship: :spouse,
+                 family_member_id: member.id
+               )
+    end
+
+    test "create_invite/3 allows a child under 18" do
+      primary_user = create_user_with_lifetime_membership()
+
+      member =
+        insert_family_member(primary_user, %{birth_date: child_birth_date()})
+
+      assert {:ok, _invite} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 relationship: :child,
+                 family_member_id: to_string(member.id)
+               )
+    end
+
+    test "create_invite/3 ignores a family_member_id that is not a ULID" do
+      primary_user = create_user_with_lifetime_membership()
+
+      assert {:ok, _invite} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 family_member_id: "not-a-ulid"
+               )
+    end
+
+    test "create_invite/3 allows an adult spouse" do
+      primary_user = create_user_with_lifetime_membership()
+
+      member =
+        insert_family_member(primary_user, %{
+          type: "spouse",
+          birth_date: ~D[1990-01-01]
+        })
+
+      assert {:ok, _invite} =
+               FamilyInvites.create_invite(primary_user, unique_user_email(),
+                 relationship: :spouse,
+                 family_member_id: member.id
+               )
+    end
+
+    test "accept_invite/2 rejects an adult accepting a child invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               FamilyInvites.accept_invite(
+                 invite.token,
+                 Map.put(
+                   invite_accept_user_attrs(email),
+                   :date_of_birth,
+                   adult_birth_date()
+                 )
+               )
+
+      assert %{date_of_birth: [message]} = errors_on(changeset)
+      assert message =~ "under 18"
+      assert Accounts.get_user_by_email(email) == nil
+      assert is_nil(Repo.get!(FamilyInvite, invite.id).accepted_at)
+    end
+
+    test "accept_invite/2 lets an adult accept a spouse invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, email, relationship: :spouse)
+
+      assert {:ok, user} =
+               FamilyInvites.accept_invite(
+                 invite.token,
+                 Map.put(
+                   invite_accept_user_attrs(email),
+                   :date_of_birth,
+                   ~D[1990-01-01]
+                 )
+               )
+
+      assert user.primary_user_id == primary_user.id
+    end
+
+    test "link_existing_user/2 refuses an adult on a child invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee =
+        user_fixture(%{email: email})
+        |> Ecto.Changeset.change(date_of_birth: adult_birth_date())
+        |> Repo.update!()
+
+      assert {:error, :child_is_adult} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert is_nil(Repo.get!(User, invitee.id).primary_user_id)
+    end
+
+    test "link_existing_user/3 requires a date of birth on a child invite when none is on file" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      invitee = user_fixture(%{email: email})
+      assert is_nil(invitee.date_of_birth)
+
+      assert FamilyInvites.date_of_birth_required_to_link?(invitee, invite)
+
+      assert {:error, :date_of_birth_required} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert {:error, :date_of_birth_required} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 "date_of_birth" => ""
+               })
+
+      assert is_nil(Repo.get!(User, invitee.id).primary_user_id)
+      assert is_nil(Repo.get!(FamilyInvite, invite.id).accepted_at)
+    end
+
+    test "link_existing_user/3 saves a supplied under-18 date of birth and links" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      invitee = user_fixture(%{email: email})
+      dob = child_birth_date()
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 "date_of_birth" => Date.to_iso8601(dob)
+               })
+
+      assert linked.primary_user_id == primary_user.id
+      assert Repo.get!(User, invitee.id).date_of_birth == dob
+    end
+
+    test "link_existing_user/3 rejects a supplied adult or invalid date of birth" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      invitee = user_fixture(%{email: email})
+
+      assert {:error, %Ecto.Changeset{} = adult} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 date_of_birth: adult_birth_date()
+               })
+
+      assert %{date_of_birth: [message]} = errors_on(adult)
+      assert message =~ "under 18"
+
+      assert {:error, %Ecto.Changeset{} = future} =
+               FamilyInvites.link_existing_user(invite.token, invitee, %{
+                 date_of_birth: Date.add(Date.utc_today(), 1)
+               })
+
+      assert %{date_of_birth: ["cannot be in the future"]} = errors_on(future)
+
+      reloaded = Repo.get!(User, invitee.id)
+      assert is_nil(reloaded.primary_user_id)
+      assert is_nil(reloaded.date_of_birth)
+    end
+
+    test "link_existing_user/3 does not ask for a date of birth on a spouse invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, email, relationship: :spouse)
+
+      invitee = user_fixture(%{email: email})
+
+      refute FamilyInvites.date_of_birth_required_to_link?(invitee, invite)
+
+      assert {:ok, _linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+    end
+
+    test "link_existing_user/2 lets an adult join via a spouse invite" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, email, relationship: :spouse)
+
+      invitee =
+        user_fixture(%{email: email})
+        |> Ecto.Changeset.change(date_of_birth: ~D[1990-01-01])
+        |> Repo.update!()
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert linked.primary_user_id == primary_user.id
     end
   end
 
@@ -1458,6 +1722,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       invitee =
         user_fixture(%{
+          date_of_birth: child_birth_date(),
           email: email,
           first_name: "Invitee",
           last_name: "User"
@@ -1506,7 +1771,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
 
-      invitee = user_fixture(%{email: email})
+      invitee = user_fixture(%{email: email, date_of_birth: child_birth_date()})
       warm_primary_family_caches(primary_user)
 
       assert {:ok, linked} =
@@ -1603,7 +1868,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                  first_name: "Sub",
                  last_name: "User",
                  phone_number: "+14159098268",
-                 date_of_birth: ~D[1990-01-01]
+                 date_of_birth: child_birth_date()
                })
 
       assert is_nil(Repo.get!(FamilyInvite, invite.id).accepted_at)
@@ -1686,7 +1951,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       first_name: Keyword.get(opts, :first_name, "Sub"),
       last_name: Keyword.get(opts, :last_name, "User"),
       phone_number: "+14159098268",
-      date_of_birth: ~D[1990-01-01]
+      date_of_birth: child_birth_date()
     }
   end
 end

@@ -94,14 +94,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </h4>
                     <.badge
                       type={tier_status_badge_type(ticket_tier)}
-                      class="text-xs uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
+                      class="text-xs uppercase tracking-wider font-bold! rounded-full! px-2 py-0.5 me-0"
                     >
                       {tier_status_text(ticket_tier)}
                     </.badge>
                     <.badge
                       :if={ticket_tier.member_only}
                       type="violet"
-                      class="inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
+                      class="inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold! rounded-full! px-2 py-0.5 me-0"
                     >
                       <.icon name="hero-lock-closed" class="w-3 h-3" /> Member only
                     </.badge>

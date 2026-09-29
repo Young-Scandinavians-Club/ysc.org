@@ -112,9 +112,16 @@ defmodule YscWeb.TahoeBookingLive do
             do: Accounts.preload_user_subscriptions_for_booking(user),
             else: nil
 
+        family_user_ids =
+          if user, do: Accounts.get_family_group_user_ids(user), else: []
+
         # Load active bookings for the entire family group (needed for eligibility check)
         active_bookings =
-          if user, do: get_family_group_active_bookings(user), else: []
+          if user do
+            Bookings.list_active_tahoe_bookings_for_family(family_user_ids)
+          else
+            []
+          end
 
         # Check if user can book (pass user_with_subs to avoid re-fetching subscriptions)
         {can_book, booking_error_title, booking_disabled_reason} =
@@ -169,9 +176,6 @@ defmodule YscWeb.TahoeBookingLive do
           Bookings.get_active_refund_policy(:tahoe, :buyout)
 
         room_refund_policy = Bookings.get_active_refund_policy(:tahoe, :room)
-
-        family_user_ids =
-          if user, do: get_family_group_user_ids(user), else: []
 
         {user_with_subs, active_bookings, can_book, booking_error_title,
          booking_disabled_reason, active_tab, membership_type,
@@ -1310,7 +1314,7 @@ defmodule YscWeb.TahoeBookingLive do
             class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
           >
             <!-- Left Column: Selection Area (2 columns on large screens) -->
-            <div class="lg:col-span-2 space-y-8">
+            <div class="lg:col-span-2 flex flex-col gap-8">
               <!-- Step 1: Booking Mode Selection -->
               <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
                 <.step_heading id="booking-step-mode" step={1} class="mb-4">
@@ -1433,7 +1437,7 @@ defmodule YscWeb.TahoeBookingLive do
                 </fieldset>
               </section>
               <!-- Booking Rules & Policies (Above Stay Details) -->
-              <div :if={@booking_step == :details} class="space-y-3 mb-6">
+              <div :if={@booking_step == :details} class="space-y-3">
                 <!-- Weekend Rule Alert (Reactive - shows when a stay includes Saturday without spanning Friday-Sunday) -->
                 <div
                   :if={
@@ -2116,9 +2120,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </span>
                               <span
                                 :if={room.min_billable_occupancy > 1}
+                                id={"room-#{room.id}-min-charge-badge"}
                                 class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
                               >
-                                Min {room.min_billable_occupancy} Guests
+                                {YscWeb.BookingUserMessages.room_min_charge_badge(
+                                  room.min_billable_occupancy
+                                )}
                               </span>
                             </div>
                             <!-- Room Features: Compact Badges -->
@@ -2165,7 +2172,9 @@ defmodule YscWeb.TahoeBookingLive do
                                 <div :if={room.minimum_price}>
                                   {MoneyHelper.format_money!(room.minimum_price)} min
                                   <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    ({room.min_billable_occupancy} guest)
+                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
+                                      room.min_billable_occupancy
+                                    )}
                                   </span>
                                 </div>
                                 <div :if={!room.minimum_price}>
@@ -2281,9 +2290,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </span>
                               <span
                                 :if={room.min_billable_occupancy > 1}
+                                id={"room-#{room.id}-min-charge-badge"}
                                 class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
                               >
-                                Min {room.min_billable_occupancy} Guests
+                                {YscWeb.BookingUserMessages.room_min_charge_badge(
+                                  room.min_billable_occupancy
+                                )}
                               </span>
                             </div>
                             <!-- Room Features: Compact Badges -->
@@ -2330,7 +2342,9 @@ defmodule YscWeb.TahoeBookingLive do
                                 <div :if={room.minimum_price}>
                                   {MoneyHelper.format_money!(room.minimum_price)} min
                                   <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    ({room.min_billable_occupancy} guest)
+                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
+                                      room.min_billable_occupancy
+                                    )}
                                   </span>
                                 </div>
                                 <div :if={!room.minimum_price}>
@@ -2468,18 +2482,22 @@ defmodule YscWeb.TahoeBookingLive do
                           <% min_required = room.min_billable_occupancy || 1 %>
                           <div
                             :if={total_people < min_required}
-                            class="p-2 bg-red-50 border border-red-200 rounded-sm"
+                            id={"tahoe-room-min-charge-notice-#{room.id}"}
+                            class="p-2 bg-amber-50 border border-amber-200 rounded-sm"
                           >
                             <div class="flex items-start gap-2">
                               <.icon
-                                name="hero-exclamation-triangle-solid"
-                                class="w-4 h-4 text-red-600 shrink-0 mt-0.5"
+                                name="hero-information-circle"
+                                class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
                               />
                               <div class="flex-1">
-                                <p class="text-xs font-semibold text-red-900">
-                                  {room.name} requires minimum of {min_required} guests
+                                <p class="text-xs font-semibold text-amber-900">
+                                  {YscWeb.BookingUserMessages.room_below_min_charge_title(
+                                    room.name,
+                                    min_required
+                                  )}
                                 </p>
-                                <p class="text-xs text-red-800 mt-0.5">
+                                <p class="text-xs text-amber-800 mt-0.5">
                                   <% season =
                                     Season.find_season_for_date(
                                       @seasons,
@@ -2490,12 +2508,13 @@ defmodule YscWeb.TahoeBookingLive do
                                     get_default_adult_price(@property, season_id) %>
                                   <% room_adult_price =
                                     room.adult_price_per_night ||
-                                      fallback_adult_price %> ({MoneyHelper.format_money!(
-                                    case Money.mult(room_adult_price, min_required) do
-                                      {:ok, total} -> total
-                                      _ -> room_adult_price
-                                    end
-                                  )}/night minimum)
+                                      fallback_adult_price %>
+                                  <% {:ok, nightly_min} =
+                                    Money.mult(room_adult_price, min_required) %>
+                                  {YscWeb.BookingUserMessages.room_below_min_charge_body(
+                                    min_required,
+                                    MoneyHelper.format_money!(nightly_min)
+                                  )}
                                 </p>
                               </div>
                             </div>
@@ -2593,6 +2612,7 @@ defmodule YscWeb.TahoeBookingLive do
                       <div :if={@selected_booking_mode == :room}>
                         <div
                           :if={@price_breakdown[:using_minimum_pricing]}
+                          id="tahoe-minimum-pricing-applied"
                           class="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-sm"
                         >
                           <div class="flex items-start gap-2">
@@ -2601,18 +2621,26 @@ defmodule YscWeb.TahoeBookingLive do
                               class="w-3 h-3 text-amber-600 shrink-0 mt-0.5"
                             />
                             <p class="text-xs text-amber-800 leading-tight">
-                              Minimum occupancy pricing applied
+                              {YscWeb.BookingUserMessages.room_minimum_pricing_applied(
+                                @price_breakdown[:billable_people] ||
+                                  @price_breakdown[:guests_count] ||
+                                  0
+                              )}
                             </p>
                           </div>
                         </div>
                         <div class="flex justify-between text-sm">
-                          <span class="text-zinc-600">
+                          <span id="tahoe-base-price-people" class="text-zinc-600">
                             Base Price
                             <%= if @price_breakdown.nights && @price_breakdown[:adult_price_per_night] do %>
-                              <% adult_count =
+                              <% billable_people =
                                 @price_breakdown[:billable_people] ||
                                   @price_breakdown[:guests_count] ||
-                                  0 %> ({BookingDisplay.adults_label(adult_count)} × {BookingDisplay.nights_label(
+                                  0 %>
+                              <% guests_count = @price_breakdown[:guests_count] || 0 %> ({YscWeb.BookingUserMessages.room_base_price_people_label(
+                                billable_people,
+                                guests_count
+                              )} × {BookingDisplay.nights_label(
                                 @price_breakdown.nights
                               )})
                             <% end %>
@@ -2750,6 +2778,7 @@ defmodule YscWeb.TahoeBookingLive do
                   <!-- Submit Button -->
                   <div class="pt-2">
                     <.button
+                      id="tahoe-review-booking-desktop"
                       phx-click="show-confirm-modal"
                       phx-disable-with="Loading..."
                       disabled={!can_submit_booking?(assigns)}
@@ -2762,7 +2791,7 @@ defmodule YscWeb.TahoeBookingLive do
                       }
                     >
                       <span class="flex items-center justify-center gap-2">
-                        <.icon name="hero-check-circle-solid" class="w-5 h-5" />Review booking
+                        <.icon name="hero-check-circle-solid" class="w-5 h-5" />{YscWeb.BookingUserMessages.tahoe_review_booking_button()}
                       </span>
                     </.button>
                     <p
@@ -2776,15 +2805,16 @@ defmodule YscWeb.TahoeBookingLive do
               </div>
             </aside>
           </div>
-          <!-- Confirmation Modal (Interstitial) -->
+          <!-- Review acknowledgments before checkout (stay is not booked yet) -->
           <div
             :if={Map.get(assigns, :show_confirm_modal, false)}
+            id="tahoe-review-booking-modal"
             class="fixed inset-0 z-50 overflow-y-auto"
             phx-click-away="close-confirm-modal"
           >
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
               <div
-                class="fixed inset-0 transition-opacity bg-zinc-500 bg-opacity-75"
+                class="fixed inset-0 transition-opacity bg-zinc-500/75"
                 aria-hidden="true"
               >
               </div>
@@ -2795,7 +2825,7 @@ defmodule YscWeb.TahoeBookingLive do
                 &#8203;
               </span>
               <div
-                class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
                 phx-click="ignore"
                 phx-click-stop
               >
@@ -2808,12 +2838,18 @@ defmodule YscWeb.TahoeBookingLive do
                       />
                     </div>
                     <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                      <h3 class="text-lg leading-6 font-medium text-zinc-900 mb-4">
-                        Confirm Your Booking
+                      <h3
+                        id="tahoe-review-booking-modal-title"
+                        class="text-lg leading-6 font-medium text-zinc-900 mb-4"
+                      >
+                        {YscWeb.BookingUserMessages.tahoe_review_modal_title()}
                       </h3>
-                      <div class="mt-2 space-y-4">
-                        <p class="text-sm text-zinc-500 mb-4">
-                          Before confirming, please acknowledge the following requirements:
+                      <div class="mt-2 flex flex-col gap-4">
+                        <p
+                          id="tahoe-review-booking-modal-intro"
+                          class="text-sm text-zinc-500"
+                        >
+                          {YscWeb.BookingUserMessages.tahoe_review_modal_intro()}
                         </p>
                         <label class="flex items-start gap-3 cursor-pointer p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
                           <input
@@ -2893,6 +2929,7 @@ defmodule YscWeb.TahoeBookingLive do
                 </div>
                 <div class="bg-zinc-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <.button
+                    id="tahoe-review-booking-continue"
                     phx-click="create-booking"
                     disabled={
                       !Map.get(assigns, :linens_confirmed, false) ||
@@ -2916,14 +2953,15 @@ defmodule YscWeb.TahoeBookingLive do
                       |> Enum.join(" ")
                     }
                   >
-                    Confirm Booking
+                    {YscWeb.BookingUserMessages.tahoe_review_modal_continue_button()}
                   </.button>
                   <button
                     type="button"
+                    id="tahoe-review-booking-go-back"
                     phx-click="close-confirm-modal"
                     class="mt-3 w-full sm:mt-0 sm:w-auto px-4 py-2 text-sm font-semibold text-zinc-700 bg-white border border-zinc-300 rounded-sm hover:bg-zinc-50"
                   >
-                    Cancel
+                    {YscWeb.BookingUserMessages.tahoe_review_modal_back_button()}
                   </button>
                 </div>
               </div>
@@ -2938,7 +2976,7 @@ defmodule YscWeb.TahoeBookingLive do
           >
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
               <div
-                class="fixed inset-0 transition-opacity bg-zinc-500 bg-opacity-75"
+                class="fixed inset-0 transition-opacity bg-zinc-500/75"
                 aria-hidden="true"
               >
               </div>
@@ -2949,7 +2987,7 @@ defmodule YscWeb.TahoeBookingLive do
                 &#8203;
               </span>
               <div
-                class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
                 phx-click-away="close-terms-modal"
               >
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
@@ -3520,7 +3558,10 @@ defmodule YscWeb.TahoeBookingLive do
                 </section>
                 <!-- Pre-Arrival Checklist & Door Code -->
                 <section class="grid md:grid-cols-2 gap-6">
-                  <div class="bg-blue-600 rounded-xl p-8 text-white shadow-xs">
+                  <div
+                    id="door-code-access"
+                    class="bg-blue-600 rounded-xl p-8 text-white shadow-xs"
+                  >
                     <div class="flex items-center gap-3 mb-6">
                       <div class="p-2 bg-white/20 rounded-md">🔑</div>
                       <h2 class="text-xl font-bold text-white">
@@ -3528,7 +3569,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </h2>
                     </div>
                     <p class="text-blue-100 mb-6 leading-relaxed">
-                      Sent via email <strong>24 hours before check-in</strong>. Unique to your booking. The code is also displayed on your booking confirmation page when your stay is within 48 hours of check-in or currently active.
+                      {YscWeb.BookingUserMessages.cabin_access_info_tab_body()}
                     </p>
                     <div class="bg-blue-700/50 border border-white/10 rounded-xl p-4 text-sm">
                       <p class="font-semibold text-blue-50 mb-2">Important:</p>
@@ -3536,7 +3577,9 @@ defmodule YscWeb.TahoeBookingLive do
                         <li>
                           Save the door code before you arrive — cell service can be limited in the area
                         </li>
-                        <li>The door code is unique to your booking period</li>
+                        <li>
+                          The cabin door code can change between stays — use the code we send you for this visit
+                        </li>
                         <li>
                           If you don't receive the code, check your spam folder. Still nothing? Email the Tahoe cabin contact at <a
                             href={"mailto:#{EmailConfig.tahoe_email()}"}
@@ -4581,6 +4624,7 @@ defmodule YscWeb.TahoeBookingLive do
               </div>
               <.button
                 :if={@can_book}
+                id="tahoe-review-booking-mobile"
                 phx-click="show-confirm-modal"
                 disabled={!can_submit_booking?(assigns)}
                 class={
@@ -4591,7 +4635,7 @@ defmodule YscWeb.TahoeBookingLive do
                   end
                 }
               >
-                Confirm Booking
+                {YscWeb.BookingUserMessages.tahoe_review_booking_button()}
               </.button>
             </div>
           </div>
@@ -5128,7 +5172,7 @@ defmodule YscWeb.TahoeBookingLive do
              )
              |> YscWeb.Flash.put_toast(
                :info,
-               "Booking created! Please complete payment to confirm.",
+               YscWeb.BookingUserMessages.tahoe_hold_created_toast(),
                title: "Booking",
                icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
              )
@@ -7168,14 +7212,8 @@ defmodule YscWeb.TahoeBookingLive do
   # Get active bookings for the entire family group (primary user + all sub-accounts)
   defp get_family_group_active_bookings(user, limit \\ 10) do
     user
-    |> get_family_group_user_ids()
+    |> Accounts.get_family_group_user_ids()
     |> Bookings.list_active_tahoe_bookings_for_family(limit: limit)
-  end
-
-  # Get all user IDs in the family group (primary user + all sub-accounts)
-  defp get_family_group_user_ids(user) do
-    family_group = Accounts.get_family_group(user)
-    Enum.map(family_group, & &1.id)
   end
 
   defp past_checkout_time? do

@@ -319,7 +319,7 @@ defmodule YscWeb.BookingGuestForm do
   Loads family members for guest selection dropdowns.
   """
   def load_family_members(%User{} = user) do
-    family_members = Ysc.Accounts.get_family_group(user)
+    family_members = Ysc.Accounts.list_household_guest_picker_users(user)
 
     other_family_members =
       Enum.reject(family_members, fn member -> member.id == user.id end)

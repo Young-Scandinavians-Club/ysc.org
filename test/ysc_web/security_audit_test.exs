@@ -60,6 +60,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 69 (HIGH)     Volunteers could unpublish then delete live posts via restore-post (Finding 62 bypass)
   Finding 63 (MEDIUM)   Public post comments trusted client post_id, allowing comments on draft/other posts
   Finding 64 (MEDIUM)   Event agenda delete/move did not verify event ownership (cross-event agenda IDOR)
+  Finding 75 (MEDIUM)   Event agenda create/update cast client agenda_id/event_id, allowing cross-event planting and reassignment (Finding 64 bypass)
   Finding 65 (MEDIUM)   Trix upload post_id auto-set cover image on any post without ownership binding
   Finding 66 (MEDIUM)   Ticket checkout ignored tier sale end_date (early-bird price after window)
   Finding 67 (HIGH)     Volunteers could unpublish or cancel any published event
@@ -69,6 +70,9 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 72 (HIGH)     Family sub-accounts inherited the primary's Stripe subscription and could cancel/resume/change it via hidden LiveView events
   Finding 73 (HIGH)     SES webhook Notifications accepted any TopicArn when SNS_TOPIC_ARN allowlist was empty (forged bounce → mail suppression)
   Finding 74 (MEDIUM)   Volunteers could soft-delete any scheduled event (including others') via the list and editor; Finding 59 only blocked published/cancelled
+  Finding 76 (MEDIUM)   Volunteers could read other members' expense reports (submitter, purpose, status, net cost) on the event Statistics tab, bypassing LetMe expense_report :read (admin or own_resource) and the full-admin Money page
+  Finding 77 (MEDIUM)   Open redirect: valid_internal_redirect?/1 allowed backslash and %5c paths that browsers treat as protocol-relative (ticket QR href + post-login Location)
+  Finding 78 (MEDIUM)   Event partiful_link host check used String.ends_with?(host, "partiful.com"), accepting lookalikes (evilpartiful.com, not-partiful.com) that render as the trusted public "RSVP on Partiful" CTA
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -94,6 +98,7 @@ defmodule YscWeb.SecurityAuditTest do
   alias Ysc.Repo
   alias Ysc.Test.KioskAPIKeyHelper
   alias YscWeb.AuthController
+  alias YscWeb.UserAuth
 
   import Ysc.AccountsFixtures
 
@@ -4065,6 +4070,163 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Finding 75 (MEDIUM): Agenda create/update must not cast association FKs
+  # Finding 64 blocked delete/move across events; create/update still cast
+  # client `agenda_id` / `event_id`, so a volunteer editing Event A could plant
+  # items onto Event B or re-home an entire agenda day onto another event.
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 75: agenda association mass assignment" do
+    test "create_agenda_item ignores forged agenda_id and stays on the source agenda" do
+      organizer = user_fixture(%{role: :volunteer})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Create A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Create B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
+        })
+
+      {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "A"})
+      {:ok, agenda_b} = Ysc.Agendas.create_agenda(event_b, %{title: "B"})
+
+      assert {:ok, item} =
+               Ysc.Agendas.create_agenda_item(event_a.id, agenda_a, %{
+                 "title" => "Planted?",
+                 "agenda_id" => agenda_b.id
+               })
+
+      assert item.agenda_id == agenda_a.id
+      assert Ysc.Agendas.get_agenda!(agenda_b.id).agenda_items == []
+    end
+
+    test "update_agenda_item ignores forged agenda_id and refuses foreign items" do
+      organizer = user_fixture(%{role: :volunteer})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Update A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Update B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
+        })
+
+      {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "A"})
+      {:ok, agenda_b} = Ysc.Agendas.create_agenda(event_b, %{title: "B"})
+
+      {:ok, item} =
+        Ysc.Agendas.create_agenda_item(event_a.id, agenda_a, %{
+          "title" => "Talk"
+        })
+
+      assert {:ok, updated} =
+               Ysc.Agendas.update_agenda_item(event_a.id, item, %{
+                 "title" => "Talk updated",
+                 "agenda_id" => agenda_b.id
+               })
+
+      assert updated.agenda_id == agenda_a.id
+      assert updated.title == "Talk updated"
+
+      assert {:error, :wrong_event} =
+               Ysc.Agendas.update_agenda_item(event_b.id, item, %{
+                 "title" => "Hijacked"
+               })
+
+      reloaded = Ysc.Agendas.get_agenda_item!(item.id)
+      assert reloaded.agenda_id == agenda_a.id
+      assert reloaded.title == "Talk updated"
+    end
+
+    test "update_agenda ignores forged event_id and refuses foreign agendas" do
+      organizer = user_fixture(%{role: :volunteer})
+
+      {:ok, event_a} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Agenda A #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            )
+        })
+
+      {:ok, event_b} =
+        Ysc.Events.create_event(%{
+          title: "Finding 75 Agenda B #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
+        })
+
+      {:ok, agenda_a} = Ysc.Agendas.create_agenda(event_a, %{title: "Day 1"})
+
+      assert {:ok, updated} =
+               Ysc.Agendas.update_agenda(event_a.id, agenda_a, %{
+                 "title" => "Day One",
+                 "event_id" => event_b.id
+               })
+
+      assert updated.event_id == event_a.id
+      assert updated.title == "Day One"
+
+      assert {:error, :wrong_event} =
+               Ysc.Agendas.update_agenda(event_b.id, agenda_a, %{
+                 "title" => "Stolen"
+               })
+
+      reloaded = Ysc.Agendas.get_agenda!(agenda_a.id)
+      assert reloaded.event_id == event_a.id
+      assert reloaded.title == "Day One"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 65 (MEDIUM): Trix uploads must not set cover via client post_id
   # ---------------------------------------------------------------------------
 
@@ -4736,6 +4898,167 @@ defmodule YscWeb.SecurityAuditTest do
                render_click(view, "delete-event", %{})
 
       assert Ysc.Events.get_event!(event.id).state == :deleted
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 76 (MEDIUM): Volunteers must not read other members' expense reports
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 76: volunteers cannot read expense reports on event statistics" do
+    import Ysc.EventsFixtures
+
+    test "volunteer statistics tab omits another member's submitted expense report" do
+      organizer = user_fixture(%{role: :member})
+      volunteer = user_fixture(%{role: :volunteer})
+      member = user_fixture(%{first_name: "Astrid", last_name: "Finding76"})
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "Finding 76 Stats #{System.unique_integer([:positive])}"
+        })
+
+      report =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Finding 76 confidential reimbursement purpose",
+          reimbursement_method: "bank_transfer",
+          certification_accepted: true
+        })
+
+      conn = log_in_user(build_conn(), volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      refute has_element?(view, "#event-expense-reports-section")
+      refute has_element?(view, "#expense-report-#{report.id}")
+    end
+
+    test "full admin statistics tab still lists the submitted expense report" do
+      admin = user_fixture(%{role: :admin})
+
+      member =
+        user_fixture(%{first_name: "Astrid", last_name: "Finding76Admin"})
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          state: :published,
+          title: "Finding 76 Admin Stats #{System.unique_integer([:positive])}"
+        })
+
+      report =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Finding 76 admin-visible purpose",
+          reimbursement_method: "bank_transfer",
+          certification_accepted: true
+        })
+
+      conn = log_in_user(build_conn(), admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      assert has_element?(view, "#event-expense-reports-section")
+      assert has_element?(view, "#expense-report-#{report.id}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 77 (MEDIUM): Backslash / %5c open redirect via return_to
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 77: backslash-smuggled protocol-relative redirects are rejected" do
+    import Ysc.EventsFixtures
+
+    test "valid_internal_redirect?/1 rejects raw and encoded backslash hosts" do
+      refute UserAuth.valid_internal_redirect?("/\\evil.com")
+      refute UserAuth.valid_internal_redirect?("/%5cevil.com")
+      refute UserAuth.valid_internal_redirect?("/%5Cevil.com")
+      refute UserAuth.valid_internal_redirect?("/%255cevil.com")
+      assert UserAuth.valid_internal_redirect?("/events/123")
+    end
+
+    test "log_in_user ignores encoded-backslash redirect_to" do
+      user = user_fixture()
+      {:ok, user} = Accounts.mark_email_verified(user)
+
+      conn =
+        build_conn()
+        |> init_test_session(%{})
+        |> UserAuth.log_in_user(user, %{}, "/%5cevil.com")
+
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "ticket QR back link does not emit a backslash href" do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+      order = ticket_order_fixture(%{user: member, event: event})
+
+      conn = log_in_user(build_conn(), member)
+
+      # Inspect the connected-mount HTML only. Unconfirmed fixture tickets
+      # cause a later push_navigate that shuts the LiveView down, so a
+      # second has_element?/2 round-trip would raise :noproc.
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/tickets/#{order.id}/qr" <> "?return_to=/%5cevil.example.com"
+        )
+
+      assert html =~ ~s(id="back-link")
+      assert html =~ ~s(href="/users/tickets")
+      refute html =~ "evil.example.com"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 78 (MEDIUM): partiful_link host suffix allowlist
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 78: partiful_link rejects lookalike hosts" do
+    test "suffix-matching hosts are rejected; real partiful.com still works" do
+      organizer = user_fixture(%{role: :admin, state: :active})
+
+      for host <- ["evilpartiful.com", "not-partiful.com"] do
+        cs =
+          Ysc.Events.Event.changeset(%Ysc.Events.Event{}, %{
+            state: :draft,
+            organizer_id: organizer.id,
+            title: "Partiful phishing",
+            partiful_link: "https://#{host}/e/phish"
+          })
+
+        refute cs.valid?
+        assert {"must be a partiful.com URL", _} = cs.errors[:partiful_link]
+      end
+
+      ok =
+        Ysc.Events.Event.changeset(%Ysc.Events.Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "Real Partiful",
+          partiful_link: "https://partiful.com/e/ok"
+        })
+
+      assert ok.valid?
     end
   end
 

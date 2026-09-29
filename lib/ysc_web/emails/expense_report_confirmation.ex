@@ -8,17 +8,9 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
     mjml_template: "templates/expense_report_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers,
-    only: [
-      absolute_url: 1,
-      member_greeting_name: 1,
-      format_date: 1,
-      format_datetime: 1,
-      format_money: 1
-    ]
+  import YscWeb.Emails.Helpers, only: [member_greeting_name: 1]
 
-  alias Ysc.Repo
-  alias Ysc.ExpenseReports.ExpenseReport
+  alias YscWeb.Emails.ExpenseReportHelpers
 
   def get_template_name() do
     "expense_report_confirmation"
@@ -38,194 +30,16 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
   - Map with all necessary data for the email template
   """
   def prepare_email_data(expense_report) do
-    expense_report = validate_and_preload_expense_report(expense_report)
-
-    submitted_date = format_datetime(expense_report.inserted_at)
-    expense_items_list = expense_report.expense_items || []
-    income_items_list = expense_report.income_items || []
-
-    expense_total = calculate_expense_total(expense_items_list)
-    income_total = calculate_income_total(income_items_list)
-    net_total = calculate_net_total(expense_total, income_total)
-
-    expense_items = format_expense_items(expense_items_list)
-    income_items = format_income_items(income_items_list)
-
-    reimbursement_method =
-      format_reimbursement_method(expense_report.reimbursement_method)
-
-    event_info = build_event_info(expense_report.event)
-    bank_account_info = build_bank_account_info(expense_report.bank_account)
+    {report, fields} =
+      ExpenseReportHelpers.email_payload(expense_report,
+        missing: "Not specified",
+        bank_missing: "Not on file"
+      )
 
     %{
-      first_name: member_greeting_name(expense_report.user),
-      expense_report: %{
-        id: expense_report.id,
-        purpose: present_or(expense_report.purpose, "Not specified"),
-        submitted_date: submitted_date,
-        reimbursement_method: reimbursement_method,
-        expense_total: format_money(expense_total),
-        income_total: format_money(income_total),
-        net_total: format_money(net_total),
-        expense_items: expense_items,
-        income_items: income_items,
-        event: event_info,
-        bank_account: bank_account_info
-      },
-      expense_report_url: expense_report_url(expense_report.id)
+      first_name: member_greeting_name(report.user),
+      expense_report: fields,
+      expense_report_url: ExpenseReportHelpers.member_url(report.id)
     }
   end
-
-  defp validate_and_preload_expense_report(expense_report) do
-    if is_nil(expense_report) do
-      raise ArgumentError, "Expense report cannot be nil"
-    end
-
-    if is_nil(expense_report.id) do
-      raise ArgumentError,
-            "Expense report missing id: #{inspect(expense_report)}"
-    end
-
-    expense_report = ensure_expense_report_preloaded(expense_report)
-
-    if is_nil(expense_report.user) do
-      raise ArgumentError,
-            "Expense report missing user association: #{expense_report.id}"
-    end
-
-    expense_report
-  end
-
-  defp ensure_expense_report_preloaded(expense_report) do
-    if Ecto.assoc_loaded?(expense_report.user) &&
-         Ecto.assoc_loaded?(expense_report.expense_items) &&
-         Ecto.assoc_loaded?(expense_report.income_items) do
-      expense_report
-    else
-      load_expense_report_with_preloads(expense_report.id)
-    end
-  end
-
-  defp load_expense_report_with_preloads(expense_report_id) do
-    case Repo.get(ExpenseReport, expense_report_id)
-         |> Repo.preload([
-           :user,
-           :expense_items,
-           :income_items,
-           :event,
-           :bank_account,
-           :address
-         ]) do
-      nil ->
-        raise ArgumentError, "Expense report not found: #{expense_report_id}"
-
-      loaded_report ->
-        loaded_report
-    end
-  end
-
-  defp calculate_expense_total(expense_items_list) do
-    expense_items_list
-    |> Enum.reduce(Money.new(0, :USD), fn item, acc ->
-      add_item_amount(acc, item.amount)
-    end)
-  end
-
-  defp calculate_income_total(income_items_list) do
-    income_items_list
-    |> Enum.reduce(Money.new(0, :USD), fn item, acc ->
-      add_item_amount(acc, item.amount)
-    end)
-  end
-
-  defp add_item_amount(acc, amount) do
-    if amount do
-      case Money.add(acc, amount) do
-        {:ok, new_total} -> new_total
-        {:error, _} -> acc
-      end
-    else
-      acc
-    end
-  end
-
-  defp calculate_net_total(expense_total, income_total) do
-    case Money.sub(expense_total, income_total) do
-      {:ok, result} -> result
-      {:error, _} -> Money.new(0, :USD)
-    end
-  end
-
-  defp format_expense_items(expense_items_list) do
-    Enum.map(expense_items_list, fn item ->
-      %{
-        vendor: present_or(item.vendor, "Not specified"),
-        description: present_or(item.description, "Not specified"),
-        date: format_date(item.date),
-        amount: format_money(item.amount),
-        has_receipt:
-          !is_nil(item.receipt_s3_path) && item.receipt_s3_path != "",
-        mileage: item.expense_type == "mileage",
-        mileage_info: format_mileage_info(item)
-      }
-    end)
-  end
-
-  defp format_mileage_info(%{expense_type: "mileage"} = item) do
-    route = if item.mileage_from_to, do: "#{item.mileage_from_to} — ", else: ""
-    miles = if item.miles_driven, do: "#{item.miles_driven} mi", else: ""
-    "#{route}#{miles}"
-  end
-
-  defp format_mileage_info(_item), do: nil
-
-  defp format_income_items(income_items_list) do
-    Enum.map(income_items_list, fn item ->
-      %{
-        description: present_or(item.description, "Not specified"),
-        date: format_date(item.date),
-        amount: format_money(item.amount),
-        has_proof: !is_nil(item.proof_s3_path) && item.proof_s3_path != ""
-      }
-    end)
-  end
-
-  defp build_event_info(nil), do: nil
-
-  defp build_event_info(event) do
-    %{
-      title: event.title,
-      id: event.id,
-      reference_id: event.reference_id
-    }
-  end
-
-  defp build_bank_account_info(nil), do: nil
-
-  defp build_bank_account_info(bank_account) do
-    %{
-      last_4: present_or(bank_account.account_number_last_4, "Not on file")
-    }
-  end
-
-  defp expense_report_url(expense_report_id) do
-    absolute_url("/expensereport/#{expense_report_id}/success")
-  end
-
-  defp format_reimbursement_method("bank_transfer"), do: "Bank Transfer"
-  defp format_reimbursement_method("check"), do: "Check"
-
-  defp format_reimbursement_method(method) when is_binary(method),
-    do: String.capitalize(method)
-
-  defp format_reimbursement_method(_), do: "Not specified"
-
-  defp present_or(value, fallback) when is_binary(value) do
-    case String.trim(value) do
-      "" -> fallback
-      trimmed -> trimmed
-    end
-  end
-
-  defp present_or(_value, fallback), do: fallback
 end

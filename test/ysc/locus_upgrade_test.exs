@@ -39,6 +39,7 @@ defmodule Ysc.LocusUpgradeTest do
     end
 
     test "DatabaseFetcher still implements the custom fetcher callbacks" do
+      assert {:module, _} = Code.ensure_loaded(DatabaseFetcher)
       assert function_exported?(DatabaseFetcher, :description, 1)
       assert function_exported?(DatabaseFetcher, :fetch, 1)
       assert function_exported?(DatabaseFetcher, :conditionally_fetch, 2)

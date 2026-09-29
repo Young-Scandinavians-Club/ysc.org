@@ -23,6 +23,7 @@ defmodule Ysc.ReqUpgradeTest do
     end
 
     test "get, post, request, and Test modules we use still load" do
+      assert {:module, _} = Code.ensure_loaded(Req)
       assert function_exported?(Req, :get, 1)
       assert function_exported?(Req, :get, 2)
       assert function_exported?(Req, :post, 2)

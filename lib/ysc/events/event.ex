@@ -6,6 +6,7 @@ defmodule Ysc.Events.Event do
   for event data manipulation.
   """
   use Ecto.Schema
+  use Flop.Schema
 
   import Ecto.Changeset
 
@@ -15,8 +16,7 @@ defmodule Ysc.Events.Event do
 
   @reference_prefix "EVT"
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [
       :state,
       :organizer_id,
@@ -46,7 +46,7 @@ defmodule Ysc.Events.Event do
         organizer_name: [:organizer_first, :organizer_last]
       ]
     ]
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
@@ -312,9 +312,10 @@ defmodule Ysc.Events.Event do
           changeset = put_change(changeset, :partiful_link, link)
 
           case URI.parse(link) do
-            %URI{scheme: scheme, host: host}
-            when scheme in ["http", "https"] and not is_nil(host) ->
-              if String.ends_with?(host, "partiful.com") do
+            %URI{scheme: scheme, host: host, userinfo: userinfo} = uri
+            when scheme in ["http", "https"] and is_binary(host) and host != "" and
+                   userinfo in [nil, ""] ->
+              if partiful_host?(host) and uri.port in [nil, 80, 443] do
                 changeset
               else
                 add_error(
@@ -329,6 +330,19 @@ defmodule Ysc.Events.Event do
           end
         end
     end
+  end
+
+  # Exact host or subdomain of partiful.com — never a suffix match.
+  # `String.ends_with?(host, "partiful.com")` wrongly accepts lookalikes such as
+  # `evilpartiful.com` and `not-partiful.com`, which then render as the trusted
+  # public "RSVP on Partiful" CTA (Finding 78).
+  defp partiful_host?(host) when is_binary(host) do
+    host =
+      host
+      |> String.downcase()
+      |> String.trim_trailing(".")
+
+    host == "partiful.com" or String.ends_with?(host, ".partiful.com")
   end
 
   defp strip_description_html(changeset) do

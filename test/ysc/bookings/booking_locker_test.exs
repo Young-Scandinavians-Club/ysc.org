@@ -802,6 +802,99 @@ defmodule Ysc.Bookings.BookingLockerTest do
       end)
     end
 
+    test "confirmation email does not re-SELECT bookings/users/rooms", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(417)
+
+      skip_attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      {checkin2, checkout2} = locker_buyout_dates(418)
+
+      email_attrs = %{
+        user_id: user.id,
+        property: :clear_lake,
+        checkin_date: checkin2,
+        checkout_date: checkout2,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {_ok, bookings_without_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(skip_attrs,
+                skip_email: true,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "bookings"/i,
+            caller_pids: [self()]
+          )
+
+        {_ok, bookings_with_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(email_attrs,
+                skip_email: false,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "bookings"/i,
+            caller_pids: [self()]
+          )
+
+        {skip_checkin2, skip_checkout2} = locker_buyout_dates_after(checkout)
+
+        {_ok, users_without_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(
+                Map.merge(skip_attrs, %{
+                  checkin_date: skip_checkin2,
+                  checkout_date: skip_checkout2
+                }),
+                skip_email: true,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "users"/i,
+            caller_pids: [self()]
+          )
+
+        {email_checkin2, email_checkout2} = locker_buyout_dates_after(checkout2)
+
+        {_ok, users_with_email} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              BookingLocker.create_admin_booking(
+                Map.merge(email_attrs, %{
+                  checkin_date: email_checkin2,
+                  checkout_date: email_checkout2
+                }),
+                skip_email: false,
+                skip_reminders: true
+              )
+            end,
+            pattern: ~r/FROM "users"/i,
+            caller_pids: [self()]
+          )
+
+        assert bookings_with_email == bookings_without_email
+        assert users_with_email == users_without_email
+      end)
+    end
+
     test "schedules check-in and checkout reminder Oban jobs when skip_reminders is false",
          %{user: user} do
       {checkin, checkout} = locker_future_buyout_dates(14)
@@ -2879,9 +2972,833 @@ defmodule Ysc.Bookings.BookingLockerTest do
         )
       end)
     end
+
+    test "does not re-SELECT the booking to schedule the confirmation email",
+         %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(419)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {{:ok, confirmed}, booking_selects} =
+          Ysc.QueryCounter.with_query_counter(
+            fn -> BookingLocker.confirm_booking(hold.id) end,
+            pattern: ~r/FROM "bookings"/i,
+            caller_pids: [self()]
+          )
+
+        assert confirmed.status == :complete
+
+        # get! + sibling-hold lookup. Email must not `Repo.get` the booking again.
+        assert booking_selects == 2
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "booking_confirmation",
+            "idempotency_key" => "booking_confirmation_#{confirmed.id}"
+          }
+        )
+      end)
+    end
+  end
+
+  describe "release_hold_with_stripe_reconcile/1" do
+    setup :verify_on_exit!
+
+    test "confirms the hold when Stripe cancel reveals payment already succeeded",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {checkin, checkout} = locker_buyout_dates(420)
+
+      assert {:ok, hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      payment_intent_id =
+        "pi_release_hold_succeeded_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id,
+          payment_intent_id: payment_intent_id
+        })
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        assert {:confirmed, confirmed} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        assert confirmed.status == :complete
+        assert confirmed.applied_booking_entitlement_id == entitlement.id
+
+        consumed = Entitlements.get_entitlement(entitlement.id)
+        assert consumed.status == :consumed
+        assert consumed.consumed_booking_id == confirmed.id
+
+        payment = Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+        assert Money.equal?(payment.amount, hold.total_price)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when PaymentIntent is still processing", %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(421)
+
+      assert {:ok, hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_release_hold_processing_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => hold.id}
+           }}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.payment_intent_id == payment_intent_id
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "releases an unpaid hold after Stripe confirms the Intent canceled",
+         %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(422)
+
+      assert {:ok, hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_release_hold_unpaid_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+          {:ok, %Stripe.PaymentIntent{id: id, status: "canceled"}}
+        end)
+
+        assert {:ok, canceled} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        assert canceled.status == :canceled
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when Stripe cancel times out", %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 425)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error, :timeout}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.payment_intent_id == payment_intent_id
+        assert reloaded.applied_booking_entitlement_id == entitlement.id
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refunds and releases the hold when succeeded payment amount does not match",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 426)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        # CheckoutCancel retrieve + create_stripe_refund retrieve. If confirm
+        # skips the refund, Mox fails because the second retrieve never happens.
+        expect(
+          Ysc.StripeMock,
+          :retrieve_payment_intent,
+          2,
+          fn ^payment_intent_id, _opts ->
+            {:ok,
+             succeeded_sibling_payment_intent(
+               payment_intent_id,
+               hold,
+               user,
+               amount_cents + 500
+             )}
+          end
+        )
+
+        assert {:ok, canceled} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        assert canceled.status == :canceled
+        assert is_nil(canceled.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when succeeded payment metadata does not match", %{
+      user: user
+    } do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 427)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           succeeded_sibling_payment_intent(
+             payment_intent_id,
+             hold,
+             user,
+             amount_cents,
+             metadata: %{
+               "booking_id" => "not-this-booking",
+               "user_id" => user.id
+             }
+           )}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.applied_booking_entitlement_id == entitlement.id
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when payment succeeded but booking confirmation fails",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 428)
+
+      # Consume will fail (entitlement no longer active) while inventory is
+      # still held, so a mistaken :release would cancel the paid hold.
+      assert {:ok, _} = Entitlements.revoke_entitlement(entitlement)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           succeeded_sibling_payment_intent(
+             payment_intent_id,
+             hold,
+             user,
+             amount_cents
+           )}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.applied_booking_entitlement_id == entitlement.id
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "releases the hold when Stripe refused cancel because the PI is already canceled",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 429)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "canceled"
+           }}
+        end)
+
+        assert {:ok, canceled} =
+                 BookingLocker.release_hold_with_stripe_reconcile(hold.id)
+
+        assert canceled.status == :canceled
+        assert is_nil(canceled.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+  end
+
+  describe "revert_hold_to_draft_with_stripe_reconcile/1" do
+    setup :verify_on_exit!
+
+    test "confirms the hold when Stripe cancel reveals payment already succeeded",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {checkin, checkout} = locker_buyout_dates(430)
+
+      assert {:ok, hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      payment_intent_id =
+        "pi_revert_hold_succeeded_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id,
+          payment_intent_id: payment_intent_id
+        })
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        assert {:confirmed, confirmed} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        assert confirmed.status == :complete
+        assert confirmed.applied_booking_entitlement_id == entitlement.id
+
+        consumed = Entitlements.get_entitlement(entitlement.id)
+        assert consumed.status == :consumed
+        assert consumed.consumed_booking_id == confirmed.id
+
+        payment = Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+        assert Money.equal?(payment.amount, hold.total_price)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when PaymentIntent is still processing", %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(431)
+
+      assert {:ok, hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_revert_hold_processing_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => hold.id}
+           }}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.payment_intent_id == payment_intent_id
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "reverts an unpaid hold after Stripe confirms the Intent canceled",
+         %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(432)
+
+      assert {:ok, hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_revert_hold_unpaid_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+          {:ok, %Stripe.PaymentIntent{id: id, status: "canceled"}}
+        end)
+
+        assert {:ok, reverted} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        assert reverted.status == :draft
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when Stripe cancel times out", %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 440)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error, :timeout}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.payment_intent_id == payment_intent_id
+        assert reloaded.applied_booking_entitlement_id == entitlement.id
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refunds and reverts the hold to draft when succeeded payment amount does not match",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 441)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        # CheckoutCancel retrieve + create_stripe_refund retrieve. If confirm
+        # skips the refund, Mox fails because the second retrieve never happens.
+        expect(
+          Ysc.StripeMock,
+          :retrieve_payment_intent,
+          2,
+          fn ^payment_intent_id, _opts ->
+            {:ok,
+             succeeded_sibling_payment_intent(
+               payment_intent_id,
+               hold,
+               user,
+               amount_cents + 500
+             )}
+          end
+        )
+
+        assert {:ok, reverted} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        assert reverted.status == :draft
+        assert is_nil(reverted.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when succeeded payment metadata does not match", %{
+      user: user
+    } do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 442)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           succeeded_sibling_payment_intent(
+             payment_intent_id,
+             hold,
+             user,
+             amount_cents,
+             metadata: %{
+               "booking_id" => "not-this-booking",
+               "user_id" => user.id
+             }
+           )}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.applied_booking_entitlement_id == entitlement.id
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps the hold when payment succeeded but booking confirmation fails",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 443)
+
+      # Consume will fail (entitlement no longer active) while inventory is
+      # still held, so a mistaken :release would drop the paid hold to draft.
+      assert {:ok, _} = Entitlements.revoke_entitlement(entitlement)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           succeeded_sibling_payment_intent(
+             payment_intent_id,
+             hold,
+             user,
+             amount_cents
+           )}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+        assert reloaded.applied_booking_entitlement_id == entitlement.id
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "reverts the hold to draft when Stripe refused cancel because the PI is already canceled",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {hold, payment_intent_id, entitlement} =
+        hold_for_release_reconcile(user, 444)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "canceled"
+           }}
+        end)
+
+        assert {:ok, reverted} =
+                 BookingLocker.revert_hold_to_draft_with_stripe_reconcile(
+                   hold.id
+                 )
+
+        assert reverted.status == :draft
+        assert is_nil(reverted.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
   end
 
   describe "confirm_booking/1 other holds" do
+    setup :verify_on_exit!
+
     test "second confirm_booking is idempotent when booking is already complete",
          %{
            user: user
@@ -2934,6 +3851,427 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
       second = Ysc.Repo.reload!(second_hold)
       assert second.status == :canceled
+    end
+
+    test "confirms a sibling hold when Stripe cancel reveals payment already succeeded",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {week1_in, week1_out} = locker_buyout_dates(30)
+      {week2_in, week2_out} = locker_buyout_dates_after(week1_out)
+
+      assert {:ok, first_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week1_in,
+                 week1_out,
+                 4
+               )
+
+      assert {:ok, second_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week2_in,
+                 week2_out,
+                 4
+               )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      payment_intent_id =
+        "pi_sibling_hold_succeeded_#{System.unique_integer([:positive])}"
+
+      second_hold =
+        second_hold
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id,
+          payment_intent_id: payment_intent_id
+        })
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(second_hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => second_hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :complete
+        assert sibling.applied_booking_entitlement_id == entitlement.id
+
+        consumed = Entitlements.get_entitlement(entitlement.id)
+        assert consumed.status == :consumed
+        assert consumed.consumed_booking_id == sibling.id
+
+        payment = Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+        assert Money.equal?(payment.amount, second_hold.total_price)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps a sibling hold when its PaymentIntent is still processing", %{
+      user: user
+    } do
+      {week1_in, week1_out} = locker_buyout_dates(31)
+      {week2_in, week2_out} = locker_buyout_dates_after(week1_out)
+
+      assert {:ok, first_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week1_in,
+                 week1_out,
+                 4
+               )
+
+      assert {:ok, second_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week2_in,
+                 week2_out,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_sibling_hold_processing_#{System.unique_integer([:positive])}"
+
+      second_hold =
+        second_hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => second_hold.id}
+           }}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :hold
+        assert sibling.payment_intent_id == payment_intent_id
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "releases an unpaid sibling hold after Stripe confirms the Intent canceled",
+         %{user: user} do
+      {week1_in, week1_out} = locker_buyout_dates(32)
+      {week2_in, week2_out} = locker_buyout_dates_after(week1_out)
+
+      assert {:ok, first_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week1_in,
+                 week1_out,
+                 4
+               )
+
+      assert {:ok, second_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week2_in,
+                 week2_out,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_sibling_hold_unpaid_#{System.unique_integer([:positive])}"
+
+      second_hold =
+        second_hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "canceled"
+           }}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :canceled
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps a sibling hold when Stripe cancel times out", %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {first_hold, second_hold, payment_intent_id, entitlement} =
+        sibling_hold_with_entitlement(user, 33)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error, :timeout}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :hold
+        assert sibling.payment_intent_id == payment_intent_id
+        assert sibling.applied_booking_entitlement_id == entitlement.id
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refunds and releases a sibling hold when succeeded payment amount does not match",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {first_hold, second_hold, payment_intent_id, entitlement} =
+        sibling_hold_with_entitlement(user, 34)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(second_hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        # CheckoutCancel retrieve + create_stripe_refund retrieve. If confirm
+        # skips the refund, Mox fails because the second retrieve never happens.
+        expect(
+          Ysc.StripeMock,
+          :retrieve_payment_intent,
+          2,
+          fn ^payment_intent_id, _opts ->
+            {:ok,
+             succeeded_sibling_payment_intent(
+               payment_intent_id,
+               second_hold,
+               user,
+               amount_cents + 500
+             )}
+          end
+        )
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :canceled
+        assert is_nil(sibling.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps a sibling hold when succeeded payment metadata does not match",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {first_hold, second_hold, payment_intent_id, entitlement} =
+        sibling_hold_with_entitlement(user, 35)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(second_hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           succeeded_sibling_payment_intent(
+             payment_intent_id,
+             second_hold,
+             user,
+             amount_cents,
+             metadata: %{
+               "booking_id" => "not-this-booking",
+               "user_id" => user.id
+             }
+           )}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :hold
+        assert sibling.applied_booking_entitlement_id == entitlement.id
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "keeps a sibling hold when payment succeeded but booking confirmation fails",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {first_hold, second_hold, payment_intent_id, entitlement} =
+        sibling_hold_with_entitlement(user, 36)
+
+      # Consume will fail (entitlement no longer active) while inventory is
+      # still held, so a mistaken :release would cancel the paid sibling.
+      assert {:ok, _} = Entitlements.revoke_entitlement(entitlement)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(second_hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           succeeded_sibling_payment_intent(
+             payment_intent_id,
+             second_hold,
+             user,
+             amount_cents
+           )}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :hold
+        assert sibling.applied_booking_entitlement_id == entitlement.id
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "releases a sibling hold when Stripe refused cancel because the PI is already canceled",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {first_hold, second_hold, payment_intent_id, entitlement} =
+        sibling_hold_with_entitlement(user, 37)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "canceled"
+           }}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :canceled
+        assert is_nil(sibling.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
     end
   end
 
@@ -5221,5 +6559,132 @@ defmodule Ysc.Bookings.BookingLockerTest do
       |> Ysc.Repo.insert()
 
     category
+  end
+
+  defp hold_for_release_reconcile(user, slot) do
+    alias Ysc.Bookings.Entitlements
+
+    {checkin, checkout} = locker_buyout_dates(slot)
+
+    assert {:ok, hold} =
+             BookingLocker.create_buyout_booking(
+               user.id,
+               :tahoe,
+               checkin,
+               checkout,
+               4
+             )
+
+    {:ok, entitlement} =
+      Entitlements.create_entitlement(
+        %{
+          user_id: user.id,
+          issued_by_user_id: user.id,
+          benefit_kind: :fixed_amount_off,
+          property: :tahoe,
+          amount_off: Money.new(25, :USD),
+          max_guests: 10
+        },
+        send_notification: false
+      )
+
+    payment_intent_id =
+      "pi_release_hold_edge_#{slot}_#{System.unique_integer([:positive])}"
+
+    hold =
+      hold
+      |> Ecto.Changeset.change(%{
+        applied_booking_entitlement_id: entitlement.id,
+        payment_intent_id: payment_intent_id
+      })
+      |> Repo.update!()
+
+    {hold, payment_intent_id, entitlement}
+  end
+
+  defp sibling_hold_with_entitlement(user, slot) do
+    alias Ysc.Bookings.Entitlements
+
+    {week1_in, week1_out} = locker_buyout_dates(slot)
+    {week2_in, week2_out} = locker_buyout_dates_after(week1_out)
+
+    assert {:ok, first_hold} =
+             BookingLocker.create_buyout_booking(
+               user.id,
+               :tahoe,
+               week1_in,
+               week1_out,
+               4
+             )
+
+    assert {:ok, second_hold} =
+             BookingLocker.create_buyout_booking(
+               user.id,
+               :tahoe,
+               week2_in,
+               week2_out,
+               4
+             )
+
+    {:ok, entitlement} =
+      Entitlements.create_entitlement(
+        %{
+          user_id: user.id,
+          issued_by_user_id: user.id,
+          benefit_kind: :fixed_amount_off,
+          property: :tahoe,
+          amount_off: Money.new(25, :USD),
+          max_guests: 10
+        },
+        send_notification: false
+      )
+
+    payment_intent_id =
+      "pi_sibling_hold_edge_#{slot}_#{System.unique_integer([:positive])}"
+
+    second_hold =
+      second_hold
+      |> Ecto.Changeset.change(%{
+        applied_booking_entitlement_id: entitlement.id,
+        payment_intent_id: payment_intent_id
+      })
+      |> Repo.update!()
+
+    {first_hold, second_hold, payment_intent_id, entitlement}
+  end
+
+  defp stub_sibling_cancel_refused(payment_intent_id) do
+    # Stub rather than expect: amount-mismatch / already-canceled paths
+    # release the hold afterwards, and release_hold cancels the PI again.
+    stub(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id, _opts ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :payment_intent_unexpected_state,
+         message:
+           "You cannot cancel this PaymentIntent because it has a status of succeeded",
+         extra: %{}
+       }}
+    end)
+  end
+
+  defp succeeded_sibling_payment_intent(
+         payment_intent_id,
+         booking,
+         user,
+         amount_cents,
+         opts \\ []
+       ) do
+    %Stripe.PaymentIntent{
+      id: payment_intent_id,
+      status: "succeeded",
+      amount: amount_cents,
+      latest_charge: "ch_#{payment_intent_id}",
+      metadata:
+        Keyword.get(opts, :metadata, %{
+          "booking_id" => booking.id,
+          "user_id" => user.id
+        })
+    }
   end
 end

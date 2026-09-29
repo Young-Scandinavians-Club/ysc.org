@@ -48,10 +48,24 @@ defmodule Ysc.EmailConfig do
   end
 
   @doc """
+  Returns the Treasurer email address.
+  """
+  def treasurer_email do
+    Application.get_env(:ysc, :emails)[:treasurer_email] || "treasurer@ysc.org"
+  end
+
+  @doc """
   Returns the volunteer email address.
   """
   def volunteer_email do
     Application.get_env(:ysc, :emails)[:volunteer_email] || "volunteer@ysc.org"
+  end
+
+  @doc """
+  Returns the WebTech team email address.
+  """
+  def webtech_email do
+    Application.get_env(:ysc, :emails)[:webtech_email] || "webtech@ysc.org"
   end
 
   @doc """

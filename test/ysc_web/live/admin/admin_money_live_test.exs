@@ -798,6 +798,53 @@ defmodule YscWeb.AdminMoneyLiveTest do
       refute html =~ "Mismatch"
     end
 
+    test "associated payment and refund rows still show reference, member, and amount after slim loads",
+         %{conn: conn} do
+      member =
+        user_fixture(%{first_name: "PayoutRow", last_name: "Member"})
+
+      payment =
+        LedgersFixtures.payment_fixture(
+          user_id: member.id,
+          amount: Money.new(64, :USD)
+        )
+
+      {:ok, {refund, _transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(19, :USD),
+          reason: "Payout modal list-row refund",
+          external_refund_id:
+            "re_payout_modal_row_#{System.unique_integer([:positive])}"
+        })
+
+      payout =
+        LedgersFixtures.payout_fixture(
+          payout_amount: Money.new(45, :USD),
+          fee_total: Money.new(0, :USD)
+        )
+
+      {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+      {:ok, _} = Ledgers.link_refund_to_payout(payout, refund)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money/payouts/#{payout.id}")
+
+      payment_row = "#payout-modal-payment-#{payment.id}"
+      refund_row = "#payout-modal-refund-#{refund.id}"
+
+      assert has_element?(view, payment_row, payment.reference_id)
+      assert has_element?(view, payment_row, "PayoutRow Member")
+      assert has_element?(view, payment_row, member.email)
+      assert has_element?(view, payment_row, Money.to_string!(payment.amount))
+      assert has_element?(view, payment_row, "Completed")
+
+      assert has_element?(view, refund_row, refund.reference_id)
+      assert has_element?(view, refund_row, "PayoutRow Member")
+      assert has_element?(view, refund_row, member.email)
+      assert has_element?(view, refund_row, Money.to_string!(refund.amount))
+      assert has_element?(view, refund_row, "Payout modal list-row refund")
+    end
+
     test "retry QB sync button is visible when sync status is not synced", %{
       conn: conn
     } do

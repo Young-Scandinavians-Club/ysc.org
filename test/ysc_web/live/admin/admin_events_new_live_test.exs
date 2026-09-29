@@ -524,6 +524,29 @@ defmodule YscWeb.AdminEventsNewLiveTest do
              "expected a single agenda stream item (no duplicate PubSub + handler insert)"
     end
 
+    test "delete-agenda from another event is refused and toasts", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_a =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Owner A"})
+
+      event_b =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Owner B"})
+
+      {:ok, agenda_b} =
+        Agendas.create_agenda(event_b, %{title: "Victim Day"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/edit")
+
+      html = render_click(view, "delete-agenda", %{"id" => agenda_b.id})
+
+      assert html =~ "That agenda does not belong to this event."
+      assert Agendas.get_agenda!(agenda_b.id).id == agenda_b.id
+      assert [%{id: id}] = Agendas.list_agendas_for_event(event_b.id)
+      assert id == agenda_b.id
+    end
+
     test "shows Hosts section on edit tab", %{conn: conn, admin: admin} do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
@@ -1627,6 +1650,38 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert has_element?(view, "#expense-report-#{submitted.id}")
       refute has_element?(view, "#expense-report-#{draft.id}")
+    end
+
+    test "volunteers do not see per-report expense rows (Finding 76)", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: "volunteer"})
+      conn = log_in_user(conn, volunteer)
+      member = user_fixture(%{first_name: "Nils", last_name: "VolunteerStats"})
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: "Volunteer Stats Event"
+        })
+
+      report =
+        Repo.insert!(%Ysc.ExpenseReports.ExpenseReport{
+          user_id: member.id,
+          event_id: event.id,
+          status: "submitted",
+          purpose: "Volunteer should not see this purpose",
+          reimbursement_method: "bank_transfer",
+          certification_accepted: true
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/statistics")
+
+      render_async(view)
+
+      refute has_element?(view, "#event-expense-reports-section")
+      refute has_element?(view, "#expense-report-#{report.id}")
     end
   end
 

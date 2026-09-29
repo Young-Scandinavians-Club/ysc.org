@@ -78,7 +78,7 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The Cabin Master will review your refund</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• We'll email you when the money is on the way</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• The amount is based on our refund policy and when you cancelled</mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If approved, the refund goes back to your original payment method in 5-10 business days</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If approved, the refund goes back to the same card or bank account you used in 5–10 business days</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #FEF3C7; padding: 16px; border-radius: 6px; border-left: 4px solid #F59E0B;">
       <strong>Note:</strong> The estimated refund amount shown above is based on our refund policy. The final amount may change during review.

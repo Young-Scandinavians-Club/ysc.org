@@ -56,6 +56,7 @@ defmodule YscWeb.LiveToastUpgradeTest do
     end
 
     test "APIs we call still exist" do
+      assert {:module, _} = Code.ensure_loaded(LiveToast)
       assert function_exported?(LiveToast, :put_toast, 3)
       assert function_exported?(LiveToast, :put_toast, 4)
       assert function_exported?(LiveToast, :send_toast, 2)

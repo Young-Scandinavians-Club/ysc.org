@@ -6,7 +6,10 @@ defmodule YscWeb.Components.DateRangePicker do
   """
   use YscWeb, :live_component
 
-  @week_start_at :monday
+  import YscWeb.Components.CalendarMonth, only: [calendar_month_nav: 1]
+
+  alias YscWeb.Components.CalendarMonth
+
   @fsm %{
     set_start: :set_end,
     set_end: :reset,
@@ -56,61 +59,17 @@ defmodule YscWeb.Components.DateRangePicker do
       >
         <div
           id="calendar_background"
-          class="w-full bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden p-3"
+          class="w-full bg-white rounded-md shadow-lg ring-1 ring-black/5 focus:outline-hidden p-3"
         >
-          <div id="calendar_header" class="flex justify-between items-center">
-            <button
-              type="button"
-              phx-target={@myself}
-              phx-click="prev-month"
-              class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-              aria-label="Previous month"
-            >
-              <.icon name="hero-arrow-left" />
-            </button>
-
-            <div class="flex flex-col items-center gap-1">
-              <div id="current_month_year" class="font-semibold">
-                {@current.month}
-              </div>
-              <button
-                id={"#{@id}-go-to-today"}
-                type="button"
-                phx-target={@myself}
-                phx-click="today"
-                disabled={showing_current_month?(@current.date, @today)}
-                class={[
-                  "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-                  if(showing_current_month?(@current.date, @today),
-                    do:
-                      "text-zinc-400 bg-zinc-50 border-zinc-200 cursor-not-allowed opacity-60",
-                    else:
-                      "text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border-zinc-300"
-                  )
-                ]}
-                aria-label={
-                  if showing_current_month?(@current.date, @today) do
-                    "Already showing #{Calendar.strftime(@today, "%B %Y")}"
-                  else
-                    "Go to current month, #{Calendar.strftime(@today, "%B %Y")}"
-                  end
-                }
-              >
-                <.icon name="hero-calendar-days" class="w-4 h-4" aria-hidden="true" />
-                Today
-              </button>
-            </div>
-
-            <button
-              type="button"
-              phx-target={@myself}
-              phx-click="next-month"
-              class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-              aria-label="Next month"
-            >
-              <.icon name="hero-arrow-right" />
-            </button>
-          </div>
+          <.calendar_month_nav
+            id={@id}
+            header_id="calendar_header"
+            current={@current}
+            today={@today}
+            target={@myself}
+            month_label_id="current_month_year"
+            month_label_class="font-semibold"
+          />
 
           <div
             id="calendar_weekdays"
@@ -240,7 +199,7 @@ defmodule YscWeb.Components.DateRangePicker do
                 id={date_picker_tooltip_id(@id, day)}
                 role="tooltip"
                 class={[
-                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-100 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded-sm tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
+                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-100 text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
                   "max-w-[400px]",
                   "text-left"
                 ]}
@@ -265,7 +224,12 @@ defmodule YscWeb.Components.DateRangePicker do
               <.icon name="hero-x-mark" class="w-4 h-4 me-1" /> Reset
             </button>
             <div :if={!@range_start && !@range_end}></div>
-            <.button type="button" phx-click="close-calendar" phx-target={@myself}>
+            <.button
+              type="button"
+              phx-click="close-calendar"
+              phx-target={@myself}
+              disabled={incomplete_range?(@is_range?, @range_start, @range_end)}
+            >
               {select_button_text(@range_start, @range_end)}
             </.button>
           </div>
@@ -283,7 +247,7 @@ defmodule YscWeb.Components.DateRangePicker do
       :ok,
       socket
       |> assign(:calendar?, false)
-      |> assign(:current, format_date(current_date))
+      |> assign(:current, CalendarMonth.month_state(current_date))
       |> assign(:is_range?, true)
       |> assign(:range_start, nil)
       |> assign(:range_end, nil)
@@ -325,7 +289,7 @@ defmodule YscWeb.Components.DateRangePicker do
       :ok,
       socket
       |> assign(assigns)
-      |> assign(:current, format_date(current_date))
+      |> assign(:current, CalendarMonth.month_state(current_date))
       |> assign(:range_start, range_start)
       |> assign(:range_end, range_end)
       |> assign(:max, assigns[:max])
@@ -366,7 +330,7 @@ defmodule YscWeb.Components.DateRangePicker do
        |> assign(:calendar?, true)
        |> assign(:state, @initial_state)
        |> assign(:hover_range_end, nil)
-       |> assign(:current, format_date(focus_date))}
+       |> assign(:current, CalendarMonth.month_state(focus_date))}
     end
   end
 
@@ -375,6 +339,19 @@ defmodule YscWeb.Components.DateRangePicker do
         "close-calendar",
         _,
         %{assigns: %{range_start: nil, range_end: nil}} = socket
+      ) do
+    {:noreply, socket |> assign(:calendar?, false)}
+  end
+
+  # A range picker with only a start date picked is not a valid selection
+  # (e.g. clicking away, or a stale button click, before an end date is
+  # chosen). Closing here must not silently commit a zero-night stay by
+  # defaulting the end date to the start date.
+  @impl true
+  def handle_event(
+        "close-calendar",
+        _,
+        %{assigns: %{is_range?: true, range_end: nil}} = socket
       ) do
     {:noreply, socket |> assign(:calendar?, false)}
   end
@@ -421,20 +398,20 @@ defmodule YscWeb.Components.DateRangePicker do
   @impl true
   def handle_event("today", _, socket) do
     new_date = socket.assigns.today
-    {:noreply, socket |> assign(:current, format_date(new_date))}
+    {:noreply, socket |> assign(:current, CalendarMonth.month_state(new_date))}
   end
 
   @impl true
   def handle_event("prev-month", _, socket) do
     new_date = new_date(socket.assigns)
-    {:noreply, socket |> assign(:current, format_date(new_date))}
+    {:noreply, socket |> assign(:current, CalendarMonth.month_state(new_date))}
   end
 
   @impl true
   def handle_event("next-month", _, socket) do
     last_row = socket.assigns.current.week_rows |> List.last()
     new_date = next_month_new_date(socket.assigns.current.date, last_row)
-    {:noreply, socket |> assign(:current, format_date(new_date))}
+    {:noreply, socket |> assign(:current, CalendarMonth.month_state(new_date))}
   end
 
   @impl true
@@ -642,22 +619,6 @@ defmodule YscWeb.Components.DateRangePicker do
         |> Date.beginning_of_month()
         |> Date.add(-1)
     end
-  end
-
-  defp week_rows(current_date) do
-    first =
-      current_date
-      |> Date.beginning_of_month()
-      |> Date.beginning_of_week(@week_start_at)
-
-    last =
-      current_date
-      |> Date.end_of_month()
-      |> Date.end_of_week(@week_start_at)
-
-    Date.range(first, last)
-    |> Enum.map(& &1)
-    |> Enum.chunk_every(7)
   end
 
   defp calculate_date_ranges(:set_start, date_time, assigns) do
@@ -1119,11 +1080,6 @@ defmodule YscWeb.Components.DateRangePicker do
   defp range_endpoint?(day, range_dt), do: DateTime.to_date(range_dt) == day
   defp today?(day, today), do: today && day == today
 
-  defp showing_current_month?(current_date, today) do
-    today &&
-      Date.beginning_of_month(current_date) == Date.beginning_of_month(today)
-  end
-
   defp other_month?(day, current_date) do
     Date.beginning_of_month(day) != Date.beginning_of_month(current_date)
   end
@@ -1142,14 +1098,6 @@ defmodule YscWeb.Components.DateRangePicker do
     start_date = DateTime.to_date(range_start)
     end_date = DateTime.to_date(range_end)
     day in Date.range(start_date, end_date)
-  end
-
-  defp format_date(date) do
-    %{
-      date: date,
-      month: Calendar.strftime(date, "%B %Y"),
-      week_rows: week_rows(date)
-    }
   end
 
   defp from_str!(""), do: nil
@@ -1225,6 +1173,13 @@ defmodule YscWeb.Components.DateRangePicker do
   end
 
   defp to_datetime(other) when is_binary(other), do: from_str!(other)
+
+  # A range picker with a start date but no end date yet is not a valid
+  # selection to confirm — the confirm button must stay disabled until both
+  # ends of the range are picked.
+  defp incomplete_range?(is_range?, range_start, range_end) do
+    is_range? && !is_nil(range_start) && is_nil(range_end)
+  end
 
   defp select_button_text(_start_date, nil) do
     "Select Date"

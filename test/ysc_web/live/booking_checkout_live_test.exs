@@ -655,6 +655,67 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
 
+    test "price details charge for minimum guests, not extra adults", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, category} =
+        %RoomCategory{}
+        |> RoomCategory.changeset(%{
+          name: "Min Occ Copy Cat #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Min Occ Copy Room #{System.unique_integer([:positive])}",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4,
+          min_billable_occupancy: 2
+        })
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      assert {:ok, booking} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 1,
+                 children_count: 0
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      html = render(view)
+
+      assert html =~ "1 adult"
+      refute has_element?(view, "#checkout-base-price-people", "2 adults")
+
+      assert has_element?(
+               view,
+               "#checkout-base-price-people",
+               "charged for 2 guests"
+             )
+
+      assert has_element?(
+               view,
+               "#checkout-minimum-pricing-applied",
+               "You're being charged for 2 guests"
+             )
+    end
+
     test "creates payment intent idempotency key from synced checkout price", %{
       conn: conn,
       user: user
@@ -1163,6 +1224,43 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "still processing"
       assert Repo.get!(Booking, booking.id).status == :hold
     end
+
+    test "keeps the hold when Stripe cancel cannot be reached", %{
+      conn: conn,
+      user: user
+    } do
+      {checkin, checkout} = tahoe_booking_dates(21)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      pi_id = "pi_checkout_cancel_timeout_#{System.unique_integer([:positive])}"
+
+      _booking =
+        booking
+        |> Ecto.Changeset.change(%{payment_intent_id: pi_id})
+        |> Repo.update!()
+
+      expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+        {:error, :timeout}
+      end)
+
+      html =
+        view
+        |> element("button[phx-click=\"cancel-booking\"]")
+        |> render_click()
+
+      assert html =~ "cancel this booking from here"
+      assert Repo.get!(Booking, booking.id).status == :hold
+    end
   end
 
   defp booking_ledger_payment_count(booking_id) do
@@ -1586,6 +1684,35 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "held temporarily"
       assert html =~ "not confirmed yet"
       assert html =~ "go back on the calendar"
+    end
+
+    test "lists slim-loaded household names in the guest picker", %{
+      conn: conn,
+      user: user,
+      booking: booking
+    } do
+      unique = System.unique_integer([:positive])
+
+      household_guest =
+        user_fixture(%{
+          first_name: "PickerKid",
+          last_name: "Household#{unique}"
+        })
+
+      household_guest
+      |> change(%{})
+      |> Ecto.Changeset.put_change(:primary_user_id, user.id)
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert has_element?(view, "#guest-1-attendee-select")
+
+      assert has_element?(
+               view,
+               "#guest-1-attendee-select",
+               "PickerKid Household#{unique}"
+             )
     end
 
     test "validate-guest-info with invalid guest data collects errors", %{

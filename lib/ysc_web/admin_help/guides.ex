@@ -883,7 +883,7 @@ defmodule YscWeb.AdminHelp.Guides do
     def faq do
       [
         {"What ticket types exist?",
-         "Free (RSVP only), Paid (fixed price, card payment at checkout), and Donation (attendee chooses the amount). One event can mix tiers — e.g. \"Member free\" + \"Guest $20\"."},
+         "Free (RSVP only), Paid (fixed price, paid at checkout), and Donation (attendee chooses the amount). One event can mix tiers — e.g. \"Member free\" + \"Guest $20\"."},
         {"What does \"requires registration\" mean on a tier?",
          "It collects attendee details for each ticket at checkout, so you know exactly who is coming — useful for capacity-limited or catered events."},
         {"What is Tickets TBD?",

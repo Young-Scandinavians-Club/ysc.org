@@ -330,6 +330,93 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert render(view) =~ "Guest"
   end
 
+  test "lists slim-loaded household names in the modification guest picker", %{
+    conn: conn
+  } do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    unique = System.unique_integer([:positive])
+
+    household_guest =
+      user_fixture(%{
+        first_name: "ChangeKid",
+        last_name: "Household#{unique}"
+      })
+
+    household_guest
+    |> Ecto.Changeset.change(%{})
+    |> Ecto.Changeset.put_change(:primary_user_id, user.id)
+    |> Repo.update!()
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(100, :USD),
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        property: :tahoe,
+        season_id: nil
+      })
+
+    room = create_test_room!()
+    {checkin, checkout} = tahoe_booking_dates(35)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    assert {:ok, _} =
+             Bookings.create_booking_guests(booking.id, [
+               {0,
+                %{
+                  "first_name" => user.first_name || "Test",
+                  "last_name" => user.last_name || "User",
+                  "is_child" => false,
+                  "is_booking_user" => true
+                }},
+               {1,
+                %{
+                  "first_name" => "Guest",
+                  "last_name" => "Two",
+                  "is_child" => false,
+                  "is_booking_user" => false
+                }}
+             ])
+
+    {view, _html} = live_change(conn, booking)
+
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    checkout_str = date_to_datetime_string(booking.checkout_date)
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => checkout_str,
+        "guests_count" => "3",
+        "children_count" => "0"
+      }
+    })
+    |> render_change()
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => checkout_str,
+        "guests_count" => "3",
+        "children_count" => "0"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#guest-1-attendee-select")
+
+    assert has_element?(
+             view,
+             "#guest-1-attendee-select",
+             "ChangeKid Household#{unique}"
+           )
+  end
+
   test "shows capacity error when children exceed room max occupancy", %{
     conn: conn
   } do
@@ -679,6 +766,10 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(view, "#modification-payment-step")
 
+    held = Repo.get!(Booking, booking.id)
+
+    assert Bookings.modification_hold_payment_intent_id(held) == pi_id
+
     payment_delta = :sys.get_state(view.pid).socket.assigns.payment_delta
     amount_cents = Ysc.MoneyHelper.money_to_cents(payment_delta)
 
@@ -694,6 +785,404 @@ defmodule YscWeb.BookingChangeLiveTest do
     updated = Repo.get!(Booking, booking.id)
     assert updated.checkout_date == extended_checkout
     assert Bookings.modification_ledger_recorded?(booking.id, pi_id)
+  end
+
+  test "applies the captured charge when change booking is refreshed and resubmitted after payment",
+       %{conn: conn} do
+    Ysc.TestHelpers.setup_quickbooks_mocks()
+
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    pi_id = "pi_change_refresh_succeeded"
+
+    expect(StripeMock, :create_payment_intent, 1, fn params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: pi_id,
+         client_secret: "#{pi_id}_secret",
+         status: "requires_payment_method",
+         amount: params.amount
+       }}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+    original_checkout = booking.checkout_date
+    extended_checkout = Date.add(original_checkout, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    held = Repo.get!(Booking, booking.id)
+
+    assert Bookings.modification_hold_payment_intent_id(held) == pi_id
+    assert held.checkout_date == original_checkout
+
+    payment_delta = :sys.get_state(view.pid).socket.assigns.payment_delta
+    amount_cents = Ysc.MoneyHelper.money_to_cents(payment_delta)
+
+    expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+      {:error, succeeded_modification_payment_intent_error()}
+    end)
+
+    stub(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+      {:ok, succeeded_modification_payment_intent(pi_id, booking, amount_cents)}
+    end)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    {path, _flash} = assert_redirect(view, @change_async_timeout)
+
+    assert path =~ "/bookings/#{booking.id}/receipt"
+    updated = Repo.get!(Booking, booking.id)
+    assert updated.checkout_date == extended_checkout
+    assert Bookings.modification_ledger_recorded?(booking.id, pi_id)
+    assert Bookings.modification_hold_payment_intent_id(updated) == nil
+  end
+
+  test "cancels an unpaid stored modification PaymentIntent before creating a new one after refresh",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    pi_first = "pi_change_refresh_unpaid_a"
+    pi_second = "pi_change_refresh_unpaid_b"
+    create_count = :counters.new(1, [])
+
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
+      :counters.add(create_count, 1, 1)
+      n = :counters.get(create_count, 1)
+
+      id =
+        case n do
+          1 -> pi_first
+          2 -> pi_second
+          other -> "pi_change_refresh_unpaid_unexpected_#{other}"
+        end
+
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: id,
+         client_secret: "#{id}_secret",
+         status: "requires_payment_method",
+         amount: params.amount
+       }}
+    end)
+
+    # Remount Stripe-cancels the stored Intent, then `place_modification_hold/3`
+    # preserves that id so a concurrent tab cannot wipe it. Attaching PI-B
+    # therefore cancels the same (already canceled) Intent a second time.
+    expect(StripeMock, :cancel_payment_intent, 2, fn ^pi_first, _opts ->
+      {:ok, %Stripe.PaymentIntent{id: pi_first, status: "canceled"}}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+    original_checkout = booking.checkout_date
+    extended_checkout = Date.add(original_checkout, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    assert Bookings.modification_hold_payment_intent_id(
+             Repo.get!(Booking, booking.id)
+           ) ==
+             pi_first
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    held = Repo.get!(Booking, booking.id)
+    assert held.checkout_date == original_checkout
+    assert Bookings.modification_hold_payment_intent_id(held) == pi_second
+    assert :counters.get(create_count, 1) == 2
+  end
+
+  test "does not create a second PaymentIntent when refresh-and-resubmit races an in-flight charge",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    pi_id = "pi_change_refresh_processing"
+    create_count = :counters.new(1, [])
+
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
+      :counters.add(create_count, 1, 1)
+
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: pi_id,
+         client_secret: "#{pi_id}_secret",
+         status: "requires_payment_method",
+         amount: params.amount
+       }}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :payment_intent_unexpected_state,
+         message:
+           "You cannot cancel this PaymentIntent because it has a status of processing",
+         extra: %{}
+       }}
+    end)
+
+    stub(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+      {:ok, %Stripe.PaymentIntent{id: pi_id, status: "processing"}}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+    original_checkout = booking.checkout_date
+    extended_checkout = Date.add(original_checkout, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+    assert :counters.get(create_count, 1) == 1
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    html =
+      view
+      |> form("#booking-change-form", %{
+        "modification" => %{
+          "checkin_date" => checkin_str,
+          "checkout_date" => extended_checkout_str
+        }
+      })
+      |> render_submit()
+
+    assert has_element?(view, "#modification-dates")
+    refute has_element?(view, "#modification-payment-step")
+    assert html =~ "still processing"
+
+    held = Repo.get!(Booking, booking.id)
+    assert held.checkout_date == original_checkout
+    assert Bookings.modification_hold_payment_intent_id(held) == pi_id
+    refute Bookings.modification_ledger_recorded?(booking.id, pi_id)
+    assert :counters.get(create_count, 1) == 1
+  end
+
+  test "does not create a second PaymentIntent when refresh-and-resubmit cannot reach Stripe",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    pi_id = "pi_change_refresh_timeout"
+    create_count = :counters.new(1, [])
+
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
+      :counters.add(create_count, 1, 1)
+
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: pi_id,
+         client_secret: "#{pi_id}_secret",
+         status: "requires_payment_method",
+         amount: params.amount
+       }}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+      {:error, :timeout}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+    original_checkout = booking.checkout_date
+    extended_checkout = Date.add(original_checkout, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+    assert :counters.get(create_count, 1) == 1
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    html =
+      view
+      |> form("#booking-change-form", %{
+        "modification" => %{
+          "checkin_date" => checkin_str,
+          "checkout_date" => extended_checkout_str
+        }
+      })
+      |> render_submit()
+
+    assert has_element?(view, "#modification-dates")
+    refute has_element?(view, "#modification-payment-step")
+    assert html =~ "cancel this payment yet"
+
+    held = Repo.get!(Booking, booking.id)
+    assert held.checkout_date == original_checkout
+    assert Bookings.modification_hold_payment_intent_id(held) == pi_id
+    refute Bookings.modification_ledger_recorded?(booking.id, pi_id)
+    assert :counters.get(create_count, 1) == 1
   end
 
   test "keeps the modification hold when Edit changes races an in-flight PaymentIntent",
@@ -768,6 +1257,74 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert has_element?(view, "#modification-payment-step")
     refute has_element?(view, "#modification-dates")
     assert html =~ "still processing"
+
+    held = Repo.get!(Booking, booking.id)
+    assert held.checkout_date == original_checkout
+    assert held.modification_hold_expires_at
+    refute Bookings.modification_ledger_recorded?(booking.id, pi_id)
+  end
+
+  test "keeps the modification hold when Edit changes cannot reach Stripe",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    pi_id = "pi_change_cancel_timeout"
+
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: pi_id,
+         client_secret: "#{pi_id}_secret",
+         status: "requires_payment_method",
+         amount: params.amount
+       }}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+      {:error, :timeout}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+    original_checkout = booking.checkout_date
+    extended_checkout = Date.add(original_checkout, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    html = view |> element("#back-to-modification-button") |> render_click()
+
+    assert has_element?(view, "#modification-payment-step")
+    refute has_element?(view, "#modification-dates")
+    assert html =~ "cancel this payment yet"
 
     held = Repo.get!(Booking, booking.id)
     assert held.checkout_date == original_checkout

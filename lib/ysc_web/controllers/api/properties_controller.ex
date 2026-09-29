@@ -327,8 +327,8 @@ defmodule YscWeb.Api.PropertiesController do
 
   defp build_cabin_master_content(nil, _property), do: ""
 
-  defp build_cabin_master_content(_cabin_master, property) do
-    contact = CabinMaster.contact(property)
+  defp build_cabin_master_content(cabin_master, property) do
+    contact = CabinMaster.contact_from_user(cabin_master, property)
 
     parts =
       []

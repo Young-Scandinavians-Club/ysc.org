@@ -3,19 +3,19 @@ defmodule Ysc.Newsletter.Edition do
   Schema for a newsletter edition (curated content: cover, intro, posts, events).
   """
   use Ecto.Schema
+  use Flop.Schema
   import Ecto.Changeset
 
   alias Ysc.Media.Image
   alias Ysc.Accounts.User
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [:status, :title, :creator_id],
     sortable: [:inserted_at, :sent_at, :title, :subject, :status],
     default_limit: 20,
     max_limit: 100,
     default_order: %{order_by: [:inserted_at], order_directions: [:desc]}
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID

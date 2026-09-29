@@ -16,7 +16,6 @@ defmodule YscWeb.UserBookingDetailLive do
   alias YscWeb.BookingDisplay
   alias YscWeb.Authorization.Policy
   alias YscWeb.BookingActions
-  import Ecto.Query
 
   @impl true
   def mount(%{"id" => booking_id}, _session, socket) do
@@ -73,9 +72,38 @@ defmodule YscWeb.UserBookingDetailLive do
     case Policy.authorize(:booking_cancel, user, booking) do
       :ok ->
         case Bookings.cancel_booking(booking, Date.utc_today(), reason) do
+          {:ok, updated_booking, _refund_amount, :hold_payment_confirmed} ->
+            updated_booking =
+              Bookings.get_user_booking_for_member_detail(
+                booking.id,
+                user.id
+              ) || updated_booking
+
+            {:noreply,
+             socket
+             |> assign(:booking, updated_booking)
+             |> assign(
+               :can_cancel,
+               BookingActions.can_cancel_booking?(updated_booking)
+             )
+             |> assign(
+               :can_change,
+               BookingActions.can_change_booking?(updated_booking)
+             )
+             |> assign(:show_cancel_modal, false)
+             |> YscWeb.Flash.put_toast(
+               :info,
+               YscWeb.BookingUserMessages.hold_cancel_payment_already_confirmed(),
+               title: "Booking"
+             )
+             |> push_navigate(to: ~p"/bookings/#{updated_booking.id}/receipt")}
+
           {:ok, updated_booking, refund_amount, refund_result} ->
             updated_booking =
-              Repo.preload(updated_booking, [:user, rooms: :room_category])
+              Bookings.get_user_booking_for_member_detail(
+                booking.id,
+                user.id
+              ) || updated_booking
 
             refund_info =
               get_refund_info(updated_booking, socket.assigns.payment)
@@ -145,8 +173,8 @@ defmodule YscWeb.UserBookingDetailLive do
         <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
           <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
         </div>
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
-          <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3">
+          <.skeleton_block class="h-5 w-40 rounded-sm" />
           <div :for={_ <- 1..3} class="flex justify-between">
             <.skeleton_block class="h-4 w-28 rounded-sm" />
             <.skeleton_block class="h-4 w-20 rounded-sm" />
@@ -277,7 +305,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 <div class="text-sm text-zinc-600 mb-0.5">Status</div>
                 <.badge
                   type={BookingDisplay.status_badge_type(@booking.status)}
-                  class="text-sm"
+                  class="text-sm!"
                 >
                   {BookingDisplay.status_label(@booking.status)}
                 </.badge>
@@ -351,12 +379,12 @@ defmodule YscWeb.UserBookingDetailLive do
           <div
             :if={@loading_booking_payment_details}
             id="booking-payment-loading"
-            class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3"
+            class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3"
             role="status"
             aria-live="polite"
           >
             <span class="sr-only">Loading payment details…</span>
-            <.skeleton_block class="h-5 w-40 rounded-sm mb-2" />
+            <.skeleton_block class="h-5 w-40 rounded-sm" />
             <div :for={_ <- 1..3} class="flex justify-between">
               <.skeleton_block class="h-4 w-28 rounded-sm" />
               <.skeleton_block class="h-4 w-20 rounded-sm" />
@@ -379,7 +407,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 <% end %>
 
                 <div class="flex justify-between text-sm">
-                  <span class="text-zinc-600">Payment Method</span>
+                  <span class="text-zinc-600">How you paid</span>
                   <span class="text-zinc-900">
                     {get_payment_method_description(@payment)}
                   </span>
@@ -525,13 +553,7 @@ defmodule YscWeb.UserBookingDetailLive do
       |> maybe_assign_booking_payment_details()
     else
       # SECURITY: Filter by user_id in the database query to prevent unauthorized access
-      booking_query =
-        from(b in Booking,
-          where: b.id == ^booking_id and b.user_id == ^user.id,
-          preload: [:user, rooms: :room_category]
-        )
-
-      case Repo.one(booking_query) do
+      case Bookings.get_user_booking_for_member_detail(booking_id, user.id) do
         nil ->
           socket
           |> YscWeb.Flash.put_toast(
@@ -791,13 +813,13 @@ defmodule YscWeb.UserBookingDetailLive do
     MoneyHelper.format_money!(Money.new(normalize_currency(currency), amount))
   end
 
-  defp format_money_from_map(_), do: "N/A"
+  defp format_money_from_map(_), do: "Not available"
 
   defp sync_booking_after_partial_cancel(socket, booking, reason) do
     if partial_cancel_post_booking_error?(reason) do
       updated_booking =
-        Repo.get!(Booking, booking.id)
-        |> Repo.preload([:user, rooms: :room_category])
+        Bookings.get_user_booking_for_member_detail(booking.id, booking.user_id) ||
+          booking
 
       refund_info = get_refund_info(updated_booking, socket.assigns.payment)
 

@@ -620,7 +620,10 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       render_change(form, %{"user" => user_params})
-      render_submit(form, %{"user" => user_params})
+
+      render_submit(form, %{
+        "user" => user_params
+      })
 
       {path, _flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
@@ -657,7 +660,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       render_change(form, %{"user" => merged})
-      render_submit(form, %{"user" => merged})
+
+      render_submit(form, %{
+        "user" => merged
+      })
+
       assert render(lv) =~ "already registered"
 
       new_email = "fresh#{System.unique_integer()}@example.com"
@@ -725,7 +732,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
         }
       }
 
-      html = render_submit(lv, "save", %{"user" => bad_params})
+      html =
+        render_submit(lv, "save", %{
+          "user" => bad_params
+        })
+
       assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Previous step"
     end
@@ -880,7 +891,10 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
 
       render_change(form, %{"user" => user_params})
-      render_submit(form, %{"user" => user_params})
+
+      render_submit(form, %{
+        "user" => user_params
+      })
 
       assert {path, _flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
@@ -947,7 +961,9 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       render_change(form, %{"user" => base})
 
-      render_submit(form, %{"user" => base})
+      render_submit(form, %{
+        "user" => base
+      })
 
       assert {path, _flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
@@ -984,7 +1000,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
         }
       }
 
-      html = render_submit(lv, "save", %{"user" => bad_params})
+      html =
+        render_submit(lv, "save", %{
+          "user" => bad_params
+        })
+
       assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Eligibility"
     end
@@ -1056,13 +1076,18 @@ defmodule YscWeb.UserRegistrationLiveTest do
         }
       }
 
-      html = render_submit(lv, "save", %{"user" => bad_params})
+      html =
+        render_submit(lv, "save", %{
+          "user" => bad_params
+        })
+
       assert html =~ "Some required information is missing or incorrect"
       assert html =~ "Additional Questions" or html =~ "Questions"
     end
   end
 
-  describe "Turnstile verification" do
+  # Turnstile is off for the application form for now (see YscWeb.GuestTurnstile).
+  describe "Turnstile" do
     @valid_params %{
       "email" => "turnstile@example.com",
       "first_name" => "Tur",
@@ -1084,91 +1109,18 @@ defmodule YscWeb.UserRegistrationLiveTest do
       }
     }
 
-    test "renders the Turnstile widget inside the registration form", %{
-      conn: conn
-    } do
+    test "does not render the Turnstile widget", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
 
-      assert has_element?(lv, "#cf-turnstile")
+      refute has_element?(lv, "#cf-turnstile")
     end
 
-    test "allows submission when Turnstile verification succeeds", %{conn: conn} do
-      uniq = System.unique_integer()
+    test "registers without a token and never calls Cloudflare", %{conn: conn} do
+      email = "no_turnstile#{System.unique_integer()}@example.com"
 
       stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:ok, %{"success" => true}}
+        flunk("Turnstile.verify must not run for the application form")
       end)
-
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-      form = form(lv, "#registration_form")
-
-      params =
-        Map.put(@valid_params, "email", "turnstile_ok#{uniq}@example.com")
-
-      render_change(form, %{"user" => params})
-      render_submit(form, %{"user" => params})
-
-      {path, flash} = assert_redirect(lv)
-      assert path =~ "/account/setup"
-
-      assert flash["info"] =~ "Application received!"
-      assert flash["info"] =~ "6-digit code"
-    end
-
-    test "blocks submission and shows error when Turnstile verification fails",
-         %{
-           conn: conn
-         } do
-      stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:error, %{"error-codes" => ["invalid-input-response"]}}
-      end)
-
-      stub(TurnstileMock, :refresh, fn socket -> socket end)
-
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-      form = form(lv, "#registration_form")
-
-      render_change(form, %{"user" => @valid_params})
-      render_submit(form, %{"user" => @valid_params})
-
-      html = render(lv)
-      assert html =~ "verify you"
-      assert html =~ "real person"
-      refute_redirected(lv)
-    end
-
-    test "calls Turnstile.refresh after a failed verification", %{conn: conn} do
-      test_pid = self()
-
-      stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:error, %{"error-codes" => ["invalid-input-response"]}}
-      end)
-
-      stub(TurnstileMock, :refresh, fn socket ->
-        send(test_pid, :turnstile_refreshed)
-        socket
-      end)
-
-      {:ok, lv, _html} = live(conn, ~p"/users/register")
-      form = form(lv, "#registration_form")
-
-      render_change(form, %{"user" => @valid_params})
-      render_submit(form, %{"user" => @valid_params})
-
-      assert_received :turnstile_refreshed
-    end
-
-    test "does not register the user when Turnstile verification fails", %{
-      conn: conn
-    } do
-      uniq = System.unique_integer()
-      email = "blocked#{uniq}@example.com"
-
-      stub(TurnstileMock, :verify, fn _params, _ip ->
-        {:error, %{"error-codes" => ["invalid-input-response"]}}
-      end)
-
-      stub(TurnstileMock, :refresh, fn socket -> socket end)
 
       {:ok, lv, _html} = live(conn, ~p"/users/register")
       form = form(lv, "#registration_form")
@@ -1177,7 +1129,109 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_change(form, %{"user" => params})
       render_submit(form, %{"user" => params})
 
+      {path, flash} = assert_redirect(lv)
+      assert path =~ "/account/setup"
+      assert flash["info"] =~ "Application received!"
+      assert Accounts.get_user_by_email(email)
+    end
+  end
+
+  describe "rate limiting" do
+    # The client IP comes from conn.remote_ip via YscWeb.ClientIP's
+    # live_session callback, so each test gets its own bucket.
+    defp unique_client_ip do
+      n = System.unique_integer([:positive])
+      {10, rem(div(n, 256 * 256), 254) + 1, rem(div(n, 256), 256), rem(n, 256)}
+    end
+
+    defp reserve_applications!(ip, count) do
+      for _ <- 1..count do
+        {:ok, _} = Ysc.RegistrationRateLimit.reserve_application(ip)
+      end
+    end
+
+    defp exhaust_registration_limit!(ip),
+      do: reserve_applications!(ip, Ysc.RegistrationRateLimit.ip_limit())
+
+    test "blocks the application before creating an account once the IP is over the limit",
+         %{conn: conn} do
+      ip = unique_client_ip()
+      email = "rate_limited#{System.unique_integer()}@example.com"
+      exhaust_registration_limit!(ip)
+
+      {:ok, lv, _html} = live(%{conn | remote_ip: ip}, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      params = Map.put(@valid_params, "email", email)
+      render_change(form, %{"user" => params})
+      html = render_submit(form, %{"user" => params})
+
+      assert html =~ "several applications from your network"
+      assert html =~ "info@ysc.org"
+      refute_redirected(lv)
       refute Accounts.get_user_by_email(email)
+    end
+
+    test "counts submits per client IP, not per visitor", %{conn: conn} do
+      limited_ip = unique_client_ip()
+      exhaust_registration_limit!(limited_ip)
+      email = "other_ip#{System.unique_integer()}@example.com"
+
+      {:ok, lv, _html} =
+        live(%{conn | remote_ip: unique_client_ip()}, ~p"/users/register")
+
+      form = form(lv, "#registration_form")
+
+      params = Map.put(@valid_params, "email", email)
+      render_change(form, %{"user" => params})
+      render_submit(form, %{"user" => params})
+
+      {path, _flash} = assert_redirect(lv)
+      assert path =~ "/account/setup"
+      assert Accounts.get_user_by_email(email)
+    end
+
+    test "a successful application counts toward the limit", %{conn: conn} do
+      ip = unique_client_ip()
+      reserve_applications!(ip, Ysc.RegistrationRateLimit.ip_limit() - 1)
+      email = "last_allowed#{System.unique_integer()}@example.com"
+
+      {:ok, lv, _html} = live(%{conn | remote_ip: ip}, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      params = Map.put(@valid_params, "email", email)
+      render_change(form, %{"user" => params})
+      render_submit(form, %{"user" => params})
+
+      {path, _flash} = assert_redirect(lv)
+      assert path =~ "/account/setup"
+
+      assert {:error, :rate_limited, _} =
+               Ysc.RegistrationRateLimit.reserve_application(ip)
+    end
+
+    test "a submit that fails validation doesn't count toward the limit", %{
+      conn: conn
+    } do
+      ip = unique_client_ip()
+      reserve_applications!(ip, Ysc.RegistrationRateLimit.ip_limit() - 1)
+
+      {:ok, lv, _html} = live(%{conn | remote_ip: ip}, ~p"/users/register")
+
+      bad_params =
+        Map.merge(@valid_params, %{
+          "email" => "invalid#{System.unique_integer()}@example.com",
+          "first_name" => ""
+        })
+
+      html = render_submit(lv, "save", %{"user" => bad_params})
+
+      assert html =~ "Some required information is missing or incorrect"
+      # The failed submit gave its slot back, so exactly one is left.
+      assert {:ok, _} = Ysc.RegistrationRateLimit.reserve_application(ip)
+
+      assert {:error, :rate_limited, _} =
+               Ysc.RegistrationRateLimit.reserve_application(ip)
     end
   end
 end

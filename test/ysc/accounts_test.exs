@@ -320,6 +320,31 @@ defmodule Ysc.AccountsTest do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_membership_renewals_ytd_query()
     end
+
+    test "ci_query_explain_list_household_guest_picker_users_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_list_household_guest_picker_users_query()
+    end
+
+    test "ci_query_explain_list_household_dashboard_users_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_list_household_dashboard_users_query()
+    end
+
+    test "ci_query_explain_household_board_member_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_household_board_member_query()
+    end
+
+    test "ci_query_explain_household_user_ids_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_household_user_ids_query()
+    end
+
+    test "ci_query_explain_user_notification_profile_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_user_notification_profile_query()
+    end
   end
 
   describe "get_user_by_phone_number/1" do
@@ -612,6 +637,179 @@ defmodule Ysc.AccountsTest do
       assert hd(sub_accounts).id == sub.id
     end
 
+    test "list_household_guest_picker_users slims name and email fields only",
+         %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098301",
+          first_name: "Primary",
+          last_name: "Guest"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "guest picker must not load this bio"
+        })
+        |> Repo.update!()
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098302",
+          first_name: "Sub",
+          last_name: "Guest"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {members, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_household_guest_picker_users(primary) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      ids = Enum.map(members, & &1.id)
+      assert primary.id in ids
+      assert sub.id in ids
+      assert Enum.all?(members, &is_nil(&1.hashed_password))
+      assert Enum.all?(members, &is_nil(&1.board_bio))
+      assert Enum.any?(members, &(&1.email == primary.email))
+      assert password_cols == 0
+    end
+
+    test "list_household_dashboard_users slims name, relationship, and avatar",
+         %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098360",
+          first_name: "Dana",
+          last_name: "Dashboard"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "dashboard must not load this bio",
+          board_position: :treasurer
+        })
+        |> Repo.update!()
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098361",
+          first_name: "Sam",
+          last_name: "Dashboard"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{family_relationship: "spouse"})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_household_dashboard_users(primary) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_members, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_household_dashboard_users(sub) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      by_id = Map.new(loaded, &{&1.id, &1})
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert map_size(by_id) == 2
+      assert by_id[primary.id].first_name == "Dana"
+      assert by_id[primary.id].board_position == :treasurer
+      assert by_id[sub.id].family_relationship == :spouse
+      assert Enum.all?(loaded, &is_nil(&1.hashed_password))
+      assert Enum.all?(loaded, &is_nil(&1.board_bio))
+      assert Enum.all?(loaded, &Ecto.assoc_loaded?(&1.current_avatar))
+    end
+
+    test "household_board_member slims board identity without password hashes",
+         %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098362",
+          first_name: "Bo",
+          last_name: "Ard"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "board member must not load this bio"
+        })
+        |> Repo.update!()
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098363",
+          first_name: "Kid",
+          last_name: "Ard"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{board_position: :vice_president})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {member, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.household_board_member(primary) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert member.id == sub.id
+      assert member.first_name == "Kid"
+      assert member.board_position == :vice_president
+      assert is_nil(member.hashed_password)
+      assert is_nil(member.board_bio)
+      assert is_nil(Accounts.household_board_member(user_fixture()))
+    end
+
+    test "get_active_board_member slims contact fields without password hashes",
+         %{} do
+      treasurer =
+        user_fixture(%{
+          phone_number: "+14159098370",
+          first_name: "Tess",
+          last_name: "Treasurer"
+        })
+        |> Ecto.Changeset.change(%{
+          board_position: :treasurer,
+          board_bio: "treasurer must not load this bio"
+        })
+        |> Repo.update!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_active_board_member(:treasurer) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert loaded.id == treasurer.id
+      assert loaded.first_name == "Tess"
+      assert loaded.email == treasurer.email
+      assert is_nil(loaded.hashed_password)
+      assert is_nil(loaded.board_bio)
+
+      treasurer
+      |> Ecto.Changeset.change(%{state: :suspended})
+      |> Repo.update!()
+
+      assert is_nil(Accounts.get_active_board_member(:treasurer))
+    end
+
     test "get_family_group_user_ids returns all family user ids", %{} do
       primary = user_fixture(%{phone_number: "+14159098296"})
       sub = user_fixture(%{phone_number: "+14159098297"})
@@ -626,6 +824,16 @@ defmodule Ysc.AccountsTest do
       assert length(ids) == 2
       assert primary.id in ids
       assert sub.id in ids
+
+      {from_sub, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_family_group_user_ids(sub) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert Enum.sort(from_sub) == Enum.sort(ids)
+      assert password_cols == 0
     end
 
     test "remove_sub_account clears primary_user_id", %{} do
@@ -767,6 +975,46 @@ defmodule Ysc.AccountsTest do
       user = user_fixture(%{phone_number: "+14159098268"})
       found = Accounts.get_user(user.id, [:subscriptions])
       assert Ecto.assoc_loaded?(found.subscriptions)
+    end
+  end
+
+  describe "get_user_notification_profile/1" do
+    test "returns notification columns without password hashes" do
+      user =
+        user_fixture(%{phone_number: "+14159098268"})
+        |> Ecto.Changeset.change(%{
+          board_bio: "must not load this bio",
+          account_notifications_sms: true,
+          event_notifications_sms: false,
+          event_notifications: false
+        })
+        |> Repo.update!()
+
+      {found, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_user_notification_profile(user.id) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert found.id == user.id
+      assert found.email == user.email
+      assert found.phone_number == user.phone_number
+      assert found.account_notifications_sms == true
+      assert found.event_notifications_sms == false
+      assert found.event_notifications == false
+      assert found.state == user.state
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert password_cols == 0
+    end
+
+    test "returns nil for a missing user" do
+      refute Accounts.get_user_notification_profile(Ecto.ULID.generate())
+    end
+
+    test "returns nil for nil" do
+      refute Accounts.get_user_notification_profile(nil)
     end
   end
 
@@ -986,6 +1234,47 @@ defmodule Ysc.AccountsTest do
       assert is_list(users)
       assert meta.current_page == 1
       assert meta.page_size == 10
+    end
+
+    test "slims registration forms without long-text application answers" do
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          first_name: "Slimform",
+          last_name: "Applicant"
+        })
+
+      completed = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      signup_application_fixture(user, %{
+        completed: completed,
+        hear_about_the_club: "must not load this answer",
+        link_to_scandinavia: "must not load this essay"
+      })
+
+      {users, essay_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, {users, _meta}} =
+              Accounts.list_paginated_users(
+                %{page: 1, page_size: 50},
+                "Slimform"
+              )
+
+            users
+          end,
+          pattern:
+            ~r/hear_about_the_club|link_to_scandinavia|lived_in_scandinavia/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(users, &(&1.id == user.id))
+      assert found
+      assert found.registration_form.completed == completed
+      assert is_nil(found.registration_form.hear_about_the_club)
+      assert is_nil(found.registration_form.link_to_scandinavia)
+      assert Ecto.assoc_loaded?(found.current_avatar)
+      assert essay_cols == 0
     end
 
     test "filters by search term" do
@@ -2569,6 +2858,46 @@ defmodule Ysc.AccountsTest do
       assert Accounts.count_pending_approval_users() >= 2
       assert length(Accounts.list_pending_approval_users(limit: 1)) == 1
     end
+
+    test "slims pending users, avatars, and registration forms" do
+      pending =
+        oauth_user_fixture(%{
+          phone_number: unique_user_phone(),
+          first_name: "Pend",
+          last_name: "Ing",
+          state: :pending_approval
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "pending list must not load this bio"
+        })
+        |> Repo.update!()
+
+      signup_application_fixture(pending, %{
+        membership_type: "family",
+        hear_about_the_club: "must not load this answer",
+        link_to_scandinavia: "must not load this essay",
+        completed: DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+
+      {preview, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_pending_approval_users(limit: 10) end,
+          pattern:
+            ~r/hashed_password|board_bio|hear_about_the_club|link_to_scandinavia/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(preview, &(&1.id == pending.id))
+      assert found
+      assert found.first_name == "Pend"
+      assert found.registration_form.membership_type == :family
+      assert found.registration_form.completed
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert is_nil(found.registration_form.hear_about_the_club)
+      assert Ecto.assoc_loaded?(found.current_avatar)
+      assert password_cols == 0
+    end
   end
 
   describe "revoke_user_session_by_id/2" do
@@ -3203,10 +3532,70 @@ defmodule Ysc.AccountsTest do
       assert after_stats.current_ytd_joins == before.current_ytd_joins
     end
 
+    test "get_membership_joins_ytd_comparison dates joins by Stripe start_date, not row insertion" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+
+      imported_member =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(imported_member, %{review_outcome: "approved"})
+
+      [subscription] = Subscriptions.list_subscriptions(imported_member)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      # A long-standing member whose row was only just inserted by a bulk
+      # Stripe import: Stripe says they started years ago, and their annual
+      # period rolled over this year.
+      Repo.update_all(
+        from(s in Ysc.Subscriptions.Subscription,
+          where: s.id == ^subscription.id
+        ),
+        set: [
+          start_date: Timex.shift(now, years: -5),
+          current_period_start: DateTime.add(now, -1, :day),
+          inserted_at: DateTime.add(now, -2, :second)
+        ]
+      )
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.current_ytd_joins == before.current_ytd_joins
+      assert after_stats.renewals_ytd == before.renewals_ytd + 1
+    end
+
+    test "get_membership_joins_ytd_comparison only counts joins with an approved application" do
+      before = Accounts.get_membership_joins_ytd_comparison()
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      no_application = user_fixture(%{phone_number: unique_user_phone()})
+      not_approved = user_fixture(%{phone_number: unique_user_phone()})
+      approved = user_fixture(%{phone_number: unique_user_phone()})
+
+      signup_application_fixture(not_approved, %{review_outcome: nil})
+      signup_application_fixture(approved, %{review_outcome: "approved"})
+
+      for user <- [no_application, not_approved, approved] do
+        {:ok, _subscription} =
+          Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_gate_#{System.unique_integer()}",
+            stripe_status: "active",
+            name: "Single Membership",
+            start_date: DateTime.add(now, -1, :minute),
+            current_period_end: DateTime.add(now, 365, :day)
+          })
+      end
+
+      after_stats = Accounts.get_membership_joins_ytd_comparison()
+
+      assert after_stats.current_ytd_joins == before.current_ytd_joins + 1
+    end
+
     test "get_membership_joins_ytd_comparison subtracts a same-year join-and-lapse from net new" do
       before = Accounts.get_membership_joins_ytd_comparison()
 
       user = user_fixture(%{phone_number: unique_user_phone()})
+      signup_application_fixture(user, %{review_outcome: "approved"})
 
       # `inserted_at` must be strictly before the comparison's `now` so the
       # first-subscription join lands in `[year_start, now)`.
@@ -4179,6 +4568,49 @@ defmodule Ysc.AccountsTest do
                  []
                )
     end
+
+    test "get_signup_application_from_user_id!/3 slims reviewer without password hashes" do
+      subject = user_fixture(%{phone_number: unique_user_phone()})
+
+      reviewer =
+        user_fixture(%{
+          role: :admin,
+          phone_number: unique_user_phone(),
+          first_name: "Rene",
+          last_name: "Viewer"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "reviewer must not load this bio"
+        })
+        |> Repo.update!()
+
+      signup_application_fixture(subject, %{
+        reviewed_by_user_id: reviewer.id,
+        reviewed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        review_outcome: "approved"
+      })
+
+      {app, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Accounts.get_signup_application_from_user_id!(
+              subject.id,
+              reviewer,
+              reviewed_by: :current_avatar
+            )
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert app.reviewed_by.id == reviewer.id
+      assert app.reviewed_by.email == reviewer.email
+      assert app.reviewed_by.first_name == "Rene"
+      assert is_nil(app.reviewed_by.hashed_password)
+      assert is_nil(app.reviewed_by.board_bio)
+      assert Ecto.assoc_loaded?(app.reviewed_by.current_avatar)
+    end
   end
 
   describe "deliver_application_submitted_notification/1" do
@@ -4494,6 +4926,7 @@ defmodule Ysc.AccountsTest do
         assert %User{} = found.primary_user
         assert found.primary_user.id == primary.id
         assert Ecto.assoc_loaded?(found.primary_user.subscriptions)
+        assert is_nil(found.primary_user.hashed_password)
       end
     end
   end

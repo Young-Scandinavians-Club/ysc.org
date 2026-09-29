@@ -17,6 +17,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ApplicationApprovedFamilyLinked,
     ApplicationRejected,
     ApplicationSubmitted,
+    AdminAccessReview,
+    PayoutReconciliationMismatch,
     AdminApplicationSubmitted,
     ChangeEmail,
     ResetPassword,
@@ -646,6 +648,75 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
                "booking_cancellation_treasurer_notification"
     end
 
+    test "AdminAccessReview renders", %{user: user} do
+      privileged = [
+        %{
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          role: :admin,
+          state: :active,
+          board_position: :vice_president,
+          last_sign_in_at: ~U[2026-02-14 17:12:00Z]
+        }
+      ]
+
+      html =
+        AdminAccessReview.render(
+          AdminAccessReview.build_assigns(privileged, 2026)
+        )
+
+      assert html =~ user.email
+      assert html =~ "Vice President"
+
+      empty_html =
+        AdminAccessReview.render(AdminAccessReview.build_assigns([], 2026))
+
+      assert empty_html =~
+               "No accounts currently have admin or volunteer access"
+
+      assert AdminAccessReview.get_template_name() == "admin_access_review"
+    end
+
+    test "PayoutReconciliationMismatch renders" do
+      payout = %Ysc.Ledgers.Payout{
+        stripe_payout_id: "po_test_mismatch",
+        amount: Money.new(:USD, "498.10"),
+        arrival_date: ~U[2026-09-28 00:00:00Z],
+        quickbooks_deposit_id: "43896"
+      }
+
+      composition = %{
+        payments_count: 16,
+        refunds_count: 0,
+        payments_total: Money.new(:USD, "905.00"),
+        refunds_total: Money.new(:USD, "0.00"),
+        fee_total: Money.new(:USD, "37.32"),
+        reserve_adjustment: Money.new(:USD, "-324.58"),
+        computed_net: Money.new(:USD, "543.10"),
+        payout_amount: Money.new(:USD, "498.10"),
+        difference: Money.new(:USD, "-45.00")
+      }
+
+      html =
+        PayoutReconciliationMismatch.render(
+          PayoutReconciliationMismatch.build_assigns(payout, composition)
+        )
+
+      assert html =~ "po_test_mismatch"
+      assert html =~ "$543.10"
+      assert html =~ "$498.10"
+      assert html =~ "43896"
+      assert html =~ "https://dashboard.stripe.com/payouts/po_test_mismatch"
+
+      assert PayoutReconciliationMismatch.get_subject("po_test_mismatch") ==
+               "Payout reconciliation mismatch: po_test_mismatch"
+
+      assert PayoutReconciliationMismatch.get_template_name() ==
+               "payout_reconciliation_mismatch"
+    end
+
     test "VolunteerConfirmation renders", %{user: user} do
       assigns = %{
         name: "#{user.first_name} #{user.last_name}",
@@ -938,7 +1009,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: nil,
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url: "https://example.com/users/notifications"
       }
 
       html = EventNotification.render(assigns)
@@ -969,7 +1040,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
         event_image_url: "https://example.com/images/event-cover.jpg",
-        notification_settings_url: "https://example.com/users/notifications"
+        unsubscribe_url: "https://example.com/users/notifications"
       }
 
       html = EventNotification.render(assigns)
@@ -1066,6 +1137,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           "2026/2027",
           user
         )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
+        )
 
       html = TahoeWinterWeekendAvailable.render(assigns)
       assert is_binary(html)
@@ -1073,6 +1148,28 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
 
       assert TahoeWinterWeekendAvailable.get_template_name() ==
                "tahoe_winter_weekend_available"
+    end
+
+    test "TahoeWinterWeekendAvailable renders using the legacy notification_settings_url assign when unsubscribe_url is absent",
+         %{user: user} do
+      # Guards against already-enqueued Oban jobs (persisted before this
+      # deploy) whose variables still carry notification_settings_url
+      # instead of unsubscribe_url.
+      assigns =
+        TahoeWinterWeekendAvailable.prepare_email_data(
+          ~D[2026-11-06],
+          ~D[2026-11-08],
+          "2026/2027",
+          user
+        )
+        |> Map.put(
+          :notification_settings_url,
+          "https://example.com/users/notifications"
+        )
+
+      html = TahoeWinterWeekendAvailable.render(assigns)
+      assert is_binary(html)
+      assert html =~ "https://example.com/users/notifications"
     end
 
     test "TahoeSummerBuyoutAvailable renders", %{user: user} do
@@ -1083,6 +1180,10 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           "2027",
           user
         )
+        |> Map.put(
+          :unsubscribe_url,
+          "https://example.com/event-notifications/unsubscribe/token"
+        )
 
       html = TahoeSummerBuyoutAvailable.render(assigns)
       assert is_binary(html)
@@ -1090,6 +1191,28 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
 
       assert TahoeSummerBuyoutAvailable.get_template_name() ==
                "tahoe_summer_buyout_available"
+    end
+
+    test "TahoeSummerBuyoutAvailable renders using the legacy notification_settings_url assign when unsubscribe_url is absent",
+         %{user: user} do
+      # Guards against already-enqueued Oban jobs (persisted before this
+      # deploy) whose variables still carry notification_settings_url
+      # instead of unsubscribe_url.
+      assigns =
+        TahoeSummerBuyoutAvailable.prepare_email_data(
+          ~D[2027-05-07],
+          ~D[2027-05-09],
+          "2027",
+          user
+        )
+        |> Map.put(
+          :notification_settings_url,
+          "https://example.com/users/notifications"
+        )
+
+      html = TahoeSummerBuyoutAvailable.render(assigns)
+      assert is_binary(html)
+      assert html =~ "https://example.com/users/notifications"
     end
   end
 
@@ -1108,6 +1231,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "change_email" => ChangeEmail,
         "email_changed" => EmailChanged,
         "admin_application_submitted" => AdminApplicationSubmitted,
+        "admin_access_review" => AdminAccessReview,
+        "payout_reconciliation_mismatch" => PayoutReconciliationMismatch,
         "conduct_violation_confirmation" => ConductViolationConfirmation,
         "conduct_violation_board_notification" =>
           ConductViolationBoardNotification,

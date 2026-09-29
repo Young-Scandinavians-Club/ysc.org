@@ -526,6 +526,39 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert has_element?(view, "#article-body[phx-hook=GLightboxHook]")
       assert has_element?(view, "#article-body[phx-update=ignore]")
     end
+
+    test "renders event update bodies with post-render image styling and lightbox",
+         %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Updates Lightbox Event"}
+        )
+
+      body =
+        ~s(<div>Parking map below<figure class="attachment attachment--preview"><img src="https://example.com/map.webp"></figure></div>)
+
+      {:ok, update} =
+        Ysc.Events.create_event_update(event, %{
+          title: "Parking",
+          raw_body: body,
+          rendered_body: body,
+          show_on_event_page: true
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      selector = "#event-update-body-#{update.id}"
+
+      assert has_element?(
+               view,
+               "#{selector}.post-render[phx-hook=GLightboxHook]"
+             )
+
+      assert has_element?(view, "#{selector}[phx-update=ignore]")
+      assert has_element?(view, "#{selector} figure.attachment img")
+    end
   end
 
   describe "unauthenticated user interactions" do
@@ -1037,6 +1070,58 @@ defmodule YscWeb.EventDetailsLiveTest do
         })
 
       assert is_binary(result)
+    end
+
+    test "free ticket confirmation asks who is going instead of using registration jargon",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_state(:upcoming, with_image: true)
+
+      free_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Member guest",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          requires_registration: true
+        })
+
+      event = Repo.preload(event, :ticket_tiers, force: true)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{
+        "tier-id" => free_tier.id
+      })
+
+      render_click(view, "proceed-to-checkout")
+
+      assert has_element?(view, "#free-ticket-confirmation-modal")
+      assert has_element?(view, "#free-ticket-whos-going")
+      assert has_element?(view, "#free-ticket-whos-going", "Who's going?")
+
+      assert has_element?(
+               view,
+               "#free-ticket-whos-going",
+               "Add a name and email for each person attending."
+             )
+
+      assert has_element?(view, "label", "Who is this ticket for?")
+
+      refute has_element?(
+               view,
+               "#free-ticket-whos-going",
+               "Ticket Registration"
+             )
+
+      refute has_element?(
+               view,
+               "#free-ticket-whos-going",
+               "ticket that requires registration"
+             )
     end
   end
 
@@ -1591,6 +1676,38 @@ defmodule YscWeb.EventDetailsLiveTest do
         })
 
       assert is_binary(html)
+    end
+
+    test "paid checkout asks who is going instead of using registration jargon",
+         %{
+           conn: conn,
+           event: event,
+           tier: tier
+         } do
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, "#checkout-whos-going")
+
+      assert has_element?(
+               view,
+               "#checkout-whos-going",
+               "Add a name and email for each person attending."
+             )
+
+      assert has_element?(view, "#checkout-whos-going", "Who's going?")
+      assert has_element?(view, "label", "Who is this ticket for?")
+      refute has_element?(view, "#checkout-whos-going", "Ticket Registration")
+
+      refute has_element?(
+               view,
+               "#checkout-whos-going",
+               "ticket that requires registration"
+             )
     end
   end
 
@@ -2178,6 +2295,52 @@ defmodule YscWeb.EventDetailsLiveTest do
              )
 
       refute has_element?(view, "span", "1x Donation")
+    end
+
+    test "shows a partial refund badge when an order has cancelled sibling tickets",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      paid_tier = hd(event.ticket_tiers)
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: paid_tier,
+          ticket_selections: %{paid_tier.id => 2}
+        })
+
+      [first, second] =
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload([:tickets])
+        |> Map.fetch!(:tickets)
+        |> Enum.sort_by(& &1.id)
+
+      first
+      |> Ecto.Changeset.change(status: :confirmed)
+      |> Ysc.Repo.update!()
+
+      second
+      |> Ecto.Changeset.change(status: :cancelled)
+      |> Ysc.Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert has_element?(view, "#user-tickets-section")
+
+      assert has_element?(
+               view,
+               "#user-tickets-confirmed-count",
+               "1 confirmed ticket"
+             )
+
+      html = render(view)
+      assert html =~ "Partial Refund"
     end
   end
 

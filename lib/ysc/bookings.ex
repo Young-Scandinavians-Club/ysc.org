@@ -25,6 +25,7 @@ defmodule Ysc.Bookings do
   alias Ysc.Repo
   alias Stripe
   alias Ysc.Ledgers
+  alias Ysc.Stripe.InvoiceHelpers
   alias Ysc.Stripe.PaymentIntentHelpers
 
   alias Ysc.Bookings.{
@@ -45,7 +46,8 @@ defmodule Ysc.Bookings do
     PropertyInventory,
     CheckIn,
     CheckInVehicle,
-    CheckInBooking
+    CheckInBooking,
+    CabinMaster
   }
 
   # Check-in and check-out times
@@ -952,6 +954,98 @@ defmodule Ysc.Bookings do
     ])
   end
 
+  # Member checkout / change / detail / receipt pages only render room names
+  # (and receipt avatars). Skip `room_category`, room descriptions, and the
+  # full User row (`hashed_password`, `board_bio`, …). Keep `get_booking!/1`
+  # fat for confirm/cancel mutations.
+  @member_page_room_fields [:id, :name, :property, :capacity_max]
+
+  @doc """
+  Loads a member's booking for checkout or change-booking.
+
+  Preloads ordered guests and slim rooms. Does not load `:user` (the LiveView
+  already has `current_user`) or `rooms: :room_category`.
+  """
+  def get_user_booking_for_member_checkout(booking_id, user_id) do
+    member_checkout_query()
+    |> where([b], b.id == ^booking_id and b.user_id == ^user_id)
+    |> Repo.one()
+  end
+
+  @doc """
+  Reloads a checkout/change booking by id after a mutation on that hold.
+  """
+  def get_booking_for_member_checkout!(booking_id) do
+    member_checkout_query()
+    |> where([b], b.id == ^booking_id)
+    |> Repo.one!()
+  end
+
+  @doc """
+  Loads a member's booking for the booking-detail page.
+
+  Detail only lists room names — no guests, user row, or room category.
+  """
+  def get_user_booking_for_member_detail(booking_id, user_id) do
+    from(b in Booking,
+      where: b.id == ^booking_id and b.user_id == ^user_id,
+      preload: [rooms: ^member_page_room_preload_query()]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Loads a member's booking for the receipt page.
+
+  Needs guest rows and a slim user + avatar for the booking-member badge.
+  Does not load `room_category` or user password/bio columns.
+  """
+  def get_user_booking_for_receipt(booking_id, user_id) do
+    from(b in Booking,
+      where: b.id == ^booking_id and b.user_id == ^user_id,
+      preload: [
+        {:booking_guests, ^member_page_guests_preload_query()},
+        user: ^member_receipt_user_preload_query(),
+        rooms: ^member_page_room_preload_query()
+      ]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Same as `get_user_booking_for_receipt/2` but raises if the booking is missing.
+  """
+  def get_user_booking_for_receipt!(booking_id, user_id) do
+    case get_user_booking_for_receipt(booking_id, user_id) do
+      nil -> raise Ecto.NoResultsError, queryable: Booking
+      booking -> booking
+    end
+  end
+
+  defp member_checkout_query do
+    from(b in Booking,
+      preload: [
+        {:booking_guests, ^member_page_guests_preload_query()},
+        rooms: ^member_page_room_preload_query()
+      ]
+    )
+  end
+
+  defp member_page_guests_preload_query do
+    from(bg in BookingGuest, order_by: [asc: bg.order_index])
+  end
+
+  defp member_page_room_preload_query do
+    from(r in Room, select: struct(r, ^@member_page_room_fields))
+  end
+
+  defp member_receipt_user_preload_query do
+    from(u in User,
+      select: struct(u, ^@admin_calendar_user_fields),
+      preload: [current_avatar: ^admin_calendar_avatar_preload_query()]
+    )
+  end
+
   @admin_booking_modal_preloads [
     {:booking_guests,
      from(bg in BookingGuest, order_by: [asc: bg.order_index])},
@@ -1052,6 +1146,115 @@ defmodule Ysc.Bookings do
 
     result
   end
+
+  @doc """
+  Stores the Stripe PaymentIntent id created for a paid booking modification
+  on `modification_hold_attrs`.
+
+  Checkout already has `payment_intent_id` (unique, the original stay charge).
+  Modification payments must not overwrite that column. The expiry worker reads
+  this hold-attrs id to Stripe-reconcile before releasing extra nights.
+
+  When replacing a previously stored Intent, Stripe-cancels it first via
+  `CheckoutCancel` — the same atomic abandon as hold expiry / remount resubmit.
+  Blind overwrite would leave a displaced Intent open for a concurrent tab to
+  pay while the DB and expiry worker only know about the replacement.
+  """
+  def attach_modification_payment_intent(booking_id, payment_intent_id)
+
+  def attach_modification_payment_intent(
+        %Booking{id: booking_id},
+        payment_intent_id
+      )
+      when is_binary(payment_intent_id) do
+    attach_modification_payment_intent(booking_id, payment_intent_id)
+  end
+
+  def attach_modification_payment_intent(booking_id, payment_intent_id)
+      when is_binary(booking_id) and is_binary(payment_intent_id) and
+             payment_intent_id != "" do
+    booking = Repo.get!(Booking, booking_id)
+
+    case booking.modification_hold_attrs do
+      %{} = attrs ->
+        previous_id = modification_hold_payment_intent_id(booking)
+
+        case reconcile_previous_modification_payment_intent(
+               previous_id,
+               payment_intent_id,
+               booking.id
+             ) do
+          :ok ->
+            booking
+            |> Booking.changeset(
+              %{
+                modification_hold_attrs:
+                  Map.put(attrs, "payment_intent_id", payment_intent_id)
+              },
+              skip_validation: true
+            )
+            |> Repo.update()
+
+          {:error, _} = error ->
+            error
+        end
+
+      _ ->
+        {:error, :no_modification_hold}
+    end
+  end
+
+  defp reconcile_previous_modification_payment_intent(
+         previous_id,
+         payment_intent_id,
+         booking_id
+       )
+       when is_binary(previous_id) and previous_id != "" and
+              previous_id != payment_intent_id do
+    case Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           previous_id,
+           "attach_modification_payment_intent"
+         ) do
+      {:cancel, _payment_intent} ->
+        :ok
+
+      {:already_succeeded, _payment_intent} ->
+        {:error, {:modification_payment_already_succeeded, previous_id}}
+
+      {:in_progress, _payment_intent} ->
+        require Ysc.Logging
+
+        Ysc.Logging.info(
+          "Skipped replacing modification PaymentIntent while payment is in flight",
+          booking_id: booking_id,
+          previous_payment_intent_id: previous_id,
+          new_payment_intent_id: payment_intent_id
+        )
+
+        {:error, :modification_payment_in_progress}
+
+      {:error, reason} ->
+        {:error, {:stripe_reconcile_failed, reason}}
+    end
+  end
+
+  defp reconcile_previous_modification_payment_intent(
+         _previous_id,
+         _payment_intent_id,
+         _booking_id
+       ),
+       do: :ok
+
+  @doc """
+  PaymentIntent id stored on an in-progress modification hold, if any.
+  """
+  def modification_hold_payment_intent_id(%Booking{
+        modification_hold_attrs: %{"payment_intent_id" => id}
+      })
+      when is_binary(id) and id != "",
+      do: id
+
+  def modification_hold_payment_intent_id(_), do: nil
 
   @doc """
   Returns the total amount paid for a booking across all recorded Stripe payments.
@@ -4479,11 +4682,14 @@ defmodule Ysc.Bookings do
       ) do
     alias Ysc.Bookings.{BookingLocker, PendingRefund}
 
-    # First, always cancel the booking and free up inventory
+    # First, always cancel the booking and free up inventory.
+    # Holds must Stripe-reconcile *before* `release_hold/1`: a succeeded
+    # PaymentIntent is treated as `:ok` by `StripeService.cancel_payment_intent/1`,
+    # which would orphan the charge, clear the entitlement, and skip HoldExpiryWorker.
     cancel_result =
       case booking.status do
         :hold ->
-          BookingLocker.release_hold(booking.id)
+          BookingLocker.release_hold_with_stripe_reconcile(booking.id)
 
         :complete ->
           BookingLocker.cancel_complete_booking(booking.id)
@@ -4494,6 +4700,12 @@ defmodule Ysc.Bookings do
       end
 
     case cancel_result do
+      {:confirmed, confirmed_booking} ->
+        # Member tried to cancel an unpaid-looking hold whose PaymentIntent had
+        # already captured (LiveView died before payment-success). Confirm +
+        # ledger instead of orphaning the charge — same as checkout Cancel.
+        {:ok, confirmed_booking, Money.new(0, :USD), :hold_payment_confirmed}
+
       {:ok, canceled_booking} ->
         # Get the original payment for this booking first
         case get_booking_payment(canceled_booking) do
@@ -5885,40 +6097,13 @@ defmodule Ysc.Bookings do
          reason
        ) do
     require Ysc.Logging
-    import Ecto.Query
 
     try do
       booking = ensure_booking_with_user(booking)
 
       if booking && booking.user do
-        # Get cabin master for the property
-        cabin_master_position =
-          case booking.property do
-            :tahoe -> "tahoe_cabin_master"
-            :clear_lake -> "clear_lake_cabin_master"
-            _ -> nil
-          end
-
-        cabin_master =
-          if cabin_master_position do
-            from(u in Ysc.Accounts.User,
-              where:
-                u.board_position == ^cabin_master_position and
-                  u.state == :active,
-              limit: 1
-            )
-            |> Repo.one()
-          else
-            nil
-          end
-
-        # Get treasurer
-        treasurer =
-          from(u in Ysc.Accounts.User,
-            where: u.board_position == "treasurer" and u.state == :active,
-            limit: 1
-          )
-          |> Repo.one()
+        cabin_master = CabinMaster.get_active(booking.property)
+        treasurer = Accounts.get_active_board_member(:treasurer)
 
         # Send email to cabin master if found
         if cabin_master && cabin_master.email do
@@ -6206,17 +6391,50 @@ defmodule Ysc.Bookings do
     create_stripe_refund(payment_intent_id, amount_cents, reason, opts)
   end
 
-  # Creates a refund in Stripe for a payment intent.
+  # Creates a refund in Stripe for a ledger payment's external payment ID.
   #
   # ## Parameters
-  # - `payment_intent_id`: The Stripe payment intent ID
+  # - `external_payment_id`: The Stripe payment intent ID, or the invoice ID
+  #   for subscription payments (resolved to the invoice's payment intent)
   # - `amount_cents`: The refund amount in cents
   # - `reason`: Reason for the refund
   #
   # ## Returns
   # - `{:ok, %Stripe.Refund{}}` on success
   # - `{:error, reason}` on failure
-  defp create_stripe_refund(payment_intent_id, amount_cents, reason, opts \\ []) do
+  defp create_stripe_refund(
+         external_payment_id,
+         amount_cents,
+         reason,
+         opts \\ []
+       ) do
+    require Ysc.Logging
+
+    case InvoiceHelpers.refundable_payment_intent_id(external_payment_id) do
+      {:ok, payment_intent_id} ->
+        create_stripe_refund_for_payment_intent(
+          payment_intent_id,
+          amount_cents,
+          reason,
+          opts
+        )
+
+      {:error, resolve_error} ->
+        Ysc.Logging.warning("Failed to resolve payment intent for refund",
+          external_payment_id: external_payment_id,
+          error: inspect(resolve_error)
+        )
+
+        {:error, "Failed to resolve payment intent for invoice"}
+    end
+  end
+
+  defp create_stripe_refund_for_payment_intent(
+         payment_intent_id,
+         amount_cents,
+         reason,
+         opts
+       ) do
     require Ysc.Logging
 
     # First, retrieve the payment intent to get the charge ID
@@ -6530,6 +6748,43 @@ defmodule Ysc.Bookings do
       where: b.property == :tahoe,
       order_by: [desc: b.inserted_at],
       limit: 50
+    )
+  end
+
+  @doc false
+  def ci_query_explain_get_user_booking_for_member_checkout_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    member_checkout_query()
+    |> where(
+      [b],
+      b.id == ^Ysc.Ci.QueryExplain.Fixtures.ulid() and b.user_id == ^user_id
+    )
+  end
+
+  @doc false
+  def ci_query_explain_get_user_booking_for_member_detail_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    from(b in Booking,
+      where:
+        b.id == ^Ysc.Ci.QueryExplain.Fixtures.ulid() and b.user_id == ^user_id,
+      preload: [rooms: ^member_page_room_preload_query()]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_get_user_booking_for_receipt_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    from(b in Booking,
+      where:
+        b.id == ^Ysc.Ci.QueryExplain.Fixtures.ulid() and b.user_id == ^user_id,
+      preload: [
+        {:booking_guests, ^member_page_guests_preload_query()},
+        user: ^member_receipt_user_preload_query(),
+        rooms: ^member_page_room_preload_query()
+      ]
     )
   end
 

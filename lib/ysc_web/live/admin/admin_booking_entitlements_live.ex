@@ -6,9 +6,15 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
 
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
-  alias Ysc.Accounts
   alias Ysc.Bookings.Entitlements
   alias YscWeb.AdminBookingEntitlementHelpers
+  alias YscWeb.AdminUserSearch
+
+  @grant_user_search [
+    search: :grant_user_search,
+    results: :grant_user_results,
+    selected: :grant_selected_user
+  ]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -20,9 +26,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
      |> assign(:outstanding_entitlements, [])
      |> assign(:loading_outstanding_entitlements?, false)
      |> assign(:entitlement_form, entitlement_form())
-     |> assign(:grant_user_search, "")
-     |> assign(:grant_user_results, [])
-     |> assign(:grant_selected_user, nil)}
+     |> AdminUserSearch.assign_blank(@grant_user_search)}
   end
 
   @impl true
@@ -62,35 +66,15 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
         %{"value" => query},
         socket
       ) do
-    results =
-      if String.length(query) >= 2 do
-        Accounts.search_users(query, limit: 10)
-      else
-        []
-      end
-
-    {:noreply,
-     socket
-     |> assign(:grant_user_search, query)
-     |> assign(:grant_user_results, results)}
+    {:noreply, AdminUserSearch.search(socket, query, @grant_user_search)}
   end
 
   def handle_event("select-entitlement-grant-user", %{"id" => id}, socket) do
-    user = Accounts.get_user!(id)
-
-    {:noreply,
-     socket
-     |> assign(:grant_selected_user, user)
-     |> assign(:grant_user_search, "")
-     |> assign(:grant_user_results, [])}
+    {:noreply, AdminUserSearch.select(socket, id, @grant_user_search)}
   end
 
   def handle_event("clear-entitlement-grant-user", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:grant_selected_user, nil)
-     |> assign(:grant_user_search, "")
-     |> assign(:grant_user_results, [])}
+    {:noreply, AdminUserSearch.assign_blank(socket, @grant_user_search)}
   end
 
   def handle_event("validate_entitlement_form", %{"entitlement" => p}, socket) do

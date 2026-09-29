@@ -742,6 +742,12 @@ defmodule YscWeb.CoreComponents do
       "a form field struct retrieved from the form, for example: @form[:email]"
 
   attr :errors, :list, default: []
+
+  attr :toggle_button, :boolean,
+    default: true,
+    doc:
+      "password-toggle only: false to render `password_toggle_button/1` yourself (e.g. to control tab order)"
+
   attr :checked, :boolean, doc: "the checked flag for checkbox inputs"
   attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
 
@@ -1148,22 +1154,46 @@ defmodule YscWeb.CoreComponents do
           {@rest}
         />
 
-        <button
-          :if={@is_password_toggle}
-          type="button"
-          class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer password-toggle-btn"
-          data-target={"##{@id}"}
-          aria-label="Show password"
-          aria-pressed="false"
-        >
-          <.icon
-            name="hero-eye-solid"
-            class="h-5 w-5 text-zinc-400 hover:text-zinc-600"
-          />
-        </button>
+        <.password_toggle_button
+          :if={@is_password_toggle && @toggle_button}
+          target_id={@id}
+          class="absolute inset-y-0 right-0"
+        />
       </div>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
+    """
+  end
+
+  @doc """
+  Show/hide button for a `type="password-toggle"` input.
+
+  Rendered automatically by `input/1`. Pass `toggle_button={false}` to the
+  input and render this yourself when the button must come later in the DOM
+  (and so the tab order) than the input, positioning it over the field with
+  `class`.
+  """
+  attr :target_id, :string, required: true, doc: "id of the password input"
+  attr :class, :any, default: nil, doc: "positioning classes"
+
+  def password_toggle_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class={[
+        "flex items-center pr-3 cursor-pointer password-toggle-btn",
+        @class
+      ]}
+      data-target={"##{@target_id}"}
+      aria-label="Show password"
+      aria-pressed="false"
+      aria-controls={@target_id}
+    >
+      <.icon
+        name="hero-eye-solid"
+        class="h-5 w-5 text-zinc-400 hover:text-zinc-600"
+      />
+    </button>
     """
   end
 
@@ -2057,17 +2087,19 @@ defmodule YscWeb.CoreComponents do
         {render_slot(@button_block)}
       </button>
       <!-- Dropdown menu -->
+      <%!-- Mobile renders inline as an accordion inside the slide-in sheet (styled via .dropdown-content in app.css) --%>
       <div
         id={@id}
         class={[
-          "z-110 hidden font-normal bg-white divide-y rounded-sm divide-zinc-100 shadow-sm w-52 wide:w-72",
-          @drop_up && "bottom-full mb-1",
-          !@drop_up && "mt-1",
-          @right && "right-0",
-          !@right && "left-0",
-          @mobile && "block lg:absolute shadow-none lg:shadow-sm",
-          !@mobile && "absolute shadow-sm",
-          @wide && "wide"
+          "hidden font-normal",
+          @mobile && "dropdown-content",
+          !@mobile &&
+            "absolute z-110 bg-white divide-y rounded-sm divide-zinc-100 shadow-sm w-52 wide:w-72",
+          !@mobile && @drop_up && "bottom-full mb-1",
+          !@mobile && !@drop_up && "mt-1",
+          !@mobile && @right && "right-0",
+          !@mobile && !@right && "left-0",
+          !@mobile && @wide && "wide"
         ]}
       >
         {render_slot(@inner_block)}
@@ -2115,7 +2147,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         right={true}
         drop_up={@drop_up}
-        class="min-w-0 w-auto! shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+        class="min-w-0 w-auto! shrink-0 rounded-md! px-1! py-1! text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
       >
         <:button_block>
           <span class="sr-only">{@label}</span>
@@ -2488,7 +2520,13 @@ defmodule YscWeb.CoreComponents do
           class="flex items-center gap-3"
           phx-click={hide_mobile_menu(@toggle_id)}
         >
-          <.ysc_logo no_circle={true} class="h-14 w-14" width={56} height={56} />
+          <.ysc_logo
+            no_circle={true}
+            class="h-14 w-14"
+            width={56}
+            height={56}
+            decorative
+          />
           <span class="text-lg font-bold text-zinc-900">YSC.org</span>
         </.link>
         <button
@@ -3002,14 +3040,26 @@ defmodule YscWeb.CoreComponents do
   attr :width, :integer, required: true
   attr :height, :integer, required: true
 
+  attr :decorative, :boolean,
+    default: false,
+    doc:
+      "Render with an empty `alt` when the surrounding link already has an accessible name (aria-label or visible text)"
+
   def ysc_logo(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :alt,
+        if(assigns.decorative, do: "", else: "The Young Scandinavian Club Logo")
+      )
+
     ~H"""
     <picture :if={!@no_circle}>
       <source srcset={~p"/images/ysc_logo.webp"} type="image/webp" />
       <img
         class={["object-contain", @class]}
         src={~p"/images/ysc_logo.png"}
-        alt="The Young Scandinavian Club Logo"
+        alt={@alt}
         width={@width}
         height={@height}
         fetchpriority={@fetchpriority}
@@ -3019,7 +3069,7 @@ defmodule YscWeb.CoreComponents do
       :if={@no_circle}
       class={["object-contain", @class]}
       src={~p"/images/ysc_logo_no_circle.svg"}
-      alt="The Young Scandinavian Club Logo"
+      alt={@alt}
       width={@width}
       height={@height}
       fetchpriority={@fetchpriority}
@@ -3056,10 +3106,136 @@ defmodule YscWeb.CoreComponents do
       ]}
       aria-label="Young Scandinavians Club home"
     >
-      <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
+      <.ysc_logo
+        class="h-28"
+        width={112}
+        height={112}
+        fetchpriority="high"
+        decorative
+      />
     </.link>
     """
   end
+
+  @doc """
+  Centered public page for unsubscribing from an email list via a token link.
+
+  Shared by the newsletter and event-notification unsubscribe LiveViews.
+  Three states:
+
+    * Recipient still subscribed — title, email, unsubscribe button
+    * Already unsubscribed — confirmation and a home link
+    * Missing/invalid token (`email` nil or blank) — "link no longer works" and contact
+
+  Keep token verification and the unsubscribe side-effect in the LiveView.
+
+  ## Examples
+
+      <.unsubscribe_page
+        id="newsletter-unsubscribe-page"
+        email={@subscriber && @subscriber.email}
+        unsubscribed={@unsubscribed}
+        subscribed_title="Unsubscribe from our newsletter"
+        subscribed_action="our newsletter"
+        unsubscribed_body="You will no longer receive our newsletter. You can sign up again anytime from our home page."
+        still_receive="our newsletter"
+      />
+  """
+  attr :id, :string, required: true
+
+  attr :email, :string,
+    default: nil,
+    doc:
+      "Recipient email when the token resolved; omit or nil for the invalid-link state"
+
+  attr :unsubscribed, :boolean, required: true
+
+  attr :subscribed_title, :string, required: true
+
+  attr :subscribed_action, :string,
+    required: true,
+    doc: "Phrase after \"stop receiving\", e.g. `our newsletter`"
+
+  attr :unsubscribed_body, :string, required: true
+
+  attr :still_receive, :string,
+    required: true,
+    doc: "Phrase after \"If you still receive\" on the invalid-link state"
+
+  attr :unsubscribe_event, :string,
+    default: "unsubscribe",
+    doc: "LiveView event name for the unsubscribe button"
+
+  def unsubscribe_page(assigns) do
+    recipient? = present_unsubscribe_email?(assigns.email)
+
+    assigns =
+      assign(assigns,
+        recipient?: recipient?,
+        show_unsubscribe?: recipient? and not assigns.unsubscribed
+      )
+
+    ~H"""
+    <div class="py-16 lg:py-24 max-w-xl mx-auto px-4" id={@id}>
+      <div class="text-center">
+        <h1 :if={@show_unsubscribe?} class="text-2xl font-bold text-zinc-900">
+          {@subscribed_title}
+        </h1>
+        <h1
+          :if={@recipient? && @unsubscribed}
+          class="text-2xl font-bold text-zinc-900"
+        >
+          You have been unsubscribed
+        </h1>
+        <h1 :if={!@recipient?} class="text-2xl font-bold text-zinc-900">
+          This link no longer works
+        </h1>
+
+        <p :if={@show_unsubscribe?} class="mt-4 text-zinc-600">
+          You are subscribed as <strong>{@email}</strong>. Click below to stop receiving {@subscribed_action}.
+        </p>
+
+        <p :if={@recipient? && @unsubscribed} class="mt-4 text-zinc-600">
+          {@unsubscribed_body}
+        </p>
+
+        <p :if={!@recipient?} class="mt-4 text-zinc-600">
+          This link does not work. It may be outdated or mistyped. If you still receive {@still_receive}, email
+          <.link
+            href="mailto:info@ysc.org"
+            class="text-blue-600 hover:underline font-semibold"
+          >
+            info@ysc.org
+          </.link>
+          with the address you want removed and we will unsubscribe you manually.
+        </p>
+
+        <.button
+          :if={@show_unsubscribe?}
+          id={"#{@id}-button"}
+          phx-click={@unsubscribe_event}
+          class="mt-8"
+        >
+          Unsubscribe
+        </.button>
+
+        <.link
+          :if={!@show_unsubscribe?}
+          id={"#{@id}-home"}
+          navigate={~p"/"}
+          class="mt-8 inline-block"
+        >
+          <.button>Return to home</.button>
+        </.link>
+      </div>
+    </div>
+    """
+  end
+
+  defp present_unsubscribe_email?(email) when is_binary(email),
+    do: String.trim(email) != ""
+
+  defp present_unsubscribe_email?(_), do: false
 
   attr :viking, :integer, default: 4
   attr :title, :string, default: "Looks like this page is empty"
@@ -3331,7 +3507,7 @@ defmodule YscWeb.CoreComponents do
 
       <.async_section_loader :if={@passkeys_loading} id="passkeys-loading" label="Loading passkeys..." />
 
-      <.async_section_loader label="Loading payment methods..." class="py-12" />
+      <.async_section_loader label="Loading your payment methods..." class="py-12" />
   """
   attr :id, :string, default: nil
   attr :label, :string, required: true
@@ -3687,7 +3863,7 @@ defmodule YscWeb.CoreComponents do
       role="status"
       aria-live="polite"
     >
-      <span class="sr-only">Loading payment methods…</span>
+      <span class="sr-only">Loading your cards…</span>
       <div class="flex items-center gap-3">
         <.skeleton_block class="h-8 w-12 rounded-sm" />
         <div class="space-y-1.5">
@@ -4204,6 +4380,190 @@ defmodule YscWeb.CoreComponents do
 
   defp nearby_destination_badge_class(:blue), do: "bg-blue-100 text-blue-700"
   defp nearby_destination_badge_class(:teal), do: "bg-teal-100 text-teal-700"
+
+  @doc """
+  Split image + copy showcase for a cabin property on the public homepage.
+
+  Pass `accent={:emerald}` and `image_side={:left}` for Clear Lake; Tahoe uses
+  the default blue accent with the image on the right at the `lg` breakpoint.
+
+  ## Examples
+
+      <.cabin_showcase
+        id="home-cabin-tahoe"
+        location="Lake Tahoe, CA"
+        title="The Alpine Retreat"
+        navigate={~p"/bookings/tahoe"}
+        cta="Learn More About Tahoe"
+        image_src="/images/tahoe/tahoe_cabin_main.webp"
+        image_srcset="/images/tahoe/tahoe_cabin_main-480.webp 480w"
+        image_sizes="(min-width: 1280px) 700px, 100vw"
+        image_alt="Lake Tahoe Cabin"
+      >
+        Ski in winter, hike in summer, and relax year-round.
+        <:feature>Minutes from world-class ski resorts & hiking trails</:feature>
+        <:feature>
+          Member-only rates: <strong>$45.00 / night</strong>
+        </:feature>
+      </.cabin_showcase>
+  """
+  attr :id, :string, required: true
+  attr :location, :string, required: true
+  attr :title, :string, required: true
+  attr :navigate, :any, required: true
+  attr :cta, :string, required: true
+  attr :image_src, :string, required: true
+  attr :image_srcset, :string, required: true
+  attr :image_sizes, :string, required: true
+  attr :image_alt, :string, required: true
+
+  attr :accent, :atom,
+    default: :blue,
+    values: [:blue, :emerald],
+    doc: ":blue for Tahoe; :emerald for Clear Lake"
+
+  attr :image_side, :atom,
+    default: :right,
+    values: [:left, :right],
+    doc: "Desktop image column. Mobile always shows the image first."
+
+  slot :inner_block, required: true, doc: "Property description"
+
+  slot :feature,
+    required: true,
+    doc: "Bullet under the description (check-circle prefix is added)"
+
+  def cabin_showcase(assigns) do
+    ~H"""
+    <div id={@id} class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
+      <div class={[
+        "lg:col-span-7",
+        @image_side == :right && "lg:order-2"
+      ]}>
+        <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
+          <img
+            id={"#{@id}-image"}
+            src={@image_src}
+            srcset={@image_srcset}
+            sizes={@image_sizes}
+            loading="lazy"
+            decoding="async"
+            alt={@image_alt}
+            class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
+          />
+          <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
+          </div>
+        </div>
+      </div>
+      <div class={[
+        "lg:col-span-5",
+        @image_side == :right && "lg:order-1"
+      ]}>
+        <div class={[
+          "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6",
+          cabin_showcase_badge_class(@accent)
+        ]}>
+          <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> {@location}
+        </div>
+        <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
+          {@title}
+        </h3>
+        <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
+          {render_slot(@inner_block)}
+        </p>
+        <ul class="space-y-4 mb-8">
+          <li
+            :for={feature <- @feature}
+            class="flex items-start gap-3 text-zinc-700 text-sm"
+          >
+            <.icon
+              name="hero-check-circle"
+              class="w-5 h-5 text-teal-500 shrink-0"
+            />
+            <span>{render_slot(feature)}</span>
+          </li>
+        </ul>
+        <.link
+          id={"#{@id}-cta"}
+          navigate={@navigate}
+          class={[
+            "inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2",
+            cabin_showcase_cta_class(@accent)
+          ]}
+        >
+          {@cta}
+        </.link>
+      </div>
+    </div>
+    """
+  end
+
+  defp cabin_showcase_badge_class(:blue), do: "bg-blue-50 text-blue-700"
+
+  defp cabin_showcase_badge_class(:emerald),
+    do: "bg-emerald-50 text-emerald-700"
+
+  defp cabin_showcase_cta_class(:blue), do: "hover:bg-blue-700"
+  defp cabin_showcase_cta_class(:emerald), do: "hover:bg-emerald-700"
+
+  @doc """
+  Compact dashboard shortcut card used on the signed-in homepage.
+
+  ## Examples
+
+      <.quick_action_card
+        id="home-quick-action-tahoe"
+        navigate={~p"/bookings/tahoe"}
+        icon="hero-home"
+        tone={:blue}
+        title="Lake Tahoe"
+        subtitle="Book a stay"
+      />
+  """
+  attr :id, :string, required: true
+  attr :navigate, :any, required: true
+  attr :icon, :string, required: true
+  attr :title, :string, required: true
+  attr :subtitle, :string, required: true
+
+  attr :tone, :atom,
+    required: true,
+    values: [:blue, :emerald, :orange, :purple, :zinc],
+    doc: "Icon well background and icon color"
+
+  def quick_action_card(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      navigate={@navigate}
+      class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+    >
+      <div class={[
+        "w-8 h-8 lg:w-10 lg:h-10 rounded-md flex items-center justify-center mb-2 lg:mb-4",
+        quick_action_card_well_class(@tone)
+      ]}>
+        <.icon
+          name={@icon}
+          class={["w-4 h-4 lg:w-5 lg:h-5", quick_action_card_icon_class(@tone)]}
+        />
+      </div>
+      <p class="font-bold text-sm lg:text-base text-zinc-900">{@title}</p>
+      <p class="text-xs lg:text-sm text-zinc-500">{@subtitle}</p>
+    </.link>
+    """
+  end
+
+  defp quick_action_card_well_class(:blue), do: "bg-blue-50"
+  defp quick_action_card_well_class(:emerald), do: "bg-emerald-50"
+  defp quick_action_card_well_class(:orange), do: "bg-orange-50"
+  defp quick_action_card_well_class(:purple), do: "bg-purple-50"
+  defp quick_action_card_well_class(:zinc), do: "bg-zinc-50"
+
+  defp quick_action_card_icon_class(:blue), do: "text-blue-600"
+  defp quick_action_card_icon_class(:emerald), do: "text-emerald-600"
+  defp quick_action_card_icon_class(:orange), do: "text-orange-600"
+  defp quick_action_card_icon_class(:purple), do: "text-purple-600"
+  defp quick_action_card_icon_class(:zinc), do: "text-zinc-600"
 
   @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
@@ -5151,7 +5511,7 @@ defmodule YscWeb.CoreComponents do
             }
             class="text-sm text-green-900 mt-2"
           >
-            Auto-renewal is on. Your membership will
+            Your membership will
             <strong class="text-green-900">automatically renew</strong>
             on
             <strong class="text-green-900">
@@ -5160,7 +5520,7 @@ defmodule YscWeb.CoreComponents do
                 @timezone
               )}
             </strong>
-            unless you turn it off beforehand.
+            unless you turn off automatic renewal beforehand.
           </p>
 
           <p
@@ -5476,13 +5836,16 @@ defmodule YscWeb.CoreComponents do
       <div class="hero-media-stage">
         <.hero_flag_grid :if={@flag_grid} id={@flag_grid_id} />
 
+        <%!-- Lazy: the bleed is display:none below 1921px. Eager would let the
+             preload scanner request the shared poster URL from here first at
+             low priority, defeating fetchpriority="high" on the LCP image. --%>
         <div :if={@bleed_src} class="hero-media-stage__bleed" aria-hidden="true">
           <img
             src={@bleed_src}
             srcset={@bleed_srcset}
             sizes="100vw"
             alt=""
-            loading="eager"
+            loading="lazy"
             decoding="async"
           />
         </div>
@@ -5509,14 +5872,16 @@ defmodule YscWeb.CoreComponents do
           />
           <%!-- No HTML autoplay: LiveView morphdom calls video.play() on autoplay
                nodes without catching NotAllowedError (common on iOS Safari). Playback
-               is started by HeroVideoControls with a caught promise instead. --%>
+               is started by HeroVideoControls with a caught promise instead.
+               No poster attribute: the responsive poster <img> above already
+               shows through until the first frame, and a poster here would
+               download a second, full-size copy. --%>
           <video
             :if={@video}
             id="hero-video"
             muted
             loop
             playsinline
-            poster={@poster}
             preload="auto"
           >
             <source src={@video} type="video/mp4" />
@@ -5649,7 +6014,9 @@ defmodule YscWeb.CoreComponents do
   Horizontal rule with a centered label, used between alternative actions.
 
   Sign-in, re-authentication, and similar screens place this between OAuth /
-  passkey options and a password form.
+  passkey options and a password form. Payment-method settings uses the same
+  rule between saved cards and the add-new action; pass `show_label={false}`
+  to keep the line when the label should hide.
 
   ## Examples
 
@@ -5658,6 +6025,15 @@ defmodule YscWeb.CoreComponents do
       </.labeled_divider>
 
       <.labeled_divider id="reauth-oauth-or-divider">OR</.labeled_divider>
+
+      <.labeled_divider
+        id="payment-add-new-divider"
+        class="my-6"
+        show_label={!@show_new_payment_form}
+        label_class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide"
+      >
+        Add new
+      </.labeled_divider>
   """
   attr :id, :string, required: true
 
@@ -5673,6 +6049,10 @@ defmodule YscWeb.CoreComponents do
     default: "bg-white px-2 text-zinc-500",
     doc: "Classes on the centered label span"
 
+  attr :show_label, :boolean,
+    default: true,
+    doc: "When false, renders only the rule (e.g. while an add form is open)"
+
   slot :inner_block, required: true
 
   def labeled_divider(assigns) do
@@ -5681,10 +6061,62 @@ defmodule YscWeb.CoreComponents do
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class={["w-full border-t", @line_class]}></div>
       </div>
-      <div class="relative flex justify-center items-center text-sm leading-none">
+      <div
+        :if={@show_label}
+        class="relative flex justify-center items-center text-sm leading-none"
+      >
         <span class={@label_class}>{render_slot(@inner_block)}</span>
       </div>
     </div>
+    """
+  end
+
+  @doc """
+  Inline circular busy spinner for in-place actions (deleting a row, overlay
+  on an avatar). Decorative: `aria-hidden` so surrounding buttons keep their
+  accessible name.
+
+  For a labeled loading row, prefer `<.async_section_loader>`.
+
+  ## Examples
+
+      <.loading_spinner id="delete-pm-spinner" class="w-4 h-4 text-red-600" />
+
+      <.loading_spinner
+        id="avatar-processing-spinner"
+        class="w-8 h-8 text-blue-600"
+      />
+  """
+  attr :id, :string, required: true
+
+  attr :class, :any,
+    default: "w-5 h-5",
+    doc: "Size and color utilities (merged with `animate-spin`)"
+
+  def loading_spinner(assigns) do
+    ~H"""
+    <svg
+      id={@id}
+      class={["animate-spin", @class]}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        class="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        stroke-width="4"
+      />
+      <path
+        class="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
     """
   end
 

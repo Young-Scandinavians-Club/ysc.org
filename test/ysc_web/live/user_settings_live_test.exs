@@ -357,6 +357,8 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       refute html =~ "Upgrades take effect immediately"
       refute html =~ "downgrades apply"
+      assert html =~ "Payment method"
+      assert html =~ "Add a payment method"
 
       # Select family (upgrade) so the "Change Membership Plan" button appears
       render_change(view, "validate_membership", %{
@@ -1514,6 +1516,8 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert html =~ "Application pending review"
       refute html =~ "Account Pending Approval"
       refute html =~ "approved account"
+      assert html =~ "saved a payment method during setup"
+      assert html =~ "Payment method"
 
       assert has_element?(
                view,
@@ -1860,10 +1864,15 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, view, html} = live(conn, ~p"/users/membership/payment-method")
-      render(view)
+      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      html = render(view)
 
       assert has_element?(view, "#update-payment-method-modal")
+      assert has_element?(view, "#payment-add-new-divider")
+      assert html =~ "Payment method"
+      assert html =~ "Add a payment method"
+      refute html =~ "Add Payment Method"
+      refute html =~ "Save Payment Method"
       assert html =~ "Secure, encrypted payment"
     end
 
@@ -1902,6 +1911,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert html =~ "/images/cards/link.png"
       assert html =~ "Link · Visa ending in 4242"
       assert html =~ "Expires 12 / 2030"
+      assert has_element?(view, "#payment-add-new-divider", "Add new")
     end
 
     test "select-payment-method sets default when Stripe customer update succeeds",
@@ -2063,7 +2073,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "only payment method"
+      assert render(view) =~ "only payment method on file"
       assert Payments.get_payment_method!(only.id).id == only.id
     end
 
@@ -2110,7 +2120,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "only payment method"
+      assert render(view) =~ "only payment method on file"
       assert Payments.get_payment_method!(only.id).id == only.id
     end
 
@@ -2178,7 +2188,7 @@ defmodule YscWeb.UserSettingsLiveTest do
           "payment_method_id" => foreign.id
         })
 
-      assert html =~ "Payment method not found"
+      assert html =~ "find that payment method"
       refute html =~ "Payment method removed"
       assert Payments.get_payment_method!(foreign.id).id == foreign.id
       assert Payments.get_payment_method!(foreign.id).user_id == other.id
@@ -2256,7 +2266,7 @@ defmodule YscWeb.UserSettingsLiveTest do
           "payment_method_id" => foreign.id
         })
 
-      assert html =~ "Payment method not found"
+      assert html =~ "find that payment method"
       assert Payments.get_payment_method!(own_default.id).is_default
       refute Payments.get_payment_method!(own_extra.id).is_default
       assert Payments.get_payment_method!(foreign.id).is_default
@@ -2281,7 +2291,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       render_click(view, "add-new-payment-method")
       render_click(view, "cancel-new-payment-method")
 
-      assert render(view) =~ "Payment Method"
+      assert render(view) =~ "Payment method"
     end
 
     test "retry-invoice-payment click shows feedback for unknown invoice", %{
@@ -2406,6 +2416,47 @@ defmodule YscWeb.UserSettingsLiveTest do
       render_click(view, "accept-family-invite", %{"token" => invite.token})
 
       assert render(view) =~ "expired" or render(view) =~ "already been used"
+    end
+  end
+
+  describe "family invite acceptance — date of birth" do
+    test "accept-family-invite sends an account with no date of birth to the acceptance page",
+         %{conn: conn} do
+      primary = primary_user_with_lifetime_for_family_invite()
+      invite_email = Ysc.AccountsFixtures.unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary, invite_email)
+
+      invitee = user_fixture(%{email: invite_email})
+      conn = log_in_user(conn, invitee)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "accept-family-invite", %{"token" => invite.token})
+
+      assert_redirect(view, ~p"/family-invite/#{invite.token}/accept")
+      assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
+    end
+
+    test "accept-family-invite refuses an adult on a child invite", %{
+      conn: conn
+    } do
+      primary = primary_user_with_lifetime_for_family_invite()
+      invite_email = Ysc.AccountsFixtures.unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary, invite_email)
+
+      invitee =
+        user_fixture(%{email: invite_email, date_of_birth: ~D[1990-01-01]})
+
+      conn = log_in_user(conn, invitee)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "accept-family-invite", %{"token" => invite.token})
+
+      assert render(view) =~ "18 or older"
+      assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
     end
   end
 

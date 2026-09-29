@@ -19,6 +19,7 @@
 #
 # Usage:
 #   etc/scripts/update_github_release_notes.sh [TAG]
+#   etc/scripts/update_github_release_notes.sh --self-test
 # TAG defaults to GITHUB_REF_NAME (Actions on tag push) or the latest tag at HEAD.
 #
 # shellcheck source-path=SCRIPTDIR
@@ -39,8 +40,8 @@ GITHUB_API="${GITHUB_API:-https://api.github.com}"
 OPENROUTER_API="${OPENROUTER_API:-https://openrouter.ai/api/v1/chat/completions}"
 
 usage() {
-  echo "Usage: $0 [TAG]"
-  echo "Requires OPENROUTER_API_KEY and GITHUB_TOKEN (or GH_TOKEN)."
+  echo "Usage: $0 [TAG|--self-test]"
+  echo "Requires OPENROUTER_API_KEY and GITHUB_TOKEN (or GH_TOKEN) except for --self-test."
   echo "Set DRY_RUN=1 to print the generated body without updating GitHub."
   exit 1
 }
@@ -184,22 +185,30 @@ commits_in_range_json() {
 
 # Write OpenRouter user payload: merged_pull_requests (array). When the PR list is empty and
 # range is set, include commits_in_range from git; otherwise commits_in_range is [].
+# Reads JSON from files via --slurpfile. --argjson "$(cat file)" exceeds Linux MAX_ARG_STRLEN
+# (~128KiB per argument) when a tag has many PR bodies (v2.41.0: 91 PRs, job 107277364820).
 write_openrouter_input_file() {
   local out="$1" prs_jsonf="$2" range_from="${3:-}" range_to="${4:-}"
-  local npr cj
+  local npr commits_jsonf
   npr=$(jq 'length' "$prs_jsonf" 2>/dev/null) || npr=0
+  commits_jsonf=$(mktemp)
   if [ "$npr" -eq 0 ] && [ -n "$range_from" ] && [ -n "$range_to" ]; then
-    cj=$(commits_in_range_json "$range_from" "$range_to")
+    if ! commits_in_range_json "$range_from" "$range_to" >"$commits_jsonf"; then
+      rm -f "$commits_jsonf"
+      return 1
+    fi
   else
-    cj='[]'
+    echo '[]' >"$commits_jsonf"
   fi
-  if ! jq -n --argjson prs "$(cat "$prs_jsonf")" --argjson c "$cj" \
+  if ! jq -n --slurpfile prs "$prs_jsonf" --slurpfile c "$commits_jsonf" \
     '{
-       merged_pull_requests: $prs,
-       commits_in_range: $c
+       merged_pull_requests: $prs[0],
+       commits_in_range: $c[0]
      }' >"$out"; then
+    rm -f "$commits_jsonf"
     return 1
   fi
+  rm -f "$commits_jsonf"
   return 0
 }
 
@@ -499,8 +508,89 @@ create_or_update_release() {
   fi
 }
 
+self_test() {
+  local dir i nd body bytes n
+  dir=$(mktemp -d)
+  self_test_cleanup() { rm -rf "$dir"; }
+
+  echo '[]' >"$dir/empty.json"
+  if ! write_openrouter_input_file "$dir/out.json" "$dir/empty.json" "" ""; then
+    echo "update_github_release_notes.sh: empty payload write failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq -c '{n:(.merged_pull_requests|length),c:(.commits_in_range|length)}' "$dir/out.json")" != '{"n":0,"c":0}' ]; then
+    echo "update_github_release_notes.sh: empty input payload mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # Larger than Linux MAX_ARG_STRLEN (32 pages = 131072) so --argjson "$(cat file)" fails.
+  body=$(head -c 2500 /dev/zero | tr '\0' 'x')
+  nd="$dir/nd.json"
+  : >"$nd"
+  for i in $(seq 1 80); do
+    jq -n --argjson n "$i" --arg body "$body" \
+      '{number:$n, title:("PR "+($n|tostring)), author:"bot", url:"https://example.invalid/p", body:$body}' >>"$nd"
+  done
+  jq -s '.' "$nd" >"$dir/prs.json"
+  bytes=$(wc -c <"$dir/prs.json" | tr -d ' ')
+  if [ "$bytes" -lt 131072 ]; then
+    echo "update_github_release_notes.sh: test payload too small ($bytes bytes)" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  if jq -n --argjson prs "$(cat "$dir/prs.json")" '{merged_pull_requests:$prs}' >/dev/null 2>"$dir/argjson.err"; then
+    echo "update_github_release_notes.sh: warning: --argjson succeeded on ${bytes}-byte payload (ARG_MAX may be larger than Linux MAX_ARG_STRLEN)" >&2
+  elif ! grep -qi 'Argument list too long' "$dir/argjson.err"; then
+    echo "update_github_release_notes.sh: --argjson failed for unexpected reason:" >&2
+    cat "$dir/argjson.err" >&2
+    self_test_cleanup
+    return 1
+  else
+    echo "update_github_release_notes.sh: --argjson rejected ${bytes}-byte payload (Argument list too long)"
+  fi
+
+  if ! write_openrouter_input_file "$dir/out.json" "$dir/prs.json" "" ""; then
+    echo "update_github_release_notes.sh: large payload write failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+  n=$(jq '.merged_pull_requests | length' "$dir/out.json")
+  if [ "$n" != "80" ]; then
+    echo "update_github_release_notes.sh: large payload PR count mismatch (got $n)" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq '.merged_pull_requests[0].number' "$dir/out.json")" != "1" ]; then
+    echo "update_github_release_notes.sh: large payload first PR mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq -r '.merged_pull_requests[-1].title' "$dir/out.json")" != "PR 80" ]; then
+    echo "update_github_release_notes.sh: large payload last PR mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq '.commits_in_range | length' "$dir/out.json")" != "0" ]; then
+    echo "update_github_release_notes.sh: large payload commits should be empty" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  self_test_cleanup
+  echo "update_github_release_notes.sh: self-test passed"
+}
+
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   usage
+fi
+
+if [ "${1:-}" = "--self-test" ]; then
+  require_cmd jq
+  self_test
+  exit 0
 fi
 
 require_cmd jq

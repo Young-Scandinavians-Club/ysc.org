@@ -29,4 +29,13 @@ defmodule Ysc.StripeBehaviour do
               {:ok, Stripe.PaymentMethod.t()} | {:error, any()}
   @callback create_setup_intent(map()) ::
               {:ok, Stripe.SetupIntent.t()} | {:error, any()}
+  @callback retrieve_invoice(String.t(), map()) ::
+              {:ok, Stripe.Invoice.t()} | {:error, any()}
+  @callback list_invoice_payments(map(), keyword()) ::
+              {:ok, Stripe.List.t(Stripe.InvoicePayment.t())} | {:error, any()}
+
+  # Optional so the many ad-hoc test clients don't all need stubs; callers go
+  # through `Ysc.Stripe.InvoiceHelpers`, which treats a missing callback as an
+  # error.
+  @optional_callbacks retrieve_invoice: 2, list_invoice_payments: 2
 end

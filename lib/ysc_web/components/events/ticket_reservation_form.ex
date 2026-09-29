@@ -4,7 +4,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
   import YscWeb.AdminComponents
 
   alias Ysc.Events
-  alias Ysc.Accounts
+  alias YscWeb.AdminUserSearch
 
   @impl true
   def render(assigns) do
@@ -111,9 +111,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
      |> assign(assigns)
      |> assign(:ticket_tier_id, ticket_tier.id)
      |> assign(:form, to_form(changeset))
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+     |> AdminUserSearch.assign_blank()}
   end
 
   @impl true
@@ -136,9 +134,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
      |> assign(assigns)
      |> assign(:ticket_tier_id, ticket_tier_id)
      |> assign(:form, to_form(changeset))
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+     |> AdminUserSearch.assign_blank()}
   end
 
   @impl true
@@ -185,17 +181,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
     if socket.assigns[:admin_role] != :admin do
       {:noreply, socket}
     else
-      results =
-        if String.length(query) >= 2 do
-          Accounts.search_users(query, limit: 10)
-        else
-          []
-        end
-
-      {:noreply,
-       socket
-       |> assign(:user_search, query)
-       |> assign(:user_search_results, results)}
+      {:noreply, AdminUserSearch.search(socket, query)}
     end
   end
 
@@ -204,7 +190,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
     if socket.assigns[:admin_role] != :admin do
       {:noreply, socket}
     else
-      user = Accounts.get_user!(id)
+      socket = AdminUserSearch.select(socket, id)
 
       # Get existing values from the current changeset to preserve them
       existing_changeset = socket.assigns.form.source
@@ -213,7 +199,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
         "ticket_tier_id" => socket.assigns.ticket_tier_id,
         "created_by_id" => socket.assigns.current_user.id,
         "status" => "active",
-        "user_id" => user.id,
+        "user_id" => socket.assigns.selected_user.id,
         "quantity" => Ecto.Changeset.get_field(existing_changeset, :quantity),
         "discount_percentage" =>
           Ecto.Changeset.get_field(existing_changeset, :discount_percentage),
@@ -228,12 +214,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
         |> Events.TicketReservation.changeset(params)
         |> Map.put(:action, :validate)
 
-      {:noreply,
-       socket
-       |> assign(:selected_user, user)
-       |> assign(:user_search, "")
-       |> assign(:user_search_results, [])
-       |> assign(:form, to_form(changeset))}
+      {:noreply, assign(socket, :form, to_form(changeset))}
     end
   end
 
@@ -261,9 +242,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
 
     {:noreply,
      socket
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])
+     |> AdminUserSearch.assign_blank()
      |> assign(:form, to_form(changeset))}
   end
 

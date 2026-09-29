@@ -188,13 +188,13 @@ defmodule YscWeb.UserSettingsLive do
           show
         >
           <.modal_title id="update-payment-method-modal-title">
-            Payment Method
+            Payment method
           </.modal_title>
           <%!-- Loading state --%>
           <.async_section_loader
             :if={assigns[:loading_payment_methods]}
             id="user-settings-payment-methods-loading"
-            label="Loading payment methods..."
+            label="Loading your payment methods..."
             class="py-12"
           />
           <%!-- Loaded content --%>
@@ -202,7 +202,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Section 1: Existing payment methods --%>
             <div :if={length(@all_payment_methods) > 0}>
               <p class="text-sm font-medium text-zinc-500 uppercase tracking-wide mb-3">
-                Saved methods
+                Saved payment methods
               </p>
               <div class="space-y-2">
                 <%= for payment_method <- @all_payment_methods do %>
@@ -279,7 +279,7 @@ defmodule YscWeb.UserSettingsLive do
                       phx-click="delete-payment-method"
                       phx-value-payment_method_id={payment_method.id}
                       disabled={busy?}
-                      data-confirm="Remove this payment method? It will be removed from your account and can no longer be used for membership payments."
+                      data-confirm="Remove this payment method? It will be removed from your account and can no longer be used to pay membership dues."
                       aria-label="Remove payment method"
                       class="shrink-0 p-1.5 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -288,46 +288,24 @@ defmodule YscWeb.UserSettingsLive do
                         name="hero-trash"
                         class="w-4 h-4"
                       />
-                      <svg
+                      <.loading_spinner
                         :if={deleting_this?}
-                        class="w-4 h-4 animate-spin text-red-600"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          class="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          stroke-width="4"
-                        />
-                        <path
-                          class="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
+                        id={"delete-payment-method-spinner-#{payment_method.id}"}
+                        class="w-4 h-4 text-red-600"
+                      />
                     </button>
                   </div>
                 <% end %>
               </div>
             </div>
-            <%!-- Separator --%>
-            <div class="relative my-6">
-              <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-zinc-200"></div>
-              </div>
-              <div
-                :if={!@show_new_payment_form}
-                class="relative flex justify-center"
-              >
-                <span class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide">
-                  Add new
-                </span>
-              </div>
-            </div>
+            <.labeled_divider
+              id="payment-add-new-divider"
+              class="my-6"
+              show_label={!@show_new_payment_form}
+              label_class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide"
+            >
+              Add new
+            </.labeled_divider>
             <%!-- Section 2: Add new payment method button OR Stripe form --%>
             <div :if={!@show_new_payment_form} class="flex justify-center py-2">
               <.button
@@ -339,7 +317,8 @@ defmodule YscWeb.UserSettingsLive do
                 phx-disable-with="Loading..."
                 class="border-2 border-dashed border-zinc-300 px-5 text-zinc-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
               >
-                <.icon name="hero-plus-circle" class="w-5 h-5" /> Add Payment Method
+                <.icon name="hero-plus-circle" class="w-5 h-5" />
+                Add a payment method
               </.button>
             </div>
             <div :if={@show_new_payment_form && @payment_intent_secret}>
@@ -379,7 +358,7 @@ defmodule YscWeb.UserSettingsLive do
               color="blue"
               class="px-4"
             >
-              Save Payment Method
+              Save payment method
             </.button>
           </div>
         </.modal>
@@ -403,7 +382,7 @@ defmodule YscWeb.UserSettingsLive do
           }
         />
 
-        <div class="text-medium px-2 text-zinc-500 rounded-sm w-full md:border-l md:border md:border-zinc-100 md:pl-16">
+        <div class="text-medium px-2 text-zinc-500 rounded-sm w-full min-w-0 md:border-l md:border-zinc-100 md:pl-16">
           <div :if={@live_action == :edit} class="space-y-8">
             <!-- Profile Picture Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
@@ -434,26 +413,10 @@ defmodule YscWeb.UserSettingsLive do
                     :if={@avatar_processing}
                     class="absolute inset-0 flex items-center justify-center"
                   >
-                    <svg
-                      class="w-8 h-8 text-blue-600 animate-spin"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
+                    <.loading_spinner
+                      id="avatar-processing-overlay-spinner"
+                      class="w-8 h-8 text-blue-600"
+                    />
                   </div>
                 </div>
 
@@ -549,27 +512,10 @@ defmodule YscWeb.UserSettingsLive do
                     :if={@avatar_processing}
                     class="flex items-center gap-2 text-sm text-blue-600"
                   >
-                    <svg
-                      class="w-4 h-4 animate-spin"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        class="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        stroke-width="4"
-                      />
-                      <path
-                        class="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                    Processing your photo…
+                    <.loading_spinner
+                      id="avatar-processing-label-spinner"
+                      class="w-4 h-4"
+                    /> Processing your photo…
                   </div>
 
                   <%!-- Avatar library: avoid tall skeleton that collapses when empty (CLS) --%>
@@ -610,28 +556,10 @@ defmodule YscWeb.UserSettingsLive do
                             :if={@selecting_avatar_id == avatar.id}
                             class="absolute inset-0 flex items-center justify-center rounded-full bg-white/60"
                           >
-                            <svg
-                              class="animate-spin w-5 h-5 text-blue-600"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                class="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                stroke-width="4"
-                              >
-                              </circle>
-                              <path
-                                class="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                              >
-                              </path>
-                            </svg>
+                            <.loading_spinner
+                              id={"select-avatar-spinner-#{avatar.id}"}
+                              class="w-5 h-5 text-blue-600"
+                            />
                           </div>
                           <button
                             type="button"
@@ -870,7 +798,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Sub-account: read-only view --%>
             <div
               :if={@is_sub_account}
-              class="rounded-sm border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -901,7 +829,7 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
                 </div>
               </div>
-              <div class="mt-4 pt-4 border-t border-zinc-200">
+              <div class="pt-4 border-t border-zinc-200">
                 <p class="text-sm text-zinc-600 mb-2">
                   You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
                 </p>
@@ -982,7 +910,7 @@ defmodule YscWeb.UserSettingsLive do
               </.button>
               <div
                 :if={@pending_family_invites != []}
-                class="mt-6 border-t border-zinc-100 pt-4"
+                class="mt-2 border-t border-zinc-100 pt-4"
               >
                 <h3 class="text-sm font-semibold text-zinc-900">
                   Pending Family Invitations
@@ -1018,7 +946,7 @@ defmodule YscWeb.UserSettingsLive do
             <%!-- Lifetime membership: special case --%>
             <div
               :if={@active_plan_type == :lifetime && !@is_sub_account}
-              class="rounded-sm border border-zinc-100 p-6 space-y-4"
+              class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
               <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
               <.membership_status
@@ -1072,14 +1000,14 @@ defmodule YscWeb.UserSettingsLive do
               </.button>
               <.link
                 navigate={~p"/users/settings/family"}
-                class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 ms-2"
+                class="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 ms-2"
               >
                 <.icon name="hero-user-group" class="w-4 h-4" />
                 Add family members to your membership
               </.link>
               <div
                 :if={@pending_family_invites != []}
-                class="mt-6 border-t border-zinc-100 pt-4"
+                class="mt-2 border-t border-zinc-100 pt-4"
               >
                 <h3 class="text-sm font-semibold text-zinc-900">
                   Pending Family Invitations
@@ -1238,7 +1166,7 @@ defmodule YscWeb.UserSettingsLive do
                       </span>
                       <div>
                         <h3 class="text-lg font-semibold text-zinc-900">
-                          Payment Method
+                          Payment method
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
                           Used for this purchase and all future automatic renewals.
@@ -1489,7 +1417,7 @@ defmodule YscWeb.UserSettingsLive do
                     class="w-full sm:w-auto justify-center"
                   >
                     <.icon name="hero-credit-card" class="w-5 h-5" />
-                    Change Payment Method
+                    Change payment method
                   </.button>
                   <.button
                     :if={
@@ -1501,7 +1429,7 @@ defmodule YscWeb.UserSettingsLive do
                     disabled={!@user_is_active}
                     class="w-full sm:w-auto justify-center"
                   >
-                    Turn on auto-renewal
+                    Turn on automatic renewal
                   </.button>
                   <.button
                     :if={
@@ -1519,10 +1447,10 @@ defmodule YscWeb.UserSettingsLive do
                           @current_membership
                         )
                     }
-                    data-confirm="Turn off automatic renewal? You keep full membership benefits until your current membership year ends, and you can turn auto-renewal back on anytime before then."
+                    data-confirm="Turn off automatic renewal? You keep full membership benefits until your current membership year ends, and you can turn automatic renewal back on anytime before then."
                     class="w-full sm:w-auto justify-center"
                   >
-                    Turn off auto-renewal
+                    Turn off automatic renewal
                   </.button>
                 </div>
               </div>
@@ -1685,7 +1613,7 @@ defmodule YscWeb.UserSettingsLive do
                       </span>
                       <div>
                         <h3 class="text-lg font-semibold text-zinc-900">
-                          Payment Method
+                          Payment method
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
                           Used for this change and all future automatic renewals.
@@ -1871,14 +1799,14 @@ defmodule YscWeb.UserSettingsLive do
           </.modal>
 
           <div :if={@live_action == :notifications} class="space-y-6">
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
+            <div class="rounded-sm border border-zinc-100 py-4 px-4 flex flex-col gap-4">
               <h2 class="text-zinc-900 font-bold text-xl">
                 Notification Preferences
               </h2>
               <p class="text-sm text-zinc-600">
                 Manage how you receive notifications from the YSC. You can control which types of notifications you receive by email or text message.
               </p>
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p class="text-sm text-blue-900">
                   <strong>SMS Consent:</strong>
                   By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club (YSC). Message and data rates may apply. You can opt out at any time by unchecking the Text options below or sending a STOP message to the number you receive messages from. See our
@@ -3971,7 +3899,7 @@ defmodule YscWeb.UserSettingsLive do
                    YscWeb.Flash.put_toast(
                      socket,
                      :error,
-                     "We saved your card, but couldn't make it your default. Please try again, or contact us at info@ysc.org if this keeps happening.",
+                     "We saved your payment method, but couldn't make it your default. Please try again, or contact us at info@ysc.org if this keeps happening.",
                      title: "Payment"
                    )}
               end
@@ -3981,7 +3909,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "We couldn't save your card. Please try again, or email info@ysc.org if this keeps happening.",
+                 "We couldn't save your payment method. Please try again, or email info@ysc.org if this keeps happening.",
                  title: "Payment"
                )}
           end
@@ -4040,7 +3968,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Payment method not found.",
+           "We couldn't find that payment method.",
            title: "Payment"
          )}
     end
@@ -4068,7 +3996,10 @@ defmodule YscWeb.UserSettingsLive do
 
       nil ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Payment method not found.",
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "We couldn't find that payment method.",
            title: "Payment"
          )}
 
@@ -4080,7 +4011,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "This is the only payment method on file for your active membership. Add another payment method first, or cancel your membership, before removing it.",
+           "This is the only payment method on file for your membership. Add another payment method first, or turn off automatic renewal, before removing it.",
            title: "Payment"
          )}
     end
@@ -4108,7 +4039,7 @@ defmodule YscWeb.UserSettingsLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "We couldn't open the secure payment form. Please refresh the page and try again, or email info@ysc.org for help adding your card.",
+         "We couldn't open the secure payment form. Please refresh the page and try again, or email info@ysc.org for help adding your payment method.",
          title: "Payment"
        )
        |> assign(:show_new_payment_form, false)}
@@ -4151,7 +4082,7 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a card.",
+             "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a payment method.",
              title: "Payment"
            )
            |> assign(:show_new_payment_form, false)}
@@ -4328,6 +4259,20 @@ defmodule YscWeb.UserSettingsLive do
            title: "Membership"
          )}
 
+      {:error, :date_of_birth_required} ->
+        # The acceptance page collects the date of birth before linking.
+        {:noreply,
+         push_navigate(socket, to: ~p"/family-invite/#{token}/accept")}
+
+      {:error, :child_is_adult} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           FamilyInvites.child_is_adult_message(),
+           title: "Membership"
+         )}
+
       {:error, _} ->
         {:noreply,
          YscWeb.Flash.put_toast(
@@ -4372,7 +4317,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :info,
-                 "Auto-renewal is off. You'll keep access until your current membership year ends.",
+                 "Automatic renewal is off. You'll keep access until your current membership year ends.",
                  title: "Membership"
                )
                |> push_patch(to: ~p"/users/membership")}
@@ -4388,7 +4333,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "Couldn't turn off auto-renewal. Please try again.",
+                 "Couldn't turn off automatic renewal. Please try again.",
                  title: "Membership"
                )}
           end
@@ -4478,7 +4423,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :info,
-                 "Auto-renewal is on. Your membership will renew as usual.",
+                 "Automatic renewal is on. Your membership will renew as usual.",
                  title: "Membership"
                )
                |> push_patch(to: ~p"/users/membership")}
@@ -4983,10 +4928,10 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, _reason} ->
           {socket,
-           "Payment method updated. We couldn't activate membership automatically — choose a plan below to finish."}
+           "Payment method saved. We couldn't activate membership automatically — choose a plan below to finish."}
       end
     else
-      {socket, "Payment method updated and set as default."}
+      {socket, "Payment method saved and set as default."}
     end
   end
 
@@ -5111,7 +5056,7 @@ defmodule YscWeb.UserSettingsLive do
          |> assign(:deleting_payment_method_id, nil)
          |> YscWeb.Flash.put_toast(
            :error,
-           "This is the only payment method on file for your active membership. Add another payment method first, or cancel your membership, before removing it.",
+           "This is the only payment method on file for your membership. Add another payment method first, or turn off automatic renewal, before removing it.",
            title: "Payment"
          )}
 
@@ -5165,7 +5110,9 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:selecting_payment_method, false)
-         |> YscWeb.Flash.put_toast(:info, "Payment method set as default.",
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "This payment method is now your default.",
            title: "Payment",
            icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
          )}
@@ -5277,7 +5224,7 @@ defmodule YscWeb.UserSettingsLive do
      revert_optimistic_update(socket)
      |> YscWeb.Flash.put_toast(
        :error,
-       "Failed to set payment method as default",
+       "We couldn't set that payment method as your default.",
        title: "Payment"
      )}
   end
@@ -5367,8 +5314,7 @@ defmodule YscWeb.UserSettingsLive do
     if socket.assigns[:default_payment_method] do
       :ok
     else
-      {:error,
-       "To upgrade, please add a payment method first. Use the Payment method step above to add a card or bank account."}
+      {:error, "To upgrade, add a payment method first using the step above."}
     end
   end
 
@@ -6296,7 +6242,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp retry_invoice_link_help_message do
-    "This payment link didn't work — it may have expired. Click your name in the top-right corner and open Membership to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
+    "This payment link didn't work — it may have expired. Click your name in the top-right corner and open Membership to update your payment method and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
   end
 
   defp subscription_items_contain_price?(subscription, price_id) do

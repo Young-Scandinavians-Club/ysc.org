@@ -163,6 +163,35 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
              )
     end
 
+    test "does not SELECT password hashes when sending reminders", %{
+      event: event,
+      collection: collection
+    } do
+      buyer = user_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: buyer.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> EventPhotoReminderWorker.send_reminders(event, collection) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+    end
+
     test "schedules mailer jobs for multiple attendees", %{
       event: event,
       collection: collection

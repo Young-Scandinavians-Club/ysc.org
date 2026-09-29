@@ -11,7 +11,7 @@ defmodule YscWeb.AdminComponents do
   use YscWeb, :verified_routes
 
   alias Phoenix.LiveView.JS
-  alias Ysc.Accounts.UserDisplay
+  alias Ysc.Accounts.{SignupApplication, UserDisplay}
   alias YscWeb.AdminBookingEntitlementHelpers, as: EntitlementHelpers
   alias YscWeb.FormHelpers
 
@@ -539,6 +539,9 @@ defmodule YscWeb.AdminComponents do
   Pass `target={@myself}` from LiveComponents so search/select/clear events
   stay on the component.
 
+  Drive the search / select / clear assigns with `YscWeb.AdminUserSearch`
+  instead of copying `Accounts.search_users/2` handlers in each LiveView.
+
   ## Examples
 
       <.admin_user_autocomplete
@@ -554,6 +557,13 @@ defmodule YscWeb.AdminComponents do
         target={@myself}
         required
       />
+
+      # In the LiveView / LiveComponent:
+      alias YscWeb.AdminUserSearch
+
+      {:noreply, AdminUserSearch.search(socket, query)}
+      {:noreply, AdminUserSearch.select(socket, id)}
+      {:noreply, AdminUserSearch.assign_blank(socket)}
   """
   attr :id, :string, required: true
   attr :label, :string, default: "Member"
@@ -3035,7 +3045,7 @@ defmodule YscWeb.AdminComponents do
           <div id="admin-nav-logo-expanded">
             <.link navigate="/" class="items-center group ps-2.5 inline-block">
               <div class="flex items-center gap-2">
-                <.ysc_logo class="h-20 me-3" width={80} height={80} />
+                <.ysc_logo class="h-20 me-3" width={80} height={80} decorative />
                 <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded-sm">
                   ADMIN
                 </span>
@@ -3052,7 +3062,7 @@ defmodule YscWeb.AdminComponents do
             class="hidden flex-col items-center justify-center pt-2 pb-1 gap-1"
           >
             <.link navigate="/" aria-label="Go to site">
-              <.ysc_logo width={36} height={36} />
+              <.ysc_logo width={36} height={36} decorative />
             </.link>
           </div>
 
@@ -4140,6 +4150,261 @@ defmodule YscWeb.AdminComponents do
         />
       </div>
     </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_quoted_answer
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Italic boxed long-form answer used on membership application review screens.
+
+  ## Examples
+
+      <.admin_quoted_answer label="Link to Scandinavia">
+        {@application.link_to_scandinavia}
+      </.admin_quoted_answer>
+  """
+  attr :label, :string, required: true
+  attr :id, :string, default: nil
+  slot :inner_block, required: true
+
+  def admin_quoted_answer(assigns) do
+    ~H"""
+    <div class="pt-1">
+      <p class="text-sm font-semibold text-zinc-600 mb-1">
+        {@label}
+      </p>
+      <div
+        id={@id}
+        class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10"
+      >
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_signup_application
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Applicant details and written answers from a membership signup application.
+
+  Shared by the users-list review modal and the user-detail application tab.
+  Pass a user with `family_members` loaded when family members should be listed.
+
+  Country-flag IDs stay `application-place-of-birth`, `application-citizenship`,
+  and `application-most-connected-nordic-country` so existing LiveView tests keep
+  working. The "how did you hear about the club?" answer uses
+  `review-application-hear-about-the-club`.
+
+  ## Examples
+
+      <.admin_signup_application
+        user={@selected_user}
+        application={@selected_user_application}
+      />
+  """
+  attr :id, :string, default: "admin-signup-application"
+
+  attr :user, :map,
+    required: true,
+    doc: "The applicant `%User{}` (optionally with `:family_members` loaded)"
+
+  attr :application, :map,
+    required: true,
+    doc: "The `%SignupApplication{}` being reviewed"
+
+  def admin_signup_application(assigns) do
+    assigns =
+      assign(assigns,
+        family_members:
+          loaded_assoc_list(Map.get(assigns.user, :family_members)),
+        eligibility:
+          loaded_assoc_list(
+            Map.get(assigns.application, :membership_eligibility)
+          )
+      )
+
+    ~H"""
+    <section id={"#{@id}-details"}>
+      <.application_review_heading>Applicant Details</.application_review_heading>
+      <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+        <.application_definition label="Full Name">
+          {@user.first_name} {@user.last_name}
+        </.application_definition>
+        <.application_definition
+          label="Email"
+          value_class="mt-0.5 text-sm text-zinc-900 underline decoration-zinc-200"
+        >
+          {@user.email}
+        </.application_definition>
+        <.application_definition label="Birth Date">
+          {UserDisplay.birth_date_label(@application.birth_date)}
+        </.application_definition>
+        <.application_definition
+          :if={@family_members != []}
+          label="Family members"
+          span?
+          value_class="mt-1 text-sm text-zinc-900"
+        >
+          <ul class="space-y-1 list-disc list-inside">
+            <li :for={family_member <- @family_members}>
+              <span class="text-xs font-medium me-2 px-2.5 py-1 rounded-sm bg-blue-100 text-blue-800">
+                {String.capitalize("#{family_member.type}")}
+              </span>
+              {family_member.first_name} {family_member.last_name} ({UserDisplay.birth_date_label(
+                family_member.birth_date
+              )})
+            </li>
+          </ul>
+        </.application_definition>
+      </dl>
+    </section>
+
+    <section id={"#{@id}-answers"}>
+      <.application_review_heading>Answers</.application_review_heading>
+      <div class="space-y-4">
+        <div class="py-2">
+          <p class="text-sm font-semibold text-zinc-600 mb-1.5">
+            Membership type
+          </p>
+          <.badge type={family_membership_badge_type(@application.membership_type)}>
+            {String.capitalize("#{@application.membership_type}")}
+          </.badge>
+        </div>
+        <div class="bg-zinc-50 rounded-lg p-4 ring-1 ring-zinc-200/50">
+          <p class="text-sm font-semibold text-zinc-700 mb-2">
+            Eligibility & Connections
+          </p>
+          <ul class="text-sm space-y-1 list-disc list-inside text-zinc-600">
+            <li :for={reason <- @eligibility}>
+              {Map.get(SignupApplication.eligibility_lookup(), reason)}
+            </li>
+          </ul>
+        </div>
+
+        <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+          <.application_definition label="Occupation">
+            {@application.occupation}
+          </.application_definition>
+          <.application_definition
+            label="Place of birth"
+            value_class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2"
+          >
+            <.admin_country_with_flag
+              id="application-place-of-birth"
+              country={@application.place_of_birth}
+            />
+          </.application_definition>
+          <.application_definition
+            label="Citizenship"
+            value_class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2"
+          >
+            <.admin_country_with_flag
+              id="application-citizenship"
+              country={@application.citizenship}
+            />
+          </.application_definition>
+          <.application_definition
+            label="Most connected Nordic country"
+            value_class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2"
+          >
+            <.admin_country_with_flag
+              id="application-most-connected-nordic-country"
+              country={@application.most_connected_nordic_country}
+            />
+          </.application_definition>
+        </dl>
+
+        <.admin_quoted_answer label="Link to Scandinavia">
+          {@application.link_to_scandinavia}
+        </.admin_quoted_answer>
+        <.admin_quoted_answer label="Lived in Scandinavia">
+          {@application.lived_in_scandinavia}
+        </.admin_quoted_answer>
+        <.admin_quoted_answer label="Spoken languages">
+          {@application.spoken_languages}
+        </.admin_quoted_answer>
+        <.admin_quoted_answer
+          id="review-application-hear-about-the-club"
+          label="How did you hear about the club?"
+        >
+          {@application.hear_about_the_club}
+        </.admin_quoted_answer>
+      </div>
+    </section>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :span?, :boolean, default: false
+  attr :value_class, :any, default: nil
+  slot :inner_block, required: true
+
+  defp application_definition(assigns) do
+    ~H"""
+    <div class={["py-2", @span? && "sm:col-span-2"]}>
+      <dt class="text-sm font-semibold text-zinc-600">{@label}</dt>
+      <dd class={@value_class || "mt-0.5 text-sm text-zinc-900"}>
+        {render_slot(@inner_block)}
+      </dd>
+    </div>
+    """
+  end
+
+  slot :inner_block, required: true
+
+  defp application_review_heading(assigns) do
+    ~H"""
+    <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+      {render_slot(@inner_block)}
+    </h3>
+    """
+  end
+
+  defp family_membership_badge_type(type) when type in [:family, "family"],
+    do: "green"
+
+  defp family_membership_badge_type(_), do: "default"
+
+  defp loaded_assoc_list(value) when is_list(value), do: value
+  defp loaded_assoc_list(_), do: []
+
+  # ---------------------------------------------------------------------------
+  # admin_application_reviewer
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Linked card showing the admin who reviewed a membership application.
+
+  Preload the reviewer's `:current_avatar` so their uploaded avatar is shown.
+  """
+  attr :id, :string, required: true
+  attr :reviewer, :map, required: true, doc: "The reviewing `%User{}`"
+
+  def admin_application_reviewer(assigns) do
+    ~H"""
+    <section id={@id}>
+      <.application_review_heading>Reviewed by</.application_review_heading>
+      <.link
+        id={"#{@id}-link"}
+        navigate={~p"/admin/users/#{@reviewer.id}/details"}
+        class="flex items-center gap-4 p-4 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors"
+      >
+        <.user_avatar_image user={@reviewer} class="w-10 h-10 rounded-full" />
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-zinc-900 truncate">
+            {@reviewer.first_name} {@reviewer.last_name}
+          </div>
+          <div class="text-sm text-zinc-600 truncate">{@reviewer.email}</div>
+        </div>
+        <.icon name="hero-chevron-right" class="w-4 h-4 text-zinc-400 shrink-0" />
+      </.link>
+    </section>
     """
   end
 

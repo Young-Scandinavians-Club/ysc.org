@@ -26,7 +26,9 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
       assert body =~ "[YSC]"
       assert body =~ "Valued Member"
       assert body =~ "Property"
-      assert body =~ "Not Available"
+      assert body =~ "isn't ready yet"
+      assert body =~ "Cabin Master"
+      refute body =~ "Not Available"
       assert body =~ BookingDisplay.checkin_time_label()
     end
 
@@ -45,7 +47,16 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
       assert body =~ "May 01, 2026"
       assert body =~ "1234"
       assert body =~ "4:00 PM"
+      refute body =~ "isn't ready yet"
       refute body =~ "\n\n"
+    end
+
+    test "treats leftover Not Available as a missing door code" do
+      body = BookingCheckinReminder.render(%{door_code: "Not Available"})
+      assert body =~ "isn't ready yet"
+      assert body =~ "Cabin Master"
+      refute body =~ "Not Available"
+      refute body =~ "Your door code is:"
     end
   end
 
@@ -82,8 +93,34 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
       assert data.property_name == "Tahoe"
       assert data.checkin_time == BookingDisplay.checkin_time_label()
       assert is_binary(data.checkin_date)
+      assert data.door_code == nil
+    end
 
-      assert data.door_code == "Not Available" or is_binary(data.door_code)
+    test "includes the active door code when one exists" do
+      user = user_fixture(%{first_name: "Bjorn"})
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      suffix =
+        System.unique_integer([:positive])
+        |> Integer.to_string()
+        |> String.slice(-2, 2)
+
+      {:ok, door_code} =
+        Ysc.Bookings.create_door_code(%{
+          property: :tahoe,
+          code: "S#{suffix}4"
+        })
+
+      booking = Repo.preload(booking, :user)
+
+      data = BookingCheckinReminder.prepare_sms_data(booking)
+      assert data.door_code == door_code.code
     end
 
     test "uses Clear Lake property label" do

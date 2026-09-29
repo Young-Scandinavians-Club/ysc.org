@@ -19,7 +19,6 @@ defmodule YscWeb.BookingCheckoutLive do
   alias YscWeb.BookingGuestForm
   alias YscWeb.BookingUserMessages
   alias YscWeb.BookingDisplay
-  import Ecto.Query
   import Ysc.Text, only: [titleize: 1]
   import YscWeb.Components.BookingGuestInfoForm
   require Ysc.Logging
@@ -129,13 +128,7 @@ defmodule YscWeb.BookingCheckoutLive do
   defp load_booking(booking_id, user) do
     # SECURITY: Filter by user_id in the database query to prevent unauthorized access
     # This ensures we only fetch bookings that belong to the current user
-    booking_query =
-      from(b in Booking,
-        where: b.id == ^booking_id and b.user_id == ^user.id,
-        preload: [:user, :booking_guests, rooms: :room_category]
-      )
-
-    case Repo.one(booking_query) do
+    case Bookings.get_user_booking_for_member_checkout(booking_id, user.id) do
       nil ->
         {:error,
          {:redirect, ~p"/", YscWeb.BookingUserMessages.checkout_not_found()}}
@@ -233,7 +226,13 @@ defmodule YscWeb.BookingCheckoutLive do
 
     is_expired = booking_expired?(booking)
     {checkout_step, guest_info_form} = determine_checkout_step(booking, user)
-    {family_members, other_family_members} = load_family_members(user)
+
+    {family_members, other_family_members} =
+      if checkout_step == :guest_info do
+        BookingGuestForm.load_family_members(user)
+      else
+        {[], []}
+      end
 
     socket =
       assign(socket,
@@ -292,15 +291,6 @@ defmodule YscWeb.BookingCheckoutLive do
     else
       {:payment, nil}
     end
-  end
-
-  defp load_family_members(user) do
-    family_members = Ysc.Accounts.get_family_group(user)
-
-    other_family_members =
-      Enum.reject(family_members, fn member -> member.id == user.id end)
-
-    {family_members, other_family_members}
   end
 
   defp create_payment_intent_if_needed(
@@ -735,7 +725,7 @@ defmodule YscWeb.BookingCheckoutLive do
               <%= if @complimentary_checkout do %>
                 Continue to confirmation
               <% else %>
-                Continue to Payment
+                Continue to payment
               <% end %>
             </span>
             <.icon name="hero-arrow-right" class="w-5 h-5" />
@@ -1347,13 +1337,9 @@ defmodule YscWeb.BookingCheckoutLive do
           {:ok, _guests} ->
             # Reload booking to get guests
             booking =
-              Repo.get!(Booking, socket.assigns.booking.id)
-              |> Repo.preload([
-                :user,
-                :booking_guests,
-                :rooms,
-                rooms: :room_category
-              ])
+              Bookings.get_booking_for_member_checkout!(
+                socket.assigns.booking.id
+              )
 
             # Create payment intent now that guests are saved (skip Stripe when total is $0)
             user = socket.assigns.current_user
@@ -2555,6 +2541,15 @@ defmodule YscWeb.BookingCheckoutLive do
           else
             adult_price_per_night
           end %>
+        <div
+          :if={billable_people > guests_count}
+          id="checkout-minimum-pricing-applied"
+          class="mb-2 p-2 bg-amber-900/40 border border-amber-700 rounded-sm"
+        >
+          <p class="text-xs text-amber-100 leading-tight">
+            {BookingUserMessages.room_minimum_pricing_applied(billable_people)}
+          </p>
+        </div>
         <!-- Adults pricing -->
         <%= if billable_people > 0 && (base_total || adult_price_per_night) do %>
           <% final_base_total =
@@ -2570,8 +2565,11 @@ defmodule YscWeb.BookingCheckoutLive do
                    nil
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-            <div class="text-zinc-400">
-              {BookingDisplay.adults_label(billable_people)}
+            <div id="checkout-base-price-people" class="text-zinc-400">
+              {BookingUserMessages.room_base_price_people_label(
+                billable_people,
+                guests_count
+              )}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
               <%= if adult_price_per_night do %>
@@ -2850,8 +2848,7 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp reload_checkout_booking(booking_id) do
-    Repo.get!(Booking, booking_id)
-    |> Repo.preload([:user, :booking_guests, rooms: :room_category])
+    Bookings.get_booking_for_member_checkout!(booking_id)
   end
 
   defp booking_payable?(%Booking{status: :hold} = booking) do
@@ -3185,7 +3182,7 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp checkout_guest_info_submit_label(true), do: "Continue to confirmation"
-  defp checkout_guest_info_submit_label(false), do: "Continue to Payment"
+  defp checkout_guest_info_submit_label(false), do: "Continue to payment"
 
   defp save_guests(booking, guest_changesets) when is_list(guest_changesets) do
     # Delete existing guests first (in case of re-submission)

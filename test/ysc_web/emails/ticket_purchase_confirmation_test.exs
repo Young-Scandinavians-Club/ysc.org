@@ -476,15 +476,14 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       event = ticket_order.event
 
       {:ok, agenda} =
-        %Agenda{}
-        |> Agenda.changeset(%{event_id: event.id, title: "Day 1"})
+        %Agenda{event_id: event.id}
+        |> Agenda.changeset(%{title: "Day 1"})
         |> Ecto.Changeset.put_change(:position, 0)
         |> Repo.insert()
 
       {:ok, _} =
-        %AgendaItem{}
+        %AgendaItem{agenda_id: agenda.id}
         |> AgendaItem.changeset(%{
-          agenda_id: agenda.id,
           title: "Doors",
           description: "Open",
           start_time: ~T[09:00:00],
@@ -513,8 +512,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       event = ticket_order.event
 
       {:ok, _} =
-        %Agenda{}
-        |> Agenda.changeset(%{event_id: event.id, title: "Empty day"})
+        %Agenda{event_id: event.id}
+        |> Agenda.changeset(%{title: "Empty day"})
         |> Ecto.Changeset.put_change(:position, 0)
         |> Repo.insert()
 
@@ -739,15 +738,14 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       event = ticket_order.event
 
       {:ok, a1} =
-        %Agenda{}
-        |> Agenda.changeset(%{event_id: event.id, title: "Morning"})
+        %Agenda{event_id: event.id}
+        |> Agenda.changeset(%{title: "Morning"})
         |> Ecto.Changeset.put_change(:position, 0)
         |> Repo.insert()
 
       {:ok, _} =
-        %AgendaItem{}
+        %AgendaItem{agenda_id: a1.id}
         |> AgendaItem.changeset(%{
-          agenda_id: a1.id,
           title: "Coffee",
           description: nil,
           start_time: ~T[09:00:00],
@@ -757,15 +755,14 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
         |> Repo.insert()
 
       {:ok, a2} =
-        %Agenda{}
-        |> Agenda.changeset(%{event_id: event.id, title: "Afternoon"})
+        %Agenda{event_id: event.id}
+        |> Agenda.changeset(%{title: "Afternoon"})
         |> Ecto.Changeset.put_change(:position, 1)
         |> Repo.insert()
 
       {:ok, _} =
-        %AgendaItem{}
+        %AgendaItem{agenda_id: a2.id}
         |> AgendaItem.changeset(%{
-          agenda_id: a2.id,
           title: "Talk",
           description: "Details",
           start_time: ~T[14:00:00],

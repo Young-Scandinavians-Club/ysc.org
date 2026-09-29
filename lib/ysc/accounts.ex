@@ -211,6 +211,38 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @notification_profile_fields [
+    :id,
+    :email,
+    :phone_number,
+    :account_notifications_sms,
+    :event_notifications_sms,
+    :event_notifications,
+    :state
+  ]
+
+  @doc """
+  Loads the columns needed to decide whether to send email or SMS.
+
+  Used by the email and SMS workers instead of `get_user/1` / `Repo.get/2`,
+  so those paths do not SELECT `hashed_password` / `board_bio`.
+  Returns `nil` when no row matches.
+  """
+  def get_user_notification_profile(nil), do: nil
+
+  def get_user_notification_profile(user_id) do
+    user_id
+    |> user_notification_profile_query()
+    |> Repo.one()
+  end
+
+  defp user_notification_profile_query(user_id) do
+    from(u in User,
+      where: u.id == ^user_id,
+      select: struct(u, ^@notification_profile_fields)
+    )
+  end
+
   @doc """
   Returns whether the user has a password set in the database.
 
@@ -510,8 +542,38 @@ defmodule Ysc.Accounts do
              user_id: id
            }) do
       Repo.get_by!(SignupApplication, user_id: id)
-      |> Repo.preload(preloads)
+      |> preload_signup_application(preloads)
     end
+  end
+
+  # Reviewer card only needs name, email, country, and avatar thumbs — not
+  # password hashes, bios, or Stripe ids.
+  @signup_application_reviewer_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :most_connected_country,
+    :current_avatar_id
+  ]
+
+  defp preload_signup_application(application, reviewed_by: :current_avatar) do
+    Repo.preload(application,
+      reviewed_by: signup_application_reviewer_query()
+    )
+  end
+
+  defp preload_signup_application(application, preloads) do
+    Repo.preload(application, preloads)
+  end
+
+  defp signup_application_reviewer_query do
+    avatar_query = admin_list_avatar_preload_query()
+
+    from(u in User,
+      select: struct(u, ^@signup_application_reviewer_fields),
+      preload: [current_avatar: ^avatar_query]
+    )
   end
 
   ## User registration
@@ -1402,10 +1464,31 @@ defmodule Ysc.Accounts do
     from u in User, where: u.state == :pending_approval
   end
 
+  # Dashboard preview cards: name, default-avatar country, and application
+  # wait time / plan. Skip hashes, bios, and long-text application answers.
+  @pending_approval_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :state,
+    :most_connected_country,
+    :current_avatar_id,
+    :inserted_at
+  ]
+
   defp pending_approval_users_query do
-    pending_approval_users_base_query()
-    |> preload([:registration_form, :current_avatar])
-    |> order_by([u], asc: u.inserted_at, asc: u.id)
+    avatar_query = admin_list_avatar_preload_query()
+    form_query = admin_list_registration_form_query()
+
+    from(u in pending_approval_users_base_query(),
+      select: struct(u, ^@pending_approval_user_fields),
+      preload: [
+        current_avatar: ^avatar_query,
+        registration_form: ^form_query
+      ],
+      order_by: [asc: u.inserted_at, asc: u.id]
+    )
   end
 
   defp maybe_limit_pending_approval_users(query, nil), do: query
@@ -2853,8 +2936,14 @@ defmodule Ysc.Accounts do
   end
 
   # Helper function to preload only active subscriptions
+  # Inherited-membership lookup only needs the primary's id and lifetime
+  # timestamp; subscriptions are attached below.
+  @admin_list_primary_user_fields [:id, :lifetime_membership_awarded_at]
+
   defp preload_active_subscriptions(users) do
-    users = Repo.preload(users, :current_avatar)
+    users =
+      Repo.preload(users, current_avatar: admin_list_avatar_preload_query())
+
     user_ids = Enum.map(users, & &1.id)
 
     # Get active subscriptions for all users in one query
@@ -2882,7 +2971,11 @@ defmodule Ysc.Accounts do
       if primary_user_ids != [] do
         # Get primary users with their active subscriptions
         primary_users =
-          from(u in User, where: u.id in ^primary_user_ids) |> Repo.all()
+          from(u in User,
+            where: u.id in ^primary_user_ids,
+            select: struct(u, ^@admin_list_primary_user_fields)
+          )
+          |> Repo.all()
 
         # Get subscriptions for primary users
         primary_user_subscriptions =
@@ -3416,8 +3509,40 @@ defmodule Ysc.Accounts do
     %{meta | flop: updated_flop}
   end
 
+  # Applied column / dashboard wait time + plan. Skip long-text answers
+  # (`hear_about_the_club`, `link_to_scandinavia`, …) on every list page.
+  @admin_list_registration_form_fields [
+    :id,
+    :user_id,
+    :completed,
+    :reviewed_at,
+    :membership_type
+  ]
+
+  @admin_list_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+
   defp preload_registration_forms(users),
-    do: Repo.preload(users, :registration_form)
+    do:
+      Repo.preload(users,
+        registration_form: admin_list_registration_form_query()
+      )
+
+  defp admin_list_registration_form_query do
+    from(sa in SignupApplication,
+      select: struct(sa, ^@admin_list_registration_form_fields)
+    )
+  end
+
+  defp admin_list_avatar_preload_query do
+    from(a in Ysc.Avatars.Avatar, select: struct(a, ^@admin_list_avatar_fields))
+  end
 
   @doc """
   Marks a user's email as verified by setting the email_verified_at timestamp.
@@ -3521,6 +3646,89 @@ defmodule Ysc.Accounts do
     end
   end
 
+  # Guest pickers / ticket registration only need identity + name + email.
+  # Skip password hashes, bios, Stripe ids, and notification flags that
+  # `get_family_group/1` loads.
+  @guest_picker_user_fields [:id, :first_name, :last_name, :email]
+
+  # Home "Your Family" + board-pause notice. Name, relationship, avatar,
+  # and board_position only.
+  @household_dashboard_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :family_relationship,
+    :most_connected_country,
+    :current_avatar_id,
+    :board_position,
+    :primary_user_id
+  ]
+
+  @household_dashboard_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+
+  @household_board_member_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :board_position
+  ]
+
+  @doc """
+  Household members for Tahoe guest-info dropdowns and event ticket
+  registration.
+
+  One SELECT of `id`/`first_name`/`last_name`/`email` for the primary user and
+  sub-accounts. Does not replace `get_family_group/1` for billing/board checks.
+  """
+  def list_household_guest_picker_users(%User{} = user) do
+    list_household_guest_picker_users_query(user.primary_user_id || user.id)
+    |> Repo.all()
+  end
+
+  defp list_household_guest_picker_users_query(primary_id) do
+    household_users_query(primary_id, @guest_picker_user_fields)
+  end
+
+  @doc """
+  Household members for the home dashboard family section and board-pause notice.
+
+  One SELECT of name, relationship, country, avatar, and board position — not
+  the full User row `get_family_group/1` loads.
+  """
+  def list_household_dashboard_users(%User{} = user) do
+    list_household_dashboard_users_query(user.primary_user_id || user.id)
+    |> Repo.all()
+  end
+
+  defp list_household_dashboard_users_query(primary_id) do
+    avatar_query =
+      from(a in Ysc.Avatars.Avatar,
+        select: struct(a, ^@household_dashboard_avatar_fields)
+      )
+
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      select: struct(u, ^@household_dashboard_user_fields),
+      preload: [current_avatar: ^avatar_query],
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
+  end
+
+  defp household_users_query(primary_id, fields) do
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      select: struct(u, ^fields),
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
+  end
+
   @doc """
   Returns the first household member (primary or sub-account) who currently
   holds a board position, or `nil` if nobody in the household does.
@@ -3529,8 +3737,40 @@ defmodule Ysc.Accounts do
   due to board volunteer service.
   """
   def household_board_member(user) do
-    get_family_group(user)
-    |> Enum.find(&(&1.board_position != nil))
+    household_board_member_query(user.primary_user_id || user.id)
+    |> Repo.one()
+  end
+
+  @active_board_member_fields [:id, :email, :first_name, :last_name]
+
+  @doc """
+  Returns the active user currently holding `board_position`, or `nil`.
+
+  Selects `id` / `email` / `first_name` / `last_name` only — used by
+  cancellation emails and expense-report treasurer contact, not billing.
+  """
+  def get_active_board_member(position)
+      when is_atom(position) or is_binary(position) do
+    active_board_member_query(position)
+    |> Repo.one()
+  end
+
+  defp active_board_member_query(position) do
+    from(u in User,
+      where: u.board_position == ^position and u.state == :active,
+      select: struct(u, ^@active_board_member_fields),
+      limit: 1
+    )
+  end
+
+  defp household_board_member_query(primary_id) do
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      where: not is_nil(u.board_position),
+      select: struct(u, ^@household_board_member_fields),
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id],
+      limit: 1
+    )
   end
 
   @doc """
@@ -3579,10 +3819,20 @@ defmodule Ysc.Accounts do
   @doc """
   Gets all user IDs in a family group.
   Useful for querying bookings across the family.
+
+  One SELECT of `users.id` — does not load full User rows.
   """
   def get_family_group_user_ids(user) do
-    get_family_group(user)
-    |> Enum.map(& &1.id)
+    household_user_ids_query(user.primary_user_id || user.id)
+    |> Repo.all()
+  end
+
+  defp household_user_ids_query(primary_id) do
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      select: u.id,
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
   end
 
   @doc """
@@ -3929,6 +4179,244 @@ defmodule Ysc.Accounts do
     else
       {:error, :unauthorized}
     end
+  end
+
+  # Family memberships cover the primary holder, their spouse/partner, and
+  # children under this age.
+  @family_child_age_limit 18
+
+  # Only children whose 18th birthday falls within this many days are picked
+  # up by the daily sweep, so a missed run still catches them without
+  # sweeping up adult children who were linked before this rule existed.
+  @aged_out_default_lookback_days 7
+
+  @doc """
+  Lists child family members (sub-accounts) who turned #{@family_child_age_limit}
+  within the lookback window ending on `today`.
+
+  Spouses are never included. Deleted accounts are skipped.
+
+  ## Options
+  - `:lookback_days` - how many days back to look for 18th birthdays
+    (default: #{@aged_out_default_lookback_days})
+  """
+  def list_aged_out_family_members(%Date{} = today, opts \\ []) do
+    today
+    |> aged_out_family_members_query(opts)
+    |> Repo.all()
+  end
+
+  defp aged_out_family_members_query(today, opts) do
+    lookback_days =
+      Keyword.get(opts, :lookback_days, @aged_out_default_lookback_days)
+
+    # Born on or before this date => already 18 today.
+    latest_dob = latest_adult_birth_date(today)
+
+    # Born after this date => turned 18 within the lookback window.
+    earliest_dob_exclusive =
+      today
+      |> Date.add(-lookback_days)
+      |> latest_adult_birth_date()
+
+    from(u in User,
+      where: not is_nil(u.primary_user_id),
+      where: u.family_relationship == "child" or is_nil(u.family_relationship),
+      where: u.state != :deleted,
+      where: u.date_of_birth <= ^latest_dob,
+      where: u.date_of_birth > ^earliest_dob_exclusive,
+      order_by: [asc: u.date_of_birth, asc: u.id]
+    )
+  end
+
+  # Latest birth date of someone who is #{@family_child_age_limit} on `date`.
+  # Someone counts as 18 from `Date.shift(birth_date, year: 18)`, the same rule
+  # the family invite age check uses, so Feb 29 birthdays turn 18 on Feb 28 in
+  # non-leap years. Shifting `date` back instead would push them to Mar 1.
+  defp latest_adult_birth_date(date) do
+    shifted = Date.shift(date, year: -@family_child_age_limit)
+    next_day = Date.add(shifted, 1)
+
+    if Date.compare(Date.shift(next_day, year: @family_child_age_limit), date) ==
+         :gt do
+      shifted
+    else
+      next_day
+    end
+  end
+
+  @doc """
+  Detaches a child family member who has turned #{@family_child_age_limit} from
+  their family membership and emails them that they need their own membership
+  to stay a member. The family's membership holder is emailed too, so they know
+  why the member is no longer on their membership.
+
+  The row is re-read under lock so a member who already left (or was moved to
+  another family) since being listed is left untouched.
+
+  Returns `{:ok, updated_user}`, `{:error, :not_sub_account}` when the user is
+  no longer linked to the same family, or `{:error, changeset}`.
+  """
+  @dialyzer {:nowarn_function, detach_aged_out_family_member: 1}
+  def detach_aged_out_family_member(%User{} = user) do
+    primary_user_id = user.primary_user_id
+
+    if is_nil(primary_user_id) do
+      {:error, :not_sub_account}
+    else
+      multi =
+        Ecto.Multi.new()
+        |> Ecto.Multi.run(:locked_user, fn repo, _changes ->
+          locked =
+            from(u in User, where: u.id == ^user.id, lock: "FOR UPDATE")
+            |> repo.one()
+
+          case locked do
+            %User{primary_user_id: ^primary_user_id} = locked ->
+              {:ok, locked}
+
+            _ ->
+              {:error, :not_sub_account}
+          end
+        end)
+        # The member row is locked and still points at the primary, and the FK
+        # nilifies on delete, so the primary is guaranteed to exist here.
+        |> Ecto.Multi.run(:primary_user, fn repo, _changes ->
+          {:ok, repo.get!(User, primary_user_id)}
+        end)
+        |> Ecto.Multi.update(:sub_account, fn %{locked_user: locked} ->
+          Ecto.Changeset.change(locked, %{
+            primary_user_id: nil,
+            family_relationship: nil
+          })
+        end)
+        |> Ecto.Multi.insert(
+          :user_event,
+          UserEvent.new_user_event_changeset(%UserEvent{}, %{
+            user_id: user.id,
+            # No system actor exists; attribute the change to the member.
+            updated_by_user_id: user.id,
+            type: :family_removed,
+            from: "#{primary_user_id}",
+            to: "none"
+          })
+        )
+        |> YscWeb.Emails.Notifier.schedule_email_multi(
+          :family_member_aged_out_email,
+          fn %{locked_user: locked, primary_user: primary_user} ->
+            family_member_aged_out_email_args(locked, primary_user)
+          end
+        )
+        |> YscWeb.Emails.Notifier.schedule_email_multi(
+          :family_member_aged_out_primary_email,
+          fn %{locked_user: locked, primary_user: primary_user} ->
+            family_member_aged_out_primary_email_args(locked, primary_user)
+          end
+        )
+
+      case Repo.transaction(multi) do
+        {:ok, %{sub_account: updated_sub_account, primary_user: primary_user}} ->
+          MembershipCache.invalidate_user(updated_sub_account.id)
+
+          invalidate_family_link_profile_caches(
+            updated_sub_account.id,
+            primary_user_id
+          )
+
+          sync_board_volunteer_billing_after_family_change(
+            primary_user,
+            updated_sub_account
+          )
+
+          {:ok, updated_sub_account}
+
+        {:error, _step, reason, _changes} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp family_member_aged_out_email_args(user, primary_user) do
+    first_name = user.first_name || "there"
+
+    primary_name = primary_user.first_name || "the primary account holder"
+
+    membership_url = YscWeb.Emails.FamilyMemberAgedOut.membership_url()
+
+    %{
+      recipient: user.email,
+      idempotency_key: "family_member_aged_out_#{user.id}",
+      subject: YscWeb.Emails.FamilyMemberAgedOut.get_subject(),
+      template: YscWeb.Emails.FamilyMemberAgedOut.get_template_name(),
+      variables: %{
+        first_name: first_name,
+        primary_user_name: primary_name,
+        membership_url: membership_url
+      },
+      text_body: """
+      ==============================
+
+      Hi #{first_name},
+
+      Congratulations on turning 18!
+
+      Family memberships cover children under 18, so you are no longer part of #{primary_name}'s family membership.
+
+      Your account stays open. To keep booking cabins, buying member event tickets, and enjoying other member benefits, you will need your own membership:
+
+      #{membership_url}
+
+      ==============================
+      """,
+      user_id: user.id,
+      opts: []
+    }
+  end
+
+  defp family_member_aged_out_primary_email_args(member, primary_user) do
+    primary_first_name = primary_user.first_name || "there"
+
+    member_name =
+      [member.first_name, member.last_name]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.join(" ")
+      |> case do
+        "" -> "Your family member"
+        name -> name
+      end
+
+    family_management_url =
+      YscWeb.Emails.FamilyMemberAgedOutPrimary.family_management_url()
+
+    %{
+      recipient: primary_user.email,
+      idempotency_key:
+        "family_member_aged_out_primary_#{member.id}_#{primary_user.id}",
+      subject: YscWeb.Emails.FamilyMemberAgedOutPrimary.get_subject(),
+      template: YscWeb.Emails.FamilyMemberAgedOutPrimary.get_template_name(),
+      variables: %{
+        primary_first_name: primary_first_name,
+        member_name: member_name,
+        family_management_url: family_management_url
+      },
+      text_body: """
+      ==============================
+
+      Hi #{primary_first_name},
+
+      #{member_name} has turned 18. Family memberships cover children under 18, so #{member_name} is no longer part of your family membership.
+
+      Your membership and your other family members are not affected.
+
+      We have emailed #{member_name} about getting their own membership so they can keep booking cabins and buying member event tickets.
+
+      View your family: #{family_management_url}
+
+      ==============================
+      """,
+      user_id: primary_user.id,
+      opts: []
+    }
   end
 
   defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
@@ -4454,13 +4942,28 @@ defmodule Ysc.Accounts do
 
   - had `lifetime_membership_awarded_at` fall in the half-open interval
     `[range_start, range_end)`, or
-  - had their **first** ever `Subscription` that reached a paid status
-    (i.e. excluding "incomplete"/"incomplete_expired" checkout attempts
-    that never converted) fall in that interval, by `inserted_at`.
+  - have an **approved** `SignupApplication` and had their **first** ever
+    `Subscription` that reached a paid status (i.e. excluding
+    "incomplete"/"incomplete_expired" checkout attempts that never
+    converted) fall in that interval, by Stripe's `start_date` (falling
+    back to `inserted_at` when it's missing).
+
+  Only approved applicants can become members, so the approval is a
+  gate — it keeps legacy accounts that never went through the application
+  process (and whose subscription was re-created during the Stripe
+  migration) out of the join count. It is deliberately *not* the join
+  date: legacy `reviewed_at` values were frequently re-stamped years after
+  the original application, whereas the first payment is when the member
+  actually joined (the app only lets approved users subscribe).
+
+  `start_date` rather than `inserted_at` matters: the bulk Stripe import
+  (July 2026) inserted a row for every existing and long-lapsed member at
+  once, so `inserted_at` would count the whole historical membership as
+  having "joined" that year.
 
   These never double-count renewals: a recurring subscription's row is
   reused across billing cycles (see `Subscriptions.create_subscription_from_stripe/3`),
-  so only its original `inserted_at` can ever land in a join window.
+  so only its original start can ever land in a join window.
 
   `current_ytd_losses`/`prior_ytd_losses` count distinct primary users
   whose subscription lapsed (`stripe_status` of "canceled"/"cancelled"/
@@ -4567,17 +5070,30 @@ defmodule Ysc.Accounts do
     first_subs =
       from(s in Subscription,
         join: u in User,
+        as: :user,
         on: s.user_id == u.id,
         where: is_nil(u.primary_user_id),
         where: u.state == :active,
         where: s.stripe_status not in ["incomplete", "incomplete_expired"],
+        where:
+          exists(
+            from(a in SignupApplication,
+              where:
+                a.user_id == parent_as(:user).id and
+                  a.review_outcome == :approved,
+              select: 1
+            )
+          ),
         group_by: s.user_id,
         having:
-          (min(s.inserted_at) >= ^current_start and
-             min(s.inserted_at) < ^current_end) or
-            (min(s.inserted_at) >= ^prior_start and
-               min(s.inserted_at) < ^prior_end),
-        select: %{user_id: s.user_id, joined_at: min(s.inserted_at)}
+          (min(coalesce(s.start_date, s.inserted_at)) >= ^current_start and
+             min(coalesce(s.start_date, s.inserted_at)) < ^current_end) or
+            (min(coalesce(s.start_date, s.inserted_at)) >= ^prior_start and
+               min(coalesce(s.start_date, s.inserted_at)) < ^prior_end),
+        select: %{
+          user_id: s.user_id,
+          joined_at: min(coalesce(s.start_date, s.inserted_at))
+        }
       )
 
     from(j in subquery(union_all(lifetime, ^first_subs)),
@@ -4642,10 +5158,11 @@ defmodule Ysc.Accounts do
 
   # Distinct primary users whose subscription entered a **new billing
   # period** starting in `[start_dt, end_dt)`, for a subscription that isn't
-  # brand new — i.e. `current_period_start` is after the row's own
-  # `inserted_at`, which only happens once Stripe has pushed the period
-  # forward at least once (an initial subscribe's first period starts at
-  # or before the row is inserted). This is the renewal counterpart to
+  # brand new — i.e. `current_period_start` is after the subscription's own
+  # Stripe `start_date` (or `inserted_at` when missing), which only happens
+  # once Stripe has pushed the period forward at least once. Comparing
+  # against `inserted_at` alone would miss every renewal that happened before
+  # the July 2026 bulk import inserted the row. This is the renewal counterpart to
   # `membership_joins_ytd_query/4`'s first-ever-subscription check.
   defp membership_renewals_ytd_query(
          %DateTime{} = start_dt,
@@ -4660,7 +5177,7 @@ defmodule Ysc.Accounts do
       where: not is_nil(s.current_period_start),
       where:
         s.current_period_start >= ^start_dt and s.current_period_start < ^end_dt,
-      where: s.current_period_start > s.inserted_at,
+      where: s.current_period_start > coalesce(s.start_date, s.inserted_at),
       select: count(s.user_id, :distinct)
     )
   end
@@ -4928,6 +5445,38 @@ defmodule Ysc.Accounts do
   end
 
   @doc false
+  def ci_query_explain_aged_out_family_members_query do
+    aged_out_family_members_query(Ysc.Ci.QueryExplain.Fixtures.today(), [])
+  end
+
+  @doc false
+  def ci_query_explain_list_household_guest_picker_users_query do
+    list_household_guest_picker_users_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_household_dashboard_users_query do
+    list_household_dashboard_users_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_household_board_member_query do
+    household_board_member_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_active_board_member_query do
+    active_board_member_query(:treasurer)
+  end
+
+  @doc false
+  def ci_query_explain_household_user_ids_query do
+    household_user_ids_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
   def ci_query_explain_application_statistics_query do
     application_statistics_query(Ysc.Ci.QueryExplain.Fixtures.now())
   end
@@ -4974,6 +5523,26 @@ defmodule Ysc.Accounts do
       membership_ytd_windows(Ysc.Ci.QueryExplain.Fixtures.now())
 
     membership_renewals_ytd_query(current_start, current_end)
+  end
+
+  @doc false
+  def ci_query_explain_user_notification_profile_query do
+    user_notification_profile_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_signup_application_reviewer_query do
+    signup_application_reviewer_query()
+  end
+
+  @doc false
+  def ci_query_explain_admin_list_registration_form_query do
+    admin_list_registration_form_query()
+  end
+
+  @doc false
+  def ci_query_explain_pending_approval_users_query do
+    pending_approval_users_query()
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do

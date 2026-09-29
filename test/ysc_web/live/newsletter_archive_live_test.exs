@@ -6,6 +6,9 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
 
   alias Ysc.{Newsletter, Repo}
 
+  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
+  @turnstile_params %{"cf-turnstile-response" => "test-token"}
+
   defp clear_newsletter_rate_limit do
     :ets.delete_all_objects(Ysc.NewsletterRateLimit)
   end
@@ -87,7 +90,7 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
       html =
         view
         |> form("#newsletter-subscribe-form", %{"email" => email})
-        |> render_submit()
+        |> render_submit(@turnstile_params)
 
       # Double opt-in: form submission sends a confirmation email rather
       # than subscribing immediately.
@@ -104,7 +107,7 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
       html =
         view
         |> form("#newsletter-subscribe-form", %{"email" => "not-valid"})
-        |> render_submit()
+        |> render_submit(@turnstile_params)
 
       assert has_element?(view, "#newsletter-error")
       assert html =~ "valid email"
@@ -123,7 +126,7 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
         |> form("#newsletter-subscribe-form", %{
           "email" => "test@mailinator.com"
         })
-        |> render_submit()
+        |> render_submit(@turnstile_params)
 
       assert has_element?(view, "#newsletter-error")
 
@@ -145,12 +148,37 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
       html =
         view
         |> form("#newsletter-subscribe-form", %{"email" => "user@#{domain}"})
-        |> render_submit()
+        |> render_submit(@turnstile_params)
 
       assert has_element?(view, "#newsletter-error")
 
       assert html =~
                "This email domain appears to be invalid. Please check your email address."
+    end
+
+    test "subscribe_newsletter rejects a submit without a Turnstile token", %{
+      conn: conn
+    } do
+      clear_newsletter_rate_limit()
+
+      email =
+        "archive_no_token_#{System.unique_integer([:positive])}@example.com"
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/newsletters")
+      render_async(view)
+
+      html =
+        view
+        |> form("#newsletter-subscribe-form", %{"email" => email})
+        |> render_submit()
+
+      assert has_element?(view, "#newsletter-error")
+      assert html =~ "Please complete the verification to continue."
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
     end
 
     test "shows subscription widget for logged-in users", %{conn: conn} do

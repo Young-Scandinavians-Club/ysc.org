@@ -178,9 +178,7 @@ defmodule Ysc.Accounts.AuthService do
   def check_suspicious_activity(auth_event) do
     # Check for rapid failed attempts from same IP
     recent_failed_attempts =
-      AuthEvent.recent_failed_attempts_query(auth_event.ip_address, 15)
-      |> Repo.all()
-      |> length()
+      count_recent_failed_attempts_for_ip(auth_event.ip_address)
 
     threat_indicators = []
 
@@ -441,10 +439,7 @@ defmodule Ysc.Accounts.AuthService do
       |> length()
 
     # Check failed attempts from this IP in the last 15 minutes
-    recent_ip_attempts =
-      AuthEvent.recent_failed_attempts_query(ip_address, 15)
-      |> Repo.all()
-      |> length()
+    recent_ip_attempts = count_recent_failed_attempts_for_ip(ip_address)
 
     # Lock account if too many failed attempts
     if recent_failed_attempts >= 5 or recent_ip_attempts >= 10 do
@@ -627,6 +622,16 @@ defmodule Ysc.Accounts.AuthService do
 
   # Private helper functions
 
+  defp count_recent_failed_attempts_for_ip(ip_address)
+       when is_binary(ip_address) do
+    AuthEvent.recent_failed_attempts_query(ip_address, 15)
+    |> Repo.all()
+    |> length()
+  end
+
+  # No resolvable client IP: nothing to correlate by.
+  defp count_recent_failed_attempts_for_ip(_ip_address), do: 0
+
   @dialyzer {:nowarn_function, enrich_with_geo_data: 1}
   defp enrich_with_geo_data(%{ip_address: ip} = auth_data) when is_binary(ip) do
     geo = Ysc.GeoIP.lookup(ip)
@@ -638,49 +643,32 @@ defmodule Ysc.Accounts.AuthService do
   defp get_client_ip(conn_or_socket) do
     case conn_or_socket do
       %Plug.Conn{} = conn ->
-        # Check for forwarded IP first (for load balancers/proxies)
         get_conn_client_ip(conn)
 
-      %Phoenix.LiveView.Socket{} ->
-        # For LiveView sockets, we don't have direct access to IP
-        # Return a default value for now
-        "127.0.0.1"
+      %Phoenix.LiveView.Socket{assigns: %{remote_ip: remote_ip}} ->
+        # LiveViews that log auth events resolve the client IP in mount/3
+        # (see YscWeb.ClientIP.from_socket/2) and assign it as :remote_ip.
+        format_ip(remote_ip)
 
       _ ->
-        "127.0.0.1"
+        nil
     end
   end
 
-  defp get_conn_client_ip(conn) do
-    case get_header(conn, "x-forwarded-for") do
-      nil ->
-        get_real_ip_or_fallback(conn)
+  # `conn.remote_ip` is the real client address: YscWeb.Plugs.ClientIP
+  # resolves it from trusted proxy headers. Raw X-Forwarded-For / X-Real-IP
+  # are client-controlled and only kept in metadata for auditing.
+  defp get_conn_client_ip(%Plug.Conn{remote_ip: remote_ip}),
+    do: format_ip(remote_ip)
 
-      forwarded_for ->
-        # Take the first IP from comma-separated list
-        forwarded_for
-        |> String.split(",")
-        |> List.first()
-        |> String.trim()
+  defp format_ip(ip) when is_tuple(ip) do
+    case :inet.ntoa(ip) do
+      {:error, _} -> nil
+      charlist -> to_string(charlist)
     end
   end
 
-  defp get_real_ip_or_fallback(conn) do
-    case get_header(conn, "x-real-ip") do
-      nil ->
-        # Fall back to remote_ip
-        conn.remote_ip
-        |> :inet.ntoa()
-        |> to_string()
-
-      real_ip ->
-        # Take the first IP from comma-separated list
-        real_ip
-        |> String.split(",")
-        |> List.first()
-        |> String.trim()
-    end
-  end
+  defp format_ip(_ip), do: nil
 
   defp get_user_agent(conn_or_socket) do
     get_header(conn_or_socket, "user-agent")

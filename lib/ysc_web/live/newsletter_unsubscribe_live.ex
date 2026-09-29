@@ -62,67 +62,15 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      class="py-16 lg:py-24 max-w-xl mx-auto px-4"
+    <.unsubscribe_page
       id="newsletter-unsubscribe-page"
-    >
-      <div class="text-center">
-        <h1
-          :if={@subscriber && !@unsubscribed}
-          class="text-2xl font-bold text-zinc-900"
-        >
-          Unsubscribe from our newsletter
-        </h1>
-        <h1
-          :if={@subscriber && @unsubscribed}
-          class="text-2xl font-bold text-zinc-900"
-        >
-          You have been unsubscribed
-        </h1>
-        <h1 :if={!@subscriber} class="text-2xl font-bold text-zinc-900">
-          This link no longer works
-        </h1>
-
-        <p :if={@subscriber && !@unsubscribed} class="mt-4 text-zinc-600">
-          You are subscribed as <strong><%= @subscriber.email %></strong>. Click below to stop receiving our newsletter.
-        </p>
-
-        <p :if={@subscriber && @unsubscribed} class="mt-4 text-zinc-600">
-          You will no longer receive our newsletter. You can sign up again anytime from our home page.
-        </p>
-
-        <p :if={!@subscriber} class="mt-4 text-zinc-600">
-          This link does not work. It may be outdated or mistyped. If you still receive our newsletter, email
-          <.link
-            href="mailto:info@ysc.org"
-            class="text-blue-600 hover:underline font-semibold"
-          >
-            info@ysc.org
-          </.link>
-          with the address you want removed and we will unsubscribe you manually.
-        </p>
-
-        <.button
-          :if={@subscriber && !@unsubscribed}
-          phx-click="unsubscribe"
-          class="mt-8"
-        >
-          Unsubscribe
-        </.button>
-
-        <.link
-          :if={@subscriber && @unsubscribed}
-          navigate={~p"/"}
-          class="mt-8 inline-block"
-        >
-          <.button>Return to home</.button>
-        </.link>
-
-        <.link :if={!@subscriber} navigate={~p"/"} class="mt-8 inline-block">
-          <.button>Return to home</.button>
-        </.link>
-      </div>
-    </div>
+      email={@subscriber && @subscriber.email}
+      unsubscribed={@unsubscribed}
+      subscribed_title="Unsubscribe from our newsletter"
+      subscribed_action="our newsletter"
+      unsubscribed_body="You will no longer receive our newsletter. You can sign up again anytime from our home page."
+      still_receive="our newsletter"
+    />
     """
   end
 

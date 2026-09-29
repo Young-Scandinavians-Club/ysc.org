@@ -916,32 +916,36 @@ defmodule YscWeb.UserAuth do
   def valid_internal_redirect?(path) when is_binary(path) do
     normalized = repeatedly_percent_decode_redirect_target(path)
 
-    case URI.parse(normalized) do
-      %URI{scheme: nil, host: nil, path: path_part} = uri
-      when is_binary(path_part) and path_part != "" ->
-        cond do
-          not String.starts_with?(path_part, "/") ->
-            false
+    if local_redirect_path_safe?(path) and local_redirect_path_safe?(normalized) do
+      case URI.parse(normalized) do
+        %URI{scheme: nil, host: nil, path: path_part} = uri
+        when is_binary(path_part) and path_part != "" ->
+          cond do
+            not String.starts_with?(path_part, "/") ->
+              false
 
-          path_part in @return_to_paths_allowing_nested_urls ->
-            # Allow nested URLs in the query; still forbid them in path/fragment.
-            not dangerous_redirect_path_or_fragment?(path_part, uri.fragment)
+            path_part in @return_to_paths_allowing_nested_urls ->
+              # Allow nested URLs in the query; still forbid them in path/fragment.
+              not dangerous_redirect_path_or_fragment?(path_part, uri.fragment)
 
-          contains_dangerous_redirect_token?(normalized) ->
-            false
+            contains_dangerous_redirect_token?(normalized) ->
+              false
 
-          true ->
-            true
-        end
+            true ->
+              true
+          end
 
-      %URI{scheme: scheme} when not is_nil(scheme) ->
-        false
+        %URI{scheme: scheme} when not is_nil(scheme) ->
+          false
 
-      %URI{host: host} when not is_nil(host) ->
-        false
+        %URI{host: host} when not is_nil(host) ->
+          false
 
-      _ ->
-        false
+        _ ->
+          false
+      end
+    else
+      false
     end
   end
 
@@ -1004,8 +1008,21 @@ defmodule YscWeb.UserAuth do
       # here (CVE-2026-64941 / EEF-CVE-2026-64941 style bypass).
       "\t",
       "\n",
-      "\r"
+      "\r",
+      # Browsers treat `\` as `/` when parsing special URLs, so "/\evil.com"
+      # becomes the protocol-relative "//evil.com". Phoenix.Controller.redirect/2
+      # already rejects a raw backslash, but encoded forms (`/%5cevil.com`) and
+      # HTML `href` / LiveView `navigate` sinks still reach the browser
+      # (Finding 77).
+      "\\"
     ])
+  end
+
+  # Phoenix.URL.classify_local_path/1 is the same gate Controller.redirect/2
+  # uses. Require it on both the caller-supplied string and the percent-decoded
+  # form so `/%5cevil.com` cannot slip through as a "local" path.
+  defp local_redirect_path_safe?(path) when is_binary(path) do
+    Phoenix.URL.classify_local_path(path) == :ok
   end
 
   defp dangerous_redirect_path_or_fragment?(path_part, fragment) do

@@ -11,6 +11,50 @@
       submission_date: "January 15, 2026",
       review_url: "http://localhost:4000/admin/applications/preview"
     },
+    "payout_reconciliation_mismatch" => %{
+      stripe_payout_id: "po_1UKS44IZd8GkARoBVvD9couK",
+      payout_date: "September 27, 2026 at 05:00 PM PDT",
+      payout_amount: "$498.10",
+      payments_count: 16,
+      payments_total: "$905.00",
+      refunds_count: 0,
+      refunds_total: "$0.00",
+      fee_total: "$37.32",
+      reserve_adjustment: "-$324.58",
+      computed_net: "$543.10",
+      difference: "-$45.00",
+      quickbooks_deposit_id: "43896",
+      stripe_payout_url:
+        "https://dashboard.stripe.com/payouts/po_1UKS44IZd8GkARoBVvD9couK",
+      admin_money_url: "http://localhost:4000/admin/money"
+    },
+    "admin_access_review" => %{
+      year: 2026,
+      admin_count: 1,
+      volunteer_count: 1,
+      has_users: true,
+      users: [
+        %{
+          name: "Astrid Lindqvist",
+          email: "astrid@example.com",
+          role: "Admin",
+          board_position: "President",
+          state: "Active",
+          last_sign_in: "February 14, 2026 at 09:12 AM PST",
+          edit_url: "http://localhost:4000/admin/users/01HZXAMPLE"
+        },
+        %{
+          name: "Erik Hansen",
+          email: "erik@example.com",
+          role: "Volunteer",
+          board_position: "—",
+          state: "Active",
+          last_sign_in: "Never",
+          edit_url: "http://localhost:4000/admin/users/01HZXAMPLE2"
+        }
+      ],
+      admin_users_url: "http://localhost:4000/admin/users"
+    },
     "admin_membership_report" => %{
       date_from: "2026-01-01",
       date_to: "2026-01-31",
@@ -199,6 +243,26 @@
       manage_bookings_hint:
         "Start a new booking to use this benefit — it appears on your price summary automatically before you confirm."
     },
+    "booking_modification_cabin_master_notification" => %{
+      booking: %{
+        reference_id: "BK-PREVIEW-123",
+        property: "Tahoe",
+        checkin_date: "December 1, 2026",
+        checkout_date: "December 3, 2026",
+        guests_count: 2,
+        children_count: 0
+      },
+      previous: %{
+        checkin_date: "November 28, 2026",
+        checkout_date: "November 30, 2026",
+        guests_count: 2,
+        children_count: 0
+      },
+      dates_changed: true,
+      guests_changed: false,
+      user: %{name: "Astrid Berg", email: "astrid@example.com"},
+      booking_url: "http://localhost:4000/admin/bookings/preview"
+    },
     "booking_modification_confirmation" => %{
       first_name: "Astrid",
       booking: %{
@@ -326,7 +390,8 @@
       event_date_time: "Jun 21, 2026 at 2:00 PM",
       event_url: "http://localhost:4000/events/preview",
       event_image_url: nil,
-      notification_settings_url: "http://localhost:4000/users/notifications"
+      unsubscribe_url:
+        "http://localhost:4000/event-notifications/unsubscribe/preview"
     },
     "event_photo_upload_reminder" => %{
       first_name: "Astrid",
@@ -335,6 +400,18 @@
       event_image_url: nil,
       upload_url: "http://localhost:4000/events/preview/photos",
       notification_settings_url: "http://localhost:4000/users/notifications"
+    },
+    "event_cancellation_notification" => %{
+      first_name: "Astrid",
+      event: %{
+        title: "Midsummer Picnic",
+        location_name: "Golden Gate Park",
+        address: "123 Main St, San Francisco, CA"
+      },
+      event_date_time: "Jun 21, 2026 at 2:00 PM",
+      event_image_url: nil,
+      upcoming_events_url: "http://localhost:4000/events",
+      events_email: "events@ysc.org"
     },
     "event_update_notification" => %{
       first_name: "Astrid",
@@ -488,6 +565,16 @@
       first_name: "Freja",
       primary_user_name: "Astrid Berg",
       membership_url: "http://localhost:4000/users/membership"
+    },
+    "family_member_aged_out" => %{
+      first_name: "Freja",
+      primary_user_name: "Astrid",
+      membership_url: "http://localhost:4000/users/membership"
+    },
+    "family_member_aged_out_primary" => %{
+      primary_first_name: "Astrid",
+      member_name: "Freja Berg",
+      family_management_url: "http://localhost:4000/users/settings/family"
     },
     "membership_ended" => %{
       first_name: "Astrid",
@@ -683,14 +770,16 @@
       cycle_label: "2027",
       weekend_range: "May 7–9, 2027",
       booking_url: "http://localhost:4000/bookings/tahoe",
-      notification_settings_url: "http://localhost:4000/users/notifications"
+      unsubscribe_url:
+        "http://localhost:4000/event-notifications/unsubscribe/preview"
     },
     "tahoe_winter_weekend_available" => %{
       first_name: "Astrid",
       cycle_label: "2026/2027",
       weekend_range: "November 6–8, 2026",
       booking_url: "http://localhost:4000/bookings/tahoe",
-      notification_settings_url: "http://localhost:4000/users/notifications"
+      unsubscribe_url:
+        "http://localhost:4000/event-notifications/unsubscribe/preview"
     },
     "ticket_order_refund" => %{
       first_name: "Astrid",

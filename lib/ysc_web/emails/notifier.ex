@@ -33,6 +33,9 @@ defmodule YscWeb.Emails.Notifier do
     "email_changed" => YscWeb.Emails.EmailChanged,
     "admin_application_submitted" => YscWeb.Emails.AdminApplicationSubmitted,
     "admin_membership_report" => YscWeb.Emails.AdminMembershipReport,
+    "admin_access_review" => YscWeb.Emails.AdminAccessReview,
+    "payout_reconciliation_mismatch" =>
+      YscWeb.Emails.PayoutReconciliationMismatch,
     "conduct_violation_confirmation" =>
       YscWeb.Emails.ConductViolationConfirmation,
     "conduct_violation_board_notification" =>
@@ -43,6 +46,8 @@ defmodule YscWeb.Emails.Notifier do
     "booking_confirmation" => YscWeb.Emails.BookingConfirmation,
     "booking_modification_confirmation" =>
       YscWeb.Emails.BookingModificationConfirmation,
+    "booking_modification_cabin_master_notification" =>
+      YscWeb.Emails.BookingModificationCabinMasterNotification,
     "booking_entitlement_granted" => YscWeb.Emails.BookingEntitlementGranted,
     "booking_refund_processed" => YscWeb.Emails.BookingRefundProcessed,
     "booking_refund_pending" => YscWeb.Emails.BookingRefundPending,
@@ -68,6 +73,9 @@ defmodule YscWeb.Emails.Notifier do
     "family_invite_accepted" => YscWeb.Emails.FamilyInviteAccepted,
     "family_invite_cancelled" => YscWeb.Emails.FamilyInviteCancelled,
     "family_member_removed" => YscWeb.Emails.FamilyMemberRemoved,
+    "family_member_aged_out" => YscWeb.Emails.FamilyMemberAgedOut,
+    "family_member_aged_out_primary" =>
+      YscWeb.Emails.FamilyMemberAgedOutPrimary,
     "booking_checkin_reminder" => YscWeb.Emails.BookingCheckinReminder,
     "booking_checkout_reminder" => YscWeb.Emails.BookingCheckoutReminder,
     "tahoe_winter_weekend_available" =>
@@ -86,6 +94,8 @@ defmodule YscWeb.Emails.Notifier do
     "booking_cancellation_confirmation" =>
       YscWeb.Emails.BookingCancellationConfirmation,
     "event_update_notification" => YscWeb.Emails.EventUpdateNotification,
+    "event_cancellation_notification" =>
+      YscWeb.Emails.EventCancellationNotification,
     "event_photo_upload_reminder" => YscWeb.Emails.EventPhotoUploadReminder,
     "newsletter_stats_snapshot" => YscWeb.Emails.NewsletterStatsSnapshot,
     "newsletter_confirmation" => YscWeb.Emails.NewsletterConfirmation

@@ -279,6 +279,160 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "cabin_showcase/1" do
+    test "renders a Tahoe-style showcase with blue accent and right-side image" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.cabin_showcase
+          id="home-cabin-tahoe"
+          location="Lake Tahoe, CA"
+          title="The Alpine Retreat"
+          navigate="/bookings/tahoe"
+          cta="Learn More About Tahoe"
+          image_src="/images/tahoe/tahoe_cabin_main.webp"
+          image_srcset="/images/tahoe/tahoe_cabin_main-480.webp 480w"
+          image_sizes="100vw"
+          image_alt="Lake Tahoe Cabin"
+        >
+          Ski in winter and cozy <em>hygge</em>
+          evenings.
+          <:feature>Minutes from world-class ski resorts</:feature>
+          <:feature>
+            Member-only rates: <strong>$45.00 / night</strong>
+          </:feature>
+        </.cabin_showcase>
+        """)
+
+      assert html =~ ~s(id="home-cabin-tahoe")
+      assert html =~ ~s(id="home-cabin-tahoe-cta")
+      assert html =~ ~s(id="home-cabin-tahoe-image")
+      assert html =~ ~s(href="/bookings/tahoe")
+      assert html =~ "Learn More About Tahoe"
+      assert html =~ "The Alpine Retreat"
+      assert html =~ "Lake Tahoe, CA"
+      assert html =~ "bg-blue-50"
+      assert html =~ "text-blue-700"
+      assert html =~ "hover:bg-blue-700"
+      assert html =~ "lg:order-2"
+      assert html =~ "lg:order-1"
+      assert html =~ "hygge"
+      assert html =~ "Minutes from world-class ski resorts"
+      assert html =~ "$45.00 / night"
+      assert html =~ ~s(alt="Lake Tahoe Cabin")
+      refute html =~ "bg-emerald-50"
+      refute html =~ "hover:bg-emerald-700"
+    end
+
+    test "renders a Clear Lake-style showcase with emerald accent and left-side image" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.cabin_showcase
+          id="home-cabin-clear-lake"
+          location="Clear Lake, CA"
+          title="The Waterfront Sanctuary"
+          navigate="/bookings/clear-lake"
+          cta="Learn More About Clear Lake"
+          image_src="/images/clear_lake/clear_lake_dock.webp"
+          image_srcset="/images/clear_lake/clear_lake_dock-480.webp 480w"
+          image_sizes="100vw"
+          image_alt="Clear Lake Cabin"
+          accent={:emerald}
+          image_side={:left}
+        >
+          Our social heart since 1963.
+          <:feature>Private dock access for swimming & boating</:feature>
+        </.cabin_showcase>
+        """)
+
+      assert html =~ ~s(id="home-cabin-clear-lake")
+      assert html =~ ~s(id="home-cabin-clear-lake-cta")
+      assert html =~ ~s(href="/bookings/clear-lake")
+      assert html =~ "Learn More About Clear Lake"
+      assert html =~ "The Waterfront Sanctuary"
+      assert html =~ "bg-emerald-50"
+      assert html =~ "text-emerald-700"
+      assert html =~ "hover:bg-emerald-700"
+      assert html =~ "Private dock access"
+      refute html =~ "lg:order-2"
+      refute html =~ "hover:bg-blue-700"
+    end
+  end
+
+  describe "quick_action_card/1" do
+    test "renders a Tahoe booking shortcut with blue tone" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.quick_action_card
+          id="home-quick-action-tahoe"
+          navigate="/bookings/tahoe"
+          icon="hero-home"
+          tone={:blue}
+          title="Lake Tahoe"
+          subtitle="Book a stay"
+        />
+        """)
+
+      assert html =~ ~s(id="home-quick-action-tahoe")
+      assert html =~ ~s(href="/bookings/tahoe")
+      assert html =~ "Lake Tahoe"
+      assert html =~ "Book a stay"
+      assert html =~ "hero-home"
+      assert html =~ "bg-blue-50"
+      assert html =~ "text-blue-600"
+      assert html =~ "snap-center"
+    end
+
+    test "renders emerald, orange, and zinc tones" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.quick_action_card
+          id="home-quick-action-clear-lake"
+          navigate="/bookings/clear-lake"
+          icon="hero-home"
+          tone={:emerald}
+          title="Clear Lake"
+          subtitle="Book a stay"
+        />
+        <.quick_action_card
+          id="home-quick-action-expenses"
+          navigate="/expensereports"
+          icon="hero-receipt-refund"
+          tone={:orange}
+          title="Expenses"
+          subtitle="View reports"
+        />
+        <.quick_action_card
+          id="home-quick-action-settings"
+          navigate="/users/settings"
+          icon="hero-cog-6-tooth"
+          tone={:zinc}
+          title="Settings"
+          subtitle="Preferences"
+        />
+        """)
+
+      assert html =~ ~s(id="home-quick-action-clear-lake")
+      assert html =~ ~s(id="home-quick-action-expenses")
+      assert html =~ ~s(id="home-quick-action-settings")
+      assert html =~ "bg-emerald-50"
+      assert html =~ "text-emerald-600"
+      assert html =~ "bg-orange-50"
+      assert html =~ "text-orange-600"
+      assert html =~ "bg-zinc-50"
+      assert html =~ "text-zinc-600"
+      assert html =~ "hero-receipt-refund"
+      assert html =~ "hero-cog-6-tooth"
+    end
+  end
+
   describe "step_heading/1" do
     test "renders a numbered Tahoe step heading" do
       assigns = %{}

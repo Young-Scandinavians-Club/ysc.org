@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.40.3",
+      version: "2.43.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -178,8 +178,16 @@ defmodule Ysc.MixProject do
       # 0.12.0: serve_socket/2 for embedders that own the TLS listener; handshake
       # now runs in the per-connection process. We do not start h2 servers;
       # hackney talks to h2_connection client APIs only, so those are unused.
+      # 0.12.1: decode rejected HEADERS (and CONTINUATION) before dropping them
+      # (RFC 9113 §4.3) so HPACK stays in sync after RST_STREAM.
+      # 0.12.2: h2_client CLI matches `{closed, Reason}` (h2_connection never
+      # sent a bare `closed` atom). We do not run h2_client. hackney already
+      # handles `{closed, Reason}`.
+      # 0.12.3: SETTINGS_INITIAL_WINDOW_SIZE increase drains buffered DATA
+      # (RFC 9113 §6.9.2). Unused in app code; hackney still uses
+      # h2_connection client APIs.
       {:hackney, "~> 4.7", override: true},
-      {:h2, "~> 0.12.0", override: true},
+      {:h2, "~> 0.12.3", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
@@ -235,15 +243,22 @@ defmodule Ysc.MixProject do
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
-      # 1.10.1: EEF-CVE-2026-82672 (unvalidated HTTP/1 chunk-size line tail →
-      # response smuggling on pooled connections). 1.10.0 also covers
-      # EEF-CVE-2026-82728 (unbounded status-line / chunk-extension buffering)
-      # and EEF-CVE-2026-82729 (quadratic chunk-size parsing). Finch still lists
-      # mint ~> 1.8, so pin the patched floor.
-      {:mint, "~> 1.10.1", override: true},
+      # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
+      # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
+      # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
+      # chunked is not the final transfer coding). 1.10.1 still covers
+      # EEF-CVE-2026-82672. Finch still lists mint ~> 1.8, so pin the patched
+      # floor.
+      {:mint, "~> 1.11.0", override: true},
       {:floki, "~> 0.38"},
-      {:flop, "~> 0.28.0"},
-      {:flop_phoenix, "~> 0.26.3"},
+      # 0.29.0: Flop.Schema is a behaviour (`use Flop.Schema` + `@flop_options`)
+      # instead of a protocol (`@derive`). field_info/2, get_field/3, and
+      # primary_key/1 take the schema module. Schema option accessors are gone
+      # (use Flop.get_option/3 and Flop.allowed_fields/2). We paginate with
+      # validate_and_run/3 + page pagination; join fields still declare ecto_type.
+      {:flop, "~> 0.29.0"},
+      # 0.27.0: requires Flop 0.29; sortable/filterable via allowed_fields/2.
+      {:flop_phoenix, "~> 0.27.0"},
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
       {:goth, "~> 1.4"},
@@ -321,6 +336,13 @@ defmodule Ysc.MixProject do
       # LiveComponent asyncs on removal; HTMLFormatter early-close gate.
       {:phoenix_live_view, "~> 1.2.12"},
       {:phoenix_test, "~> 0.12", only: :test, runtime: false},
+      # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
+      # SVG and MathML on to_html/2 so a parse/serialize round-trip cannot
+      # turn encoded markup into live tags (mutation XSS). Phoenix.LiveView.Test.DOM
+      # serializes with LazyHTML.to_html/2; we query HTML in tests and do not
+      # sanitize untrusted HTML with lazy_html (that's html_sanitize_ex).
+      # phoenix_live_view lists it optional ~> 0.1.0; pin the patched floor.
+      {:lazy_html, "~> 0.1.13", only: :test},
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+.
       # 1.8.12: clear return_to after login; drop channel messages without a join_ref.
@@ -328,13 +350,15 @@ defmodule Ysc.MixProject do
       # 1.8.14: LongPoll fetch timer leak (we use websocket only); VerifiedRoutes
       # :router must be a compile-time module; local path validation is shared
       # across redirect, static_path, and ~p (also rejects CR/LF in paths).
-      {:phoenix, "~> 1.8.14"},
+      # 1.8.15: phoenix.js does not let an async transport close tear down the
+      # replacement transport; phx.gen.cert Chromium cert and phx.new Tailwind
+      # 4.3.3 are unused (we already ship Tailwind 4.3.3).
+      {:phoenix, "~> 1.8.15"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
-      {:remote_ip, "~> 1.2"},
       {:req, "~> 0.7"},
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing
@@ -346,7 +370,9 @@ defmodule Ysc.MixProject do
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
       # 1.27.1: AmazonSES returns {:error, %{code, message}} instead of crashing when
       # SES error XML is missing Code/Message nodes (we use SES).
-      {:swoosh, "~> 1.27.1"},
+      # 1.28.0: TurboSMTP adapter. 1.28.1: Customer.io CC. We use AmazonSES, so
+      # both are unused.
+      {:swoosh, "~> 1.28.1"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
       # tag_values is still supported and emits no deprecation warning. We keep

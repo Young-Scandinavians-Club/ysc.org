@@ -52,6 +52,7 @@ defmodule Ysc.HammerUpgradeTest do
 
     test "rate limiters still export fix_window hit/set/get/expires_at" do
       Enum.each(@rate_limiters, fn module ->
+        assert {:module, _} = Code.ensure_loaded(module)
         assert function_exported?(module, :hit, 3)
         assert function_exported?(module, :hit, 4)
         assert function_exported?(module, :set, 3)

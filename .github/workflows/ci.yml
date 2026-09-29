@@ -139,7 +139,7 @@ jobs:
       # GHA service containers do not pass `server /data` to the MinIO image, so the
       # container exits immediately (help text only) and the health check never passes.
       # Start MinIO explicitly on the runner (same image as etc/docker/docker-compose).
-      # Pulls from quay.io first: Docker Hub denied minio/minio on GHA (run 34650037512).
+      # Pulls quay.io, then docker.io/minio, then bitnamilegacy (quay 401 on 2026-09-24).
       - name: Start MinIO and create buckets
         run: ./etc/scripts/ci/start_minio.sh
 
@@ -214,6 +214,12 @@ jobs:
 
       - name: start_minio self-test
         run: ./etc/scripts/ci/start_minio.sh --self-test
+
+      - name: docker_buildx_push_retry self-test
+        run: ./etc/scripts/docker_buildx_push_retry.sh --self-test
+
+      - name: update_github_release_notes self-test
+        run: ./etc/scripts/update_github_release_notes.sh --self-test
 
       - name: dprint (format check)
         run: dprint check

@@ -15,6 +15,13 @@ if System.get_env("ENVIRONMENT") do
     environment: System.get_env("ENVIRONMENT")
 end
 
+# Fly Proxy sets `Fly-Client-IP` (FLY_APP_NAME is present on every Fly Machine).
+# Without this, `conn.remote_ip` is the proxy/app address and per-IP rate limits
+# bucket every visitor together. See YscWeb.ClientIP.
+if config_env() != :test and System.get_env("FLY_APP_NAME") not in [nil, ""] do
+  config :ysc, YscWeb.ClientIP, trust_proxy_headers: true
+end
+
 # Stripe — `payout.paid` webhooks create ledger payouts unless disabled here.
 # Set STRIPE_PROCESS_PAYOUT_WEBHOOKS to false, 0, no, or off (case-insensitive) while another
 # system handles the same Stripe account (e.g. legacy site); unset means enabled.
@@ -73,7 +80,9 @@ config :ysc, :emails,
   admin_email: System.get_env("EMAIL_ADMIN") || "admin@ysc.org",
   membership_email: System.get_env("EMAIL_MEMBERSHIP") || "memberships@ysc.org",
   board_email: System.get_env("EMAIL_BOARD") || "board@ysc.org",
+  treasurer_email: System.get_env("EMAIL_TREASURER") || "treasurer@ysc.org",
   volunteer_email: System.get_env("EMAIL_VOLUNTEER") || "volunteer@ysc.org",
+  webtech_email: System.get_env("EMAIL_WEBTECH") || "webtech@ysc.org",
   tahoe_email: System.get_env("EMAIL_TAHOE") || "tahoe@ysc.org",
   clear_lake_email: System.get_env("EMAIL_CLEAR_LAKE") || "cl@ysc.org"
 

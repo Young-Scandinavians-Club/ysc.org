@@ -131,15 +131,15 @@ defmodule YscWeb.AdminUsersLive do
                 Review Application
               </.admin_page_title>
               <p class="text-sm text-zinc-500 mt-0.5">
-                {if @selected_user.state == :pending_approval do
-                  "Submitted " <>
-                    Timex.from_now(@selected_user_application.completed)
-                else
+                {if @selected_user.state != :pending_approval &&
+                      @selected_user_application.reviewed_at do
                   "Reviewed " <>
                     DateTimeDisplay.format_utc_date(
                       @selected_user_application.reviewed_at
-                    ) <>
-                    " by " <> @selected_user_application.reviewed_by.email
+                    )
+                else
+                  "Submitted " <>
+                    Timex.from_now(@selected_user_application.completed)
                 end}
               </p>
             </div>
@@ -158,160 +158,26 @@ defmodule YscWeb.AdminUsersLive do
                   @selected_user_application.review_outcome
                 )
               }>
-                {@selected_user_application.review_outcome}
+                {String.capitalize("#{@selected_user_application.review_outcome}")}
               </.badge>
             </span>
           </div>
 
           <div class="space-y-6">
-            <section>
-              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
-                Applicant Details
-              </h3>
-              <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                <div class="py-2">
-                  <dt class="text-sm font-semibold text-zinc-600">Full Name</dt>
-                  <dd class="mt-0.5 text-sm text-zinc-900">
-                    {"#{@selected_user.first_name} #{@selected_user.last_name}"}
-                  </dd>
-                </div>
-                <div class="py-2">
-                  <dt class="text-sm font-semibold text-zinc-600">Email</dt>
-                  <dd class="mt-0.5 text-sm text-zinc-900 underline decoration-zinc-200">
-                    {@selected_user.email}
-                  </dd>
-                </div>
-                <div class="py-2">
-                  <dt class="text-sm font-semibold text-zinc-600">Birth Date</dt>
-                  <dd class="mt-0.5 text-sm text-zinc-900">
-                    {UserDisplay.birth_date_label(
-                      @selected_user_application.birth_date
-                    )}
-                  </dd>
-                </div>
-                <div
-                  :if={length(@selected_user.family_members) > 0}
-                  class="py-2 sm:col-span-2"
-                >
-                  <dt class="text-sm font-semibold text-zinc-600">
-                    Family members
-                  </dt>
-                  <dd class="mt-1 text-sm text-zinc-900">
-                    <ul class="space-y-1 list-disc list-inside">
-                      <li :for={family_member <- @selected_user.family_members}>
-                        <span class="text-xs font-medium me-2 px-2.5 py-1 rounded-sm bg-blue-100 text-blue-800">
-                          {String.capitalize("#{family_member.type}")}
-                        </span>
-                        {"#{family_member.first_name} #{family_member.last_name} (#{UserDisplay.birth_date_label(family_member.birth_date)})"}
-                      </li>
-                    </ul>
-                  </dd>
-                </div>
-              </dl>
-            </section>
+            <.admin_application_reviewer
+              :if={
+                @selected_user.state != :pending_approval &&
+                  @selected_user_application.reviewed_at &&
+                  @selected_user_application.reviewed_by
+              }
+              id="review-application-reviewed-by"
+              reviewer={@selected_user_application.reviewed_by}
+            />
 
-            <section>
-              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
-                Answers
-              </h3>
-              <div class="space-y-4">
-                <div class="py-2">
-                  <p class="text-sm font-semibold text-zinc-600 mb-1.5">
-                    Membership type
-                  </p>
-                  <.badge type={
-                    if to_string(@selected_user_application.membership_type) ==
-                         "family", do: "green", else: "default"
-                  }>
-                    {String.capitalize(
-                      "#{@selected_user_application.membership_type}"
-                    )}
-                  </.badge>
-                </div>
-                <div class="bg-zinc-50 rounded-lg p-4 ring-1 ring-zinc-200/50">
-                  <p class="text-sm font-semibold text-zinc-700 mb-2">
-                    Eligibility & Connections
-                  </p>
-                  <ul class="text-sm space-y-1 list-disc list-inside text-zinc-600">
-                    <li :for={
-                      reason <- @selected_user_application.membership_eligibility
-                    }>
-                      {Map.get(
-                        Ysc.Accounts.SignupApplication.eligibility_lookup(),
-                        reason
-                      )}
-                    </li>
-                  </ul>
-                </div>
-
-                <dl class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                  <div class="py-2">
-                    <dt class="text-sm font-semibold text-zinc-600">Occupation</dt>
-                    <dd class="mt-0.5 text-sm text-zinc-900">
-                      {@selected_user_application.occupation}
-                    </dd>
-                  </div>
-                  <div class="py-2">
-                    <dt class="text-sm font-semibold text-zinc-600">
-                      Place of birth
-                    </dt>
-                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
-                      <.admin_country_with_flag
-                        id="application-place-of-birth"
-                        country={@selected_user_application.place_of_birth}
-                      />
-                    </dd>
-                  </div>
-                  <div class="py-2">
-                    <dt class="text-sm font-semibold text-zinc-600">Citizenship</dt>
-                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
-                      <.admin_country_with_flag
-                        id="application-citizenship"
-                        country={@selected_user_application.citizenship}
-                      />
-                    </dd>
-                  </div>
-                  <div class="py-2">
-                    <dt class="text-sm font-semibold text-zinc-600">
-                      Most connected Nordic country
-                    </dt>
-                    <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
-                      <.admin_country_with_flag
-                        id="application-most-connected-nordic-country"
-                        country={
-                          @selected_user_application.most_connected_nordic_country
-                        }
-                      />
-                    </dd>
-                  </div>
-                </dl>
-
-                <div class="pt-1">
-                  <p class="text-sm font-semibold text-zinc-600 mb-1">
-                    Link to Scandinavia
-                  </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
-                    {@selected_user_application.link_to_scandinavia}
-                  </div>
-                </div>
-                <div class="pt-1">
-                  <p class="text-sm font-semibold text-zinc-600 mb-1">
-                    Lived in Scandinavia
-                  </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
-                    {@selected_user_application.lived_in_scandinavia}
-                  </div>
-                </div>
-                <div class="pt-1">
-                  <p class="text-sm font-semibold text-zinc-600 mb-1">
-                    Spoken languages
-                  </p>
-                  <div class="mt-1 p-3 bg-white border border-zinc-200 rounded-md text-sm text-zinc-800 italic min-h-10">
-                    {@selected_user_application.spoken_languages}
-                  </div>
-                </div>
-              </div>
-            </section>
+            <.admin_signup_application
+              user={@selected_user}
+              application={@selected_user_application}
+            />
 
             <div
               :if={@selected_user.state == :pending_approval}
@@ -333,7 +199,7 @@ defmodule YscWeb.AdminUsersLive do
                     for={@rejection_form}
                     id="reject-application-form"
                     phx-submit="deny-application"
-                    class="space-y-3"
+                    class="flex flex-col gap-3"
                   >
                     <p class="text-sm text-zinc-600">
                       Optional rejection note (internal use only; not sent to the applicant).
@@ -342,7 +208,7 @@ defmodule YscWeb.AdminUsersLive do
                       field={@rejection_form[:note]}
                       type="textarea"
                       label="Rejection note (optional)"
-                      class="mt-1 block w-full rounded-sm border-zinc-300 text-zinc-900 sm:text-sm"
+                      class="block w-full rounded-sm border-zinc-300 text-zinc-900 sm:text-sm"
                       rows="3"
                     />
                     <button
@@ -1293,9 +1159,9 @@ defmodule YscWeb.AdminUsersLive do
 
     application =
       if socket.assigns.live_action == :review do
-        Accounts.get_signup_application_from_user_id!(id, current_user, [
-          :reviewed_by
-        ])
+        Accounts.get_signup_application_from_user_id!(id, current_user,
+          reviewed_by: :current_avatar
+        )
       else
         nil
       end

@@ -1,0 +1,75 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Booking Modification Notification</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">A booking at <%= @booking.property %> has been updated.</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="16px" css-class="green-alert-box" background-color="#F0FDF4" border-left="4px solid #10B981" border-radius="6px">
+      <strong>✓ Processed Automatically:</strong> This modification has been processed automatically. No action is required from you.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- What Changed -->
+    <%= if @dates_changed || @guests_changed do %>
+    <mj-text align="center" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">What Changed</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <%= if @dates_changed do %>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Dates:</strong> <%= @previous.checkin_date %> – <%= @previous.checkout_date %> → <%= @booking.checkin_date %> – <%= @booking.checkout_date %>
+    </mj-text>
+    <% end %>
+    <%= if @guests_changed do %>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Guests:</strong>
+      <%= YscWeb.BookingDisplay.guests_label(@previous.guests_count, @previous.children_count) %>
+      → <%= YscWeb.BookingDisplay.guests_label(@booking.guests_count, @booking.children_count) %>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
+    <!-- Booking Details -->
+    <mj-text align="center" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Updated Booking Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Booking Reference:</strong>
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">
+        <%= @booking.reference_id %>
+      </span>
+    </mj-text>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Property:</strong> <%= @booking.property %>
+    </mj-text>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-in:</strong> <%= @booking.checkin_date %>
+    </mj-text>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Check-out:</strong> <%= @booking.checkout_date %>
+    </mj-text>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Guests:</strong>
+      <%= YscWeb.BookingDisplay.guests_label(@booking.guests_count, @booking.children_count, omit_zero_adults: true) %>
+      <span style="color: #6B7280;"> (<%= YscWeb.BookingDisplay.guests_total_label(@booking.guests_count, @booking.children_count) %>)</span>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- User Details -->
+    <mj-text align="center" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">User Details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Name:</strong> <%= @user.name %>
+    </mj-text>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Email:</strong> <%= @user.email %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#6B7280" color="#ffffff" align="center" font-size="18px" border-radius="4px">View Booking Details →</mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

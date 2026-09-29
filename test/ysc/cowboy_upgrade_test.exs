@@ -35,6 +35,7 @@ defmodule Ysc.CowboyUpgradeTest do
     end
 
     test "Plug.Cowboy APIs we call still exist" do
+      assert {:module, _} = Code.ensure_loaded(Plug.Cowboy)
       assert function_exported?(Plug.Cowboy, :http, 3)
       assert function_exported?(Plug.Cowboy, :shutdown, 1)
     end

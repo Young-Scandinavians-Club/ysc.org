@@ -18,6 +18,9 @@ defmodule YscWeb.HomeLiveTest do
   alias Ysc.Repo
   alias YscWeb.NewsletterSubscribe
 
+  # The Turnstile widget injects this field client-side; TurnstileMock accepts it.
+  @turnstile_params %{"cf-turnstile-response" => "test-token"}
+
   describe "guest" do
     test "renders marketing home with hero and newsletter section", %{
       conn: conn
@@ -28,6 +31,22 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ "Young Scandinavians Club"
       assert has_element?(view, "#newsletter-heading")
       assert has_element?(view, "#newsletter-email")
+      assert has_element?(view, "#home-cabin-tahoe")
+
+      assert has_element?(
+               view,
+               "#home-cabin-tahoe-cta",
+               "Learn More About Tahoe"
+             )
+
+      assert has_element?(
+               view,
+               "#home-cabin-clear-lake-cta",
+               "Learn More About Clear Lake"
+             )
+
+      assert has_element?(view, "#home-cabin-tahoe-image")
+      refute has_element?(view, "#home-quick-actions")
     end
 
     test "accepts query params on initial load", %{conn: conn} do
@@ -146,7 +165,7 @@ defmodule YscWeb.HomeLiveTest do
 
       view
       |> form("form[phx-submit=subscribe_newsletter]", %{"email" => email})
-      |> render_submit()
+      |> render_submit(@turnstile_params)
 
       html = render(view)
       # Double opt-in: the anonymous signup form no longer subscribes
@@ -243,7 +262,11 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ user.first_name
       assert has_element?(view, "#home-quick-action-tahoe", "Book a stay")
       assert has_element?(view, "#home-quick-action-clear-lake", "Book a stay")
+      assert has_element?(view, "#home-quick-action-events", "Browse Events")
+      assert has_element?(view, "#home-quick-action-settings", "Preferences")
+      refute has_element?(view, "#home-quick-action-expenses")
       refute has_element?(view, "#home-quick-actions", "Reserve Cabin")
+      refute has_element?(view, "#home-cabin-tahoe")
     end
 
     test "toggles newsletter subscription from the member dashboard", %{
@@ -280,6 +303,52 @@ defmodule YscWeb.HomeLiveTest do
 
       assert NewsletterSubscribe.subscribed?(user.email)
       assert has_element?(view, "#home-newsletter-member-status", "Subscribed")
+    end
+
+    test "toggles event notifications from the member dashboard", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/")
+      render_async(view, 5_000)
+
+      assert user.event_notifications
+
+      assert has_element?(
+               view,
+               "#home-event-notifications-status",
+               "Event notifications on"
+             )
+
+      view
+      |> element(
+        "#home-event-notifications-status button[phx-click='toggle_event_notifications']",
+        "Turn off"
+      )
+      |> render_click()
+
+      refute Ysc.Accounts.get_user!(user.id).event_notifications
+
+      assert has_element?(
+               view,
+               "#home-event-notifications-status",
+               "Event notifications off"
+             )
+
+      view
+      |> element(
+        "#home-event-notifications-status button[phx-click='toggle_event_notifications']",
+        "Turn on"
+      )
+      |> render_click()
+
+      assert Ysc.Accounts.get_user!(user.id).event_notifications
+
+      assert has_element?(
+               view,
+               "#home-event-notifications-status",
+               "Event notifications on"
+             )
     end
 
     test "uses Norwegian greeting when most_connected_country is Norway", %{
@@ -336,6 +405,8 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "Expenses"
       assert html =~ "View reports"
+      assert has_element?(view, "#home-quick-action-expenses", "View reports")
+      refute has_element?(view, "#home-quick-action-events")
     end
 
     test "shows expense report launcher for admin users", %{conn: conn} do
@@ -349,6 +420,8 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "Expenses"
       assert html =~ "View reports"
+      assert has_element?(view, "#home-quick-action-expenses", "View reports")
+      refute has_element?(view, "#home-quick-action-events")
     end
 
     test "lists upcoming events in the member community section", %{conn: conn} do
@@ -398,16 +471,34 @@ defmodule YscWeb.HomeLiveTest do
     test "shows upcoming event tickets when user has confirmed tickets", %{
       conn: conn
     } do
-      data = Ysc.TestDataFactory.complete_ticket_order()
+      unique = System.unique_integer([:positive])
+      event_title = "Home Slim Event #{unique}"
+      tier_name = "HomeSlimTier #{unique}"
+
+      data =
+        Ysc.TestDataFactory.complete_ticket_order(
+          ticket_count: 1,
+          event_attrs: %{title: event_title}
+        )
+
+      hd(data.tiers)
+      |> Ecto.Changeset.change(%{name: tier_name})
+      |> Repo.update!()
+
+      Enum.each(data.tickets, fn ticket ->
+        ticket
+        |> Ticket.status_changeset(%{status: :confirmed})
+        |> Repo.update!()
+      end)
+
       conn = log_in_user(conn, data.user)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
       render_async(view, 5_000)
-      html = render(view)
 
-      assert html =~ "Event Tickets"
-      assert html =~ data.event.title
+      assert has_element?(view, "h3", event_title)
+      assert has_element?(view, "span", tier_name)
     end
 
     test "hides event tickets for events that already started today", %{
@@ -654,10 +745,12 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~
-               "will automatically renew on Mar 5, 2027 unless you turn it off"
+               "will automatically renew on Mar 5, 2027 unless you turn off automatic renewal"
 
       assert html =~ "Mar 5, 2027"
       refute html =~ "Mar 4, 2027"
+      refute html =~ "Auto-renewal"
+      refute html =~ "club properties"
     end
   end
 
@@ -1044,6 +1137,27 @@ defmodule YscWeb.HomeLiveTest do
   end
 
   describe "logged-in user — family and bookings" do
+    test "shows other household members in the Your Family section", %{
+      conn: conn
+    } do
+      primary = Ysc.TestDataFactory.user_with_membership(:lifetime)
+
+      sub =
+        user_fixture(%{first_name: "FamilyKid"})
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      conn = log_in_user(conn, primary)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+
+      assert has_element?(view, "#home-family", "Your Family")
+      assert has_element?(view, "#home-family-member-#{sub.id}", "FamilyKid")
+    end
+
     test "shows Clear Lake upcoming booking on the itinerary", %{conn: conn} do
       user = Ysc.TestDataFactory.user_with_membership(:lifetime)
 
@@ -1127,7 +1241,7 @@ defmodule YscWeb.HomeLiveTest do
          } do
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{"email" => "notvalid"})
+      submit_newsletter(view, %{"email" => "notvalid"})
 
       assert has_element?(view, "#newsletter-error")
       assert render(view) =~ "Please enter a valid email address."
@@ -1138,7 +1252,7 @@ defmodule YscWeb.HomeLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{
+      submit_newsletter(view, %{
         "email" => "test@mailinator.com"
       })
 
@@ -1154,7 +1268,7 @@ defmodule YscWeb.HomeLiveTest do
 
       domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
 
-      render_submit(view, "subscribe_newsletter", %{"email" => "user@#{domain}"})
+      submit_newsletter(view, %{"email" => "user@#{domain}"})
 
       assert has_element?(view, "#newsletter-error")
       assert render(view) =~ "email domain appears to be invalid"
@@ -1166,7 +1280,7 @@ defmodule YscWeb.HomeLiveTest do
       email = "nl_branch_ok_#{System.unique_integer([:positive])}@example.com"
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{"email" => email})
+      submit_newsletter(view, %{"email" => email})
 
       html = render(view)
       refute Newsletter.get_subscriber_by_email(email).subscribed
@@ -1179,12 +1293,62 @@ defmodule YscWeb.HomeLiveTest do
       email = "nl_rate_#{System.unique_integer([:positive])}@example.com"
       {:ok, view, _html} = live(conn, ~p"/")
 
-      render_submit(view, "subscribe_newsletter", %{"email" => email})
-      html = render_submit(view, "subscribe_newsletter", %{"email" => email})
+      submit_newsletter(view, %{"email" => email})
+      html = submit_newsletter(view, %{"email" => email})
 
       assert has_element?(view, "#newsletter-error")
       assert html =~ "Too many subscription attempts"
     end
+
+    test "subscribe_newsletter rejects a submit without a Turnstile token", %{
+      conn: conn
+    } do
+      test_pid = self()
+      email = "nl_no_token_#{System.unique_integer([:positive])}@example.com"
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        flunk("Turnstile.verify must not run without a token")
+      end)
+
+      stub(TurnstileMock, :refresh, fn socket ->
+        send(test_pid, :turnstile_refreshed)
+        socket
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html =
+        render_submit(view, "subscribe_newsletter", %{"email" => email})
+
+      assert has_element?(view, "#newsletter-error")
+      assert html =~ NewsletterSubscribe.guest_error(:turnstile)
+      assert_received :turnstile_refreshed
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
+    end
+
+    test "subscribe_newsletter rejects a failed Turnstile check", %{conn: conn} do
+      email = "nl_bad_token_#{System.unique_integer([:positive])}@example.com"
+
+      stub(TurnstileMock, :verify, fn _params, _ip ->
+        {:error, %{"error-codes" => ["invalid-input-response"]}}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      html = submit_newsletter(view, %{"email" => email})
+
+      assert has_element?(view, "#newsletter-error")
+      assert html =~ NewsletterSubscribe.guest_error(:turnstile)
+      assert is_nil(Newsletter.get_subscriber_by_email(email))
+    end
+  end
+
+  defp submit_newsletter(view, params) do
+    render_submit(
+      view,
+      "subscribe_newsletter",
+      Map.merge(@turnstile_params, params)
+    )
   end
 
   defp draft_upcoming_published_events! do

@@ -1,7 +1,7 @@
 defmodule Ysc.PaymentUserMessages do
   @moduledoc false
 
-  @card_declined_message "Your card was declined. Please try a different payment method or contact your bank."
+  @card_declined_message "Your card was declined. Please try a different card or contact your bank."
 
   def payment_setup_failed do
     trim("""
@@ -11,7 +11,7 @@ defmodule Ysc.PaymentUserMessages do
 
   def invoice_retry_failed do
     trim("""
-    We couldn't process that payment. Update your card in Membership settings and try again, or email #{Ysc.EmailConfig.membership_email()} for help.
+    We couldn't process that payment. Update your payment method in Membership settings and try again, or email #{Ysc.EmailConfig.membership_email()} for help.
     """)
   end
 
@@ -24,7 +24,7 @@ defmodule Ysc.PaymentUserMessages do
 
   def generic_payment_failed do
     trim("""
-    We couldn't process your payment. Check your card details or try another payment method. If this keeps happening, email #{Ysc.EmailConfig.contact_email()}.
+    We couldn't process your payment. Check your payment method details or try another payment method. If this keeps happening, email #{Ysc.EmailConfig.contact_email()}.
     """)
   end
 

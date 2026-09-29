@@ -32,6 +32,7 @@ defmodule Ysc.MoxUpgradeTest do
     end
 
     test "expect, stub, stub_with, verify, allow, and mode helpers still exist" do
+      assert {:module, _} = Code.ensure_loaded(Mox)
       assert function_exported?(Mox, :expect, 3)
       assert function_exported?(Mox, :expect, 4)
       assert function_exported?(Mox, :stub, 3)

@@ -11,10 +11,10 @@ defmodule YscWeb.Emails.EventNotification do
   import YscWeb.Emails.Helpers,
     only: [
       event_cover_image_url: 1,
+      event_notification_unsubscribe_url: 1,
       event_url: 1,
       format_event_start_datetime: 2,
       member_greeting_name: 1,
-      notification_settings_url: 0,
       plain_text_from_html: 1,
       preload_event_associations: 1
     ]
@@ -84,6 +84,7 @@ defmodule YscWeb.Emails.EventNotification do
     event
     |> prepare_shared_email_data()
     |> Map.put(:first_name, member_greeting_name(user))
+    |> Map.put(:unsubscribe_url, event_notification_unsubscribe_url(user.id))
   end
 
   @doc """
@@ -127,8 +128,7 @@ defmodule YscWeb.Emails.EventNotification do
       event: event_map,
       event_date_time: event_date_time,
       event_url: event_url(event.id),
-      event_image_url: event_cover_image_url(event),
-      notification_settings_url: notification_settings_url()
+      event_image_url: event_cover_image_url(event)
     }
   end
 end

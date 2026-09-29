@@ -15,16 +15,17 @@ defmodule Ysc.Media.Image do
   for image data manipulation.
   """
   use Ecto.Schema
+  use Flop.Schema
 
   import Ecto.Changeset
 
   @default_blur_hash "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
   @default_placeholder_path "/images/ysc_logo.webp"
 
-  @derive {
-    Flop.Schema,
-    filterable: [:title, :alt_text, :user_id], sortable: [:inserted_at]
-  }
+  @flop_options [
+    filterable: [:title, :alt_text, :user_id],
+    sortable: [:inserted_at]
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID

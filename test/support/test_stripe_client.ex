@@ -61,4 +61,10 @@ defmodule Ysc.TestStripeClient do
 
   @impl true
   def create_setup_intent(_params), do: {:error, :not_implemented}
+
+  @impl true
+  def retrieve_invoice(_id, _params), do: {:error, :not_implemented}
+
+  @impl true
+  def list_invoice_payments(_params, _opts), do: {:error, :not_implemented}
 end

@@ -39,13 +39,18 @@ defmodule Ysc.Bookings.BookingLocker do
 
   alias Ysc.Bookings.{
     Booking,
+    CabinMaster,
     Entitlements,
     PropertyInventory,
     RoomInventory,
     Room
   }
 
+  alias Ysc.Accounts.User
   alias Ysc.Bookings
+  alias Ysc.Tickets.CheckoutCancel
+
+  @booking_email_room_fields [:id, :name]
 
   @hold_duration_minutes 30
 
@@ -2016,10 +2021,9 @@ defmodule Ysc.Bookings.BookingLocker do
     require Ysc.Logging
 
     try do
-      # Reload booking with associations
-      booking =
-        Repo.get(Ysc.Bookings.Booking, booking.id)
-        |> Repo.preload([:user, :rooms])
+      # Callers already load rooms (confirm) or rooms+user (admin create).
+      # Only preload what is still missing — never `Repo.get` the booking again.
+      booking = ensure_booking_assocs(booking, [:user, :rooms])
 
       if booking && booking.user do
         # Prepare email data
@@ -2081,9 +2085,14 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  # Helper to cancel all other hold bookings for the same property and user
+  # Abandoned checkouts for the same property/user are released after a
+  # successful confirm so leftover inventory is not stuck on :hold. Stripe-first
+  # the sibling PaymentIntent before `release_hold/1`:
+  # `StripeService.cancel_payment_intent/1` treats a succeeded Intent as `:ok`,
+  # which would cancel a paid sibling, clear `applied_booking_entitlement_id`,
+  # and leave HoldExpiryWorker with nothing to confirm (`status != :hold`).
+  # Same atomic abandon as HoldExpiryWorker / checkout Cancel / ticket TimeoutWorker.
   defp cancel_other_hold_bookings(property, user_id, exclude_booking_id) do
-    # Find all other hold bookings for the same property and user
     other_hold_bookings =
       Repo.all(
         from b in Booking,
@@ -2093,26 +2102,335 @@ defmodule Ysc.Bookings.BookingLocker do
           where: b.id != ^exclude_booking_id
       )
 
-    # Release each hold booking
     Enum.each(other_hold_bookings, fn hold_booking ->
-      case release_hold(hold_booking.id) do
-        {:ok, _} ->
-          # Successfully released
-          :ok
-
-        {:error, reason} ->
-          # Log error but don't fail the main operation
-          require Ysc.Logging
-
-          Ysc.Logging.warning(
-            "Failed to release hold booking #{hold_booking.id} when confirming booking #{exclude_booking_id}: #{inspect(reason)}"
-          )
-      end
+      reconcile_sibling_hold(hold_booking, exclude_booking_id)
     end)
+  end
+
+  defp reconcile_sibling_hold(%Booking{} = hold_booking, confirmed_booking_id) do
+    case reconcile_sibling_hold_payment(hold_booking) do
+      :release ->
+        case release_hold(hold_booking.id) do
+          {:ok, _} ->
+            :ok
+
+          {:error, reason} ->
+            Ysc.Logging.warning(
+              "Failed to release hold booking #{hold_booking.id} when confirming booking #{confirmed_booking_id}: #{inspect(reason)}"
+            )
+        end
+
+      :confirmed ->
+        :ok
+
+      :skip ->
+        Ysc.Logging.info(
+          "Skipped releasing sibling hold while checkout payment is in flight",
+          booking_id: hold_booking.id,
+          confirmed_booking_id: confirmed_booking_id,
+          payment_intent_id: hold_booking.payment_intent_id
+        )
+    end
+  end
+
+  defp reconcile_sibling_hold_payment(
+         %Booking{payment_intent_id: payment_intent_id} = booking
+       )
+       when is_binary(payment_intent_id) and payment_intent_id != "" do
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           payment_intent_id,
+           "confirm_booking_sibling_hold"
+         ) do
+      {:cancel, _payment_intent} ->
+        :release
+
+      {:already_succeeded, payment_intent} ->
+        confirm_succeeded_sibling_hold(booking, payment_intent)
+
+      {:in_progress, _payment_intent} ->
+        :skip
+
+      {:error, stripe_error} ->
+        Ysc.Logging.warning(
+          "Could not reconcile sibling hold payment with Stripe, not releasing hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent_id,
+          error: inspect(stripe_error)
+        )
+
+        :skip
+    end
+  end
+
+  defp reconcile_sibling_hold_payment(_booking), do: :release
+
+  defp confirm_succeeded_sibling_hold(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case Bookings.verify_booking_payment_intent(payment_intent, booking) do
+      :ok ->
+        confirm_verified_sibling_hold(booking, payment_intent)
+
+      {:error, :payment_amount_mismatch} = error ->
+        Ysc.Logging.error(
+          "Payment succeeded on a sibling hold but amount did not match the hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(error)
+        )
+
+        Bookings.maybe_refund_unfulfilled_checkout_payment(
+          booking,
+          payment_intent,
+          :payment_amount_mismatch
+        )
+
+        :release
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on a sibling hold but could not be verified",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
+  end
+
+  defp confirm_verified_sibling_hold(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case confirm_booking(booking.id) do
+      {:ok, confirmed} ->
+        case Bookings.record_hold_checkout_ledger_payment(
+               confirmed,
+               payment_intent
+             ) do
+          :ok ->
+            :ok
+
+          {:error, ledger_reason} ->
+            Ysc.Logging.error(
+              "Sibling hold confirmed after payment succeeded but ledger payment recording failed",
+              booking_id: confirmed.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(ledger_reason)
+            )
+        end
+
+        Ysc.Logging.info(
+          "Confirmed sibling hold after payment succeeded during confirm_booking cleanup",
+          booking_id: confirmed.id,
+          reference_id: confirmed.reference_id,
+          payment_intent_id: payment_intent.id
+        )
+
+        :confirmed
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on a sibling hold but booking could not be confirmed",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
+  end
+
+  @doc """
+  Stripe-first hold release for member/admin cancel paths.
+
+  `release_hold/1` then `StripeService.cancel_payment_intent/1` treats a
+  succeeded Intent as `:ok`, which orphans a captured charge against a
+  `:canceled` hold, clears `applied_booking_entitlement_id`, and leaves
+  HoldExpiryWorker with nothing to confirm (`status != :hold`). Same
+  invariant as HoldExpiryWorker / checkout Cancel / sibling-hold cleanup.
+
+  Returns:
+  - `{:ok, canceled_booking}` when Stripe cancelled (or no PI) and the hold
+    was released
+  - `{:confirmed, confirmed_booking}` when Stripe already captured — the hold
+    is confirmed + ledgered instead of released
+  - `{:error, :payment_in_progress}` while Stripe is processing / unreachable
+  - `{:error, reason}` on release failure
+  """
+  def release_hold_with_stripe_reconcile(booking_id)
+      when is_binary(booking_id) do
+    reconcile_then_release_hold(
+      booking_id,
+      &release_hold/1,
+      "release_hold_with_stripe_reconcile"
+    )
+  end
+
+  @doc """
+  Stripe-first hold revert to draft for admin status changes.
+
+  Same invariant as `release_hold_with_stripe_reconcile/1`: a succeeded
+  PaymentIntent must confirm the stay instead of dropping the booking to
+  `:draft`, which would clear inventory, entitlement, and skip
+  HoldExpiryWorker (`status != :hold`).
+  """
+  def revert_hold_to_draft_with_stripe_reconcile(booking_id)
+      when is_binary(booking_id) do
+    reconcile_then_release_hold(
+      booking_id,
+      &revert_hold_to_draft/1,
+      "revert_hold_to_draft_with_stripe_reconcile"
+    )
+  end
+
+  defp reconcile_then_release_hold(booking_id, on_release, context)
+       when is_binary(booking_id) and is_function(on_release, 1) and
+              is_binary(context) do
+    booking = Repo.get!(Booking, booking_id)
+
+    case reconcile_hold_payment_for_release(booking, context) do
+      :release ->
+        on_release.(booking_id)
+
+      :confirmed ->
+        confirmed =
+          Repo.get!(Booking, booking_id) |> Repo.preload([:rooms, :user])
+
+        {:confirmed, confirmed}
+
+      :skip ->
+        {:error, :payment_in_progress}
+    end
+  end
+
+  defp reconcile_hold_payment_for_release(
+         %Booking{payment_intent_id: payment_intent_id} = booking,
+         context
+       )
+       when is_binary(payment_intent_id) and payment_intent_id != "" and
+              is_binary(context) do
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           payment_intent_id,
+           context
+         ) do
+      {:cancel, _payment_intent} ->
+        :release
+
+      {:already_succeeded, payment_intent} ->
+        confirm_succeeded_hold_for_release(booking, payment_intent)
+
+      {:in_progress, _payment_intent} ->
+        Ysc.Logging.info(
+          "Skipped releasing hold while checkout payment is in flight",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent_id
+        )
+
+        :skip
+
+      {:error, stripe_error} ->
+        Ysc.Logging.warning(
+          "Could not reconcile hold payment with Stripe, not releasing hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent_id,
+          error: inspect(stripe_error)
+        )
+
+        :skip
+    end
+  end
+
+  defp reconcile_hold_payment_for_release(_booking, _context), do: :release
+
+  defp confirm_succeeded_hold_for_release(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case Bookings.verify_booking_payment_intent(payment_intent, booking) do
+      :ok ->
+        confirm_verified_hold_for_release(booking, payment_intent)
+
+      {:error, :payment_amount_mismatch} = error ->
+        Ysc.Logging.error(
+          "Payment succeeded on hold release but amount did not match the hold",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(error)
+        )
+
+        Bookings.maybe_refund_unfulfilled_checkout_payment(
+          booking,
+          payment_intent,
+          :payment_amount_mismatch
+        )
+
+        :release
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on hold release but could not be verified",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
+  end
+
+  defp confirm_verified_hold_for_release(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent
+       ) do
+    case confirm_booking(booking.id) do
+      {:ok, confirmed} ->
+        case Bookings.record_hold_checkout_ledger_payment(
+               confirmed,
+               payment_intent
+             ) do
+          :ok ->
+            :ok
+
+          {:error, ledger_reason} ->
+            Ysc.Logging.error(
+              "Hold confirmed after payment succeeded during release reconcile but ledger payment recording failed",
+              booking_id: confirmed.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(ledger_reason)
+            )
+        end
+
+        Ysc.Logging.info(
+          "Confirmed hold after payment succeeded during release reconcile",
+          booking_id: confirmed.id,
+          reference_id: confirmed.reference_id,
+          payment_intent_id: payment_intent.id
+        )
+
+        :confirmed
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Payment succeeded on hold release but booking could not be confirmed",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          error: inspect(reason)
+        )
+
+        :skip
+    end
   end
 
   @doc """
   Releases a hold (cancels a :hold booking) and updates inventory accordingly.
+
+  Prefer `release_hold_with_stripe_reconcile/1` for member/admin cancel paths
+  that may race a captured PaymentIntent. Callers that already Stripe-reconciled
+  (HoldExpiryWorker, checkout Cancel, sibling-hold cleanup) may call this
+  directly after a successful cancel.
 
   ## Parameters:
   - `booking_id`: The booking to release
@@ -2208,6 +2526,10 @@ defmodule Ysc.Bookings.BookingLocker do
   Reverts a hold booking to `:draft` and releases held inventory.
 
   Like `release_hold/1`, but leaves the booking in draft instead of canceled.
+
+  Prefer `revert_hold_to_draft_with_stripe_reconcile/1` for admin hold→draft
+  paths that may race a captured PaymentIntent. Callers that already
+  Stripe-reconciled may call this directly after a successful cancel.
   """
   def revert_hold_to_draft(booking_id) do
     Repo.transaction(fn ->
@@ -2327,6 +2649,13 @@ defmodule Ysc.Bookings.BookingLocker do
               |> DateTime.add(hold_minutes, :minute)
               |> DateTime.truncate(:second)
 
+            # Rebuilds attrs from the new dates. Keeps any previously stored
+            # `payment_intent_id` so a concurrent tab cannot wipe the id that
+            # HoldExpiryWorker / remount-resubmit reconcile against. Callers
+            # that replace a paid hold must still Stripe-reconcile first
+            # (`BookingChangeLive.proceed_after_modification_details/3`);
+            # `attach_modification_payment_intent/2` cancels the previous
+            # Intent before overwriting.
             hold_attrs =
               encode_modification_hold_attrs(booking, attrs, hold_data, opts)
 
@@ -2355,8 +2684,9 @@ defmodule Ysc.Bookings.BookingLocker do
   Releases a modification payment hold without applying the modification.
 
   By default clears stored hold attrs (user cancelled). Pass `clear_attrs: false`
-  when the hold timed out but a Stripe payment may still complete — attrs are
-  needed to apply the modification on redirect return.
+  when the hold timed out after Stripe confirmed the PaymentIntent was canceled
+  (or there was never a PaymentIntent). Paid holds must be Stripe-reconciled
+  *before* this release — see `ModificationHoldExpiryWorker`.
   """
   def release_modification_hold(booking_id, opts \\ []) do
     clear_attrs = Keyword.get(opts, :clear_attrs, true)
@@ -2552,6 +2882,12 @@ defmodule Ysc.Bookings.BookingLocker do
       {:ok, updated_booking} ->
         reschedule_booking_reminders(updated_booking)
         send_booking_modification_email(updated_booking, previous_details)
+
+        send_booking_modification_cabin_master_email(
+          updated_booking,
+          previous_details
+        )
+
         invalidate_availability_cache({:ok, updated_booking})
         {:ok, updated_booking}
 
@@ -2643,6 +2979,15 @@ defmodule Ysc.Bookings.BookingLocker do
       "overlap_extra_guests" => overlap_extra_guests,
       "booking_mode" => Atom.to_string(booking.booking_mode)
     }
+
+    base =
+      case Bookings.modification_hold_payment_intent_id(booking) do
+        payment_intent_id when is_binary(payment_intent_id) ->
+          Map.put(base, "payment_intent_id", payment_intent_id)
+
+        _ ->
+          base
+      end
 
     case Keyword.get(opts, :guest_params) do
       guest_params when is_map(guest_params) and map_size(guest_params) > 0 ->
@@ -3591,9 +3936,7 @@ defmodule Ysc.Bookings.BookingLocker do
     require Ysc.Logging
 
     try do
-      booking =
-        Repo.get(Booking, booking.id)
-        |> Repo.preload([:user, :rooms])
+      booking = ensure_booking_assocs(booking, [:user, :rooms])
 
       if booking && booking.user do
         email_data =
@@ -3646,6 +3989,120 @@ defmodule Ysc.Bookings.BookingLocker do
           error: Exception.message(error)
         )
     end
+  end
+
+  defp send_booking_modification_cabin_master_email(booking, previous_details) do
+    require Ysc.Logging
+
+    try do
+      booking = ensure_booking_assocs(booking, [:user])
+
+      if booking && booking.user do
+        cabin_master = CabinMaster.get_active(booking.property)
+
+        if cabin_master && cabin_master.email do
+          email_data =
+            YscWeb.Emails.BookingModificationCabinMasterNotification.prepare_email_data(
+              booking,
+              previous_details
+            )
+
+          idempotency_key =
+            "booking_modification_cabin_master_#{booking.id}_#{System.unique_integer([:positive, :monotonic])}"
+
+          result =
+            YscWeb.Emails.Notifier.schedule_email(
+              cabin_master.email,
+              idempotency_key,
+              YscWeb.Emails.BookingModificationCabinMasterNotification.get_subject(),
+              "booking_modification_cabin_master_notification",
+              email_data,
+              "",
+              cabin_master.id,
+              Ysc.EmailConfig.booking_reply_to(booking.property)
+            )
+
+          case result do
+            %Oban.Job{} = job ->
+              Ysc.Logging.info(
+                "Cabin master modification email scheduled successfully",
+                booking_id: booking.id,
+                cabin_master_id: cabin_master.id,
+                job_id: job.id
+              )
+
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Failed to schedule cabin master modification email",
+                booking_id: booking.id,
+                cabin_master_id: cabin_master.id,
+                error: reason
+              )
+          end
+        else
+          Ysc.Logging.warning(
+            "No cabin master found for property, skipping modification notification",
+            property: booking.property,
+            booking_id: booking.id
+          )
+        end
+      end
+    rescue
+      error ->
+        Ysc.Logging.error(
+          "Failed to send cabin master modification email",
+          booking_id: booking.id,
+          error: Exception.message(error)
+        )
+    end
+  end
+
+  defp ensure_booking_assocs(%Booking{} = booking, assocs) do
+    Enum.reduce(assocs, booking, fn
+      :user, acc -> ensure_booking_email_user(acc)
+      :rooms, acc -> ensure_booking_email_rooms(acc)
+    end)
+  end
+
+  # Direct SELECT of identity columns — `Repo.preload/2` custom queries still
+  # emit `hashed_password` / `board_bio` in some Ecto preload plans.
+  defp ensure_booking_email_user(%Booking{} = booking) do
+    if Ecto.assoc_loaded?(booking.user) do
+      booking
+    else
+      user =
+        from(u in User,
+          where: u.id == ^booking.user_id,
+          select: {u.id, u.email, u.first_name, u.last_name}
+        )
+        |> Repo.one()
+        |> booking_email_user_struct()
+
+      %{booking | user: user}
+    end
+  end
+
+  defp booking_email_user_struct(nil), do: nil
+
+  defp booking_email_user_struct({id, email, first_name, last_name}) do
+    %User{
+      id: id,
+      email: email,
+      first_name: first_name,
+      last_name: last_name
+    }
+  end
+
+  defp ensure_booking_email_rooms(%Booking{} = booking) do
+    if Ecto.assoc_loaded?(booking.rooms) do
+      booking
+    else
+      Repo.preload(booking, rooms: booking_email_rooms_query())
+    end
+  end
+
+  defp booking_email_rooms_query do
+    from(r in Room, select: struct(r, ^@booking_email_room_fields))
   end
 
   @doc """

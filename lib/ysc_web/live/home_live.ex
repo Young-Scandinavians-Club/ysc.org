@@ -50,7 +50,11 @@ defmodule YscWeb.HomeLive do
     else
       # Guest user: load data synchronously for SEO
       # Search engines need to see content in the initial HTML response
-      socket = mount_guest_with_data(socket)
+      socket =
+        mount_guest_with_data(
+          socket,
+          YscWeb.ClientIP.from_socket(socket, session)
+        )
 
       socket =
         if connected?(socket) do
@@ -101,7 +105,7 @@ defmodule YscWeb.HomeLive do
 
   # Guest user: load data synchronously for SEO-friendly initial render
   # Search engines and social media crawlers need to see actual content
-  defp mount_guest_with_data(socket) do
+  defp mount_guest_with_data(socket, remote_ip) do
     # Determine hero video and captions based on season (no DB query)
     {hero_video, hero_poster, hero_poster_srcset, hero_captions} =
       case Season.for_date(
@@ -140,9 +144,6 @@ defmodule YscWeb.HomeLive do
       |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
         Map.put(acc, key, value)
       end)
-
-    # Get remote IP for Turnstile verification
-    remote_ip = get_connect_info(socket, :peer_data).address
 
     assign(socket,
       page_title: "Home",
@@ -200,18 +201,9 @@ defmodule YscWeb.HomeLive do
   defp load_user_with_subscriptions(user_id, just_logged_in) do
     preloads =
       if just_logged_in do
-        [
-          :passkeys,
-          :sub_accounts,
-          primary_user: :sub_accounts,
-          subscriptions: :subscription_items
-        ]
+        [:passkeys, subscriptions: :subscription_items]
       else
-        [
-          :sub_accounts,
-          primary_user: :sub_accounts,
-          subscriptions: :subscription_items
-        ]
+        [subscriptions: :subscription_items]
       end
 
     user_with_subs =
@@ -220,28 +212,26 @@ defmodule YscWeb.HomeLive do
 
     is_sub_account = Accounts.sub_account?(user_with_subs)
 
-    primary_user =
-      if is_sub_account,
-        do: Accounts.get_primary_user(user_with_subs),
-        else: nil
+    household = Accounts.list_household_dashboard_users(user_with_subs)
 
-    # For family/lifetime members, get family group (primary + sub-accounts)
-    user_for_family = primary_user || user_with_subs
-
-    family_group = Accounts.get_family_group(user_for_family)
-
-    # Same household set as Accounts.household_board_member/1 (single DB path vs. extra async task)
     membership_paused_by_board =
-      Enum.find(family_group, fn member -> member.board_position != nil end)
+      Enum.find(household, fn member -> member.board_position != nil end)
 
-    # Get active plan type for showing "Your Family" section
+    primary_user =
+      if is_sub_account do
+        Enum.find(household, &(&1.id == user_with_subs.primary_user_id))
+      else
+        nil
+      end
+
+    # MembershipCache already follows sub-accounts to the primary user.
     active_plan_type =
-      Ysc.Accounts.MembershipCache.get_membership_plan_type(user_for_family)
+      Ysc.Accounts.MembershipCache.get_membership_plan_type(user_with_subs)
 
     # Only show family section for primary users with family/lifetime and linked members
     other_family_members =
       if active_plan_type in [:family, :lifetime] and not is_sub_account do
-        Enum.reject(family_group, &(&1.id == user_with_subs.id))
+        Enum.reject(household, &(&1.id == user_with_subs.id))
       else
         []
       end
@@ -418,9 +408,12 @@ defmodule YscWeb.HomeLive do
             <div class="relative z-10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transform lg:rotate-2">
               <img
                 src={~p"/images/ysc_75th.webp"}
+                srcset={"#{~p"/images/ysc_75th-480.webp"} 480w, #{~p"/images/ysc_75th.webp"} 800w"}
+                sizes="(min-width: 1280px) 690px, (min-width: 1024px) 55vw, 100vw"
                 alt="YSC 75th Anniversary"
                 class="w-full h-64 sm:h-80 lg:h-96 object-cover"
                 loading="lazy"
+                decoding="async"
               />
             </div>
             <div class="hidden lg:block absolute -bottom-12 -left-20 z-20 w-64 h-64 rounded-3xl overflow-hidden shadow-2xl border-8 border-white transform -rotate-6">
@@ -460,6 +453,10 @@ defmodule YscWeb.HomeLive do
             <div class="relative h-full min-h-[280px] sm:min-h-[340px] md:min-h-[400px]">
               <img
                 src={~p"/images/clear_lake_midsummer.webp"}
+                srcset={"#{~p"/images/clear_lake_midsummer-640.webp"} 640w, #{~p"/images/clear_lake_midsummer.webp"} 1024w"}
+                sizes="(min-width: 1280px) 604px, (min-width: 768px) 50vw, 100vw"
+                loading="lazy"
+                decoding="async"
                 alt="Midsummer at Clear Lake"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
@@ -479,6 +476,10 @@ defmodule YscWeb.HomeLive do
             <div class="relative aspect-video">
               <img
                 src={~p"/images/ysc_bonfire_2024.webp"}
+                srcset={"#{~p"/images/ysc_bonfire_2024-480.webp"} 480w, #{~p"/images/ysc_bonfire_2024.webp"} 800w"}
+                sizes="(min-width: 1280px) 604px, (min-width: 768px) 50vw, 100vw"
+                loading="lazy"
+                decoding="async"
                 alt="YSC Bonfire 2024"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
@@ -496,8 +497,13 @@ defmodule YscWeb.HomeLive do
           <%!-- Cultural connection card --%>
           <div class="md:col-span-1 bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group">
             <div class="relative aspect-square">
+              <%!-- Square card cropping a ~1.46:1 image, so it renders ~1.46x the card width --%>
               <img
                 src={~p"/images/flags.webp"}
+                srcset={"#{~p"/images/flags-480.webp"} 480w, #{~p"/images/flags-800.webp"} 800w, #{~p"/images/flags.webp"} 1200w"}
+                sizes="(min-width: 1280px) 424px, (min-width: 768px) 36vw, 146vw"
+                loading="lazy"
+                decoding="async"
                 alt="Nordic country flags"
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
@@ -554,107 +560,47 @@ defmodule YscWeb.HomeLive do
         </div>
 
         <div class="space-y-20 sm:space-y-24 lg:space-y-32">
-          <%!-- Lake Tahoe --%>
-          <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
-            <div class="lg:col-span-5 order-2 lg:order-1">
-              <div class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6">
-                <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Lake Tahoe, CA
-              </div>
-              <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
-                The Alpine Retreat
-              </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
-                Ski in winter, hike in summer, and relax year-round. Perfectly positioned for alpine adventures and cozy
-                <em>hygge</em>
-                evenings by the fire.
-              </p>
-              <ul class="space-y-4 mb-8">
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>Minutes from world-class ski resorts & hiking trails</span>
-                </li>
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>
-                    Member-only rates: <strong>$45.00 / night</strong>
-                  </span>
-                </li>
-              </ul>
-              <.link
-                navigate={~p"/bookings/tahoe"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold hover:bg-blue-700 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-              >
-                Learn More About Tahoe
-              </.link>
-            </div>
-            <div class="lg:col-span-7 order-1 lg:order-2">
-              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
-                <img
-                  src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-                  alt="Lake Tahoe Cabin"
-                  class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                />
-                <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
-                </div>
-              </div>
-            </div>
-          </div>
+          <.cabin_showcase
+            id="home-cabin-tahoe"
+            location="Lake Tahoe, CA"
+            title="The Alpine Retreat"
+            navigate={~p"/bookings/tahoe"}
+            cta="Learn More About Tahoe"
+            image_src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+            image_srcset={"#{~p"/images/tahoe/tahoe_cabin_main-480.webp"} 480w, #{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+            image_sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
+            image_alt="Lake Tahoe Cabin"
+          >
+            Ski in winter, hike in summer, and relax year-round. Perfectly positioned for alpine adventures and cozy
+            <em>hygge</em>
+            evenings by the fire.
+            <:feature>
+              Minutes from world-class ski resorts & hiking trails
+            </:feature>
+            <:feature>
+              Member-only rates: <strong>$45.00 / night</strong>
+            </:feature>
+          </.cabin_showcase>
 
-          <%!-- Clear Lake --%>
-          <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
-            <div class="lg:col-span-7">
-              <div class="relative group overflow-hidden rounded-2xl sm:rounded-[2.5rem] border border-zinc-100">
-                <img
-                  src={~p"/images/clear_lake/clear_lake_dock.webp"}
-                  alt="Clear Lake Cabin"
-                  class="w-full aspect-4/3 object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                />
-                <div class="absolute inset-0 bg-linear-to-t from-black/20 to-transparent">
-                </div>
-              </div>
-            </div>
-            <div class="lg:col-span-5">
-              <div class="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6">
-                <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Clear Lake, CA
-              </div>
-              <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
-                The Waterfront Sanctuary
-              </h3>
-              <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
-                Our social heart since 1963. Swim, boat, and unwind at California's largest natural lake. A sun-drenched escape from the city.
-              </p>
-              <ul class="space-y-4 mb-8">
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>Private dock access for swimming & boating</span>
-                </li>
-                <li class="flex items-start gap-3 text-zinc-700 text-sm">
-                  <.icon
-                    name="hero-check-circle"
-                    class="w-5 h-5 text-teal-500 shrink-0"
-                  />
-                  <span>
-                    Member-only rates: <strong>$25.00 / night</strong>
-                  </span>
-                </li>
-              </ul>
-              <.link
-                navigate={~p"/bookings/clear-lake"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-sm font-bold hover:bg-emerald-700 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
-              >
-                Learn More About Clear Lake
-              </.link>
-            </div>
-          </div>
+          <.cabin_showcase
+            id="home-cabin-clear-lake"
+            location="Clear Lake, CA"
+            title="The Waterfront Sanctuary"
+            navigate={~p"/bookings/clear-lake"}
+            cta="Learn More About Clear Lake"
+            image_src={~p"/images/clear_lake/clear_lake_dock.webp"}
+            image_srcset={"#{~p"/images/clear_lake/clear_lake_dock-480.webp"} 480w, #{~p"/images/clear_lake/clear_lake_dock-900.webp"} 900w, #{~p"/images/clear_lake/clear_lake_dock.webp"} 1280w"}
+            image_sizes="(min-width: 1280px) 700px, (min-width: 1024px) 55vw, 100vw"
+            image_alt="Clear Lake Cabin"
+            accent={:emerald}
+            image_side={:left}
+          >
+            Our social heart since 1963. Swim, boat, and unwind at California's largest natural lake. A sun-drenched escape from the city.
+            <:feature>Private dock access for swimming & boating</:feature>
+            <:feature>
+              Member-only rates: <strong>$25.00 / night</strong>
+            </:feature>
+          </.cabin_showcase>
         </div>
       </div>
     </section>
@@ -1139,73 +1085,49 @@ defmodule YscWeb.HomeLive do
             phx-hook="InteractScrollbar"
             class="flex overflow-x-auto snap-x scroll-smooth thin-scrollbar lg:grid lg:grid-cols-4 gap-3 lg:gap-4 pb-2 lg:pb-4 -mx-4 px-4 lg:mx-0 lg:px-0 mb-12 mt-4 lg:mt-0"
           >
-            <.link
+            <.quick_action_card
               id="home-quick-action-tahoe"
               navigate={~p"/bookings/tahoe"}
-              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-blue-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon name="hero-home" class="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Lake Tahoe</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Book a stay</p>
-            </.link>
-            <.link
+              icon="hero-home"
+              tone={:blue}
+              title="Lake Tahoe"
+              subtitle="Book a stay"
+            />
+            <.quick_action_card
               id="home-quick-action-clear-lake"
               navigate={~p"/bookings/clear-lake"}
-              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon
-                  name="hero-home"
-                  class="w-4 h-4 lg:w-5 lg:h-5 text-emerald-600"
-                />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Clear Lake</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Book a stay</p>
-            </.link>
+              icon="hero-home"
+              tone={:emerald}
+              title="Clear Lake"
+              subtitle="Book a stay"
+            />
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
-              <.link
+              <.quick_action_card
+                id="home-quick-action-expenses"
                 navigate={~p"/expensereports"}
-                class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-              >
-                <div class="w-8 h-8 lg:w-10 lg:h-10 bg-orange-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                  <.icon
-                    name="hero-receipt-refund"
-                    class="w-4 h-4 lg:w-5 lg:h-5 text-orange-600"
-                  />
-                </div>
-                <p class="font-bold text-sm lg:text-base text-zinc-900">Expenses</p>
-                <p class="text-xs lg:text-sm text-zinc-500">View reports</p>
-              </.link>
+                icon="hero-receipt-refund"
+                tone={:orange}
+                title="Expenses"
+                subtitle="View reports"
+              />
             <% else %>
-              <.link
+              <.quick_action_card
+                id="home-quick-action-events"
                 navigate={~p"/events"}
-                class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-              >
-                <div class="w-8 h-8 lg:w-10 lg:h-10 bg-purple-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                  <.icon
-                    name="hero-calendar-days"
-                    class="w-4 h-4 lg:w-5 lg:h-5 text-purple-600"
-                  />
-                </div>
-                <p class="font-bold text-sm lg:text-base text-zinc-900">Events</p>
-                <p class="text-xs lg:text-sm text-zinc-500">Browse Events</p>
-              </.link>
+                icon="hero-calendar-days"
+                tone={:purple}
+                title="Events"
+                subtitle="Browse Events"
+              />
             <% end %>
-            <.link
+            <.quick_action_card
+              id="home-quick-action-settings"
               navigate={~p"/users/settings"}
-              class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon
-                  name="hero-cog-6-tooth"
-                  class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-600"
-                />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Settings</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Preferences</p>
-            </.link>
+              icon="hero-cog-6-tooth"
+              tone={:zinc}
+              title="Settings"
+              subtitle="Preferences"
+            />
           </div>
 
           <%!-- Main Content Grid --%>
@@ -1325,7 +1247,7 @@ defmodule YscWeb.HomeLive do
                             "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded-sm uppercase tracking-tighter",
                             case days_until_this_booking do
                               :started ->
-                                "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
+                                "bg-green-50 text-green-700 ring-1 ring-green-200/50 animate-pulse"
 
                               0 ->
                                 "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
@@ -1334,7 +1256,7 @@ defmodule YscWeb.HomeLive do
                                 "bg-blue-50 text-blue-700 ring-1 ring-blue-200/50"
 
                               days when days <= 7 ->
-                                "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/50"
+                                "bg-violet-50 text-violet-700 ring-1 ring-violet-200/50"
 
                               _ ->
                                 "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
@@ -1465,7 +1387,7 @@ defmodule YscWeb.HomeLive do
                           <% end %>
                         </div>
                         <div class="flex flex-col gap-1.5">
-                          <div class="flex items-center gap-3">
+                          <div class="flex flex-wrap items-center gap-3">
                             <.button
                               navigate={
                                 ~p"/events/#{event.id}/tickets/qr?return_to=/"
@@ -1839,32 +1761,86 @@ defmodule YscWeb.HomeLive do
                 </div>
               </.modal>
 
-              <%!-- Newsletter Subscription --%>
+              <%!-- Notifications --%>
               <section>
                 <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
-                  Newsletter
+                  Notifications
                 </h2>
 
                 <div
                   :if={!@async_data_loaded}
-                  class="flex items-center gap-3 animate-pulse"
+                  class="space-y-4 animate-pulse"
                 >
-                  <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
-                  <div class="space-y-2 flex-1">
-                    <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
-                    <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
+                  <div :for={_i <- 1..2} class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
+                    <div class="space-y-2 flex-1">
+                      <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
+                      <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
+                    </div>
                   </div>
                 </div>
 
-                <div :if={@async_data_loaded}>
+                <div :if={@async_data_loaded} class="space-y-4">
                   <.newsletter_member_status
                     id="home-newsletter-member-status"
                     subscribed={@newsletter_subscribed}
                     layout={:compact}
                   />
+
+                  <div
+                    id="home-event-notifications-status"
+                    class="flex items-center gap-3"
+                  >
+                    <div class={[
+                      "flex items-center justify-center w-9 h-9 rounded-full shrink-0",
+                      if(@current_user.event_notifications,
+                        do: "bg-emerald-100",
+                        else: "bg-zinc-100"
+                      )
+                    ]}>
+                      <.icon
+                        name={
+                          if(@current_user.event_notifications,
+                            do: "hero-bell",
+                            else: "hero-bell-slash"
+                          )
+                        }
+                        class={[
+                          "w-4 h-4",
+                          if(@current_user.event_notifications,
+                            do: "text-emerald-600",
+                            else: "text-zinc-500"
+                          )
+                        ]}
+                      />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="font-semibold text-zinc-900 text-sm">
+                        {if @current_user.event_notifications,
+                          do: "Event notifications on",
+                          else: "Event notifications off"}
+                      </p>
+                      <p class="text-xs text-zinc-500 mt-0.5">
+                        {if @current_user.event_notifications,
+                          do: "You'll hear about new events and reminders.",
+                          else: "Turn on to hear about new events and reminders."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      phx-click="toggle_event_notifications"
+                      phx-disable-with="Saving..."
+                      class="shrink-0 text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      {if @current_user.event_notifications,
+                        do: "Turn off",
+                        else: "Turn on"}
+                    </button>
+                  </div>
+
                   <.link
                     navigate={~p"/newsletters"}
-                    class="mt-3 flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
+                    class="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
                   >
                     Browse newsletter archive
                     <.icon name="hero-arrow-right" class="w-3 h-3" />
@@ -1873,7 +1849,10 @@ defmodule YscWeb.HomeLive do
               </section>
 
               <%!-- Your Family Section (family/lifetime members with linked users) --%>
-              <section :if={@async_data_loaded && @other_family_members != []}>
+              <section
+                :if={@async_data_loaded && @other_family_members != []}
+                id="home-family"
+              >
                 <div class="flex items-center justify-between mb-6">
                   <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
                     Your Family
@@ -1888,6 +1867,7 @@ defmodule YscWeb.HomeLive do
                 <div class="flex flex-wrap gap-x-3 gap-y-4">
                   <%= for member <- @other_family_members do %>
                     <div
+                      id={"home-family-member-#{member.id}"}
                       class="flex flex-col items-center w-16 text-center"
                       title={"#{member.first_name} #{member.last_name} · #{FamilyDisplay.relationship_label(member.family_relationship)}"}
                     >
@@ -1991,9 +1971,9 @@ defmodule YscWeb.HomeLive do
     case plan_type do
       :lifetime ->
         if is_sub_account do
-          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the member who manages your family account"}. Enjoy full access to all club properties and events forever."
+          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the member who manages your family account"}. Enjoy full access to our cabins and events forever."
         else
-          "You are a lifetime member. Enjoy full access to all club properties and events forever."
+          "You are a lifetime member. Enjoy full access to our cabins and events forever."
         end
 
       plan_id when not is_nil(plan_id) ->
@@ -2013,7 +1993,7 @@ defmodule YscWeb.HomeLive do
               "Your #{membership_type} membership will not automatically renew. You are still an active member until #{format_membership_date(renewal_date, timezone)}."
 
             renewal_date ->
-              "You have an active #{membership_type} membership. Auto-renewal is on—your membership will automatically renew on #{format_membership_date(renewal_date, timezone)} unless you turn it off beforehand."
+              "You have an active #{membership_type} membership. It will automatically renew on #{format_membership_date(renewal_date, timezone)} unless you turn off automatic renewal beforehand."
 
             true ->
               "You have an active #{membership_type} membership."
@@ -2021,7 +2001,7 @@ defmodule YscWeb.HomeLive do
         end
 
       _ ->
-        "You have an active membership with access to all club properties and events."
+        "You have an active membership with access to our cabins and events."
     end
   end
 
@@ -2178,6 +2158,34 @@ defmodule YscWeb.HomeLive do
      NewsletterSubscribe.toggle_member(socket, source: "home_dashboard")}
   end
 
+  def handle_event("toggle_event_notifications", _params, socket) do
+    user = socket.assigns.current_user
+    now_enabled? = !user.event_notifications
+
+    case Accounts.update_notification_preferences(user, %{
+           "event_notifications" => now_enabled?
+         }) do
+      {:ok, _updated_user} ->
+        {title, body} = event_notifications_toggle_toast(now_enabled?)
+
+        {:noreply,
+         socket
+         |> assign(:current_user, %{user | event_notifications: now_enabled?})
+         |> YscWeb.Flash.put_toast(:info, body,
+           title: title,
+           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+         )}
+
+      {:error, _changeset} ->
+        {:noreply,
+         Phoenix.LiveView.put_flash(
+           socket,
+           :error,
+           "We couldn't update your event notification preference. Please try again, or email info@ysc.org if this keeps happening."
+         )}
+    end
+  end
+
   defp format_event_time(_event_start_date, %Time{} = time) do
     Calendar.strftime(time, "%-I:%M %p")
   end
@@ -2197,6 +2205,13 @@ defmodule YscWeb.HomeLive do
   end
 
   defp format_event_time(_, _), do: ""
+
+  defp event_notifications_toggle_toast(true),
+    do:
+      {"Event notifications on", "You'll hear about new events and reminders."}
+
+  defp event_notifications_toggle_toast(false),
+    do: {"Event notifications off", "You won't receive event notifications."}
 
   defp format_membership_date(%DateTime{} = dt, timezone) do
     DateDisplay.format_date_in_zone(dt, timezone)

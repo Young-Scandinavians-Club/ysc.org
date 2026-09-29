@@ -144,6 +144,186 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
     end
 
+    test "information tab exposes door-code-access copy matching the 3-day reminder",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/bookings/tahoe?tab=information&info_tab=general"
+        )
+
+      render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "Door Code & Access"
+             )
+
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "about 3 days before check-in"
+             )
+
+      assert has_element?(
+               view,
+               "#door-code-access",
+               "starting 48 hours before check-in"
+             )
+
+      refute has_element?(view, "#door-code-access", "24 hours")
+      refute has_element?(view, "#door-code-access", "within 48 hours")
+      refute has_element?(view, "#door-code-access", "Unique to your booking")
+    end
+
+    test "review-before-checkout copy does not say Confirm Booking", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-desktop",
+               "Review booking"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-mobile",
+               "Review booking"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-review-booking-mobile",
+               "Confirm Booking"
+             )
+
+      render_click(view, "show-confirm-modal", %{})
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-modal-title",
+               "Review your booking"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-modal-intro",
+               "not booked yet"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-continue",
+               "Continue to payment"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-review-booking-go-back",
+               "Go back"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-review-booking-modal",
+               "Confirm Your Booking"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-review-booking-continue",
+               "Confirm Booking"
+             )
+    end
+
+    test "family-room minimum is billed guests, not a booking block", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      room = create_tahoe_room!(min_billable_occupancy: 2, capacity_max: 5)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(80, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room",
+        "guests_count" => "1"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+
+      assert has_element?(view, "#room-#{room.id}")
+
+      assert has_element?(
+               view,
+               "#room-#{room.id}-min-charge-badge",
+               "Priced for 2+ guests"
+             )
+
+      refute has_element?(
+               view,
+               "#room-#{room.id}-min-charge-badge",
+               "Min 2 Guests"
+             )
+
+      render_click(view, "room-changed", %{"room-id" => room.id})
+
+      assert has_element?(
+               view,
+               "#tahoe-room-min-charge-notice-#{room.id}",
+               "is billed for at least 2 guests"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-room-min-charge-notice-#{room.id}",
+               "You can still book with fewer people"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-room-min-charge-notice-#{room.id}",
+               "requires minimum of"
+             )
+
+      html = render(view)
+      refute html =~ "Minimum occupancy pricing applied"
+      refute html =~ "Min 2 Guests"
+
+      refute has_element?(view, "#tahoe-base-price-people", "2 adults")
+
+      assert has_element?(
+               view,
+               "#tahoe-minimum-pricing-applied",
+               "You're being charged for 2 guests"
+             )
+    end
+
     test "uses book, not rent or reserve, for the entire-cabin option", %{
       conn: conn
     } do
@@ -1912,6 +2092,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
   defp create_tahoe_room!(opts) when is_list(opts) do
     suffix = Keyword.get(opts, :suffix, "default")
     capacity_max = Keyword.get(opts, :capacity_max, 4)
+    min_billable_occupancy = Keyword.get(opts, :min_billable_occupancy, 1)
 
     {:ok, category} =
       %RoomCategory{}
@@ -1926,7 +2107,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
         name: "Tahoe calendar test room #{System.unique_integer([:positive])}",
         property: :tahoe,
         room_category_id: category.id,
-        capacity_max: capacity_max
+        capacity_max: capacity_max,
+        min_billable_occupancy: min_billable_occupancy
       })
 
     RoomsListCache.invalidate()

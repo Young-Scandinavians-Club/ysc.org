@@ -711,7 +711,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Your Membership
           <:subtitle>
-            Your membership is active. Review the details below and make sure a payment method is on file for auto-renewal.
+            Your membership is active. Review the details below and make sure a payment method is on file for automatic renewal.
           </:subtitle>
         </.header>
 
@@ -768,14 +768,14 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm">
             <.icon name="hero-exclamation-triangle" class="w-5 h-5 mt-0.5 shrink-0" />
             <span>
-              You haven't saved a card or bank account yet. Add one so your membership can renew automatically.
+              You haven't saved a payment method yet. Add one so your membership can renew automatically.
             </span>
           </div>
           <%= if is_nil(@payment_intent_secret) do %>
             <div class="mt-6 flex justify-end">
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
                 <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
-                Add Payment Method
+                Add a payment method
               </.button>
             </div>
           <% else %>
@@ -795,7 +795,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <div class="flex justify-end mt-4">
                 <.button type="submit" id="submit" phx-disable-with="Saving...">
                   <.icon name="hero-lock-closed" class="w-4 h-4 me-1" />
-                  Save Payment Method
+                  Save payment method
                 </.button>
               </div>
             </form>
@@ -804,9 +804,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <% else %>
         <%!-- No active subscription: offer to set one up, with a skip option --%>
         <.header class="text-left">
-          Set Up Renewal Payment
+          Set up automatic renewal
           <:subtitle>
-            Add a card or bank account so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a payment method later in account settings.
+            Add a payment method so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a payment method later in account settings.
           </:subtitle>
         </.header>
 
@@ -845,7 +845,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               phx-click="confirm_payment_step"
               phx-disable-with="Setting up renewal..."
             >
-              Turn on auto-renewal and continue
+              Turn on automatic renewal and continue
               <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>
@@ -863,7 +863,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               </.button>
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
                 <.icon name="hero-credit-card" class="w-4 h-4 me-1" />
-                Add Payment Method
+                Add a payment method
               </.button>
             </div>
           <% else %>
@@ -1456,7 +1456,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
         YscWeb.Flash.send_toast(
           :error,
-          "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a card.",
+          "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a payment method.",
           title: "Payment Error"
         )
 
@@ -1848,7 +1848,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     base =
       if skip_payment,
         do: base,
-        else: base ++ [{"Renewal Payment", @step_payment}]
+        else: base ++ [{"Save payment method", @step_payment}]
 
     if needs_family_members_step,
       do: base ++ [{"Family", @step_family}],
@@ -2692,6 +2692,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               "#{email} (#{name}) already has an account. You can link them from Family in Account settings."
           }
 
+        {:error, :child_is_adult} ->
+          %{ok: false, message: FamilyInvites.child_is_adult_message(name)}
+
         {:error, :max_sub_accounts_reached} ->
           %{ok: false, message: "Maximum number of family members reached."}
 
@@ -2808,10 +2811,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp payment_method_display(%{last_four: last4}) when is_binary(last4) do
-    "Card ···· #{last4}"
+    "Payment method ···· #{last4}"
   end
 
-  defp payment_method_display(_), do: "Card on file"
+  defp payment_method_display(_), do: "Payment method on file"
 
   defp assign_avatar_data(socket, user) do
     socket

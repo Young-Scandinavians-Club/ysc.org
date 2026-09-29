@@ -46,6 +46,7 @@ defmodule Ysc.DnsClusterUpgradeTest do
     end
 
     test "start_link/1 and Resolver still load" do
+      assert {:module, _} = Code.ensure_loaded(DNSCluster)
       assert function_exported?(DNSCluster, :start_link, 1)
 
       assert {:module, DNSCluster.Resolver} =

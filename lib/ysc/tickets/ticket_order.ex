@@ -6,14 +6,14 @@ defmodule Ysc.Tickets.TicketOrder do
   for ticket order data manipulation.
   """
   use Ecto.Schema
+  use Flop.Schema
   import Ecto.Changeset
 
   alias Ysc.ReferenceGenerator
 
   @reference_prefix "ORD"
 
-  @derive {
-    Flop.Schema,
+  @flop_options [
     filterable: [:user_id, :status, :event_id],
     sortable: [
       :reference_id,
@@ -28,7 +28,7 @@ defmodule Ysc.Tickets.TicketOrder do
       order_by: [:inserted_at],
       order_directions: [:desc]
     }
-  }
+  ]
 
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID

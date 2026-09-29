@@ -2684,7 +2684,10 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={payment <- @selected_payout.payments}>
+                <tr
+                  :for={payment <- @selected_payout.payments}
+                  id={"payout-modal-payment-#{payment.id}"}
+                >
                   <td class="px-4 py-2 whitespace-nowrap font-mono text-xs">
                     {payment.reference_id}
                   </td>
@@ -2797,7 +2800,10 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={refund <- @selected_payout.refunds}>
+                <tr
+                  :for={refund <- @selected_payout.refunds}
+                  id={"payout-modal-refund-#{refund.id}"}
+                >
                   <td class="px-4 py-2 whitespace-nowrap font-mono text-xs">
                     {refund.reference_id}
                   </td>
@@ -3010,7 +3016,7 @@ defmodule YscWeb.AdminMoneyLive do
       >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Payment Details</h3>
 
-        <div class="mb-6 space-y-4">
+        <div class="mb-6 flex flex-col gap-4">
           <!-- Payment Information -->
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -3105,7 +3111,7 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
           </div>
           <!-- QuickBooks Information -->
-          <div class="mt-4 p-4 bg-amber-50 rounded-sm border border-amber-200">
+          <div class="p-4 bg-amber-50 rounded-sm border border-amber-200">
             <h4 class="text-sm font-semibold text-zinc-800 mb-3">
               QuickBooks Information
             </h4>
@@ -3185,7 +3191,7 @@ defmodule YscWeb.AdminMoneyLive do
           <div
             :if={@payment_related_entity}
             id="payment-related-entity"
-            class="mt-4 p-4 bg-blue-50 rounded-sm border border-blue-200"
+            class="p-4 bg-blue-50 rounded-sm border border-blue-200"
           >
             <h4 class="text-sm font-semibold text-zinc-800 mb-2">Related Entity</h4>
             <%= case @payment_related_entity do %>
@@ -3238,7 +3244,7 @@ defmodule YscWeb.AdminMoneyLive do
             <% end %>
           </div>
           <!-- Refunds Section -->
-          <div class="mt-4">
+          <div>
             <h4 class="text-md font-semibold text-zinc-800 mb-3">
               Refunds ({length(@payment_refunds || [])})
             </h4>
@@ -3314,7 +3320,7 @@ defmodule YscWeb.AdminMoneyLive do
             </p>
           </div>
           <!-- Ledger Entries Section -->
-          <div class="mt-4">
+          <div>
             <h4 class="text-md font-semibold text-zinc-800 mb-3">
               Ledger Entries ({length(@payment_ledger_entries || [])})
             </h4>

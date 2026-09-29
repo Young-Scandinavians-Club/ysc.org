@@ -6,6 +6,7 @@ defmodule Ysc.ExpenseReports do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ysc.Accounts
   alias Ysc.Accounts.{Address, User}
   alias Ysc.Events.Event
 
@@ -325,6 +326,9 @@ defmodule Ysc.ExpenseReports do
   purpose, status, and net total. Drafts are omitted — they are a member's
   in-progress scratch copy. Headline totals still use `totals_for_event/2`,
   which counts only approved/paid reports.
+
+  Callers must be full admins. LetMe `expense_report :read` is admin or
+  own_resource; Finding 76 was volunteers loading this on event Statistics.
   """
   def list_expense_reports_for_event(event_id) do
     event_id
@@ -1302,12 +1306,7 @@ defmodule Ysc.ExpenseReports do
         expense_report_id: expense_report.id
       )
 
-      treasurer =
-        from(u in User,
-          where: u.board_position == "treasurer" and u.state == :active,
-          limit: 1
-        )
-        |> Repo.one()
+      treasurer = Accounts.get_active_board_member(:treasurer)
 
       Ysc.Logging.info(
         "send_expense_report_emails_impl: Treasurer query result",

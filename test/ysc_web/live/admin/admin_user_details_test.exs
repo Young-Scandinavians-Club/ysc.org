@@ -159,6 +159,26 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert orders_html =~ "Tickets"
     end
 
+    test "orders tab still shows reference, event, ticket count, and amount after slim load",
+         %{conn: conn} do
+      data = Ysc.TestDataFactory.complete_ticket_order()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{data.user.id}/details/orders")
+
+      render_async(view)
+
+      table = "#user_ticket_orders_list"
+      formatted_total = Ysc.MoneyHelper.format_money!(data.order.total_amount)
+
+      assert has_element?(view, table)
+      assert has_element?(view, table, data.order.reference_id)
+      assert has_element?(view, table, data.event.title)
+      assert has_element?(view, table, "2 ticket(s)")
+      assert has_element?(view, table, formatted_total)
+      assert has_element?(view, table, "Completed")
+    end
+
     test "can navigate to bookings tab", %{conn: conn} do
       user = user_fixture()
 
@@ -1009,6 +1029,44 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       |> render_change()
 
       assert has_element?(view, "#override-rejection-form .field-error")
+    end
+  end
+
+  describe "application tab reviewed by" do
+    test "shows the reviewer with a link to their user page",
+         %{conn: conn, user: admin} do
+      user = user_fixture(%{state: :active})
+
+      signup_application_fixture(user, %{
+        review_outcome: "approved",
+        reviewed_at: DateTime.utc_now(),
+        reviewed_by_user_id: admin.id
+      })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
+
+      assert has_element?(view, "#admin-application-reviewed-by", admin.email)
+
+      assert has_element?(
+               view,
+               ~s|#admin-application-reviewed-by-link[href="/admin/users/#{admin.id}/details"]|
+             )
+    end
+
+    test "hides the reviewer section for unreviewed applications",
+         %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval})
+      signup_application_fixture(user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/application")
+
+      render_async(view)
+
+      refute has_element?(view, "#admin-application-reviewed-by")
     end
   end
 

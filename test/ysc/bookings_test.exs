@@ -2194,6 +2194,128 @@ defmodule Ysc.BookingsTest do
       assert Ecto.assoc_loaded?(view_loaded.check_ins)
     end
 
+    test "get_user_booking_for_member_checkout/2 slims rooms and skips user" do
+      {user, room, _category, booking} = admin_list_slim_booking_fixture()
+
+      {loaded, category_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_checkout(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?room_categories["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, user_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_checkout(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?users["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, room_copy} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_checkout(booking.id, user.id)
+          end,
+          pattern: ~r/description|hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == booking.id
+      assert hd(loaded.rooms).id == room.id
+      assert hd(loaded.rooms).name == room.name
+      assert hd(loaded.rooms).capacity_max == room.capacity_max
+      assert is_nil(hd(loaded.rooms).description)
+      refute Ecto.assoc_loaded?(loaded.user)
+      assert Ecto.assoc_loaded?(loaded.booking_guests)
+      refute Ecto.assoc_loaded?(hd(loaded.rooms).room_category)
+      assert category_queries == 0
+      assert user_queries == 0
+      assert room_copy == 0
+    end
+
+    test "get_user_booking_for_member_detail/2 skips guests, user, and categories" do
+      {user, room, _category, booking} = admin_list_slim_booking_fixture()
+
+      {loaded, category_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_detail(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?room_categories["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, guest_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_member_detail(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?booking_guests["']?/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == booking.id
+      assert hd(loaded.rooms).name == room.name
+      refute Ecto.assoc_loaded?(loaded.user)
+      refute Ecto.assoc_loaded?(loaded.booking_guests)
+      assert category_queries == 0
+      assert guest_queries == 0
+    end
+
+    test "get_user_booking_for_receipt/2 slims user and skips room categories" do
+      {user, room, _category, booking} = admin_list_slim_booking_fixture()
+
+      {loaded, category_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_receipt(booking.id, user.id)
+          end,
+          pattern: ~r/FROM ["']?room_categories["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.get_user_booking_for_receipt(booking.id, user.id)
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == booking.id
+      assert loaded.user.id == user.id
+      assert loaded.user.first_name == user.first_name
+      assert is_nil(loaded.user.hashed_password)
+      assert is_nil(loaded.user.board_bio)
+      assert hd(loaded.rooms).name == room.name
+      assert Ecto.assoc_loaded?(loaded.booking_guests)
+      assert category_queries == 0
+      assert password_cols == 0
+    end
+
+    test "member checkout loaders return nil for another user's booking" do
+      {_user, _room, _category, booking} = admin_list_slim_booking_fixture()
+      other = user_fixture()
+
+      assert is_nil(
+               Bookings.get_user_booking_for_member_checkout(
+                 booking.id,
+                 other.id
+               )
+             )
+
+      assert is_nil(
+               Bookings.get_user_booking_for_member_detail(booking.id, other.id)
+             )
+
+      assert is_nil(Bookings.get_user_booking_for_receipt(booking.id, other.id))
+    end
+
     test "mark_booking_checked_in/1 marks booking as checked in" do
       booking = booking_fixture()
       refute booking.checked_in
@@ -5368,6 +5490,13 @@ defmodule Ysc.BookingsTest do
   end
 
   describe "cancel_booking/3 hold booking and release_hold" do
+    setup :verify_on_exit!
+
+    setup do
+      allow_far_future_booking_dates()
+      :ok
+    end
+
     test "returns cancellation_failed when buyout hold cannot clear inventory" do
       user = user_fixture()
 
@@ -5393,6 +5522,130 @@ defmodule Ysc.BookingsTest do
       assert {:error,
               {:cancellation_failed, {:error, :inventory_update_failed}}} =
                Bookings.cancel_booking(booking)
+    end
+
+    test "confirms instead of canceling when hold PaymentIntent already succeeded" do
+      user = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(423)
+
+      assert {:ok, hold} =
+               Ysc.Bookings.BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_cancel_booking_succeeded_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        assert {:ok, confirmed, refund_amount, :hold_payment_confirmed} =
+                 Bookings.cancel_booking(hold)
+
+        assert confirmed.status == :complete
+        assert Money.zero?(refund_amount)
+
+        payment = Ledgers.get_payment_by_external_id(payment_intent_id)
+        assert payment
+        assert payment.status == :completed
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "does not release a hold while PaymentIntent is still processing" do
+      user = user_fixture()
+      {checkin, checkout} = locker_buyout_dates(424)
+
+      assert {:ok, hold} =
+               Ysc.Bookings.BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      payment_intent_id =
+        "pi_cancel_booking_processing_#{System.unique_integer([:positive])}"
+
+      hold =
+        hold
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{"booking_id" => hold.id}
+           }}
+        end)
+
+        assert {:error, {:cancellation_failed, :payment_in_progress}} =
+                 Bookings.cancel_booking(hold)
+
+        reloaded = Repo.reload!(hold)
+        assert reloaded.status == :hold
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
     end
   end
 
@@ -6429,6 +6682,242 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "attach_modification_payment_intent/2" do
+    test "stores the PaymentIntent id on modification hold attrs" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0
+          }
+        })
+        |> Repo.update!()
+
+      assert {:ok, updated} =
+               Bookings.attach_modification_payment_intent(
+                 booking,
+                 "pi_mod_attach"
+               )
+
+      refute updated.payment_intent_id == "pi_mod_attach"
+
+      assert Bookings.modification_hold_payment_intent_id(updated) ==
+               "pi_mod_attach"
+
+      reloaded = Repo.reload!(booking)
+
+      assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+               "pi_mod_attach"
+    end
+
+    test "cancels the previous modification PaymentIntent when replaced" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0,
+            "payment_intent_id" => "pi_mod_old"
+          }
+        })
+        |> Repo.update!()
+
+      test_pid = self()
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn "pi_mod_old", _opts ->
+          send(test_pid, {:canceled_stale_modification_pi, "pi_mod_old"})
+          {:ok, %Stripe.PaymentIntent{id: "pi_mod_old", status: "canceled"}}
+        end)
+
+        assert {:ok, updated} =
+                 Bookings.attach_modification_payment_intent(
+                   booking,
+                   "pi_mod_new"
+                 )
+
+        assert Bookings.modification_hold_payment_intent_id(updated) ==
+                 "pi_mod_new"
+
+        assert_received {:canceled_stale_modification_pi, "pi_mod_old"}
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refuses to overwrite when the previous modification PaymentIntent already succeeded" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0,
+            "payment_intent_id" => "pi_mod_paid"
+          }
+        })
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn "pi_mod_paid",
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn "pi_mod_paid",
+                                                            _opts ->
+          {:ok, %Stripe.PaymentIntent{id: "pi_mod_paid", status: "succeeded"}}
+        end)
+
+        assert {:error,
+                {:modification_payment_already_succeeded, "pi_mod_paid"}} =
+                 Bookings.attach_modification_payment_intent(
+                   booking,
+                   "pi_mod_replacement"
+                 )
+
+        reloaded = Repo.reload!(booking)
+
+        assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+                 "pi_mod_paid"
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refuses to overwrite while the previous modification PaymentIntent is in flight" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0,
+            "payment_intent_id" => "pi_mod_processing"
+          }
+        })
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn "pi_mod_processing",
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn "pi_mod_processing",
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{id: "pi_mod_processing", status: "processing"}}
+        end)
+
+        assert {:error, :modification_payment_in_progress} =
+                 Bookings.attach_modification_payment_intent(
+                   booking,
+                   "pi_mod_replacement"
+                 )
+
+        reloaded = Repo.reload!(booking)
+
+        assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+                 "pi_mod_processing"
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refuses to overwrite when Stripe times out cancelling the previous modification PaymentIntent" do
+      booking = booking_fixture(%{status: :complete})
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          modification_hold_attrs: %{
+            "checkin_date" => Date.to_iso8601(booking.checkin_date),
+            "checkout_date" =>
+              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
+            "guests_count" => booking.guests_count,
+            "children_count" => booking.children_count || 0,
+            "payment_intent_id" => "pi_mod_timeout"
+          }
+        })
+        |> Repo.update!()
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn "pi_mod_timeout",
+                                                          _opts ->
+          {:error, :timeout}
+        end)
+
+        assert {:error, {:stripe_reconcile_failed, :timeout}} =
+                 Bookings.attach_modification_payment_intent(
+                   booking,
+                   "pi_mod_replacement"
+                 )
+
+        reloaded = Repo.reload!(booking)
+
+        assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+                 "pi_mod_timeout"
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "returns an error when no modification hold attrs are present" do
+      booking = booking_fixture(%{status: :complete})
+
+      assert {:error, :no_modification_hold} =
+               Bookings.attach_modification_payment_intent(
+                 booking.id,
+                 "pi_mod_missing_hold"
+               )
+    end
+  end
+
   describe "ci_query_explain_* query builders" do
     test "each helper builds a runnable Ecto query" do
       assert %Ecto.Query{} = Bookings.ci_query_explain_query()
@@ -6453,6 +6942,15 @@ defmodule Ysc.BookingsTest do
 
       assert %Ecto.Query{} =
                Bookings.ci_query_explain_list_pending_refunds_for_admin_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_get_user_booking_for_member_checkout_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_get_user_booking_for_member_detail_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_get_user_booking_for_receipt_query()
     end
 
     test "the admin property dashboard stats query executes against the database" do

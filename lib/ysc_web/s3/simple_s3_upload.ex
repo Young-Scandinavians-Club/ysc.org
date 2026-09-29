@@ -18,6 +18,9 @@ defmodule YscWeb.S3.SimpleS3Upload do
   For Tigris, the region should be set to "auto" and the upload URL should use
   virtual-hosted style format: https://<bucket-name>.fly.storage.tigris.dev
 
+  LiveView callers that need Phoenix `external` uploader meta should use
+  `YscWeb.S3.DirectUpload.presign/2` instead of calling this directly.
+
   ## Options
     * `:key` - The required key of the object to be uploaded.
     * `:max_file_size` - The required maximum allowed file size in bytes.

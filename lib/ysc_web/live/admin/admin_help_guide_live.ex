@@ -204,7 +204,7 @@ defmodule YscWeb.AdminHelpGuideLive do
 
         <div
           :if={@guide_panel == :steps}
-          class="bg-white rounded-xl border border-zinc-200 p-6 md:p-8 shadow-xs print:hidden"
+          class="mt-6 bg-white rounded-xl border border-zinc-200 p-6 md:p-8 shadow-xs print:hidden"
         >
           <.admin_help_step
             id={"admin-help-step-#{@current_step}"}
