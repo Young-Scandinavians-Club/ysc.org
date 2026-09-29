@@ -73,6 +73,47 @@ defmodule Ysc.Events.EventTest do
       assert Keyword.has_key?(cs.errors, :partiful_link)
     end
 
+    test "rejects lookalike hosts that only suffix-match partiful.com (Finding 78)",
+         %{organizer: organizer} do
+      for host <- ["evilpartiful.com", "not-partiful.com", "partiful.com.evil.com"] do
+        cs =
+          Event.changeset(%Event{}, %{
+            state: :draft,
+            organizer_id: organizer.id,
+            title: "T",
+            partiful_link: "https://#{host}/e/phish"
+          })
+
+        refute cs.valid?, "expected rejection for host #{host}"
+        assert Keyword.has_key?(cs.errors, :partiful_link)
+      end
+    end
+
+    test "accepts partiful.com subdomains", %{organizer: organizer} do
+      cs =
+        Event.changeset(%Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "T",
+          partiful_link: "https://www.partiful.com/e/abc123"
+        })
+
+      assert cs.valid?
+    end
+
+    test "rejects partiful link with userinfo", %{organizer: organizer} do
+      cs =
+        Event.changeset(%Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "T",
+          partiful_link: "https://user:pass@partiful.com/e/abc123"
+        })
+
+      refute cs.valid?
+      assert Keyword.has_key?(cs.errors, :partiful_link)
+    end
+
     test "rejects malformed partiful link", %{organizer: organizer} do
       cs =
         Event.changeset(%Event{}, %{
