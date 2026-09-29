@@ -21,6 +21,7 @@ defmodule Ysc.Tickets.BookingLocker do
     TicketTierHelpers
   }
 
+  alias Ysc.Tickets.ReservationDiscount
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Accounts.User
 
@@ -995,13 +996,12 @@ defmodule Ysc.Tickets.BookingLocker do
         tier = Enum.find(tiers, &(&1.id == tier_id))
         tier_reservations = Map.get(reservations_by_tier, tier_id, [])
 
-        case tier.type do
-          :free ->
+        cond do
+          TicketTierHelpers.free_tier?(tier) ->
             {acc_total, acc_discount}
 
-          :donation ->
+          TicketTierHelpers.donation_tier?(tier) ->
             # For donations, amount_or_quantity is already in cents
-            # Convert cents to dollars Decimal, then create Money
             dollars_decimal =
               Ysc.MoneyHelper.cents_to_dollars(amount_or_quantity)
 
@@ -1015,24 +1015,7 @@ defmodule Ysc.Tickets.BookingLocker do
 
             {new_total, acc_discount}
 
-          "donation" ->
-            # For donations, amount_or_quantity is already in cents
-            # Convert cents to dollars Decimal, then create Money
-            dollars_decimal =
-              Ysc.MoneyHelper.cents_to_dollars(amount_or_quantity)
-
-            donation_amount = Money.new(dollars_decimal, :USD)
-
-            new_total =
-              case Money.add(acc_total, donation_amount) do
-                {:ok, total} -> total
-                {:error, _} -> acc_total
-              end
-
-            {new_total, acc_discount}
-
-          _ ->
-            # For regular paid tiers, calculate with discounts
+          true ->
             calculate_tier_total_with_discounts(
               tier,
               amount_or_quantity,
@@ -1071,49 +1054,28 @@ defmodule Ysc.Tickets.BookingLocker do
         if remaining_to_cover <= 0 do
           {:halt, {covered_qty, discount_acc}}
         else
-          reservation_qty = reservation.quantity
+          tickets_from_reservation =
+            min(reservation.quantity, remaining_to_cover)
 
-          reservation_discount_pct =
-            reservation.discount_percentage || Decimal.new(0)
+          discount_amount =
+            ReservationDiscount.amount(
+              tier.price,
+              tickets_from_reservation,
+              reservation.discount_percentage
+            )
 
-          if Decimal.gt?(reservation_discount_pct, 0) do
-            # Calculate how many tickets from this reservation we can use
-            tickets_from_reservation = min(reservation_qty, remaining_to_cover)
+          new_covered = covered_qty + tickets_from_reservation
 
-            # Calculate discount for these tickets
-            reservation_tier_total =
-              case Money.mult(tier.price, tickets_from_reservation) do
-                {:ok, total} -> total
-                {:error, _} -> Money.new(0, :USD)
-              end
-
-            # Apply discount percentage (convert percentage to decimal: 50% = 0.50)
-            discount_pct_decimal =
-              Decimal.div(reservation_discount_pct, Decimal.new(100))
-
-            discount_amount =
-              case Money.mult(reservation_tier_total, discount_pct_decimal) do
-                {:ok, discount} -> discount
-                {:error, _} -> Money.new(0, :USD)
-              end
-
-            new_covered = covered_qty + tickets_from_reservation
-
-            new_discount =
-              case Money.add(discount_acc, discount_amount) do
-                {:ok, total} -> total
-                {:error, _} -> discount_acc
-              end
-
-            if new_covered >= requested_quantity do
-              {:halt, {new_covered, new_discount}}
-            else
-              {:cont, {new_covered, new_discount}}
+          new_discount =
+            case Money.add(discount_acc, discount_amount) do
+              {:ok, total} -> total
+              {:error, _} -> discount_acc
             end
+
+          if new_covered >= requested_quantity do
+            {:halt, {new_covered, new_discount}}
           else
-            # No discount, but still count as covered
-            new_covered = covered_qty + min(reservation_qty, remaining_to_cover)
-            {:cont, {new_covered, discount_acc}}
+            {:cont, {new_covered, new_discount}}
           end
         end
       end)
@@ -1235,10 +1197,10 @@ defmodule Ysc.Tickets.BookingLocker do
         # For donation tiers, always create 1 ticket regardless of amount
         # For other tiers, calculate how many tickets to create
         requested_count =
-          case tier.type do
-            :donation -> 1
-            "donation" -> 1
-            _ -> amount_or_quantity
+          if TicketTierHelpers.donation_tier?(tier) do
+            1
+          else
+            amount_or_quantity
           end
 
         # Get fulfilled reservations for this tier (each entry is {reservation, fulfill_qty})
@@ -1256,33 +1218,11 @@ defmodule Ysc.Tickets.BookingLocker do
           |> Enum.flat_map(fn {reservation, fulfill_qty} ->
             # Calculate discount per ticket for this reservation
             per_ticket_discount =
-              if reservation.discount_percentage &&
-                   Decimal.gt?(reservation.discount_percentage, 0) &&
-                   tier.price do
-                # Calculate total discount for this reservation
-                reservation_total =
-                  case Money.mult(tier.price, fulfill_qty) do
-                    {:ok, total} -> total
-                    {:error, _} -> Money.new(0, :USD)
-                  end
-
-                discount_pct_decimal =
-                  Decimal.div(reservation.discount_percentage, Decimal.new(100))
-
-                total_discount =
-                  case Money.mult(reservation_total, discount_pct_decimal) do
-                    {:ok, discount} -> discount
-                    {:error, _} -> Money.new(0, :USD)
-                  end
-
-                # Divide discount evenly across tickets in this reservation
-                case Money.div(total_discount, fulfill_qty) do
-                  {:ok, per_ticket} -> per_ticket
-                  {:error, _} -> Money.new(0, :USD)
-                end
-              else
-                Money.new(0, :USD)
-              end
+              ReservationDiscount.per_ticket_amount(
+                tier.price,
+                fulfill_qty,
+                reservation.discount_percentage
+              )
 
             # Create one ticket per fulfilled quantity (may be less than the original hold)
             Enum.map(1..fulfill_qty, fn _ ->
