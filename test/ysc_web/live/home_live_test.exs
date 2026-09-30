@@ -389,9 +389,20 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~ "Application Under Review"
-      assert html =~ "Awaiting board review"
+
+      assert has_element?(
+               view,
+               "#home-pending-review-status[href='/pending-review']",
+               "View application status"
+             )
+
+      assert html =~
+               "Cabin bookings and member-only tickets become available after you are approved and your membership dues are paid."
+
       refute html =~ "Get Membership Now"
       refute html =~ "Membership Required"
+      refute html =~ "Paying membership dues may still be required"
+      refute html =~ "Awaiting board review"
     end
 
     test "shows expense report launcher for volunteer users", %{conn: conn} do
