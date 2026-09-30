@@ -3068,7 +3068,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = clear_lake_booking_dates(90, 3)
+      {checkin, checkout} = clear_lake_upcoming_stay_dates(30, 3)
 
       {:ok, view, _html} =
         live_clear_lake(
@@ -3094,7 +3094,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       assert :sys.get_state(view.pid).socket.assigns.checkin_date == nil
 
-      {checkin, checkout} = clear_lake_booking_dates(90, 3)
+      {checkin, checkout} = clear_lake_upcoming_stay_dates(30, 3)
 
       render_patch(
         view,
@@ -3183,7 +3183,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = clear_lake_booking_dates(90, 3)
+      {checkin, checkout} = clear_lake_upcoming_stay_dates(30, 3)
 
       {:ok, view, _html} =
         live_clear_lake(
