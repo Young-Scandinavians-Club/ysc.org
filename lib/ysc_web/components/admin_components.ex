@@ -1273,6 +1273,36 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # attendee_answer_chips
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Small labelled chips for an attendee's answers (dietary restrictions, a
+  child's age, ...), so event staff see them right where they check people in.
+  Renders nothing when there are no answers.
+  """
+  attr :answers, :list, default: []
+  attr :id, :string, default: nil
+
+  def attendee_answer_chips(assigns) do
+    ~H"""
+    <div
+      :if={@answers != []}
+      id={@id}
+      class="mt-1 flex flex-wrap gap-1"
+    >
+      <span
+        :for={answer <- @answers}
+        class="inline-flex items-center gap-1 rounded-sm border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-900"
+      >
+        <span class="font-medium">{answer.label}:</span>
+        <span>{answer.value}</span>
+      </span>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_event_check_in_pending_row
   # ---------------------------------------------------------------------------
 
@@ -1291,6 +1321,10 @@ defmodule YscWeb.AdminComponents do
   attr :order_ref, :string, default: nil
   attr :order_ref_tooltip, :string, default: nil
   attr :ticket_id, :any, default: nil
+
+  attr :answers, :list,
+    default: [],
+    doc: "attendee answers as `[%{label:, value:}]`, e.g. dietary restrictions"
 
   attr :interactive, :boolean,
     default: true,
@@ -1335,6 +1369,10 @@ defmodule YscWeb.AdminComponents do
           </div>
           <div class="col-span-3">
             <p class="text-sm font-medium text-zinc-900">{@name}</p>
+            <.attendee_answer_chips
+              answers={@answers}
+              id={"checkin-answers-#{@ticket_id}"}
+            />
           </div>
           <div class="col-span-2">
             <p class="text-sm text-zinc-600 truncate">{@email}</p>
@@ -1372,6 +1410,10 @@ defmodule YscWeb.AdminComponents do
           <div class="min-w-0 flex-1 mr-3">
             <p class="text-sm font-medium text-zinc-900">{@name}</p>
             <p class="text-xs text-zinc-500 truncate">{@email}</p>
+            <.attendee_answer_chips
+              answers={@answers}
+              id={"checkin-answers-mobile-#{@ticket_id}"}
+            />
             <div class="flex items-center gap-2 mt-1">
               <.badge :if={@tier} type="sky">{@tier}</.badge>
               <span class="text-xs font-mono text-zinc-400">{@ticket_ref}</span>
@@ -1408,6 +1450,11 @@ defmodule YscWeb.AdminComponents do
   attr :ticket_ref, :string, required: true
   attr :tier, :string, default: nil
   attr :ticket_id, :any, default: nil
+
+  attr :answers, :list,
+    default: [],
+    doc: "attendee answers as `[%{label:, value:}]`, e.g. dietary restrictions"
+
   attr :checked_in_at, :any, default: nil
   attr :checked_in_time_label, :string, default: nil
 
@@ -1453,6 +1500,10 @@ defmodule YscWeb.AdminComponents do
           </div>
           <div class="col-span-3">
             <p class="text-sm font-medium text-zinc-400 line-through">{@name}</p>
+            <.attendee_answer_chips
+              answers={@answers}
+              id={"checkin-answers-#{@ticket_id}"}
+            />
           </div>
           <div class="col-span-2">
             <p class="text-sm text-zinc-400 truncate">{@email}</p>
@@ -1496,6 +1547,10 @@ defmodule YscWeb.AdminComponents do
                 {@name}
               </p>
               <p class="text-xs text-zinc-400 truncate">{@email}</p>
+              <.attendee_answer_chips
+                answers={@answers}
+                id={"checkin-answers-mobile-#{@ticket_id}"}
+              />
               <div class="flex items-center gap-2 mt-1">
                 <.badge :if={@tier} type="default">{@tier}</.badge>
                 <span class="text-xs font-mono text-zinc-400">{@ticket_ref}</span>

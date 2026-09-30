@@ -200,12 +200,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
                     <div>
                       <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
-                        Registration
+                        Attendee info
                       </p>
-                      <p class="text-sm text-zinc-700">
-                        {if ticket_tier.requires_registration,
-                          do: "Required",
-                          else: "Not Required"}
+                      <p
+                        id={"tier-attendee-info-#{ticket_tier.id}"}
+                        class="text-sm text-zinc-700"
+                      >
+                        {attendee_info_summary(ticket_tier)}
                       </p>
                     </div>
                   </div>
@@ -647,6 +648,23 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       end
 
     {:ok, socket}
+  end
+
+  # One line naming what each ticket of the tier is asked, e.g.
+  # "Name & email, Dietary restrictions".
+  defp attendee_info_summary(tier) do
+    identity = if tier.requires_registration, do: ["Name & email"], else: []
+
+    questions =
+      tier
+      |> Map.get(:attendee_questions)
+      |> List.wrap()
+      |> Enum.map(& &1.label)
+
+    case identity ++ questions do
+      [] -> "None"
+      parts -> Enum.join(parts, ", ")
+    end
   end
 
   defp refresh_ticket_data(socket) do

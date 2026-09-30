@@ -339,8 +339,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
     end
   end
 
-  describe "requires registration option" do
-    test "shows an inline description instead of only a tooltip" do
+  describe "attendee info section" do
+    test "explains the name and email option inline instead of only a tooltip" do
       event = event_fixture()
 
       html =
@@ -352,10 +352,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
           action: :new
         })
 
-      assert html =~ "Requires registration"
+      assert html =~ "Attendee info"
+      assert html =~ "name and email"
 
       assert html =~
-               "Collect first name, last name, and email for every ticket"
+               "Collects first name, last name, and email for every ticket"
     end
   end
 end

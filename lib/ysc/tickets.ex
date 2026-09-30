@@ -1146,7 +1146,14 @@ defmodule Ysc.Tickets do
     :most_connected_country,
     :current_avatar_id
   ]
-  @admin_ticket_tier_fields [:id, :name, :type, :price, :requires_registration]
+  @admin_ticket_tier_fields [
+    :id,
+    :name,
+    :type,
+    :price,
+    :requires_registration,
+    :attendee_questions
+  ]
   @admin_ticket_order_fields [
     :id,
     :reference_id,
@@ -1160,7 +1167,8 @@ defmodule Ysc.Tickets do
     :ticket_id,
     :first_name,
     :last_name,
-    :email
+    :email,
+    :answers
   ]
   @admin_ticket_list_fields [
     :id,

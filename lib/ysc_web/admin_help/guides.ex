@@ -884,8 +884,10 @@ defmodule YscWeb.AdminHelp.Guides do
       [
         {"What ticket types exist?",
          "Free (RSVP only), Paid (fixed price, paid at checkout), and Donation (attendee chooses the amount). One event can mix tiers — e.g. \"Member free\" + \"Guest $20\"."},
-        {"What does \"requires registration\" mean on a tier?",
-         "It collects attendee details for each ticket at checkout, so you know exactly who is coming — useful for capacity-limited or catered events."},
+        {"What is \"Attendee info\" on a tier?",
+         "It controls what each ticket is asked at checkout. Turn on **Ask for each guest's name and email** to know exactly who is coming, and add **Extra questions** — dietary restrictions, a child's age, a shirt size, anything — as text, number, yes/no, or pick-one-from-a-list. Answers show in the ticket list, the CSV export, and on the check-in desk. Members only see their own answers."},
+        {"How do I ask for a child's age or dietary restrictions?",
+         "Edit (or add) the tier, then under **Attendee info** click **Dietary restrictions** or **Child's age**. Both are optional by default; toggle **Required** if you need an answer. The child's age is pre-filled from the birthdate of the family member the ticket is for. Use **Copy questions from** to reuse them on another tier."},
         {"What is Tickets TBD?",
          "A placeholder mode when you haven't decided pricing yet. The event can be published with \"tickets to be announced\" and you add real tiers later."},
         {"Can I delete a tier after sales started?",
@@ -944,7 +946,7 @@ defmodule YscWeb.AdminHelp.Guides do
         %{
           title: "Create ticket tiers",
           body:
-            "Add one or more **tiers**. Each tier has a type — **Free**, **Paid** (fixed price), or **Donation** (attendee picks the amount) — plus an optional quantity limit and a **sales window** (start/end dates for when it can be bought).\n\nTypical setups: \"Member — free\" + \"Guest — $20\"; or an \"Early bird\" paid tier whose window closes two weeks out, followed by a regular tier. Enable **requires registration** to collect each attendee's details at checkout.\n\nOn the public event page, the sidebar shows a summary price (e.g. **From $20**), and **Get Tickets** opens a modal listing every tier you configured.",
+            "Add one or more **tiers**. Each tier has a type — **Free**, **Paid** (fixed price), or **Donation** (attendee picks the amount) — plus an optional quantity limit and a **sales window** (start/end dates for when it can be bought).\n\nTypical setups: \"Member — free\" + \"Guest — $20\"; or an \"Early bird\" paid tier whose window closes two weeks out, followed by a regular tier. Use **Attendee info** to collect each guest's name and email, or to ask extra questions such as dietary restrictions, at checkout.\n\nOn the public event page, the sidebar shows a summary price (e.g. **From $20**), and **Get Tickets** opens a modal listing every tier you configured.",
           image: "ghost:events-tickets",
           image_scroll: "ghost-event-ticket-tiers-section",
           hotspots: [
@@ -1361,7 +1363,7 @@ defmodule YscWeb.AdminHelp.Guides do
         %{
           title: "Search for attendees",
           body:
-            "Type a **name**, **email**, **order reference** (ORD-…), or **ticket reference** (TKT-…) — the references are in every confirmation email, so an attendee can just show you their phone.\n\nResults group tickets by order, so a family of four shows as one order with four tickets.",
+            "Type a **name**, **email**, **order reference** (ORD-…), or **ticket reference** (TKT-…) — the references are in every confirmation email, so an attendee can just show you their phone.\n\nResults group tickets by order, so a family of four shows as one order with four tickets. If a tier asks questions such as dietary restrictions, the answers appear as highlighted notes under each guest's name.",
           image: "ghost:check-in-desk",
           hotspots: [
             %{x: 2, y: 8, w: 97, h: 9, label: "Search bar"}

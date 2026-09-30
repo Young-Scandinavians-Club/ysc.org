@@ -126,6 +126,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                     ticket_id={ticket.id}
                     name={attendee_name(ticket)}
                     email={attendee_email(ticket)}
+                    answers={attendee_answers(ticket)}
                     tier={ticket.ticket_tier && ticket.ticket_tier.name}
                     ticket_ref={ticket.reference_id}
                     order_ref={
@@ -164,6 +165,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                     ticket_id={ticket.id}
                     name={attendee_name(ticket)}
                     email={attendee_email(ticket)}
+                    answers={attendee_answers(ticket)}
                     tier={ticket.ticket_tier && ticket.ticket_tier.name}
                     ticket_ref={ticket.reference_id}
                   />
@@ -193,6 +195,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                   ticket_id={ticket.id}
                   name={attendee_name(ticket)}
                   email={attendee_email(ticket)}
+                  answers={attendee_answers(ticket)}
                   tier={ticket.ticket_tier && ticket.ticket_tier.name}
                   ticket_ref={ticket.reference_id}
                   checked_in_at={ticket.checked_in_at}
@@ -214,6 +217,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                   ticket_id={ticket.id}
                   name={attendee_name(ticket)}
                   email={attendee_email(ticket)}
+                  answers={attendee_answers(ticket)}
                   tier={ticket.ticket_tier && ticket.ticket_tier.name}
                   ticket_ref={ticket.reference_id}
                 />
@@ -752,11 +756,16 @@ defmodule YscWeb.AdminEventCheckInLive do
     assign(socket, :checked_in_count, socket.assigns.checked_in_count + delta)
   end
 
-  defp attendee_name(%{
-         registration: %Ysc.Events.TicketDetail{first_name: fn_, last_name: ln}
-       })
-       when not is_nil(fn_),
-       do: "#{fn_} #{ln}"
+  # The named attendee when the ticket has one, otherwise the purchaser (tiers
+  # that only ask questions leave the registration's name blank).
+  defp attendee_name(
+         %{registration: %Ysc.Events.TicketDetail{} = detail} = ticket
+       ) do
+    case String.trim("#{detail.first_name} #{detail.last_name}") do
+      "" -> attendee_name(Map.put(ticket, :registration, nil))
+      name -> name
+    end
+  end
 
   defp attendee_name(%{user: %{first_name: fn_, last_name: ln}})
        when not is_nil(fn_),
@@ -765,13 +774,18 @@ defmodule YscWeb.AdminEventCheckInLive do
   defp attendee_name(_), do: "Unknown"
 
   defp attendee_email(%{registration: %Ysc.Events.TicketDetail{email: email}})
-       when not is_nil(email),
+       when email not in [nil, ""],
        do: email
 
   defp attendee_email(%{user: %{email: email}}) when not is_nil(email),
     do: email
 
   defp attendee_email(_), do: ""
+
+  defp attendee_answers(%{registration: registration}),
+    do: Ysc.Events.AttendeeInfo.display_answers(registration)
+
+  defp attendee_answers(_), do: []
 
   defp short_ref(nil), do: "—"
   defp short_ref(ref), do: ref

@@ -42,7 +42,8 @@ defmodule Ysc.Scanning do
     :ticket_id,
     :first_name,
     :last_name,
-    :email
+    :email,
+    :answers
   ]
   @checkin_ticket_tier_fields [:id, :name]
   @checkin_ticket_order_fields [:id, :reference_id]

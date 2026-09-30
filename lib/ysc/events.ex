@@ -711,6 +711,7 @@ defmodule Ysc.Events do
                   unlimited_quantity:
                     tier.quantity == nil or tier.quantity == 0,
                   requires_registration: tier.requires_registration,
+                  attendee_questions: duplicate_attendee_questions(tier),
                   start_date: tier.start_date,
                   end_date: tier.end_date
                 }
@@ -750,6 +751,23 @@ defmodule Ysc.Events do
   end
 
   # Finding 55: volunteers must not mint ticket inventory via Copy Event.
+  # Question ids only need to be unique within a tier, so the copies keep them.
+  defp duplicate_attendee_questions(tier) do
+    Enum.map(tier.attendee_questions || [], fn q ->
+      %{
+        "id" => q.id,
+        "label" => q.label,
+        "help_text" => q.help_text,
+        "type" => to_string(q.type),
+        "required" => q.required,
+        "options_text" => Enum.join(q.options || [], "\n"),
+        "min" => q.min,
+        "max" => q.max,
+        "prefill" => q.prefill && to_string(q.prefill)
+      }
+    end)
+  end
+
   defp copy_ticket_tiers?(opts) when is_list(opts) do
     case Keyword.get(opts, :acting_role) do
       :admin -> Keyword.get(opts, :copy_ticket_tiers, true)
@@ -1842,6 +1860,7 @@ defmodule Ysc.Events do
         tt.price,
         tt.quantity,
         tt.requires_registration,
+        tt.attendee_questions,
         tt.member_only,
         tt.start_date,
         tt.end_date,
@@ -1858,6 +1877,7 @@ defmodule Ysc.Events do
         price: tt.price,
         quantity: tt.quantity,
         requires_registration: tt.requires_registration,
+        attendee_questions: tt.attendee_questions,
         member_only: tt.member_only,
         start_date: tt.start_date,
         end_date: tt.end_date,
@@ -1941,6 +1961,21 @@ defmodule Ysc.Events do
   """
   def get_ticket_tier!(id) do
     Repo.get!(TicketTier, id)
+  end
+
+  @doc """
+  Tiers of an event that ask attendee questions (id, name and questions only),
+  so the tier form can offer to copy them to another tier.
+  """
+  def list_tiers_with_attendee_questions(event_id) do
+    from(tt in TicketTier,
+      where:
+        tt.event_id == ^event_id and
+          fragment("jsonb_array_length(?) > 0", tt.attendee_questions),
+      order_by: [asc: tt.name],
+      select: struct(tt, [:id, :name, :attendee_questions])
+    )
+    |> Repo.all()
   end
 
   @doc """
@@ -2912,9 +2947,13 @@ defmodule Ysc.Events do
     end)
   end
 
+  # `identity: false` marks tickets whose tier asks questions but not who is
+  # attending, so name and email aren't required. See `AttendeeInfo.build_detail/2`.
   defp insert_ticket_detail(attrs) do
+    {identity?, attrs} = Map.pop(attrs, :identity, true)
+
     case %TicketDetail{}
-         |> TicketDetail.changeset(attrs)
+         |> TicketDetail.changeset(attrs, identity: identity?)
          |> Repo.insert() do
       {:ok, ticket_detail} -> ticket_detail
       {:error, changeset} -> Repo.rollback(changeset)
@@ -2952,15 +2991,18 @@ defmodule Ysc.Events do
   Create a registration (ticket detail) for a ticket.
 
   ## Parameters
-  - `attrs`: Map containing `ticket_id`, `first_name`, `last_name`, and `email`
+  - `attrs`: Map containing `ticket_id`, `first_name`, `last_name`, `email`
+    and optionally `answers`
+  - `opts`: pass `identity: false` when the name and email are optional
+    (see `Ysc.Events.TicketDetail.changeset/3`)
 
   ## Returns
   - `{:ok, registration}` on success
   - `{:error, changeset}` on failure
   """
-  def create_registration(attrs \\ %{}) do
+  def create_registration(attrs \\ %{}, opts \\ []) do
     %TicketDetail{}
-    |> TicketDetail.changeset(attrs)
+    |> TicketDetail.changeset(attrs, opts)
     |> Repo.insert()
   end
 
@@ -2969,15 +3011,16 @@ defmodule Ysc.Events do
 
   ## Parameters
   - `registration`: The TicketDetail struct to update
-  - `attrs`: Map containing fields to update (`first_name`, `last_name`, `email`)
+  - `attrs`: Map containing fields to update (`first_name`, `last_name`, `email`, `answers`)
+  - `opts`: same as `create_registration/2`
 
   ## Returns
   - `{:ok, registration}` on success
   - `{:error, changeset}` on failure
   """
-  def update_registration(%TicketDetail{} = registration, attrs) do
+  def update_registration(%TicketDetail{} = registration, attrs, opts \\ []) do
     registration
-    |> TicketDetail.changeset(attrs)
+    |> TicketDetail.changeset(attrs, opts)
     |> Repo.update()
   end
 
