@@ -342,8 +342,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           <div>
             <h4 class="text-sm font-medium text-zinc-900">Extra questions</h4>
             <p class="text-xs text-zinc-500">
-              Asked once per ticket. Only admins and check-in staff see the
-              answers.
+              Asked once per ticket. Admins and check-in staff see the
+              answers; buyers see their own on the order confirmation.
             </p>
           </div>
 

@@ -899,6 +899,39 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert row["Registration Provided"] == "Yes"
     end
 
+    test "the CSV export neutralizes spreadsheet formulas in answers", ctx do
+      {:ok, _} =
+        Events.create_ticket_details([
+          %{
+            ticket_id: ctx.ticket.id,
+            identity: false,
+            answers:
+              Map.merge(
+                answer_for(ctx.diet, "=HYPERLINK(1)"),
+                answer_for(ctx.age, -3)
+              )
+          }
+        ])
+
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      view |> element("#export-tickets-csv") |> render_click()
+      assert_push_event(view, "download-csv", %{content: content})
+
+      [row] =
+        content
+        |> Base.decode64!()
+        |> String.split("\n", trim: true)
+        |> CSV.decode!(headers: true)
+        |> Enum.to_list()
+
+      assert row["Dietary restrictions"] == "'=HYPERLINK(1)"
+
+      # Negative numbers are data, not formulas.
+      assert row["Child's age"] == "-3"
+    end
+
     test "the CSV export has no question columns when no tier asks", ctx do
       plain_event = event_fixture()
 

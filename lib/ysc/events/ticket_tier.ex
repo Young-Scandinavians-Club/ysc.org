@@ -83,6 +83,7 @@ defmodule Ysc.Events.TicketTier do
       :event_id
     ])
     |> validate_attendee_questions_limit()
+    |> validate_unique_question_labels()
     |> enforce_free_price()
     |> validate_required_price()
     |> validate_quantity()
@@ -105,6 +106,26 @@ defmodule Ysc.Events.TicketTier do
       )
     else
       changeset
+    end
+  end
+
+  # Exports and CSV columns key answers by label, so labels must be distinct.
+  defp validate_unique_question_labels(changeset) do
+    labels =
+      changeset
+      |> get_field(:attendee_questions)
+      |> List.wrap()
+      |> Enum.map(&String.downcase(&1.label || ""))
+      |> Enum.reject(&(&1 == ""))
+
+    if length(labels) == length(Enum.uniq(labels)) do
+      changeset
+    else
+      add_error(
+        changeset,
+        :attendee_questions,
+        "each question needs a different name"
+      )
     end
   end
 

@@ -5189,16 +5189,32 @@ defmodule YscWeb.EventDetailsLive do
              attendee_state(socket)
            ) do
         {:ok, ticket_details_list} ->
-          save_ticket_details_and_process(ticket_details_list, socket, fn ->
-            process_payment_success(socket, payment_intent_id)
-          end)
+          # The customer has already been charged, so never hold the order back
+          # over attendee info; record it best-effort.
+          case Ysc.Events.create_ticket_details(ticket_details_list) do
+            {:ok, _ticket_details} ->
+              :ok
+
+            {:error, reason} ->
+              log_attendee_info_lost_after_payment(
+                socket,
+                payment_intent_id,
+                reason
+              )
+          end
+
+          process_payment_success(socket, payment_intent_id)
 
         {:error, failing} ->
-          handle_registration_validation_failure(
-            failing,
+          log_attendee_info_lost_after_payment(
             socket,
-            "Please fill in all required ticket details before completing payment."
+            payment_intent_id,
+            Enum.map(failing, fn {ticket, {:error, reason}} ->
+              {ticket.id, reason}
+            end)
           )
+
+          process_payment_success(socket, payment_intent_id)
       end
     else
       # No attendee info needed, proceed with payment
@@ -6661,6 +6677,22 @@ defmodule YscWeb.EventDetailsLive do
            title: "Ticket details"
          )}
     end
+  end
+
+  # Payment already succeeded; surface (via Sentry) that the attendee info
+  # couldn't be stored so someone can follow up with the buyer.
+  defp log_attendee_info_lost_after_payment(socket, payment_intent_id, reason) do
+    require Ysc.Logging
+
+    Ysc.Logging.error("Could not save attendee info after payment",
+      extra: %{
+        payment_intent_id: payment_intent_id,
+        user_id: socket.assigns.current_user.id,
+        ticket_order_id:
+          socket.assigns.ticket_order && socket.assigns.ticket_order.id,
+        reason: inspect(reason)
+      }
+    )
   end
 
   # Helper function to handle registration validation failure

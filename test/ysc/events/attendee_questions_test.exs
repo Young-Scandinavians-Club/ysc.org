@@ -150,6 +150,25 @@ defmodule Ysc.Events.AttendeeQuestionsTest do
       assert %{attendee_questions: [_]} = errors_on(changeset)
     end
 
+    test "question names must be distinct within a tier" do
+      event = event_fixture()
+
+      assert {:error, changeset} =
+               Events.create_ticket_tier(%{
+                 name: "Dupes",
+                 type: :free,
+                 price: Money.new(0, :USD),
+                 event_id: event.id,
+                 attendee_questions: [
+                   question_attrs(%{"label" => "Dietary restrictions"}),
+                   question_attrs(%{"label" => " dietary RESTRICTIONS"})
+                 ]
+               })
+
+      assert %{attendee_questions: ["each question needs a different name"]} =
+               errors_on(changeset)
+    end
+
     test "list_tiers_with_attendee_questions/1 only returns tiers that ask" do
       event = event_fixture()
       plain = ticket_tier_fixture(%{event_id: event.id, name: "Plain"})

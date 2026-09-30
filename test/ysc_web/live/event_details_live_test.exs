@@ -1916,6 +1916,43 @@ defmodule YscWeb.EventDetailsLiveTest do
     end
   end
 
+  describe "payment success with incomplete attendee info" do
+    test "does not hold back an order that was already paid for", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_state(:upcoming, with_image: true)
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Paid dinner",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 50,
+          attendee_questions: [
+            %{
+              "label" => "Dietary restrictions",
+              "type" => "text",
+              "required" => "true"
+            }
+          ]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      # Required answer missing, but Stripe says the payment went through.
+      html =
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => "pi_test_already_charged"
+        })
+
+      refute html =~ "Please fill in all required ticket details"
+    end
+  end
+
   describe "attendee questions alongside names" do
     test "collects name, email and answers for every ticket", %{conn: conn} do
       user = user_with_membership(:lifetime)
