@@ -117,6 +117,28 @@ defmodule YscWeb.ContactLive do
                   </p>
                 </div>
               </div>
+              <div id="contact-attend-board-meeting" class="flex items-start gap-4">
+                <.icon
+                  name="hero-calendar"
+                  class="w-6 h-6 text-zinc-400 shrink-0 mt-0.5"
+                />
+                <div>
+                  <p class="font-semibold text-zinc-900 mb-1">
+                    Attend a Board Meeting
+                  </p>
+                  <p class="text-zinc-600 leading-relaxed">
+                    Any member is welcome to join a regular board meeting.
+                    See the
+                    <.link
+                      navigate={~p"/board#board-meeting-schedule"}
+                      class="text-blue-600 hover:underline"
+                    >
+                      board meeting schedule
+                    </.link>
+                    for upcoming dates and how to let us know you're coming.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

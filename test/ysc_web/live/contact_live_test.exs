@@ -18,6 +18,15 @@ defmodule YscWeb.ContactLiveTest do
       assert has_element?(view, "h1", "Get in touch")
     end
 
+    test "links to the board meeting schedule", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      assert has_element?(
+               view,
+               "#contact-attend-board-meeting a[href='/board#board-meeting-schedule']"
+             )
+    end
+
     test "sets page title to Contact", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/contact")
 
