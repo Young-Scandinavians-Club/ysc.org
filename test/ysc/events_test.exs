@@ -4406,6 +4406,46 @@ defmodule Ysc.EventsTest do
       assert is_list(events)
     end
 
+    test "list_upcoming_events_with_preload keeps in-progress events until they end",
+         %{user: user} do
+      now = DateTime.utc_now()
+
+      create = fn title, start_date, end_date ->
+        {:ok, event} =
+          Events.create_event(%{
+            title: title,
+            description: "D",
+            state: :published,
+            organizer_id: user.id,
+            start_date: start_date,
+            end_date: end_date,
+            published_at: now
+          })
+
+        event
+      end
+
+      in_progress =
+        create.(
+          "Picker in progress",
+          DateTime.add(now, -2, :hour),
+          DateTime.add(now, 2, :hour)
+        )
+
+      ended =
+        create.(
+          "Picker ended",
+          DateTime.add(now, -3, :day),
+          DateTime.add(now, -2, :day)
+        )
+
+      ids =
+        Events.list_upcoming_events_with_preload(50, []) |> Enum.map(& &1.id)
+
+      assert in_progress.id in ids
+      refute ended.id in ids
+    end
+
     test "event_pricing_display_string and event_earliest_tickets_sale_date", %{
       event: event
     } do
