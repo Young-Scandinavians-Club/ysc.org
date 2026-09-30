@@ -1377,7 +1377,7 @@ defmodule YscWeb.EventDetailsLive do
     <.modal
       :if={@show_ticket_modal}
       id="ticket-modal"
-      backdrop_class="bg-zinc-100/80 backdrop-blur-md"
+      backdrop_class="bg-zinc-100/65 backdrop-blur-md"
       show
       on_cancel={JS.push("close-ticket-modal")}
       max_width="max-w-6xl"
@@ -2063,7 +2063,7 @@ defmodule YscWeb.EventDetailsLive do
     <.modal
       :if={@show_payment_modal}
       id="payment-modal"
-      backdrop_class="bg-zinc-100/80 backdrop-blur-md"
+      backdrop_class="bg-zinc-100/65 backdrop-blur-md"
       show
       on_cancel={JS.push("close-payment-modal")}
       max_width="max-w-6xl"
@@ -2438,7 +2438,7 @@ defmodule YscWeb.EventDetailsLive do
     <.modal
       :if={@show_free_ticket_confirmation}
       id="free-ticket-confirmation-modal"
-      backdrop_class="bg-zinc-100/80 backdrop-blur-md"
+      backdrop_class="bg-zinc-100/65 backdrop-blur-md"
       show
       on_cancel={JS.push("close-free-ticket-confirmation")}
       max_width="max-w-4xl"
@@ -2526,7 +2526,7 @@ defmodule YscWeb.EventDetailsLive do
     <.modal
       :if={@show_order_completion}
       id="order-completion-modal"
-      backdrop_class="bg-zinc-100/80 backdrop-blur-md"
+      backdrop_class="bg-zinc-100/65 backdrop-blur-md"
       show
       on_cancel={JS.push("close-order-completion")}
       max_width="max-w-2xl"
