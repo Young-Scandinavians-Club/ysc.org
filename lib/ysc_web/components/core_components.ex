@@ -2814,7 +2814,7 @@ defmodule YscWeb.CoreComponents do
 
   def presence_avatars(assigns) do
     ~H"""
-    <div :if={@editors != []} class={["flex items-center -space-x-2", @class]}>
+    <div :if={@editors != []} class={["flex items-center -space-x-2 [&>div]:shrink-0", @class]}>
       <.tooltip
         :for={editor <- Enum.take(@editors, @max_shown)}
         tooltip_text={"#{editor.name} is editing"}
@@ -2823,7 +2823,7 @@ defmodule YscWeb.CoreComponents do
           src={editor.avatar_url}
           alt=""
           class={[
-            "rounded-full ring-2 ring-white object-cover",
+            "shrink-0 max-w-none aspect-square rounded-full ring-2 ring-white object-cover",
             @size == :sm && "h-5 w-5",
             @size == :md && "h-7 w-7"
           ]}
@@ -2836,7 +2836,7 @@ defmodule YscWeb.CoreComponents do
         }
       >
         <span class={[
-          "flex items-center justify-center rounded-full bg-zinc-200 font-semibold text-zinc-700 ring-2 ring-white",
+          "flex shrink-0 items-center justify-center rounded-full bg-zinc-200 font-semibold text-zinc-700 ring-2 ring-white",
           @size == :sm && "h-5 w-5 text-[9px]",
           @size == :md && "h-7 w-7 text-[10px]"
         ]}>
