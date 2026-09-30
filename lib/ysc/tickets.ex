@@ -19,6 +19,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Tickets.AdminGrants
   alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Tickets.DonationDisplay
+  alias Ysc.Tickets.ReservationDiscount
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketTier
@@ -2941,37 +2942,16 @@ defmodule Ysc.Tickets do
     # Calculate total discount amount
     fulfilled_reservations
     |> Enum.reduce(Money.new(0, :USD), fn reservation, acc ->
-      if reservation.discount_percentage &&
-           Decimal.gt?(reservation.discount_percentage, 0) do
-        # Calculate original price for reserved tickets
-        tier_price = reservation.ticket_tier.price
+      discount_amount =
+        ReservationDiscount.amount(
+          reservation.ticket_tier.price,
+          reservation.quantity,
+          reservation.discount_percentage
+        )
 
-        if tier_price do
-          original_total =
-            case Money.mult(tier_price, reservation.quantity) do
-              {:ok, total} -> total
-              {:error, _} -> Money.new(0, :USD)
-            end
-
-          # Apply discount percentage
-          discount_pct_decimal =
-            Decimal.div(reservation.discount_percentage, Decimal.new(100))
-
-          discount_amount =
-            case Money.mult(original_total, discount_pct_decimal) do
-              {:ok, discount} -> discount
-              {:error, _} -> Money.new(0, :USD)
-            end
-
-          case Money.add(acc, discount_amount) do
-            {:ok, new_total} -> new_total
-            {:error, _} -> acc
-          end
-        else
-          acc
-        end
-      else
-        acc
+      case Money.add(acc, discount_amount) do
+        {:ok, new_total} -> new_total
+        {:error, _} -> acc
       end
     end)
   end

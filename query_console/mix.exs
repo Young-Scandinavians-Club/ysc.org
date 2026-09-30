@@ -33,7 +33,15 @@ defmodule QueryConsole.MixProject do
 
   defp deps do
     [
-      {:phoenix, "~> 1.8.0"},
+      # 1.8.15: phoenix.js replaceTransport noops old conn handlers before
+      # close so an async transport close cannot tear down the replacement
+      # (#6852). 1.8.14: LongPoll fetch timers are cleared after success or
+      # abort (#6811); VerifiedRoutes :router must be a compile-time module;
+      # local path validation is shared. We enable longpoll on the LiveView
+      # socket (app.js longPollFallbackMs: 2500). 1.8.13: phoenix.js
+      # reconnects after Chrome freeze/resume. 1.8.10: longpoll POST timeout
+      # close-and-retry. phx.gen.auth / phx.gen.cert / phx.new unused.
+      {:phoenix, "~> 1.8.15"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
       # 0.22.4: Escape comments on Postgrex.stream/4 (EEF-CVE-2026-66838).
@@ -67,6 +75,13 @@ defmodule QueryConsole.MixProject do
       # values with CR/LF/NUL. We use Bandit.PhoenixAdapter (bandit_pid/1 for
       # idle shutdown). Public adapter APIs are unchanged.
       {:bandit, "~> 1.12.5"},
+      # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
+      # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
+      # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
+      # chunked is not the final transfer coding). 1.10.1 still covers
+      # EEF-CVE-2026-82672. We reach mint through Finch and Req (SSO token
+      # POST). Finch still lists mint ~> 1.8, so pin the patched floor.
+      {:mint, "~> 1.11.0", override: true},
       {:req, "~> 0.5"},
       {:lotus, "~> 0.16.6"},
       {:lotus_web, "~> 0.14.1"},

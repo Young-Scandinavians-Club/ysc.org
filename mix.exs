@@ -243,12 +243,13 @@ defmodule Ysc.MixProject do
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
-      # 1.10.1: EEF-CVE-2026-82672 (unvalidated HTTP/1 chunk-size line tail →
-      # response smuggling on pooled connections). 1.10.0 also covers
-      # EEF-CVE-2026-82728 (unbounded status-line / chunk-extension buffering)
-      # and EEF-CVE-2026-82729 (quadratic chunk-size parsing). Finch still lists
-      # mint ~> 1.8, so pin the patched floor.
-      {:mint, "~> 1.10.1", override: true},
+      # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
+      # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
+      # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
+      # chunked is not the final transfer coding). 1.10.1 still covers
+      # EEF-CVE-2026-82672. Finch still lists mint ~> 1.8, so pin the patched
+      # floor.
+      {:mint, "~> 1.11.0", override: true},
       {:floki, "~> 0.38"},
       # 0.29.0: Flop.Schema is a behaviour (`use Flop.Schema` + `@flop_options`)
       # instead of a protocol (`@derive`). field_info/2, get_field/3, and

@@ -170,7 +170,7 @@ defmodule YscWeb.Workers.SmsNotifier do
          user_id,
          category
        ) do
-    case Ysc.Accounts.get_user(user_id) do
+    case Ysc.Accounts.get_user_notification_profile(user_id) do
       nil ->
         Ysc.Logging.warning("SMS sent without user validation - user not found",
           job_id: job.id,

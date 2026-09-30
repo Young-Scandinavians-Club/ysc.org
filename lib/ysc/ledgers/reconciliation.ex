@@ -281,20 +281,14 @@ defmodule Ysc.Ledgers.Reconciliation do
     }
   end
 
-  # Payouts migrated from the pre-Elixir WordPress/WooCommerce site are
-  # marked with this sentinel deposit id. Their underlying payments/refunds
-  # were never migrated into this system's ledger, so there's nothing to
-  # reconcile them against - composition and fee-booking checks would always
-  # spuriously fail.
-  @wordpress_legacy_deposit_id "wordpress-legacy"
-
-  defp check_payout_consistency(%Payout{
-         quickbooks_deposit_id: @wordpress_legacy_deposit_id
-       }) do
-    {:ok, :legacy_migrated_payout}
-  end
-
-  defp check_payout_consistency(%Payout{} = payout) do
+  @doc """
+  Breaks a payout (with `:payments` and `:refunds` preloaded) down into the
+  figures reconciliation compares: linked payments − refunds − fees + reserve
+  adjustment (`computed_net`, or `nil` if it can't be computed) versus what
+  Stripe actually wired (`payout.amount`). `difference` is
+  `payout.amount - computed_net`.
+  """
+  def payout_composition(%Payout{} = payout) do
     payments = payout.payments || []
     refunds = payout.refunds || []
     fee_total = payout.fee_total || Money.new(0, :USD)
@@ -324,6 +318,52 @@ defmodule Ysc.Ledgers.Reconciliation do
       else
         _ -> nil
       end
+
+    difference =
+      with %Money{} <- computed_net,
+           {:ok, diff} <- Money.sub(payout.amount, computed_net) do
+        diff
+      else
+        _ -> nil
+      end
+
+    %{
+      payments_count: length(payments),
+      refunds_count: length(refunds),
+      payments_total: payments_total,
+      refunds_total: refunds_total,
+      fee_total: fee_total,
+      reserve_adjustment: reserve_adjustment,
+      computed_net: computed_net,
+      payout_amount: payout.amount,
+      difference: difference
+    }
+  end
+
+  # Payouts migrated from the pre-Elixir WordPress/WooCommerce site are
+  # marked with this sentinel deposit id. Their underlying payments/refunds
+  # were never migrated into this system's ledger, so there's nothing to
+  # reconcile them against - composition and fee-booking checks would always
+  # spuriously fail.
+  @wordpress_legacy_deposit_id "wordpress-legacy"
+
+  defp check_payout_consistency(%Payout{
+         quickbooks_deposit_id: @wordpress_legacy_deposit_id
+       }) do
+    {:ok, :legacy_migrated_payout}
+  end
+
+  defp check_payout_consistency(%Payout{} = payout) do
+    payments = payout.payments || []
+    refunds = payout.refunds || []
+
+    %{
+      payments_total: payments_total,
+      refunds_total: refunds_total,
+      fee_total: fee_total,
+      reserve_adjustment: reserve_adjustment,
+      computed_net: computed_net
+    } = payout_composition(payout)
 
     issues = []
 

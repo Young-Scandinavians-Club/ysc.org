@@ -459,6 +459,43 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "access the property"
     end
 
+    test "check-in reminder missing door code tells members what to do next" do
+      html =
+        BookingCheckinReminder.render(%{
+          first_name: "Jane",
+          door_code: nil,
+          property: "tahoe",
+          property_name: "Tahoe",
+          property_address: "2685 Cedar Lane, Homewood, CA 96141",
+          checkin_date: "December 1, 2026",
+          checkout_date: "December 3, 2026",
+          checkin_time: "3:00 PM",
+          checkout_time: "11:00 AM",
+          days_until_checkin: 2,
+          booking_reference_id: "BK-TEST-123",
+          booking_mode: "Individual room(s)",
+          room_names: "Room 1",
+          nights: 2,
+          is_buyout: false,
+          guests_count: 2,
+          children_count: 0,
+          cabin_master_name: "Lars Berg",
+          cabin_master_email: "cabinmaster@ysc.org",
+          cabin_master_phone: "4155550199",
+          clear_lake_info_url: "https://example.com/bookings/clear-lake",
+          booking_url: "https://example.com/bookings/preview"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Door code not ready yet"
+      assert text =~ "isn't ready yet"
+      assert text =~ "View Booking Details"
+      assert text =~ "Cabin Master"
+      refute text =~ "Not Available"
+      refute text =~ "Please save this code"
+    end
+
     test "checkout reminder uses cabin, not property" do
       html =
         BookingCheckoutReminder.render(%{

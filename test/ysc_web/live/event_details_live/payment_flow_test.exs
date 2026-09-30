@@ -12,6 +12,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   import Ysc.TestDataFactory
   import Ysc.EventsFixtures
   import Ysc.TicketsFixtures
+  import Ysc.AccountsFixtures
   import EventDetailsLiveHelpers
   import Mox
   import Ecto.Query
@@ -1364,6 +1365,93 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         assert tickets != []
         assert Enum.all?(tickets, &(&1.status == :confirmed))
       end)
+    end
+  end
+
+  describe "ticket registration family picker after slim household load" do
+    test "lists household names and fills registration from slim-loaded fields",
+         %{conn: conn, user: user} do
+      unique = System.unique_integer([:positive])
+
+      household_guest =
+        user_fixture(%{
+          first_name: "EventKid",
+          last_name: "Picker#{unique}",
+          email: "event-kid-picker-#{unique}@ysc.test"
+        })
+
+      household_guest
+      |> Ecto.Changeset.change(%{})
+      |> Ecto.Changeset.put_change(:primary_user_id, user.id)
+      |> Repo.update!()
+
+      event = event_with_state(:upcoming, with_image: true, user: user)
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Registration Family Picker",
+          type: :paid,
+          price: Money.new(5000, :USD),
+          quantity: 20,
+          requires_registration: true
+        })
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+
+      payment_intent_id = "pi_family_picker_#{order.id}"
+
+      order =
+        order
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+        |> Repo.update!()
+
+      order = stabilize_pending_ticket_order!(order) |> Repo.preload(:tickets)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: payment_intent_id,
+           amount: money_to_cents(order.total_amount)
+         })}
+      end)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+        )
+
+      view = wait_for_async(view)
+
+      ticket = hd(order.tickets)
+      attendee_select = "#ticket_#{ticket.id}_attendee_select"
+
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, attendee_select)
+      assert has_element?(view, attendee_select, "EventKid Picker#{unique}")
+
+      render_change(view, "select-ticket-attendee", %{
+        "ticket_id" => ticket.id,
+        "ticket_#{ticket.id}_attendee_select" => "family_#{household_guest.id}"
+      })
+
+      assert has_element?(
+               view,
+               "#ticket_#{ticket.id}_first_name[value='EventKid']"
+             )
+
+      assert has_element?(
+               view,
+               "#ticket_#{ticket.id}_last_name[value='Picker#{unique}']"
+             )
+
+      assert has_element?(
+               view,
+               "#ticket_#{ticket.id}_email[value='#{household_guest.email}']"
+             )
     end
   end
 

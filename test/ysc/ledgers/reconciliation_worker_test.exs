@@ -229,6 +229,106 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
     end
   end
 
+  describe "perform/1 - Treasurer payout mismatch email" do
+    setup do
+      Ledgers.ensure_basic_accounts()
+
+      uniq = System.unique_integer([:positive])
+      stripe_payout_id = "po_treasurer_#{uniq}"
+
+      # A payout with nothing linked to it, backdated past the auto-heal
+      # lookback so the worker doesn't try to re-link it via Stripe - i.e. a
+      # mismatch that's still there after auto-heal.
+      {:ok, {_payout_payment, _transaction, _entries, payout}} =
+        Ledgers.process_stripe_payout(%{
+          payout_amount: Money.new(:USD, "498.10"),
+          stripe_payout_id: stripe_payout_id,
+          description: "Test payout - treasurer alert",
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now()
+        })
+
+      backdated = DateTime.add(DateTime.utc_now(), -60, :day)
+
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "UPDATE payouts SET inserted_at = $1 WHERE id = $2",
+        [DateTime.truncate(backdated, :second), to_uuid(payout.id)]
+      )
+
+      %{payout: payout, stripe_payout_id: stripe_payout_id}
+    end
+
+    test "emails the Treasurer when a payout doesn't reconcile", %{
+      payout: payout,
+      stripe_payout_id: stripe_payout_id
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _report} = ReconciliationWorker.perform(@job)
+
+        treasurer_jobs =
+          Oban.Job
+          |> Repo.all()
+          |> Enum.filter(
+            &(&1.args["template"] == "payout_reconciliation_mismatch")
+          )
+
+        assert [
+                 %Oban.Job{
+                   args: %{
+                     "recipient" => "treasurer@ysc.org",
+                     "subject" => subject,
+                     "idempotency_key" => idempotency_key,
+                     "params" => params
+                   }
+                 }
+               ] = treasurer_jobs
+
+        assert subject == "Payout reconciliation mismatch: #{stripe_payout_id}"
+        assert idempotency_key =~ payout.id
+        assert params["stripe_payout_id"] == stripe_payout_id
+        assert params["payout_amount"] == "$498.10"
+        assert params["computed_net"] == "$0.00"
+        assert params["difference"] == "$498.10"
+      end)
+    end
+
+    test "sends the Treasurer only one email across repeated nightly runs", %{
+      stripe_payout_id: stripe_payout_id
+    } do
+      subject = "Payout reconciliation mismatch: #{stripe_payout_id}"
+
+      assert {:ok, _report} = ReconciliationWorker.perform(@job)
+      assert {:ok, _report} = ReconciliationWorker.perform(@job)
+
+      treasurer_emails =
+        collect_sent_emails([])
+        |> Enum.filter(&(&1.subject == subject))
+
+      assert [email] = treasurer_emails
+      assert email.to == [{"", "treasurer@ysc.org"}]
+    end
+
+    test "does not email the Treasurer once the payout reconciles", %{
+      payout: payout
+    } do
+      # Re-point the payout at an amount its (empty) composition explains.
+      payout
+      |> Ecto.Changeset.change(amount: Money.new(:USD, 0))
+      |> Repo.update!()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _report} = ReconciliationWorker.perform(@job)
+
+        refute Enum.any?(
+                 Repo.all(Oban.Job),
+                 &(&1.args["template"] == "payout_reconciliation_mismatch")
+               )
+      end)
+    end
+  end
+
   describe "perform/1 - payment discrepancies" do
     setup do
       Ledgers.ensure_basic_accounts()
@@ -617,6 +717,14 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
 
     test "module compiles without errors" do
       assert Code.ensure_loaded?(ReconciliationWorker)
+    end
+  end
+
+  defp collect_sent_emails(acc) do
+    receive do
+      {:email, email} -> collect_sent_emails([email | acc])
+    after
+      0 -> Enum.reverse(acc)
     end
   end
 

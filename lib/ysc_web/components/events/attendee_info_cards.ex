@@ -34,7 +34,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
 
   def intro(tickets) do
     if Enum.any?(tickets, &AttendeeInfo.ticket_collects_identity?/1),
-      do: "Please provide details for each ticket.",
+      do: "Add a name and email for each person attending.",
       else: "Tell us a little more about each ticket."
   end
 

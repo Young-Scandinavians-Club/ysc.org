@@ -155,7 +155,8 @@ defmodule YscWeb.Sms.SmsNotifierTest do
       assert is_binary(message)
       assert String.contains?(message, "Valued Member")
       assert String.contains?(message, "Property")
-      assert String.contains?(message, "Not Available")
+      assert String.contains?(message, "isn't ready yet")
+      refute String.contains?(message, "Not Available")
     end
 
     test "trims and normalizes whitespace in rendered message" do
@@ -573,6 +574,45 @@ defmodule YscWeb.Sms.SmsNotifierTest do
 
       # Should succeed
       assert :ok = result
+    end
+
+    test "does not SELECT password hashes when scheduling or sending SMS", %{
+      user: user
+    } do
+      variables = %{
+        first_name: user.first_name,
+        property_name: "Clear Lake",
+        checkin_date: "Dec 05, 2025",
+        door_code: "12345",
+        checkin_time: "3:00 PM"
+      }
+
+      {scheduled, schedule_password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Notifier.schedule_sms(
+              user.phone_number,
+              "test_#{System.unique_integer()}",
+              "booking_checkin_reminder",
+              variables,
+              user.id
+            )
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, %Oban.Job{} = job} = scheduled
+      assert schedule_password_cols == 0
+
+      {_result, send_password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> SmsNotifier.perform(job) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert send_password_cols == 0
     end
 
     test "handles phone number normalization throughout the flow", %{user: user} do

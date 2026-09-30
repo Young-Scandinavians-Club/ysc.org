@@ -18,6 +18,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ApplicationRejected,
     ApplicationSubmitted,
     AdminAccessReview,
+    PayoutReconciliationMismatch,
     AdminApplicationSubmitted,
     ChangeEmail,
     ResetPassword,
@@ -678,6 +679,44 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert AdminAccessReview.get_template_name() == "admin_access_review"
     end
 
+    test "PayoutReconciliationMismatch renders" do
+      payout = %Ysc.Ledgers.Payout{
+        stripe_payout_id: "po_test_mismatch",
+        amount: Money.new(:USD, "498.10"),
+        arrival_date: ~U[2026-09-28 00:00:00Z],
+        quickbooks_deposit_id: "43896"
+      }
+
+      composition = %{
+        payments_count: 16,
+        refunds_count: 0,
+        payments_total: Money.new(:USD, "905.00"),
+        refunds_total: Money.new(:USD, "0.00"),
+        fee_total: Money.new(:USD, "37.32"),
+        reserve_adjustment: Money.new(:USD, "-324.58"),
+        computed_net: Money.new(:USD, "543.10"),
+        payout_amount: Money.new(:USD, "498.10"),
+        difference: Money.new(:USD, "-45.00")
+      }
+
+      html =
+        PayoutReconciliationMismatch.render(
+          PayoutReconciliationMismatch.build_assigns(payout, composition)
+        )
+
+      assert html =~ "po_test_mismatch"
+      assert html =~ "$543.10"
+      assert html =~ "$498.10"
+      assert html =~ "43896"
+      assert html =~ "https://dashboard.stripe.com/payouts/po_test_mismatch"
+
+      assert PayoutReconciliationMismatch.get_subject("po_test_mismatch") ==
+               "Payout reconciliation mismatch: po_test_mismatch"
+
+      assert PayoutReconciliationMismatch.get_template_name() ==
+               "payout_reconciliation_mismatch"
+    end
+
     test "VolunteerConfirmation renders", %{user: user} do
       assigns = %{
         name: "#{user.first_name} #{user.last_name}",
@@ -1193,6 +1232,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "email_changed" => EmailChanged,
         "admin_application_submitted" => AdminApplicationSubmitted,
         "admin_access_review" => AdminAccessReview,
+        "payout_reconciliation_mismatch" => PayoutReconciliationMismatch,
         "conduct_violation_confirmation" => ConductViolationConfirmation,
         "conduct_violation_board_notification" =>
           ConductViolationBoardNotification,

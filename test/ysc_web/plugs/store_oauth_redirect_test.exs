@@ -83,6 +83,12 @@ defmodule YscWeb.Plugs.StoreOAuthRedirectTest do
       assert get_session(conn, :oauth_redirect_to) == nil
     end
 
+    test "does not store backslash-smuggled redirect_to (Finding 77)" do
+      conn = run_plug(%{"redirect_to" => "/%5cevil.com"})
+
+      assert get_session(conn, :oauth_redirect_to) == nil
+    end
+
     test "stores a known mobile_redirect_uri in session" do
       conn = run_plug(%{"mobile_redirect_uri" => "ysc-admin://auth-callback"})
 

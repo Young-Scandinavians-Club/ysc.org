@@ -53,4 +53,20 @@ defmodule YscWeb.Emails.EventPhotoUploadReminderTest do
 
     assert data == Map.put(shared, :first_name, "Alex")
   end
+
+  test "prepare_shared_email_data does not load organizer users", %{
+    event: event,
+    upload_url: upload_url
+  } do
+    {_shared, user_selects} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          EventPhotoUploadReminder.prepare_shared_email_data(event, upload_url)
+        end,
+        pattern: ~r/FROM "users"/i,
+        caller_pids: [self()]
+      )
+
+    assert user_selects == 0
+  end
 end

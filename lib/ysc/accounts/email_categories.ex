@@ -60,6 +60,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "admin_application_submitted" => :account,
     "admin_membership_report" => :account,
     "admin_access_review" => :account,
+    "payout_reconciliation_mismatch" => :account,
     "conduct_violation_board_notification" => :account,
     "volunteer_board_notification" => :account,
     "contact_form_board_notification" => :account,

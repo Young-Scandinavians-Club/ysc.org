@@ -330,6 +330,93 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert render(view) =~ "Guest"
   end
 
+  test "lists slim-loaded household names in the modification guest picker", %{
+    conn: conn
+  } do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    unique = System.unique_integer([:positive])
+
+    household_guest =
+      user_fixture(%{
+        first_name: "ChangeKid",
+        last_name: "Household#{unique}"
+      })
+
+    household_guest
+    |> Ecto.Changeset.change(%{})
+    |> Ecto.Changeset.put_change(:primary_user_id, user.id)
+    |> Repo.update!()
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(100, :USD),
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        property: :tahoe,
+        season_id: nil
+      })
+
+    room = create_test_room!()
+    {checkin, checkout} = tahoe_booking_dates(35)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    assert {:ok, _} =
+             Bookings.create_booking_guests(booking.id, [
+               {0,
+                %{
+                  "first_name" => user.first_name || "Test",
+                  "last_name" => user.last_name || "User",
+                  "is_child" => false,
+                  "is_booking_user" => true
+                }},
+               {1,
+                %{
+                  "first_name" => "Guest",
+                  "last_name" => "Two",
+                  "is_child" => false,
+                  "is_booking_user" => false
+                }}
+             ])
+
+    {view, _html} = live_change(conn, booking)
+
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    checkout_str = date_to_datetime_string(booking.checkout_date)
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => checkout_str,
+        "guests_count" => "3",
+        "children_count" => "0"
+      }
+    })
+    |> render_change()
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => checkout_str,
+        "guests_count" => "3",
+        "children_count" => "0"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#guest-1-attendee-select")
+
+    assert has_element?(
+             view,
+             "#guest-1-attendee-select",
+             "ChangeKid Household#{unique}"
+           )
+  end
+
   test "shows capacity error when children exceed room max occupancy", %{
     conn: conn
   } do

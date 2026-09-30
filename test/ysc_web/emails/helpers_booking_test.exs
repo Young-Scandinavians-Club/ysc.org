@@ -41,6 +41,34 @@ defmodule YscWeb.Emails.HelpersBookingTest do
       assert loaded.user.id == user.id
     end
 
+    test "slims user to identity and SMS columns without password hashes" do
+      user =
+        user_fixture(%{first_name: "Astrid", phone_number: "+14155550100"})
+        |> Ecto.Changeset.change(%{
+          board_bio: "must not load this bio",
+          account_notifications_sms: true
+        })
+        |> Repo.update!()
+
+      booking = booking_fixture(%{user_id: user.id})
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Helpers.ensure_booking(booking, [:user, :rooms]) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert loaded.user.first_name == "Astrid"
+      assert loaded.user.email == user.email
+      assert loaded.user.phone_number == user.phone_number
+      assert loaded.user.account_notifications_sms == true
+      assert is_nil(loaded.user.hashed_password)
+      assert is_nil(loaded.user.board_bio)
+      assert Ecto.assoc_loaded?(loaded.rooms)
+    end
+
     test "loads rooms when requested" do
       user = user_fixture()
       booking = booking_fixture(%{user_id: user.id})
