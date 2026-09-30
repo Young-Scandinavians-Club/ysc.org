@@ -1091,7 +1091,7 @@ defmodule Ysc.Events do
   @doc false
   def upcoming_events_with_preload_query(limit \\ 36) do
     from(e in Event,
-      where: e.start_date > ^DateTime.utc_now(),
+      where: ^event_upcoming_dynamic(),
       where: e.state in [:published, :cancelled],
       order_by: [
         asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
@@ -1106,6 +1106,8 @@ defmodule Ysc.Events do
   Fetch upcoming events as full Event structs with given preloads.
 
   Use for admin pickers (e.g. newsletter) where full structs and cover_image are needed.
+  Events stay listed until they are actually over (end date/time, or the day
+  after the start date when no end is set), not just until they start.
   Single query + preload, no N+1.
   """
   def list_upcoming_events_with_preload(limit \\ 36, preloads \\ [:cover_image]) do
