@@ -54,7 +54,7 @@ defmodule YscWeb.CoreComponents do
   attr :backdrop_class, :string,
     default: "bg-zinc-50/90",
     doc:
-      "Tailwind classes for the backdrop colour. Use an opaque colour (e.g. `bg-zinc-100`) so nothing behind the modal shows through."
+      "Tailwind classes for the backdrop colour. Use an opaque colour (e.g. `bg-zinc-100`) or add `backdrop-blur-md` so page content behind the modal is not legible."
 
   slot :inner_block, required: true
 
