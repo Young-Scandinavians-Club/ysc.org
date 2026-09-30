@@ -82,7 +82,13 @@ defmodule QueryConsole.MixProject do
       # EEF-CVE-2026-82672. We reach mint through Finch and Req (SSO token
       # POST). Finch still lists mint ~> 1.8, so pin the patched floor.
       {:mint, "~> 1.11.0", override: true},
-      {:req, "~> 0.5"},
+      # 0.7.4: put_params overwrites existing query keys but keeps explicit
+      # duplicates; redirects drop :path_params so the Location path is not
+      # rewritten. 0.7.3: GET-with-body stays GET (reverts 0.7.0). 0.7.2:
+      # form_multipart string names and AWS SigV4 Supabase. We only call
+      # Req.post/2 with json: for SSO token exchange — no :params,
+      # :path_params, :form_multipart, or AWS. Pin the patched floor.
+      {:req, "~> 0.7.4"},
       {:lotus, "~> 0.16.6"},
       {:lotus_web, "~> 0.14.1"},
       {:cachex, "~> 4.0"},
