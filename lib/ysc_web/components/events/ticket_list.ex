@@ -13,6 +13,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   alias Ysc.Accounts.UserDisplay
   alias Ysc.Events
+  alias Ysc.Events.AttendeeInfo
   alias Ysc.Events.TicketDetail
   alias Ysc.Tickets
   alias Ysc.Tickets.DonationDisplay
@@ -139,6 +140,21 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                     + Add name &amp; email
                   </button>
                 <% end %>
+                <dl
+                  :if={AttendeeInfo.display_answers(ticket.registration) != []}
+                  id={"ticket-answers-#{ticket.id}"}
+                  class="mt-1 space-y-0.5 text-xs text-zinc-600"
+                >
+                  <div
+                    :for={
+                      answer <- AttendeeInfo.display_answers(ticket.registration)
+                    }
+                    class="flex gap-1"
+                  >
+                    <dt class="font-medium text-zinc-500">{answer.label}:</dt>
+                    <dd>{answer.value}</dd>
+                  </div>
+                </dl>
                 <div
                   :if={reassigned?(ticket, group.order)}
                   class="text-xs text-amber-700 mt-0.5"
@@ -238,15 +254,31 @@ defmodule YscWeb.AdminEventsLive.TicketList do
             type="text"
             label="First name"
             field={@detail_form[:first_name]}
-            required
+            required={@editing_identity_required?}
           />
           <.input
             type="text"
             label="Last name"
             field={@detail_form[:last_name]}
-            required
+            required={@editing_identity_required?}
           />
-          <.input type="email" label="Email" field={@detail_form[:email]} required />
+          <.input
+            type="email"
+            label="Email"
+            field={@detail_form[:email]}
+            required={@editing_email_required?}
+          />
+
+          <div
+            :for={question <- @editing_questions}
+            id={"answer-field-#{question.id}"}
+          >
+            <.answer_input
+              question={question}
+              value={Map.get(@answer_values, question.id, "")}
+              error={Map.get(@answer_errors, question.id)}
+            />
+          </div>
 
           <:actions>
             <div class="flex justify-end gap-2 w-full">
@@ -377,6 +409,68 @@ defmodule YscWeb.AdminEventsLive.TicketList do
     """
   end
 
+  attr :question, :map, required: true
+  attr :value, :string, default: ""
+  attr :error, :string, default: nil
+
+  # One admin-editable answer. Input names are `answers[<question id>]`.
+  defp answer_input(assigns) do
+    assigns =
+      assign(assigns,
+        name: "answers[#{assigns.question.id}]",
+        id: "answer-#{assigns.question.id}"
+      )
+
+    ~H"""
+    <%= case @question.type do %>
+      <% :select -> %>
+        <.input
+          type="select"
+          id={@id}
+          name={@name}
+          label={@question.label}
+          value={@value}
+          prompt="Choose one…"
+          options={@question.options}
+          errors={List.wrap(@error)}
+        />
+      <% :yes_no -> %>
+        <.input
+          type="select"
+          id={@id}
+          name={@name}
+          label={@question.label}
+          value={@value}
+          prompt="No answer"
+          options={[{"Yes", "yes"}, {"No", "no"}]}
+          errors={List.wrap(@error)}
+        />
+      <% :number -> %>
+        <.input
+          type="number"
+          id={@id}
+          name={@name}
+          label={@question.label}
+          value={@value}
+          min={@question.min}
+          max={@question.max}
+          step="1"
+          errors={List.wrap(@error)}
+        />
+      <% _text -> %>
+        <.input
+          type="text"
+          id={@id}
+          name={@name}
+          label={@question.label}
+          value={@value}
+          maxlength="500"
+          errors={List.wrap(@error)}
+        />
+    <% end %>
+    """
+  end
+
   @impl true
   def update(assigns, socket) do
     prev_refresh_token = socket.assigns[:refresh_token]
@@ -403,6 +497,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
          |> refresh_data()
          |> assign(:editing_ticket, nil)
          |> assign(:detail_form, nil)
+         |> assign_edit_defaults()
          |> assign(:reassigning_ticket, nil)
          |> AdminUserSearch.assign_blank()
          |> assign(:refunding_ticket, nil)
@@ -538,16 +633,29 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   @impl true
   def handle_event("open-edit-detail", %{"id" => id}, socket) do
     ticket = find_ticket!(socket, id)
+    identity? = AttendeeInfo.ticket_collects_identity?(ticket)
+    email? = AttendeeInfo.ticket_collects_email?(ticket)
+    opts = [identity: identity?, require_email: email?]
 
     changeset =
       case ticket.registration do
-        nil -> TicketDetail.changeset(%TicketDetail{}, %{})
-        registration -> TicketDetail.changeset(registration, %{})
+        nil -> TicketDetail.changeset(%TicketDetail{}, %{}, opts)
+        registration -> TicketDetail.changeset(registration, %{}, opts)
       end
 
     {:noreply,
      socket
      |> assign(:editing_ticket, ticket)
+     |> assign(:editing_identity_required?, identity?)
+     |> assign(:editing_email_required?, email?)
+     |> assign(:editing_questions, AttendeeInfo.ticket_questions(ticket))
+     |> assign(
+       :answer_values,
+       AttendeeInfo.answers_to_form(
+         ticket.registration && ticket.registration.answers
+       )
+     )
+     |> assign(:answer_errors, %{})
      |> assign(:detail_form, to_form(changeset, as: "ticket_detail"))}
   end
 
@@ -556,34 +664,46 @@ defmodule YscWeb.AdminEventsLive.TicketList do
     {:noreply,
      socket
      |> assign(:editing_ticket, nil)
-     |> assign(:detail_form, nil)}
+     |> assign(:detail_form, nil)
+     |> assign_edit_defaults()}
   end
 
   @impl true
-  def handle_event("save-ticket-detail", %{"ticket_detail" => params}, socket) do
+  def handle_event(
+        "save-ticket-detail",
+        %{"ticket_detail" => params} = all,
+        socket
+      ) do
     ticket = socket.assigns.editing_ticket
-    attrs = Map.put(params, "ticket_id", ticket.id)
 
-    result =
-      case ticket.registration do
-        nil -> Events.create_registration(attrs)
-        registration -> Events.update_registration(registration, attrs)
-      end
+    detail_opts = [
+      identity: socket.assigns.editing_identity_required?,
+      require_email: socket.assigns.editing_email_required?
+    ]
 
-    case result do
-      {:ok, _registration} ->
+    raw_answers = Map.get(all, "answers", %{})
+
+    case AttendeeInfo.cast_answers(
+           socket.assigns.editing_questions,
+           raw_answers
+         ) do
+      {:ok, answers} ->
+        save_ticket_detail(socket, ticket, params, answers, detail_opts)
+
+      {:error, errors} ->
+        changeset =
+          (ticket.registration || %TicketDetail{})
+          |> TicketDetail.changeset(
+            Map.put(params, "ticket_id", ticket.id),
+            detail_opts
+          )
+          |> Map.put(:action, :validate)
+
         {:noreply,
          socket
-         |> assign(:editing_ticket, nil)
-         |> assign(:detail_form, nil)
-         |> refresh_data()
-         |> YscWeb.Flash.put_toast(:info, "Attendee info saved.",
-           title: "Ticket"
-         )}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply,
-         assign(socket, :detail_form, to_form(changeset, as: "ticket_detail"))}
+         |> assign(:answer_values, raw_answers)
+         |> assign(:answer_errors, errors)
+         |> assign(:detail_form, to_form(changeset, as: "ticket_detail"))}
     end
   end
 
@@ -814,10 +934,11 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   def handle_event("export-tickets-csv", _params, socket) do
     tickets = Events.list_tickets_for_export(socket.assigns.event_id)
 
+    {headers, rows} = build_csv(tickets)
+
     csv_content =
-      tickets
-      |> build_csv_rows()
-      |> CSV.encode(headers: true)
+      rows
+      |> CSV.encode(headers: headers)
       |> Enum.to_list()
       |> IO.iodata_to_binary()
 
@@ -832,6 +953,48 @@ defmodule YscWeb.AdminEventsLive.TicketList do
      })}
   end
 
+  defp save_ticket_detail(socket, ticket, params, answers, detail_opts) do
+    attrs =
+      params
+      |> Map.put("ticket_id", ticket.id)
+      |> Map.put("answers", answers)
+
+    result =
+      case ticket.registration do
+        nil ->
+          Events.create_registration(attrs, detail_opts)
+
+        registration ->
+          Events.update_registration(registration, attrs, detail_opts)
+      end
+
+    case result do
+      {:ok, _registration} ->
+        {:noreply,
+         socket
+         |> assign(:editing_ticket, nil)
+         |> assign(:detail_form, nil)
+         |> assign_edit_defaults()
+         |> refresh_data()
+         |> YscWeb.Flash.put_toast(:info, "Attendee info saved.",
+           title: "Ticket"
+         )}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         assign(socket, :detail_form, to_form(changeset, as: "ticket_detail"))}
+    end
+  end
+
+  defp assign_edit_defaults(socket) do
+    socket
+    |> assign(:editing_identity_required?, true)
+    |> assign(:editing_email_required?, true)
+    |> assign(:editing_questions, [])
+    |> assign(:answer_values, %{})
+    |> assign(:answer_errors, %{})
+  end
+
   defp find_ticket!(socket, id) do
     Enum.find(socket.assigns.tickets, &(to_string(&1.id) == to_string(id)))
   end
@@ -839,10 +1002,18 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   # The attendee is whoever the registration record names; when no separate
   # registration was collected (e.g. the tier doesn't require one), the
   # attendee is just the purchaser -- matches the CSV export's fallback.
-  defp attendee_display(%{registration: %{} = registration}) do
-    {[registration.first_name, registration.last_name]
-     |> Enum.reject(&(&1 in [nil, ""]))
-     |> Enum.join(" "), registration.email}
+  defp attendee_display(%{registration: %{} = registration} = ticket) do
+    name =
+      [registration.first_name, registration.last_name]
+      |> Enum.reject(&(&1 in [nil, ""]))
+      |> Enum.join(" ")
+
+    if name == "" and registration.email in [nil, ""] do
+      # Answers-only detail: no attendee was named, so the buyer stands in.
+      attendee_display(%{user: ticket.user})
+    else
+      {name, registration.email}
+    end
   end
 
   defp attendee_display(%{user: %{} = user}) do
@@ -860,7 +1031,31 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   defp format_money_safe(%Money{} = money), do: Money.to_string!(money)
   defp format_money_safe(_), do: "—"
 
-  defp build_csv_rows(tickets) do
+  @csv_base_headers Enum.sort([
+                      "Ticket Reference",
+                      "Ticket Tier",
+                      "Purchase Date",
+                      "Purchaser First Name",
+                      "Purchaser Last Name",
+                      "Purchaser Email",
+                      "Purchaser Phone",
+                      "Attendee First Name",
+                      "Attendee Last Name",
+                      "Attendee Email",
+                      "Registration Provided"
+                    ])
+
+  # Returns `{headers, rows}`. The fixed columns keep their existing
+  # (alphabetical) order; one column per attendee question follows, in the
+  # order the questions are asked. A question labelled like a fixed column gets
+  # an " (answer)" suffix so it can't clobber it.
+  defp build_csv(tickets) do
+    answer_labels =
+      AttendeeInfo.export_columns(
+        tickets |> Enum.map(& &1.ticket_tier) |> Enum.reject(&is_nil/1),
+        tickets |> Enum.map(& &1.ticket_detail) |> Enum.reject(&is_nil/1)
+      )
+
     Enum.map(tickets, fn ticket ->
       purchaser_first_name = ticket.user.first_name || ""
       purchaser_last_name = ticket.user.last_name || ""
@@ -873,16 +1068,17 @@ defmodule YscWeb.AdminEventsLive.TicketList do
            )) ||
           ""
 
+      # The attendee is whoever the registration names; when the ticket has no
+      # named attendee (the tier doesn't ask), the purchaser stands in.
       {attendee_first_name, attendee_last_name, attendee_email} =
-        if ticket.ticket_tier && ticket.ticket_tier.requires_registration &&
-             ticket.ticket_detail do
-          {
-            ticket.ticket_detail.first_name || "",
-            ticket.ticket_detail.last_name || "",
-            ticket.ticket_detail.email || ""
-          }
-        else
-          {purchaser_first_name, purchaser_last_name, purchaser_email}
+        case ticket.ticket_detail do
+          %{first_name: first, last_name: last, email: email}
+          when first not in [nil, ""] or last not in [nil, ""] or
+                 email not in [nil, ""] ->
+            {first || "", last || "", email || ""}
+
+          _ ->
+            {purchaser_first_name, purchaser_last_name, purchaser_email}
         end
 
       base_row = %{
@@ -896,16 +1092,46 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         "Purchaser Phone" => phone,
         "Attendee First Name" => attendee_first_name,
         "Attendee Last Name" => attendee_last_name,
-        "Attendee Email" => attendee_email
+        "Attendee Email" => attendee_email,
+        "Registration Provided" =>
+          if(ticket.ticket_detail, do: "Yes", else: "No")
       }
 
-      if ticket.ticket_detail do
-        Map.put(base_row, "Registration Provided", "Yes")
-      else
-        Map.put(base_row, "Registration Provided", "No")
-      end
+      Enum.reduce(answer_labels, base_row, fn label, row ->
+        Map.put(
+          row,
+          csv_answer_header(label),
+          csv_safe(AttendeeInfo.export_value(ticket.ticket_detail, label))
+        )
+      end)
+    end)
+    |> then(fn rows ->
+      {@csv_base_headers ++ Enum.map(answer_labels, &csv_answer_header/1), rows}
     end)
   end
+
+  defp csv_answer_header(label) when label in @csv_base_headers,
+    do: csv_safe("#{label} (answer)")
+
+  defp csv_answer_header(label), do: csv_safe(label)
+
+  # Members type free text that admins open in a spreadsheet. A cell starting
+  # with = + - @ (or a tab / carriage return) can run as a formula, so prefix
+  # it with an apostrophe. Plain negative numbers are left alone.
+  defp csv_safe(value) when is_binary(value) do
+    cond do
+      Regex.match?(~r/^-\d+$/, value) ->
+        value
+
+      String.starts_with?(value, ["=", "+", "-", "@", "\t", "\r"]) ->
+        "'" <> value
+
+      true ->
+        value
+    end
+  end
+
+  defp csv_safe(value), do: value
 
   defp deny_full_admin(socket, title) do
     YscWeb.Flash.put_toast(

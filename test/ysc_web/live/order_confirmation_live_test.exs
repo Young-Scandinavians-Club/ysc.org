@@ -1275,5 +1275,59 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       assert html =~ "Registration Details"
       assert html =~ "Reg"
     end
+
+    test "shows the buyer their own answers to a tier's questions", %{
+      conn: conn
+    } do
+      user = create_user_with_membership()
+      event = create_event(%{})
+
+      tier =
+        create_ticket_tier(event, %{
+          name: "Dinner",
+          attendee_questions: [
+            %{"label" => "Dietary restrictions", "type" => "text"}
+          ]
+        })
+
+      order = create_ticket_order(user, event)
+
+      {:ok, ticket} =
+        %Events.Ticket{}
+        |> Events.Ticket.changeset(%{
+          ticket_order_id: order.id,
+          ticket_tier_id: tier.id,
+          event_id: event.id,
+          user_id: user.id,
+          reference_id: "TKT-#{System.unique_integer()}",
+          status: :confirmed,
+          expires_at: DateTime.add(DateTime.utc_now(), 30, :minute)
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        Events.create_ticket_details([
+          %{
+            ticket_id: ticket.id,
+            identity: false,
+            answers: %{
+              "abc" => %{
+                "label" => "Dietary restrictions",
+                "type" => "text",
+                "position" => 0,
+                "value" => "Vegan"
+              }
+            }
+          }
+        ])
+
+      conn = log_in_user(conn, user)
+      {:ok, view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(view, "#ticket-answers-#{ticket.id}", "Vegan")
+      assert html =~ "Dietary restrictions"
+      # No name/email were collected, so no registration block.
+      refute html =~ "Registration Details"
+    end
   end
 end

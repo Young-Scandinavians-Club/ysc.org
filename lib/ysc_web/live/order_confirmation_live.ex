@@ -483,6 +483,30 @@ defmodule YscWeb.OrderConfirmationLive do
                         </div>
                       </div>
                     <% end %>
+                    <%= if !is_donation && Ysc.Events.AttendeeInfo.display_answers(ticket_detail) != [] do %>
+                      <div
+                        id={"ticket-answers-#{ticket.id}"}
+                        class="mt-3 pt-3 border-t border-zinc-300"
+                      >
+                        <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                          Your Answers
+                        </p>
+                        <dl class="space-y-1 text-sm">
+                          <div
+                            :for={
+                              answer <-
+                                Ysc.Events.AttendeeInfo.display_answers(
+                                  ticket_detail
+                                )
+                            }
+                            class="text-zinc-700"
+                          >
+                            <dt class="inline font-medium">{answer.label}:</dt>
+                            <dd class="inline">{answer.value}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    <% end %>
                     <%= if requires_registration && ticket_detail && !is_donation do %>
                       <div class={[
                         "pt-3 border-t border-zinc-300",
