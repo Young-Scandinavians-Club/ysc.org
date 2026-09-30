@@ -1019,4 +1019,111 @@ defmodule YscWeb.CoreComponentsTest do
       refute html =~ "Last edited by"
     end
   end
+
+  describe "membership_qr_modal/1" do
+    test "renders check-in copy, details, and lifetime valid-until" do
+      assigns = %{
+        token: "membership-qr-token",
+        details: %{
+          type_label: "Lifetime Membership",
+          member_since: ~D[2019-06-15],
+          renewal_date: nil,
+          is_sub_account: false,
+          primary_name: nil
+        }
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.membership_qr_modal
+          id="membership-qr-modal"
+          token={@token}
+          details={@details}
+          timezone="America/Los_Angeles"
+          wallet_platform={:both}
+        />
+        """)
+
+      assert html =~ ~s(id="membership-qr-modal")
+      assert html =~ "My Membership QR"
+
+      assert html =~
+               "Show this at check-in so a volunteer can confirm your membership."
+
+      refute html =~ "Show this to an admin for membership verification"
+      assert html =~ "Type"
+      assert html =~ "Lifetime Membership"
+      assert html =~ "Member Since"
+      assert html =~ "Jun 15, 2019"
+      assert html =~ "Valid Until"
+      assert html =~ "Forever ✦"
+      assert html =~ "text-emerald-700"
+      refute html =~ "Through"
+      refute html =~ "Add to Apple Wallet"
+      refute html =~ "Add to Google Wallet"
+      assert html =~ "Close"
+    end
+
+    test "renders renewal date, through row, and wallet badges when enabled" do
+      assigns = %{
+        token: "membership-qr-token",
+        details: %{
+          type_label: "Family Membership",
+          member_since: ~U[2021-01-01 08:00:00Z],
+          renewal_date: ~U[2027-03-05 06:00:00Z],
+          is_sub_account: true,
+          primary_name: "Pat Primary"
+        },
+        google_url: "https://pay.google.com/gp/v/save/example"
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.membership_qr_modal
+          id="settings-membership-qr-modal"
+          token={@token}
+          details={@details}
+          timezone="America/New_York"
+          apple_wallet_enabled?={true}
+          google_wallet_enabled?={true}
+          google_wallet_url={@google_url}
+          wallet_platform={:both}
+        />
+        """)
+
+      assert html =~ ~s(id="settings-membership-qr-modal")
+      assert html =~ "Family Membership"
+      assert html =~ "Mar 5, 2027"
+      refute html =~ "Forever ✦"
+      assert html =~ "Through"
+      assert html =~ "Pat Primary"
+      assert html =~ "Add to Apple Wallet"
+      assert html =~ ~s(href="/wallet/membership")
+      assert html =~ "Add to Google Wallet"
+      assert html =~ "https://pay.google.com/gp/v/save/example"
+    end
+
+    test "hides wallet badges when the detected platform does not match" do
+      assigns = %{
+        token: "membership-qr-token",
+        google_url: "https://pay.google.com/gp/v/save/example"
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.membership_qr_modal
+          id="membership-qr-modal"
+          token={@token}
+          timezone="Etc/UTC"
+          apple_wallet_enabled?={true}
+          google_wallet_enabled?={true}
+          google_wallet_url={@google_url}
+          wallet_platform={:google_only}
+        />
+        """)
+
+      refute html =~ "Add to Apple Wallet"
+      assert html =~ "Add to Google Wallet"
+    end
+  end
 end

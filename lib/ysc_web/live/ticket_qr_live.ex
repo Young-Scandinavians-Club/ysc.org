@@ -8,6 +8,7 @@ defmodule YscWeb.TicketQrLive do
   alias Ysc.AppleWallet
   alias Ysc.GoogleWallet
   alias YscWeb.UserAuth
+  alias YscWeb.WalletPlatform
 
   @impl true
   def render(assigns) do
@@ -360,7 +361,7 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
       |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
       |> assign(:google_wallet_ticket_urls, %{})
-      |> assign(:wallet_platform, wallet_platform_from_params(socket))
+      |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
 
     socket =
       if connected?(socket) do
@@ -392,7 +393,7 @@ defmodule YscWeb.TicketQrLive do
       |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
       |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
       |> assign(:google_wallet_ticket_urls, %{})
-      |> assign(:wallet_platform, wallet_platform_from_params(socket))
+      |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
 
     socket =
       if connected?(socket) do
@@ -457,14 +458,7 @@ defmodule YscWeb.TicketQrLive do
         %{"platform" => platform},
         socket
       ) do
-    platform_atom =
-      case platform do
-        "apple_only" -> :apple_only
-        "google_only" -> :google_only
-        _ -> :both
-      end
-
-    {:noreply, assign(socket, :wallet_platform, platform_atom)}
+    {:noreply, WalletPlatform.assign_from_hook(socket, platform)}
   end
 
   # --- Private ---
@@ -639,21 +633,6 @@ defmodule YscWeb.TicketQrLive do
 
             acc
         end)
-    end
-  end
-
-  # Reads the wallet platform from LiveView connect_params (populated from
-  # localStorage by app.js). Falls back to :both on the disconnected render
-  # (no connect_params available) and on unknown values.
-  defp wallet_platform_from_params(socket) do
-    if connected?(socket) do
-      case get_connect_params(socket)["wallet_platform"] do
-        "apple_only" -> :apple_only
-        "google_only" -> :google_only
-        _ -> :both
-      end
-    else
-      :both
     end
   end
 end
