@@ -2814,7 +2814,10 @@ defmodule YscWeb.CoreComponents do
 
   def presence_avatars(assigns) do
     ~H"""
-    <div :if={@editors != []} class={["flex items-center -space-x-2 [&>div]:shrink-0", @class]}>
+    <div
+      :if={@editors != []}
+      class={["flex items-center -space-x-2 [&>div]:shrink-0", @class]}
+    >
       <.tooltip
         :for={editor <- Enum.take(@editors, @max_shown)}
         tooltip_text={"#{editor.name} is editing"}
