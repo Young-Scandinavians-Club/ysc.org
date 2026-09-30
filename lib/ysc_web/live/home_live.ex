@@ -1583,7 +1583,7 @@ defmodule YscWeb.HomeLive do
                         <span class="block mb-2 font-bold text-white">
                           Pending Approval
                         </span>
-                        Your membership application has been submitted and is being reviewed by the board. We will email you when there is a decision. Paying membership dues may still be required before cabin bookings and member-only tickets are available.
+                        Your membership application has been submitted and is being reviewed by the board. We will email you when there is a decision. Cabin bookings and member-only tickets become available after you are approved and your membership dues are paid.
                       <% true -> %>
                         <span class="block mb-2 font-bold text-white">
                           Membership Required
@@ -1598,10 +1598,14 @@ defmodule YscWeb.HomeLive do
 
                   <%= cond do %>
                     <% @current_user.state == :pending_approval -> %>
-                      <div class="flex w-full items-center justify-center rounded-sm px-6 py-4 text-sm font-semibold leading-6 bg-white/10 text-sky-100 border border-white/20 backdrop-blur-md">
+                      <.link
+                        navigate={~p"/pending-review"}
+                        id="home-pending-review-status"
+                        class="flex w-full items-center justify-center rounded-sm px-6 py-4 text-sm font-semibold leading-6 bg-white text-sky-950 hover:bg-sky-50 shadow-lg transition duration-150 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sky-950 active:scale-[0.98] active:transition-none"
+                      >
                         <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
-                        Awaiting board review
-                      </div>
+                        View application status
+                      </.link>
                     <% true -> %>
                       <.link
                         navigate={~p"/users/membership"}
