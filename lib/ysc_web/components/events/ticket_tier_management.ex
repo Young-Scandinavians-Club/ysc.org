@@ -653,13 +653,17 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   # One line naming what each ticket of the tier is asked, e.g.
   # "Name & email, Dietary restrictions".
   defp attendee_info_summary(tier) do
-    identity = if tier.requires_registration, do: ["Name & email"], else: []
+    questions_list = tier |> Map.get(:attendee_questions) |> List.wrap()
+    name_only? = Enum.any?(questions_list, &(&1.prefill == :age))
 
-    questions =
-      tier
-      |> Map.get(:attendee_questions)
-      |> List.wrap()
-      |> Enum.map(& &1.label)
+    identity =
+      cond do
+        not tier.requires_registration -> []
+        name_only? -> ["Name"]
+        true -> ["Name & email"]
+      end
+
+    questions = Enum.map(questions_list, & &1.label)
 
     case identity ++ questions do
       [] -> "None"

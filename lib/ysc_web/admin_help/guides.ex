@@ -887,7 +887,7 @@ defmodule YscWeb.AdminHelp.Guides do
         {"What is \"Attendee info\" on a tier?",
          "It controls what each ticket is asked at checkout. Turn on **Ask for each guest's name and email** to know exactly who is coming, and add **Extra questions** — dietary restrictions, a child's age, a shirt size, anything — as text, number, yes/no, or pick-one-from-a-list. Answers show in the ticket list, the CSV export, and on the check-in desk. Members only see their own answers."},
         {"How do I ask for a child's age or dietary restrictions?",
-         "Edit (or add) the tier, then under **Attendee info** click **Dietary restrictions** or **Child's age**. Both are optional by default; toggle **Required** if you need an answer. The child's age is pre-filled from the birthdate of the family member the ticket is for. Use **Copy questions from** to reuse them on another tier."},
+         "Edit (or add) the tier, then under **Attendee info** click **Dietary restrictions** or **Child's age**. Both are optional by default; toggle **Required** if you need an answer. The child's age is pre-filled from the birthdate of the family member the ticket is for, and a tier that asks for it collects a name only (no email) when name collection is on. Use **Copy questions from** to reuse them on another tier."},
         {"What is Tickets TBD?",
          "A placeholder mode when you haven't decided pricing yet. The event can be published with \"tickets to be announced\" and you add real tiers later."},
         {"Can I delete a tier after sales started?",

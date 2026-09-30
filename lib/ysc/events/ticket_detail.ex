@@ -34,15 +34,19 @@ defmodule Ysc.Events.TicketDetail do
   By default the attendee's first name, last name and email are required.
   Pass `identity: false` for tickets whose tier only asks extra questions and
   doesn't collect who is attending; the name/email fields are then optional
-  (though still format-checked when given).
+  (though still format-checked when given). Pass `require_email: false` to
+  require a name but not an email, for tickets that only need a name.
   """
   def changeset(ticket_detail, attrs \\ %{}, opts \\ []) do
     identity? = Keyword.get(opts, :identity, true)
+    email? = Keyword.get(opts, :require_email, true)
 
     required =
-      if identity?,
-        do: [:ticket_id, :first_name, :last_name, :email],
-        else: [:ticket_id]
+      cond do
+        not identity? -> [:ticket_id]
+        email? -> [:ticket_id, :first_name, :last_name, :email]
+        true -> [:ticket_id, :first_name, :last_name]
+      end
 
     ticket_detail
     |> cast(attrs, [:ticket_id, :first_name, :last_name, :email, :answers])

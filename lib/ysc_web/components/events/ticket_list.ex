@@ -266,7 +266,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
             type="email"
             label="Email"
             field={@detail_form[:email]}
-            required={@editing_identity_required?}
+            required={@editing_email_required?}
           />
 
           <div
@@ -634,20 +634,20 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   def handle_event("open-edit-detail", %{"id" => id}, socket) do
     ticket = find_ticket!(socket, id)
     identity? = AttendeeInfo.ticket_collects_identity?(ticket)
+    email? = AttendeeInfo.ticket_collects_email?(ticket)
+    opts = [identity: identity?, require_email: email?]
 
     changeset =
       case ticket.registration do
-        nil ->
-          TicketDetail.changeset(%TicketDetail{}, %{}, identity: identity?)
-
-        registration ->
-          TicketDetail.changeset(registration, %{}, identity: identity?)
+        nil -> TicketDetail.changeset(%TicketDetail{}, %{}, opts)
+        registration -> TicketDetail.changeset(registration, %{}, opts)
       end
 
     {:noreply,
      socket
      |> assign(:editing_ticket, ticket)
      |> assign(:editing_identity_required?, identity?)
+     |> assign(:editing_email_required?, email?)
      |> assign(:editing_questions, AttendeeInfo.ticket_questions(ticket))
      |> assign(
        :answer_values,
@@ -675,7 +675,12 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         socket
       ) do
     ticket = socket.assigns.editing_ticket
-    identity? = socket.assigns.editing_identity_required?
+
+    detail_opts = [
+      identity: socket.assigns.editing_identity_required?,
+      require_email: socket.assigns.editing_email_required?
+    ]
+
     raw_answers = Map.get(all, "answers", %{})
 
     case AttendeeInfo.cast_answers(
@@ -683,14 +688,14 @@ defmodule YscWeb.AdminEventsLive.TicketList do
            raw_answers
          ) do
       {:ok, answers} ->
-        save_ticket_detail(socket, ticket, params, answers, identity?)
+        save_ticket_detail(socket, ticket, params, answers, detail_opts)
 
       {:error, errors} ->
         changeset =
           (ticket.registration || %TicketDetail{})
           |> TicketDetail.changeset(
             Map.put(params, "ticket_id", ticket.id),
-            identity: identity?
+            detail_opts
           )
           |> Map.put(:action, :validate)
 
@@ -948,7 +953,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
      })}
   end
 
-  defp save_ticket_detail(socket, ticket, params, answers, identity?) do
+  defp save_ticket_detail(socket, ticket, params, answers, detail_opts) do
     attrs =
       params
       |> Map.put("ticket_id", ticket.id)
@@ -957,10 +962,10 @@ defmodule YscWeb.AdminEventsLive.TicketList do
     result =
       case ticket.registration do
         nil ->
-          Events.create_registration(attrs, identity: identity?)
+          Events.create_registration(attrs, detail_opts)
 
         registration ->
-          Events.update_registration(registration, attrs, identity: identity?)
+          Events.update_registration(registration, attrs, detail_opts)
       end
 
     case result do
@@ -984,6 +989,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   defp assign_edit_defaults(socket) do
     socket
     |> assign(:editing_identity_required?, true)
+    |> assign(:editing_email_required?, true)
     |> assign(:editing_questions, [])
     |> assign(:answer_values, %{})
     |> assign(:answer_errors, %{})

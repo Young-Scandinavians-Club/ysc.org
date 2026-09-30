@@ -342,7 +342,7 @@ defmodule Ysc.Events.AttendeeInfoTest do
       tier = %{
         requires_registration: true,
         attendee_questions: [
-          question(id: "age", type: :number, required: true, prefill: :age)
+          question(id: "age", type: :number, required: true)
         ]
       }
 
@@ -402,6 +402,51 @@ defmodule Ysc.Events.AttendeeInfoTest do
 
       bad_email = put_in(typed.ticket_details_form["t1"].email, "nope")
       refute AttendeeInfo.complete?(ticket, bad_email)
+    end
+
+    test "tiers that ask a child's age collect a name but no email", %{
+      state: state,
+      kid: kid
+    } do
+      ticket = %{
+        id: "t3",
+        ticket_tier: %{
+          requires_registration: true,
+          attendee_questions: [
+            question(id: "age", type: :number, prefill: :age)
+          ]
+        }
+      }
+
+      assert AttendeeInfo.collects_identity?(ticket.ticket_tier)
+      refute AttendeeInfo.collects_email?(ticket.ticket_tier)
+      assert AttendeeInfo.collects_email?(%{requires_registration: true})
+
+      # A typed name is enough.
+      named = %{
+        state
+        | ticket_details_form: %{
+            "t3" => %{first_name: "Sam", last_name: "Guest", email: ""}
+          }
+      }
+
+      assert AttendeeInfo.complete?(ticket, named)
+
+      assert {:ok, detail} = AttendeeInfo.build_detail(ticket, named)
+      assert detail.identity
+      refute detail.require_email
+      assert detail.first_name == "Sam"
+
+      # A family member's own email is never carried over to the child ticket.
+      family = %{state | selected_family_members: %{"t3" => kid.id}}
+
+      assert %{identity: %{email: "", first_name: "Kim"}} =
+               AttendeeInfo.resolve(ticket, family)
+
+      assert {:ok, %{email: ""}} = AttendeeInfo.build_detail(ticket, family)
+
+      # A name is still required.
+      refute AttendeeInfo.complete?(ticket, state)
     end
 
     test "questions-only tickets don't need a name", %{state: state} do

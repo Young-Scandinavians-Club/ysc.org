@@ -1953,6 +1953,70 @@ defmodule YscWeb.EventDetailsLiveTest do
     end
   end
 
+  describe "child tickets that collect a name and age" do
+    test "no email is asked for", %{conn: conn} do
+      %{primary: primary, sub_accounts: [child]} =
+        family_with_sub_accounts(1, %{}, %{})
+
+      child
+      |> Ecto.Changeset.change(
+        primary_user_id: primary.id,
+        date_of_birth: Date.add(Date.utc_today(), -365 * 6 - 30)
+      )
+      |> Repo.update!()
+
+      conn = log_in_user(conn, primary)
+      event = event_with_state(:upcoming, with_image: true)
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Kids",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          requires_registration: true,
+          attendee_questions: [
+            %{"label" => "Child's age", "type" => "number", "prefill" => "age"}
+          ]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      ticket =
+        Repo.one!(
+          from(t in Ysc.Events.Ticket,
+            where: t.user_id == ^primary.id and t.event_id == ^event.id
+          )
+        )
+
+      assert has_element?(view, "#ticket_#{ticket.id}_first_name")
+      assert has_element?(view, "#ticket_#{ticket.id}_last_name")
+      refute has_element?(view, "#ticket_#{ticket.id}_email")
+
+      assert has_element?(
+               view,
+               "#free-ticket-whos-going",
+               "Add a name for each person attending."
+             )
+
+      render_change(view, "select-ticket-attendee", %{
+        "ticket_id" => ticket.id,
+        "ticket_#{ticket.id}_attendee_select" => "family_#{child.id}"
+      })
+
+      render_click(view, "confirm-free-tickets")
+
+      detail = Repo.get_by!(Ysc.Events.TicketDetail, ticket_id: ticket.id)
+      assert detail.first_name == child.first_name
+      assert detail.email == nil
+      assert Enum.map(detail.answers, fn {_, a} -> a["value"] end) == [6]
+    end
+  end
+
   describe "attendee questions alongside names" do
     test "collects name, email and answers for every ticket", %{conn: conn} do
       user = user_with_membership(:lifetime)

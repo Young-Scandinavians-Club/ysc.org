@@ -260,6 +260,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         :missing_presets,
         missing_presets(assigns.form[:attendee_questions])
       )
+      |> assign(:asks_child_age?, asks_child_age?(assigns.form))
       |> assign(:summary, attendee_summary(assigns.form))
       |> assign(:open?, attendee_info_configured?(assigns.form))
 
@@ -328,6 +329,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             <span class="text-xs text-zinc-500">
               Collects first name, last name, and email for every ticket, not
               just the buyer's.
+            </span>
+            <span
+              :if={@asks_child_age?}
+              id="attendee-info-name-only-hint"
+              class="text-xs text-zinc-500"
+            >
+              This tier asks for a child's age, so it collects a name only, no email.
             </span>
           </span>
         </label>
@@ -420,6 +428,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       attendee_labels(form) != []
   end
 
+  defp asks_child_age?(form) do
+    form.source
+    |> Ecto.Changeset.get_field(:attendee_questions)
+    |> List.wrap()
+    |> Enum.any?(&(&1.prefill == :age))
+  end
+
   defp attendee_labels(form) do
     form.source
     |> Ecto.Changeset.get_field(:attendee_questions)
@@ -435,7 +450,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
            "checkbox",
            form[:requires_registration].value
          ),
-         do: ["Name & email"],
+         do: [if(asks_child_age?(form), do: "Name", else: "Name & email")],
          else: []
 
     case identity ++ attendee_labels(form) do

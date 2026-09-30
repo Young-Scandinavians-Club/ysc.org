@@ -2951,9 +2951,13 @@ defmodule Ysc.Events do
   # attending, so name and email aren't required. See `AttendeeInfo.build_detail/2`.
   defp insert_ticket_detail(attrs) do
     {identity?, attrs} = Map.pop(attrs, :identity, true)
+    {email?, attrs} = Map.pop(attrs, :require_email, true)
 
     case %TicketDetail{}
-         |> TicketDetail.changeset(attrs, identity: identity?)
+         |> TicketDetail.changeset(attrs,
+           identity: identity?,
+           require_email: email?
+         )
          |> Repo.insert() do
       {:ok, ticket_detail} -> ticket_detail
       {:error, changeset} -> Repo.rollback(changeset)

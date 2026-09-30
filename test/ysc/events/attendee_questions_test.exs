@@ -277,6 +277,25 @@ defmodule Ysc.Events.AttendeeQuestionsTest do
       assert Repo.get!(TicketDetail, detail.id).answers == answers
     end
 
+    test "name-only details need a name but not an email", %{ticket: ticket} do
+      assert {:error, %Ecto.Changeset{}} =
+               Events.create_ticket_details([
+                 %{ticket_id: ticket.id, require_email: false}
+               ])
+
+      assert {:ok, [detail]} =
+               Events.create_ticket_details([
+                 %{
+                   ticket_id: ticket.id,
+                   first_name: "Kim",
+                   last_name: "Parent",
+                   require_email: false
+                 }
+               ])
+
+      assert detail.email == nil
+    end
+
     test "details still require a name by default", %{ticket: ticket} do
       assert {:error, %Ecto.Changeset{}} =
                Events.create_ticket_details([

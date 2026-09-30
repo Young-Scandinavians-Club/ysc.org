@@ -49,6 +49,15 @@ defmodule Ysc.Events.AttendeeInfo do
   def collects_info?(tier),
     do: collects_identity?(tier) or questions(tier) != []
 
+  @doc """
+  Whether tickets of this tier need an attendee email (on top of a name).
+
+  Tiers that ask for a child's age (a question that pre-fills from a date of
+  birth) only collect a name: children don't need to be emailed.
+  """
+  def collects_email?(tier),
+    do: collects_identity?(tier) and not prefills?(tier)
+
   @doc "Whether any of the tier's questions pre-fills from a date of birth."
   def prefills?(tier), do: Enum.any?(questions(tier), &(&1.prefill == :age))
 
@@ -62,6 +71,9 @@ defmodule Ysc.Events.AttendeeInfo do
   @doc "Whether the ticket's tier asks for an attendee name and email."
   def ticket_collects_identity?(%{ticket_tier: tier}),
     do: collects_identity?(tier)
+
+  @doc "Whether the ticket's tier asks for an attendee email."
+  def ticket_collects_email?(%{ticket_tier: tier}), do: collects_email?(tier)
 
   @doc "The questions asked for this ticket."
   def ticket_questions(%{ticket_tier: tier}), do: questions(tier)
@@ -353,6 +365,14 @@ defmodule Ysc.Events.AttendeeInfo do
         answers: %{question_id => raw string}}
   """
   def resolve(ticket, state) do
+    resolved = do_resolve(ticket, state)
+
+    if ticket_collects_email?(ticket),
+      do: resolved,
+      else: put_in(resolved.identity.email, "")
+  end
+
+  defp do_resolve(ticket, state) do
     ticket_id_str = to_string(ticket.id)
     tickets_for_me = state[:tickets_for_me] || %{}
     selected_family_members = state[:selected_family_members] || %{}
@@ -421,10 +441,15 @@ defmodule Ysc.Events.AttendeeInfo do
   defp get_in_form(map, key),
     do: Map.get(map, key) || Map.get(map, to_string(key))
 
-  @doc "Whether an identity has a name and a plausible email."
-  def identity_complete?(%{first_name: first, last_name: last, email: email}) do
-    present?(first) and present?(last) and present?(email) and
-      String.contains?(email, "@")
+  @doc """
+  Whether an identity has a name and, when `email_required?`, a plausible email.
+  """
+  def identity_complete?(
+        %{first_name: first, last_name: last, email: email},
+        email_required? \\ true
+      ) do
+    present?(first) and present?(last) and
+      (not email_required? or (present?(email) and String.contains?(email, "@")))
   end
 
   defp present?(value), do: is_binary(value) and String.trim(value) != ""
@@ -436,7 +461,7 @@ defmodule Ysc.Events.AttendeeInfo do
     resolved = resolve(ticket, state)
 
     (not ticket_collects_identity?(ticket) or
-       identity_complete?(resolved.identity)) and
+       identity_complete?(resolved.identity, ticket_collects_email?(ticket))) and
       valid_answers?(ticket_questions(ticket), resolved.answers)
   end
 
@@ -453,11 +478,17 @@ defmodule Ysc.Events.AttendeeInfo do
   def build_detail(ticket, state) do
     resolved = resolve(ticket, state)
     identity? = ticket_collects_identity?(ticket)
+    email? = ticket_collects_email?(ticket)
 
-    with :ok <- check_identity(identity?, resolved.identity),
+    with :ok <- check_identity(identity?, resolved.identity, email?),
          {:ok, answers} <-
            cast_answers(ticket_questions(ticket), resolved.answers) do
-      base = %{ticket_id: ticket.id, answers: answers, identity: identity?}
+      base = %{
+        ticket_id: ticket.id,
+        answers: answers,
+        identity: identity?,
+        require_email: email?
+      }
 
       if identity? do
         {:ok, Map.merge(base, resolved.identity)}
@@ -467,9 +498,9 @@ defmodule Ysc.Events.AttendeeInfo do
     end
   end
 
-  defp check_identity(false, _identity), do: :ok
+  defp check_identity(false, _identity, _email?), do: :ok
 
-  defp check_identity(true, identity) do
-    if identity_complete?(identity), do: :ok, else: {:error, :identity}
+  defp check_identity(true, identity, email?) do
+    if identity_complete?(identity, email?), do: :ok, else: {:error, :identity}
   end
 end

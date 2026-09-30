@@ -33,9 +33,16 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
   end
 
   def intro(tickets) do
-    if Enum.any?(tickets, &AttendeeInfo.ticket_collects_identity?/1),
-      do: "Add a name and email for each person attending.",
-      else: "Tell us a little more about each ticket."
+    cond do
+      Enum.any?(tickets, &AttendeeInfo.ticket_collects_email?/1) ->
+        "Add a name and email for each person attending."
+
+      Enum.any?(tickets, &AttendeeInfo.ticket_collects_identity?/1) ->
+        "Add a name for each person attending."
+
+      true ->
+        "Tell us a little more about each ticket."
+    end
   end
 
   attr :tickets, :list, required: true, doc: "tickets whose tier asks for info"
@@ -71,6 +78,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
 
     resolved = AttendeeInfo.resolve(ticket, state)
     identity? = AttendeeInfo.collects_identity?(tier)
+    email? = AttendeeInfo.collects_email?(tier)
     questions = AttendeeInfo.questions(tier)
 
     tickets_for_me = state.tickets_for_me || %{}
@@ -86,6 +94,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
       assigns
       |> assign(:resolved, resolved)
       |> assign(:identity?, identity?)
+      |> assign(:email?, email?)
       |> assign(:questions, questions)
       |> assign(:picker?, identity? or AttendeeInfo.prefills?(tier))
       |> assign(:complete?, AttendeeInfo.complete?(ticket, state))
@@ -223,7 +232,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
                   />
                 </div>
               </div>
-              <div>
+              <div :if={@email?}>
                 <label
                   for={"ticket_#{@ticket.id}_email"}
                   class="block text-sm font-medium text-zinc-700"
@@ -257,8 +266,10 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
               <strong>
                 {@resolved.identity.first_name} {@resolved.identity.last_name}
               </strong>
-              <br />
-              <span class="text-blue-600">{@resolved.identity.email}</span>
+              <br :if={@email?} />
+              <span :if={@email?} class="text-blue-600">
+                {@resolved.identity.email}
+              </span>
             </p>
           </div>
         </div>
