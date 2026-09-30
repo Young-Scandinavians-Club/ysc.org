@@ -117,7 +117,8 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
         amount: formatted_amounts.refund_amount,
         is_pending: is_pending_refund
       },
-      booking_url: booking_url(booking.id)
+      booking_url: booking_url(booking.id),
+      cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
     }
   end
 end

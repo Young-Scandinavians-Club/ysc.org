@@ -99,7 +99,8 @@ defmodule YscWeb.Emails.BookingRefundPending do
       },
       request_date: request_date,
       policy_refund_amount: policy_refund_amount,
-      booking_url: booking_url(booking.id)
+      booking_url: booking_url(booking.id),
+      cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
     }
   end
 end

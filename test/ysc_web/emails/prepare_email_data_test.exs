@@ -158,6 +158,17 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       assert data.pending_refund.cancellation_reason == "Booking cancelled"
     end
 
+    test "points questions to the cabin mailbox", %{
+      pending_refund: pr,
+      booking: booking,
+      payment: payment
+    } do
+      data = BookingRefundPending.prepare_email_data(pr, booking, payment)
+
+      assert data.cabin_email ==
+               Ysc.EmailConfig.booking_reply_to(booking.property)
+    end
+
     test "payment nil omits refund percentage and shows N/A for payment amount",
          %{
            pending_refund: pr,
@@ -762,6 +773,9 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       assert data.cancellation.reason == "No reason provided"
       assert data.booking_url =~ "/bookings/#{booking.id}/receipt"
       assert data.refund.is_pending == false
+
+      assert data.cabin_email ==
+               Ysc.EmailConfig.booking_reply_to(booking.property)
     end
 
     test "passes custom reason and pending refund flag", %{booking: booking} do
@@ -994,6 +1008,9 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
       assert data.booking.reference_id == booking.reference_id
       assert data.refund.amount =~ "$"
+
+      assert data.cabin_email ==
+               Ysc.EmailConfig.booking_reply_to(booking.property)
     end
 
     test "uses N/A for payment when payment is nil", %{
