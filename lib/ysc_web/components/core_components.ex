@@ -50,6 +50,12 @@ defmodule YscWeb.CoreComponents do
   attr :on_cancel, JS, default: %JS{}
   attr :z_index, :string, default: "z-200"
   attr :panel_class, :any, default: nil
+
+  attr :backdrop_class, :string,
+    default: "bg-zinc-50/90",
+    doc:
+      "Tailwind classes for the backdrop colour. Use an opaque colour (e.g. `bg-zinc-100`) so nothing behind the modal shows through."
+
   slot :inner_block, required: true
 
   def modal(assigns) do
@@ -64,7 +70,10 @@ defmodule YscWeb.CoreComponents do
       class={"relative #{@z_index} hidden"}
     >
       <%!-- No aria-hidden on backdrop: dialog has aria-modal="true"; avoids blocking focus/hidden violation --%>
-      <div id={"#{@id}-bg"} class="fixed inset-0 transition-opacity bg-zinc-50/90" />
+      <div
+        id={"#{@id}-bg"}
+        class={["fixed inset-0 transition-opacity", @backdrop_class]}
+      />
       <div
         class={[
           "fixed inset-0",
