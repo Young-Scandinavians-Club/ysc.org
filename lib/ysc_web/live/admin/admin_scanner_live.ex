@@ -942,6 +942,7 @@ defmodule YscWeb.AdminScannerLive do
               <div class="space-y-2 mb-6">
                 <div
                   :for={ticket <- @group_prompt.unchecked_tickets}
+                  id={"scanner-pending-#{ticket.id}"}
                   class="flex items-center justify-between bg-zinc-50 rounded-lg px-3 py-2"
                 >
                   <div>
@@ -976,6 +977,7 @@ defmodule YscWeb.AdminScannerLive do
                 <p class="text-xs text-zinc-400 mb-1">Already checked in:</p>
                 <div
                   :for={ticket <- @group_prompt.checked_tickets}
+                  id={"scanner-checked-#{ticket.id}"}
                   class="flex items-center bg-zinc-100 rounded-sm px-3 py-1.5 mb-1 text-sm text-zinc-400"
                 >
                   <.icon

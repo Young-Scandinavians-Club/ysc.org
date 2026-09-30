@@ -398,6 +398,153 @@ defmodule YscWeb.AdminScannerLiveTest do
       assert html =~ "Check in ALL" or html =~ "group" or html =~ "Guests"
     end
 
+    test "group check-in shows dietary answers and unnamed tickets", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: member,
+          event: event,
+          ticket_selections: %{tier.id => 2}
+        })
+
+      order = confirm_tickets(order)
+      [named, answers_only] = order.tickets
+
+      {:ok, _} =
+        Ysc.Events.create_ticket_details([
+          %{
+            ticket_id: named.id,
+            first_name: "Kim",
+            last_name: "Guest",
+            email: "kim-scanner-#{System.unique_integer([:positive])}@ysc.org",
+            answers: %{
+              "q1" => %{
+                "label" => "Dietary restrictions",
+                "type" => "text",
+                "position" => 0,
+                "value" => "Peanut allergy"
+              }
+            }
+          },
+          %{
+            ticket_id: answers_only.id,
+            identity: false,
+            answers: %{
+              "q1" => %{
+                "label" => "Dietary restrictions",
+                "type" => "text",
+                "position" => 0,
+                "value" => "Gluten free"
+              }
+            }
+          }
+        ])
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      start_event_session(view, event)
+
+      view
+      |> render_hook("scan_result", %{
+        "data" => QrToken.sign_ticket(named.id)
+      })
+
+      assert has_element?(view, "#group-checkin-modal")
+      assert has_element?(view, "#scanner-pending-#{named.id}", "Kim Guest")
+
+      assert has_element?(
+               view,
+               "#scanner-pending-#{answers_only.id}",
+               "No registration info"
+             )
+
+      assert has_element?(
+               view,
+               "#scanner-answers-#{named.id}",
+               "Peanut allergy"
+             )
+
+      assert has_element?(
+               view,
+               "#scanner-answers-#{answers_only.id}",
+               "Gluten free"
+             )
+    end
+
+    test "already-checked-in answers-only tickets show as Guest", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: member,
+          event: event,
+          ticket_selections: %{tier.id => 3}
+        })
+
+      order = confirm_tickets(order)
+      [checked, remaining, _other] = order.tickets
+
+      {:ok, _} =
+        Ysc.Events.create_ticket_details([
+          %{
+            ticket_id: checked.id,
+            identity: false,
+            answers: %{
+              "q1" => %{
+                "label" => "Dietary restrictions",
+                "type" => "text",
+                "position" => 0,
+                "value" => "Vegan"
+              }
+            }
+          },
+          %{
+            ticket_id: remaining.id,
+            first_name: "Sam",
+            last_name: "Walker",
+            email: "sam-scanner-#{System.unique_integer([:positive])}@ysc.org"
+          }
+        ])
+
+      checked
+      |> Ysc.Events.Ticket.check_in_changeset()
+      |> Ysc.Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      start_event_session(view, event)
+
+      view
+      |> render_hook("scan_result", %{
+        "data" => QrToken.sign_ticket(remaining.id)
+      })
+
+      assert has_element?(view, "#scanner-checked-#{checked.id}", "Guest")
+
+      assert has_element?(
+               view,
+               "#scanner-pending-#{remaining.id}",
+               "Sam Walker"
+             )
+
+      refute has_element?(
+               view,
+               "#scanner-checked-#{checked.id}",
+               "No registration info"
+             )
+    end
+
     test "check_in_all checks in all tickets in the order", %{
       conn: conn,
       admin: admin
