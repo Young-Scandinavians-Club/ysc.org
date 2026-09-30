@@ -27,6 +27,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Payments.PaymentDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.BookingDisplay
+  alias YscWeb.{MembershipQr, WalletPlatform}
 
   @impl true
   def render(assigns) do
@@ -1704,99 +1705,20 @@ defmodule YscWeb.UserSettingsLive do
           >
           </div>
 
-          <.modal
+          <.membership_qr_modal
             :if={
               @show_membership_qr &&
                 (@live_action == :membership || @live_action == :payment_method)
             }
             id="settings-membership-qr-modal"
-            show
-            on_cancel={JS.push("hide_membership_qr")}
-          >
-            <div class="text-center">
-              <h3 class="text-xl font-bold text-zinc-900 mb-1">
-                My Membership QR
-              </h3>
-              <p class="text-sm text-zinc-500 mb-5">
-                Show this at check-in so a volunteer can confirm your membership.
-              </p>
-              <.qr_code data={@membership_qr_token} size={250} class="mx-auto" />
-              <%= if @apple_wallet_membership_enabled? &&
-                    @wallet_platform in [:apple_only, :both] do %>
-                <div class="flex justify-center mt-4">
-                  <.add_to_wallet_button href={~p"/wallet/membership"} />
-                </div>
-              <% end %>
-              <%= if @google_wallet_membership_enabled? &&
-                    @wallet_platform in [:google_only, :both] &&
-                    @google_wallet_membership_url do %>
-                <div class="flex justify-center mt-2">
-                  <.add_to_google_wallet_button href={@google_wallet_membership_url} />
-                </div>
-              <% end %>
-              <%= if @membership_qr_details do %>
-                <div class="mt-5 rounded-xl bg-zinc-50 border border-zinc-200 divide-y divide-zinc-200 text-left">
-                  <div class="flex items-center justify-between px-4 py-3">
-                    <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                      Type
-                    </span>
-                    <span class="text-sm font-semibold text-zinc-900">
-                      {@membership_qr_details.type_label}
-                    </span>
-                  </div>
-                  <%= if @membership_qr_details.member_since do %>
-                    <div class="flex items-center justify-between px-4 py-3">
-                      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                        Member Since
-                      </span>
-                      <span class="text-sm font-semibold text-zinc-900">
-                        {format_utc_date(
-                          @membership_qr_details.member_since,
-                          "%b %-d, %Y",
-                          @timezone
-                        )}
-                      </span>
-                    </div>
-                  <% end %>
-                  <div class="flex items-center justify-between px-4 py-3">
-                    <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                      Valid Until
-                    </span>
-                    <%= if @membership_qr_details.renewal_date do %>
-                      <span class="text-sm font-semibold text-zinc-900">
-                        {format_utc_date(
-                          @membership_qr_details.renewal_date,
-                          "%b %-d, %Y",
-                          @timezone
-                        )}
-                      </span>
-                    <% else %>
-                      <span class="text-sm font-semibold text-emerald-700">
-                        Forever ✦
-                      </span>
-                    <% end %>
-                  </div>
-                  <%= if @membership_qr_details.is_sub_account && @membership_qr_details.primary_name do %>
-                    <div class="flex items-center justify-between px-4 py-3">
-                      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
-                        Through
-                      </span>
-                      <span class="text-sm font-semibold text-zinc-900">
-                        {@membership_qr_details.primary_name}
-                      </span>
-                    </div>
-                  <% end %>
-                </div>
-              <% end %>
-              <.button
-                phx-click="hide_membership_qr"
-                color="zinc"
-                class="w-full mt-3"
-              >
-                Close
-              </.button>
-            </div>
-          </.modal>
+            token={@membership_qr_token}
+            details={@membership_qr_details}
+            timezone={@timezone}
+            apple_wallet_enabled?={@apple_wallet_membership_enabled?}
+            google_wallet_enabled?={@google_wallet_membership_enabled?}
+            google_wallet_url={@google_wallet_membership_url}
+            wallet_platform={@wallet_platform}
+          />
 
           <div :if={@live_action == :notifications} class="space-y-6">
             <div class="rounded-sm border border-zinc-100 py-4 px-4 flex flex-col gap-4">
@@ -2689,7 +2611,7 @@ defmodule YscWeb.UserSettingsLive do
         GoogleWallet.configured?(:membership)
       )
       |> assign(:google_wallet_membership_url, nil)
-      |> assign(:wallet_platform, wallet_platform_from_params(socket))
+      |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
       |> assign(:user_avatars, [])
       |> assign(:current_avatar_url, nil)
       |> assign(:avatar_processing, false)
@@ -3079,14 +3001,7 @@ defmodule YscWeb.UserSettingsLive do
         %{"platform" => platform},
         socket
       ) do
-    platform_atom =
-      case platform do
-        "apple_only" -> :apple_only
-        "google_only" -> :google_only
-        _ -> :both
-      end
-
-    {:noreply, assign(socket, :wallet_platform, platform_atom)}
+    {:noreply, WalletPlatform.assign_from_hook(socket, platform)}
   end
 
   def handle_event("validate_profile", params, socket) do
@@ -4128,23 +4043,7 @@ defmodule YscWeb.UserSettingsLive do
         } =
           socket
       ) do
-    token = Ysc.Scanning.QrToken.sign_membership(user.id)
-    details = build_membership_qr_details(socket.assigns)
-
-    google_wallet_url =
-      if socket.assigns.google_wallet_membership_enabled? do
-        case GoogleWallet.generate_membership_save_url(user) do
-          {:ok, url} -> url
-          _ -> nil
-        end
-      end
-
-    {:noreply,
-     socket
-     |> assign(:show_membership_qr, true)
-     |> assign(:membership_qr_token, token)
-     |> assign(:membership_qr_details, details)
-     |> assign(:google_wallet_membership_url, google_wallet_url)}
+    {:noreply, MembershipQr.show(socket, user)}
   end
 
   def handle_event("show_membership_qr", _params, socket) do
@@ -4152,11 +4051,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_event("hide_membership_qr", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_membership_qr, false)
-     |> assign(:membership_qr_token, nil)
-     |> assign(:membership_qr_details, nil)}
+    {:noreply, MembershipQr.hide(socket)}
   end
 
   def handle_event("leave-family-membership", _params, socket) do
@@ -6296,22 +6191,6 @@ defmodule YscWeb.UserSettingsLive do
 
   defp payment_dom_id(_) do
     "payment-#{System.unique_integer([:positive])}"
-  end
-
-  defp build_membership_qr_details(assigns) do
-    YscWeb.MembershipHelpers.build_membership_qr_details(assigns)
-  end
-
-  defp wallet_platform_from_params(socket) do
-    if connected?(socket) do
-      case get_connect_params(socket)["wallet_platform"] do
-        "apple_only" -> :apple_only
-        "google_only" -> :google_only
-        _ -> :both
-      end
-    else
-      :both
-    end
   end
 
   # --- Avatar helpers ---
