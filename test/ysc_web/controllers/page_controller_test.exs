@@ -31,6 +31,12 @@ defmodule YscWeb.PageControllerTest do
                "c_d621b3a4fc0326de60ed10ce25ca45e0c5c818f9947b1ebb4f5a71311f61963c"
 
       assert html =~ "Board Meeting Schedule"
+
+      assert LazyHTML.from_fragment(html)
+             |> LazyHTML.query(
+               "#board-meeting-attendance a[href='mailto:board@ysc.org']"
+             )
+             |> Enum.count() == 1
     end
   end
 
