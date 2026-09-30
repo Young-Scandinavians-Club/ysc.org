@@ -45,6 +45,21 @@ defmodule Ysc.Events.AttendeeQuestionsTest do
       assert Ecto.Changeset.get_field(changeset, :options) == ["Small", "Large"]
     end
 
+    test "each select choice must be 120 characters or fewer" do
+      too_long = String.duplicate("a", 121)
+
+      attrs =
+        question_attrs(%{
+          "type" => "select",
+          "options_text" => "Small\n#{too_long}"
+        })
+
+      changeset = AttendeeQuestion.changeset(%AttendeeQuestion{}, attrs)
+
+      assert %{options_text: ["each choice must be 120 characters or fewer"]} =
+               errors_on(changeset)
+    end
+
     test "number bounds must be ordered and only apply to numbers" do
       attrs = question_attrs(%{"type" => "number", "min" => "5", "max" => "2"})
       changeset = AttendeeQuestion.changeset(%AttendeeQuestion{}, attrs)
