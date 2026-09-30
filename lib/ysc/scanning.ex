@@ -22,9 +22,9 @@ defmodule Ysc.Scanning do
   alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord, SessionCheckIn}
   alias Ysc.MessagePassingEvents
 
-  # Display fields for the admin event check-in list. Omits hashed_password,
-  # board_bio, order notes, tier descriptions, and other columns the page
-  # never renders.
+  # Display fields for the admin event check-in list and QR scan path.
+  # Omits hashed_password, board_bio, event HTML, order notes, tier
+  # descriptions, and other columns those screens never render.
   @checkin_ticket_fields [
     :id,
     :event_id,
@@ -485,85 +485,71 @@ defmodule Ysc.Scanning do
       metadata: %{original_checkin_at: ticket.checked_in_at}
     })
 
-    order = ticket.ticket_order
+    order_tickets = scan_order_tickets(ticket)
 
-    if order do
-      loaded_order = Repo.preload(order, tickets: [:registration])
-      all_tickets = loaded_order.tickets
+    unchecked =
+      Enum.filter(order_tickets, fn t ->
+        t.status == :confirmed && !t.checked_in
+      end)
 
-      unchecked =
-        Enum.filter(all_tickets, fn t ->
-          t.status == :confirmed && !t.checked_in
-        end)
+    checked = Enum.filter(order_tickets, & &1.checked_in)
 
-      checked = Enum.filter(all_tickets, & &1.checked_in)
-
-      if unchecked != [] do
-        {:ok, :group_prompt,
-         %{
-           ticket: ticket,
-           order: loaded_order,
-           unchecked_tickets: unchecked,
-           checked_tickets: checked,
-           partially_scanned: true
-         }}
-      else
-        {:error, :already_scanned,
-         %{
-           checked_in_at: ticket.checked_in_at,
-           ticket_id: ticket.id,
-           order_id: ticket.ticket_order_id,
-           user_id: ticket.user_id
-         }}
-      end
-    else
-      {:error, :already_scanned,
+    if unchecked != [] do
+      {:ok, :group_prompt,
        %{
-         checked_in_at: ticket.checked_in_at,
-         ticket_id: ticket.id,
-         order_id: ticket.ticket_order_id,
-         user_id: ticket.user_id
+         ticket: ticket,
+         order: ticket.ticket_order,
+         unchecked_tickets: unchecked,
+         checked_tickets: checked,
+         partially_scanned: true
        }}
+    else
+      {:error, :already_scanned, already_scanned_info(ticket)}
     end
   end
 
   defp check_group_tickets(session, ticket) do
-    order = ticket.ticket_order
+    order_tickets = scan_order_tickets(ticket)
 
-    if order do
-      order_tickets =
-        order
-        |> Repo.preload(tickets: [:registration])
-        |> Map.get(:tickets, [])
+    unchecked =
+      Enum.filter(order_tickets, fn t ->
+        t.status == :confirmed && !t.checked_in
+      end)
 
-      unchecked =
-        Enum.filter(order_tickets, fn t ->
-          t.status == :confirmed && !t.checked_in
-        end)
+    checked = Enum.filter(order_tickets, & &1.checked_in)
 
-      checked =
-        Enum.filter(order_tickets, fn t ->
-          t.checked_in
-        end)
+    case unchecked do
+      [_, _ | _] ->
+        {:ok, :group_prompt,
+         %{
+           ticket: ticket,
+           order: ticket.ticket_order,
+           unchecked_tickets: unchecked,
+           checked_tickets: checked,
+           partially_scanned: checked != []
+         }}
 
-      case unchecked do
-        [_, _ | _] ->
-          {:ok, :group_prompt,
-           %{
-             ticket: ticket,
-             order: order,
-             unchecked_tickets: unchecked,
-             checked_tickets: checked,
-             partially_scanned: checked != []
-           }}
-
-        _ ->
-          do_check_in_ticket(session, ticket, :individual)
-      end
-    else
-      do_check_in_ticket(session, ticket, :individual)
+      _ ->
+        do_check_in_ticket(session, ticket, :individual)
     end
   end
+
+  defp already_scanned_info(ticket) do
+    %{
+      checked_in_at: ticket.checked_in_at,
+      ticket_id: ticket.id,
+      order_id: ticket.ticket_order_id,
+      user_id: ticket.user_id
+    }
+  end
+
+  # Sibling tickets (and their attendee answers) are nested on the slim
+  # ticket_order preload from `get_ticket_for_scan/1`.
+  defp scan_order_tickets(%{ticket_order: %{tickets: tickets}})
+       when is_list(tickets),
+       do: tickets
+
+  defp scan_order_tickets(_ticket), do: []
 
   @doc """
   Check in a single ticket by ID.
@@ -604,7 +590,8 @@ defmodule Ysc.Scanning do
     from(t in Ticket,
       where:
         t.ticket_order_id == ^order_id and t.status == :confirmed and
-          t.checked_in == false
+          t.checked_in == false,
+      select: struct(t, [:id, :user_id, :ticket_order_id])
     )
     |> Repo.all()
   end
@@ -709,13 +696,7 @@ defmodule Ysc.Scanning do
         {:error, :invalid, "This ticket is #{ticket.status}, not confirmed."}
 
       ticket.checked_in ->
-        {:error, :already_scanned,
-         %{
-           checked_in_at: ticket.checked_in_at,
-           ticket_id: ticket.id,
-           order_id: ticket.ticket_order_id,
-           user_id: ticket.user_id
-         }}
+        {:error, :already_scanned, already_scanned_info(ticket)}
 
       true ->
         do_check_in_ticket(session, ticket, :individual)
@@ -782,10 +763,13 @@ defmodule Ysc.Scanning do
   """
   def manual_ticket_lookup(reference_id, event_id)
       when is_binary(reference_id) do
+    ticket_id_query = from(t in Ticket, select: struct(t, [:id]))
+
     order =
       TicketOrder
       |> where([o], o.reference_id == ^reference_id and o.event_id == ^event_id)
-      |> preload(tickets: [:registration])
+      |> select([o], struct(o, [:id, :reference_id, :event_id]))
+      |> preload(tickets: ^ticket_id_query)
       |> Repo.one()
 
     case order do
@@ -1427,20 +1411,39 @@ defmodule Ysc.Scanning do
   # --- Helpers ---
 
   defp get_ticket_for_scan(ticket_id) do
-    Ticket
-    |> Repo.get(ticket_id)
-    |> case do
-      nil ->
-        nil
+    ticket_id
+    |> ticket_for_scan_query()
+    |> Repo.one()
+  end
 
-      ticket ->
-        Repo.preload(ticket, [
-          :event,
-          :user,
-          :registration,
-          ticket_order: :tickets
-        ])
-    end
+  # Same slim ticket/user/registration/tier columns as the desk list, plus
+  # sibling tickets and attendee answers so group check-in does not re-SELECT *.
+  defp ticket_for_scan_query(ticket_id) do
+    Ticket
+    |> where([t], t.id == ^ticket_id)
+    |> select([t], struct(t, ^@checkin_ticket_fields))
+    |> preload(^scan_ticket_preloads())
+  end
+
+  defp scan_ticket_preloads do
+    sibling_query =
+      from(t in Ticket,
+        select: struct(t, ^@checkin_ticket_fields),
+        preload: [registration: ^checkin_registration_query()]
+      )
+
+    order_query =
+      from(o in TicketOrder,
+        select: struct(o, ^@checkin_ticket_order_fields),
+        preload: [tickets: ^sibling_query]
+      )
+
+    [
+      registration: checkin_registration_query(),
+      user: checkin_user_query(),
+      ticket_tier: checkin_ticket_tier_query(),
+      ticket_order: order_query
+    ]
   end
 
   defp get_member_since(user, membership) do
@@ -1495,5 +1498,10 @@ defmodule Ysc.Scanning do
   @doc false
   def ci_query_explain_list_sessions_query do
     list_sessions_query([])
+  end
+
+  @doc false
+  def ci_query_explain_ticket_for_scan_query do
+    ticket_for_scan_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

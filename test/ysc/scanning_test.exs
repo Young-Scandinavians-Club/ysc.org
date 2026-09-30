@@ -850,6 +850,40 @@ defmodule Ysc.ScanningTest do
       assert updated_ticket.checked_in_at != nil
     end
 
+    test "does not SELECT user password hashes on check-in", %{
+      session: session,
+      order: order
+    } do
+      ticket = hd(order.tickets)
+      token = QrToken.sign_ticket(ticket.id)
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.process_scan(session, token) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+    end
+
+    test "does not SELECT event body HTML on check-in", %{
+      session: session,
+      order: order
+    } do
+      ticket = hd(order.tickets)
+      token = QrToken.sign_ticket(ticket.id)
+
+      {_result, html_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.process_scan(session, token) end,
+          pattern: ~r/raw_details/i,
+          caller_pids: [self()]
+        )
+
+      assert html_cols == 0
+    end
+
     test "records a scan_record with :success on check-in", %{
       session: session,
       order: order
@@ -1038,6 +1072,46 @@ defmodule Ysc.ScanningTest do
       assert {:ok, :group_prompt, info} = Scanning.process_scan(session, token)
       assert length(info.unchecked_tickets) == 3
       assert info.partially_scanned == false
+    end
+
+    test "loads attendee answers on the group prompt without fat user columns",
+         %{session: session, order: order} do
+      ticket = hd(order.tickets)
+
+      {:ok, _registration} =
+        Ysc.Events.create_registration(%{
+          "ticket_id" => ticket.id,
+          "first_name" => "ScanGuest",
+          "last_name" => "One",
+          "email" =>
+            "scan-guest-#{System.unique_integer([:positive])}@example.com",
+          "answers" => %{
+            "q1" => %{
+              "label" => "Meal",
+              "type" => "text",
+              "position" => 0,
+              "value" => "Vegan"
+            }
+          }
+        })
+
+      token = QrToken.sign_ticket(ticket.id)
+
+      {result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.process_scan(session, token) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert {:ok, :group_prompt, info} = result
+
+      prompted = Enum.find(info.unchecked_tickets, &(&1.id == ticket.id))
+
+      assert prompted.registration.first_name == "ScanGuest"
+      assert prompted.registration.answers["q1"]["value"] == "Vegan"
+      assert is_nil(info.ticket.user.hashed_password)
     end
 
     test "shows group prompt with partially_scanned=true when some tickets already checked in",
