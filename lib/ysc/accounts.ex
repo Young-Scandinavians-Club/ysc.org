@@ -3649,7 +3649,13 @@ defmodule Ysc.Accounts do
   # Guest pickers / ticket registration only need identity + name + email.
   # Skip password hashes, bios, Stripe ids, and notification flags that
   # `get_family_group/1` loads.
-  @guest_picker_user_fields [:id, :first_name, :last_name, :email]
+  @guest_picker_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :date_of_birth
+  ]
 
   # Home "Your Family" + board-pause notice. Name, relationship, avatar,
   # and board_position only.
