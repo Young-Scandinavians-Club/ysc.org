@@ -82,7 +82,8 @@ defmodule YscWeb.Emails.BookingRefundProcessed do
       },
       refund_date: refund_date,
       refund_amount: refund_amount,
-      booking_url: booking_url(booking.id)
+      booking_url: booking_url(booking.id),
+      cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
     }
   end
 end

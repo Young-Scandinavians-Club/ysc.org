@@ -40,6 +40,13 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
                Calendar.strftime(previous_checkin, "%B %d, %Y")
 
       assert data.booking_url =~ "/bookings/#{booking.id}/receipt"
+
+      assert data.cabin_email ==
+               Ysc.EmailConfig.booking_reply_to(booking.property)
+
+      html = BookingModificationConfirmation.render(data)
+      assert html =~ "mailto:#{data.cabin_email}"
+      refute html =~ "info@ysc.org"
     end
 
     test "omits additional_payment when zero or absent" do
