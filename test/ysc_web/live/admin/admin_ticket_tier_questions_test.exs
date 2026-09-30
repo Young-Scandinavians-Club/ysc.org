@@ -56,6 +56,22 @@ defmodule YscWeb.AdminTicketTierQuestionsTest do
     assert has_element?(view, "#attendee-info-summary", "Dietary restrictions")
   end
 
+  test "tiers with a NULL requires_registration still list", %{
+    conn: conn,
+    event: event
+  } do
+    tier = ticket_tier_fixture(%{event_id: event.id, name: "Legacy"})
+
+    Repo.update_all(
+      from(t in TicketTier, where: t.id == ^tier.id),
+      set: [requires_registration: nil]
+    )
+
+    {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+    assert has_element?(view, "#tier-attendee-info-#{tier.id}", "None")
+  end
+
   test "an existing tier that asks for names starts expanded",
        %{conn: conn, event: event} do
     tier =

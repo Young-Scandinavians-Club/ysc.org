@@ -658,7 +658,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
     identity =
       cond do
-        not tier.requires_registration -> []
+        tier.requires_registration != true -> []
         name_only? -> ["Name"]
         true -> ["Name & email"]
       end
