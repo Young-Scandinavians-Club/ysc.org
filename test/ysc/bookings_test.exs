@@ -4162,6 +4162,10 @@ defmodule Ysc.BookingsTest do
   end
 
   describe "create_stripe_refund_for_admin/3" do
+    setup do
+      stub_stripe_mock_retrieve_for_test_refunds()
+    end
+
     test "creates a refund in test stub mode" do
       assert {:ok, %Stripe.Refund{id: id}} =
                Bookings.create_stripe_refund_for_admin(
@@ -4189,6 +4193,10 @@ defmodule Ysc.BookingsTest do
   end
 
   describe "maybe_refund_unfulfilled_checkout_payment/3" do
+    setup do
+      stub_stripe_mock_retrieve_for_test_refunds()
+    end
+
     test "refunds captured hold payments when entitlement pricing is stale" do
       booking = booking_fixture(%{status: :hold})
 
@@ -4372,6 +4380,10 @@ defmodule Ysc.BookingsTest do
   end
 
   describe "maybe_refund_unfulfilled_modification_payment/3" do
+    setup do
+      stub_stripe_mock_retrieve_for_test_refunds()
+    end
+
     test "refunds captured modification payments when fulfillment fails" do
       user = Ysc.AccountsFixtures.user_fixture()
 

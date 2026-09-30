@@ -3399,6 +3399,10 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "maybe_refund_unfulfilled_ticket_payment/3" do
+    setup do
+      stub_stripe_mock_retrieve_for_test_refunds()
+    end
+
     test "refunds captured payments when fulfillment rejects stale amount" do
       order = ticket_order_fixture(%{status: :pending})
 
@@ -3407,6 +3411,28 @@ defmodule Ysc.TicketsTest do
         status: "succeeded",
         amount: 3000,
         latest_charge: "ch_test_unfulfilled_ticket"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Tickets.maybe_refund_unfulfilled_ticket_payment(
+                 order,
+                 payment_intent,
+                 :amount_mismatch
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
+    test "refunds captured payments when stripe_client leaked to StripeMock" do
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      order = ticket_order_fixture(%{status: :pending})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_unfulfilled_ticket_mock_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 3000,
+        latest_charge: "ch_test_unfulfilled_ticket_mock"
       }
 
       assert {:ok, %Stripe.Refund{id: refund_id}} =
