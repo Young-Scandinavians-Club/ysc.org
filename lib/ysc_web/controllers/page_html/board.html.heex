@@ -14,7 +14,14 @@
       >
         Financials & Annual Meetings
       </.link>
-      page.
+      page. Regular meeting dates are posted on the
+      <a
+        href="#board-meeting-schedule"
+        class="hover:text-blue-600 transition-colors duration-150"
+      >
+        board meeting schedule
+      </a>
+      below.
     </p>
   </div>
 
@@ -169,6 +176,44 @@
           </div>
         <% end %>
       </div>
+    </div>
+  </div>
+
+  <%!-- Board Meeting Schedule (bylaws §5.11: regular meetings follow a publicly posted schedule) --%>
+  <div
+    id="board-meeting-schedule"
+    class="border-t border-zinc-100 mt-12 pt-12 lg:mt-14"
+  >
+    <div class="flex items-center gap-3 mb-4">
+      <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-600 shrink-0">
+        <.icon name="hero-calendar" class="w-5 h-5" />
+      </span>
+      <h2 class="text-xl font-black text-zinc-900 tracking-tight">
+        Board Meeting Schedule
+      </h2>
+    </div>
+    <div class="prose prose-zinc prose-a:text-blue-600 max-w-3xl mb-6">
+      <p>
+        Regular meetings of the Board of Directors follow the schedule below, which also includes the Annual Meeting. Section 5.11 of the
+        <.link
+          navigate={~p"/bylaws"}
+          class="hover:text-blue-600 transition-colors duration-150"
+        >
+          bylaws
+        </.link>
+        covers how regular and special meetings are noticed.
+      </p>
+    </div>
+    <div class="w-full overflow-hidden rounded-xl border border-zinc-200">
+      <iframe
+        id="board-meeting-calendar"
+        src="https://calendar.google.com/calendar/embed?src=c_d621b3a4fc0326de60ed10ce25ca45e0c5c818f9947b1ebb4f5a71311f61963c%40group.calendar.google.com&ctz=America%2FLos_Angeles"
+        class="w-full border-0"
+        height="600"
+        frameborder="0"
+        scrolling="no"
+        title="YSC Board Meeting Schedule"
+      ></iframe>
     </div>
   </div>
 </div>
