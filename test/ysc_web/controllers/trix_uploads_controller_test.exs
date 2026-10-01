@@ -184,6 +184,24 @@ defmodule YscWeb.TrixUploadsControllerTest do
       assert json_response(conn, 422)["error"] =~ "not allowed"
     end
 
+    test "volunteers are also blocked from uploading HTML (Finding 79)" do
+      volunteer = user_fixture(%{role: :volunteer})
+      conn = log_in_user(build_conn(), volunteer)
+
+      path =
+        write_tmp(
+          "<!DOCTYPE html><html><body>phish</body></html>",
+          "ysc-login.html"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "ysc-login.html")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
     test "returns 422 for an SVG attachment (Finding 79)", %{conn: conn} do
       path =
         write_tmp(
