@@ -32,6 +32,9 @@ defmodule Ysc.Tickets do
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Bookings
   alias Ysc.Ledgers
+  alias Ysc.Ledgers.Payment
+  alias Ysc.Media.Image
+  alias Ysc.Payments.PaymentMethod
 
   @payment_timeout_minutes 5
 
@@ -220,12 +223,13 @@ defmodule Ysc.Tickets do
   @doc """
   Gets a ticket order for checkout UI (payment modal, registration).
 
-  Lighter preload than `get_ticket_order/1` — no event agendas or payment.
+  Lighter than `get_ticket_order/1` — no event, agendas, or payment. Tiers
+  keep `attendee_questions` for checkout cards; skip description and the
+  sale window. Purchaser skips `hashed_password` and board copy.
   """
   def get_ticket_order_for_checkout(id) do
-    TicketOrder
-    |> where([to], to.id == ^id)
-    |> preload([:user, tickets: :ticket_tier])
+    id
+    |> ticket_order_for_checkout_query()
     |> Repo.one()
   end
 
@@ -233,11 +237,72 @@ defmodule Ysc.Tickets do
   Gets a ticket order for checkout for a specific user (authorization + light preload).
   """
   def get_user_ticket_order_for_checkout(user_id, order_id) do
-    from(to in TicketOrder,
-      where: to.id == ^order_id and to.user_id == ^user_id,
-      preload: [:user, tickets: :ticket_tier]
-    )
+    order_id
+    |> ticket_order_for_checkout_query()
+    |> where([to], to.user_id == ^user_id)
     |> Repo.one()
+  end
+
+  # Checkout UI + Stripe PI: order identity/pricing, ticket cards, and
+  # attendee-question collection. Omits grant notes, cancellation copy,
+  # event body HTML (not preloaded), and purchaser hashed_password.
+  @checkout_ticket_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :total_amount,
+    :discount_amount,
+    :payment_intent_id,
+    :expires_at,
+    :completed_at,
+    :user_id,
+    :event_id,
+    :payment_id
+  ]
+  @checkout_ticket_fields [
+    :id,
+    :status,
+    :reference_id,
+    :ticket_tier_id,
+    :ticket_order_id,
+    :user_id,
+    :event_id,
+    :discount_amount
+  ]
+  @checkout_ticket_tier_fields [
+    :id,
+    :name,
+    :type,
+    :price,
+    :requires_registration,
+    :attendee_questions
+  ]
+  @checkout_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :stripe_id
+  ]
+
+  defp ticket_order_for_checkout_query(order_id) do
+    user_query =
+      from(u in User, select: struct(u, ^@checkout_user_fields))
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@checkout_ticket_tier_fields))
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@checkout_ticket_fields),
+        preload: [ticket_tier: ^tier_query]
+      )
+
+    from(to in TicketOrder,
+      where: to.id == ^order_id,
+      select: struct(to, ^@checkout_ticket_order_fields),
+      preload: [user: ^user_query, tickets: ^ticket_query]
+    )
   end
 
   @doc """
@@ -346,20 +411,116 @@ defmodule Ysc.Tickets do
   @doc """
   Gets a ticket order for the post-checkout confirmation page.
 
-  Lighter than `get_user_ticket_order/2` — no event agendas; includes cover image,
-  payment method, and ticket registrations needed by the confirmation UI.
+  Lighter than `get_user_ticket_order/2` — no agendas, purchaser row, event
+  body HTML, QuickBooks payment blobs, or image upload payloads. Includes
+  cover image, payment method, ticket registrations, and attendee answers
+  the confirmation UI renders.
   """
   def get_user_ticket_order_for_confirmation(user_id, order_id) do
+    user_id
+    |> ticket_order_for_confirmation_query(order_id)
+    |> Repo.one()
+  end
+
+  @confirmation_ticket_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :total_amount,
+    :discount_amount,
+    :payment_intent_id,
+    :user_id,
+    :event_id,
+    :payment_id
+  ]
+  @confirmation_event_fields [
+    :id,
+    :title,
+    :start_date,
+    :start_time,
+    :location_name,
+    :address,
+    :image_id
+  ]
+  @confirmation_cover_image_fields [
+    :id,
+    :title,
+    :alt_text,
+    :raw_image_path,
+    :optimized_image_path,
+    :thumbnail_path,
+    :blur_hash,
+    :width,
+    :height
+  ]
+  @confirmation_payment_fields [
+    :id,
+    :external_payment_id,
+    :amount,
+    :status,
+    :payment_method_id,
+    :user_id
+  ]
+  @confirmation_payment_method_fields [
+    :id,
+    :type,
+    :display_brand,
+    :last_four,
+    :bank_name
+  ]
+  @confirmation_registration_fields [
+    :id,
+    :ticket_id,
+    :first_name,
+    :last_name,
+    :email,
+    :answers
+  ]
+
+  defp ticket_order_for_confirmation_query(user_id, order_id) do
+    image_query =
+      from(i in Image, select: struct(i, ^@confirmation_cover_image_fields))
+
+    event_query =
+      from(e in Event,
+        select: struct(e, ^@confirmation_event_fields),
+        preload: [cover_image: ^image_query]
+      )
+
+    payment_method_query =
+      from(pm in PaymentMethod,
+        select: struct(pm, ^@confirmation_payment_method_fields)
+      )
+
+    payment_query =
+      from(p in Payment,
+        select: struct(p, ^@confirmation_payment_fields),
+        preload: [payment_method: ^payment_method_query]
+      )
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@checkout_ticket_tier_fields))
+
+    registration_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@confirmation_registration_fields)
+      )
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@checkout_ticket_fields),
+        preload: [ticket_tier: ^tier_query, registration: ^registration_query]
+      )
+
     from(to in TicketOrder,
       where: to.id == ^order_id and to.user_id == ^user_id,
+      select: struct(to, ^@confirmation_ticket_order_fields),
       preload: [
-        :user,
-        event: :cover_image,
-        payment: :payment_method,
-        tickets: [:ticket_tier, :registration]
+        event: ^event_query,
+        payment: ^payment_query,
+        tickets: ^ticket_query
       ]
     )
-    |> Repo.one()
   end
 
   @doc """
@@ -3292,6 +3453,17 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_ticket_order_by_payment_id_query do
     ticket_order_by_payment_id_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_for_checkout_query do
+    ticket_order_for_checkout_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_for_confirmation_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+    ticket_order_for_confirmation_query(ulid, ulid)
   end
 
   defp stripe_client do
