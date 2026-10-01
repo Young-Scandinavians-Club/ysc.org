@@ -840,18 +840,38 @@ defmodule YscWeb.AdminSettingsLive do
   end
 
   def handle_event("update-settings", %{"settings" => settings}, socket) do
-    for {k, v} <- settings do
-      case Settings.update_setting(k, Map.get(v, "value")) do
-        {:ok, _} -> :ok
-        {:error, :not_found} -> :skip
-        {:error, _} -> :ok
-      end
-    end
+    results =
+      Enum.map(settings, fn {k, v} ->
+        case Settings.update_setting(k, Map.get(v, "value")) do
+          {:ok, _} -> :ok
+          {:error, :not_found} -> :ok
+          {:error, %Ecto.Changeset{} = changeset} -> {:error, k, changeset}
+          {:error, _} -> {:error, k, nil}
+        end
+      end)
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Settings updated.", title: "Settings")
-     |> redirect(to: ~p"/admin/settings")}
+    case Enum.find(results, &match?({:error, _, _}, &1)) do
+      {:error, name, changeset} ->
+        message =
+          case changeset do
+            %Ecto.Changeset{errors: [{_field, {msg, _}} | _]} ->
+              "#{name}: #{msg}"
+
+            _ ->
+              "Could not update #{name}."
+          end
+
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, message, title: "Settings")}
+
+      nil ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "Settings updated.",
+           title: "Settings"
+         )
+         |> redirect(to: ~p"/admin/settings")}
+    end
   end
 
   def handle_event("reschedule_job", %{"job_id" => job_id}, socket) do
