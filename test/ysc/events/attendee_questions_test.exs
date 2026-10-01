@@ -346,5 +346,50 @@ defmodule Ysc.Events.AttendeeQuestionsTest do
       [exported] = Events.list_tickets_for_export(ticket.event_id)
       assert exported.ticket_detail.answers == answers
     end
+
+    test "create_ticket_details/1 upserts on ticket_id instead of inserting duplicates",
+         %{ticket: ticket} do
+      first_answers = %{
+        "q" => %{
+          "label" => "Dietary restrictions",
+          "position" => 0,
+          "value" => "Vegan"
+        }
+      }
+
+      updated_answers = %{
+        "q" => %{
+          "label" => "Dietary restrictions",
+          "position" => 0,
+          "value" => "Peanut allergy"
+        }
+      }
+
+      assert {:ok, [first]} =
+               Events.create_ticket_details([
+                 %{
+                   ticket_id: ticket.id,
+                   answers: first_answers,
+                   identity: false
+                 }
+               ])
+
+      assert {:ok, [updated]} =
+               Events.create_ticket_details([
+                 %{
+                   ticket_id: ticket.id,
+                   answers: updated_answers,
+                   identity: false
+                 }
+               ])
+
+      assert updated.id == first.id
+      assert updated.answers["q"]["value"] == "Peanut allergy"
+
+      assert Repo.aggregate(
+               from(td in TicketDetail, where: td.ticket_id == ^ticket.id),
+               :count
+             ) == 1
+    end
   end
 end

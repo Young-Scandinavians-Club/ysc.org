@@ -5158,8 +5158,13 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("payment-redirect-started", _params, socket) do
-    # Track that a payment redirect is in progress (e.g., Amazon Pay, CashApp)
-    # This prevents the order from being cancelled when the LiveView connection is lost
+    # Persist attendee info before Stripe.confirmPayment. Redirect wallets
+    # (Amazon Pay, Cash App, 3DS) never fire `payment-success` on this LiveView;
+    # `/payment/success` and the succeeded webhook fulfill the order without the
+    # checkout form assigns. The Stripe Elements hook waits for this event's
+    # ack so the rows exist before the charge.
+    persist_attendee_details_before_charge(socket)
+
     {:noreply, assign(socket, :payment_redirect_in_progress, true)}
   end
 
@@ -6642,6 +6647,28 @@ defmodule YscWeb.EventDetailsLive do
       email: (person && person.email) || "",
       answers: answers
     })
+  end
+
+  # Save attendee info while checkout assigns still exist. Redirect payments
+  # leave this LiveView, so waiting until `payment-success` drops the answers.
+  defp persist_attendee_details_before_charge(socket) do
+    tickets = socket.assigns[:tickets_requiring_registration] || []
+
+    if tickets != [] do
+      case build_ticket_details_list(tickets, attendee_state(socket)) do
+        {:ok, ticket_details_list} ->
+          case Events.create_ticket_details(ticket_details_list) do
+            {:ok, _ticket_details} ->
+              :ok
+
+            {:error, reason} ->
+              log_attendee_info_lost_after_payment(socket, nil, reason)
+          end
+
+        {:error, _failing} ->
+          :ok
+      end
+    end
   end
 
   # What to persist for every ticket that asks for attendee info, or the
