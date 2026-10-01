@@ -314,6 +314,39 @@ defmodule YscWeb.TrixUploadsControllerTest do
       assert {:ok, mime} = FileValidator.validate_attachment(path, "data.bin")
       assert mime == "application/octet-stream"
     end
+
+    test "blocks HTML prefixed with a UTF-8 BOM even when renamed as PDF" do
+      path =
+        write_tmp(
+          <<0xEF, 0xBB, 0xBF, "<html><body>phish</body></html>">>,
+          "invoice.pdf"
+        )
+
+      assert {:error, _reason} =
+               FileValidator.validate_attachment(path, "invoice.pdf")
+    end
+
+    test "blocks XML-wrapped SVG masquerading as a PDF" do
+      path =
+        write_tmp(
+          ~s|<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"></svg>|,
+          "logo.pdf"
+        )
+
+      assert {:error, _reason} =
+               FileValidator.validate_attachment(path, "logo.pdf")
+    end
+
+    test "returns an error when the temp file cannot be opened" do
+      missing =
+        Path.join(
+          System.tmp_dir!(),
+          "ysc-missing-#{System.unique_integer([:positive])}.bin"
+        )
+
+      assert {:error, _reason} =
+               FileValidator.validate_attachment(missing, "notes.txt")
+    end
   end
 
   describe "create/2 — non-image attachments" do

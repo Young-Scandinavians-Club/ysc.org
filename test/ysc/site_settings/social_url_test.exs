@@ -67,6 +67,15 @@ defmodule Ysc.SiteSettings.SocialUrlTest do
                  "https://user:pass@www.facebook.com/ysc"
                )
     end
+
+    test "rejects non-binary values and unknown setting names" do
+      refute SocialUrl.social_setting?(nil)
+      refute SocialUrl.social_setting?(:facebook)
+      assert {:error, _} = SocialUrl.validate("facebook", nil)
+
+      assert {:error, _} =
+               SocialUrl.validate("facebook", ["https://facebook.com"])
+    end
   end
 
   describe "site_setting_changeset/2" do
@@ -97,6 +106,20 @@ defmodule Ysc.SiteSettings.SocialUrlTest do
         })
 
       assert changeset.valid?
+    end
+
+    test "trims surrounding whitespace before persisting a valid URL" do
+      setting = %SiteSetting{group: "socials", name: "facebook", value: ""}
+
+      changeset =
+        SiteSetting.site_setting_changeset(setting, %{
+          value: "  https://www.facebook.com/YoungScandinaviansClub/  "
+        })
+
+      assert changeset.valid?
+
+      assert Ecto.Changeset.get_field(changeset, :value) ==
+               "https://www.facebook.com/YoungScandinaviansClub/"
     end
   end
 end
