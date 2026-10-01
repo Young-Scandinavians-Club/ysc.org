@@ -15,8 +15,10 @@ defmodule Ysc.PaymentUserMessagesTest do
   test "invoice_retry_failed includes membership guidance" do
     message = PaymentUserMessages.invoice_retry_failed()
 
-    assert message =~ "Membership settings"
+    assert message =~ "open Membership"
+    assert message =~ "Click your name in the top-right corner"
     assert message =~ "memberships@ysc.org"
+    refute message =~ "Membership settings"
     refute message =~ "Failed to retry payment"
   end
 
@@ -54,6 +56,9 @@ defmodule Ysc.PaymentUserMessagesTest do
              "declined"
 
     assert PaymentUserMessages.invoice_retry_error("No such customer") =~
+             "open Membership"
+
+    refute PaymentUserMessages.invoice_retry_error("No such customer") =~
              "Membership settings"
   end
 
