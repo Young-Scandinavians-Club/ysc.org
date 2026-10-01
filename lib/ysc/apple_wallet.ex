@@ -383,8 +383,6 @@ defmodule Ysc.AppleWallet do
 
   defp download_image_to_tmp(nil), do: :error
 
-  # tmp_path is constructed from System.tmp_dir!() + random hex, not user input
-  @sobelow_skip ["Traversal.FileModule"]
   defp download_image_to_tmp(url) when is_binary(url) do
     # Cover-image URLs are normally our S3/CDN objects, but the column is a
     # free-form string. Fail closed on SSRF (UrlFetchGuard) and never follow
@@ -407,6 +405,8 @@ defmodule Ysc.AppleWallet do
 
   defp download_image_to_tmp(_), do: :error
 
+  # tmp_path is constructed from System.tmp_dir!() + random hex, not user input
+  @sobelow_skip ["Traversal.FileModule"]
   defp do_download_image_to_tmp(url) do
     task =
       Task.async(fn ->
