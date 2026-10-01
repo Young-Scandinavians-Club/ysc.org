@@ -2938,20 +2938,24 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Create multiple ticket details for a list of tickets.
+  Create or update ticket details for a list of tickets.
+
+  Upserts on `ticket_id` so saving attendee info before a redirect payment
+  and again on `payment-success` does not insert duplicate rows.
+
   Returns {:ok, list} on success, {:error, reason} on failure.
   """
   def create_ticket_details(ticket_details_list)
       when is_list(ticket_details_list) do
     Repo.transaction(fn ->
       ticket_details_list
-      |> Enum.map(&insert_ticket_detail/1)
+      |> Enum.map(&upsert_ticket_detail/1)
     end)
   end
 
   # `identity: false` marks tickets whose tier asks questions but not who is
   # attending, so name and email aren't required. See `AttendeeInfo.build_detail/2`.
-  defp insert_ticket_detail(attrs) do
+  defp upsert_ticket_detail(attrs) do
     {identity?, attrs} = Map.pop(attrs, :identity, true)
     {email?, attrs} = Map.pop(attrs, :require_email, true)
 
@@ -2960,7 +2964,13 @@ defmodule Ysc.Events do
            identity: identity?,
            require_email: email?
          )
-         |> Repo.insert() do
+         |> Repo.insert(
+           on_conflict:
+             {:replace,
+              [:first_name, :last_name, :email, :answers, :updated_at]},
+           conflict_target: :ticket_id,
+           returning: true
+         ) do
       {:ok, ticket_detail} -> ticket_detail
       {:error, changeset} -> Repo.rollback(changeset)
     end

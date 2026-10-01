@@ -1914,6 +1914,63 @@ defmodule YscWeb.EventDetailsLiveTest do
                ~s(#payment-information-step[data-attendee-info-complete="true"])
              )
     end
+
+    test "persists answers when a redirect payment starts", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_state(:upcoming, with_image: true)
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Paid dinner",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 50,
+          attendee_questions: [
+            %{
+              "label" => "Dietary restrictions",
+              "type" => "text",
+              "required" => "true"
+            }
+          ]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      ticket =
+        Repo.one!(
+          from(t in Ysc.Events.Ticket,
+            where: t.user_id == ^user.id and t.event_id == ^event.id
+          )
+        )
+
+      [question] = tier.attendee_questions
+
+      render_change(view, "update-attendee-answer", %{
+        "ticket_#{ticket.id}_answer_#{question.id}" => "Peanut allergy"
+      })
+
+      refute Repo.get_by(Ysc.Events.TicketDetail, ticket_id: ticket.id)
+
+      render_click(view, "payment-redirect-started")
+
+      detail = Repo.get_by!(Ysc.Events.TicketDetail, ticket_id: ticket.id)
+      assert detail.answers[question.id]["value"] == "Peanut allergy"
+      assert detail.answers[question.id]["label"] == "Dietary restrictions"
+
+      render_click(view, "payment-redirect-started")
+
+      assert Repo.aggregate(
+               from(td in Ysc.Events.TicketDetail,
+                 where: td.ticket_id == ^ticket.id
+               ),
+               :count
+             ) == 1
+    end
   end
 
   describe "payment success with incomplete attendee info" do

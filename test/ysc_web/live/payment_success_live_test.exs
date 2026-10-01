@@ -221,6 +221,55 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         Application.put_env(:ysc, :stripe_client, original_client)
       end
     end
+
+    test "keeps attendee details saved before the redirect payment", %{
+      conn: conn,
+      user: user,
+      order: order
+    } do
+      ticket = hd(Repo.preload(order, :tickets).tickets)
+
+      {:ok, [saved]} =
+        Ysc.Events.create_ticket_details([
+          %{
+            ticket_id: ticket.id,
+            answers: %{
+              "q1" => %{
+                "label" => "Dietary restrictions",
+                "type" => "text",
+                "position" => 0,
+                "value" => "Peanut allergy"
+              }
+            },
+            identity: false
+          }
+        ])
+
+      payment_intent_id = "pi_ticket_attendee_#{order.id}"
+
+      client_module =
+        stripe_client_module(
+          %{"ticket_order_id" => order.id, "user_id" => user.id},
+          amount_cents: 5000
+        )
+
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        assert {:error, {:redirect, _}} =
+                 live(
+                   conn,
+                   ~p"/payment/success?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
+                 )
+
+        kept = Ysc.Events.get_ticket_detail_for_ticket(ticket.id)
+        assert kept.id == saved.id
+        assert kept.answers["q1"]["value"] == "Peanut allergy"
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+      end
+    end
   end
 
   describe "mount/3 - security and authorization" do
