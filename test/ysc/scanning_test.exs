@@ -1417,6 +1417,39 @@ defmodule Ysc.ScanningTest do
       assert found.id == order.id
     end
 
+    test "preloads only ticket ids so the scanner can sign a QR token", %{
+      event: event,
+      order: order
+    } do
+      order = Repo.preload(order, :tickets)
+
+      assert {:ok, found} =
+               Scanning.manual_ticket_lookup(order.reference_id, event.id)
+
+      [ticket] = found.tickets
+      expected_ids = Enum.map(order.tickets, & &1.id)
+
+      assert ticket.id in expected_ids
+      assert is_nil(ticket.user_id)
+      assert is_nil(ticket.status)
+      assert is_nil(ticket.event_id)
+    end
+
+    test "returns an empty ticket list when the order has no tickets", %{
+      event: event,
+      order: order
+    } do
+      Repo.delete_all(
+        from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+      )
+
+      assert {:ok, found} =
+               Scanning.manual_ticket_lookup(order.reference_id, event.id)
+
+      assert found.id == order.id
+      assert found.tickets == []
+    end
+
     test "returns error for wrong event" do
       Ysc.Ledgers.ensure_basic_accounts()
       another_event = event_fixture()

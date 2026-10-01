@@ -1,6 +1,8 @@
 defmodule YscWeb.MembershipQrTest do
   use Ysc.DataCase, async: true
 
+  import Ysc.AccountsFixtures
+
   alias Ysc.Scanning.QrToken
   alias YscWeb.MembershipQr
 
@@ -44,6 +46,26 @@ defmodule YscWeb.MembershipQrTest do
       assert updated.assigns.membership_qr_details.member_since ==
                ~D[2019-06-15]
 
+      assert updated.assigns.google_wallet_membership_url == nil
+    end
+
+    test "leaves the google wallet url unset when credentials are missing" do
+      user = user_fixture()
+      membership = %{type: :lifetime, awarded_at: ~D[2019-06-15]}
+
+      updated =
+        MembershipQr.show(
+          socket(%{
+            current_user: user,
+            current_membership: membership,
+            is_sub_account: false,
+            primary_user: nil,
+            google_wallet_membership_enabled?: true
+          }),
+          user
+        )
+
+      assert updated.assigns.show_membership_qr
       assert updated.assigns.google_wallet_membership_url == nil
     end
   end

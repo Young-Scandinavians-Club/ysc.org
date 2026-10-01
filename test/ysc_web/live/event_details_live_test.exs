@@ -1861,6 +1861,122 @@ defmodule YscWeb.EventDetailsLiveTest do
     end
   end
 
+  describe "yes/no and select attendee questions at checkout" do
+    setup %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      event = event_with_state(:upcoming, with_image: true)
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Dinner",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          requires_registration: false,
+          attendee_questions: [
+            %{
+              "label" => "Vegetarian?",
+              "type" => "yes_no",
+              "required" => "true"
+            },
+            %{
+              "label" => "Shirt size",
+              "type" => "select",
+              "required" => "true",
+              "options_text" => "Small\nMedium\nLarge"
+            }
+          ]
+        })
+
+      %{
+        conn: log_in_user(conn, user),
+        user: user,
+        event: event,
+        tier: tier
+      }
+    end
+
+    test "renders yes/no radios and a select, then saves chosen answers",
+         ctx do
+      {:ok, view, _html} = live(ctx.conn, ~p"/events/#{ctx.event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => ctx.tier.id})
+
+      render_click(view, "proceed-to-checkout")
+
+      ticket =
+        Repo.one!(
+          from(t in Ysc.Events.Ticket,
+            where: t.user_id == ^ctx.user.id and t.event_id == ^ctx.event.id
+          )
+        )
+
+      [yes_no_q, select_q] = ctx.tier.attendee_questions
+
+      assert has_element?(
+               view,
+               "#ticket_#{ticket.id}_answer_#{yes_no_q.id}_yes"
+             )
+
+      assert has_element?(view, "#ticket_#{ticket.id}_answer_#{yes_no_q.id}_no")
+      assert has_element?(view, "#ticket_#{ticket.id}_answer_#{select_q.id}")
+
+      render_click(view, "confirm-free-tickets")
+      assert Repo.get_by(Ysc.Events.TicketDetail, ticket_id: ticket.id) == nil
+
+      render_change(view, "update-attendee-answer", %{
+        "ticket_#{ticket.id}_answer_#{yes_no_q.id}" => "yes",
+        "ticket_#{ticket.id}_answer_#{select_q.id}" => "Medium"
+      })
+
+      render_click(view, "confirm-free-tickets")
+
+      detail = Repo.get_by!(Ysc.Events.TicketDetail, ticket_id: ticket.id)
+      assert detail.answers[yes_no_q.id]["value"] == true
+      assert detail.answers[select_q.id]["value"] == "Medium"
+    end
+
+    test "rejects answers that are not yes/no or a listed option", ctx do
+      {:ok, view, _html} = live(ctx.conn, ~p"/events/#{ctx.event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => ctx.tier.id})
+
+      render_click(view, "proceed-to-checkout")
+
+      ticket =
+        Repo.one!(
+          from(t in Ysc.Events.Ticket,
+            where: t.user_id == ^ctx.user.id and t.event_id == ^ctx.event.id
+          )
+        )
+
+      [yes_no_q, select_q] = ctx.tier.attendee_questions
+
+      render_change(view, "update-attendee-answer", %{
+        "ticket_#{ticket.id}_answer_#{yes_no_q.id}" => "maybe",
+        "ticket_#{ticket.id}_answer_#{select_q.id}" => "XXL"
+      })
+
+      assert has_element?(
+               view,
+               "#ticket_#{ticket.id}_answer_#{yes_no_q.id}_wrapper",
+               "choose yes or no"
+             )
+
+      assert has_element?(
+               view,
+               "#ticket_#{ticket.id}_answer_#{select_q.id}_wrapper",
+               "choose one of the options"
+             )
+
+      render_click(view, "confirm-free-tickets")
+      assert Repo.get_by(Ysc.Events.TicketDetail, ticket_id: ticket.id) == nil
+    end
+  end
+
   describe "attendee questions in paid checkout" do
     test "payment stays locked until required answers are given", %{conn: conn} do
       user = user_with_membership(:lifetime)

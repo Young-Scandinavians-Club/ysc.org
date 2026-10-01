@@ -1,6 +1,7 @@
 defmodule YscWeb.AdminScannerLiveTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
@@ -640,6 +641,62 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       html = render(view)
       assert html =~ "not found" or html =~ "Error" or html =~ "error"
+    end
+  end
+
+  describe "manual_lookup — event mode" do
+    setup [:create_admin]
+
+    test "checks in a confirmed ticket from the order reference", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+
+      order =
+        ticket_order_fixture(%{user: member, event: event}) |> confirm_tickets()
+
+      ticket = hd(order.tickets)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      start_event_session(view, event)
+
+      view
+      |> form("#manual-entry-form", %{manual: %{query: order.reference_id}})
+      |> render_submit()
+
+      assert has_element?(view, "#scanner-result-checked-in", "Checked In")
+
+      assert Ysc.Repo.get!(Ysc.Events.Ticket, ticket.id).checked_in
+    end
+
+    test "shows an error when the order has no tickets", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      event = event_fixture(%{organizer_id: admin.id})
+      member = make_active_member()
+      order = ticket_order_fixture(%{user: member, event: event})
+
+      Ysc.Repo.delete_all(
+        from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      start_event_session(view, event)
+
+      view
+      |> form("#manual-entry-form", %{manual: %{query: order.reference_id}})
+      |> render_submit()
+
+      assert has_element?(
+               view,
+               "#scanner-result-error",
+               "No tickets found in this order."
+             )
     end
   end
 
