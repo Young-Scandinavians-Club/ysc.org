@@ -147,6 +147,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Update your card or bank account"
       assert text =~ "Expired or invalid card"
       assert text =~ "Using a different card or bank account"
+
+      assert text =~
+               "Click Update your card or bank account above to add a new one first"
+
       assert text =~ "payment ID: in_123"
       assert text =~ "jane@example.com"
       refute text =~ "successfully processed"
@@ -155,6 +159,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "Retry Payment Now"
       refute text =~ "Update Payment Method"
       refute text =~ "payment method"
+      refute text =~ "Membership settings"
     end
 
     test "renewal-failure email says after you pay, not once payment is processed" do
@@ -176,10 +181,15 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       assert text =~ "After you update your card or bank account and pay"
       assert text =~ "Update your card or bank account"
+
+      assert text =~
+               "Click Update your card or bank account above to add a new one first"
+
       refute text =~ "successfully processed"
       refute text =~ "couldn't process your"
       refute text =~ "Update Payment Method"
       refute text =~ "payment method"
+      refute text =~ "Membership settings"
     end
 
     test "renewal-success email says we received payment instead of processed" do
