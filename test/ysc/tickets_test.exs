@@ -762,6 +762,75 @@ defmodule Ysc.TicketsTest do
                order.id
              ) == nil
     end
+
+    test "omits purchaser secrets, grant notes, and unused tier columns", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, tier1} =
+        Events.update_ticket_tier(tier1, %{
+          description: "toast copy checkout must not load",
+          attendee_questions: [
+            %{"label" => "Dietary restrictions", "type" => "text"}
+          ]
+        })
+
+      user
+      |> Ecto.Changeset.change(%{board_bio: "board bio checkout must not load"})
+      |> Repo.update!()
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      order
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes: "grant notes checkout must not load",
+        cancellation_reason: "cancel copy checkout must not load"
+      })
+      |> Repo.update!()
+
+      {_found, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_checkout(order.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_found, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_checkout(order.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_found, notes_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_checkout(order.id) end,
+          pattern: ~r/admin_grant_notes|cancellation_reason/i,
+          caller_pids: [self()]
+        )
+
+      found = Tickets.get_user_ticket_order_for_checkout(user.id, order.id)
+      ticket = hd(found.tickets)
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert notes_cols == 0
+      assert found.user.email == user.email
+      assert found.user.hashed_password == nil
+      assert found.user.board_bio == nil
+      assert found.admin_grant_notes == nil
+      assert found.cancellation_reason == nil
+      assert found.payment_intent_id == order.payment_intent_id
+      assert ticket.ticket_tier.name == tier1.name
+      assert ticket.ticket_tier.price == tier1.price
+      assert ticket.ticket_tier.description == nil
+
+      assert Enum.map(ticket.ticket_tier.attendee_questions, & &1.label) == [
+               "Dietary restrictions"
+             ]
+    end
   end
 
   describe "sync_pending_order_pricing/1" do
@@ -1641,12 +1710,16 @@ defmodule Ysc.TicketsTest do
       found = Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
 
       assert found.id == order.id
-      assert Ecto.assoc_loaded?(found.user)
+      refute Ecto.assoc_loaded?(found.user)
       assert Ecto.assoc_loaded?(found.event)
       assert Ecto.assoc_loaded?(found.event.cover_image)
       assert Ecto.assoc_loaded?(found.payment)
       assert Ecto.assoc_loaded?(found.tickets)
-      assert Enum.all?(found.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+
+      assert Enum.all?(found.tickets, fn ticket ->
+               Ecto.assoc_loaded?(ticket.ticket_tier) and
+                 Ecto.assoc_loaded?(ticket.registration)
+             end)
     end
 
     test "returns nil for another user", %{
@@ -1680,6 +1753,89 @@ defmodule Ysc.TicketsTest do
         Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
 
       refute Ecto.assoc_loaded?(confirmation.event.agendas)
+    end
+
+    test "omits event HTML, purchaser secrets, and unused payment/image columns",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, _tier1} =
+        Events.update_ticket_tier(tier1, %{
+          description: "toast copy confirmation must not load",
+          attendee_questions: [
+            %{"label" => "Dietary restrictions", "type" => "text"}
+          ]
+        })
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>event body html</p>",
+        rendered_details: "<p>event body html</p>"
+      })
+      |> Repo.update!()
+
+      user
+      |> Ecto.Changeset.change(%{
+        board_bio: "board bio confirmation must not load"
+      })
+      |> Repo.update!()
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      {:ok, _} =
+        Events.create_ticket_details([
+          %{
+            ticket_id: ticket.id,
+            first_name: "Ada",
+            last_name: "Lovelace",
+            email: "ada@example.com",
+            answers: %{
+              "abc" => %{
+                "label" => "Dietary restrictions",
+                "type" => "text",
+                "position" => 0,
+                "value" => "Vegan"
+              }
+            }
+          }
+        ])
+
+      order
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes: "grant notes confirmation must not load",
+        cancellation_reason: "cancel copy confirmation must not load"
+      })
+      |> Repo.update!()
+
+      {_found, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
+          end,
+          pattern:
+            ~r/hashed_password|board_bio|raw_details|rendered_details|upload_data|quickbooks_response|admin_grant_notes|cancellation_reason/i,
+          caller_pids: [self()]
+        )
+
+      found = Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
+      loaded_ticket = hd(found.tickets)
+
+      assert fat_cols == 0
+      refute Ecto.assoc_loaded?(found.user)
+      assert found.event.title == event.title
+      assert found.event.raw_details == nil
+      assert found.event.rendered_details == nil
+      assert found.admin_grant_notes == nil
+      assert loaded_ticket.ticket_tier.description == nil
+      assert loaded_ticket.registration.first_name == "Ada"
+      assert loaded_ticket.registration.email == "ada@example.com"
+
+      assert loaded_ticket.registration.answers["abc"]["value"] == "Vegan"
     end
   end
 
@@ -3492,6 +3648,16 @@ defmodule Ysc.TicketsTest do
     test "ci_query_explain_list_user_event_tickets_for_page_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Tickets.ci_query_explain_list_user_event_tickets_for_page_query()
+    end
+
+    test "ci_query_explain_ticket_order_for_checkout_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_ticket_order_for_checkout_query()
+    end
+
+    test "ci_query_explain_ticket_order_for_confirmation_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_ticket_order_for_confirmation_query()
     end
   end
 end
