@@ -71,6 +71,8 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       assert html =~ "Newsletter"
       assert has_element?(view, "#newsletter-editor-form")
       assert has_element?(view, "#newsletter-editor-autosave-status")
+      assert has_element?(view, "#newsletter-posts-picker")
+      assert has_element?(view, "#newsletter-events-picker")
     end
 
     test "shows title and subject fields", %{conn: conn} do
