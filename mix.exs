@@ -242,7 +242,14 @@ defmodule Ysc.MixProject do
       {:ex_phone_number, "~> 0.4"},
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
-      {:finch, "~> 0.21"},
+      # 0.24.0: close HTTP/1 connections after request/response errors
+      # before returning them to the pool (stale Mint 1.11 refs after
+      # receive timeouts). Also HTTP QUERY method, pool_timeout wait for
+      # dynamic HTTP/2 pools, async TLS shutdown. We use Finch.build/4 +
+      # Finch.request/2 (QuickBooks, Discord, Flowroute, outage scraper).
+      # We do not use :query, start_pool/3, or SSLKEYLOGFILE. No documented
+      # 0.23→0.24 breaking changes.
+      {:finch, "~> 0.24.0"},
       # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
       # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
       # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
