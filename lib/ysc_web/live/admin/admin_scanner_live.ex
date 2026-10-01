@@ -1166,7 +1166,10 @@ defmodule YscWeb.AdminScannerLive do
 
   defp render_scan_result(%{scan_result: %{status: :checked_in}} = assigns) do
     ~H"""
-    <div class="scanner-result-sheet bg-emerald-600 rounded-t-3xl px-6 pt-5 pb-10 text-white">
+    <div
+      id="scanner-result-checked-in"
+      class="scanner-result-sheet bg-emerald-600 rounded-t-3xl px-6 pt-5 pb-10 text-white"
+    >
       <div class="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5"></div>
       <div class="flex items-center gap-4 mb-5">
         <div class="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
@@ -1263,7 +1266,10 @@ defmodule YscWeb.AdminScannerLive do
 
   defp render_scan_result(%{scan_result: %{status: :error}} = assigns) do
     ~H"""
-    <div class="scanner-result-sheet bg-zinc-800 rounded-t-3xl px-6 pt-5 pb-10 text-white">
+    <div
+      id="scanner-result-error"
+      class="scanner-result-sheet bg-zinc-800 rounded-t-3xl px-6 pt-5 pb-10 text-white"
+    >
       <div class="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5"></div>
       <div class="flex items-center gap-4 mb-4">
         <div class="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center shrink-0">

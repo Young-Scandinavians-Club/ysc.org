@@ -1011,5 +1011,55 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert html =~ "must be at most 17"
       assert Repo.get_by(TicketDetail, ticket_id: ctx.ticket.id) == nil
     end
+
+    test "admins can record yes/no and select answers", ctx do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          price: Money.new(0, :USD),
+          attendee_questions: [
+            %{
+              "label" => "Vegetarian?",
+              "type" => "yes_no",
+              "required" => "true"
+            },
+            %{
+              "label" => "Shirt size",
+              "type" => "select",
+              "required" => "true",
+              "options_text" => "Small\nMedium\nLarge"
+            }
+          ]
+        })
+
+      %{tickets: [ticket]} =
+        completed_ticket_order_with_payment!(event: event, tier: tier)
+
+      [yes_no_q, select_q] = tier.attendee_questions
+
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view |> element("#ticket-actions-#{ticket.id}-edit") |> render_click()
+
+      assert has_element?(view, "#answer-#{yes_no_q.id}")
+      assert has_element?(view, "#answer-#{select_q.id}")
+
+      view
+      |> form("#ticket-detail-form", %{
+        "answers" => %{yes_no_q.id => "no", select_q.id => "Large"}
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#edit-ticket-detail-modal")
+
+      detail = Repo.get_by!(TicketDetail, ticket_id: ticket.id)
+      assert detail.answers[yes_no_q.id]["value"] == false
+      assert detail.answers[select_q.id]["value"] == "Large"
+
+      assert has_element?(view, "#ticket-answers-#{ticket.id}", "No")
+      assert has_element?(view, "#ticket-answers-#{ticket.id}", "Large")
+    end
   end
 end
