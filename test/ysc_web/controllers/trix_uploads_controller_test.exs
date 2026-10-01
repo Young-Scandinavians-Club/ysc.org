@@ -168,6 +168,53 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
       assert json_response(conn, 422)["error"] =~ "not allowed"
     end
+
+    test "returns 422 for an HTML attachment (Finding 79)", %{conn: conn} do
+      path =
+        write_tmp(
+          "<html><body><script>alert(document.domain)</script></body></html>",
+          "ysc-login.html"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "ysc-login.html")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
+    test "returns 422 for an SVG attachment (Finding 79)", %{conn: conn} do
+      path =
+        write_tmp(
+          ~s|<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>|,
+          "logo.svg"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "logo.svg")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
+    test "returns 422 for HTML content renamed as a PDF (Finding 79)", %{
+      conn: conn
+    } do
+      path =
+        write_tmp(
+          "<!DOCTYPE html><html><script>alert(1)</script></html>",
+          "invoice.pdf"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "invoice.pdf")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
   end
 
   describe "FileValidator — image?/1" do
