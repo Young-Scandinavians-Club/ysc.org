@@ -221,7 +221,12 @@ defmodule Ysc.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
       # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
-      {:dns_cluster, "~> 0.3"},
+      # 0.3.1: look up the hostname of a `{basename, query}` tuple instead
+      # of passing the tuple to Resolver.lookup/2 (FunctionClauseError on
+      # the real resolver). We pass a string query (`DNS_CLUSTER_QUERY`)
+      # or `:ignore`, not a tuple, so the fix is unused. Public APIs
+      # unchanged.
+      {:dns_cluster, "~> 0.3.1"},
       {:ecto_enum, "~> 1.4"},
       {:ecto_psql_extras, "~> 0.8"},
       {:ecto_sql, "~> 3.13"},
