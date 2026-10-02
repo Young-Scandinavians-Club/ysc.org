@@ -5130,13 +5130,12 @@ defmodule YscWeb.SecurityAuditTest do
     test "SMS bodies with HTML payloads render as escaped text, not srcdoc", %{
       conn: conn
     } do
-      xss_name = ~s(<img src=x onerror=alert(document.domain)>)
+      xss_name = "<img src=x onerror=alert(document.domain)>"
 
       member =
         user_fixture(%{
           first_name: xss_name,
-          state: :active,
-          phone_number: "+15555550182"
+          state: :active
         })
 
       sms_body =
@@ -5145,8 +5144,9 @@ defmodule YscWeb.SecurityAuditTest do
       {:ok, sms} =
         Ysc.Messages.create_message_idempotency(%{
           user_id: member.id,
-          phone_number: member.phone_number,
-          idempotency_key: "finding82_sms_#{System.unique_integer([:positive])}",
+          phone_number: member.phone_number || "+15555550182",
+          idempotency_key:
+            "finding82_sms_#{System.unique_integer([:positive])}",
           message_template: "phone_verification",
           message_type: :sms,
           rendered_message: sms_body
@@ -5165,8 +5165,8 @@ defmodule YscWeb.SecurityAuditTest do
       html = render(view)
       # Escaped in the text node — payload must not appear as raw HTML markup.
       assert html =~ "onerror=alert(document.domain)"
-      refute html =~ ~s(<img src=x onerror=alert(document.domain)>)
-      refute html =~ ~s(srcdoc=)
+      refute html =~ "<img src=x onerror=alert(document.domain)>"
+      refute html =~ "srcdoc="
     end
 
     test "email bodies use a sandboxed iframe without allow-scripts", %{
