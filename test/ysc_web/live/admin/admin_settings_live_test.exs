@@ -99,6 +99,50 @@ defmodule YscWeb.AdminSettingsLiveTest do
 
       assert_redirected(view, ~p"/admin/settings")
     end
+
+    test "rejects a javascript facebook URL and leaves the stored footer href unchanged",
+         %{conn: conn} do
+      original = Ysc.Settings.get_social_url("facebook")
+      assert original
+      refute original =~ "javascript:"
+
+      {:ok, view, _html} = live(conn, ~p"/admin/settings")
+      render_loaded_settings(view)
+
+      html =
+        view
+        |> form("#admin-settings-form", %{
+          settings: %{"facebook" => %{"value" => "javascript:alert(1)"}}
+        })
+        |> render_submit()
+
+      assert html =~ "facebook: must be an HTTPS URL on an allowed host"
+      assert html =~ original
+      refute html =~ "javascript:alert(1)"
+
+      assert Ysc.Settings.get_social_url("facebook") == original
+    end
+
+    test "rejects a lookalike facebook host and does not redirect", %{
+      conn: conn
+    } do
+      original = Ysc.Settings.get_social_url("facebook")
+
+      {:ok, view, _html} = live(conn, ~p"/admin/settings")
+      render_loaded_settings(view)
+
+      html =
+        view
+        |> form("#admin-settings-form", %{
+          settings: %{
+            "facebook" => %{"value" => "https://evil-facebook.com/ysc"}
+          }
+        })
+        |> render_submit()
+
+      assert html =~ "facebook: must be an official facebook HTTPS URL"
+      assert Ysc.Settings.get_social_url("facebook") == original
+    end
   end
 
   describe "Reported Outages" do
