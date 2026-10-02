@@ -1031,6 +1031,49 @@ defmodule YscWeb.UserSettingsLiveTest do
   end
 
   describe "settings page — payments tab" do
+    test "intro lists cabin, event, donation, and membership payments", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/payments")
+      render_async(view)
+
+      assert has_element?(
+               view,
+               "#payments-intro",
+               "cabin bookings, events, donations, and membership"
+             )
+
+      refute has_element?(
+               view,
+               "#payments-intro",
+               "cabin booking payment history"
+             )
+
+      assert has_element?(
+               view,
+               "#payments-empty",
+               "Cabin bookings, events, donations, and membership payments"
+             )
+
+      assert has_element?(
+               view,
+               "button[phx-click=\"filter-payments\"][phx-value-filter=\"events\"]"
+             )
+
+      assert has_element?(
+               view,
+               "button[phx-click=\"filter-payments\"][phx-value-filter=\"donations\"]"
+             )
+
+      assert has_element?(
+               view,
+               "button[phx-click=\"filter-payments\"][phx-value-filter=\"membership\"]"
+             )
+    end
+
     test "loads payments view and filters by category", %{conn: conn} do
       user = user_fixture(%{state: :active})
       conn = log_in_user(conn, user)
