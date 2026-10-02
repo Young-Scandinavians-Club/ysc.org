@@ -2310,43 +2310,70 @@ defmodule Ysc.Events do
 
   @doc """
   Get all tickets for an event for CSV export.
-  Includes ticket_tier, user (purchaser), and ticket_detail (attendee registration) preloads.
-  Both purchaser and attendee information are maintained for export.
+
+  Loads purchaser identity, the tier name and attendee questions, and
+  registration answers. Omits password hashes, bios, Stripe ids, and
+  unused ticket/tier columns the spreadsheet never includes.
   """
   def list_tickets_for_export(event_id) do
-    tickets =
-      Ticket
-      |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-      |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
-      |> join(:left, [t], u in assoc(t, :user), as: :user)
-      |> preload([ticket_tier: tt, user: u], ticket_tier: tt, user: u)
-      |> order_by([t], asc: t.inserted_at)
-      |> Repo.all()
-
-    # Load ticket details (attendee registration) for each ticket (only if there are tickets)
-    ticket_details_map =
-      if Enum.empty?(tickets) do
-        %{}
-      else
-        ticket_ids = Enum.map(tickets, & &1.id)
-
-        TicketDetail
-        |> where([td], td.ticket_id in ^ticket_ids)
-        |> Repo.all()
-        |> Enum.group_by(& &1.ticket_id)
-        |> Enum.map(fn {ticket_id, [detail | _]} -> {ticket_id, detail} end)
-        |> Map.new()
-      end
-
-    # Attach ticket details to tickets while maintaining user (purchaser) information
-    Enum.map(tickets, fn ticket ->
-      ticket_detail = Map.get(ticket_details_map, ticket.id)
-      # Ensure both user (purchaser) and ticket_detail (attendee) are available
-      ticket
-      |> Map.put(:ticket_detail, ticket_detail)
-
-      # User is already preloaded, so it's already available
+    event_id
+    |> list_tickets_for_export_query()
+    |> Repo.all()
+    |> Enum.map(fn ticket ->
+      Map.put(ticket, :ticket_detail, ticket.registration)
     end)
+  end
+
+  # CSV columns: purchaser name/email/phone, attendee name/email, tier name,
+  # purchase time, and one column per attendee question.
+  @export_ticket_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :phone_number
+  ]
+  @export_ticket_tier_fields [:id, :name, :attendee_questions]
+  @export_ticket_detail_fields [
+    :id,
+    :ticket_id,
+    :first_name,
+    :last_name,
+    :email,
+    :answers
+  ]
+  @export_ticket_fields [
+    :id,
+    :reference_id,
+    :inserted_at,
+    :user_id,
+    :ticket_tier_id,
+    :status,
+    :event_id
+  ]
+
+  defp list_tickets_for_export_query(event_id) do
+    user_query =
+      from(u in User, select: struct(u, ^@export_ticket_user_fields))
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@export_ticket_tier_fields))
+
+    detail_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@export_ticket_detail_fields)
+      )
+
+    from(t in Ticket,
+      where: t.event_id == ^event_id and t.status == :confirmed,
+      order_by: [asc: t.inserted_at],
+      select: struct(t, ^@export_ticket_fields),
+      preload: [
+        ticket_tier: ^tier_query,
+        user: ^user_query,
+        registration: ^detail_query
+      ]
+    )
   end
 
   @doc """
@@ -4173,5 +4200,10 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_attendee_users_query do
     attendee_users_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_list_tickets_for_export_query do
+    list_tickets_for_export_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
