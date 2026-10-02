@@ -1540,10 +1540,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:location_presets, EventLocationConfig.presets())
     |> assign_check_in_path(event)
     |> assign(:loading_event?, false)
-    |> assign(
-      :editors,
-      EditingPresence.editors(:event, id, socket.assigns.current_user.id)
-    )
+    |> EditingPresence.assign_editors(:event, id)
   end
 
   defp assign_new_event_loading_shell(socket) do
@@ -3228,14 +3225,13 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
-    editors =
-      EditingPresence.editors(
-        :event,
-        socket.assigns.event.id,
-        socket.assigns.current_user.id
-      )
+    event_id =
+      case socket.assigns[:event] do
+        %{id: id} -> id
+        _ -> nil
+      end
 
-    {:noreply, assign(socket, :editors, editors)}
+    {:noreply, EditingPresence.assign_editors(socket, :event, event_id)}
   end
 
   defp send_ticket_tier_management_reservation_update(socket, tier_id, opts) do
