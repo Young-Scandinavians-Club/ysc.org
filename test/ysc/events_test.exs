@@ -2677,6 +2677,89 @@ defmodule Ysc.EventsTest do
       assert is_list(tickets)
       assert length(tickets) >= 3
     end
+
+    test "slims purchaser, tier, and registration columns", %{user: user} do
+      user
+      |> Ecto.Changeset.change(%{
+        board_bio: "bio the CSV export must not load"
+      })
+      |> Repo.update!()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Export slim #{System.unique_integer()}",
+          description: "Description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 100,
+          event_id: event.id,
+          description: "tier copy the CSV export must not load"
+        })
+
+      ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      {:ok, detail} =
+        Events.create_ticket_detail(%{
+          ticket_id: ticket.id,
+          first_name: "Ada",
+          last_name: "Lovelace",
+          email: "ada@example.com"
+        })
+
+      {_loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_tickets_for_export(event.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_tickets_for_export(event.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, description_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_tickets_for_export(event.id) end,
+          pattern: ~r/ticket_tiers.*description|t0\.\"description\"/i,
+          caller_pids: [self()]
+        )
+
+      assert [loaded] = Events.list_tickets_for_export(event.id)
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert description_cols == 0
+      assert loaded.id == ticket.id
+      assert loaded.reference_id == ticket.reference_id
+      assert loaded.user.id == user.id
+      assert loaded.user.email == user.email
+      assert loaded.user.first_name == user.first_name
+      assert loaded.user.phone_number == user.phone_number
+      assert loaded.user.hashed_password == nil
+      assert loaded.user.board_bio == nil
+      assert loaded.ticket_tier.id == tier.id
+      assert loaded.ticket_tier.name == "GA"
+      assert loaded.ticket_tier.description == nil
+      assert loaded.ticket_detail.id == detail.id
+      assert loaded.ticket_detail.first_name == "Ada"
+      assert loaded.ticket_detail.inserted_at == nil
+    end
   end
 
   describe "get_ticket_purchase_summary/1" do
@@ -5122,7 +5205,7 @@ defmodule Ysc.EventsTest do
       assert Events.event_pricing_display_string(event) == "$0.00"
     end
 
-    test "list_tickets_for_export/1 returns empty list and hits empty ticket_details map",
+    test "list_tickets_for_export/1 returns empty list when the event has no tickets",
          %{
            user: user
          } do
@@ -5749,6 +5832,11 @@ defmodule Ysc.EventsTest do
     test "ci_query_explain_event_stripe_fees_total_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Events.ci_query_explain_event_stripe_fees_total_query()
+    end
+
+    test "ci_query_explain_list_tickets_for_export_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Events.ci_query_explain_list_tickets_for_export_query()
     end
   end
 
