@@ -503,6 +503,35 @@ defmodule Ysc.AppleWalletTest do
         assert is_binary(pkpass) and byte_size(pkpass) > 0
       end)
     end
+
+    test "skips strip files when the cover URL is blocked by UrlFetchGuard (Finding 81)",
+         %{
+           user: user,
+           ticket: ticket,
+           event: event
+         } do
+      {:ok, image} =
+        %Ysc.Media.Image{user_id: user.id}
+        |> Ysc.Media.Image.add_image_changeset(%{
+          title: "Poisoned Cover",
+          raw_image_path: "file:///etc/passwd",
+          optimized_image_path: "file:///etc/passwd",
+          thumbnail_path: "file:///etc/passwd",
+          processing_state: "completed"
+        })
+        |> Repo.insert()
+
+      event
+      |> Ecto.Changeset.change(image_id: image.id)
+      |> Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} =
+                 AppleWallet.generate_ticket_pass(ticket.id, user.id)
+
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+      end)
+    end
   end
 
   # ---------------------------------------------------------------------------

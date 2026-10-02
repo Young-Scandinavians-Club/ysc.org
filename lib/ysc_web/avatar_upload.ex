@@ -10,7 +10,7 @@ defmodule YscWeb.AvatarUpload do
   alias Ysc.S3Config
   alias YscWeb.S3.DirectUpload
 
-  @allowed_extensions ~w(.jpg .jpeg .png .webp .gif .svg)
+  @allowed_extensions ~w(.jpg .jpeg .png .webp .gif)
 
   @doc """
   Presigns a direct avatar upload using a server-controlled content type.

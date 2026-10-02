@@ -383,12 +383,39 @@ defmodule Ysc.AppleWallet do
 
   defp download_image_to_tmp(nil), do: :error
 
+  defp download_image_to_tmp(url) when is_binary(url) do
+    # Cover-image URLs are normally our S3/CDN objects, but the column is a
+    # free-form string. Fail closed on SSRF (UrlFetchGuard) and never follow
+    # redirects — a 302 to link-local/metadata would otherwise bypass the
+    # first-hop host check (Finding 81).
+    case Ysc.Http.UrlFetchGuard.validate_url_for_server_fetch(url) do
+      :ok ->
+        do_download_image_to_tmp(url)
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Apple Wallet strip image URL rejected by UrlFetchGuard",
+          reason: reason,
+          url_summary: safe_strip_url_summary(url)
+        )
+
+        :error
+    end
+  end
+
+  defp download_image_to_tmp(_), do: :error
+
   # tmp_path is constructed from System.tmp_dir!() + random hex, not user input
   @sobelow_skip ["Traversal.FileModule"]
-  defp download_image_to_tmp(url) do
+  defp do_download_image_to_tmp(url) do
     task =
       Task.async(fn ->
-        Req.get(url, receive_timeout: @strip_download_timeout_ms)
+        Req.get(url,
+          receive_timeout: @strip_download_timeout_ms,
+          max_redirects: 0,
+          redirect: false,
+          retry: false
+        )
       end)
 
     req_result =
@@ -413,6 +440,16 @@ defmodule Ysc.AppleWallet do
 
       _ ->
         :error
+    end
+  end
+
+  defp safe_strip_url_summary(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host} when is_binary(host) ->
+        "#{scheme}://#{host}/…"
+
+      _ ->
+        "[unparseable]"
     end
   end
 

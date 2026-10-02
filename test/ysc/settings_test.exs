@@ -192,6 +192,21 @@ defmodule Ysc.SettingsTest do
                Settings.update_setting("nonexistent", "value")
     end
 
+    test "returns a changeset error for a javascript social URL (Finding 80)" do
+      %SiteSetting{
+        group: "socials",
+        name: "facebook",
+        value: "https://www.facebook.com/x"
+      }
+      |> Repo.insert!()
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Settings.update_setting("facebook", "javascript:alert(1)")
+
+      refute changeset.valid?
+      assert changeset.errors[:value]
+    end
+
     test "updates caches after successful update" do
       %SiteSetting{name: "cached", value: "old"} |> Repo.insert!()
 

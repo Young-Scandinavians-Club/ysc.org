@@ -211,14 +211,23 @@ defmodule Ysc.Settings do
   end
 
   defp update_setting!(current_setting, name, value) do
-    case SiteSetting.site_setting_changeset(current_setting, %{value: value})
-         |> Repo.update() do
+    changeset =
+      SiteSetting.site_setting_changeset(current_setting, %{value: value})
+
+    case Repo.update(changeset) do
       {:ok, updated} ->
         # Update both caches. Routed through Ysc.DistributedCache so the write
         # replicates to every node — settings entries have no TTL, so a plain
         # local Cachex.put here would leave other nodes serving the old value
         # indefinitely instead of just until the next expiry.
-        Ysc.DistributedCache.put(:ysc_cache, setting_cache_key(name), value)
+        # Persist the trimmed URL from the changeset/DB row, not the raw param.
+        cached_value = updated.value
+
+        Ysc.DistributedCache.put(
+          :ysc_cache,
+          setting_cache_key(name),
+          cached_value
+        )
 
         case Cachex.get(:ysc_cache, @settings_cache_key) do
           {:ok, settings} when is_list(settings) ->
@@ -238,6 +247,9 @@ defmodule Ysc.Settings do
         end
 
         {:ok, updated}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:error, changeset}
 
       error ->
         error

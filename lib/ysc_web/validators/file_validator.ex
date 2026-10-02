@@ -21,7 +21,17 @@ defmodule YscWeb.Validators.FileValidator do
                    "application/vnd.microsoft.portable-executable",
                    "application/x-dosexec",
                    "application/x-sh",
-                   "application/x-csh"
+                   "application/x-csh",
+                   # Active web content — public media bucket serves these with
+                   # Content-Type from this detector; HTML/SVG/JS must not land
+                   # on assets.ysc.org for volunteers to weaponize (Finding 79).
+                   "text/html",
+                   "application/xhtml+xml",
+                   "image/svg+xml",
+                   "text/javascript",
+                   "application/javascript",
+                   "application/x-javascript",
+                   "text/jscript"
                  ])
 
   # Dangerous extensions checked against the client-provided filename (layer 2 + 3)
@@ -58,6 +68,19 @@ defmodule YscWeb.Validators.FileValidator do
                         ".vbs",
                         ".vbe",
                         ".jse",
+                        ".js",
+                        ".mjs",
+                        ".cjs",
+                        # Active web documents (Finding 79)
+                        ".html",
+                        ".htm",
+                        ".xhtml",
+                        ".shtml",
+                        ".svg",
+                        ".svgz",
+                        ".xml",
+                        ".xsl",
+                        ".xslt",
                         # System / library
                         ".sys",
                         ".dll",
@@ -158,7 +181,8 @@ defmodule YscWeb.Validators.FileValidator do
     with :ok <- check_filename_safety(client_filename),
          {:ok, mime_result} <- detect_mime(file_path),
          :ok <- check_blocked_mime(mime_result),
-         :ok <- check_all_extensions(client_filename) do
+         :ok <- check_all_extensions(client_filename),
+         :ok <- check_active_web_content(file_path) do
       detected_mime =
         case mime_result do
           {_ext, mime} -> mime
@@ -219,12 +243,14 @@ defmodule YscWeb.Validators.FileValidator do
       {:ok, "image/jpeg"}
   """
   def validate_image(file_path, allowed_extensions \\ []) do
+    # SVG is intentionally excluded: even as <img> it is often safe, but a
+    # direct navigation to a public object with Content-Type image/svg+xml
+    # executes script on the assets host (Finding 79).
     allowed_mime_types = [
       "image/jpeg",
       "image/png",
       "image/gif",
-      "image/webp",
-      "image/svg+xml"
+      "image/webp"
     ]
 
     validate_file(file_path, allowed_mime_types, allowed_extensions)
@@ -278,6 +304,46 @@ defmodule YscWeb.Validators.FileValidator do
       :ok
     end
   end
+
+  # FileType often returns :unknown for HTML/SVG. Block by leading markup so a
+  # renamed `invoice.pdf` that is actually HTML cannot land on the public CDN.
+  # sobelow_skip ["Traversal.FileModule"]
+  defp check_active_web_content(file_path) do
+    case File.open(file_path, [:read, :binary]) do
+      {:ok, file} ->
+        prefix = IO.binread(file, 512)
+        File.close(file)
+
+        if active_web_markup?(prefix) do
+          {:error, "File type not allowed"}
+        else
+          :ok
+        end
+
+      {:error, _} ->
+        {:error, "Cannot open file"}
+    end
+  end
+
+  defp active_web_markup?(data) when is_binary(data) do
+    trimmed =
+      data
+      |> strip_utf8_bom()
+      |> String.trim_leading()
+      |> String.downcase()
+
+    String.starts_with?(trimmed, "<!doctype html") or
+      String.starts_with?(trimmed, "<html") or
+      String.starts_with?(trimmed, "<svg") or
+      (String.starts_with?(trimmed, "<?xml") and
+         (String.contains?(trimmed, "<html") or
+            String.contains?(trimmed, "<svg")))
+  end
+
+  defp active_web_markup?(_), do: false
+
+  defp strip_utf8_bom(<<0xEF, 0xBB, 0xBF, rest::binary>>), do: rest
+  defp strip_utf8_bom(other), do: other
 
   # Checks the final extension AND all intermediate extensions (double-extension attack defence).
   # e.g. "report.exe.pdf" has intermediate ".exe" which is blocked.

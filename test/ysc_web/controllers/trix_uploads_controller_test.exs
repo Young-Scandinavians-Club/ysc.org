@@ -168,6 +168,71 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
       assert json_response(conn, 422)["error"] =~ "not allowed"
     end
+
+    test "returns 422 for an HTML attachment (Finding 79)", %{conn: conn} do
+      path =
+        write_tmp(
+          "<html><body><script>alert(document.domain)</script></body></html>",
+          "ysc-login.html"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "ysc-login.html")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
+    test "volunteers are also blocked from uploading HTML (Finding 79)" do
+      volunteer = user_fixture(%{role: :volunteer})
+      conn = log_in_user(build_conn(), volunteer)
+
+      path =
+        write_tmp(
+          "<!DOCTYPE html><html><body>phish</body></html>",
+          "ysc-login.html"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "ysc-login.html")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
+    test "returns 422 for an SVG attachment (Finding 79)", %{conn: conn} do
+      path =
+        write_tmp(
+          ~s|<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>|,
+          "logo.svg"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "logo.svg")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
+    test "returns 422 for HTML content renamed as a PDF (Finding 79)", %{
+      conn: conn
+    } do
+      path =
+        write_tmp(
+          "<!DOCTYPE html><html><script>alert(1)</script></html>",
+          "invoice.pdf"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "invoice.pdf")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
   end
 
   describe "FileValidator — image?/1" do
@@ -248,6 +313,39 @@ defmodule YscWeb.TrixUploadsControllerTest do
       path = write_tmp("random binary \x00\x01\x02 data", "data.bin")
       assert {:ok, mime} = FileValidator.validate_attachment(path, "data.bin")
       assert mime == "application/octet-stream"
+    end
+
+    test "blocks HTML prefixed with a UTF-8 BOM even when renamed as PDF" do
+      path =
+        write_tmp(
+          <<0xEF, 0xBB, 0xBF, "<html><body>phish</body></html>">>,
+          "invoice.pdf"
+        )
+
+      assert {:error, _reason} =
+               FileValidator.validate_attachment(path, "invoice.pdf")
+    end
+
+    test "blocks XML-wrapped SVG masquerading as a PDF" do
+      path =
+        write_tmp(
+          ~s|<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"></svg>|,
+          "logo.pdf"
+        )
+
+      assert {:error, _reason} =
+               FileValidator.validate_attachment(path, "logo.pdf")
+    end
+
+    test "returns an error when the temp file cannot be opened" do
+      missing =
+        Path.join(
+          System.tmp_dir!(),
+          "ysc-missing-#{System.unique_integer([:positive])}.bin"
+        )
+
+      assert {:error, _reason} =
+               FileValidator.validate_attachment(missing, "notes.txt")
     end
   end
 
