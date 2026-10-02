@@ -1108,6 +1108,8 @@ defmodule YscWeb.AdminEventsNewLive do
                 id="event-update-preview-iframe"
                 phx-hook="EmailPreview"
                 class="w-full border border-zinc-200 rounded-sm min-h-[400px]"
+                sandbox="allow-same-origin"
+                title="Event update email preview"
               />
             </.modal>
           </div>
