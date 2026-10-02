@@ -879,8 +879,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 phx-hook="EmailPreview"
                 srcdoc={@_preview_html || ""}
                 sandbox="allow-same-origin"
-              >
-              </iframe>
+              ></iframe>
             </div>
           </div>
         </div>
