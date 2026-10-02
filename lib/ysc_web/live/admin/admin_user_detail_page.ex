@@ -1834,13 +1834,29 @@ defmodule YscWeb.AdminUserDetailsLive do
                     </p>
                     <div class="bg-zinc-50 rounded-lg border border-zinc-200 overflow-hidden">
                       <%= if @selected_notification.rendered_message do %>
-                        <iframe
-                          id={"email-preview-#{@selected_notification.id}"}
-                          srcdoc={@selected_notification.rendered_message}
-                          class="w-full border-0"
-                          style="min-height: 400px; height: 600px;"
-                          phx-hook="EmailPreview"
-                        ></iframe>
+                        <%= if @selected_notification.message_type == :sms do %>
+                          <%!-- SMS bodies are plain text but may contain user-controlled
+                               names/titles. Never use srcdoc (HTML) for them — that was
+                               Finding 82 (same-origin XSS when an admin opened the panel). --%>
+                          <pre
+                            id={"sms-preview-#{@selected_notification.id}"}
+                            class="p-4 text-sm text-zinc-800 whitespace-pre-wrap break-words font-sans"
+                          >{@selected_notification.rendered_message}</pre>
+                        <% else %>
+                          <%!-- Email HTML is trusted only after template escaping /
+                               scrubbing. Still sandbox without allow-scripts so a
+                               scrubber miss cannot run JS as the admin origin. --%>
+                          <iframe
+                            id={"email-preview-#{@selected_notification.id}"}
+                            srcdoc={@selected_notification.rendered_message}
+                            sandbox="allow-same-origin"
+                            class="w-full border-0"
+                            style="min-height: 400px; height: 600px;"
+                            phx-hook="EmailPreview"
+                            title="Email message preview"
+                          >
+                          </iframe>
+                        <% end %>
                       <% else %>
                         <div class="p-4">
                           <p class="text-sm text-zinc-400 italic">
