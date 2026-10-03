@@ -427,13 +427,51 @@ defmodule Ysc.Tickets.StripeServiceTest do
          %{
            ticket_order: ticket_order
          } do
-      payment_intent =
-        payment_intent_for_order(ticket_order, amount: 1)
+      stub_stripe_mock_retrieve_for_test_refunds()
 
-      deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+      payment_intent =
+        payment_intent_for_order(ticket_order,
+          amount: 1,
+          latest_charge: "ch_stale_amount_#{ticket_order.id}"
+        )
 
       assert {:error, :amount_mismatch} =
                StripeService.process_successful_payment(payment_intent)
+
+      reloaded = Ysc.Tickets.get_ticket_order(ticket_order.id)
+      assert reloaded.status == :pending
+    end
+
+    test "refunds a captured PaymentIntent when tier price changed after the Intent was created",
+         %{
+           ticket_order: ticket_order
+         } do
+      stub_stripe_mock_retrieve_for_test_refunds()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        order = Ysc.Tickets.get_ticket_order(ticket_order.id)
+        [%{ticket_tier: tier} | _] = order.tickets
+        stale_amount_cents = MoneyHelper.money_to_cents(order.total_amount)
+
+        {:ok, _tier} =
+          Ysc.Events.update_ticket_tier(tier, %{price: Money.new(99, :USD)})
+
+        payment_intent =
+          payment_intent_for_order(order,
+            id: "pi_stale_reprice_#{order.id}",
+            amount: stale_amount_cents,
+            latest_charge: "ch_stale_reprice_#{order.id}"
+          )
+
+        cancel_timeout_jobs_for_order!(order.id)
+
+        assert {:error, :amount_mismatch} =
+                 StripeService.process_successful_payment(payment_intent)
+
+        reloaded = Ysc.Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :pending
+        assert Money.equal?(reloaded.total_amount, Money.new(99, :USD))
+      end)
     end
 
     test "returns error when payment intent has not succeeded", %{
