@@ -2098,8 +2098,11 @@ defmodule YscWeb.UserSettingsLive do
                   <h2 class="text-zinc-900 font-bold text-xl">
                     My Bookings & Payments
                   </h2>
-                  <p class="text-sm text-zinc-600 mt-1 max-w-2xl">
-                    View your cabin booking payment history below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. To see or use your event tickets, open Your event tickets.
+                  <p
+                    id="payments-intro"
+                    class="text-sm text-zinc-600 mt-1 max-w-2xl"
+                  >
+                    View payments for cabin bookings, events, donations, and membership below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. To see or use your event tickets, open Your event tickets.
                   </p>
                 </div>
                 <.link
@@ -2322,9 +2325,13 @@ defmodule YscWeb.UserSettingsLive do
                   </p>
                 </div>
 
-                <div :if={@payments_total == 0} class="text-center py-12">
+                <div
+                  :if={@payments_total == 0}
+                  id="payments-empty"
+                  class="text-center py-12"
+                >
                   <p class="text-zinc-600 text-sm">
-                    No payments yet. Cabin bookings you've paid for and event purchases will show up here.
+                    No payments yet. Cabin bookings, events, donations, and membership payments will show up here.
                   </p>
                 </div>
 
