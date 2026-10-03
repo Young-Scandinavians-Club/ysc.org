@@ -26,6 +26,12 @@ defmodule YscWeb.Admin.EditingPresenceTest do
     key
   end
 
+  defp live_socket(assigns) do
+    %Phoenix.LiveView.Socket{
+      assigns: Map.merge(%{__changed__: %{}}, assigns)
+    }
+  end
+
   describe "topic/1" do
     test "maps each resource type to its own topic" do
       assert EditingPresence.topic(:post) == "presence:posts"
@@ -229,6 +235,132 @@ defmodule YscWeb.Admin.EditingPresenceTest do
 
     test "returns an empty list when the diff has no metas" do
       assert EditingPresence.diff_resource_ids(%{joins: %{}, leaves: %{}}) == []
+    end
+  end
+
+  describe "visible_diff_ids/2" do
+    test "keeps only ids that are currently on the listing page" do
+      visible_id = Ecto.ULID.generate()
+      other_id = Ecto.ULID.generate()
+
+      ids =
+        EditingPresence.visible_diff_ids(
+          %{
+            joins: %{"a" => %{metas: [%{resource_id: visible_id}]}},
+            leaves: %{"b" => %{metas: [%{resource_id: other_id}]}}
+          },
+          %{visible_id => %{id: visible_id}}
+        )
+
+      assert ids == [visible_id]
+    end
+
+    test "returns an empty list when none of the diff ids are on the page" do
+      assert EditingPresence.visible_diff_ids(
+               %{
+                 joins: %{
+                   "a" => %{metas: [%{resource_id: Ecto.ULID.generate()}]}
+                 },
+                 leaves: %{}
+               },
+               %{}
+             ) == []
+    end
+  end
+
+  describe "assign_editors/3" do
+    test "assigns editors currently tracked on the resource, excluding the caller" do
+      resource_id = Ecto.ULID.generate()
+      editor = user_fixture(%{first_name: "Jane", last_name: "Doe"})
+      viewer = user_fixture()
+
+      track_fixture(:event, resource_id, editor)
+
+      updated =
+        EditingPresence.assign_editors(
+          live_socket(%{current_user: viewer, editors: []}),
+          :event,
+          resource_id
+        )
+
+      assert [%{user_id: user_id, name: name}] = updated.assigns.editors
+      assert user_id == editor.id
+      assert name == UserDisplay.full_name(editor)
+    end
+
+    test "clears editors when the resource id is not persisted yet" do
+      viewer = user_fixture()
+
+      updated =
+        EditingPresence.assign_editors(
+          live_socket(%{current_user: viewer, editors: [%{user_id: "stale"}]}),
+          :newsletter,
+          nil
+        )
+
+      assert updated.assigns.editors == []
+    end
+  end
+
+  describe "refresh_list_stream/3" do
+    test "assigns editors_by_resource and skips stream inserts for off-page ids" do
+      visible_id = Ecto.ULID.generate()
+      off_page_id = Ecto.ULID.generate()
+      editor = user_fixture(%{first_name: "Taylor"})
+      viewer = user_fixture()
+      event = %{id: visible_id, title: "On page"}
+
+      track_fixture(:event, visible_id, editor)
+
+      updated =
+        EditingPresence.refresh_list_stream(
+          live_socket(%{
+            current_user: viewer,
+            events_by_id: %{visible_id => event},
+            editors_by_event: %{}
+          }),
+          %{
+            joins: %{"k" => %{metas: [%{resource_id: off_page_id}]}},
+            leaves: %{}
+          },
+          resource: :event,
+          stream: :events,
+          by_id: :events_by_id,
+          editors: :editors_by_event
+        )
+
+      assert [%{user_id: user_id}] =
+               Map.fetch!(updated.assigns.editors_by_event, visible_id)
+
+      assert user_id == editor.id
+    end
+
+    test "still assigns editors when the listing tab is not visible" do
+      resource_id = Ecto.ULID.generate()
+      editor = user_fixture()
+      viewer = user_fixture()
+
+      track_fixture(:newsletter, resource_id, editor)
+
+      updated =
+        EditingPresence.refresh_list_stream(
+          live_socket(%{
+            current_user: viewer,
+            editions_by_id: %{resource_id => %{id: resource_id}},
+            editors_by_edition: %{}
+          }),
+          %{
+            joins: %{"k" => %{metas: [%{resource_id: resource_id}]}},
+            leaves: %{}
+          },
+          resource: :newsletter,
+          stream: :editions,
+          by_id: :editions_by_id,
+          editors: :editors_by_edition,
+          visible?: false
+        )
+
+      assert Map.has_key?(updated.assigns.editors_by_edition, resource_id)
     end
   end
 

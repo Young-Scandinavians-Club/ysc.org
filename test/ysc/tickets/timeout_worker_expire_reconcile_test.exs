@@ -147,6 +147,7 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
           id: payment_intent_id,
           status: "succeeded",
           amount: 1,
+          latest_charge: "ch_timeout_fulfillment_fail_#{order.id}",
           metadata: %{
             "ticket_order_id" => order.id,
             "user_id" => order.user_id
@@ -157,6 +158,12 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
         payment_intent_id,
         succeeded_payment_intent
       )
+
+      # Auto-refund on amount_mismatch retrieves the PI again for the charge id.
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
 
       # expire_specific_order rollbacks `{:error, reason}`, so Oban sees a nested
       # error tuple. That still fails the job (retry); do not unwrap it here.
@@ -261,6 +268,7 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
           id: payment_intent_id,
           status: "succeeded",
           amount: 1,
+          latest_charge: "ch_cron_fulfillment_fail_#{order.id}",
           metadata: %{
             "ticket_order_id" => order.id,
             "user_id" => order.user_id
@@ -271,6 +279,11 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
         payment_intent_id,
         succeeded_payment_intent
       )
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
 
       assert {:ok, "Expired 0 timed out ticket orders (1 failed)"} =
                TimeoutWorker.perform(%Oban.Job{args: %{}})

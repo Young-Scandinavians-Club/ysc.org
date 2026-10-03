@@ -10,6 +10,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   alias Ecto.Multi
 
   alias Ysc.Accounts.{
+    Address,
     Email,
     User,
     FamilyInvite,
@@ -24,6 +25,17 @@ defmodule Ysc.Accounts.FamilyInvites do
   @max_sub_accounts 10
   @max_spouses 1
   @adult_age 18
+
+  # Invite pages, membership pending-invite cards, and the accepted-invite
+  # email only need identity + country. Skip hashed_password / board_bio /
+  # Stripe ids that `preload([:primary_user, :created_by_user])` would SELECT.
+  @invite_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :most_connected_country
+  ]
 
   @doc """
   Toast shown when an invitation token does not match a current invite.
@@ -185,10 +197,15 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   @doc """
   Gets an invite by token.
+
+  Loads slim `primary_user` (name, email, country) and `created_by_user`
+  (name, email) for the accept page and the accepted-invite email. The family
+  settings list does not use this helper.
   """
   def get_invite_by_token(token) do
-    Repo.get_by(FamilyInvite, token: token)
-    |> Repo.preload([:primary_user, :created_by_user])
+    token
+    |> get_invite_by_token_query()
+    |> Repo.one()
   end
 
   @doc """
@@ -201,14 +218,18 @@ defmodule Ysc.Accounts.FamilyInvites do
     primary_user_id = invite.primary_user_id
     relationship = invite.relationship || :child
 
-    primary =
-      from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
+    nested_primary_id =
+      from(u in User,
+        where: u.id == ^primary_user_id,
+        select: u.primary_user_id,
+        lock: "FOR UPDATE"
+      )
       |> repo.one!()
 
     cond do
       # Finding 83: nested invites must not be accepted even if they were
       # persisted before create_invite started refusing sub-accounts.
-      not is_nil(primary.primary_user_id) ->
+      not is_nil(nested_primary_id) ->
         {:error, :not_primary_user}
 
       not FamilyInvite.valid?(invite) ->
@@ -304,7 +325,7 @@ defmodule Ysc.Accounts.FamilyInvites do
               final_user =
                 copy_most_connected_country_from_primary(
                   updated_user,
-                  invite.primary_user_id
+                  invite.primary_user
                 )
 
               # Create UserEvent to track family addition
@@ -579,16 +600,7 @@ defmodule Ysc.Accounts.FamilyInvites do
          %FamilyInvite{} = invite,
          %User{} = accepted_user
        ) do
-    invite =
-      if Ecto.assoc_loaded?(invite.created_by_user) do
-        invite
-      else
-        Repo.preload(invite, [:created_by_user, :primary_user])
-      end
-
-    inviter =
-      invite.created_by_user || Repo.get!(User, invite.created_by_user_id)
-
+    inviter = invite_created_by_user(invite)
     inviter_first_name = inviter.first_name || "there"
     invitee_name = format_invitee_name(accepted_user)
     invitee_email = accepted_user.email || invite.email
@@ -677,13 +689,13 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   @doc """
   Lists all invites for a primary user (pending and accepted).
+
+  The family-management and admin family tabs only render invite email,
+  relationship, and expiry — they never show who created the row.
   """
   def list_invites(primary_user) do
-    from(i in FamilyInvite,
-      where: i.primary_user_id == ^primary_user.id,
-      order_by: [desc: i.inserted_at],
-      preload: [:created_by_user]
-    )
+    primary_user.id
+    |> list_invites_query()
     |> Repo.all()
   end
 
@@ -694,17 +706,8 @@ defmodule Ysc.Accounts.FamilyInvites do
   can accept without needing the original email link.
   """
   def list_pending_invites_for_email(email) when is_binary(email) do
-    normalized_email = Email.normalize(email)
-    now = DateTime.utc_now()
-
-    from(i in FamilyInvite,
-      where:
-        i.email == ^normalized_email and
-          is_nil(i.accepted_at) and
-          i.expires_at > ^now,
-      order_by: [desc: i.inserted_at],
-      preload: [:primary_user]
-    )
+    email
+    |> list_pending_invites_for_email_query(DateTime.utc_now())
     |> Repo.all()
   end
 
@@ -1059,13 +1062,9 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   defp copy_billing_address_from_primary(sub_account, primary_user_id) do
-    primary_user = Ysc.Accounts.get_user!(primary_user_id, [:billing_address])
-
-    case primary_user.billing_address do
-      %Ysc.Accounts.Address{} = primary_address ->
-        # Check if sub-account already has an address
-        existing_address =
-          Ysc.Repo.get_by(Ysc.Accounts.Address, user_id: sub_account.id)
+    case Repo.get_by(Address, user_id: primary_user_id) do
+      %Address{} = primary_address ->
+        existing_address = Repo.get_by(Address, user_id: sub_account.id)
 
         if existing_address do
           {:ok, existing_address}
@@ -1078,21 +1077,20 @@ defmodule Ysc.Accounts.FamilyInvites do
         end
 
       _ ->
-        # Primary user doesn't have a billing address, skip
         {:ok, nil}
     end
   end
 
-  defp copy_most_connected_country_from_primary(sub_account, primary_user_id) do
-    primary_user = Ysc.Accounts.get_user!(primary_user_id)
+  defp copy_most_connected_country_from_primary(sub_account, primary_user) do
+    country =
+      case primary_user do
+        %User{most_connected_country: country} -> country
+        _ -> nil
+      end
 
-    # Only copy if primary user has a most_connected_country and sub-account doesn't
-    if not is_nil(primary_user.most_connected_country) and
-         is_nil(sub_account.most_connected_country) do
+    if not is_nil(country) and is_nil(sub_account.most_connected_country) do
       sub_account
-      |> Ecto.Changeset.change(
-        most_connected_country: primary_user.most_connected_country
-      )
+      |> Ecto.Changeset.change(most_connected_country: country)
       |> Repo.update!()
     else
       sub_account
@@ -1114,8 +1112,8 @@ defmodule Ysc.Accounts.FamilyInvites do
       user_id: sub_account.id
     }
 
-    case Ysc.Accounts.Address.changeset(%Ysc.Accounts.Address{}, address_attrs)
-         |> Ysc.Repo.insert() do
+    case Address.changeset(%Address{}, address_attrs)
+         |> Repo.insert() do
       {:ok, address} ->
         {:ok, address}
 
@@ -1132,12 +1130,34 @@ defmodule Ysc.Accounts.FamilyInvites do
     end
   end
 
-  @doc false
-  def ci_query_explain_query do
-    alias Ysc.Ci.QueryExplain.Fixtures
+  defp invite_user_query do
+    from(u in User, select: struct(u, ^@invite_user_fields))
+  end
 
-    now = Fixtures.now()
-    normalized_email = Email.normalize(Fixtures.email())
+  defp get_invite_by_token_query(token) do
+    primary_user_query = invite_user_query()
+    created_by_user_query = invite_user_query()
+
+    from(i in FamilyInvite,
+      where: i.token == ^token,
+      preload: [
+        primary_user: ^primary_user_query,
+        created_by_user: ^created_by_user_query
+      ]
+    )
+  end
+
+  defp list_invites_query(primary_user_id) do
+    from(i in FamilyInvite,
+      where: i.primary_user_id == ^primary_user_id,
+      order_by: [desc: i.inserted_at]
+    )
+  end
+
+  defp list_pending_invites_for_email_query(email, now)
+       when is_binary(email) do
+    normalized_email = Email.normalize(email)
+    primary_user_query = invite_user_query()
 
     from(i in FamilyInvite,
       where:
@@ -1145,7 +1165,49 @@ defmodule Ysc.Accounts.FamilyInvites do
           is_nil(i.accepted_at) and
           i.expires_at > ^now,
       order_by: [desc: i.inserted_at],
-      preload: [:primary_user]
+      preload: [primary_user: ^primary_user_query]
     )
+  end
+
+  defp invite_created_by_user(%FamilyInvite{} = invite) do
+    if Ecto.assoc_loaded?(invite.created_by_user) and invite.created_by_user do
+      invite.created_by_user
+    else
+      from(u in User,
+        where: u.id == ^invite.created_by_user_id,
+        select: struct(u, ^@invite_user_fields)
+      )
+      |> Repo.one!()
+    end
+  end
+
+  defp invite_created_by_user_query(created_by_user_id) do
+    from(u in User,
+      where: u.id == ^created_by_user_id,
+      select: struct(u, ^@invite_user_fields)
+    )
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    list_pending_invites_for_email_query(
+      Ysc.Ci.QueryExplain.Fixtures.email(),
+      Ysc.Ci.QueryExplain.Fixtures.now()
+    )
+  end
+
+  @doc false
+  def ci_query_explain_get_invite_by_token_query do
+    get_invite_by_token_query("ci-query-explain-invite-token")
+  end
+
+  @doc false
+  def ci_query_explain_list_invites_query do
+    list_invites_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_invite_created_by_user_query do
+    invite_created_by_user_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

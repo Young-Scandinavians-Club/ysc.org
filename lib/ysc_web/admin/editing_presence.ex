@@ -5,7 +5,14 @@ defmodule YscWeb.Admin.EditingPresence do
   Presence metadata is resolved once at `track/4` time (name + avatar URL) so
   rendering never needs a DB hit — editor pages and their listing pages both
   read from the same per-resource-type topic.
+
+  Listing pages should call `refresh_list_stream/3` from their `presence_diff`
+  handler instead of copying the stream-insert + editors-assign loop.
+  Editor pages should call `assign_editors/3`.
   """
+
+  import Phoenix.Component, only: [assign: 3]
+  import Phoenix.LiveView, only: [stream_insert: 3]
 
   alias Ysc.Accounts.UserDisplay
   alias YscWeb.Presence
@@ -73,5 +80,94 @@ defmodule YscWeb.Admin.EditingPresence do
     |> Enum.flat_map(fn %{metas: metas} -> metas end)
     |> Enum.map(& &1.resource_id)
     |> Enum.uniq()
+  end
+
+  @doc """
+  Ids from a `presence_diff` payload that are currently on the listing page.
+
+  `by_id` is the `%{id => item}` assign the listing keeps for visible rows.
+  """
+  def visible_diff_ids(payload, by_id) when is_map(by_id) do
+    payload
+    |> diff_resource_ids()
+    |> Enum.filter(&Map.has_key?(by_id, &1))
+  end
+
+  @doc """
+  Assigns `:editors` for a single resource currently open in an editor LiveView.
+
+  Pass `nil` (or a non-binary id) when the resource is not persisted yet —
+  that clears the assign to `[]` without hitting Presence.
+  """
+  def assign_editors(socket, type, resource_id)
+      when type in [:post, :newsletter, :event] do
+    editor_list =
+      case resource_id do
+        id when is_binary(id) ->
+          editors(type, id, socket.assigns.current_user.id)
+
+        _ ->
+          []
+      end
+
+    assign(socket, :editors, editor_list)
+  end
+
+  @doc """
+  Refreshes listing-page presence avatars after a `presence_diff`.
+
+  Recomputes the `editors` assign from Presence, then `stream_insert`s only
+  rows whose presence actually changed *and* that are currently on the page
+  (looked up in the `by_id` assign). Other rows need neither a DB hit nor a
+  stream touch — content inside a `phx-update="stream"` container only
+  updates via explicit stream operations.
+
+  ## Options
+
+    * `:resource` — `:post | :newsletter | :event`
+    * `:stream` — stream name, e.g. `:events`
+    * `:by_id` — assign holding `%{id => item}` for the current page
+    * `:editors` — assign to store `editors_by_resource/2`
+    * `:visible?` — when `false`, still updates the editors assign but skips
+      stream inserts (e.g. newsletters when not on the editions tab).
+      Defaults to `true`.
+
+  ## Usage
+
+      def handle_info(
+            %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload},
+            socket
+          ) do
+        {:noreply,
+         EditingPresence.refresh_list_stream(socket, payload,
+           resource: :event,
+           stream: :events,
+           by_id: :events_by_id,
+           editors: :editors_by_event
+         )}
+      end
+  """
+  def refresh_list_stream(socket, payload, opts) do
+    resource = Keyword.fetch!(opts, :resource)
+    stream = Keyword.fetch!(opts, :stream)
+    by_id_key = Keyword.fetch!(opts, :by_id)
+    editors_key = Keyword.fetch!(opts, :editors)
+    visible? = Keyword.get(opts, :visible?, true)
+
+    editors_by = editors_by_resource(resource, socket.assigns.current_user.id)
+    by_id = Map.fetch!(socket.assigns, by_id_key)
+
+    changed_ids =
+      if visible? do
+        visible_diff_ids(payload, by_id)
+      else
+        []
+      end
+
+    changed_ids
+    |> Enum.reduce(socket, fn id, acc ->
+      stream_insert(acc, stream, Map.fetch!(by_id, id))
+    end)
+    |> assign(editors_key, editors_by)
   end
 end

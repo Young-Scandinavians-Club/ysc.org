@@ -157,18 +157,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         _ -> nil
       end
 
-    editors =
-      if edition_id do
-        EditingPresence.editors(
-          :newsletter,
-          edition_id,
-          socket.assigns.current_user.id
-        )
-      else
-        []
-      end
-
-    assign(socket, :editors, editors)
+    EditingPresence.assign_editors(socket, :newsletter, edition_id)
   end
 
   defp maybe_load_email_stats(socket, %Edition{status: :sent, id: edition_id})

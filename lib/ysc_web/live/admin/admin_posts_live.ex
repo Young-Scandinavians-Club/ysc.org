@@ -342,33 +342,17 @@ defmodule YscWeb.AdminPostsLive do
      |> stream(:posts, [], reset: true)}
   end
 
-  # Presence data lives outside the `:posts` stream, but content inside a
-  # `phx-update="stream"` container only updates via explicit stream
-  # operations — a plain assign change alone won't re-render existing rows.
-  # `editors_by_post` is cheap to recompute (in-memory Presence.list, no DB),
-  # but we only need to force a row re-render for posts whose presence
-  # actually changed *and* that are currently visible on this page — anything
-  # else doesn't need a DB hit or a stream touch at all.
   def handle_info(
         %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload},
         socket
       ) do
-    editors_by_post =
-      EditingPresence.editors_by_resource(:post, socket.assigns.current_user.id)
-
-    changed_ids =
-      payload
-      |> EditingPresence.diff_resource_ids()
-      |> Enum.filter(&Map.has_key?(socket.assigns.posts_by_id, &1))
-
-    socket =
-      changed_ids
-      |> Enum.reduce(socket, fn post_id, acc ->
-        stream_insert(acc, :posts, Map.fetch!(acc.assigns.posts_by_id, post_id))
-      end)
-      |> assign(:editors_by_post, editors_by_post)
-
-    {:noreply, socket}
+    {:noreply,
+     EditingPresence.refresh_list_stream(socket, payload,
+       resource: :post,
+       stream: :posts,
+       by_id: :posts_by_id,
+       editors: :editors_by_post
+     )}
   end
 
   def handle_params(params, _uri, socket) do

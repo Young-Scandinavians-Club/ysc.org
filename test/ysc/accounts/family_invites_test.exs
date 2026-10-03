@@ -311,6 +311,38 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert Ecto.assoc_loaded?(found_invite.primary_user)
       assert Ecto.assoc_loaded?(found_invite.created_by_user)
       assert found_invite.primary_user.id == primary_user.id
+      assert found_invite.primary_user.first_name == primary_user.first_name
+
+      assert found_invite.primary_user.most_connected_country ==
+               primary_user.most_connected_country
+
+      assert found_invite.created_by_user.email == primary_user.email
+      assert is_nil(found_invite.primary_user.hashed_password)
+      assert is_nil(found_invite.created_by_user.hashed_password)
+    end
+
+    test "skips unused user columns on the token lookup" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      {_found, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> FamilyInvites.get_invite_by_token(invite.token) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_found, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> FamilyInvites.get_invite_by_token(invite.token) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert bio_cols == 0
     end
 
     test "returns nil for invalid token" do
@@ -823,8 +855,23 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert Enum.at(invites, 1).id == invite2.id
       assert Enum.at(invites, 2).id == invite1.id
 
-      # Should preload created_by_user
-      assert Ecto.assoc_loaded?(Enum.at(invites, 0).created_by_user)
+      refute Ecto.assoc_loaded?(Enum.at(invites, 0).created_by_user)
+    end
+
+    test "does not join unused creator user rows" do
+      primary_user = create_user_with_lifetime_membership()
+
+      {:ok, _invite} =
+        FamilyInvites.create_invite(primary_user, unique_user_email())
+
+      {_invites, user_joins} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> FamilyInvites.list_invites(primary_user) end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      assert user_joins == 0
     end
 
     test "returns empty list when no invites exist" do
@@ -1170,6 +1217,33 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert length(found) == 1
       assert hd(found).id == invite.id
       assert hd(found).primary_user.id == primary_user.id
+      assert hd(found).primary_user.first_name == primary_user.first_name
+      assert hd(found).primary_user.last_name == primary_user.last_name
+      assert is_nil(hd(found).primary_user.hashed_password)
+    end
+
+    test "skips unused primary-user columns on pending invite lookup" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, _invite} = FamilyInvites.create_invite(primary_user, email)
+
+      {_found, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> FamilyInvites.list_pending_invites_for_email(email) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_found, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> FamilyInvites.list_pending_invites_for_email(email) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert bio_cols == 0
     end
 
     test "finds pending invite when query uses Gmail alias of stored address" do
@@ -2005,11 +2079,41 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert is_nil(args["params"]["invitee_name"])
       assert args["params"]["invitee_email"] == nameless_user.email
     end
+
+    test "loads the inviter without unused user columns" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      accepted_user = user_fixture(%{email: email, first_name: "Solo"})
+
+      {_job, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> FamilyInvites.notify_invite_accepted(invite, accepted_user) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+    end
   end
 
   describe "ci_query_explain_query/0" do
     test "returns a valid Ecto query usable for query-explain tooling" do
       assert %Ecto.Query{} = FamilyInvites.ci_query_explain_query()
+    end
+
+    test "ci_query_explain_get_invite_by_token_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               FamilyInvites.ci_query_explain_get_invite_by_token_query()
+    end
+
+    test "ci_query_explain_list_invites_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = FamilyInvites.ci_query_explain_list_invites_query()
+    end
+
+    test "ci_query_explain_invite_created_by_user_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               FamilyInvites.ci_query_explain_invite_created_by_user_query()
     end
   end
 

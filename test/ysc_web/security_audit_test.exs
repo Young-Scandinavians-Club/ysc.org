@@ -5116,7 +5116,9 @@ defmodule YscWeb.SecurityAuditTest do
   # Finding 82 (HIGH): Unsandboxed srcdoc XSS via SMS rendered_message
   # ---------------------------------------------------------------------------
 
-  describe "Finding 82: admin notification preview must not execute SMS HTML" do
+  describe "Finding 82: admin HTML previews must not execute scripts" do
+    import Ysc.EventsFixtures
+
     setup %{conn: conn} do
       admin =
         user_fixture(%{
@@ -5198,6 +5200,64 @@ defmodule YscWeb.SecurityAuditTest do
       assert has_element?(
                view,
                "#email-preview-#{email.id}[sandbox='allow-same-origin']"
+             )
+
+      html = render(view)
+      refute html =~ ~s(sandbox="allow-scripts")
+      refute html =~ ~s(sandbox="allow-same-origin allow-scripts")
+    end
+
+    test "newsletter editor preview iframe is sandboxed without allow-scripts",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Finding 82 Preview", "subject" => "Sandbox"},
+          created_by_id: admin.id
+        )
+
+      {:ok, edition} =
+        Newsletter.update_edition(edition, %{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+
+      render_async(view)
+
+      assert has_element?(
+               view,
+               "#newsletter-email-preview-iframe[sandbox='allow-same-origin']"
+             )
+
+      html = render(view)
+      refute html =~ ~s(sandbox="allow-scripts")
+      refute html =~ ~s(sandbox="allow-same-origin allow-scripts")
+    end
+
+    test "event update preview iframe is sandboxed without allow-scripts", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      render_click(view, "editor-update", %{
+        "field" => "update[raw_body]",
+        "value" => "<div>Finding 82 event preview</div>"
+      })
+
+      view |> element("#preview-event-update-btn") |> render_click()
+
+      assert has_element?(
+               view,
+               "#event-update-preview-iframe[sandbox='allow-same-origin']"
              )
 
       html = render(view)

@@ -356,38 +356,17 @@ defmodule YscWeb.AdminEventsLive do
      |> stream(:events, [], reset: true)}
   end
 
-  # Content inside a `phx-update="stream"` container only updates via
-  # explicit stream operations. `editors_by_event` is cheap to recompute
-  # (in-memory Presence.list, no DB), but we only force a row re-render for
-  # events whose presence actually changed *and* are currently visible on
-  # this page — everything else needs neither a DB hit nor a stream touch.
   def handle_info(
         %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload},
         socket
       ) do
-    editors_by_event =
-      EditingPresence.editors_by_resource(
-        :event,
-        socket.assigns.current_user.id
-      )
-
-    changed_ids =
-      payload
-      |> EditingPresence.diff_resource_ids()
-      |> Enum.filter(&Map.has_key?(socket.assigns.events_by_id, &1))
-
-    socket =
-      changed_ids
-      |> Enum.reduce(socket, fn event_id, acc ->
-        stream_insert(
-          acc,
-          :events,
-          Map.fetch!(acc.assigns.events_by_id, event_id)
-        )
-      end)
-      |> assign(:editors_by_event, editors_by_event)
-
-    {:noreply, socket}
+    {:noreply,
+     EditingPresence.refresh_list_stream(socket, payload,
+       resource: :event,
+       stream: :events,
+       by_id: :events_by_id,
+       editors: :editors_by_event
+     )}
   end
 
   def handle_params(params, _uri, socket) do
