@@ -3857,6 +3857,15 @@ defmodule YscWeb.AdminUserDetailsLive do
                title: "Invite User"
              )}
 
+          {:error, :not_primary_user} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Only the family membership holder can send invites.",
+               title: "Invite User"
+             )}
+
           {:error, %Ecto.Changeset{} = changeset} ->
             msg = format_changeset_errors(changeset)
 

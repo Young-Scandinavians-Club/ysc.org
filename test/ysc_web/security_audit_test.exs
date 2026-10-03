@@ -76,6 +76,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 80 (MEDIUM)   Admin social URL settings accepted javascript:/lookalike hosts and rendered them as footer hrefs for every visitor (bypass of Trix scrubber)
   Finding 81 (MEDIUM)   Apple Wallet cover-image fetch had no UrlFetchGuard and followed redirects (SSRF if a media path were poisoned)
   Finding 82 (HIGH)     Admin user notification panel rendered SMS/email bodies in an unsandboxed same-origin srcdoc iframe; SMS bodies embed user-controlled first_name / event titles as plain text, so a crafted name became stored XSS against the admin session
+  Finding 83 (HIGH)     Family sub-accounts with their own lifetime/family membership could mint nested invites (UI hidden, LiveView/context ungated). Accept walked has_active_membership?/1 to the real primary and counted the 10-seat cap on the nested id, granting unpaid membership and bypassing the household limit.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -96,7 +97,7 @@ defmodule YscWeb.SecurityAuditTest do
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Payments
   alias Ysc.Tickets
-  alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
+  alias Ysc.Accounts.{FamilyInvite, FamilyInvites, FamilyMember, User}
   alias Ysc.Subscriptions
   alias Ysc.Accounts.UserToken
   alias Ysc.Repo
@@ -5202,6 +5203,102 @@ defmodule YscWeb.SecurityAuditTest do
       html = render(view)
       refute html =~ ~s(sandbox="allow-scripts")
       refute html =~ ~s(sandbox="allow-same-origin allow-scripts")
+    end
+  end
+
+  # Finding 83 (HIGH): Family sub-accounts must not mint nested invites
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 83: family sub-accounts cannot mint nested invites" do
+    test "lifetime spouse cannot create_invite or grant membership via hidden LiveView event",
+         %{conn: conn} do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      lifetime_sub =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      outsider_email =
+        "nested_#{System.unique_integer([:positive])}@example.com"
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.create_invite(lifetime_sub, outsider_email)
+
+      conn = log_in_user(conn, lifetime_sub)
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render(view)
+
+      html =
+        render_hook(view, "invite_family_member", %{
+          "invite" => %{"email" => outsider_email}
+        })
+
+      assert html =~ "Only the family membership holder can send invites."
+      assert FamilyInvites.list_invites(lifetime_sub) == []
+      assert FamilyInvites.list_invites(primary) == []
+    end
+
+    test "pre-existing nested invite cannot be accepted once the holder is a sub-account" do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      lifetime_sub =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      email = "stale_nested_#{System.unique_integer([:positive])}@example.com"
+
+      invite =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: lifetime_sub.id,
+          created_by_user_id: lifetime_sub.id,
+          relationship: :child
+        })
+        |> Repo.insert!()
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: email,
+                 password: "password1234",
+                 first_name: "Nested",
+                 last_name: "Member",
+                 phone_number: unique_user_phone(),
+                 date_of_birth: Date.shift(Date.utc_today(), year: -10)
+               })
+
+      refute Accounts.get_user_by_email(email)
     end
   end
 

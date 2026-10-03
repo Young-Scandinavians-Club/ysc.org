@@ -201,10 +201,16 @@ defmodule Ysc.Accounts.FamilyInvites do
     primary_user_id = invite.primary_user_id
     relationship = invite.relationship || :child
 
-    from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
-    |> repo.one!()
+    primary =
+      from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
+      |> repo.one!()
 
     cond do
+      # Finding 83: nested invites must not be accepted even if they were
+      # persisted before create_invite started refusing sub-accounts.
+      not is_nil(primary.primary_user_id) ->
+        {:error, :not_primary_user}
+
       not FamilyInvite.valid?(invite) ->
         {:error, :invite_expired_or_used}
 
@@ -790,6 +796,15 @@ defmodule Ysc.Accounts.FamilyInvites do
     cond do
       user.state != :active ->
         {:error, :user_not_active}
+
+      # Finding 83: family sub-accounts must never mint invites. Eligibility
+      # previously only checked lifetime/family on *this* user, so a lifetime
+      # member (or someone with their own family plan) who later joined another
+      # household could invite a nested tree. Accept walked
+      # has_active_membership?/1 up to the real primary and counted the 10-seat
+      # cap against the nested id, bypassing the household limit.
+      Ysc.Accounts.sub_account?(user) ->
+        {:error, :not_primary_user}
 
       not has_family_or_lifetime_membership?(user) ->
         {:error, :invalid_membership_type}
