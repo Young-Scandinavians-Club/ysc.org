@@ -2936,7 +2936,8 @@ defmodule Ysc.Tickets do
       case Ysc.Bookings.create_stripe_refund_for_admin(
              payment_intent.id,
              payment_intent.amount,
-             refund_reason
+             refund_reason,
+             idempotency_key: "unfulfilled_ticket_#{payment_intent.id}"
            ) do
         {:ok, refund} ->
           Ysc.Logging.info(

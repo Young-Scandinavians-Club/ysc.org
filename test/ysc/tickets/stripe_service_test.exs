@@ -427,13 +427,18 @@ defmodule Ysc.Tickets.StripeServiceTest do
          %{
            ticket_order: ticket_order
          } do
-      stub_stripe_mock_retrieve_for_test_refunds()
-
       payment_intent =
         payment_intent_for_order(ticket_order,
           amount: 1,
           latest_charge: "ch_stale_amount_#{ticket_order.id}"
         )
+
+      # process_successful_payment/1 already has the PI struct; the extra
+      # retrieve is from maybe_refund_unfulfilled_ticket_payment/3.
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        assert id == payment_intent.id
+        {:ok, payment_intent}
+      end)
 
       assert {:error, :amount_mismatch} =
                StripeService.process_successful_payment(payment_intent)
@@ -446,8 +451,6 @@ defmodule Ysc.Tickets.StripeServiceTest do
          %{
            ticket_order: ticket_order
          } do
-      stub_stripe_mock_retrieve_for_test_refunds()
-
       Oban.Testing.with_testing_mode(:manual, fn ->
         order = Ysc.Tickets.get_ticket_order(ticket_order.id)
         [%{ticket_tier: tier} | _] = order.tickets
@@ -464,6 +467,11 @@ defmodule Ysc.Tickets.StripeServiceTest do
           )
 
         cancel_timeout_jobs_for_order!(order.id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+          assert id == payment_intent.id
+          {:ok, payment_intent}
+        end)
 
         assert {:error, :amount_mismatch} =
                  StripeService.process_successful_payment(payment_intent)

@@ -3576,7 +3576,14 @@ defmodule Ysc.TicketsTest do
                  :amount_mismatch
                )
 
-      assert String.starts_with?(refund_id, "re_test")
+      assert refund_id == "re_test_unfulfilled_ticket_#{payment_intent.id}"
+
+      assert {:ok, %Stripe.Refund{id: ^refund_id}} =
+               Tickets.maybe_refund_unfulfilled_ticket_payment(
+                 order,
+                 payment_intent,
+                 :amount_mismatch
+               )
     end
 
     test "refunds captured payments when stripe_client leaked to StripeMock" do
@@ -3598,7 +3605,7 @@ defmodule Ysc.TicketsTest do
                  :amount_mismatch
                )
 
-      assert String.starts_with?(refund_id, "re_test")
+      assert refund_id == "re_test_unfulfilled_ticket_#{payment_intent.id}"
     end
 
     test "skips refund for non-refundable verification failures" do
