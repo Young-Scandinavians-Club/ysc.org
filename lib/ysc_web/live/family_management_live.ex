@@ -986,13 +986,21 @@ defmodule YscWeb.FamilyManagementLive do
     family_member_id = params["family_member_id"]
     email = String.trim(params["email"] || "")
 
-    if email == "" do
-      {:noreply,
-       YscWeb.Flash.put_toast(socket, :error, "Please enter an email address.",
-         title: "Family"
-       )}
-    else
-      send_family_invite(socket, user, email, family_member_id)
+    cond do
+      Accounts.sub_account?(user) ->
+        {:noreply, invite_error(socket, :not_primary_user)}
+
+      email == "" ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Please enter an email address.",
+           title: "Family"
+         )}
+
+      true ->
+        send_family_invite(socket, user, email, family_member_id)
     end
   end
 
@@ -1113,6 +1121,9 @@ defmodule YscWeb.FamilyManagementLive do
       case reason do
         :user_not_active ->
           "Your account must be approved by the board before you can send family invitations. We'll email you when your application is approved."
+
+        :not_primary_user ->
+          "Only the family membership holder can send invites."
 
         :invalid_membership_type ->
           "You must have a family or lifetime membership to send invites."

@@ -1019,6 +1019,19 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                FamilyInvites.validate_primary_user_eligibility(user)
     end
 
+    test "returns error for a family sub-account even with lifetime membership" do
+      primary = create_user_with_lifetime_membership()
+      lifetime_sub = create_user_with_lifetime_membership()
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.validate_primary_user_eligibility(lifetime_sub)
+    end
+
     test "returns error when max sub-accounts reached" do
       user = create_user_with_lifetime_membership()
 
@@ -1043,6 +1056,67 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       assert {:error, :max_sub_accounts_reached} =
                FamilyInvites.validate_primary_user_eligibility(user)
+    end
+  end
+
+  describe "Finding 83: family sub-accounts cannot mint nested invites" do
+    test "create_invite/3 refuses a lifetime member who later joined another family" do
+      primary = create_user_with_lifetime_membership()
+      lifetime_sub = create_user_with_lifetime_membership()
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.create_invite(lifetime_sub, unique_user_email())
+    end
+
+    test "create_invite/3 refuses a family-plan member who later joined another family" do
+      primary = create_user_with_family_membership()
+      family_sub = create_user_with_family_membership()
+
+      assert {:ok, family_sub} =
+               Accounts.admin_link_user_to_family(primary, family_sub,
+                 relationship: :spouse
+               )
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.create_invite(family_sub, unique_user_email())
+    end
+
+    test "accept_invite refuses a nested invite already stored under a sub-account" do
+      primary = create_user_with_lifetime_membership()
+      lifetime_sub = create_user_with_lifetime_membership()
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      email = unique_user_email()
+
+      invite =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: lifetime_sub.id,
+          created_by_user_id: lifetime_sub.id,
+          relationship: :child
+        })
+        |> Repo.insert!()
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: email,
+                 password: "password1234",
+                 first_name: "Nested",
+                 last_name: "Member",
+                 phone_number: unique_user_phone(),
+                 date_of_birth: child_birth_date()
+               })
     end
   end
 

@@ -604,6 +604,33 @@ defmodule YscWeb.FamilyManagementLiveTest do
       assert path == ~p"/users/membership"
     end
 
+    test "lifetime sub-account cannot mint nested invites via hidden event", %{
+      conn: conn
+    } do
+      primary = lifetime_member(%{phone_number: unique_phone()})
+      lifetime_sub = lifetime_member(%{phone_number: unique_phone()})
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      conn = log_in_user(conn, lifetime_sub)
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+
+      refute has_element?(view, "#add-family-member-button")
+      refute has_element?(view, "#invite-form")
+
+      html =
+        render_hook(view, "invite_family_member", %{
+          "invite" => %{"email" => unique_user_email()}
+        })
+
+      assert html =~ "Only the family membership holder can send invites."
+      assert FamilyInvites.list_invites(lifetime_sub) == []
+    end
+
     test "leave-family-membership as primary shows error via hook", %{
       conn: conn
     } do
