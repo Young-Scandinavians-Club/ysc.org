@@ -647,6 +647,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
           id: payment_intent_id,
           status: "succeeded",
           amount: 1,
+          latest_charge: "ch_expire_fulfillment_fail_#{order.id}",
           metadata: %{
             "ticket_order_id" => order.id,
             "user_id" => order.user_id
@@ -663,6 +664,12 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
         {:error, stripe_unexpected_state_error()}
       end)
 
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
+
+      # Auto-refund on amount_mismatch retrieves the PI again for the charge id.
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
         {:ok, succeeded_payment_intent}
@@ -892,6 +899,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
           id: payment_intent_id,
           status: "succeeded",
           amount: 1,
+          latest_charge: "ch_fulfillment_fail_#{order.id}",
           metadata: %{
             "ticket_order_id" => order.id,
             "user_id" => order.user_id
@@ -903,6 +911,12 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
         {:error, stripe_unexpected_state_error()}
       end)
 
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
+
+      # Auto-refund on amount_mismatch retrieves the PI again for the charge id.
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
         {:ok, succeeded_payment_intent}
