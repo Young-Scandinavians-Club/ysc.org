@@ -209,43 +209,18 @@ defmodule YscWeb.AdminNewslettersLive do
     {:noreply, stream_insert_edition(socket, edition)}
   end
 
-  # Content inside a `phx-update="stream"` container only updates via
-  # explicit stream operations. `editors_by_edition` is cheap to recompute
-  # (in-memory Presence.list, no DB), but we only force a row re-render for
-  # editions whose presence actually changed *and* are currently visible on
-  # the editions tab (the only tab presence applies to) — everything else
-  # needs neither a DB hit nor a stream touch.
   def handle_info(
         %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload},
         socket
       ) do
-    editors_by_edition =
-      EditingPresence.editors_by_resource(
-        :newsletter,
-        socket.assigns.current_user.id
-      )
-
-    changed_ids =
-      if socket.assigns.current_tab == "editions" do
-        payload
-        |> EditingPresence.diff_resource_ids()
-        |> Enum.filter(&Map.has_key?(socket.assigns.editions_by_id, &1))
-      else
-        []
-      end
-
-    socket =
-      changed_ids
-      |> Enum.reduce(socket, fn edition_id, acc ->
-        stream_insert(
-          acc,
-          :editions,
-          Map.fetch!(acc.assigns.editions_by_id, edition_id)
-        )
-      end)
-      |> assign(:editors_by_edition, editors_by_edition)
-
-    {:noreply, socket}
+    {:noreply,
+     EditingPresence.refresh_list_stream(socket, payload,
+       resource: :newsletter,
+       stream: :editions,
+       by_id: :editions_by_id,
+       editors: :editors_by_edition,
+       visible?: socket.assigns.current_tab == "editions"
+     )}
   end
 
   def handle_info({:edition_sent, edition}, socket) do
