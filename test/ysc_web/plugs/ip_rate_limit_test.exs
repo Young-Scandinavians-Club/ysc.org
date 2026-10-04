@@ -4,17 +4,13 @@ defmodule YscWeb.Plugs.IpRateLimitTest do
   alias YscWeb.Plugs.IpRateLimit
 
   setup do
-    Application.put_env(:ysc, Ysc.AuthRateLimit,
-      ip_limit: 1,
-      identifier_limit: 10_000
-    )
-
-    on_exit(fn ->
-      Application.put_env(:ysc, Ysc.AuthRateLimit,
-        ip_limit: 10_000,
+    token =
+      Ysc.Test.AuthRateLimitHelper.capture!(
+        ip_limit: 1,
         identifier_limit: 10_000
       )
-    end)
+
+    on_exit(fn -> Ysc.Test.AuthRateLimitHelper.restore!(token) end)
 
     :ok
   end
