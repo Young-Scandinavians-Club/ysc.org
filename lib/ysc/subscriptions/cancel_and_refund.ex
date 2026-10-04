@@ -33,6 +33,7 @@ defmodule Ysc.Subscriptions.CancelAndRefund do
           | :payment_not_completed
           | :already_refunded
           | :no_stripe_payment
+          | :unsupported_currency
           | {:cancel_failed, term()}
           | {:refund_failed, struct(), term()}
 
@@ -45,8 +46,18 @@ defmodule Ysc.Subscriptions.CancelAndRefund do
   """
   @spec latest_refundable([Payment.t()]) ::
           {:ok, %{payment: Payment.t(), refundable: Money.t()}}
-          | {:error, :no_payment | :payment_not_completed | :already_refunded}
+          | {:error,
+             :no_payment
+             | :payment_not_completed
+             | :already_refunded
+             | :unsupported_currency}
   def latest_refundable([]), do: {:error, :no_payment}
+
+  # Ledger refund totals are always USD; refuse anything else up front instead
+  # of raising on a currency mismatch when subtracting.
+  def latest_refundable([%Payment{amount: %Money{currency: currency}} | _])
+      when currency != :USD,
+      do: {:error, :unsupported_currency}
 
   def latest_refundable([%Payment{} = payment | _]) do
     case payment.status do
@@ -145,6 +156,16 @@ defmodule Ysc.Subscriptions.CancelAndRefund do
         )
 
         {:error, {:refund_failed, cancelled, reason}}
+
+      unexpected ->
+        Ysc.Logging.error(
+          "Membership cancelled but refund returned unexpected result",
+          payment_id: payment.id,
+          subscription_id: cancelled.id,
+          error: inspect(unexpected)
+        )
+
+        {:error, {:refund_failed, cancelled, unexpected}}
     end
   end
 end

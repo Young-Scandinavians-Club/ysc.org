@@ -3520,13 +3520,13 @@ defmodule YscWeb.AdminUserDetailsLive do
                title: "Cancel & refund"
              )}
 
-          {:error, {:refund_failed, _cancelled, reason}} ->
+          {:error, {:refund_failed, _cancelled, _reason}} ->
             {:noreply,
              socket
              |> assign_subscription_data()
              |> YscWeb.Flash.put_toast(
                :error,
-               "Membership was cancelled, but the refund failed: #{inspect(reason)}. Refund the payment from the Stripe dashboard.",
+               "Membership was cancelled, but the refund failed. Refund the payment from the Stripe dashboard.",
                title: "Cancel & refund"
              )}
 
@@ -4203,6 +4203,9 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp cancel_refund_error_message(:no_stripe_payment),
     do:
       "The latest payment wasn't made through Stripe, so it can't be refunded here."
+
+  defp cancel_refund_error_message(:unsupported_currency),
+    do: "The latest payment isn't in USD, so it can't be refunded here."
 
   defp cancel_refund_error_message({:cancel_failed, _reason}),
     do: "Couldn't cancel the subscription in Stripe. Nothing was refunded."

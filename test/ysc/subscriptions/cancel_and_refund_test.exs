@@ -64,6 +64,17 @@ defmodule Ysc.Subscriptions.CancelAndRefundTest do
       assert {:error, :no_payment} = CancelAndRefund.latest_refundable([])
     end
 
+    test "rejects non-USD payments instead of raising" do
+      payment = %Ysc.Ledgers.Payment{
+        id: Ecto.ULID.generate(),
+        status: :completed,
+        amount: Money.new(:CAD, 100)
+      }
+
+      assert {:error, :unsupported_currency} =
+               CancelAndRefund.latest_refundable([payment])
+    end
+
     test "errors when the latest payment is not completed" do
       user = user_fixture()
       sub = subscription_for(user)
