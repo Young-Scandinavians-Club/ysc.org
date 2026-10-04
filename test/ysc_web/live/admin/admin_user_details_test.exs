@@ -7,6 +7,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.AuthEvent
+  alias Ysc.Ledgers
   alias Ysc.Newsletter
   alias Ysc.Repo
   alias Ysc.Subscriptions
@@ -1408,5 +1409,117 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   defp register_and_log_in_admin(%{conn: conn}) do
     user = user_fixture(%{role: :admin})
     %{conn: log_in_user(conn, user), user: user}
+  end
+
+  describe "membership tab - cancel and refund" do
+    defp active_subscription_for(user) do
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      subscription
+    end
+
+    defp add_membership_payment(user, subscription, attrs) do
+      Ledgers.ensure_basic_accounts()
+
+      {:ok, payment} =
+        Ledgers.create_payment(
+          Map.merge(
+            %{
+              user_id: user.id,
+              external_provider: :stripe,
+              external_payment_id:
+                "in_test_#{System.unique_integer([:positive])}",
+              amount: Money.new(:USD, 100),
+              status: :completed,
+              payment_date: DateTime.utc_now() |> DateTime.truncate(:second)
+            },
+            attrs
+          )
+        )
+
+      for {account, debit_credit} <- [
+            {"stripe_account", :debit},
+            {"membership_revenue", :credit}
+          ] do
+        {:ok, _} =
+          Ledgers.create_entry(%{
+            account_id: Ledgers.get_account_by_name(account).id,
+            payment_id: payment.id,
+            related_entity_type: :membership,
+            related_entity_id: subscription.id,
+            amount: payment.amount,
+            debit_credit: debit_credit
+          })
+      end
+
+      payment
+    end
+
+    defp open_membership_tab(conn, user) do
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> element("a[href$='/details/membership']")
+      |> render_click()
+
+      view
+    end
+
+    test "shows an enabled button and the refund preview for a refundable payment",
+         %{conn: conn} do
+      user = user_fixture()
+      subscription = active_subscription_for(user)
+      add_membership_payment(user, subscription, %{})
+
+      view = open_membership_tab(conn, user)
+
+      assert has_element?(view, "#cancel-refund-membership-section")
+      assert has_element?(view, "#cancel-refund-preview", "$100.00")
+
+      assert has_element?(
+               view,
+               "#cancel-and-refund-membership-button:not([disabled])"
+             )
+    end
+
+    test "disables the button when there is no refundable payment", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      active_subscription_for(user)
+
+      view = open_membership_tab(conn, user)
+
+      assert has_element?(view, "#cancel-refund-unavailable")
+      refute has_element?(view, "#cancel-refund-preview")
+
+      assert has_element?(
+               view,
+               "#cancel-and-refund-membership-button[disabled]"
+             )
+    end
+
+    test "server refuses to cancel when the payment is already refunded",
+         %{conn: conn} do
+      user = user_fixture()
+      subscription = active_subscription_for(user)
+
+      add_membership_payment(user, subscription, %{status: :refunded})
+
+      view = open_membership_tab(conn, user)
+
+      # The button is disabled in the UI; the server must still refuse.
+      render_hook(view, "cancel_and_refund_membership", %{})
+
+      assert Repo.get!(Subscriptions.Subscription, subscription.id).stripe_status ==
+               "active"
+    end
   end
 end
