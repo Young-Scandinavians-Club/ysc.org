@@ -446,6 +446,13 @@ defmodule Ysc.Accounts.FamilyInvites do
       current_user.id == invite.primary_user_id ->
         {:error, :cannot_link_self}
 
+      # Finding 83 leftover: a primary who already has linked members must not
+      # join another household. Their dependents keep primary_user_id pointing
+      # at them, so has_active_membership?/1 walks nested → real primary while
+      # the 10-seat cap only counts direct children of that primary.
+      has_linked_sub_accounts?(current_user) ->
+        {:error, :has_dependent_family_members}
+
       true ->
         case link_date_of_birth_changes(current_user, invite, attrs) do
           {:ok, dob_changes} ->
@@ -497,6 +504,19 @@ defmodule Ysc.Accounts.FamilyInvites do
       case validate_invite_acceptance(Repo, invite) do
         :ok -> :ok
         {:error, reason} -> Repo.rollback(reason)
+      end
+
+      # Serialize against concurrent family links onto this invitee and re-check
+      # dependents under the same lock used for the primary seat cap.
+      from(u in User,
+        where: u.id == ^current_user.id,
+        select: u.id,
+        lock: "FOR UPDATE"
+      )
+      |> Repo.one!()
+
+      if has_linked_sub_accounts?(current_user) do
+        Repo.rollback(:has_dependent_family_members)
       end
 
       updated_user =
@@ -879,6 +899,11 @@ defmodule Ysc.Accounts.FamilyInvites do
   defp count_sub_accounts_by_primary_id(primary_user_id) do
     from(u in User, where: u.primary_user_id == ^primary_user_id)
     |> Repo.aggregate(:count, :id)
+  end
+
+  defp has_linked_sub_accounts?(%User{id: user_id}) do
+    from(u in User, where: u.primary_user_id == ^user_id)
+    |> Repo.exists?()
   end
 
   defp reserved_sub_account_slots(primary_user) do

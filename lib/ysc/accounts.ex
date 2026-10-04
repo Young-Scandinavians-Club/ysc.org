@@ -3922,6 +3922,12 @@ defmodule Ysc.Accounts do
       not primary_user?(primary_user) ->
         {:error, :not_primary_user}
 
+      # Same nested-tree hole as FamilyInvites.link_existing_user/3: linking a
+      # household holder who already has dependents creates a nested chain that
+      # inherits membership while bypassing the direct 10-seat cap.
+      count_sub_accounts_for_primary(user_to_link.id) > 0 ->
+        {:error, :has_dependent_family_members}
+
       not has_family_or_lifetime_membership?(primary_user) ->
         {:error, :primary_must_have_family_or_lifetime}
 
@@ -4003,6 +4009,19 @@ defmodule Ysc.Accounts do
       # Serialize with invite acceptance/linking, which locks the primary row.
       from(u in User, where: u.id == ^primary_user.id, lock: "FOR UPDATE")
       |> Repo.one!()
+
+      # Lock invitee and re-check dependents so a concurrent accept/link cannot
+      # nest a household under this primary after the outer guard passed.
+      from(u in User,
+        where: u.id == ^user_to_link.id,
+        select: u.id,
+        lock: "FOR UPDATE"
+      )
+      |> Repo.one!()
+
+      if count_sub_accounts_for_primary(user_to_link.id) > 0 do
+        Repo.rollback(:has_dependent_family_members)
+      end
 
       case relationship do
         rel when rel in [:spouse, "spouse"] ->

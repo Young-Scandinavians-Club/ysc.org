@@ -1490,6 +1490,40 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert {:error, :already_linked_to_family} =
                FamilyInvites.link_existing_user(invite.token, sub)
     end
+
+    test "returns has_dependent_family_members when invitee already has sub-accounts" do
+      primary_a = create_user_with_lifetime_membership()
+
+      # Invite must be minted before the holder account exists (create_invite
+      # refuses registered emails). Holder then registers, adds dependents, and
+      # tries to accept — which would nest their tree under primary_a.
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_a, email)
+
+      holder = create_user_with_lifetime_membership(%{email: email})
+
+      _dependent =
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: unique_user_email(),
+            password: "password1234",
+            first_name: "Dep",
+            last_name: "Child",
+            phone_number: "+14159098268",
+            date_of_birth: child_birth_date()
+          },
+          holder.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+
+      assert {:error, :has_dependent_family_members} =
+               FamilyInvites.link_existing_user(invite.token, holder)
+
+      assert is_nil(Repo.get!(User, holder.id).primary_user_id)
+    end
   end
 
   describe "adult?/2" do

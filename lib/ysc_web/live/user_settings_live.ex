@@ -4161,6 +4161,15 @@ defmodule YscWeb.UserSettingsLive do
            title: "Membership"
          )}
 
+      {:error, :has_dependent_family_members} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "You already manage linked family members on your own account. Remove them from Family settings before joining another family membership.",
+           title: "Membership"
+         )}
+
       {:error, :date_of_birth_required} ->
         # The acceptance page collects the date of birth before linking.
         {:noreply,

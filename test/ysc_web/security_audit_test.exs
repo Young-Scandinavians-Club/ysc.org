@@ -76,7 +76,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 80 (MEDIUM)   Admin social URL settings accepted javascript:/lookalike hosts and rendered them as footer hrefs for every visitor (bypass of Trix scrubber)
   Finding 81 (MEDIUM)   Apple Wallet cover-image fetch had no UrlFetchGuard and followed redirects (SSRF if a media path were poisoned)
   Finding 82 (HIGH)     Admin user notification panel rendered SMS/email bodies in an unsandboxed same-origin srcdoc iframe; SMS bodies embed user-controlled first_name / event titles as plain text, so a crafted name became stored XSS against the admin session
-  Finding 83 (HIGH)     Family sub-accounts with their own lifetime/family membership could mint nested invites (UI hidden, LiveView/context ungated). Accept walked has_active_membership?/1 to the real primary and counted the 10-seat cap on the nested id, granting unpaid membership and bypassing the household limit.
+  Finding 83 (HIGH)     Family sub-accounts with their own lifetime/family membership could mint nested invites (UI hidden, LiveView/context ungated). Accept walked has_active_membership?/1 to the real primary and counted the 10-seat cap on the nested id, granting unpaid membership and bypassing the household limit. Leftover: a household holder with existing dependents could still join another family via link/admin and bring a nested tree.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -5359,6 +5359,47 @@ defmodule YscWeb.SecurityAuditTest do
                })
 
       refute Accounts.get_user_by_email(email)
+    end
+
+    test "household holder with dependents cannot join another family via link or admin" do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      invite_email =
+        "bring_tree_#{System.unique_integer([:positive])}@example.com"
+
+      {:ok, invite} = FamilyInvites.create_invite(primary, invite_email)
+
+      holder =
+        user_fixture(%{state: :active, email: invite_email})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      _dependent =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          primary_user_id: holder.id,
+          family_relationship: :child
+        })
+        |> Repo.update!()
+
+      assert {:error, :has_dependent_family_members} =
+               FamilyInvites.link_existing_user(invite.token, holder)
+
+      assert {:error, :has_dependent_family_members} =
+               Accounts.admin_link_user_to_family(primary, holder,
+                 relationship: :spouse
+               )
+
+      assert is_nil(Repo.get!(User, holder.id).primary_user_id)
     end
   end
 

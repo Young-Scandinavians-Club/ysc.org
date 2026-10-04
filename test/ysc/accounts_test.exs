@@ -4189,6 +4189,21 @@ defmodule Ysc.AccountsTest do
                Accounts.admin_link_user_to_family(other_primary, already_sub)
     end
 
+    test "admin_link_user_to_family/3 returns has_dependent_family_members when target has sub-accounts" do
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098417"})
+      holder = user_with_lifetime_membership(%{phone_number: "+14159098418"})
+
+      _dependent =
+        oauth_user_fixture(%{phone_number: "+14159098419"})
+        |> Ecto.Changeset.change(%{primary_user_id: holder.id})
+        |> Repo.update!()
+
+      assert {:error, :has_dependent_family_members} =
+               Accounts.admin_link_user_to_family(primary, holder)
+
+      assert is_nil(Repo.get!(User, holder.id).primary_user_id)
+    end
+
     test "admin_link_user_to_family/3 returns primary_must_have_family_or_lifetime when primary has no membership" do
       primary = user_fixture(%{phone_number: "+14159098500"})
       victim = user_fixture(%{phone_number: "+14159098501"})

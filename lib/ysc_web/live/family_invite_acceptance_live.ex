@@ -194,6 +194,15 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
            title: "Invitation"
          )}
 
+      {:error, :has_dependent_family_members} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "You already manage linked family members on your own account. Remove them from Settings > Family before joining another family membership.",
+           title: "Invitation"
+         )}
+
       {:error, :child_is_adult} ->
         {:noreply,
          socket
