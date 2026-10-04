@@ -194,6 +194,8 @@ defmodule Ysc.Tickets.StripeService do
     # so a pre-check failure previously returned `:amount_mismatch` with the
     # Stripe charge still captured and seats unfulfilled — cabin checkout
     # refunds from the LiveView/receipt verify path instead.
+    # `maybe_refund_unfulfilled_ticket_payment/3` also locally cancels the
+    # pending order so seats stop counting toward capacity.
     with {:ok, ticket_order} <-
            get_ticket_order_from_payment_intent(payment_intent),
          {:ok, ticket_order} <-

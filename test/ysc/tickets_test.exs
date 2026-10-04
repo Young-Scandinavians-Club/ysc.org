@@ -3578,6 +3578,11 @@ defmodule Ysc.TicketsTest do
 
       assert refund_id == "re_test_unfulfilled_ticket_#{payment_intent.id}"
 
+      released = Tickets.get_ticket_order(order.id)
+      assert released.status == :cancelled
+      assert released.cancellation_reason == "Payment amount mismatch"
+      assert Enum.all?(released.tickets, &(&1.status == :cancelled))
+
       assert {:ok, %Stripe.Refund{id: ^refund_id}} =
                Tickets.maybe_refund_unfulfilled_ticket_payment(
                  order,

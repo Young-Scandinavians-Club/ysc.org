@@ -1660,7 +1660,8 @@ defmodule YscWeb.SecurityAuditTest do
                Tickets.process_ticket_order_payment(order, payment_intent)
 
       reloaded = Tickets.get_ticket_order(order.id)
-      assert reloaded.status == :pending
+      assert reloaded.status == :cancelled
+      assert reloaded.cancellation_reason == "Payment amount mismatch"
       assert Money.equal?(reloaded.total_amount, Money.new(50, :USD))
     end
   end

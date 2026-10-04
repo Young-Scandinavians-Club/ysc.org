@@ -1601,19 +1601,54 @@ defmodule Ysc.Tickets do
         ok
 
       {:error, fulfillment_error} ->
-        Ysc.Logging.error(
-          "Payment succeeded during checkout reconcile but order could not be fulfilled",
-          ticket_order_id: ticket_order.id,
-          payment_intent_id: payment_intent.id,
-          error: inspect(fulfillment_error)
-        )
+        case released_unfulfilled_mismatch_order(
+               ticket_order,
+               fulfillment_error
+             ) do
+          {:ok, released} = ok ->
+            Ysc.Logging.info(
+              "Released ticket order after unfulfilled succeeded payment was refunded",
+              ticket_order_id: released.id,
+              payment_intent_id: payment_intent.id,
+              status: released.status,
+              error: inspect(fulfillment_error)
+            )
 
-        # Tagged distinctly from a plain cancel/expire failure: the customer's
-        # card was already charged, so callers must not treat this like an
-        # ordinary timeout.
-        {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
+            ok
+
+          :not_released ->
+            Ysc.Logging.error(
+              "Payment succeeded during checkout reconcile but order could not be fulfilled",
+              ticket_order_id: ticket_order.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(fulfillment_error)
+            )
+
+            # Tagged distinctly from a plain cancel/expire failure: the customer's
+            # card was already charged, so callers must not treat this like an
+            # ordinary timeout.
+            {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
+        end
     end
   end
+
+  # Amount-mismatch refunds cancel the pending order (PI is already succeeded,
+  # so Stripe-first cancel would loop back into this fulfill path). TimeoutWorker
+  # wraps expire in a transaction and rollbacks errors; returning {:ok, ...}
+  # here lets that release commit.
+  defp released_unfulfilled_mismatch_order(ticket_order, :amount_mismatch) do
+    case get_ticket_order(ticket_order.id) do
+      %TicketOrder{status: status} = order
+      when status in [:cancelled, :expired] ->
+        {:ok, order}
+
+      _ ->
+        :not_released
+    end
+  end
+
+  defp released_unfulfilled_mismatch_order(_ticket_order, _error),
+    do: :not_released
 
   defp do_expire_ticket_order(ticket_order) do
     now = DateTime.utc_now()
@@ -2916,6 +2951,10 @@ defmodule Ysc.Tickets do
   @doc """
   Refunds a captured Stripe payment when ticket fulfillment fails and the
   order remains uncompleted (for example, tier prices changed during checkout).
+
+  On a successful refund the pending/expired order is cancelled locally
+  (`reconcile_with_stripe: false`): the PaymentIntent has already succeeded, so
+  Stripe-first cancel would try to fulfill again instead of releasing seats.
   """
   def maybe_refund_unfulfilled_ticket_payment(
         %TicketOrder{} = ticket_order,
@@ -2948,6 +2987,12 @@ defmodule Ysc.Tickets do
             reason: normalized_reason
           )
 
+          _ =
+            release_unfulfilled_refunded_ticket_order(
+              ticket_order,
+              normalized_reason
+            )
+
           {:ok, refund}
 
         {:error, refund_error} ->
@@ -2975,6 +3020,27 @@ defmodule Ysc.Tickets do
       ticket_order.status in [:pending, :expired] and
       reason in @refundable_unfulfilled_ticket_errors
   end
+
+  # Stripe will not cancel a succeeded PaymentIntent. After the captured charge
+  # is refunded the pending seats must be released locally so they stop counting
+  # toward capacity and the member can start a new cart. Cabin HoldExpiry
+  # already refunds *and* releases on payment_amount_mismatch.
+  defp release_unfulfilled_refunded_ticket_order(
+         %TicketOrder{} = ticket_order,
+         reason
+       ) do
+    cancel_ticket_order(
+      ticket_order,
+      unfulfilled_ticket_release_reason(reason),
+      reconcile_with_stripe: false
+    )
+  end
+
+  defp unfulfilled_ticket_release_reason(:amount_mismatch),
+    do: "Payment amount mismatch"
+
+  defp unfulfilled_ticket_release_reason(reason) when is_atom(reason),
+    do: "Unfulfilled ticket:#{reason}"
 
   defp normalize_ticket_fulfillment_failure_reason({:error, reason}),
     do: normalize_ticket_fulfillment_failure_reason(reason)
