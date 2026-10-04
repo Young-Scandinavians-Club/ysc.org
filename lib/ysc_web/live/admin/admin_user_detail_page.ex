@@ -3746,6 +3746,15 @@ defmodule YscWeb.AdminUserDetailsLive do
              title: "Link User"
            )}
 
+        {:error, :has_dependent_family_members} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "That user already has linked family members. Remove them first, or link each member individually.",
+             title: "Link User"
+           )}
+
         {:error, :not_primary_user} ->
           {:noreply,
            socket
