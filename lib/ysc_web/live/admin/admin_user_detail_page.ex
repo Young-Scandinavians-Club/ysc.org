@@ -1739,18 +1739,19 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
             </div>
 
+            <%!-- Sticky so the details stay in view while the list is scrolled:
+                 the page scrolls, the list scrolls with it, the panel does not.
+                 The header is pinned; only the message body scrolls. --%>
             <div
               :if={@selected_notification}
               id="resizable-right-panel"
               phx-hook="PanelResizer"
+              phx-window-keydown="close_notification_panel"
+              phx-key="Escape"
               data-target=".resizable-right"
-              class="resizable-right flex-[0_0_auto] bg-white border-l-4 border-zinc-300 hover:border-blue-500 select-none transition-colors flex flex-row"
+              class="resizable-right sticky top-4 self-start flex-[0_0_auto] bg-white border-l-4 border-zinc-300 hover:border-blue-500 transition-colors flex flex-row"
               style={
-                if @panel_width do
-                  "max-height: calc(100vh - 200px); width: #{@panel_width}; flex-shrink: 0;"
-                else
-                  "max-height: calc(100vh - 200px); width: 40%; flex-shrink: 0;"
-                end
+                "max-height: calc(100vh - 2rem); flex-shrink: 0; width: #{@panel_width || "40%"};"
               }
             >
               <div
@@ -1765,61 +1766,26 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
               <div
                 id={"notification-content-#{@selected_notification.id}"}
-                class="flex-1 p-6 overflow-auto"
+                class="flex-1 min-w-0 flex flex-col"
               >
-                <div class="flex justify-between items-start mb-4">
-                  <h3 class="text-lg font-semibold text-zinc-800">
-                    Message Details
-                  </h3>
-                  <button
-                    phx-click="close_notification_panel"
-                    class="text-zinc-400 hover:text-zinc-600"
-                    type="button"
-                  >
-                    <.icon name="hero-x-mark" class="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div class="space-y-4">
-                  <div>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
-                      Sent
-                    </p>
-                    <p class="text-sm text-zinc-800">
-                      {format_datetime_for_display(
-                        @selected_notification.inserted_at
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
-                      Type
-                    </p>
-                    <p class="text-sm text-zinc-800">
+                <div class="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-zinc-200">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-x-1 gap-y-2">
                       <.admin_message_type_badge
                         message_type={@selected_notification.message_type}
                         variant={:detail}
                       />
-                    </p>
-                  </div>
-
-                  <div>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
-                      Template
-                    </p>
-                    <p class="text-sm text-zinc-800">
-                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded-sm">
+                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded-sm break-all">
                         {@selected_notification.message_template}
                       </code>
+                    </div>
+                    <p class="mt-2 text-sm text-zinc-800">
+                      {format_datetime_for_display(
+                        @selected_notification.inserted_at
+                      )}
                     </p>
-                  </div>
-
-                  <div>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
-                      Recipient
-                    </p>
-                    <p class="text-sm text-zinc-800">
+                    <p class="text-sm text-zinc-500 break-all">
+                      <span class="sr-only">Recipient</span>
                       <%= if recipient = AdminBadgeHelpers.message_recipient_text(@selected_notification) do %>
                         {recipient}
                       <% else %>
@@ -1827,7 +1793,21 @@ defmodule YscWeb.AdminUserDetailsLive do
                       <% end %>
                     </p>
                   </div>
+                  <button
+                    id="close-notification-panel"
+                    phx-click="close_notification_panel"
+                    class="shrink-0 text-zinc-400 hover:text-zinc-600"
+                    type="button"
+                    aria-label="Close message details"
+                  >
+                    <.icon name="hero-x-mark" class="w-5 h-5" />
+                  </button>
+                </div>
 
+                <div
+                  id="notification-body"
+                  class="flex-1 min-h-0 overflow-y-auto p-6 space-y-6"
+                >
                   <div>
                     <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
                       Message
