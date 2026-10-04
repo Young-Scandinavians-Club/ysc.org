@@ -371,7 +371,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     if ticket_order_email_data_loaded?(ticket_order) do
       ticket_order
     else
-      case Tickets.get_ticket_order(ticket_order.id) do
+      case Tickets.get_ticket_order_for_email(ticket_order.id) do
         nil ->
           raise ArgumentError, "Ticket order not found: #{ticket_order.id}"
 
@@ -384,8 +384,11 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
   defp ticket_order_email_data_loaded?(ticket_order) do
     Ecto.assoc_loaded?(ticket_order.user) and
       Ecto.assoc_loaded?(ticket_order.event) and
+      Ecto.assoc_loaded?(ticket_order.event.agendas) and
+      Ecto.assoc_loaded?(ticket_order.payment) and
       Ecto.assoc_loaded?(ticket_order.tickets) and
-      ticket_order.tickets != []
+      ticket_order.tickets != [] and
+      Enum.all?(ticket_order.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
   end
 
   # Calculate total discount from tickets (fallback if discount_amount not stored on order)

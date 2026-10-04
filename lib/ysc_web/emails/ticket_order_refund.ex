@@ -51,7 +51,7 @@ defmodule YscWeb.Emails.TicketOrderRefund do
 
     # Always reload so callers that updated related records in the DB see fresh data.
     ticket_order =
-      case Tickets.get_ticket_order(ticket_order.id) do
+      case Tickets.get_ticket_order_for_email(ticket_order.id) do
         nil ->
           raise ArgumentError, "Ticket order not found: #{ticket_order.id}"
 
