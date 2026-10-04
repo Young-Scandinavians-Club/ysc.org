@@ -1,22 +1,20 @@
 defmodule Ysc.H2UpgradeTest do
   @moduledoc """
-  Guards the h2 0.12.1 → 0.12.3 upgrade.
+  Guards the h2 0.12.3 → 0.12.4 upgrade.
 
-  0.12.3 drains DATA already buffered on open streams when a SETTINGS frame
-  raises `SETTINGS_INITIAL_WINDOW_SIZE` (RFC 9113 §6.9.2). The larger window
-  was applied, but nothing flushed the buffers, so a body queued against a
-  zero window stalled until an unrelated WINDOW_UPDATE.
+  0.12.4 keeps existing streams valid after GOAWAY (RFC 9113 §6.8).
+  `goaway_sent` / `goaway_received` used to accept only `send_data`,
+  `send_data_blocking`, and `consume`, so `cancel`, `send_trailers`,
+  `send_response`, and `respond` returned `{error, unknown_request}`.
+  A received GOAWAY also failed to stick: the frame loop put an
+  acked client back in `connected`, so new requests still went out on
+  a closing connection. 0.12.4 shares one per-stream dispatcher and
+  returns `{error, goaway_received}` for new requests.
 
-  0.12.2 is CLI-only: `h2_client` now matches `{closed, Reason}`.
-  `h2_connection` never sent a bare `closed` atom. hackney already handles
-  `{closed, Reason}`. We do not run `h2_client`.
-
-  We do not call h2 APIs in app code. hackney 4.7.4 drives HTTP/2 through
-  `h2_connection` (`start_link/4`, `activate/1`, `wait_connected/2`,
-  `send_request_headers/3,4`, `send_data/4,5`, `cancel_stream/2`,
-  `consume/3`, `close/1`). webtransport uses `h2:connect/3` and
-  `h2:request/4` for WebTransport-over-h2; we do not call that either.
-  `serve_socket/2` is unused. Public client APIs are unchanged.
+  hackney 4.7.4 calls `h2_connection:cancel_stream/2` and
+  `send_trailers/3` after a peer GOAWAY; that is the path this
+  patch fixes. We do not call h2 APIs in app code. Public client
+  APIs are unchanged besides the new `goaway_received` error.
   """
   use ExUnit.Case, async: false
 
@@ -25,6 +23,7 @@ defmodule Ysc.H2UpgradeTest do
   @h2_client_src Path.expand("../../deps/h2/src/h2_client.erl", __DIR__)
   @h2_changelog Path.expand("../../deps/h2/CHANGELOG.md", __DIR__)
   @mix_exs Path.expand("../../mix.exs", __DIR__)
+  @mix_lock Path.expand("../../mix.lock", __DIR__)
   @hackney_rebar Path.expand("../../deps/hackney/rebar.config", __DIR__)
   @hackney_conn Path.expand("../../deps/hackney/src/hackney_conn.erl", __DIR__)
   @webtransport_rebar Path.expand(
@@ -35,6 +34,10 @@ defmodule Ysc.H2UpgradeTest do
                      "../../deps/webtransport/src/webtransport_h2.erl",
                      __DIR__
                    )
+  @hackney_h2_stream Path.expand(
+                       "../../deps/hackney/src/hackney_h2_stream.erl",
+                       __DIR__
+                     )
 
   setup_all do
     {:ok, _} = Application.ensure_all_started(:h2)
@@ -43,14 +46,20 @@ defmodule Ysc.H2UpgradeTest do
     :ok
   end
 
-  describe "0.12.3 Hex lock and public APIs" do
-    test "locks the Hex package to 0.12.3" do
-      assert to_string(Application.spec(:h2, :vsn)) == "0.12.3"
+  describe "0.12.4 Hex lock and public APIs" do
+    test "locks the Hex package to 0.12.4" do
+      assert to_string(Application.spec(:h2, :vsn)) == "0.12.4"
+    end
+
+    test "companion lock is 0.12.4" do
+      lock = File.read!(@mix_lock)
+      assert lock =~ ~s|"h2": {:hex, :h2, "0.12.4"|
+      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.3"|
     end
 
     test "mix.exs override matches hackney and webtransport" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s({:h2, "~> 0.12.3", override: true})
+      assert mix_exs =~ ~s|{:h2, "~> 0.12.4", override: true}|
 
       assert File.read!(@hackney_rebar) =~ ~s|{h2, "~>0.12.0"}|
       assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.12"}|
@@ -70,6 +79,11 @@ defmodule Ysc.H2UpgradeTest do
       assert function_exported?(:h2, :set_stream_handler, 3)
       assert function_exported?(:h2, :cancel, 2)
       assert function_exported?(:h2, :cancel, 3)
+      assert function_exported?(:h2, :goaway, 1)
+      assert function_exported?(:h2, :goaway, 2)
+      assert function_exported?(:h2, :send_trailers, 3)
+      assert function_exported?(:h2, :send_response, 4)
+      assert function_exported?(:h2, :respond, 5)
 
       assert {:module, _} = Code.ensure_loaded(:h2_connection)
       assert function_exported?(:h2_connection, :start_link, 3)
@@ -241,6 +255,112 @@ defmodule Ysc.H2UpgradeTest do
       assert_receive {:h2, ^conn, {:response, ^stream_id, 200, _headers}}, 2_000
       refute_receive {:h2, ^conn, {:data, ^stream_id, _, _}}, 150
       assert Process.alive?(conn)
+    end
+  end
+
+  describe "0.12.4 GOAWAY keeps existing streams alive" do
+    test "changelog documents RFC 9113 §6.8 dispatcher and sticky goaway_received" do
+      changelog = File.read!(@h2_changelog)
+
+      v0124 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.12.4]"))
+
+      assert v0124
+      assert v0124 =~ "RFC 9113 §6.8"
+      assert v0124 =~ "goaway_received"
+      assert v0124 =~ "{error, goaway_received}"
+      assert v0124 =~ "per-stream calls now share one dispatcher"
+      assert v0124 =~ "h2:goaway/1,2"
+      refute v0124 =~ "Breaking"
+    end
+
+    test "connection source dispatches per-stream calls in goaway states" do
+      source = File.read!(@h2_connection_src)
+
+      assert source =~ "handle_stream_call(From, {cancel_stream,"
+      assert source =~ "handle_stream_call(From, {send_trailers,"
+      assert source =~ "handle_stream_call(From, {send_response,"
+      assert source =~ "handle_stream_call(From, {respond,"
+
+      assert source =~
+               "next_frame_state(goaway_received, _NewStateName) -> goaway_received"
+
+      assert source =~ "determine_state_transition(goaway_received, State) ->"
+
+      assert source =~
+               "{keep_state, State, [{reply, From, {error, goaway_received}}]}"
+    end
+
+    test "hackney still cancels streams and sends trailers on h2_connection" do
+      assert File.read!(@hackney_conn) =~
+               "h2_connection:cancel_stream(H2Conn, StreamId)"
+
+      assert File.read!(@hackney_h2_stream) =~
+               "h2_connection:send_trailers(H2Conn, Sid, Trailers)"
+
+      assert File.read!(@hackney_h2_stream) =~
+               "h2_connection:cancel_stream(H2Conn, Sid)"
+    end
+
+    test "server can still respond after sending GOAWAY; client refuses new requests" do
+      handler = fn conn, stream_id, _method, _path, _headers ->
+        assert :ok = :h2.goaway(conn)
+
+        :ok =
+          :h2.send_response(conn, stream_id, 200, [
+            {<<"content-type">>, <<"text/plain">>}
+          ])
+
+        :ok = :h2.send_data(conn, stream_id, "h2-goaway-ok", true)
+      end
+
+      {_server, conn} = start_h2c_client(handler)
+
+      assert {:ok, stream_id} =
+               :h2.request(conn, "GET", "/", [{<<"host">>, <<"127.0.0.1">>}])
+
+      assert_receive {:h2, ^conn, {:goaway, _last, _code}}, 2_000
+
+      assert_receive {:h2, ^conn, {:response, ^stream_id, 200, _headers}}, 2_000
+
+      assert_receive {:h2, ^conn, {:data, ^stream_id, "h2-goaway-ok", true}},
+                     2_000
+
+      assert {:error, :goaway_received} =
+               :h2.request(conn, "GET", "/again", [
+                 {<<"host">>, <<"127.0.0.1">>}
+               ])
+
+      assert :ok = :h2.goaway(conn)
+      assert Process.alive?(conn)
+    end
+
+    test "client can cancel an existing stream after the peer GOAWAY" do
+      test_pid = self()
+
+      handler = fn conn, stream_id, _method, _path, _headers ->
+        send(test_pid, {:server_ready, conn, self(), stream_id})
+
+        receive do
+          :stop -> :ok
+        after
+          2_000 -> :ok
+        end
+      end
+
+      {_server, conn} = start_h2c_client(handler)
+
+      assert {:ok, stream_id} =
+               :h2.request(conn, "GET", "/", [{<<"host">>, <<"127.0.0.1">>}])
+
+      assert_receive {:server_ready, server_conn, handler_pid, _sid}, 2_000
+      assert :ok = :h2.goaway(server_conn)
+      assert_receive {:h2, ^conn, {:goaway, _last, _code}}, 2_000
+      assert :ok = :h2.cancel(conn, stream_id)
+      assert Process.alive?(conn)
+      send(handler_pid, :stop)
     end
   end
 
