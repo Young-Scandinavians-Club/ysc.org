@@ -80,6 +80,22 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       assert data.ticket_summaries != []
     end
 
+    test "builds confirmation data from a bare order via slim email query", %{
+      ticket_order: ticket_order
+    } do
+      data =
+        TicketPurchaseConfirmation.prepare_email_data(%Ysc.Tickets.TicketOrder{
+          id: ticket_order.id
+        })
+
+      assert data.event.title == ticket_order.event.title
+      assert data.ticket_order.reference_id == ticket_order.reference_id
+      assert data.tickets != []
+
+      assert data.first_name ==
+               (ticket_order.user.first_name || "Valued Member")
+    end
+
     test "formats event date with time when start_time is set", %{
       ticket_order: ticket_order
     } do

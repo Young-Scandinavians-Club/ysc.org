@@ -311,16 +311,11 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                  "couldn't load your confirmation"
 
-        reloaded = Repo.get!(Ysc.Tickets.TicketOrder, order.id)
-        assert reloaded.status == :pending
-
-        refute Enum.any?(
-                 Repo.all(
-                   from t in Ysc.Events.Ticket,
-                     where: t.ticket_order_id == ^order.id
-                 ),
-                 &(&1.status == :confirmed)
-               )
+        reloaded = Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :cancelled
+        assert reloaded.cancellation_reason == "Payment amount mismatch"
+        assert Enum.all?(reloaded.tickets, &(&1.status == :cancelled))
+        refute Enum.any?(reloaded.tickets, &(&1.status == :confirmed))
       after
         Application.put_env(:ysc, :stripe_client, original_client)
       end

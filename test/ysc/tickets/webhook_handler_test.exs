@@ -173,8 +173,11 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
                    %{"id" => payment_intent_id}
                  )
 
-        reloaded = Repo.get!(TicketOrder, order.id)
-        assert reloaded.status == :pending
+        reloaded = Ysc.Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :cancelled
+        assert reloaded.cancellation_reason == "Payment amount mismatch"
+        assert Enum.all?(reloaded.tickets, &(&1.status == :cancelled))
+        refute Enum.any?(reloaded.tickets, &(&1.status == :confirmed))
       end)
     end
 

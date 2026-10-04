@@ -1839,6 +1839,121 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "get_ticket_order_for_email/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns order with email preloads", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, _agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      found = Tickets.get_ticket_order_for_email(order.id)
+
+      assert found.id == order.id
+      assert Ecto.assoc_loaded?(found.user)
+      assert Ecto.assoc_loaded?(found.event)
+      assert Ecto.assoc_loaded?(found.event.agendas)
+      assert Ecto.assoc_loaded?(found.payment)
+      assert Ecto.assoc_loaded?(found.tickets)
+
+      assert Enum.all?(found.event.agendas, fn agenda ->
+               Ecto.assoc_loaded?(agenda.agenda_items)
+             end)
+
+      assert Enum.all?(found.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+      assert hd(found.event.agendas).title == "Day 1"
+    end
+
+    test "returns nil for a missing order" do
+      assert Tickets.get_ticket_order_for_email(Ecto.ULID.generate()) == nil
+    end
+
+    test "omits event HTML, purchaser secrets, QuickBooks JSON, and unused columns",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      {:ok, _tier1} =
+        Events.update_ticket_tier(tier1, %{
+          description: "toast copy email must not load"
+        })
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>event body html</p>",
+        rendered_details: "<p>event body html</p>"
+      })
+      |> Ysc.Repo.update!()
+
+      user
+      |> Ecto.Changeset.change(%{
+        board_bio: "board bio email must not load"
+      })
+      |> Ysc.Repo.update!()
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, {payment, _tx, _en}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: order.total_amount,
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id: "pi_email_slim_test",
+          stripe_fee: Money.new(160, :USD),
+          description: "Email slim order",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment
+      |> Ecto.Changeset.change(%{quickbooks_response: %{"Id" => "123"}})
+      |> Ysc.Repo.update!()
+
+      order
+      |> Ecto.Changeset.change(%{
+        payment_id: payment.id,
+        admin_grant_notes: "grant notes email must not load",
+        cancellation_reason: "cancel copy email must not load"
+      })
+      |> Ysc.Repo.update!()
+
+      {_found, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_email(order.id) end,
+          pattern:
+            ~r/hashed_password|board_bio|raw_details|rendered_details|quickbooks_response|admin_grant_notes|cancellation_reason/i,
+          caller_pids: [self()]
+        )
+
+      found = Tickets.get_ticket_order_for_email(order.id)
+      loaded_ticket = hd(found.tickets)
+
+      assert fat_cols == 0
+      assert found.user.email == user.email
+      assert found.user.hashed_password == nil
+      assert found.user.board_bio == nil
+      assert found.event.title == event.title
+      assert found.event.raw_details == nil
+      assert found.event.rendered_details == nil
+      assert found.admin_grant_notes == nil
+      assert found.cancellation_reason == nil
+      assert found.payment.reference_id == payment.reference_id
+      assert found.payment.quickbooks_response == nil
+      assert loaded_ticket.ticket_tier.name == tier1.name
+      assert loaded_ticket.ticket_tier.description == nil
+    end
+  end
+
   describe "complete_ticket_order/2 and cancel_ticket_order/2" do
     setup do
       tickets_setup()
@@ -3577,6 +3692,11 @@ defmodule Ysc.TicketsTest do
                )
 
       assert refund_id == "re_test_unfulfilled_ticket_#{payment_intent.id}"
+
+      released = Tickets.get_ticket_order(order.id)
+      assert released.status == :cancelled
+      assert released.cancellation_reason == "Payment amount mismatch"
+      assert Enum.all?(released.tickets, &(&1.status == :cancelled))
 
       assert {:ok, %Stripe.Refund{id: ^refund_id}} =
                Tickets.maybe_refund_unfulfilled_ticket_payment(

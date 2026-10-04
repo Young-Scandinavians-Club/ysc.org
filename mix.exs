@@ -186,8 +186,13 @@ defmodule Ysc.MixProject do
       # 0.12.3: SETTINGS_INITIAL_WINDOW_SIZE increase drains buffered DATA
       # (RFC 9113 §6.9.2). Unused in app code; hackney still uses
       # h2_connection client APIs.
+      # 0.12.4: existing streams stay valid after GOAWAY (RFC 9113 §6.8);
+      # cancel/trailers/respond work in goaway states. A received GOAWAY
+      # stays in goaway_received so new requests return
+      # {error, goaway_received}. hackney cancel_stream/send_trailers
+      # after a peer GOAWAY used to get {error, unknown_request}.
       {:hackney, "~> 4.7", override: true},
-      {:h2, "~> 0.12.3", override: true},
+      {:h2, "~> 0.12.4", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},

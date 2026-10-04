@@ -635,7 +635,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
 
-    test "returns fulfillment error when succeeded payment cannot complete the order at expire" do
+    test "releases the order after refunding a succeeded amount-mismatched payment at expire" do
       order = ticket_order_fixture()
       payment_intent_id = "pi_expire_fulfillment_fail_#{order.id}"
 
@@ -675,10 +675,9 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
         {:ok, succeeded_payment_intent}
       end)
 
-      assert {:error, {:payment_succeeded_fulfillment_failed, :amount_mismatch}} =
-               Tickets.expire_ticket_order(order)
-
-      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+      assert {:ok, released} = Tickets.expire_ticket_order(order)
+      assert released.status == :cancelled
+      assert released.cancellation_reason == "Payment amount mismatch"
     end
   end
 
@@ -887,7 +886,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
 
-    test "returns fulfillment error when succeeded payment cannot complete the order" do
+    test "releases the order after refunding a succeeded amount-mismatched payment" do
       order = ticket_order_fixture()
       payment_intent_id = "pi_fulfillment_fail_#{order.id}"
 
@@ -922,10 +921,11 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
         {:ok, succeeded_payment_intent}
       end)
 
-      assert {:error, {:payment_succeeded_fulfillment_failed, :amount_mismatch}} =
+      assert {:ok, released} =
                Tickets.cancel_ticket_order(order, "User left checkout")
 
-      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+      assert released.status == :cancelled
+      assert released.cancellation_reason == "Payment amount mismatch"
     end
 
     test "still cancels completed orders after refund without payment guard" do
