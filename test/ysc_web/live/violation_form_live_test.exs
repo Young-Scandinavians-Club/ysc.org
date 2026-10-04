@@ -14,17 +14,60 @@ defmodule YscWeb.ViolationFormLiveTest do
       user = user_fixture(%{phone_number: "+14155559999"})
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/report-conduct-violation")
+      {:ok, view, _html} = live(conn, ~p"/report-conduct-violation")
 
-      assert html =~ "Report a concern"
-      assert html =~ "What happened?"
-      refute html =~ "Violation Summary"
-      assert html =~ "kept private"
-      refute html =~ "confidentiality protocols"
-      assert html =~ "if your report is about a current board member"
-      refute html =~ "if your violation involves"
-      assert html =~ "Keep my name private from the people this report is about"
-      refute html =~ "parties involved"
+      assert has_element?(view, "#violation-form")
+      assert render(view) =~ "Report a concern"
+      assert render(view) =~ "What happened?"
+      refute render(view) =~ "Violation Summary"
+      refute render(view) =~ "confidentiality protocols"
+      refute render(view) =~ "if your violation involves"
+      refute render(view) =~ "private channel"
+      refute render(view) =~ "unless you choose otherwise below"
+
+      refute render(view) =~
+               "will not be shared with the people involved in what happened"
+
+      assert has_element?(view, "#report-privacy-note")
+      assert has_element?(view, "#report-privacy-choice")
+      assert has_element?(view, "#report-privacy-choice-help")
+      assert has_element?(view, "#board-member-notice")
+      assert has_element?(view, "#board-member-notice a[href='/contact']")
+
+      assert render(view) =~
+               "The board reviews every report privately and with care."
+
+      assert render(view) =~
+               "Keep my name private from the people this report is about"
+
+      assert render(view) =~
+               "If you leave this unchecked, the board may share your name"
+
+      assert render(view) =~
+               "Check the box at the bottom if you want your name hidden"
+
+      refute has_element?(
+               view,
+               "input[name='conduct_form[anonymous]'][type='checkbox'][checked]"
+             )
+    end
+
+    test "shows the same privacy choice copy to guests", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/report-conduct-violation")
+
+      assert has_element?(view, "#report-privacy-note")
+      assert has_element?(view, "#report-privacy-choice-help")
+      assert has_element?(view, "#board-member-notice a[href='/contact']")
+
+      assert render(view) =~
+               "If you leave this unchecked, the board may share your name"
+
+      refute render(view) =~ "unless you choose otherwise below"
+
+      refute has_element?(
+               view,
+               "input[name='conduct_form[anonymous]'][type='checkbox'][checked]"
+             )
     end
   end
 
