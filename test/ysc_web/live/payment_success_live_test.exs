@@ -270,6 +270,61 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         Application.put_env(:ysc, :stripe_client, original_client)
       end
     end
+
+    test "refunds a captured redirect payment when the tier price changed after checkout",
+         %{
+           conn: conn,
+           user: user,
+           order: order
+         } do
+      order = Tickets.get_ticket_order(order.id)
+      [%{ticket_tier: tier} | _] = order.tickets
+      stale_amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier, %{price: Money.new(99, :USD)})
+
+      payment_intent_id = "pi_ticket_reprice_#{order.id}"
+
+      client_module =
+        stripe_client_module(
+          %{"ticket_order_id" => order.id, "user_id" => user.id},
+          amount_cents: stale_amount_cents,
+          latest_charge: "ch_ticket_reprice_#{order.id}",
+          notify: self()
+        )
+
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        redirect =
+          live(
+            conn,
+            ~p"/payment/success?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
+          )
+
+        {:ok, conn} = follow_redirect(redirect, conn)
+
+        assert_received {:refund_retrieve, ^payment_intent_id}
+
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+                 "couldn't load your confirmation"
+
+        reloaded = Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        assert reloaded.status == :pending
+
+        refute Enum.any?(
+                 Repo.all(
+                   from t in Ysc.Events.Ticket,
+                     where: t.ticket_order_id == ^order.id
+                 ),
+                 &(&1.status == :confirmed)
+               )
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+      end
+    end
   end
 
   describe "mount/3 - security and authorization" do
@@ -708,6 +763,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
   defp stripe_client_module(metadata, opts \\ []) do
     status = Keyword.get(opts, :status, "succeeded")
     amount_cents = Keyword.get(opts, :amount_cents)
+    latest_charge = Keyword.get(opts, :latest_charge)
     unique = System.unique_integer([:positive])
 
     notify_name =
@@ -726,6 +782,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         @metadata unquote(Macro.escape(metadata))
         @status unquote(status)
         @amount_cents unquote(amount_cents)
+        @latest_charge unquote(latest_charge)
         @notify unquote(notify_name)
 
         def create_payment_intent(_params, _opts),
@@ -763,7 +820,11 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         def update_customer(_id, _params), do: {:error, :not_implemented}
         def retrieve_payment_method(_id), do: {:error, :not_implemented}
 
-        def retrieve_payment_intent(id, _opts) do
+        def retrieve_payment_intent(id, opts) do
+          if @notify && opts == %{expand: ["latest_charge"]} do
+            send(@notify, {:refund_retrieve, id})
+          end
+
           payment_intent = %Stripe.PaymentIntent{
             id: id,
             metadata: @metadata,
@@ -774,6 +835,12 @@ defmodule YscWeb.PaymentSuccessLiveTest do
             case @amount_cents do
               nil -> payment_intent
               amount -> %{payment_intent | amount: amount}
+            end
+
+          payment_intent =
+            case @latest_charge do
+              nil -> payment_intent
+              charge -> %{payment_intent | latest_charge: charge}
             end
 
           {:ok, payment_intent}

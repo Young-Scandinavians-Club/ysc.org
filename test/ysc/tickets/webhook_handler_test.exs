@@ -15,6 +15,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
   import Ysc.TicketsFixtures
 
+  alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Tickets.WebhookHandler
@@ -120,6 +121,61 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       # Verify the function returns :ok for unknown events
       result = WebhookHandler.handle_webhook_event("unknown.event", %{})
       assert :ok == result
+    end
+
+    test "refunds a captured payment_intent.succeeded when the tier was repriced after checkout" do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        cancel_timeout_jobs_for_order!(ticket_order.id)
+
+        order = Ysc.Tickets.get_ticket_order(ticket_order.id)
+        [%{ticket_tier: tier} | _] = order.tickets
+        stale_amount_cents = MoneyHelper.money_to_cents(order.total_amount)
+
+        {:ok, _tier} =
+          Ysc.Events.update_ticket_tier(tier, %{price: Money.new(99, :USD)})
+
+        payment_intent_id = "pi_webhook_reprice_#{order.id}"
+
+        payment_intent = %Stripe.PaymentIntent{
+          id: payment_intent_id,
+          status: "succeeded",
+          amount: stale_amount_cents,
+          latest_charge: "ch_webhook_reprice_#{order.id}",
+          metadata: %{
+            "ticket_order_id" => order.id,
+            "user_id" => order.user_id
+          }
+        }
+
+        # process_successful_payment/1 looks the PI up by id.
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+          assert id == payment_intent_id
+          {:ok, payment_intent}
+        end)
+
+        # Auto-refund retrieves again for the charge id.
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, opts ->
+          assert id == payment_intent_id
+          assert opts == %{expand: ["latest_charge"]}
+          {:ok, payment_intent}
+        end)
+
+        pin_stripe_mock!()
+
+        # Webhook always returns :ok so Stripe will not retry. The refund must
+        # happen on this first (and only) delivery.
+        assert :ok =
+                 WebhookHandler.handle_webhook_event(
+                   "payment_intent.succeeded",
+                   %{"id" => payment_intent_id}
+                 )
+
+        reloaded = Repo.get!(TicketOrder, order.id)
+        assert reloaded.status == :pending
+      end)
     end
 
     test "returns :ok even when StripeService returns error" do

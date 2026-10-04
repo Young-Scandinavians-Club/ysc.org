@@ -434,9 +434,10 @@ defmodule Ysc.Tickets.StripeServiceTest do
         )
 
       # process_successful_payment/1 already has the PI struct; the extra
-      # retrieve is from maybe_refund_unfulfilled_ticket_payment/3.
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+      # retrieve with expand is from maybe_refund_unfulfilled_ticket_payment/3.
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, opts ->
         assert id == payment_intent.id
+        assert opts == %{expand: ["latest_charge"]}
         {:ok, payment_intent}
       end)
 
@@ -468,8 +469,9 @@ defmodule Ysc.Tickets.StripeServiceTest do
 
         cancel_timeout_jobs_for_order!(order.id)
 
-        expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn id, opts ->
           assert id == payment_intent.id
+          assert opts == %{expand: ["latest_charge"]}
           {:ok, payment_intent}
         end)
 
@@ -479,6 +481,8 @@ defmodule Ysc.Tickets.StripeServiceTest do
         reloaded = Ysc.Tickets.get_ticket_order(order.id)
         assert reloaded.status == :pending
         assert Money.equal?(reloaded.total_amount, Money.new(99, :USD))
+
+        refute Enum.any?(reloaded.tickets, &(&1.status == :confirmed))
       end)
     end
 
