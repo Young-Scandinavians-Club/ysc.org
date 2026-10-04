@@ -1245,6 +1245,83 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     end
   end
 
+  describe "admin sent notifications panel" do
+    setup do
+      user = user_fixture()
+
+      {:ok, message} =
+        %Ysc.Messages.MessageIdempotency{user_id: user.id}
+        |> Ysc.Messages.MessageIdempotency.changeset(%{
+          message_type: :email,
+          idempotency_key: "panel_test_#{System.unique_integer([:positive])}",
+          message_template: "booking_checkout_reminder",
+          email: user.email,
+          params: %{"first_name" => "Stian"},
+          rendered_message: "<html><body><p>Hello</p></body></html>"
+        })
+        |> Ysc.Repo.insert()
+
+      %{user: user, message: message}
+    end
+
+    test "detail panel is sticky and keeps its header outside the scroll body",
+         %{conn: conn, user: user, message: message} do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/notifications")
+
+      render_async(view)
+
+      refute has_element?(view, "#resizable-right-panel")
+
+      view
+      |> element("tr[phx-value-id='#{message.id}']")
+      |> render_click()
+
+      assert has_element?(view, "#resizable-right-panel.sticky")
+
+      assert has_element?(
+               view,
+               "#resizable-right-panel #close-notification-panel"
+             )
+
+      assert has_element?(
+               view,
+               "#notification-body #email-preview-#{message.id}"
+             )
+
+      refute has_element?(
+               view,
+               "#notification-body #close-notification-panel"
+             )
+    end
+
+    test "close button and Escape both dismiss the panel", %{
+      conn: conn,
+      user: user,
+      message: message
+    } do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/notifications")
+
+      render_async(view)
+
+      view |> element("tr[phx-value-id='#{message.id}']") |> render_click()
+      assert has_element?(view, "#resizable-right-panel")
+
+      view |> element("#close-notification-panel") |> render_click()
+      refute has_element?(view, "#resizable-right-panel")
+
+      view |> element("tr[phx-value-id='#{message.id}']") |> render_click()
+      assert has_element?(view, "#resizable-right-panel")
+
+      view
+      |> element("#resizable-right-panel")
+      |> render_keydown(%{"key" => "Escape"})
+
+      refute has_element?(view, "#resizable-right-panel")
+    end
+  end
+
   describe "admin notification preferences" do
     test "notifications tab shows preferences form collapsed by default", %{
       conn: conn
