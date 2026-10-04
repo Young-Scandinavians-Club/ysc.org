@@ -69,6 +69,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
                id: id,
                status: "succeeded",
                amount: @mock_amount,
+               latest_charge: %Stripe.Charge{id: "ch_test_#{id}"},
                metadata: @mock_metadata
              }}
           end
@@ -613,7 +614,9 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
                  Tickets.process_ticket_order_payment(order, pi_id)
 
         reloaded = Tickets.get_ticket_order(order.id)
-        assert reloaded.status == :pending
+        assert reloaded.status == :cancelled
+        assert reloaded.cancellation_reason == "Payment amount mismatch"
+        assert Enum.all?(reloaded.tickets, &(&1.status == :cancelled))
         assert Money.equal?(reloaded.total_amount, Money.new(50, :USD))
       end
     )
@@ -657,7 +660,9 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
                  Tickets.process_ticket_order_payment(order, pi_id)
 
         reloaded = Tickets.get_ticket_order(order.id)
-        assert reloaded.status == :pending
+        assert reloaded.status == :cancelled
+        assert reloaded.cancellation_reason == "Payment amount mismatch"
+        assert Enum.all?(reloaded.tickets, &(&1.status == :cancelled))
         assert Money.equal?(reloaded.total_amount, Money.new(50, :USD))
       end
     )

@@ -444,7 +444,9 @@ defmodule Ysc.Tickets.StripeServiceTest do
                StripeService.process_successful_payment(payment_intent)
 
       reloaded = Ysc.Tickets.get_ticket_order(ticket_order.id)
-      assert reloaded.status == :pending
+      assert reloaded.status == :cancelled
+      assert reloaded.cancellation_reason == "Payment amount mismatch"
+      assert Enum.all?(reloaded.tickets, &(&1.status == :cancelled))
     end
 
     test "refunds a captured PaymentIntent when tier price changed after the Intent was created",
@@ -477,8 +479,20 @@ defmodule Ysc.Tickets.StripeServiceTest do
                  StripeService.process_successful_payment(payment_intent)
 
         reloaded = Ysc.Tickets.get_ticket_order(order.id)
-        assert reloaded.status == :pending
+        assert reloaded.status == :cancelled
+        assert reloaded.cancellation_reason == "Payment amount mismatch"
+        assert Enum.all?(reloaded.tickets, &(&1.status == :cancelled))
         assert Money.equal?(reloaded.total_amount, Money.new(99, :USD))
+
+        assert {:ok, new_order} =
+                 Ysc.Tickets.create_ticket_order(
+                   order.user_id,
+                   order.event_id,
+                   %{tier.id => 1}
+                 )
+
+        assert new_order.status == :pending
+        assert new_order.id != order.id
       end)
     end
 
