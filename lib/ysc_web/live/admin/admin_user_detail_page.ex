@@ -25,6 +25,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Payments
   alias Ysc.Repo
   alias Ysc.Subscriptions
+  alias Ysc.Subscriptions.CancelAndRefund
   alias Ysc.Tickets
   alias YscWeb.AdminBookingEntitlementHelpers
   alias YscWeb.Authorization.Policy
@@ -1211,6 +1212,55 @@ defmodule YscWeb.AdminUserDetailsLive do
                     </.button>
                   </div>
                 </.simple_form>
+              </div>
+
+              <div
+                :if={@current_user.role == :admin}
+                id="cancel-refund-membership-section"
+                class="border-t border-zinc-200 pt-6"
+              >
+                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                  Cancel &amp; Refund Membership
+                </h3>
+                <p class="text-sm text-zinc-600 mb-4">
+                  Ends this membership immediately in Stripe (no further renewals) and refunds the most recent payment. This cannot be undone.
+                </p>
+                <p
+                  :if={@cancel_refund_preview}
+                  id="cancel-refund-preview"
+                  class="text-sm text-zinc-800 mb-4"
+                >
+                  <span class="font-semibold">Will refund:</span>
+                  {Ysc.MoneyHelper.format_money!(@cancel_refund_preview.refundable)} from the payment on {format_datetime_for_display(
+                    @cancel_refund_preview.payment.payment_date
+                  )}
+                </p>
+                <p
+                  :if={!@cancel_refund_preview}
+                  id="cancel-refund-unavailable"
+                  class="text-sm text-zinc-500 mb-4"
+                >
+                  The latest payment can't be refunded (none found, not completed, or already refunded).
+                </p>
+                <div class="flex flex-row justify-end w-full">
+                  <.button
+                    id="cancel-and-refund-membership-button"
+                    type="button"
+                    variant="outline"
+                    color="red"
+                    phx-click="cancel_and_refund_membership"
+                    phx-disable-with="Cancelling..."
+                    disabled={is_nil(@cancel_refund_preview)}
+                    data-confirm={
+                      if @cancel_refund_preview do
+                        "Cancel this membership immediately and refund #{Ysc.MoneyHelper.format_money!(@cancel_refund_preview.refundable)} to the member? This cannot be undone."
+                      end
+                    }
+                  >
+                    <.icon name="hero-x-circle" class="w-5 h-5 mb-0.5 me-1" />
+                    Cancel immediately &amp; refund latest payment
+                  </.button>
+                </div>
               </div>
 
               <div class="border-t border-zinc-200 pt-6">
@@ -3129,6 +3179,10 @@ defmodule YscWeb.AdminUserDetailsLive do
            |> assign(:active_subscription, subscription)
            |> assign(:subscription_payments, subscription_payments)
            |> assign(
+             :cancel_refund_preview,
+             cancel_refund_preview(subscription_payments)
+           )
+           |> assign(
              :membership_form,
              to_form(membership_changeset, as: "membership")
            )
@@ -3427,6 +3481,65 @@ defmodule YscWeb.AdminUserDetailsLive do
      socket
      |> assign(:unsealed_account_id, nil)
      |> assign(:unsealed_account, nil)}
+  end
+
+  def handle_event("cancel_and_refund_membership", _params, socket) do
+    current_user = socket.assigns.current_user
+    subscription = socket.assigns[:active_subscription]
+
+    cond do
+      current_user.role != :admin ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Not authorized.",
+           title: "Cancel & refund"
+         )}
+
+      is_nil(subscription) ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "No active subscription found.",
+           title: "Cancel & refund"
+         )}
+
+      true ->
+        case CancelAndRefund.run(subscription) do
+          {:ok, %{payment: payment, refund: refund}} ->
+            Ysc.Logging.info("Admin cancelled membership and refunded payment",
+              admin_id: current_user.id,
+              user_id: socket.assigns.selected_user.id,
+              subscription_id: subscription.id,
+              payment_id: payment.id,
+              refund_id: refund.id
+            )
+
+            {:noreply,
+             socket
+             |> assign_subscription_data()
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Membership cancelled and #{Ysc.MoneyHelper.format_money!(refund.amount)} refunded.",
+               title: "Cancel & refund"
+             )}
+
+          {:error, {:refund_failed, _cancelled, reason}} ->
+            {:noreply,
+             socket
+             |> assign_subscription_data()
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Membership was cancelled, but the refund failed: #{inspect(reason)}. Refund the payment from the Stripe dashboard.",
+               title: "Cancel & refund"
+             )}
+
+          {:error, reason} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               cancel_refund_error_message(reason),
+               title: "Cancel & refund"
+             )}
+        end
+    end
   end
 
   @dialyzer {:nowarn_function, handle_event: 3}
@@ -4060,6 +4173,40 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp format_datetime_local(nil), do: ""
   defp format_datetime_local(datetime) when is_binary(datetime), do: datetime
 
+  defp cancel_refund_preview(payments) do
+    case CancelAndRefund.latest_refundable(payments) do
+      {:ok, preview} -> preview
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp assign_subscription_data(socket) do
+    {subscription, payments} =
+      fetch_subscription_data(socket.assigns.selected_user)
+
+    socket
+    |> assign(:active_subscription, subscription)
+    |> assign(:subscription_payments, payments)
+    |> assign(:cancel_refund_preview, cancel_refund_preview(payments))
+    |> assign(:scheduled_downgrade_info, nil)
+  end
+
+  defp cancel_refund_error_message(:no_payment),
+    do: "No payment found for this membership."
+
+  defp cancel_refund_error_message(:payment_not_completed),
+    do: "The latest payment isn't completed, so it can't be refunded."
+
+  defp cancel_refund_error_message(:already_refunded),
+    do: "The latest payment has already been fully refunded."
+
+  defp cancel_refund_error_message(:no_stripe_payment),
+    do:
+      "The latest payment wasn't made through Stripe, so it can't be refunded here."
+
+  defp cancel_refund_error_message({:cancel_failed, _reason}),
+    do: "Couldn't cancel the subscription in Stripe. Nothing was refunded."
+
   defp fetch_subscription_data(user) do
     case Subscriptions.get_active_subscription(user) do
       nil ->
@@ -4587,6 +4734,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:selected_user_application, nil)
     |> assign(:active_subscription, nil)
     |> assign(:subscription_payments, [])
+    |> assign(:cancel_refund_preview, nil)
     |> assign(:default_payment_method, nil)
     |> assign(:scheduled_downgrade_info, nil)
     |> assign(:has_lifetime_membership, false)
@@ -4741,6 +4889,10 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:selected_user_application, application)
       |> assign(:active_subscription, active_subscription)
       |> assign(:subscription_payments, subscription_payments)
+      |> assign(
+        :cancel_refund_preview,
+        cancel_refund_preview(subscription_payments)
+      )
       |> assign(:default_payment_method, default_payment_method)
       |> assign(:has_lifetime_membership, has_lifetime)
       |> assign(:membership_paused_by_board, board_member)
