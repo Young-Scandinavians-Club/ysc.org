@@ -100,6 +100,23 @@ function radarGlyphTransformRequest(url) {
     }
 }
 
+/**
+ * Replaces the map canvas with a short message when the map can't be rendered
+ * (e.g. WebGL unavailable). Idempotent.
+ *
+ * @param {HTMLElement} el - the hook element (map container)
+ */
+function showMapUnavailable(el) {
+    if (el.querySelector("[data-map-unavailable]")) return;
+
+    const message = document.createElement("div");
+    message.setAttribute("data-map-unavailable", "true");
+    message.className =
+        "flex h-full w-full items-center justify-center bg-zinc-50 p-4 text-center text-sm text-zinc-500";
+    message.textContent = "The map couldn't be displayed in this browser.";
+    el.appendChild(message);
+}
+
 export default RadarMap = {
     async mounted() {
         this._radarActive = true;
@@ -268,11 +285,23 @@ export default RadarMap = {
         };
 
         const initMap = () => {
-            const instance = window.Radar.ui.map({
-                container: elementID,
-                transformRequest: radarGlyphTransformRequest,
-                cooperativeGestures,
-            });
+            let instance;
+            try {
+                instance = window.Radar.ui.map({
+                    container: elementID,
+                    transformRequest: radarGlyphTransformRequest,
+                    cooperativeGestures,
+                });
+            } catch (error) {
+                // Typically "Failed to initialize WebGL" — blocked/unsupported GPU, sandboxed
+                // or headless browsers, exhausted contexts. Not actionable on our side, so
+                // degrade gracefully instead of raising an unhandled rejection.
+                map = null;
+                this._radarMap = null;
+                console.warn("Radar map could not be initialized:", error);
+                showMapUnavailable(this.el);
+                return;
+            }
 
             map = instance;
             this._radarMap = instance;
