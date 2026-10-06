@@ -4901,9 +4901,12 @@ defmodule YscWeb.EventDetailsLive do
     # Cancel any pending ticket order when the LiveView terminates
     # BUT don't cancel if a payment redirect is in progress (e.g., Amazon Pay, CashApp)
     # The payment success page will handle the redirect back
-    if socket.assigns.ticket_order && socket.assigns.show_payment_modal do
+    # mount/3 can redirect (e.g. "Event not found") before these assigns are set
+    ticket_order = socket.assigns[:ticket_order]
+
+    if ticket_order && socket.assigns[:show_payment_modal] do
       maybe_cancel_pending_ticket_order(
-        socket.assigns.ticket_order,
+        ticket_order,
         "User left checkout",
         payment_redirect_in_progress:
           socket.assigns[:payment_redirect_in_progress],
