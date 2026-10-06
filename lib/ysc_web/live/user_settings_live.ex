@@ -3663,12 +3663,48 @@ defmodule YscWeb.UserSettingsLive do
                title: "Membership"
              )}
 
+          {:error, :user_already_has_active_subscription} ->
+            require Ysc.Logging
+
+            # Expected when the user double-submits or already has a
+            # subscription in Stripe; not an application error.
+            Ysc.Logging.warning(
+              "User already has active subscription, skipping create",
+              user_id: user.id
+            )
+
+            invalidate_membership_cache(user)
+
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Your membership is already set up. If you don't see it yet, give it a moment and refresh the page.",
+               title: "Membership"
+             )
+             |> push_patch(to: ~p"/users/membership")}
+
+          {:error, %Stripe.Error{code: :card_error} = error} ->
+            require Ysc.Logging
+
+            # Card/bank declines are user-facing outcomes, not bugs.
+            Ysc.Logging.warning("Subscription payment was declined",
+              user_id: user.id,
+              error: inspect(error)
+            )
+
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, format_payment_error(error),
+               title: "Membership"
+             )}
+
           {:error, error} ->
             require Ysc.Logging
 
             Ysc.Logging.error("Failed to create subscription",
               user_id: user.id,
-              error: error
+              error: inspect(error)
             )
 
             error_message = format_payment_error(error)
