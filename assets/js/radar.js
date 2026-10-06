@@ -142,7 +142,7 @@ export default RadarMap = {
         });
 
         this.handleEvent("position", () => {
-            if (map) map.fitToMarkers({ maxZoom: 14, padding: 80 });
+            if (map && map.style) map.fitToMarkers({ maxZoom: 14, padding: 80 });
         });
 
         try {
@@ -175,28 +175,14 @@ export default RadarMap = {
 
         const cooperativeGestures = this.el.dataset.cooperativeGestures !== "false";
 
-        map = window.Radar.ui.map({
-            container: elementID,
-            transformRequest: radarGlyphTransformRequest,
-            cooperativeGestures,
-        });
-
-        this._radarMap = map;
-
-        // Radar styles sometimes reference sprite icons (e.g. "viewpoint") not present for every zoom/style combo.
-        map.on("styleimagemissing", (e) => {
-            try {
-                if (e.id !== "viewpoint") return;
-                if (typeof map.hasImage === "function" && map.hasImage(e.id)) return;
-                map.addImage(e.id, {
-                    width: 1,
-                    height: 1,
-                    data: new Uint8Array(4),
-                });
-            } catch {
-                /* ignore — avoid breaking map load */
-            }
-        });
+        // Safari (and mobile browsers generally) can drop the WebGL context, e.g. when the
+        // tab is backgrounded or GPU memory is reclaimed. MapLibre then destroys its style
+        // and sets `map.style = null`, so any further call on that instance throws
+        // "null is not an object (evaluating 'this.style.imageManager')". Instead of
+        // touching the dead map we tear it down and build a fresh one.
+        const MAX_CONTEXT_REBUILDS = 3;
+        const CONTEXT_REBUILD_DELAY_MS = 1000;
+        let contextRebuilds = 0;
 
         const verifyMarker = (marker) => {
             if (!marker) return false;
@@ -208,12 +194,13 @@ export default RadarMap = {
         };
 
         const isMapReady = () => {
+            if (!map || !map.style) return false;
             if (typeof map.loaded === 'function') return map.loaded();
             return true;
         };
 
         const setMarker = (lat, lon) => {
-            if (!lat || !lon) return false;
+            if (!map || !map.style || !lat || !lon) return false;
 
             try {
                 if (existingMarker) existingMarker.remove();
@@ -230,6 +217,8 @@ export default RadarMap = {
         };
 
         const addMarkerWithRetry = (attempts = 0) => {
+            if (!this._radarActive) return;
+
             if (attempts > 20) {
                 console.warn("Map marker retry limit reached. Marker may not be visible.");
                 return;
@@ -246,52 +235,127 @@ export default RadarMap = {
             setTimeout(() => addMarkerWithRetry(attempts + 1), 500);
         };
 
-        map.on("load", () => {
-            if (pendingMarker) {
-                const { lat, lon } = pendingMarker;
-                if (setMarker(lat, lon)) pendingMarker = null;
-            }
+        const handleContextLost = (instance) => {
+            if (map !== instance || !this._radarActive) return;
 
-            if (existingMarker) {
-                if (verifyMarker(existingMarker)) {
-                    setTimeout(() => map.fitToMarkers({ maxZoom: 14, padding: 80 }), 300);
-                } else {
-                    map.fitToMarkers({ maxZoom: 14, padding: 80 });
-                }
-            }
-        });
-
-        map.on("click", (e) => {
-            if (!this._radarActive) return;
-            if (locked) return;
-            if (typeof map.loaded === 'function' && !map.loaded()) return;
-
-            if (existingMarker) existingMarker.remove();
-
-            const { lng, lat } = e.lngLat;
+            // Keep the marker position so the replacement map can restore it.
             try {
-                existingMarker = Radar.ui.marker().setLngLat([lng, lat]).addTo(map);
+                const lngLat = existingMarker?.getLngLat?.();
+                if (lngLat) pendingMarker = { lat: lngLat.lat, lon: lngLat.lng };
+            } catch (_) {
+                /* ignore */
+            }
+            existingMarker = null;
 
-                if (!verifyMarker(existingMarker)) {
-                    console.error("Failed to attach marker to map");
-                    return;
+            map = null;
+            this._radarMap = null;
+            try {
+                instance.remove();
+            } catch (_) {
+                /* style is already gone — nothing left to clean up */
+            }
+
+            if (contextRebuilds >= MAX_CONTEXT_REBUILDS) {
+                console.warn("Radar map lost its WebGL context; giving up after repeated rebuilds.");
+                return;
+            }
+
+            contextRebuilds += 1;
+            this._radarRebuildTimer = setTimeout(() => {
+                this._radarRebuildTimer = null;
+                if (this._radarActive && !map) initMap();
+            }, CONTEXT_REBUILD_DELAY_MS);
+        };
+
+        const initMap = () => {
+            const instance = window.Radar.ui.map({
+                container: elementID,
+                transformRequest: radarGlyphTransformRequest,
+                cooperativeGestures,
+            });
+
+            map = instance;
+            this._radarMap = instance;
+
+            instance.on("webglcontextlost", () => handleContextLost(instance));
+
+            // Radar styles sometimes reference sprite icons (e.g. "viewpoint") not present for every zoom/style combo.
+            instance.on("styleimagemissing", (e) => {
+                try {
+                    if (map !== instance || !instance.style) return;
+                    if (e.id !== "viewpoint") return;
+                    if (typeof instance.hasImage === "function" && instance.hasImage(e.id)) return;
+                    instance.addImage(e.id, {
+                        width: 1,
+                        height: 1,
+                        data: new Uint8Array(4),
+                    });
+                } catch {
+                    /* ignore — avoid breaking map load */
+                }
+            });
+
+            instance.on("load", () => {
+                if (map !== instance) return;
+
+                if (pendingMarker) {
+                    const { lat, lon } = pendingMarker;
+                    if (setMarker(lat, lon)) pendingMarker = null;
                 }
 
-                reverseGeocodeAndPush(this, lat, lng);
-                map.fitToMarkers({ maxZoom: 14, padding: 80 });
+                if (existingMarker) {
+                    if (verifyMarker(existingMarker)) {
+                        setTimeout(() => {
+                            if (map === instance && instance.style) {
+                                instance.fitToMarkers({ maxZoom: 14, padding: 80 });
+                            }
+                        }, 300);
+                    } else {
+                        instance.fitToMarkers({ maxZoom: 14, padding: 80 });
+                    }
+                }
+            });
 
-                existingMarker.on("click", () => {
-                    existingMarker.remove();
-                    map.fitToMarkers({ maxZoom: 14, padding: 80 });
-                });
-            } catch (error) {
-                console.error("Error creating marker on click:", error);
-            }
-        });
+            instance.on("click", (e) => {
+                if (!this._radarActive || map !== instance || !instance.style) return;
+                if (locked) return;
+                if (typeof instance.loaded === 'function' && !instance.loaded()) return;
+
+                if (existingMarker) existingMarker.remove();
+
+                const { lng, lat } = e.lngLat;
+                try {
+                    existingMarker = Radar.ui.marker().setLngLat([lng, lat]).addTo(instance);
+
+                    if (!verifyMarker(existingMarker)) {
+                        console.error("Failed to attach marker to map");
+                        return;
+                    }
+
+                    reverseGeocodeAndPush(this, lat, lng);
+                    instance.fitToMarkers({ maxZoom: 14, padding: 80 });
+
+                    existingMarker.on("click", () => {
+                        existingMarker.remove();
+                        if (map === instance && instance.style) {
+                            instance.fitToMarkers({ maxZoom: 14, padding: 80 });
+                        }
+                    });
+                } catch (error) {
+                    console.error("Error creating marker on click:", error);
+                }
+            });
+        };
+
+        initMap();
     },
 
     destroyed() {
         this._radarActive = false;
+        if (this._radarRebuildTimer) {
+            clearTimeout(this._radarRebuildTimer);
+            this._radarRebuildTimer = null;
+        }
         if (this._radarMap) {
             try {
                 this._radarMap.remove();
