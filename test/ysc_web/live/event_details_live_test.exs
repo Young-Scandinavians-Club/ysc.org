@@ -1183,6 +1183,12 @@ defmodule YscWeb.EventDetailsLiveTest do
                live(conn, ~p"/events/images.php")
     end
 
+    test "terminate/2 does not raise when mount redirected before assigns were set" do
+      socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}}}
+
+      refute YscWeb.EventDetailsLive.terminate(:shutdown, socket)
+    end
+
     test "handles expired event gracefully", %{conn: conn} do
       event = event_with_state(:past, with_image: true)
 
