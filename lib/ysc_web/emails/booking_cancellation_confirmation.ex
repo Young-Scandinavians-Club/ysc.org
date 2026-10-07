@@ -12,13 +12,11 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
     only: [
       booking_receipt_url: 1,
       ensure_booking: 1,
-      member_greeting_name: 1,
-      format_date: 1,
       format_datetime: 1,
       format_money: 1
     ]
 
-  alias Ysc.Bookings.PropertyDisplay
+  alias YscWeb.Emails.BookingHelpers
 
   def get_template_name() do
     "booking_cancellation_confirmation"
@@ -51,74 +49,28 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
         reason \\ nil
       ) do
     booking = ensure_booking(booking)
-    formatted_dates = format_booking_dates(booking)
-    formatted_amounts = format_payment_amounts(payment, refund_amount)
-    property_name = PropertyDisplay.short_name(booking.property)
 
-    build_email_data(
-      booking,
-      formatted_dates,
-      formatted_amounts,
-      property_name,
-      payment,
-      is_pending_refund,
-      reason
-    )
-  end
-
-  defp format_booking_dates(booking) do
-    %{
-      checkin_date: format_date(booking.checkin_date),
-      checkout_date: format_date(booking.checkout_date),
-      cancellation_date: format_datetime(DateTime.utc_now())
-    }
-  end
-
-  defp format_payment_amounts(payment, refund_amount) do
-    %{
-      original_amount:
-        if(payment, do: format_money(payment.amount), else: "N/A"),
-      refund_amount:
-        if(refund_amount && Money.positive?(refund_amount),
-          do: format_money(refund_amount),
-          else: nil
-        )
-    }
-  end
-
-  defp build_email_data(
-         booking,
-         formatted_dates,
-         formatted_amounts,
-         property_name,
-         payment,
-         is_pending_refund,
-         reason
-       ) do
-    %{
-      first_name: member_greeting_name(booking.user),
-      booking: %{
-        reference_id: booking.reference_id,
-        property: property_name,
-        checkin_date: formatted_dates.checkin_date,
-        checkout_date: formatted_dates.checkout_date,
-        guests_count: booking.guests_count,
-        children_count: booking.children_count || 0
-      },
+    booking
+    |> BookingHelpers.member_links()
+    |> Map.merge(%{
+      booking: BookingHelpers.booking_summary(booking),
       cancellation: %{
-        date: formatted_dates.cancellation_date,
+        date: format_datetime(DateTime.utc_now()),
         reason: reason || "No reason provided"
       },
-      payment: %{
-        reference_id: if(payment, do: payment.reference_id, else: "N/A"),
-        amount: formatted_amounts.original_amount
-      },
+      payment: BookingHelpers.payment_summary(payment),
       refund: %{
-        amount: formatted_amounts.refund_amount,
+        amount: positive_refund_amount(refund_amount),
         is_pending: is_pending_refund
-      },
-      booking_url: booking_url(booking.id),
-      cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
-    }
+      }
+    })
+  end
+
+  defp positive_refund_amount(refund_amount) do
+    if refund_amount && Money.positive?(refund_amount) do
+      format_money(refund_amount)
+    else
+      nil
+    end
   end
 end
