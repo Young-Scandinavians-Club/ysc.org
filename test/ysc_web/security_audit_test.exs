@@ -81,8 +81,7 @@ defmodule YscWeb.SecurityAuditTest do
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
-  or explicitly out of scope per the fix plan. Finding 73 (SES SNS topic allowlist fail-open)
-  is tracked in open PR #1344.
+  or explicitly out of scope per the fix plan.
   """
   use YscWeb.ConnCase, async: true
 
