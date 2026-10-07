@@ -333,8 +333,11 @@ defmodule Ysc.H2UpgradeTest do
                  {<<"host">>, <<"127.0.0.1">>}
                ])
 
-      assert :ok = :h2.goaway(conn)
+      # The connection must stay up after a received GOAWAY so in-flight
+      # streams can finish. A subsequent goaway/1 from this side may then
+      # tear the process down (RFC 9113 §6.8); do not assert alive after.
       assert Process.alive?(conn)
+      assert :ok = :h2.goaway(conn)
     end
 
     test "client can cancel an existing stream after the peer GOAWAY" do
