@@ -1463,9 +1463,8 @@ defmodule Ysc.Ledgers do
     require Ysc.Logging
 
     try do
-      # Reload ticket order with associations
       ticket_order =
-        case Ysc.Tickets.get_ticket_order(ticket_order.id) do
+        case Ysc.Tickets.get_ticket_order_for_email(ticket_order.id) do
           nil ->
             Ysc.Logging.warning("Ticket order not found for refund email",
               refund_id: refund.id,
@@ -1483,12 +1482,7 @@ defmodule Ysc.Ledgers do
         # For now, we'll get all tickets from the order and filter by cancelled status
         # This is a simplification - ideally we'd track which specific tickets were refunded
         refunded_tickets =
-          from(t in Ysc.Events.Ticket,
-            where: t.ticket_order_id == ^ticket_order.id,
-            where: t.status == :cancelled,
-            preload: [:ticket_tier]
-          )
-          |> Repo.all()
+          Enum.filter(ticket_order.tickets, &(&1.status == :cancelled))
 
         if Enum.empty?(refunded_tickets) do
           Ysc.Logging.warning(

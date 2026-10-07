@@ -183,6 +183,26 @@ defmodule Ysc.DataCase do
   end
 
   @doc """
+  Makes refund helpers in this process survive a leaked `Ysc.StripeMock`.
+
+  `:stripe_client` is VM-global Application env. `stub_default_external_mocks/0`
+  resets it to `Ysc.TestStripeClient`, but a concurrent async test can switch
+  it to `Ysc.StripeMock` mid-test. `create_stripe_refund_for_admin/3` then
+  calls `retrieve_payment_intent/2` on the mock and raises
+  `Mox.UnexpectedCallError` unless this process has a stub.
+
+  Do not use in tests that `deny/3` `retrieve_payment_intent/2`.
+  """
+  def stub_stripe_mock_retrieve_for_test_refunds do
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, opts ->
+      Ysc.TestStripeClient.retrieve_payment_intent(id, opts)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
+    :ok
+  end
+
+  @doc """
   Sets up the sandbox based on the test tags.
   Returns the owner PID so it can be passed to concurrent tasks.
   """

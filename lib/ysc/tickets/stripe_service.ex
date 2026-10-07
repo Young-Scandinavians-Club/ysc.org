@@ -186,12 +186,37 @@ defmodule Ysc.Tickets.StripeService do
   end
 
   def process_successful_payment(%Stripe.PaymentIntent{} = payment_intent) do
+    # Sync + validate here so a stale PaymentIntent (tier reprice after the
+    # Intent was created) is rejected before `process_ticket_order_payment/2`.
+    # That helper also validates, but only its `do_process` path auto-refunds
+    # `:amount_mismatch`. Production callers always enter through this function
+    # (webhook, PaymentSuccessLive, EventDetailsLive, TimeoutWorker reconcile),
+    # so a pre-check failure previously returned `:amount_mismatch` with the
+    # Stripe charge still captured and seats unfulfilled — cabin checkout
+    # refunds from the LiveView/receipt verify path instead.
+    # `maybe_refund_unfulfilled_ticket_payment/3` also locally cancels the
+    # pending order so seats stop counting toward capacity.
     with {:ok, ticket_order} <-
            get_ticket_order_from_payment_intent(payment_intent),
          {:ok, ticket_order} <-
-           Tickets.sync_pending_order_pricing_for_fulfillment(ticket_order),
-         :ok <- validate_payment_intent(payment_intent, ticket_order) do
-      Tickets.process_ticket_order_payment(ticket_order, payment_intent)
+           Tickets.sync_pending_order_pricing_for_fulfillment(ticket_order) do
+      case validate_payment_intent(payment_intent, ticket_order) do
+        :ok ->
+          Tickets.process_ticket_order_payment(ticket_order, payment_intent)
+
+        {:error, :amount_mismatch} = error ->
+          _ =
+            Tickets.maybe_refund_unfulfilled_ticket_payment(
+              ticket_order,
+              payment_intent,
+              :amount_mismatch
+            )
+
+          error
+
+        {:error, _} = error ->
+          error
+      end
     end
   end
 

@@ -798,4 +798,268 @@ defmodule YscWeb.AdminTicketListLiveTest do
                )
     end
   end
+
+  describe "attendee questions" do
+    setup [:create_admin]
+
+    setup do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          price: Money.new(0, :USD),
+          attendee_questions: [
+            %{"label" => "Dietary restrictions", "type" => "text"},
+            %{
+              "label" => "Child's age",
+              "type" => "number",
+              "min" => "0",
+              "max" => "17"
+            }
+          ]
+        })
+
+      %{tickets: [ticket], user: buyer} =
+        completed_ticket_order_with_payment!(event: event, tier: tier)
+
+      [diet, age] = tier.attendee_questions
+
+      %{
+        event: event,
+        tier: tier,
+        ticket: ticket,
+        buyer: buyer,
+        diet: diet,
+        age: age
+      }
+    end
+
+    defp answer_for(question, value) do
+      %{
+        question.id => %{
+          "label" => question.label,
+          "type" => Atom.to_string(question.type),
+          "position" => 0,
+          "value" => value
+        }
+      }
+    end
+
+    test "answers appear on the ticket row", ctx do
+      {:ok, _} =
+        Events.create_ticket_details([
+          %{
+            ticket_id: ctx.ticket.id,
+            answers: answer_for(ctx.diet, "Vegan"),
+            identity: false
+          }
+        ])
+
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      assert has_element?(
+               view,
+               "#ticket-answers-#{ctx.ticket.id}",
+               "Dietary restrictions"
+             )
+
+      assert has_element?(view, "#ticket-answers-#{ctx.ticket.id}", "Vegan")
+      # The buyer stands in as the attendee when the detail names nobody.
+      assert has_element?(view, "#ticket-row-#{ctx.ticket.id}", ctx.buyer.email)
+    end
+
+    test "the CSV export has a column per question", ctx do
+      {:ok, _} =
+        Events.create_ticket_details([
+          %{
+            ticket_id: ctx.ticket.id,
+            answers: answer_for(ctx.diet, "Vegan"),
+            identity: false
+          }
+        ])
+
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      view |> element("#export-tickets-csv") |> render_click()
+      assert_push_event(view, "download-csv", %{content: content})
+
+      [row] =
+        content
+        |> Base.decode64!()
+        |> String.split("\n", trim: true)
+        |> CSV.decode!(headers: true)
+        |> Enum.to_list()
+
+      assert row["Dietary restrictions"] == "Vegan"
+      assert row["Child's age"] == ""
+      assert row["Attendee Email"] == ctx.buyer.email
+      assert row["Registration Provided"] == "Yes"
+    end
+
+    test "the CSV export neutralizes spreadsheet formulas in answers", ctx do
+      {:ok, _} =
+        Events.create_ticket_details([
+          %{
+            ticket_id: ctx.ticket.id,
+            identity: false,
+            answers:
+              Map.merge(
+                answer_for(ctx.diet, "=HYPERLINK(1)"),
+                answer_for(ctx.age, -3)
+              )
+          }
+        ])
+
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      view |> element("#export-tickets-csv") |> render_click()
+      assert_push_event(view, "download-csv", %{content: content})
+
+      [row] =
+        content
+        |> Base.decode64!()
+        |> String.split("\n", trim: true)
+        |> CSV.decode!(headers: true)
+        |> Enum.to_list()
+
+      assert row["Dietary restrictions"] == "'=HYPERLINK(1)"
+
+      # Negative numbers are data, not formulas.
+      assert row["Child's age"] == "-3"
+    end
+
+    test "the CSV export has no question columns when no tier asks", ctx do
+      plain_event = event_fixture()
+
+      %{event: event} =
+        completed_ticket_order_with_payment!(
+          event: plain_event,
+          tier:
+            ticket_tier_fixture(%{
+              event_id: plain_event.id,
+              price: Money.new(0, :USD)
+            })
+        )
+
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view |> element("#export-tickets-csv") |> render_click()
+      assert_push_event(view, "download-csv", %{content: content})
+
+      refute Base.decode64!(content) =~ "Dietary restrictions"
+    end
+
+    test "question columns follow the fixed columns", ctx do
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      view |> element("#export-tickets-csv") |> render_click()
+      assert_push_event(view, "download-csv", %{content: content})
+
+      [header | _] = content |> Base.decode64!() |> String.split("\r\n")
+
+      assert String.ends_with?(
+               header,
+               "Ticket Tier,Dietary restrictions,Child's age"
+             )
+    end
+
+    test "admins can record answers without naming an attendee", ctx do
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      view |> element("#ticket-actions-#{ctx.ticket.id}-edit") |> render_click()
+
+      assert has_element?(view, "#answer-field-#{ctx.diet.id}")
+      assert has_element?(view, "#answer-field-#{ctx.age.id}")
+
+      view
+      |> form("#ticket-detail-form", %{
+        "answers" => %{ctx.diet.id => "No shellfish", ctx.age.id => "6"}
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#edit-ticket-detail-modal")
+
+      detail = Repo.get_by!(TicketDetail, ticket_id: ctx.ticket.id)
+      assert detail.answers[ctx.diet.id]["value"] == "No shellfish"
+      assert detail.answers[ctx.age.id]["value"] == 6
+
+      assert has_element?(
+               view,
+               "#ticket-answers-#{ctx.ticket.id}",
+               "No shellfish"
+             )
+    end
+
+    test "invalid answers keep the modal open and save nothing", ctx do
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      view |> element("#ticket-actions-#{ctx.ticket.id}-edit") |> render_click()
+
+      html =
+        view
+        |> form("#ticket-detail-form", %{"answers" => %{ctx.age.id => "30"}})
+        |> render_submit()
+
+      assert has_element?(view, "#edit-ticket-detail-modal")
+      assert html =~ "must be at most 17"
+      assert Repo.get_by(TicketDetail, ticket_id: ctx.ticket.id) == nil
+    end
+
+    test "admins can record yes/no and select answers", ctx do
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          price: Money.new(0, :USD),
+          attendee_questions: [
+            %{
+              "label" => "Vegetarian?",
+              "type" => "yes_no",
+              "required" => "true"
+            },
+            %{
+              "label" => "Shirt size",
+              "type" => "select",
+              "required" => "true",
+              "options_text" => "Small\nMedium\nLarge"
+            }
+          ]
+        })
+
+      %{tickets: [ticket]} =
+        completed_ticket_order_with_payment!(event: event, tier: tier)
+
+      [yes_no_q, select_q] = tier.attendee_questions
+
+      {:ok, view, _html} = live(ctx.conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view |> element("#ticket-actions-#{ticket.id}-edit") |> render_click()
+
+      assert has_element?(view, "#answer-#{yes_no_q.id}")
+      assert has_element?(view, "#answer-#{select_q.id}")
+
+      view
+      |> form("#ticket-detail-form", %{
+        "answers" => %{yes_no_q.id => "no", select_q.id => "Large"}
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#edit-ticket-detail-modal")
+
+      detail = Repo.get_by!(TicketDetail, ticket_id: ticket.id)
+      assert detail.answers[yes_no_q.id]["value"] == false
+      assert detail.answers[select_q.id]["value"] == "Large"
+
+      assert has_element?(view, "#ticket-answers-#{ticket.id}", "No")
+      assert has_element?(view, "#ticket-answers-#{ticket.id}", "Large")
+    end
+  end
 end

@@ -19,6 +19,9 @@ defmodule Ysc.Tickets do
   alias Ysc.Tickets.AdminGrants
   alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Tickets.DonationDisplay
+  alias Ysc.Tickets.ReservationDiscount
+  alias Ysc.Events.Agenda
+  alias Ysc.Events.AgendaItem
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketTier
@@ -31,6 +34,9 @@ defmodule Ysc.Tickets do
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Bookings
   alias Ysc.Ledgers
+  alias Ysc.Ledgers.Payment
+  alias Ysc.Media.Image
+  alias Ysc.Payments.PaymentMethod
 
   @payment_timeout_minutes 5
 
@@ -189,9 +195,7 @@ defmodule Ysc.Tickets do
         broadcast_ticket_availability_update(event_id)
 
         if !skip_email? do
-          ticket_order.id
-          |> get_ticket_order()
-          |> send_ticket_confirmation_email()
+          send_ticket_confirmation_email(ticket_order)
         end
 
         {:ok, ticket_order}
@@ -203,6 +207,9 @@ defmodule Ysc.Tickets do
 
   @doc """
   Gets a ticket order by ID with preloaded tickets.
+
+  Fat load for cancel/resume and payment fulfillment. Purchase and refund
+  emails should use `get_ticket_order_for_email/1` instead.
   """
   def get_ticket_order(id) do
     TicketOrder
@@ -217,14 +224,164 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Loads a ticket order for purchase-confirmation and refund emails.
+
+  Struct-selects purchaser identity, event card copy, slim agendas/items,
+  payment display fields, and ticket/tier line items. Omits event body HTML
+  (`raw_details` / `rendered_details`), QuickBooks payment JSON, purchaser
+  secrets, and unused grant/cancel copy.
+  """
+  def get_ticket_order_for_email(id) do
+    id
+    |> ticket_order_for_email_query()
+    |> Repo.one()
+  end
+
+  # Confirmation/refund MJML: greeting, event card, agenda table, payment
+  # method line, and per-tier totals. Skip cover images, attendee answers,
+  # hashed_password, and QuickBooks blobs.
+  @email_ticket_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :total_amount,
+    :discount_amount,
+    :completed_at,
+    :payment_channel,
+    :offline_amount_collected,
+    :user_id,
+    :event_id,
+    :payment_id
+  ]
+  @email_user_fields [:id, :email, :first_name, :last_name]
+  @email_event_fields [
+    :id,
+    :title,
+    :description,
+    :start_date,
+    :start_time,
+    :location_name,
+    :address,
+    :age_restriction
+  ]
+  @email_agenda_fields [:id, :event_id, :title, :position]
+  @email_agenda_item_fields [
+    :id,
+    :agenda_id,
+    :title,
+    :description,
+    :start_time,
+    :end_time,
+    :position
+  ]
+  @email_payment_fields [
+    :id,
+    :reference_id,
+    :external_payment_id,
+    :payment_date,
+    :amount,
+    :status,
+    :payment_method_id
+  ]
+  @email_payment_method_fields [
+    :id,
+    :type,
+    :display_brand,
+    :last_four,
+    :bank_name
+  ]
+  @email_ticket_fields [
+    :id,
+    :status,
+    :reference_id,
+    :ticket_tier_id,
+    :ticket_order_id,
+    :discount_amount
+  ]
+  @email_ticket_tier_fields [:id, :name, :type, :price]
+
+  defp ticket_order_for_email_query(order_id) do
+    user_query = from(u in User, select: struct(u, ^@email_user_fields))
+
+    agenda_item_query =
+      from(ai in AgendaItem,
+        select: struct(ai, ^@email_agenda_item_fields),
+        order_by: [asc: ai.position]
+      )
+
+    agenda_query =
+      from(a in Agenda,
+        select: struct(a, ^@email_agenda_fields),
+        order_by: [asc: a.position],
+        preload: [agenda_items: ^agenda_item_query]
+      )
+
+    event_query =
+      from(e in Event,
+        select: struct(e, ^@email_event_fields),
+        preload: [agendas: ^agenda_query]
+      )
+
+    payment_method_query =
+      from(pm in PaymentMethod,
+        select: struct(pm, ^@email_payment_method_fields)
+      )
+
+    payment_query =
+      from(p in Payment,
+        select: struct(p, ^@email_payment_fields),
+        preload: [payment_method: ^payment_method_query]
+      )
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@email_ticket_tier_fields))
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@email_ticket_fields),
+        preload: [ticket_tier: ^tier_query]
+      )
+
+    from(to in TicketOrder,
+      where: to.id == ^order_id,
+      select: struct(to, ^@email_ticket_order_fields),
+      preload: [
+        user: ^user_query,
+        event: ^event_query,
+        payment: ^payment_query,
+        tickets: ^ticket_query
+      ]
+    )
+  end
+
+  defp ticket_order_ready_for_email?(%TicketOrder{} = ticket_order) do
+    Ecto.assoc_loaded?(ticket_order.user) and
+      Ecto.assoc_loaded?(ticket_order.event) and
+      Ecto.assoc_loaded?(ticket_order.event.agendas) and
+      Ecto.assoc_loaded?(ticket_order.payment) and
+      Ecto.assoc_loaded?(ticket_order.tickets) and
+      ticket_order.tickets != [] and
+      Enum.all?(ticket_order.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+  end
+
+  defp ensure_ticket_order_for_email(%TicketOrder{} = ticket_order) do
+    if ticket_order_ready_for_email?(ticket_order) do
+      ticket_order
+    else
+      get_ticket_order_for_email(ticket_order.id) || ticket_order
+    end
+  end
+
+  @doc """
   Gets a ticket order for checkout UI (payment modal, registration).
 
-  Lighter preload than `get_ticket_order/1` — no event agendas or payment.
+  Lighter than `get_ticket_order/1` — no event, agendas, or payment. Tiers
+  keep `attendee_questions` for checkout cards; skip description and the
+  sale window. Purchaser skips `hashed_password` and board copy.
   """
   def get_ticket_order_for_checkout(id) do
-    TicketOrder
-    |> where([to], to.id == ^id)
-    |> preload([:user, tickets: :ticket_tier])
+    id
+    |> ticket_order_for_checkout_query()
     |> Repo.one()
   end
 
@@ -232,11 +389,72 @@ defmodule Ysc.Tickets do
   Gets a ticket order for checkout for a specific user (authorization + light preload).
   """
   def get_user_ticket_order_for_checkout(user_id, order_id) do
-    from(to in TicketOrder,
-      where: to.id == ^order_id and to.user_id == ^user_id,
-      preload: [:user, tickets: :ticket_tier]
-    )
+    order_id
+    |> ticket_order_for_checkout_query()
+    |> where([to], to.user_id == ^user_id)
     |> Repo.one()
+  end
+
+  # Checkout UI + Stripe PI: order identity/pricing, ticket cards, and
+  # attendee-question collection. Omits grant notes, cancellation copy,
+  # event body HTML (not preloaded), and purchaser hashed_password.
+  @checkout_ticket_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :total_amount,
+    :discount_amount,
+    :payment_intent_id,
+    :expires_at,
+    :completed_at,
+    :user_id,
+    :event_id,
+    :payment_id
+  ]
+  @checkout_ticket_fields [
+    :id,
+    :status,
+    :reference_id,
+    :ticket_tier_id,
+    :ticket_order_id,
+    :user_id,
+    :event_id,
+    :discount_amount
+  ]
+  @checkout_ticket_tier_fields [
+    :id,
+    :name,
+    :type,
+    :price,
+    :requires_registration,
+    :attendee_questions
+  ]
+  @checkout_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :stripe_id
+  ]
+
+  defp ticket_order_for_checkout_query(order_id) do
+    user_query =
+      from(u in User, select: struct(u, ^@checkout_user_fields))
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@checkout_ticket_tier_fields))
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@checkout_ticket_fields),
+        preload: [ticket_tier: ^tier_query]
+      )
+
+    from(to in TicketOrder,
+      where: to.id == ^order_id,
+      select: struct(to, ^@checkout_ticket_order_fields),
+      preload: [user: ^user_query, tickets: ^ticket_query]
+    )
   end
 
   @doc """
@@ -345,20 +563,116 @@ defmodule Ysc.Tickets do
   @doc """
   Gets a ticket order for the post-checkout confirmation page.
 
-  Lighter than `get_user_ticket_order/2` — no event agendas; includes cover image,
-  payment method, and ticket registrations needed by the confirmation UI.
+  Lighter than `get_user_ticket_order/2` — no agendas, purchaser row, event
+  body HTML, QuickBooks payment blobs, or image upload payloads. Includes
+  cover image, payment method, ticket registrations, and attendee answers
+  the confirmation UI renders.
   """
   def get_user_ticket_order_for_confirmation(user_id, order_id) do
+    user_id
+    |> ticket_order_for_confirmation_query(order_id)
+    |> Repo.one()
+  end
+
+  @confirmation_ticket_order_fields [
+    :id,
+    :status,
+    :reference_id,
+    :total_amount,
+    :discount_amount,
+    :payment_intent_id,
+    :user_id,
+    :event_id,
+    :payment_id
+  ]
+  @confirmation_event_fields [
+    :id,
+    :title,
+    :start_date,
+    :start_time,
+    :location_name,
+    :address,
+    :image_id
+  ]
+  @confirmation_cover_image_fields [
+    :id,
+    :title,
+    :alt_text,
+    :raw_image_path,
+    :optimized_image_path,
+    :thumbnail_path,
+    :blur_hash,
+    :width,
+    :height
+  ]
+  @confirmation_payment_fields [
+    :id,
+    :external_payment_id,
+    :amount,
+    :status,
+    :payment_method_id,
+    :user_id
+  ]
+  @confirmation_payment_method_fields [
+    :id,
+    :type,
+    :display_brand,
+    :last_four,
+    :bank_name
+  ]
+  @confirmation_registration_fields [
+    :id,
+    :ticket_id,
+    :first_name,
+    :last_name,
+    :email,
+    :answers
+  ]
+
+  defp ticket_order_for_confirmation_query(user_id, order_id) do
+    image_query =
+      from(i in Image, select: struct(i, ^@confirmation_cover_image_fields))
+
+    event_query =
+      from(e in Event,
+        select: struct(e, ^@confirmation_event_fields),
+        preload: [cover_image: ^image_query]
+      )
+
+    payment_method_query =
+      from(pm in PaymentMethod,
+        select: struct(pm, ^@confirmation_payment_method_fields)
+      )
+
+    payment_query =
+      from(p in Payment,
+        select: struct(p, ^@confirmation_payment_fields),
+        preload: [payment_method: ^payment_method_query]
+      )
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@checkout_ticket_tier_fields))
+
+    registration_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@confirmation_registration_fields)
+      )
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@checkout_ticket_fields),
+        preload: [ticket_tier: ^tier_query, registration: ^registration_query]
+      )
+
     from(to in TicketOrder,
       where: to.id == ^order_id and to.user_id == ^user_id,
+      select: struct(to, ^@confirmation_ticket_order_fields),
       preload: [
-        :user,
-        event: :cover_image,
-        payment: :payment_method,
-        tickets: [:ticket_tier, :registration]
+        event: ^event_query,
+        payment: ^payment_query,
+        tickets: ^ticket_query
       ]
     )
-    |> Repo.one()
   end
 
   @doc """
@@ -544,7 +858,8 @@ defmodule Ysc.Tickets do
   Gets paginated ticket orders for a user with Flop.
 
   Used by the admin user-detail orders table. Keep `get_user_ticket_order/2`
-  and `get_ticket_order/1` fat for cancel/resume and confirmation emails.
+  and `get_ticket_order/1` fat for cancel/resume. Emails use
+  `get_ticket_order_for_email/1`.
   """
   def list_user_ticket_orders_paginated(user_id, params) do
     case Flop.validate_and_run(
@@ -1146,7 +1461,14 @@ defmodule Ysc.Tickets do
     :most_connected_country,
     :current_avatar_id
   ]
-  @admin_ticket_tier_fields [:id, :name, :type, :price, :requires_registration]
+  @admin_ticket_tier_fields [
+    :id,
+    :name,
+    :type,
+    :price,
+    :requires_registration,
+    :attendee_questions
+  ]
   @admin_ticket_order_fields [
     :id,
     :reference_id,
@@ -1160,7 +1482,8 @@ defmodule Ysc.Tickets do
     :ticket_id,
     :first_name,
     :last_name,
-    :email
+    :email,
+    :answers
   ]
   @admin_ticket_list_fields [
     :id,
@@ -1431,19 +1754,54 @@ defmodule Ysc.Tickets do
         ok
 
       {:error, fulfillment_error} ->
-        Ysc.Logging.error(
-          "Payment succeeded during checkout reconcile but order could not be fulfilled",
-          ticket_order_id: ticket_order.id,
-          payment_intent_id: payment_intent.id,
-          error: inspect(fulfillment_error)
-        )
+        case released_unfulfilled_mismatch_order(
+               ticket_order,
+               fulfillment_error
+             ) do
+          {:ok, released} = ok ->
+            Ysc.Logging.info(
+              "Released ticket order after unfulfilled succeeded payment was refunded",
+              ticket_order_id: released.id,
+              payment_intent_id: payment_intent.id,
+              status: released.status,
+              error: inspect(fulfillment_error)
+            )
 
-        # Tagged distinctly from a plain cancel/expire failure: the customer's
-        # card was already charged, so callers must not treat this like an
-        # ordinary timeout.
-        {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
+            ok
+
+          :not_released ->
+            Ysc.Logging.error(
+              "Payment succeeded during checkout reconcile but order could not be fulfilled",
+              ticket_order_id: ticket_order.id,
+              payment_intent_id: payment_intent.id,
+              error: inspect(fulfillment_error)
+            )
+
+            # Tagged distinctly from a plain cancel/expire failure: the customer's
+            # card was already charged, so callers must not treat this like an
+            # ordinary timeout.
+            {:error, {:payment_succeeded_fulfillment_failed, fulfillment_error}}
+        end
     end
   end
+
+  # Amount-mismatch refunds cancel the pending order (PI is already succeeded,
+  # so Stripe-first cancel would loop back into this fulfill path). TimeoutWorker
+  # wraps expire in a transaction and rollbacks errors; returning {:ok, ...}
+  # here lets that release commit.
+  defp released_unfulfilled_mismatch_order(ticket_order, :amount_mismatch) do
+    case get_ticket_order(ticket_order.id) do
+      %TicketOrder{status: status} = order
+      when status in [:cancelled, :expired] ->
+        {:ok, order}
+
+      _ ->
+        :not_released
+    end
+  end
+
+  defp released_unfulfilled_mismatch_order(_ticket_order, _error),
+    do: :not_released
 
   defp do_expire_ticket_order(ticket_order) do
     now = DateTime.utc_now()
@@ -2746,6 +3104,10 @@ defmodule Ysc.Tickets do
   @doc """
   Refunds a captured Stripe payment when ticket fulfillment fails and the
   order remains uncompleted (for example, tier prices changed during checkout).
+
+  On a successful refund the pending/expired order is cancelled locally
+  (`reconcile_with_stripe: false`): the PaymentIntent has already succeeded, so
+  Stripe-first cancel would try to fulfill again instead of releasing seats.
   """
   def maybe_refund_unfulfilled_ticket_payment(
         %TicketOrder{} = ticket_order,
@@ -2766,7 +3128,8 @@ defmodule Ysc.Tickets do
       case Ysc.Bookings.create_stripe_refund_for_admin(
              payment_intent.id,
              payment_intent.amount,
-             refund_reason
+             refund_reason,
+             idempotency_key: "unfulfilled_ticket_#{payment_intent.id}"
            ) do
         {:ok, refund} ->
           Ysc.Logging.info(
@@ -2776,6 +3139,12 @@ defmodule Ysc.Tickets do
             refund_id: refund.id,
             reason: normalized_reason
           )
+
+          _ =
+            release_unfulfilled_refunded_ticket_order(
+              ticket_order,
+              normalized_reason
+            )
 
           {:ok, refund}
 
@@ -2804,6 +3173,27 @@ defmodule Ysc.Tickets do
       ticket_order.status in [:pending, :expired] and
       reason in @refundable_unfulfilled_ticket_errors
   end
+
+  # Stripe will not cancel a succeeded PaymentIntent. After the captured charge
+  # is refunded the pending seats must be released locally so they stop counting
+  # toward capacity and the member can start a new cart. Cabin HoldExpiry
+  # already refunds *and* releases on payment_amount_mismatch.
+  defp release_unfulfilled_refunded_ticket_order(
+         %TicketOrder{} = ticket_order,
+         reason
+       ) do
+    cancel_ticket_order(
+      ticket_order,
+      unfulfilled_ticket_release_reason(reason),
+      reconcile_with_stripe: false
+    )
+  end
+
+  defp unfulfilled_ticket_release_reason(:amount_mismatch),
+    do: "Payment amount mismatch"
+
+  defp unfulfilled_ticket_release_reason(reason) when is_atom(reason),
+    do: "Unfulfilled ticket:#{reason}"
 
   defp normalize_ticket_fulfillment_failure_reason({:error, reason}),
     do: normalize_ticket_fulfillment_failure_reason(reason)
@@ -2933,37 +3323,16 @@ defmodule Ysc.Tickets do
     # Calculate total discount amount
     fulfilled_reservations
     |> Enum.reduce(Money.new(0, :USD), fn reservation, acc ->
-      if reservation.discount_percentage &&
-           Decimal.gt?(reservation.discount_percentage, 0) do
-        # Calculate original price for reserved tickets
-        tier_price = reservation.ticket_tier.price
+      discount_amount =
+        ReservationDiscount.amount(
+          reservation.ticket_tier.price,
+          reservation.quantity,
+          reservation.discount_percentage
+        )
 
-        if tier_price do
-          original_total =
-            case Money.mult(tier_price, reservation.quantity) do
-              {:ok, total} -> total
-              {:error, _} -> Money.new(0, :USD)
-            end
-
-          # Apply discount percentage
-          discount_pct_decimal =
-            Decimal.div(reservation.discount_percentage, Decimal.new(100))
-
-          discount_amount =
-            case Money.mult(original_total, discount_pct_decimal) do
-              {:ok, discount} -> discount
-              {:error, _} -> Money.new(0, :USD)
-            end
-
-          case Money.add(acc, discount_amount) do
-            {:ok, new_total} -> new_total
-            {:error, _} -> acc
-          end
-        else
-          acc
-        end
-      else
-        acc
+      case Money.add(acc, discount_amount) do
+        {:ok, new_total} -> new_total
+        {:error, _} -> acc
       end
     end)
   end
@@ -3155,6 +3524,8 @@ defmodule Ysc.Tickets do
   def send_ticket_confirmation_email(ticket_order) do
     require Ysc.Logging
 
+    ticket_order = ensure_ticket_order_for_email(ticket_order)
+
     Ysc.Logging.info("Starting ticket confirmation email process",
       ticket_order_id: ticket_order.id,
       user_id: ticket_order.user_id,
@@ -3304,6 +3675,22 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_ticket_order_by_payment_id_query do
     ticket_order_by_payment_id_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_for_checkout_query do
+    ticket_order_for_checkout_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_for_confirmation_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+    ticket_order_for_confirmation_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_for_email_query do
+    ticket_order_for_email_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   defp stripe_client do

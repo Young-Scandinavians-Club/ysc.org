@@ -6,14 +6,14 @@ defmodule YscWeb.Emails.HeaderBlock do
   """
   use MjmlEEx.Component, mode: :runtime
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, home_url: 0]
 
   @impl MjmlEEx.Component
   def render(_assigns) do
     """
     <mj-section padding="32px">
       <mj-column padding="0">
-        <mj-image padding="0px" src="#{logo_path()}" width="120px"></mj-image>
+        <mj-image padding="0px" src="#{logo_path()}" href="#{home_url()}" alt="Young Scandinavians Club" width="120px"></mj-image>
       </mj-column>
     </mj-section>
     """

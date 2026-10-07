@@ -7,6 +7,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.AuthEvent
+  alias Ysc.Ledgers
   alias Ysc.Newsletter
   alias Ysc.Repo
   alias Ysc.Subscriptions
@@ -1245,6 +1246,83 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     end
   end
 
+  describe "admin sent notifications panel" do
+    setup do
+      user = user_fixture()
+
+      {:ok, message} =
+        %Ysc.Messages.MessageIdempotency{user_id: user.id}
+        |> Ysc.Messages.MessageIdempotency.changeset(%{
+          message_type: :email,
+          idempotency_key: "panel_test_#{System.unique_integer([:positive])}",
+          message_template: "booking_checkout_reminder",
+          email: user.email,
+          params: %{"first_name" => "Stian"},
+          rendered_message: "<html><body><p>Hello</p></body></html>"
+        })
+        |> Ysc.Repo.insert()
+
+      %{user: user, message: message}
+    end
+
+    test "detail panel is sticky and keeps its header outside the scroll body",
+         %{conn: conn, user: user, message: message} do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/notifications")
+
+      render_async(view)
+
+      refute has_element?(view, "#resizable-right-panel")
+
+      view
+      |> element("tr[phx-value-id='#{message.id}']")
+      |> render_click()
+
+      assert has_element?(view, "#resizable-right-panel.sticky")
+
+      assert has_element?(
+               view,
+               "#resizable-right-panel #close-notification-panel"
+             )
+
+      assert has_element?(
+               view,
+               "#notification-body #email-preview-#{message.id}"
+             )
+
+      refute has_element?(
+               view,
+               "#notification-body #close-notification-panel"
+             )
+    end
+
+    test "close button and Escape both dismiss the panel", %{
+      conn: conn,
+      user: user,
+      message: message
+    } do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/notifications")
+
+      render_async(view)
+
+      view |> element("tr[phx-value-id='#{message.id}']") |> render_click()
+      assert has_element?(view, "#resizable-right-panel")
+
+      view |> element("#close-notification-panel") |> render_click()
+      refute has_element?(view, "#resizable-right-panel")
+
+      view |> element("tr[phx-value-id='#{message.id}']") |> render_click()
+      assert has_element?(view, "#resizable-right-panel")
+
+      view
+      |> element("#resizable-right-panel")
+      |> render_keydown(%{"key" => "Escape"})
+
+      refute has_element?(view, "#resizable-right-panel")
+    end
+  end
+
   describe "admin notification preferences" do
     test "notifications tab shows preferences form collapsed by default", %{
       conn: conn
@@ -1331,5 +1409,117 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   defp register_and_log_in_admin(%{conn: conn}) do
     user = user_fixture(%{role: :admin})
     %{conn: log_in_user(conn, user), user: user}
+  end
+
+  describe "membership tab - cancel and refund" do
+    defp active_subscription_for(user) do
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      subscription
+    end
+
+    defp add_membership_payment(user, subscription, attrs) do
+      Ledgers.ensure_basic_accounts()
+
+      {:ok, payment} =
+        Ledgers.create_payment(
+          Map.merge(
+            %{
+              user_id: user.id,
+              external_provider: :stripe,
+              external_payment_id:
+                "in_test_#{System.unique_integer([:positive])}",
+              amount: Money.new(:USD, 100),
+              status: :completed,
+              payment_date: DateTime.utc_now() |> DateTime.truncate(:second)
+            },
+            attrs
+          )
+        )
+
+      for {account, debit_credit} <- [
+            {"stripe_account", :debit},
+            {"membership_revenue", :credit}
+          ] do
+        {:ok, _} =
+          Ledgers.create_entry(%{
+            account_id: Ledgers.get_account_by_name(account).id,
+            payment_id: payment.id,
+            related_entity_type: :membership,
+            related_entity_id: subscription.id,
+            amount: payment.amount,
+            debit_credit: debit_credit
+          })
+      end
+
+      payment
+    end
+
+    defp open_membership_tab(conn, user) do
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> element("a[href$='/details/membership']")
+      |> render_click()
+
+      view
+    end
+
+    test "shows an enabled button and the refund preview for a refundable payment",
+         %{conn: conn} do
+      user = user_fixture()
+      subscription = active_subscription_for(user)
+      add_membership_payment(user, subscription, %{})
+
+      view = open_membership_tab(conn, user)
+
+      assert has_element?(view, "#cancel-refund-membership-section")
+      assert has_element?(view, "#cancel-refund-preview", "$100.00")
+
+      assert has_element?(
+               view,
+               "#cancel-and-refund-membership-button:not([disabled])"
+             )
+    end
+
+    test "disables the button when there is no refundable payment", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      active_subscription_for(user)
+
+      view = open_membership_tab(conn, user)
+
+      assert has_element?(view, "#cancel-refund-unavailable")
+      refute has_element?(view, "#cancel-refund-preview")
+
+      assert has_element?(
+               view,
+               "#cancel-and-refund-membership-button[disabled]"
+             )
+    end
+
+    test "server refuses to cancel when the payment is already refunded",
+         %{conn: conn} do
+      user = user_fixture()
+      subscription = active_subscription_for(user)
+
+      add_membership_payment(user, subscription, %{status: :refunded})
+
+      view = open_membership_tab(conn, user)
+
+      # The button is disabled in the UI; the server must still refuse.
+      render_hook(view, "cancel_and_refund_membership", %{})
+
+      assert Repo.get!(Subscriptions.Subscription, subscription.id).stripe_status ==
+               "active"
+    end
   end
 end

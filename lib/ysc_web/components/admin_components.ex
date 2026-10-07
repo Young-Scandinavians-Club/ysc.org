@@ -1273,6 +1273,36 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # attendee_answer_chips
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Small labelled chips for an attendee's answers (dietary restrictions, a
+  child's age, ...), so event staff see them right where they check people in.
+  Renders nothing when there are no answers.
+  """
+  attr :answers, :list, default: []
+  attr :id, :string, default: nil
+
+  def attendee_answer_chips(assigns) do
+    ~H"""
+    <div
+      :if={@answers != []}
+      id={@id}
+      class="mt-1 flex flex-wrap gap-1"
+    >
+      <span
+        :for={answer <- @answers}
+        class="inline-flex items-center gap-1 rounded-sm border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs text-amber-900"
+      >
+        <span class="font-medium">{answer.label}:</span>
+        <span>{answer.value}</span>
+      </span>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_event_check_in_pending_row
   # ---------------------------------------------------------------------------
 
@@ -1291,6 +1321,10 @@ defmodule YscWeb.AdminComponents do
   attr :order_ref, :string, default: nil
   attr :order_ref_tooltip, :string, default: nil
   attr :ticket_id, :any, default: nil
+
+  attr :answers, :list,
+    default: [],
+    doc: "attendee answers as `[%{label:, value:}]`, e.g. dietary restrictions"
 
   attr :interactive, :boolean,
     default: true,
@@ -1335,6 +1369,10 @@ defmodule YscWeb.AdminComponents do
           </div>
           <div class="col-span-3">
             <p class="text-sm font-medium text-zinc-900">{@name}</p>
+            <.attendee_answer_chips
+              answers={@answers}
+              id={"checkin-answers-#{@ticket_id}"}
+            />
           </div>
           <div class="col-span-2">
             <p class="text-sm text-zinc-600 truncate">{@email}</p>
@@ -1372,6 +1410,10 @@ defmodule YscWeb.AdminComponents do
           <div class="min-w-0 flex-1 mr-3">
             <p class="text-sm font-medium text-zinc-900">{@name}</p>
             <p class="text-xs text-zinc-500 truncate">{@email}</p>
+            <.attendee_answer_chips
+              answers={@answers}
+              id={"checkin-answers-mobile-#{@ticket_id}"}
+            />
             <div class="flex items-center gap-2 mt-1">
               <.badge :if={@tier} type="sky">{@tier}</.badge>
               <span class="text-xs font-mono text-zinc-400">{@ticket_ref}</span>
@@ -1408,6 +1450,11 @@ defmodule YscWeb.AdminComponents do
   attr :ticket_ref, :string, required: true
   attr :tier, :string, default: nil
   attr :ticket_id, :any, default: nil
+
+  attr :answers, :list,
+    default: [],
+    doc: "attendee answers as `[%{label:, value:}]`, e.g. dietary restrictions"
+
   attr :checked_in_at, :any, default: nil
   attr :checked_in_time_label, :string, default: nil
 
@@ -1453,6 +1500,10 @@ defmodule YscWeb.AdminComponents do
           </div>
           <div class="col-span-3">
             <p class="text-sm font-medium text-zinc-400 line-through">{@name}</p>
+            <.attendee_answer_chips
+              answers={@answers}
+              id={"checkin-answers-#{@ticket_id}"}
+            />
           </div>
           <div class="col-span-2">
             <p class="text-sm text-zinc-400 truncate">{@email}</p>
@@ -1496,6 +1547,10 @@ defmodule YscWeb.AdminComponents do
                 {@name}
               </p>
               <p class="text-xs text-zinc-400 truncate">{@email}</p>
+              <.attendee_answer_chips
+                answers={@answers}
+                id={"checkin-answers-mobile-#{@ticket_id}"}
+              />
               <div class="flex items-center gap-2 mt-1">
                 <.badge :if={@tier} type="default">{@tier}</.badge>
                 <span class="text-xs font-mono text-zinc-400">{@ticket_ref}</span>
@@ -1861,6 +1916,194 @@ defmodule YscWeb.AdminComponents do
       {render_slot(@inner_block)}
     </button>
     """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_ordered_thumbnail_picker
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Card with an ordered thumbnail grid for picking featured items.
+
+  Used by the newsletter editor for posts and events. Clicking a tile toggles
+  selection; order is shown as numbered badges on tiles and as a list below
+  the grid. Pass thumbnail contents via the `:image` slot.
+
+  ## Examples
+
+      <.admin_ordered_thumbnail_picker
+        id="newsletter-posts-picker"
+        title="Latest news (posts)"
+        hint="Click to select or deselect posts to feature. Selected order is preserved."
+        items={@post_results}
+        selected_ids={@selected_post_ids}
+        visible_count={@post_visible_count}
+        loaded?={@picker_data_loaded?}
+        readonly?={@readonly?}
+        toggle_event="toggle-post"
+        show_more_event="show-more-posts"
+        loading_label="Loading posts…"
+      >
+        <:image :let={post}>
+          <img
+            :if={post.featured_image}
+            src={image_url(post.featured_image)}
+            alt=""
+            class="w-full h-full object-cover"
+          />
+        </:image>
+      </.admin_ordered_thumbnail_picker>
+  """
+  attr :id, :string, required: true
+  attr :title, :string, required: true
+  attr :hint, :string, required: true
+  attr :items, :list, required: true
+  attr :selected_ids, :list, default: []
+  attr :visible_count, :integer, required: true
+  attr :loaded?, :boolean, required: true
+  attr :readonly?, :boolean, default: false
+  attr :toggle_event, :string, required: true
+  attr :show_more_event, :string, required: true
+  attr :loading_label, :string, required: true
+  attr :skeleton_count, :integer, default: 10
+
+  slot :image, required: true
+
+  def admin_ordered_thumbnail_picker(assigns) do
+    remaining = max(length(assigns.items) - assigns.visible_count, 0)
+
+    visible_tiles =
+      assigns.items
+      |> Enum.take(assigns.visible_count)
+      |> Enum.map(fn item ->
+        %{
+          item: item,
+          selected?: to_string(item.id) in assigns.selected_ids,
+          position:
+            ordered_thumbnail_selected_position(assigns.selected_ids, item.id)
+        }
+      end)
+
+    assigns =
+      assigns
+      |> assign(:remaining, remaining)
+      |> assign(:selected_count, length(assigns.selected_ids))
+      |> assign(:visible_tiles, visible_tiles)
+      |> assign(
+        :selected_items,
+        ordered_thumbnail_selected_items(assigns.items, assigns.selected_ids)
+      )
+
+    ~H"""
+    <div id={@id} class="border border-zinc-200 rounded-lg p-4 bg-white">
+      <h2 class="text-lg font-semibold text-zinc-800 mb-2">
+        {@title}
+      </h2>
+      <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
+        {@hint}
+      </p>
+      <div
+        :if={!@loaded? && !@readonly?}
+        id={"#{@id}-loading"}
+        role="status"
+        aria-live="polite"
+      >
+        <span class="sr-only">{@loading_label}</span>
+        <.thumbnail_grid_skeleton count={@skeleton_count} />
+      </div>
+      <div :if={@loaded? && !@readonly?}>
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+          <button
+            :for={tile <- @visible_tiles}
+            type="button"
+            id={"#{@id}-item-#{tile.item.id}"}
+            phx-click={@toggle_event}
+            phx-value-id={tile.item.id}
+            class={[
+              "group text-left transition-all focus:outline-hidden rounded-xl",
+              if(tile.selected?,
+                do: "ring-2 ring-blue-500 ring-offset-2",
+                else: "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
+              )
+            ]}
+          >
+            <div class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
+              {render_slot(@image, tile.item)}
+              <div class={[
+                "absolute inset-0 transition-opacity duration-150",
+                if(tile.selected?, do: "bg-blue-600/20", else: "opacity-0")
+              ]} />
+              <span
+                :if={tile.position}
+                class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-xs"
+              >
+                {tile.position}
+              </span>
+            </div>
+            <p class={[
+              "mt-1.5 px-0.5 text-[11px] leading-tight line-clamp-2",
+              if(tile.selected?,
+                do: "font-semibold text-blue-700",
+                else: "font-medium text-zinc-600"
+              )
+            ]}>
+              {tile.item.title}
+            </p>
+          </button>
+        </div>
+        <.admin_dashed_more_button
+          :if={@remaining > 0}
+          phx-click={@show_more_event}
+        >
+          Show more ({@remaining} remaining)
+        </.admin_dashed_more_button>
+      </div>
+      <div
+        :if={@selected_count > 0 && @loaded?}
+        class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
+      >
+        <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+          Selected ({@selected_count})
+        </p>
+        <div
+          :for={{pos, item} <- @selected_items}
+          class="flex items-center gap-2 text-sm text-zinc-700"
+        >
+          <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold tabular-nums">
+            {pos}
+          </span>
+          <span class="truncate">{item.title}</span>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  1-based position of `item_id` in `selected_ids`, or `nil` if not selected.
+  """
+  def ordered_thumbnail_selected_position(ids, item_id) when is_list(ids) do
+    case Enum.find_index(ids, &(&1 == to_string(item_id))) do
+      nil -> nil
+      idx -> idx + 1
+    end
+  end
+
+  @doc """
+  Returns `[{1-based_position, item}, ...]` in selection order.
+
+  Items that are not present in `all_items` (not yet loaded) are skipped.
+  """
+  def ordered_thumbnail_selected_items(all_items, selected_ids)
+      when is_list(all_items) and is_list(selected_ids) do
+    selected_ids
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {id, pos} ->
+      case Enum.find(all_items, &(to_string(&1.id) == id)) do
+        nil -> []
+        item -> [{pos, item}]
+      end
+    end)
   end
 
   # ---------------------------------------------------------------------------

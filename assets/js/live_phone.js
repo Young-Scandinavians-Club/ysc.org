@@ -262,8 +262,9 @@ class LivePhone {
     // We don't want to partial match on the input field value
     if (e.target == "INPUT") return
 
-    // Ignore anything that is not a-zA-Z
-    if (!e.key.match(/^[a-z]$/i)) return
+    // Ignore anything that is not a-zA-Z. Synthetic keypress events (e.g. from
+    // mobile browser autofill) can arrive without a `key`.
+    if (typeof e.key !== 'string' || !e.key.match(/^[a-z]$/i)) return
 
     // Let's get a list of all known country list item names
     const items = Array.from(this.elements.countryListItemNames())

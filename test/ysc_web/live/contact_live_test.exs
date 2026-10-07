@@ -18,6 +18,44 @@ defmodule YscWeb.ContactLiveTest do
       assert has_element?(view, "h1", "Get in touch")
     end
 
+    test "public footer social links use official HTTPS URLs (Finding 80)", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      facebook = Ysc.Settings.facebook_social_url()
+      instagram = Ysc.Settings.instagram_social_url()
+      partiful = Ysc.Settings.partiful_social_url()
+
+      assert has_element?(
+               view,
+               "a[aria-label='Facebook'][href='#{facebook}']"
+             )
+
+      assert has_element?(
+               view,
+               "a[aria-label='Instagram'][href='#{instagram}']"
+             )
+
+      assert has_element?(
+               view,
+               "a[aria-label='Partiful'][href='#{partiful}']"
+             )
+
+      refute has_element?(view, "a[href^='javascript:']")
+      refute has_element?(view, "a[href^='data:']")
+      refute has_element?(view, "a[aria-label='WhatsApp']")
+    end
+
+    test "links to the board meeting schedule", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      assert has_element?(
+               view,
+               "#contact-attend-board-meeting a[href='/board#board-meeting-schedule']"
+             )
+    end
+
     test "sets page title to Contact", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/contact")
 

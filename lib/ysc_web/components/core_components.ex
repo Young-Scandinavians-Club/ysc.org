@@ -50,6 +50,12 @@ defmodule YscWeb.CoreComponents do
   attr :on_cancel, JS, default: %JS{}
   attr :z_index, :string, default: "z-200"
   attr :panel_class, :any, default: nil
+
+  attr :backdrop_class, :string,
+    default: "bg-zinc-50/90",
+    doc:
+      "Tailwind classes for the backdrop colour. Use an opaque colour (e.g. `bg-zinc-100`) or add `backdrop-blur-md` so page content behind the modal is not legible."
+
   slot :inner_block, required: true
 
   def modal(assigns) do
@@ -64,7 +70,10 @@ defmodule YscWeb.CoreComponents do
       class={"relative #{@z_index} hidden"}
     >
       <%!-- No aria-hidden on backdrop: dialog has aria-modal="true"; avoids blocking focus/hidden violation --%>
-      <div id={"#{@id}-bg"} class="fixed inset-0 transition-opacity bg-zinc-50/90" />
+      <div
+        id={"#{@id}-bg"}
+        class={["fixed inset-0 transition-opacity", @backdrop_class]}
+      />
       <div
         class={[
           "fixed inset-0",
@@ -2805,7 +2814,10 @@ defmodule YscWeb.CoreComponents do
 
   def presence_avatars(assigns) do
     ~H"""
-    <div :if={@editors != []} class={["flex items-center -space-x-2", @class]}>
+    <div
+      :if={@editors != []}
+      class={["flex items-center -space-x-2 [&>div]:shrink-0", @class]}
+    >
       <.tooltip
         :for={editor <- Enum.take(@editors, @max_shown)}
         tooltip_text={"#{editor.name} is editing"}
@@ -2814,7 +2826,7 @@ defmodule YscWeb.CoreComponents do
           src={editor.avatar_url}
           alt=""
           class={[
-            "rounded-full ring-2 ring-white object-cover",
+            "shrink-0 max-w-none aspect-square rounded-full ring-2 ring-white object-cover",
             @size == :sm && "h-5 w-5",
             @size == :md && "h-7 w-7"
           ]}
@@ -2827,7 +2839,7 @@ defmodule YscWeb.CoreComponents do
         }
       >
         <span class={[
-          "flex items-center justify-center rounded-full bg-zinc-200 font-semibold text-zinc-700 ring-2 ring-white",
+          "flex shrink-0 items-center justify-center rounded-full bg-zinc-200 font-semibold text-zinc-700 ring-2 ring-white",
           @size == :sm && "h-5 w-5 text-[9px]",
           @size == :md && "h-7 w-7 text-[10px]"
         ]}>
@@ -6273,6 +6285,134 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div class={["inline-block", @class]}>
       {Phoenix.HTML.raw(@svg)}
+    </div>
+    """
+  end
+
+  @doc """
+  Membership QR modal shown from the home dashboard and membership settings.
+
+  Callers keep their own `:if` so the modal is omitted from the DOM when
+  closed. Pair with `YscWeb.MembershipQr.show/2` and `hide/1`.
+
+  ## Examples
+
+      <.membership_qr_modal
+        :if={@show_membership_qr}
+        id="membership-qr-modal"
+        token={@membership_qr_token}
+        details={@membership_qr_details}
+        timezone={@timezone}
+        apple_wallet_enabled?={@apple_wallet_membership_enabled?}
+        google_wallet_enabled?={@google_wallet_membership_enabled?}
+        google_wallet_url={@google_wallet_membership_url}
+        wallet_platform={@wallet_platform}
+      />
+  """
+  attr :id, :string, required: true
+  attr :token, :string, required: true
+  attr :details, :any, default: nil
+  attr :timezone, :string, required: true
+  attr :apple_wallet_enabled?, :boolean, default: false
+  attr :google_wallet_enabled?, :boolean, default: false
+  attr :google_wallet_url, :string, default: nil
+  attr :wallet_platform, :atom, required: true
+
+  def membership_qr_modal(assigns) do
+    ~H"""
+    <.modal id={@id} show on_cancel={JS.push("hide_membership_qr")}>
+      <div class="text-center">
+        <h3 class="text-xl font-bold text-zinc-900 mb-1">
+          My Membership QR
+        </h3>
+        <p class="text-sm text-zinc-500 mb-5">
+          Show this at check-in so a volunteer can confirm your membership.
+        </p>
+        <.qr_code
+          data={@token}
+          size={250}
+          class="mx-auto p-2 rounded-lg border"
+        />
+        <%= if @apple_wallet_enabled? &&
+            @wallet_platform in [:apple_only, :both] do %>
+          <div class="flex justify-center mt-4">
+            <.add_to_wallet_button href={~p"/wallet/membership"} />
+          </div>
+        <% end %>
+        <%= if @google_wallet_enabled? &&
+            @wallet_platform in [:google_only, :both] &&
+            @google_wallet_url do %>
+          <div class="flex justify-center mt-2">
+            <.add_to_google_wallet_button href={@google_wallet_url} />
+          </div>
+        <% end %>
+        <%= if @details do %>
+          <div class="mt-5 rounded-xl bg-zinc-50 border border-zinc-200 divide-y divide-zinc-200 text-left">
+            <.membership_qr_detail_row label="Type">
+              {@details.type_label}
+            </.membership_qr_detail_row>
+            <.membership_qr_detail_row
+              :if={@details.member_since}
+              label="Member Since"
+            >
+              {DateDisplay.format_date_in_zone(
+                @details.member_since,
+                @timezone
+              )}
+            </.membership_qr_detail_row>
+            <.membership_qr_detail_row
+              label="Valid Until"
+              value_class={
+                if(@details.renewal_date,
+                  do: "text-sm font-semibold text-zinc-900",
+                  else: "text-sm font-semibold text-emerald-700"
+                )
+              }
+            >
+              <%= if @details.renewal_date do %>
+                {DateDisplay.format_date_in_zone(
+                  @details.renewal_date,
+                  @timezone
+                )}
+              <% else %>
+                Forever ✦
+              <% end %>
+            </.membership_qr_detail_row>
+            <.membership_qr_detail_row
+              :if={@details.is_sub_account && @details.primary_name}
+              label="Through"
+            >
+              {@details.primary_name}
+            </.membership_qr_detail_row>
+          </div>
+        <% end %>
+        <.button
+          phx-click="hide_membership_qr"
+          color="zinc"
+          class="w-full mt-3"
+        >
+          Close
+        </.button>
+      </div>
+    </.modal>
+    """
+  end
+
+  attr :label, :string, required: true
+
+  attr :value_class, :string, default: "text-sm font-semibold text-zinc-900"
+
+  slot :inner_block, required: true
+
+  defp membership_qr_detail_row(assigns) do
+    ~H"""
+    <div class="flex items-center justify-between px-4 py-3">
+      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+        {@label}
+      </span>
+      <span class={@value_class}>
+        {render_slot(@inner_block)}
+      </span>
     </div>
     """
   end

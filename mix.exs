@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.43.0",
+      version: "2.46.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -17,14 +17,16 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe],
         list_unused_filters: true
       ],
-      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-10-04.
+      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-11-06.
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-43966",
           "EEF-CVE-2026-43969",
-          # Published 2026-08-18; still unpatched on Hex cowlib 2.20.0.
-          "EEF-CVE-2026-43971"
+          # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
+          # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
+          "EEF-CVE-2026-95105",
+          "EEF-CVE-2026-94206"
         ]
       ],
       test_coverage: [
@@ -186,8 +188,13 @@ defmodule Ysc.MixProject do
       # 0.12.3: SETTINGS_INITIAL_WINDOW_SIZE increase drains buffered DATA
       # (RFC 9113 §6.9.2). Unused in app code; hackney still uses
       # h2_connection client APIs.
+      # 0.12.4: existing streams stay valid after GOAWAY (RFC 9113 §6.8);
+      # cancel/trailers/respond work in goaway states. A received GOAWAY
+      # stays in goaway_received so new requests return
+      # {error, goaway_received}. hackney cancel_stream/send_trailers
+      # after a peer GOAWAY used to get {error, unknown_request}.
       {:hackney, "~> 4.7", override: true},
-      {:h2, "~> 0.12.3", override: true},
+      {:h2, "~> 0.12.4", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
@@ -221,7 +228,12 @@ defmodule Ysc.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
       # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
-      {:dns_cluster, "~> 0.3"},
+      # 0.3.1: look up the hostname of a `{basename, query}` tuple instead
+      # of passing the tuple to Resolver.lookup/2 (FunctionClauseError on
+      # the real resolver). We pass a string query (`DNS_CLUSTER_QUERY`)
+      # or `:ignore`, not a tuple, so the fix is unused. Public APIs
+      # unchanged.
+      {:dns_cluster, "~> 0.3.1"},
       {:ecto_enum, "~> 1.4"},
       {:ecto_psql_extras, "~> 0.8"},
       {:ecto_sql, "~> 3.13"},
@@ -242,7 +254,14 @@ defmodule Ysc.MixProject do
       {:ex_phone_number, "~> 0.4"},
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
-      {:finch, "~> 0.21"},
+      # 0.24.0: close HTTP/1 connections after request/response errors
+      # before returning them to the pool (stale Mint 1.11 refs after
+      # receive timeouts). Also HTTP QUERY method, pool_timeout wait for
+      # dynamic HTTP/2 pools, async TLS shutdown. We use Finch.build/4 +
+      # Finch.request/2 (QuickBooks, Discord, Flowroute, outage scraper).
+      # We do not use :query, start_pool/3, or SSLKEYLOGFILE. No documented
+      # 0.23→0.24 breaking changes.
+      {:finch, "~> 0.24.0"},
       # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
       # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
       # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
@@ -293,11 +312,13 @@ defmodule Ysc.MixProject do
       # translation is opt-in via :gettext_backend. 0.10.1/0.10.2: custom Phoenix
       # flash components rerender on same-kind replacement and LiveView navigation.
       {:live_toast, "~> 0.11"},
-      # 2.3.16: HTTP Accept header uses commas (RFC 9110) instead of
-      # semicolons. We load GeoLite2-City via custom S3 fetcher, not the
-      # HTTP downloader, so that patch is unused. Public :locus.lookup/2
-      # and start_loader/3 APIs are unchanged.
-      {:locus, "~> 2.3"},
+      # 2.3.17: IPv4 lookup in IPv4-less MMDB trees returns not_found
+      # instead of {error, not_found}. GeoIP.lookup/1 already matches
+      # :not_found (empty map). GeoLite2-City includes IPv4, so that
+      # path is unused. 2.3.16 Accept-header commas remain unused
+      # (custom S3 fetcher). Public :locus.lookup/2 and start_loader/3
+      # APIs are unchanged.
+      {:locus, "~> 2.3.17"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; override keeps drop_by_key/drop_by_value
       # used in Passbook.Pass.generate_json/1.

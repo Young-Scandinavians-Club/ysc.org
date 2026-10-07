@@ -163,6 +163,13 @@ waitForSentry().then((available) => {
             // Discoverable-credential unsupported on some Chrome/platform setups (WebAuthn)
             ignoreErrors: [
                 /Resident credentials or empty 'allowCredentials' lists are not supported/,
+                // Thrown by browser extensions (Safari/Chrome) injected into the page, not by our code
+                /Invalid call to runtime\.sendMessage\(\)\. Tab not found/,
+            ],
+            denyUrls: [
+                /^safari-(web-)?extension:\/\//i,
+                /^chrome-extension:\/\//i,
+                /^moz-extension:\/\//i,
             ],
             beforeSend(event) {
                 if (isExpectedWebAuthnOrVideoNotAllowed(event)) {

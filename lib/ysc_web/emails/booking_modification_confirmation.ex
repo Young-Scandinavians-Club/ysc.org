@@ -67,7 +67,8 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
         previous.guests_count != booking.guests_count or
           previous.children_count != (booking.children_count || 0),
       additional_payment: additional_payment,
-      booking_url: booking_url(booking.id)
+      booking_url: booking_url(booking.id),
+      cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
     }
   end
 

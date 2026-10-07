@@ -21,9 +21,15 @@ defmodule Ysc.Events.TicketTier do
     field :quantity, :integer
     field :unlimited_quantity, :boolean, virtual: true
 
-    # If this is set all the tickets require to have
-    # a registration attached to them
+    # When true, every ticket needs an attendee's first name, last name and
+    # email attached to it ("registration"). Independent of
+    # `attendee_questions`, which may be used on their own.
     field :requires_registration, :boolean
+
+    # Extra questions asked per ticket at checkout, e.g. dietary restrictions.
+    # See `Ysc.Events.AttendeeQuestion` and `Ysc.Events.AttendeeInfo`.
+    embeds_many :attendee_questions, Ysc.Events.AttendeeQuestion,
+      on_replace: :delete
 
     # When true, purchasing is restricted based on the buyer's membership plan.
     # See `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
@@ -66,11 +72,18 @@ defmodule Ysc.Events.TicketTier do
       :event_id,
       :lock_version
     ])
+    |> cast_embed(:attendee_questions,
+      with: &Ysc.Events.AttendeeQuestion.changeset/2,
+      sort_param: :attendee_questions_sort,
+      drop_param: :attendee_questions_drop
+    )
     |> validate_required([
       :name,
       :type,
       :event_id
     ])
+    |> validate_attendee_questions_limit()
+    |> validate_unique_question_labels()
     |> enforce_free_price()
     |> validate_required_price()
     |> validate_quantity()
@@ -78,6 +91,42 @@ defmodule Ysc.Events.TicketTier do
     |> validate_money(:price)
     |> optimistic_lock(:lock_version)
     |> foreign_key_constraint(:event_id)
+  end
+
+  @max_attendee_questions 10
+
+  defp validate_attendee_questions_limit(changeset) do
+    questions = get_field(changeset, :attendee_questions) || []
+
+    if length(questions) > @max_attendee_questions do
+      add_error(
+        changeset,
+        :attendee_questions,
+        "a tier can have at most #{@max_attendee_questions} questions"
+      )
+    else
+      changeset
+    end
+  end
+
+  # Exports and CSV columns key answers by label, so labels must be distinct.
+  defp validate_unique_question_labels(changeset) do
+    labels =
+      changeset
+      |> get_field(:attendee_questions)
+      |> List.wrap()
+      |> Enum.map(&String.downcase(&1.label || ""))
+      |> Enum.reject(&(&1 == ""))
+
+    if length(labels) == length(Enum.uniq(labels)) do
+      changeset
+    else
+      add_error(
+        changeset,
+        :attendee_questions,
+        "each question needs a different name"
+      )
+    end
   end
 
   # Normalize description: empty string and literal "nil" string -> nil

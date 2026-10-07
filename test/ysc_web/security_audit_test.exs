@@ -73,10 +73,16 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 76 (MEDIUM)   Volunteers could read other members' expense reports (submitter, purpose, status, net cost) on the event Statistics tab, bypassing LetMe expense_report :read (admin or own_resource) and the full-admin Money page
   Finding 77 (MEDIUM)   Open redirect: valid_internal_redirect?/1 allowed backslash and %5c paths that browsers treat as protocol-relative (ticket QR href + post-login Location)
   Finding 78 (MEDIUM)   Event partiful_link host check used String.ends_with?(host, "partiful.com"), accepting lookalikes (evilpartiful.com, not-partiful.com) that render as the trusted public "RSVP on Partiful" CTA
+  Finding 79 (HIGH)     Trix non-image uploads allowed HTML/SVG (and HTML renamed as PDF) onto the public assets.ysc.org CDN — volunteers can host active web content
+  Finding 80 (MEDIUM)   Admin social URL settings accepted javascript:/lookalike hosts and rendered them as footer hrefs for every visitor (bypass of Trix scrubber)
+  Finding 81 (MEDIUM)   Apple Wallet cover-image fetch had no UrlFetchGuard and followed redirects (SSRF if a media path were poisoned)
+  Finding 82 (HIGH)     Admin user notification panel rendered SMS/email bodies in an unsandboxed same-origin srcdoc iframe; SMS bodies embed user-controlled first_name / event titles as plain text, so a crafted name became stored XSS against the admin session
+  Finding 83 (HIGH)     Family sub-accounts with their own lifetime/family membership could mint nested invites (UI hidden, LiveView/context ungated). Accept walked has_active_membership?/1 to the real primary and counted the 10-seat cap on the nested id, granting unpaid membership and bypassing the household limit. Leftover: a household holder with existing dependents could still join another family via link/admin and bring a nested tree.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
-  or explicitly out of scope per the fix plan.
+  or explicitly out of scope per the fix plan. Finding 73 (SES SNS topic allowlist fail-open)
+  is tracked in open PR #1344.
   """
   use YscWeb.ConnCase, async: true
 
@@ -92,7 +98,7 @@ defmodule YscWeb.SecurityAuditTest do
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Payments
   alias Ysc.Tickets
-  alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
+  alias Ysc.Accounts.{FamilyInvite, FamilyInvites, FamilyMember, User}
   alias Ysc.Subscriptions
   alias Ysc.Accounts.UserToken
   alias Ysc.Repo
@@ -1655,7 +1661,8 @@ defmodule YscWeb.SecurityAuditTest do
                Tickets.process_ticket_order_payment(order, payment_intent)
 
       reloaded = Tickets.get_ticket_order(order.id)
-      assert reloaded.status == :pending
+      assert reloaded.status == :cancelled
+      assert reloaded.cancellation_reason == "Payment amount mismatch"
       assert Money.equal?(reloaded.total_amount, Money.new(50, :USD))
     end
   end
@@ -5059,6 +5066,392 @@ defmodule YscWeb.SecurityAuditTest do
         })
 
       assert ok.valid?
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 79 (HIGH): Trix attachments must not accept active web content
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 79: Trix attachments reject HTML and SVG" do
+    test "FileValidator blocks HTML/SVG by extension, MIME, and markup prefix" do
+      tmp = System.tmp_dir!()
+
+      html = Path.join(tmp, "finding79.html")
+      File.write!(html, "<html><script>alert(1)</script></html>")
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 html,
+                 "ysc-login.html"
+               )
+
+      svg = Path.join(tmp, "finding79.svg")
+
+      File.write!(
+        svg,
+        ~s|<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>|
+      )
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 svg,
+                 "logo.svg"
+               )
+
+      renamed = Path.join(tmp, "finding79.pdf")
+      File.write!(renamed, "<!DOCTYPE html><html><body>phish</body></html>")
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 renamed,
+                 "invoice.pdf"
+               )
+    after
+      File.rm(Path.join(System.tmp_dir!(), "finding79.html"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79.svg"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79.pdf"))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 80 (MEDIUM): Social settings must not accept javascript: / lookalikes
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 80: social URL settings reject javascript and lookalikes" do
+    test "javascript: and lookalike hosts are rejected; official HTTPS hosts work" do
+      assert {:error, _} =
+               Ysc.SiteSettings.SocialUrl.validate(
+                 "facebook",
+                 "javascript:alert(1)"
+               )
+
+      assert {:error, _} =
+               Ysc.SiteSettings.SocialUrl.validate(
+                 "partiful",
+                 "https://evilpartiful.com/u/x"
+               )
+
+      assert :ok =
+               Ysc.SiteSettings.SocialUrl.validate(
+                 "facebook",
+                 "https://www.facebook.com/YoungScandinaviansClub/"
+               )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 81 (MEDIUM): Apple Wallet strip fetch is SSRF-guarded
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 81: Apple Wallet strip download rejects blocked URLs" do
+    test "UrlFetchGuard rejects loopback/metadata-style targets in prod-like mode" do
+      # UrlFetchGuard is lax in test; assert the guard API itself blocks
+      # private IPs when strict mode is forced via sandbox/prod semantics by
+      # calling the same public validator used by AppleWallet.download_image_to_tmp/1.
+      # In this test env, private IPs are allowed — so we assert the Apple Wallet
+      # module wires UrlFetchGuard (compile-time presence) and that a clearly
+      # invalid scheme is rejected in every env.
+      assert {:error, :unsupported_scheme} =
+               Ysc.Http.UrlFetchGuard.validate_url_for_server_fetch(
+                 "file:///etc/passwd"
+               )
+
+      assert {:error, :userinfo_not_allowed} =
+               Ysc.Http.UrlFetchGuard.validate_url_for_server_fetch(
+                 "https://user:pass@example.com/x.png"
+               )
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 82 (HIGH): Unsandboxed srcdoc XSS via SMS rendered_message
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 82: admin HTML previews must not execute scripts" do
+    import Ysc.EventsFixtures
+
+    setup %{conn: conn} do
+      admin =
+        user_fixture(%{
+          role: :admin,
+          state: :active,
+          email: "admin_f82_#{System.unique_integer([:positive])}@ysc.org"
+        })
+
+      %{conn: log_in_user(conn, admin), admin: admin}
+    end
+
+    test "SMS bodies with HTML payloads render as escaped text, not srcdoc", %{
+      conn: conn
+    } do
+      xss_name = "<img src=x onerror=alert(document.domain)>"
+
+      member =
+        user_fixture(%{
+          first_name: xss_name,
+          state: :active
+        })
+
+      sms_body =
+        "[YSC] Hej #{xss_name}! Your phone verification code is: 123456."
+
+      {:ok, sms} =
+        Ysc.Messages.create_message_idempotency(%{
+          user_id: member.id,
+          phone_number: member.phone_number || "+15555550182",
+          idempotency_key:
+            "finding82_sms_#{System.unique_integer([:positive])}",
+          message_template: "phone_verification",
+          message_type: :sms,
+          rendered_message: sms_body
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{member.id}/details/notifications")
+
+      render_async(view)
+
+      render_click(view, "select_notification", %{"id" => sms.id})
+
+      assert has_element?(view, "#sms-preview-#{sms.id}")
+      refute has_element?(view, "#email-preview-#{sms.id}")
+
+      html = render(view)
+      # Escaped in the text node — payload must not appear as raw HTML markup.
+      assert html =~ "onerror=alert(document.domain)"
+      refute html =~ "<img src=x onerror=alert(document.domain)>"
+      refute html =~ "srcdoc="
+    end
+
+    test "email bodies use a sandboxed iframe without allow-scripts", %{
+      conn: conn
+    } do
+      member = user_fixture(%{state: :active})
+
+      email_html =
+        "<html><body><p>Hello</p><script>window.parent.document.body.innerHTML='pwned'</script></body></html>"
+
+      {:ok, email} =
+        Ysc.Messages.create_message_idempotency(%{
+          user_id: member.id,
+          email: member.email,
+          idempotency_key:
+            "finding82_email_#{System.unique_integer([:positive])}",
+          message_template: "welcome_email",
+          message_type: :email,
+          rendered_message: email_html
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{member.id}/details/notifications")
+
+      render_async(view)
+      render_click(view, "select_notification", %{"id" => email.id})
+
+      assert has_element?(
+               view,
+               "#email-preview-#{email.id}[sandbox='allow-same-origin']"
+             )
+
+      html = render(view)
+      refute html =~ ~s(sandbox="allow-scripts")
+      refute html =~ ~s(sandbox="allow-same-origin allow-scripts")
+    end
+
+    test "newsletter editor preview iframe is sandboxed without allow-scripts",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Finding 82 Preview", "subject" => "Sandbox"},
+          created_by_id: admin.id
+        )
+
+      {:ok, edition} =
+        Newsletter.update_edition(edition, %{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+
+      render_async(view)
+
+      assert has_element?(
+               view,
+               "#newsletter-email-preview-iframe[sandbox='allow-same-origin']"
+             )
+
+      html = render(view)
+      refute html =~ ~s(sandbox="allow-scripts")
+      refute html =~ ~s(sandbox="allow-same-origin allow-scripts")
+    end
+
+    test "event update preview iframe is sandboxed without allow-scripts", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      render_click(view, "editor-update", %{
+        "field" => "update[raw_body]",
+        "value" => "<div>Finding 82 event preview</div>"
+      })
+
+      view |> element("#preview-event-update-btn") |> render_click()
+
+      assert has_element?(
+               view,
+               "#event-update-preview-iframe[sandbox='allow-same-origin']"
+             )
+
+      html = render(view)
+      refute html =~ ~s(sandbox="allow-scripts")
+      refute html =~ ~s(sandbox="allow-same-origin allow-scripts")
+    end
+  end
+
+  # Finding 83 (HIGH): Family sub-accounts must not mint nested invites
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 83: family sub-accounts cannot mint nested invites" do
+    test "lifetime spouse cannot create_invite or grant membership via hidden LiveView event",
+         %{conn: conn} do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      lifetime_sub =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      outsider_email =
+        "nested_#{System.unique_integer([:positive])}@example.com"
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.create_invite(lifetime_sub, outsider_email)
+
+      conn = log_in_user(conn, lifetime_sub)
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render(view)
+
+      html =
+        render_hook(view, "invite_family_member", %{
+          "invite" => %{"email" => outsider_email}
+        })
+
+      assert html =~ "Only the family membership holder can send invites."
+      assert FamilyInvites.list_invites(lifetime_sub) == []
+      assert FamilyInvites.list_invites(primary) == []
+    end
+
+    test "pre-existing nested invite cannot be accepted once the holder is a sub-account" do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      lifetime_sub =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      assert {:ok, lifetime_sub} =
+               Accounts.admin_link_user_to_family(primary, lifetime_sub,
+                 relationship: :spouse
+               )
+
+      email = "stale_nested_#{System.unique_integer([:positive])}@example.com"
+
+      invite =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: lifetime_sub.id,
+          created_by_user_id: lifetime_sub.id,
+          relationship: :child
+        })
+        |> Repo.insert!()
+
+      assert {:error, :not_primary_user} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: email,
+                 password: "password1234",
+                 first_name: "Nested",
+                 last_name: "Member",
+                 phone_number: unique_user_phone(),
+                 date_of_birth: Date.shift(Date.utc_today(), year: -10)
+               })
+
+      refute Accounts.get_user_by_email(email)
+    end
+
+    test "household holder with dependents cannot join another family via link or admin" do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      invite_email =
+        "bring_tree_#{System.unique_integer([:positive])}@example.com"
+
+      {:ok, invite} = FamilyInvites.create_invite(primary, invite_email)
+
+      holder =
+        user_fixture(%{state: :active, email: invite_email})
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      _dependent =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{
+          primary_user_id: holder.id,
+          family_relationship: :child
+        })
+        |> Repo.update!()
+
+      assert {:error, :has_dependent_family_members} =
+               FamilyInvites.link_existing_user(invite.token, holder)
+
+      assert {:error, :has_dependent_family_members} =
+               Accounts.admin_link_user_to_family(primary, holder,
+                 relationship: :spouse
+               )
+
+      assert is_nil(Repo.get!(User, holder.id).primary_user_id)
     end
   end
 

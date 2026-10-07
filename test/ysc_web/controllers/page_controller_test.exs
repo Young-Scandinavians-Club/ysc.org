@@ -15,6 +15,31 @@ defmodule YscWeb.PageControllerTest do
     end
   end
 
+  describe "GET /board" do
+    test "embeds the public board meeting calendar", %{conn: conn} do
+      conn = get(conn, ~p"/board")
+      html = html_response(conn, 200)
+
+      iframe =
+        html
+        |> LazyHTML.from_fragment()
+        |> LazyHTML.query("iframe#board-meeting-calendar")
+
+      assert Enum.count(iframe) == 1
+
+      assert html =~
+               "c_d621b3a4fc0326de60ed10ce25ca45e0c5c818f9947b1ebb4f5a71311f61963c"
+
+      assert html =~ "Board Meeting Schedule"
+
+      assert LazyHTML.from_fragment(html)
+             |> LazyHTML.query(
+               "#board-meeting-attendance a[href='mailto:board@ysc.org']"
+             )
+             |> Enum.count() == 1
+    end
+  end
+
   describe "GET /choir" do
     test "renders choir leader by name when no matching user exists", %{
       conn: conn

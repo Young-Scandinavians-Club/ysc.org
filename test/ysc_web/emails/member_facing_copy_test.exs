@@ -147,6 +147,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Update your card or bank account"
       assert text =~ "Expired or invalid card"
       assert text =~ "Using a different card or bank account"
+
+      assert text =~
+               "Click Update your card or bank account above to add a new one first"
+
       assert text =~ "payment ID: in_123"
       assert text =~ "jane@example.com"
       refute text =~ "successfully processed"
@@ -155,6 +159,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "Retry Payment Now"
       refute text =~ "Update Payment Method"
       refute text =~ "payment method"
+      refute text =~ "Membership settings"
     end
 
     test "renewal-failure email says after you pay, not once payment is processed" do
@@ -176,10 +181,15 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       assert text =~ "After you update your card or bank account and pay"
       assert text =~ "Update your card or bank account"
+
+      assert text =~
+               "Click Update your card or bank account above to add a new one first"
+
       refute text =~ "successfully processed"
       refute text =~ "couldn't process your"
       refute text =~ "Update Payment Method"
       refute text =~ "payment method"
+      refute text =~ "Membership settings"
     end
 
     test "renewal-success email says we received payment instead of processed" do
@@ -845,7 +855,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           },
           refund_date: "Nov 2, 2026",
           refund_amount: "$200.00",
-          booking_url: "https://example.com/bookings/preview"
+          booking_url: "https://example.com/bookings/preview",
+          cabin_email: "tahoe@ysc.org"
         })
 
       text = html_text(html)
@@ -855,7 +866,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       assert text =~ "Your booking refund is on the way"
       assert text =~ "We've issued your cabin booking refund"
-      assert text =~ "Cabin Master"
+      assert text =~ "Tahoe Cabin Master at tahoe@ysc.org"
+      refute text =~ "info@ysc.org"
       assert text =~ "Refund number:"
       assert text =~ "Payment number:"
       refute text =~ "Refund Reference"
@@ -889,7 +901,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           request_date: "Nov 2, 2026 at 10:00 AM",
           policy_refund_amount: "$100.00",
           refund_percentage: 50.0,
-          booking_url: "https://example.com/bookings/preview"
+          booking_url: "https://example.com/bookings/preview",
+          cabin_email: "tahoe@ysc.org"
         })
 
       text = html_text(html)
@@ -899,7 +912,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       assert text =~ "Your cabin booking is cancelled"
       assert text =~ "You don't need to do anything else"
-      assert text =~ "Cabin Master"
+      assert text =~ "Tahoe Cabin Master at tahoe@ysc.org"
+      refute text =~ "info@ysc.org"
       assert text =~ "money is on the way"
       assert text =~ "same card or bank account you used"
       refute text =~ "original payment method"
@@ -925,10 +939,14 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
           },
           payment: %{reference_id: "PMT-123", amount: "$200.00"},
           refund: %{amount: "$100.00", is_pending: true},
-          booking_url: "https://example.com/bookings/preview"
+          booking_url: "https://example.com/bookings/preview",
+          cabin_email: "tahoe@ysc.org"
         })
 
       pending_text = html_text(pending_html)
+
+      assert pending_text =~ "Tahoe Cabin Master at tahoe@ysc.org"
+      refute pending_text =~ "info@ysc.org"
 
       assert pending_text =~ "money is on the way"
       assert pending_text =~ "Payment number:"

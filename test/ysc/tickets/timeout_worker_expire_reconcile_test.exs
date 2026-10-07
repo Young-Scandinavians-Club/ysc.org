@@ -135,7 +135,7 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
       end)
     end
 
-    test "returns a retryable error when succeeded payment cannot be fulfilled" do
+    test "releases the order after refunding a succeeded amount-mismatched payment" do
       order = ticket_order_fixture() |> past_due_order()
       payment_intent_id = "pi_timeout_fulfillment_fail_#{order.id}"
 
@@ -147,6 +147,7 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
           id: payment_intent_id,
           status: "succeeded",
           amount: 1,
+          latest_charge: "ch_timeout_fulfillment_fail_#{order.id}",
           metadata: %{
             "ticket_order_id" => order.id,
             "user_id" => order.user_id
@@ -158,16 +159,20 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
         succeeded_payment_intent
       )
 
-      # expire_specific_order rollbacks `{:error, reason}`, so Oban sees a nested
-      # error tuple. That still fails the job (retry); do not unwrap it here.
-      assert {:error,
-              {:error,
-               {:payment_succeeded_fulfillment_failed, :amount_mismatch}}} =
+      # Auto-refund on amount_mismatch retrieves the PI again for the charge id.
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
+
+      assert {:ok, "Expired specific ticket order"} =
                TimeoutWorker.perform(%Oban.Job{
                  args: %{"ticket_order_id" => order.id}
                })
 
-      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+      released = Ysc.Repo.get!(TicketOrder, order.id)
+      assert released.status == :cancelled
+      assert released.cancellation_reason == "Payment amount mismatch"
     end
 
     test "leaves the order pending when Stripe cancel is refused because payment is still processing" do
@@ -249,7 +254,7 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
       end)
     end
 
-    test "counts a fulfillment failure and leaves the order pending" do
+    test "releases a succeeded amount-mismatched payment and counts it as expired" do
       order = ticket_order_fixture() |> past_due_order()
       payment_intent_id = "pi_cron_fulfillment_fail_#{order.id}"
 
@@ -261,6 +266,7 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
           id: payment_intent_id,
           status: "succeeded",
           amount: 1,
+          latest_charge: "ch_cron_fulfillment_fail_#{order.id}",
           metadata: %{
             "ticket_order_id" => order.id,
             "user_id" => order.user_id
@@ -272,10 +278,17 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
         succeeded_payment_intent
       )
 
-      assert {:ok, "Expired 0 timed out ticket orders (1 failed)"} =
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
+
+      assert {:ok, "Expired 1 timed out ticket orders (0 failed)"} =
                TimeoutWorker.perform(%Oban.Job{args: %{}})
 
-      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+      released = Ysc.Repo.get!(TicketOrder, order.id)
+      assert released.status == :cancelled
+      assert released.cancellation_reason == "Payment amount mismatch"
     end
 
     test "leaves the order pending when Stripe cancel is refused because payment is still processing" do

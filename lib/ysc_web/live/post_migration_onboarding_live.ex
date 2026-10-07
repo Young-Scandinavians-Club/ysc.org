@@ -2711,6 +2711,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             message: "Your membership plan doesn't support family invites."
           }
 
+        {:error, :not_primary_user} ->
+          %{
+            ok: false,
+            message: "Only the family membership holder can send invites."
+          }
+
         {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
           Ysc.Logging.warning(
             "Family invite failed during onboarding (validation)",

@@ -6,6 +6,7 @@ defmodule YscWeb.AdminScannerLive do
   require Ysc.Logging
 
   alias Ysc.Events
+  alias Ysc.Events.AttendeeInfo
   alias Ysc.Scanning
   alias Ysc.Scanning.QrToken
   alias YscWeb.{Admin.DateTimeDisplay, AdminMembershipHelpers}
@@ -941,21 +942,26 @@ defmodule YscWeb.AdminScannerLive do
               <div class="space-y-2 mb-6">
                 <div
                   :for={ticket <- @group_prompt.unchecked_tickets}
+                  id={"scanner-pending-#{ticket.id}"}
                   class="flex items-center justify-between bg-zinc-50 rounded-lg px-3 py-2"
                 >
                   <div>
                     <span
-                      :if={ticket.registration}
+                      :if={registration_name(ticket)}
                       class="text-sm font-medium text-zinc-800"
                     >
-                      {ticket.registration.first_name} {ticket.registration.last_name}
+                      {registration_name(ticket)}
                     </span>
                     <span
-                      :if={!ticket.registration}
+                      :if={!registration_name(ticket)}
                       class="text-sm text-zinc-500 italic"
                     >
                       No registration info
                     </span>
+                    <.attendee_answer_chips
+                      answers={AttendeeInfo.display_answers(ticket.registration)}
+                      id={"scanner-answers-#{ticket.id}"}
+                    />
                   </div>
                   <.button
                     phx-click="check_in_single"
@@ -971,16 +977,17 @@ defmodule YscWeb.AdminScannerLive do
                 <p class="text-xs text-zinc-400 mb-1">Already checked in:</p>
                 <div
                   :for={ticket <- @group_prompt.checked_tickets}
+                  id={"scanner-checked-#{ticket.id}"}
                   class="flex items-center bg-zinc-100 rounded-sm px-3 py-1.5 mb-1 text-sm text-zinc-400"
                 >
                   <.icon
                     name="hero-check-circle"
                     class="w-4 h-4 mr-2 text-emerald-400"
                   />
-                  <span :if={ticket.registration}>
-                    {ticket.registration.first_name} {ticket.registration.last_name}
+                  <span :if={registration_name(ticket)}>
+                    {registration_name(ticket)}
                   </span>
-                  <span :if={!ticket.registration} class="italic">Guest</span>
+                  <span :if={!registration_name(ticket)} class="italic">Guest</span>
                 </div>
               </div>
 
@@ -1159,7 +1166,10 @@ defmodule YscWeb.AdminScannerLive do
 
   defp render_scan_result(%{scan_result: %{status: :checked_in}} = assigns) do
     ~H"""
-    <div class="scanner-result-sheet bg-emerald-600 rounded-t-3xl px-6 pt-5 pb-10 text-white">
+    <div
+      id="scanner-result-checked-in"
+      class="scanner-result-sheet bg-emerald-600 rounded-t-3xl px-6 pt-5 pb-10 text-white"
+    >
       <div class="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5"></div>
       <div class="flex items-center gap-4 mb-5">
         <div class="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
@@ -1256,7 +1266,10 @@ defmodule YscWeb.AdminScannerLive do
 
   defp render_scan_result(%{scan_result: %{status: :error}} = assigns) do
     ~H"""
-    <div class="scanner-result-sheet bg-zinc-800 rounded-t-3xl px-6 pt-5 pb-10 text-white">
+    <div
+      id="scanner-result-error"
+      class="scanner-result-sheet bg-zinc-800 rounded-t-3xl px-6 pt-5 pb-10 text-white"
+    >
       <div class="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5"></div>
       <div class="flex items-center gap-4 mb-4">
         <div class="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center shrink-0">
@@ -1683,6 +1696,17 @@ defmodule YscWeb.AdminScannerLive do
       put_flash(socket, :error, "That session is already closed.")
     end
   end
+
+  # The attendee named on a ticket's registration, or nil when nobody was named
+  # (no registration, or one that only holds answers).
+  defp registration_name(%{registration: %{first_name: first, last_name: last}}) do
+    case String.trim("#{first} #{last}") do
+      "" -> nil
+      name -> name
+    end
+  end
+
+  defp registration_name(_ticket), do: nil
 
   defp handle_scan(socket, data) do
     session = socket.assigns.active_session

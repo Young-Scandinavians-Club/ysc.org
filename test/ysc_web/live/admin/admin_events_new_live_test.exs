@@ -22,9 +22,17 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     %{conn: log_in_user(conn, user), admin: user}
   end
 
+  # The editor's date picker treats "today" as today in Pacific time (the
+  # club's timezone), which differs from `Date.utc_today()` for several hours
+  # every day. Dates the tests click must be computed from the same "today",
+  # or they can land in a different month than the one the picker shows.
+  defp pacific_today do
+    DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+  end
+
   # Opening the calendar focuses the visible month on the event's existing
   # start_date, not on today - so any date button computed relative to
-  # `Date.utc_today()` may fall outside that view whenever the event's start
+  # `pacific_today()` may fall outside that view whenever the event's start
   # date and "today" land in different calendar months (which depends on
   # what day of the month the suite happens to run on). Jump to the current
   # month via the picker's own "Today" button before looking for such a
@@ -36,6 +44,25 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
 
     view
+  end
+
+  # Like `go_to_today/2`, then pages forward until `date`'s button is on
+  # screen. A month's grid ends with the week containing its last day, so a date
+  # a few days after "today" is not visible from today's month near month end.
+  defp go_to_date(view, date, id \\ "event_date") do
+    go_to_today(view, id)
+
+    button =
+      ~s|##{id}_calendar button[phx-value-date="#{Date.to_iso8601(date)}T00:00:00Z"]|
+
+    Enum.reduce_while(1..2, view, fn _, view ->
+      if has_element?(view, button) do
+        {:halt, view}
+      else
+        view |> element("##{id}-next-month") |> render_click()
+        {:cont, view}
+      end
+    end)
   end
 
   describe "mount" do
@@ -150,7 +177,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      new_date = Date.add(Date.utc_today(), 3)
+      new_date = Date.add(pacific_today(), 3)
       new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
 
       view
@@ -159,7 +186,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       assert has_element?(view, "#event_date_calendar")
 
-      go_to_today(view)
+      go_to_date(view, new_date)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
@@ -213,14 +240,14 @@ defmodule YscWeb.AdminEventsNewLiveTest do
         }
       })
 
-      new_date = Date.add(Date.utc_today(), 4)
+      new_date = Date.add(pacific_today(), 4)
       new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
 
       view
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
 
-      go_to_today(view)
+      go_to_date(view, new_date)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
@@ -260,14 +287,14 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      new_date = Date.add(Date.utc_today(), 2)
+      new_date = Date.add(pacific_today(), 2)
       new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
 
       view
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
 
-      go_to_today(view)
+      go_to_date(view, new_date)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
@@ -319,7 +346,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      earlier = Date.utc_today()
+      earlier = pacific_today()
       earlier_iso = "#{Date.to_iso8601(earlier)}T00:00:00Z"
       later_iso = "#{Date.to_iso8601(DateTime.to_date(later))}T00:00:00Z"
 
@@ -384,14 +411,14 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      new_date = Date.add(Date.utc_today(), 5)
+      new_date = Date.add(pacific_today(), 5)
       new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
 
       view
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
 
-      go_to_today(view)
+      go_to_date(view, new_date)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
@@ -444,14 +471,14 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       # Move earlier than publish_at (same class of bug as Aug 7/8 on a
       # published event that still has publish_at set).
-      new_date = Date.add(Date.utc_today(), 3)
+      new_date = Date.add(pacific_today(), 3)
       new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
 
       view
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
 
-      go_to_today(view)
+      go_to_date(view, new_date)
 
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)

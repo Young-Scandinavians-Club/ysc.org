@@ -11,7 +11,7 @@ defmodule Ysc.PaymentUserMessages do
 
   def invoice_retry_failed do
     trim("""
-    We couldn't process that payment. Update your payment method in Membership settings and try again, or email #{Ysc.EmailConfig.membership_email()} for help.
+    We couldn't process that payment. Click your name in the top-right corner and open Membership to update your payment method and try again, or email #{Ysc.EmailConfig.membership_email()} for help.
     """)
   end
 

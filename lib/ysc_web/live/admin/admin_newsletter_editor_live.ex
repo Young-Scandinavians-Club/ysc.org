@@ -157,18 +157,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         _ -> nil
       end
 
-    editors =
-      if edition_id do
-        EditingPresence.editors(
-          :newsletter,
-          edition_id,
-          socket.assigns.current_user.id
-        )
-      else
-        []
-      end
-
-    assign(socket, :editors, editors)
+    EditingPresence.assign_editors(socket, :newsletter, edition_id)
   end
 
   defp maybe_load_email_stats(socket, %Edition{status: :sent, id: edition_id})
@@ -381,26 +370,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   # Explicit check so upload shows whenever we don't have a valid cover id (nil, "", or other).
   def has_cover_image?(id) when is_binary(id) and id != "", do: true
   def has_cover_image?(_), do: false
-
-  # 1-based position in the selection list, or nil if not selected.
-  def selected_position(ids, item_id) when is_list(ids) do
-    case Enum.find_index(ids, &(&1 == to_string(item_id))) do
-      nil -> nil
-      idx -> idx + 1
-    end
-  end
-
-  # Returns [{1-based_position, item}, ...] in selection order, skipping items not yet loaded.
-  def selected_items_in_order(all_items, selected_ids) do
-    selected_ids
-    |> Enum.with_index(1)
-    |> Enum.flat_map(fn {id, pos} ->
-      case Enum.find(all_items, &(to_string(&1.id) == id)) do
-        nil -> []
-        item -> [{pos, item}]
-      end
-    end)
-  end
 
   def format_count(n) when is_integer(n) do
     n
@@ -807,183 +776,51 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 </.trix_editor>
               </div>
 
-              <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-                <h2 class="text-lg font-semibold text-zinc-800 mb-2">
-                  Latest news (posts)
-                </h2>
-                <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
-                  Click to select or deselect posts to feature. Selected order is preserved.
-                </p>
-                <div
-                  :if={!@picker_data_loaded? && !@readonly?}
-                  id="newsletter-posts-picker-loading"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span class="sr-only">Loading posts…</span>
-                  <.thumbnail_grid_skeleton count={10} />
-                </div>
-                <div :if={@picker_data_loaded? && !@readonly?}>
-                  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                    <%= for post <- Enum.take(@post_results, @post_visible_count) do %>
-                      <% selected? = to_string(post.id) in @selected_post_ids %>
-                      <button
-                        type="button"
-                        phx-click="toggle-post"
-                        phx-value-id={post.id}
-                        class={[
-                          "group text-left transition-all focus:outline-hidden rounded-xl",
-                          if(selected?,
-                            do: "ring-2 ring-blue-500 ring-offset-2",
-                            else:
-                              "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
-                          )
-                        ]}
-                      >
-                        <div class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
-                          <%= if post.featured_image do %>
-                            <img
-                              src={image_url(post.featured_image)}
-                              alt=""
-                              class="w-full h-full object-cover"
-                            />
-                          <% end %>
-                          <div class={[
-                            "absolute inset-0 transition-opacity duration-150",
-                            if(selected?, do: "bg-blue-600/20", else: "opacity-0")
-                          ]} />
-                          <span
-                            :if={selected_position(@selected_post_ids, post.id)}
-                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-xs"
-                          >
-                            {selected_position(@selected_post_ids, post.id)}
-                          </span>
-                        </div>
-                        <p class={[
-                          "mt-1.5 px-0.5 text-[11px] leading-tight line-clamp-2",
-                          if(selected?,
-                            do: "font-semibold text-blue-700",
-                            else: "font-medium text-zinc-600"
-                          )
-                        ]}>
-                          {post.title}
-                        </p>
-                      </button>
-                    <% end %>
-                  </div>
-                  <.admin_dashed_more_button
-                    :if={length(@post_results) > @post_visible_count}
-                    phx-click="show-more-posts"
-                  >
-                    Show more ({length(@post_results) - @post_visible_count} remaining)
-                  </.admin_dashed_more_button>
-                </div>
-                <div
-                  :if={@selected_post_ids != [] && @picker_data_loaded?}
-                  class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
-                >
-                  <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                    Selected ({length(@selected_post_ids)})
-                  </p>
-                  <%= for {pos, post} <- selected_items_in_order(@post_results, @selected_post_ids) do %>
-                    <div class="flex items-center gap-2 text-sm text-zinc-700">
-                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold tabular-nums">
-                        {pos}
-                      </span>
-                      <span class="truncate">{post.title}</span>
-                    </div>
-                  <% end %>
-                </div>
-              </div>
+              <.admin_ordered_thumbnail_picker
+                id="newsletter-posts-picker"
+                title="Latest news (posts)"
+                hint="Click to select or deselect posts to feature. Selected order is preserved."
+                items={@post_results}
+                selected_ids={@selected_post_ids}
+                visible_count={@post_visible_count}
+                loaded?={@picker_data_loaded?}
+                readonly?={@readonly?}
+                toggle_event="toggle-post"
+                show_more_event="show-more-posts"
+                loading_label="Loading posts…"
+              >
+                <:image :let={post}>
+                  <img
+                    :if={post.featured_image}
+                    src={image_url(post.featured_image)}
+                    alt=""
+                    class="w-full h-full object-cover"
+                  />
+                </:image>
+              </.admin_ordered_thumbnail_picker>
 
-              <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-                <h2 class="text-lg font-semibold text-zinc-800 mb-2">
-                  Upcoming events
-                </h2>
-                <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
-                  Click to select or deselect events to feature. Selected order is preserved.
-                </p>
-                <div
-                  :if={!@picker_data_loaded? && !@readonly?}
-                  id="newsletter-events-picker-loading"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span class="sr-only">Loading events…</span>
-                  <.thumbnail_grid_skeleton count={10} />
-                </div>
-                <div :if={@picker_data_loaded? && !@readonly?}>
-                  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                    <%= for event <- Enum.take(@event_results, @event_visible_count) do %>
-                      <% selected? = to_string(event.id) in @selected_event_ids %>
-                      <button
-                        type="button"
-                        phx-click="toggle-event"
-                        phx-value-id={event.id}
-                        class={[
-                          "group text-left transition-all focus:outline-hidden rounded-xl",
-                          if(selected?,
-                            do: "ring-2 ring-blue-500 ring-offset-2",
-                            else:
-                              "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
-                          )
-                        ]}
-                      >
-                        <div class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
-                          <%= if event.cover_image do %>
-                            <img
-                              src={event_image_url(event)}
-                              alt=""
-                              class="w-full h-full object-cover"
-                            />
-                          <% end %>
-                          <div class={[
-                            "absolute inset-0 transition-opacity duration-150",
-                            if(selected?, do: "bg-blue-600/20", else: "opacity-0")
-                          ]} />
-                          <span
-                            :if={selected_position(@selected_event_ids, event.id)}
-                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-xs"
-                          >
-                            {selected_position(@selected_event_ids, event.id)}
-                          </span>
-                        </div>
-                        <p class={[
-                          "mt-1.5 px-0.5 text-[11px] leading-tight line-clamp-2",
-                          if(selected?,
-                            do: "font-semibold text-blue-700",
-                            else: "font-medium text-zinc-600"
-                          )
-                        ]}>
-                          {event.title}
-                        </p>
-                      </button>
-                    <% end %>
-                  </div>
-                  <.admin_dashed_more_button
-                    :if={length(@event_results) > @event_visible_count}
-                    phx-click="show-more-events"
-                  >
-                    Show more ({length(@event_results) - @event_visible_count} remaining)
-                  </.admin_dashed_more_button>
-                </div>
-                <div
-                  :if={@selected_event_ids != [] && @picker_data_loaded?}
-                  class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
-                >
-                  <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                    Selected ({length(@selected_event_ids)})
-                  </p>
-                  <%= for {pos, event} <- selected_items_in_order(@event_results, @selected_event_ids) do %>
-                    <div class="flex items-center gap-2 text-sm text-zinc-700">
-                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold tabular-nums">
-                        {pos}
-                      </span>
-                      <span class="truncate">{event.title}</span>
-                    </div>
-                  <% end %>
-                </div>
-              </div>
+              <.admin_ordered_thumbnail_picker
+                id="newsletter-events-picker"
+                title="Upcoming events"
+                hint="Click to select or deselect events to feature. Selected order is preserved."
+                items={@event_results}
+                selected_ids={@selected_event_ids}
+                visible_count={@event_visible_count}
+                loaded?={@picker_data_loaded?}
+                readonly?={@readonly?}
+                toggle_event="toggle-event"
+                show_more_event="show-more-events"
+                loading_label="Loading events…"
+              >
+                <:image :let={event}>
+                  <img
+                    :if={event.cover_image}
+                    src={event_image_url(event)}
+                    alt=""
+                    class="w-full h-full object-cover"
+                  />
+                </:image>
+              </.admin_ordered_thumbnail_picker>
             </.form>
           </div>
         </div>
@@ -1030,6 +867,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 title="Email preview"
                 phx-hook="EmailPreview"
                 srcdoc={@_preview_html || ""}
+                sandbox="allow-same-origin"
               ></iframe>
             </div>
           </div>

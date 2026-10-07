@@ -68,7 +68,7 @@ defmodule YscWeb.ConductViolationReportLive do
               Report a concern
             </h1>
             <p class="text-lg text-zinc-600 max-w-xl mx-auto mb-4">
-              We're here to help. If you've experienced or witnessed a violation of our Code of Conduct, please share the details below. Your report will be handled with care and confidentiality.
+              We're here to help. If you've experienced or witnessed a violation of our Code of Conduct, please share the details below. The board reviews every report privately and with care.
             </p>
             <p class="text-sm text-zinc-500 mb-6">
               You can expect a response from the board within <strong class="text-zinc-700">48-72 hours</strong>. All reports are reviewed promptly and with discretion.
@@ -86,7 +86,10 @@ defmodule YscWeb.ConductViolationReportLive do
             </p>
 
             <%!-- Board member conflict notice --%>
-            <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-left max-w-xl mx-auto">
+            <div
+              id="board-member-notice"
+              class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-left max-w-xl mx-auto"
+            >
               <div class="flex gap-3">
                 <.icon
                   name="hero-exclamation-triangle"
@@ -97,7 +100,14 @@ defmodule YscWeb.ConductViolationReportLive do
                     Is your report about a board member?
                   </p>
                   <p class="text-sm text-amber-800">
-                    Since reports are reviewed by the board, if your report is about a current board member, we recommend reaching out directly to another board member you trust, or contacting the club president through a private channel to ensure your report is handled impartially.
+                    You can still use this form. If you want only the club president to handle it, use
+                    <.link
+                      navigate={~p"/contact"}
+                      class="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
+                    >
+                      our contact page
+                    </.link>
+                    and ask for that in your message.
                   </p>
                 </div>
               </div>
@@ -155,7 +165,7 @@ defmodule YscWeb.ConductViolationReportLive do
                     </div>
                   </div>
                   <p class="text-xs text-zinc-500 italic border-t border-zinc-200 pt-3">
-                    We may contact you if we need more information. Your report is kept private and only shared with the YSC board and people involved in reviewing it—not with the person you are reporting about (unless you choose otherwise below).
+                    We may contact you if we need more information.
                   </p>
                   <%!-- Hidden fields to ensure user data is submitted --%>
                   <input
@@ -220,6 +230,13 @@ defmodule YscWeb.ConductViolationReportLive do
                     </div>
                   </div>
                 </div>
+
+                <p
+                  id="report-privacy-note"
+                  class="text-sm text-zinc-600 mt-4"
+                >
+                  The board will see your name so they can follow up. Check the box at the bottom if you want your name hidden from the people this report is about.
+                </p>
               </div>
 
               <%!-- Incident Details Section --%>
@@ -254,6 +271,7 @@ defmodule YscWeb.ConductViolationReportLive do
 
               <%!-- Anonymous Option --%>
               <label
+                id="report-privacy-choice"
                 for={@form[:anonymous].id}
                 class="mb-8 p-4 bg-blue-50 border border-blue-100 rounded-lg transition-colors hover:bg-blue-100/50 cursor-pointer block group"
               >
@@ -282,8 +300,8 @@ defmodule YscWeb.ConductViolationReportLive do
                     <p class="text-sm font-semibold text-zinc-900 mb-2">
                       Keep my name private from the people this report is about
                     </p>
-                    <p class="text-xs text-zinc-600">
-                      Your name will still be visible to the YSC board for follow-up, but will not be shared with the people involved in what happened.
+                    <p id="report-privacy-choice-help" class="text-xs text-zinc-600">
+                      If you leave this unchecked, the board may share your name with the people this report is about. Check this box if you do not want them to learn your name. The board will still see your name so they can follow up with you.
                     </p>
                   </div>
                 </div>

@@ -217,4 +217,92 @@ defmodule Ysc.Events.TicketDetailTest do
       assert changeset.errors[:email] != nil
     end
   end
+
+  describe "changeset/3 identity and email options" do
+    test "identity: false only requires the ticket and stores answers", %{
+      ticket: ticket
+    } do
+      answers = %{
+        "q1" => %{
+          "label" => "Dietary restrictions",
+          "type" => "text",
+          "position" => 0,
+          "value" => "Vegan"
+        }
+      }
+
+      changeset =
+        TicketDetail.changeset(
+          %TicketDetail{},
+          %{ticket_id: ticket.id, answers: answers},
+          identity: false
+        )
+
+      assert changeset.valid?
+      refute changeset.errors[:first_name]
+      refute changeset.errors[:last_name]
+      refute changeset.errors[:email]
+
+      assert {:ok, detail} = Repo.insert(changeset)
+      assert detail.first_name == nil
+      assert detail.email == nil
+      assert detail.answers == answers
+    end
+
+    test "require_email: false keeps the name but not the email", %{
+      ticket: ticket
+    } do
+      changeset =
+        TicketDetail.changeset(
+          %TicketDetail{},
+          %{ticket_id: ticket.id, first_name: "Kim", last_name: "Parent"},
+          require_email: false
+        )
+
+      assert changeset.valid?
+      refute changeset.errors[:email]
+
+      nameless =
+        TicketDetail.changeset(
+          %TicketDetail{},
+          %{ticket_id: ticket.id},
+          require_email: false
+        )
+
+      refute nameless.valid?
+      assert nameless.errors[:first_name]
+      assert nameless.errors[:last_name]
+      refute nameless.errors[:email]
+    end
+
+    test "empty email is allowed when email is not required", %{ticket: ticket} do
+      changeset =
+        TicketDetail.changeset(
+          %TicketDetail{},
+          %{
+            ticket_id: ticket.id,
+            first_name: "Kim",
+            last_name: "Parent",
+            email: ""
+          },
+          require_email: false
+        )
+
+      assert changeset.valid?
+    end
+
+    test "invalid email is still rejected when identity is optional", %{
+      ticket: ticket
+    } do
+      changeset =
+        TicketDetail.changeset(
+          %TicketDetail{},
+          %{ticket_id: ticket.id, email: "not-an-email"},
+          identity: false
+        )
+
+      refute changeset.valid?
+      assert changeset.errors[:email]
+    end
+  end
 end

@@ -20,6 +20,43 @@ defmodule YscWeb.AdminComponentsTest do
     }
   end
 
+  defp picker_item(id, title), do: %{id: id, title: title}
+
+  defp render_ordered_thumbnail_picker(opts) do
+    assigns =
+      %{
+        items: [
+          picker_item("p1", "Winter Update"),
+          picker_item("p2", "Cabin")
+        ],
+        selected_ids: [],
+        visible_count: 10,
+        loaded?: true,
+        readonly?: false
+      }
+      |> Map.merge(Map.new(opts))
+
+    rendered_to_string(~H"""
+    <.admin_ordered_thumbnail_picker
+      id="newsletter-posts-picker"
+      title="Latest news (posts)"
+      hint="Click to select or deselect posts to feature. Selected order is preserved."
+      items={@items}
+      selected_ids={@selected_ids}
+      visible_count={@visible_count}
+      loaded?={@loaded?}
+      readonly?={@readonly?}
+      toggle_event="toggle-post"
+      show_more_event="show-more-posts"
+      loading_label="Loading posts…"
+    >
+      <:image :let={item}>
+        <img src={"/img/#{item.id}"} alt="" />
+      </:image>
+    </.admin_ordered_thumbnail_picker>
+    """)
+  end
+
   defp render_pagination(opts) do
     assigns =
       %{meta: sample_meta(), path: "/admin/items", density: :comfortable}
@@ -349,6 +386,101 @@ defmodule YscWeb.AdminComponentsTest do
         """)
 
       assert html =~ "mb-2"
+    end
+  end
+
+  describe "ordered_thumbnail_selected_position/2" do
+    test "returns 1-based index when the id is selected" do
+      assert ordered_thumbnail_selected_position(["a", "b", "c"], "b") == 2
+      assert ordered_thumbnail_selected_position(["a", "b", "c"], :a) == 1
+    end
+
+    test "returns nil when the id is not selected" do
+      assert ordered_thumbnail_selected_position(["a"], "z") == nil
+      assert ordered_thumbnail_selected_position([], "a") == nil
+    end
+  end
+
+  describe "ordered_thumbnail_selected_items/2" do
+    test "returns items in selection order with 1-based positions" do
+      items = [
+        %{id: "p1", title: "First"},
+        %{id: "p2", title: "Second"},
+        %{id: "p3", title: "Third"}
+      ]
+
+      assert ordered_thumbnail_selected_items(items, ["p3", "p1"]) == [
+               {1, %{id: "p3", title: "Third"}},
+               {2, %{id: "p1", title: "First"}}
+             ]
+    end
+
+    test "skips selected ids that are not in the loaded item list" do
+      items = [%{id: "p1", title: "First"}]
+
+      assert ordered_thumbnail_selected_items(items, ["missing", "p1"]) == [
+               {2, %{id: "p1", title: "First"}}
+             ]
+    end
+  end
+
+  describe "admin_ordered_thumbnail_picker/1" do
+    test "renders loading skeleton before picker data is ready" do
+      html = render_ordered_thumbnail_picker(loaded?: false)
+
+      assert html =~ ~s(id="newsletter-posts-picker-loading")
+      assert html =~ "Loading posts…"
+      assert html =~ "Latest news (posts)"
+      refute html =~ ~s(id="newsletter-posts-picker-item-p1")
+      refute html =~ "Selected ("
+    end
+
+    test "renders tiles, toggle events, and image slot when loaded" do
+      html = render_ordered_thumbnail_picker([])
+
+      assert html =~ ~s(id="newsletter-posts-picker-item-p1")
+      assert html =~ ~s(phx-click="toggle-post")
+      assert html =~ ~s(phx-value-id="p1")
+      assert html =~ "Winter Update"
+      assert html =~ ~s(src="/img/p1")
+      refute html =~ "newsletter-posts-picker-loading"
+      refute html =~ "Show more"
+    end
+
+    test "shows numbered badges, selected list, and remaining count" do
+      items =
+        Enum.map(1..3, fn i ->
+          picker_item("p#{i}", "Post #{i}")
+        end)
+
+      html =
+        render_ordered_thumbnail_picker(
+          items: items,
+          selected_ids: ["p3", "p1"],
+          visible_count: 2
+        )
+
+      assert html =~ "Show more (1 remaining)"
+      assert html =~ ~s(phx-click="show-more-posts")
+      assert html =~ "Selected (2)"
+      assert html =~ "Post 3"
+      assert html =~ "ring-2 ring-blue-500 ring-offset-2"
+      assert html =~ "bg-blue-600/20"
+    end
+
+    test "hides the grid in readonly mode but still lists selected items" do
+      html =
+        render_ordered_thumbnail_picker(
+          loaded?: true,
+          readonly?: true,
+          selected_ids: ["p1"]
+        )
+
+      refute html =~ "Click to select or deselect"
+      refute html =~ ~s(id="newsletter-posts-picker-item-p1")
+      refute html =~ "newsletter-posts-picker-loading"
+      assert html =~ "Selected (1)"
+      assert html =~ "Winter Update"
     end
   end
 

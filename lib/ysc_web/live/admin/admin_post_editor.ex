@@ -803,10 +803,7 @@ defmodule YscWeb.AdminPostEditorLive do
      |> assign(:post_id, post_id)
      |> assign(:post, post)
      |> assign(:page_title, post.title)
-     |> assign(
-       :editors,
-       EditingPresence.editors(:post, post_id, socket.assigns.current_user.id)
-     )
+     |> EditingPresence.assign_editors(:post, post_id)
      |> push_patch(to: ~p"/admin/posts/#{post_id}", replace: true)}
   end
 
@@ -821,14 +818,8 @@ defmodule YscWeb.AdminPostEditorLive do
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
-    editors =
-      EditingPresence.editors(
-        :post,
-        socket.assigns.post_id,
-        socket.assigns.current_user.id
-      )
-
-    {:noreply, assign(socket, :editors, editors)}
+    {:noreply,
+     EditingPresence.assign_editors(socket, :post, socket.assigns.post_id)}
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "create_failed"}, socket) do
@@ -892,14 +883,7 @@ defmodule YscWeb.AdminPostEditorLive do
            |> assign(:post_id, post.id)
            |> assign(:post, post)
            |> assign(:page_title, post.title)
-           |> assign(
-             :editors,
-             EditingPresence.editors(
-               :post,
-               post.id,
-               socket.assigns.current_user.id
-             )
-           )}
+           |> EditingPresence.assign_editors(:post, post.id)}
 
         {:error, _} ->
           {:error, socket}
@@ -1080,10 +1064,7 @@ defmodule YscWeb.AdminPostEditorLive do
     |> assign(:post_id, post.id)
     |> assign(:post, post)
     |> assign(:preview_device, :computer)
-    |> assign(
-      :editors,
-      EditingPresence.editors(:post, id, socket.assigns.current_user.id)
-    )
+    |> EditingPresence.assign_editors(:post, id)
     |> assign(form: to_form(update_post_changeset, as: "post"))
   end
 end

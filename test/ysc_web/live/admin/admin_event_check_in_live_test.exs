@@ -129,6 +129,99 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Attendee answers
+  # ---------------------------------------------------------------------------
+
+  describe "attendee answers" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          attendee_questions: [
+            %{"label" => "Dietary restrictions", "type" => "text"}
+          ]
+        })
+
+      buyer = make_member()
+
+      ticket =
+        insert_confirmed_checkin_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id,
+          user_id: buyer.id
+        })
+
+      [question] = tier.attendee_questions
+
+      {:ok, _} =
+        Ysc.Events.create_ticket_details([
+          %{
+            ticket_id: ticket.id,
+            identity: false,
+            answers: %{
+              question.id => %{
+                "label" => "Dietary restrictions",
+                "type" => "text",
+                "position" => 0,
+                "value" => "Gluten free"
+              }
+            }
+          }
+        ])
+
+      %{event: event, ticket: ticket, buyer: buyer}
+    end
+
+    test "admins see dietary notes next to the attendee", %{
+      conn: conn,
+      event: event,
+      ticket: ticket,
+      buyer: buyer
+    } do
+      conn = log_in_user(conn, user_fixture(%{role: "admin"}))
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      assert has_element?(view, "#checkin-answers-#{ticket.id}", "Gluten free")
+
+      assert has_element?(
+               view,
+               "#checkin-answers-#{ticket.id}",
+               "Dietary restrictions"
+             )
+
+      # No attendee was named, so the buyer is shown as the attendee.
+      assert render(view) =~ buyer.first_name
+    end
+
+    test "volunteers doing check-in see them too", %{
+      conn: conn,
+      event: event,
+      ticket: ticket
+    } do
+      conn = log_in_user(conn, user_fixture(%{role: "volunteer"}))
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      assert has_element?(view, "#checkin-answers-#{ticket.id}", "Gluten free")
+    end
+
+    test "answers stay visible after checking in", %{
+      conn: conn,
+      event: event,
+      ticket: ticket
+    } do
+      conn = log_in_user(conn, user_fixture(%{role: "volunteer"}))
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      render_click(view, "toggle-check-in", %{"ticket-id" => ticket.id})
+
+      assert has_element?(view, "#checkin-answers-#{ticket.id}", "Gluten free")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Page rendering
   # ---------------------------------------------------------------------------
 

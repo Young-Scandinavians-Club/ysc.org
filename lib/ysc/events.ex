@@ -711,6 +711,7 @@ defmodule Ysc.Events do
                   unlimited_quantity:
                     tier.quantity == nil or tier.quantity == 0,
                   requires_registration: tier.requires_registration,
+                  attendee_questions: duplicate_attendee_questions(tier),
                   start_date: tier.start_date,
                   end_date: tier.end_date
                 }
@@ -750,6 +751,23 @@ defmodule Ysc.Events do
   end
 
   # Finding 55: volunteers must not mint ticket inventory via Copy Event.
+  # Question ids only need to be unique within a tier, so the copies keep them.
+  defp duplicate_attendee_questions(tier) do
+    Enum.map(tier.attendee_questions || [], fn q ->
+      %{
+        "id" => q.id,
+        "label" => q.label,
+        "help_text" => q.help_text,
+        "type" => to_string(q.type),
+        "required" => q.required,
+        "options_text" => Enum.join(q.options || [], "\n"),
+        "min" => q.min,
+        "max" => q.max,
+        "prefill" => q.prefill && to_string(q.prefill)
+      }
+    end)
+  end
+
   defp copy_ticket_tiers?(opts) when is_list(opts) do
     case Keyword.get(opts, :acting_role) do
       :admin -> Keyword.get(opts, :copy_ticket_tiers, true)
@@ -1073,7 +1091,7 @@ defmodule Ysc.Events do
   @doc false
   def upcoming_events_with_preload_query(limit \\ 36) do
     from(e in Event,
-      where: e.start_date > ^DateTime.utc_now(),
+      where: ^event_upcoming_dynamic(),
       where: e.state in [:published, :cancelled],
       order_by: [
         asc: fragment("CASE WHEN ? = 'cancelled' THEN 1 ELSE 0 END", e.state),
@@ -1088,6 +1106,8 @@ defmodule Ysc.Events do
   Fetch upcoming events as full Event structs with given preloads.
 
   Use for admin pickers (e.g. newsletter) where full structs and cover_image are needed.
+  Events stay listed until they are actually over (end date/time, or the day
+  after the start date when no end is set), not just until they start.
   Single query + preload, no N+1.
   """
   def list_upcoming_events_with_preload(limit \\ 36, preloads \\ [:cover_image]) do
@@ -1842,6 +1862,7 @@ defmodule Ysc.Events do
         tt.price,
         tt.quantity,
         tt.requires_registration,
+        tt.attendee_questions,
         tt.member_only,
         tt.start_date,
         tt.end_date,
@@ -1858,6 +1879,7 @@ defmodule Ysc.Events do
         price: tt.price,
         quantity: tt.quantity,
         requires_registration: tt.requires_registration,
+        attendee_questions: tt.attendee_questions,
         member_only: tt.member_only,
         start_date: tt.start_date,
         end_date: tt.end_date,
@@ -1941,6 +1963,21 @@ defmodule Ysc.Events do
   """
   def get_ticket_tier!(id) do
     Repo.get!(TicketTier, id)
+  end
+
+  @doc """
+  Tiers of an event that ask attendee questions (id, name and questions only),
+  so the tier form can offer to copy them to another tier.
+  """
+  def list_tiers_with_attendee_questions(event_id) do
+    from(tt in TicketTier,
+      where:
+        tt.event_id == ^event_id and
+          fragment("jsonb_array_length(?) > 0", tt.attendee_questions),
+      order_by: [asc: tt.name],
+      select: struct(tt, [:id, :name, :attendee_questions])
+    )
+    |> Repo.all()
   end
 
   @doc """
@@ -2273,43 +2310,70 @@ defmodule Ysc.Events do
 
   @doc """
   Get all tickets for an event for CSV export.
-  Includes ticket_tier, user (purchaser), and ticket_detail (attendee registration) preloads.
-  Both purchaser and attendee information are maintained for export.
+
+  Loads purchaser identity, the tier name and attendee questions, and
+  registration answers. Omits password hashes, bios, Stripe ids, and
+  unused ticket/tier columns the spreadsheet never includes.
   """
   def list_tickets_for_export(event_id) do
-    tickets =
-      Ticket
-      |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-      |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
-      |> join(:left, [t], u in assoc(t, :user), as: :user)
-      |> preload([ticket_tier: tt, user: u], ticket_tier: tt, user: u)
-      |> order_by([t], asc: t.inserted_at)
-      |> Repo.all()
-
-    # Load ticket details (attendee registration) for each ticket (only if there are tickets)
-    ticket_details_map =
-      if Enum.empty?(tickets) do
-        %{}
-      else
-        ticket_ids = Enum.map(tickets, & &1.id)
-
-        TicketDetail
-        |> where([td], td.ticket_id in ^ticket_ids)
-        |> Repo.all()
-        |> Enum.group_by(& &1.ticket_id)
-        |> Enum.map(fn {ticket_id, [detail | _]} -> {ticket_id, detail} end)
-        |> Map.new()
-      end
-
-    # Attach ticket details to tickets while maintaining user (purchaser) information
-    Enum.map(tickets, fn ticket ->
-      ticket_detail = Map.get(ticket_details_map, ticket.id)
-      # Ensure both user (purchaser) and ticket_detail (attendee) are available
-      ticket
-      |> Map.put(:ticket_detail, ticket_detail)
-
-      # User is already preloaded, so it's already available
+    event_id
+    |> list_tickets_for_export_query()
+    |> Repo.all()
+    |> Enum.map(fn ticket ->
+      Map.put(ticket, :ticket_detail, ticket.registration)
     end)
+  end
+
+  # CSV columns: purchaser name/email/phone, attendee name/email, tier name,
+  # purchase time, and one column per attendee question.
+  @export_ticket_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :phone_number
+  ]
+  @export_ticket_tier_fields [:id, :name, :attendee_questions]
+  @export_ticket_detail_fields [
+    :id,
+    :ticket_id,
+    :first_name,
+    :last_name,
+    :email,
+    :answers
+  ]
+  @export_ticket_fields [
+    :id,
+    :reference_id,
+    :inserted_at,
+    :user_id,
+    :ticket_tier_id,
+    :status,
+    :event_id
+  ]
+
+  defp list_tickets_for_export_query(event_id) do
+    user_query =
+      from(u in User, select: struct(u, ^@export_ticket_user_fields))
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@export_ticket_tier_fields))
+
+    detail_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@export_ticket_detail_fields)
+      )
+
+    from(t in Ticket,
+      where: t.event_id == ^event_id and t.status == :confirmed,
+      order_by: [asc: t.inserted_at],
+      select: struct(t, ^@export_ticket_fields),
+      preload: [
+        ticket_tier: ^tier_query,
+        user: ^user_query,
+        registration: ^detail_query
+      ]
+    )
   end
 
   @doc """
@@ -2901,21 +2965,39 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Create multiple ticket details for a list of tickets.
+  Create or update ticket details for a list of tickets.
+
+  Upserts on `ticket_id` so saving attendee info before a redirect payment
+  and again on `payment-success` does not insert duplicate rows.
+
   Returns {:ok, list} on success, {:error, reason} on failure.
   """
   def create_ticket_details(ticket_details_list)
       when is_list(ticket_details_list) do
     Repo.transaction(fn ->
       ticket_details_list
-      |> Enum.map(&insert_ticket_detail/1)
+      |> Enum.map(&upsert_ticket_detail/1)
     end)
   end
 
-  defp insert_ticket_detail(attrs) do
+  # `identity: false` marks tickets whose tier asks questions but not who is
+  # attending, so name and email aren't required. See `AttendeeInfo.build_detail/2`.
+  defp upsert_ticket_detail(attrs) do
+    {identity?, attrs} = Map.pop(attrs, :identity, true)
+    {email?, attrs} = Map.pop(attrs, :require_email, true)
+
     case %TicketDetail{}
-         |> TicketDetail.changeset(attrs)
-         |> Repo.insert() do
+         |> TicketDetail.changeset(attrs,
+           identity: identity?,
+           require_email: email?
+         )
+         |> Repo.insert(
+           on_conflict:
+             {:replace,
+              [:first_name, :last_name, :email, :answers, :updated_at]},
+           conflict_target: :ticket_id,
+           returning: true
+         ) do
       {:ok, ticket_detail} -> ticket_detail
       {:error, changeset} -> Repo.rollback(changeset)
     end
@@ -2952,15 +3034,18 @@ defmodule Ysc.Events do
   Create a registration (ticket detail) for a ticket.
 
   ## Parameters
-  - `attrs`: Map containing `ticket_id`, `first_name`, `last_name`, and `email`
+  - `attrs`: Map containing `ticket_id`, `first_name`, `last_name`, `email`
+    and optionally `answers`
+  - `opts`: pass `identity: false` when the name and email are optional
+    (see `Ysc.Events.TicketDetail.changeset/3`)
 
   ## Returns
   - `{:ok, registration}` on success
   - `{:error, changeset}` on failure
   """
-  def create_registration(attrs \\ %{}) do
+  def create_registration(attrs \\ %{}, opts \\ []) do
     %TicketDetail{}
-    |> TicketDetail.changeset(attrs)
+    |> TicketDetail.changeset(attrs, opts)
     |> Repo.insert()
   end
 
@@ -2969,15 +3054,16 @@ defmodule Ysc.Events do
 
   ## Parameters
   - `registration`: The TicketDetail struct to update
-  - `attrs`: Map containing fields to update (`first_name`, `last_name`, `email`)
+  - `attrs`: Map containing fields to update (`first_name`, `last_name`, `email`, `answers`)
+  - `opts`: same as `create_registration/2`
 
   ## Returns
   - `{:ok, registration}` on success
   - `{:error, changeset}` on failure
   """
-  def update_registration(%TicketDetail{} = registration, attrs) do
+  def update_registration(%TicketDetail{} = registration, attrs, opts \\ []) do
     registration
-    |> TicketDetail.changeset(attrs)
+    |> TicketDetail.changeset(attrs, opts)
     |> Repo.update()
   end
 
@@ -4114,5 +4200,10 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_attendee_users_query do
     attendee_users_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_list_tickets_for_export_query do
+    list_tickets_for_export_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

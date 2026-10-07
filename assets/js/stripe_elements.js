@@ -47,6 +47,33 @@ function safePushEvent(hook, event, payload = {}) {
     pushEventIfConnected(hook, event, payload);
 }
 
+const PAYMENT_REDIRECT_STARTED_TIMEOUT_MS = 2000;
+
+// Wait for LiveView to persist attendee info (and mark the checkout as a
+// redirect-in-progress) before Stripe.confirmPayment. Redirect wallets never
+// return to this page, so the save must finish first. Fall back to a timeout
+// so a hung reply cannot block payment forever.
+function waitForPaymentRedirectStarted(hook, shouldNotify) {
+    if (!shouldNotify) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const done = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+        };
+
+        const sent = pushEventIfConnected(hook, 'payment-redirect-started', {}, done);
+        if (!sent) {
+            done();
+            return;
+        }
+
+        setTimeout(done, PAYMENT_REDIRECT_STARTED_TIMEOUT_MS);
+    });
+}
+
 function notifyStripePaymentElementLoading(hook) {
     safePushEvent(hook, 'stripe-payment-element-loading', {});
 }
@@ -388,15 +415,10 @@ const StripeElements = {
                 returnUrl = `${window.location.origin}/payment/success`;
             }
 
-            // Notify LiveView that a redirect might be about to happen
-            // This prevents the order from being cancelled when the connection is lost
-            // Send the event and wait a bit to ensure it's processed before redirect
-            if (ticketOrderId || bookingId) {
-                safePushEvent(this, 'payment-redirect-started', {});
-                // Give LiveView a moment to process the event before redirect happens
-                // This is especially important for redirect-based payment methods (Amazon Pay, CashApp, etc.)
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // Persist attendee info and mark checkout as redirect-in-progress
+            // before confirmPayment. Redirect wallets (Amazon Pay, Cash App, 3DS)
+            // leave this page and never fire payment-success here.
+            await waitForPaymentRedirectStarted(this, !!(ticketOrderId || bookingId));
 
             if (this.isDestroyed || !this.el?.isConnected) {
                 this._paymentConfirmInFlight = false;
