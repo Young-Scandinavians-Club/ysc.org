@@ -17,14 +17,16 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe],
         list_unused_filters: true
       ],
-      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-10-04.
+      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-11-06.
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-43966",
           "EEF-CVE-2026-43969",
-          # Published 2026-08-18; still unpatched on Hex cowlib 2.20.0.
-          "EEF-CVE-2026-43971"
+          # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
+          # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
+          "EEF-CVE-2026-95105",
+          "EEF-CVE-2026-94206"
         ]
       ],
       test_coverage: [
