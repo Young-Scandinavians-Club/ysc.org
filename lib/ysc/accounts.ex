@@ -5257,6 +5257,11 @@ defmodule Ysc.Accounts do
 
   ## User Notes
 
+  # Notes UI only shows the author's name and email — skip hashed_password,
+  # bios, Stripe ids, and other User columns that `preload([:created_by])`
+  # would SELECT.
+  @user_note_author_fields [:id, :first_name, :last_name, :email]
+
   @doc """
   Creates a new note for a user.
 
@@ -5282,7 +5287,8 @@ defmodule Ysc.Accounts do
   @doc """
   Lists all notes for a user, ordered by most recent first.
 
-  Preloads the `created_by` association to show which admin created each note.
+  Preloads a slim `created_by` (name + email) to show which admin created
+  each note.
 
   ## Examples
 
@@ -5290,26 +5296,39 @@ defmodule Ysc.Accounts do
       [%UserNote{...}, ...]
   """
   def list_user_notes(user_id) do
+    list_user_notes_query(user_id) |> Repo.all()
+  end
+
+  @doc false
+  def list_user_notes_query(user_id) do
     from(n in UserNote,
       where: n.user_id == ^user_id,
       order_by: [desc: n.inserted_at],
-      preload: [:created_by]
+      preload: [created_by: ^user_note_author_query()]
     )
-    |> Repo.all()
   end
 
   @doc """
   Lists user notes filtered by category (e.g. :rejection).
 
-  Returns notes ordered by most recent first, with created_by preloaded.
+  Returns notes ordered by most recent first, with a slim `created_by`
+  preloaded.
   """
   def list_user_notes_by_category(user_id, category) do
+    list_user_notes_by_category_query(user_id, category) |> Repo.all()
+  end
+
+  @doc false
+  def list_user_notes_by_category_query(user_id, category) do
     from(n in UserNote,
       where: n.user_id == ^user_id and n.category == ^category,
       order_by: [desc: n.inserted_at],
-      preload: [:created_by]
+      preload: [created_by: ^user_note_author_query()]
     )
-    |> Repo.all()
+  end
+
+  defp user_note_author_query do
+    from(u in User, select: struct(u, ^@user_note_author_fields))
   end
 
   ## Post-migration onboarding
@@ -5568,6 +5587,24 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_pending_approval_users_query do
     pending_approval_users_query()
+  end
+
+  @doc false
+  def ci_query_explain_list_user_notes_query do
+    list_user_notes_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_list_user_notes_by_category_query do
+    list_user_notes_by_category_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id,
+      :rejection
+    )
+  end
+
+  @doc false
+  def ci_query_explain_user_note_author_query do
+    user_note_author_query()
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do

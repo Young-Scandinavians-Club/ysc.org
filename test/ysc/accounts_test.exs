@@ -3038,6 +3038,13 @@ defmodule Ysc.AccountsTest do
       assert length(notes) == 1
       assert hd(notes).id == note.id
 
+      author = hd(notes).created_by
+      assert author.id == admin.id
+      assert author.first_name == admin.first_name
+      assert author.last_name == admin.last_name
+      assert author.email == admin.email
+      assert is_nil(author.hashed_password)
+
       assert {:ok, _} =
                Accounts.create_user_note(
                  subject,

@@ -276,6 +276,49 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       assert application_html =~ "Application"
     end
+
+    test "application tab loads signup data after a profile-only first paint",
+         %{conn: conn} do
+      user = user_fixture()
+      signup_application_fixture(user, %{occupation: "Cartographer"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> element("a[href$='/details/application']")
+      |> render_click()
+
+      html = render(view)
+      refute html =~ "No application found"
+      assert html =~ "Cartographer"
+    end
+
+    test "notes tab shows the author's name and email", %{
+      conn: conn,
+      user: admin
+    } do
+      subject = user_fixture()
+
+      {:ok, _} =
+        Accounts.create_user_note(
+          subject,
+          %{"note" => "Called about dues", "category" => "general"},
+          admin
+        )
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{subject.id}/details/logs")
+
+      render_async(view)
+
+      assert has_element?(view, "#admin-user-notes-timeline", admin.email)
+
+      assert has_element?(
+               view,
+               "#admin-user-notes-timeline",
+               "Called about dues"
+             )
+    end
   end
 
   describe "tab highlighting" do
