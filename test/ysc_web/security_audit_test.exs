@@ -5432,6 +5432,7 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert out =~ "figcaption"
       assert out =~ "&lt;img src=x onerror=alert(1)&gt;"
+
       # The dangerous markup must not appear as a live tag attribute in the scrubbed HTML.
       refute out =~ ~r/<img[^>]+onerror=/i
     end
