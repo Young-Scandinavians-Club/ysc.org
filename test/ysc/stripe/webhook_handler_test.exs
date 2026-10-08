@@ -1398,6 +1398,79 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert updated.stripe_status == "canceled"
     end
 
+    test "customer.subscription.updated does not resurrect a cancelled subscription from a stale active event" do
+      # After admin cancel-and-refund, local status is "cancelled" (British) while a
+      # delayed/retried subscription.updated with status "active" can still arrive
+      # within the webhook age window. Applying it would restore membership access
+      # even though Stripe already canceled the subscription.
+      user = user_with_stripe_id()
+
+      subscription =
+        create_subscription(user, %{
+          stripe_status: "cancelled",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      period_end_before = subscription.current_period_end
+
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "active",
+          cancel_at_period_end: false,
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 60 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      updated = Ysc.Repo.reload(subscription)
+      assert updated.stripe_status == "cancelled"
+      assert updated.current_period_end == period_end_before
+      refute Subscriptions.active?(updated)
+    end
+
+    test "customer.subscription.updated does not resurrect Stripe-spelling canceled status either" do
+      user = user_with_stripe_id()
+
+      subscription =
+        create_subscription(user, %{stripe_status: "canceled"})
+
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "trialing",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
+
+      event =
+        build_stripe_event("customer.subscription.updated", subscription_data)
+
+      assert :ok = WebhookHandler.handle_event(event)
+
+      assert Ysc.Repo.reload(subscription).stripe_status == "canceled"
+    end
+
     test "customer.subscription.deleted schedules membership ended email for voluntary lapse" do
       user = user_with_stripe_id()
 
