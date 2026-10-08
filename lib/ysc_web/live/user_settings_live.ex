@@ -1529,6 +1529,7 @@ defmodule YscWeb.UserSettingsLive do
                   <%!-- Plan change info banner --%>
                   <div
                     :if={@membership_change_info != nil}
+                    id="plan-change-info-banner"
                     class={[
                       "mx-6 mt-4 rounded-lg p-4 border",
                       if(@membership_change_info.direction == :upgrade,
@@ -1554,19 +1555,22 @@ defmodule YscWeb.UserSettingsLive do
                         ]}
                       />
                       <div>
-                        <h4 class={[
-                          "text-sm font-semibold mb-1",
-                          if(@membership_change_info.direction == :upgrade,
-                            do: "text-blue-900",
-                            else: "text-amber-900"
-                          )
-                        ]}>
+                        <h4
+                          id="plan-change-banner-heading"
+                          class={[
+                            "text-sm font-semibold mb-1",
+                            if(@membership_change_info.direction == :upgrade,
+                              do: "text-blue-900",
+                              else: "text-amber-900"
+                            )
+                          ]}
+                        >
                           <%= if @membership_change_info.direction == :upgrade do %>
                             Upgrade to {String.capitalize(
                               "#{@membership_change_info.new_plan.id}"
                             )} Membership
                           <% else %>
-                            Downgrade to {String.capitalize(
+                            Switch to {String.capitalize(
                               "#{@membership_change_info.new_plan.id}"
                             )} Membership
                           <% end %>
