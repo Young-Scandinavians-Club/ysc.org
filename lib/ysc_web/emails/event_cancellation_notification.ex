@@ -7,13 +7,9 @@ defmodule YscWeb.Emails.EventCancellationNotification do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [
-      attendee_greeting_name: 1,
-      event_cover_image_url: 1,
-      format_event_start_datetime: 2,
-      preload_event_associations: 2,
-      upcoming_events_url: 0
-    ]
+    only: [attendee_greeting_name: 1, upcoming_events_url: 0]
+
+  alias YscWeb.Emails.EventHelpers
 
   @events_email "events@ysc.org"
 
@@ -40,22 +36,15 @@ defmodule YscWeb.Emails.EventCancellationNotification do
   Compute this once per send, then `Map.put(:first_name, ...)` per recipient.
   """
   def prepare_shared_email_data(event) do
-    if is_nil(event), do: raise(ArgumentError, "Event cannot be nil")
-
-    event = preload_event_associations(event, [:cover_image])
-
-    %{
-      event: %{
-        id: event.id,
-        title: event.title,
-        location_name: event.location_name,
-        address: event.address
-      },
-      event_date_time:
-        format_event_start_datetime(event.start_date, event.start_time),
-      event_image_url: event_cover_image_url(event),
+    event
+    |> EventHelpers.event_display(
+      preload: [:cover_image],
+      event_url: false,
+      fields: [:id, :title, :location_name, :address]
+    )
+    |> Map.merge(%{
       upcoming_events_url: upcoming_events_url(),
       events_email: @events_email
-    }
+    })
   end
 end

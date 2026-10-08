@@ -7,15 +7,9 @@ defmodule YscWeb.Emails.EventUpdateNotification do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [
-      attendee_greeting_name: 1,
-      event_cover_image_url: 1,
-      event_url: 1,
-      format_event_start_datetime: 2,
-      notification_settings_url: 0,
-      plain_text_from_html: 1,
-      preload_event_associations: 1
-    ]
+    only: [attendee_greeting_name: 1, notification_settings_url: 0]
+
+  alias YscWeb.Emails.EventHelpers
 
   def raw(content) when is_binary(content), do: {:safe, content}
   def raw(nil), do: {:safe, ""}
@@ -49,33 +43,26 @@ defmodule YscWeb.Emails.EventUpdateNotification do
   we do not re-render dates, URLs, cover images, and HTML for every attendee.
   """
   def prepare_shared_email_data(event, update) do
-    if is_nil(event), do: raise(ArgumentError, "Event cannot be nil")
+    _ = EventHelpers.require_event!(event)
     if is_nil(update), do: raise(ArgumentError, "Update cannot be nil")
 
-    event = preload_event_associations(event)
-
-    event_date_time =
-      format_event_start_datetime(event.start_date, event.start_time)
-
-    event_map = %{
-      id: event.id,
-      title: event.title,
-      description: plain_text_from_html(event.description),
-      start_date: event.start_date,
-      start_time: event.start_time,
-      location_name: event.location_name,
-      address: event.address
-    }
-
-    %{
-      event: event_map,
+    event
+    |> EventHelpers.event_display(
+      fields: [
+        :id,
+        :title,
+        :description,
+        :start_date,
+        :start_time,
+        :location_name,
+        :address
+      ]
+    )
+    |> Map.merge(%{
       update_title: update.title,
       update_body: constrain_media(update.rendered_body || ""),
-      event_date_time: event_date_time,
-      event_url: event_url(event.id),
-      event_image_url: event_cover_image_url(event),
       notification_settings_url: notification_settings_url()
-    }
+    })
   end
 
   defp constrain_media(html) do
