@@ -1620,6 +1620,93 @@ defmodule YscWeb.UserSettingsLiveTest do
     end
   end
 
+  describe "select_membership Stripe error handling" do
+    test "already-active subscription shows info toast and does not create another Stripe subscription",
+         %{conn: conn} do
+      user = active_user_with_default_payment_method("alreadysub")
+
+      {:ok, _existing_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_alreadysub_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Existing Active Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+        flunk("must not create a second Stripe subscription")
+      end)
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "select_membership", %{"membership_type" => "single"})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :info) =~
+               "Your membership is already set up"
+
+      refute Phoenix.Flash.get(flash, :error)
+    end
+
+    test "card decline shows the declined-card toast instead of generic payment failure",
+         %{conn: conn} do
+      user = active_user_with_default_payment_method("carderr")
+
+      stub(Stripe.SubscriptionMock, :create, fn _params ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :card_error,
+           message: "Your card was declined.",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "select_membership", %{"membership_type" => "single"})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "declined"
+      assert error =~ "try a different card"
+      refute error =~ "couldn't process your payment"
+    end
+
+    test "generic Stripe error still shows the payment-failed toast", %{
+      conn: conn
+    } do
+      user = active_user_with_default_payment_method("genericerr")
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "select_membership", %{"membership_type" => "single"})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "couldn't process your payment"
+      refute error =~ "already set up"
+    end
+  end
+
   describe "membership plan change (stubbed Subscriptions callback)" do
     test "change-membership upgrade shows success when callback returns ok", %{
       conn: conn
@@ -3376,6 +3463,30 @@ defmodule YscWeb.UserSettingsLiveTest do
         DateTime.utc_now() |> DateTime.truncate(:second)
     })
     |> Repo.update!()
+  end
+
+  defp active_user_with_default_payment_method(prefix) do
+    user = user_fixture(%{state: :active})
+
+    {:ok, user} =
+      user
+      |> Ecto.Changeset.change(%{
+        stripe_id: "cus_#{prefix}_#{System.unique_integer([:positive])}"
+      })
+      |> Repo.update()
+
+    {:ok, _} =
+      Payments.insert_payment_method(%{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: "pm_#{prefix}_#{System.unique_integer([:positive])}",
+        provider_customer_id: user.stripe_id,
+        type: :card,
+        provider_type: "card",
+        is_default: true
+      })
+
+    user
   end
 
   defp profile_form_attrs(%Ysc.Accounts.User{} = user, overrides)
