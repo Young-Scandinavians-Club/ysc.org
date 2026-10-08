@@ -5448,12 +5448,13 @@ defmodule YscWeb.SecurityAuditTest do
       }
       const fromTextContent = "<img src=x onerror=alert(1)>";
       const escaped = escapeHtml(fromTextContent);
-      if (escaped.includes("<img") || escaped.includes("onerror=alert")) {
-        console.error("FAIL unescaped");
-        process.exit(1);
-      }
       if (escaped !== "&lt;img src=x onerror=alert(1)&gt;") {
         console.error("FAIL unexpected", escaped);
+        process.exit(1);
+      }
+      // Raw angle-bracket tags must not survive; GLightbox uses innerHTML for title.
+      if (/<[a-z]/i.test(escaped)) {
+        console.error("FAIL raw tag remains", escaped);
         process.exit(1);
       }
       console.log("ok");
