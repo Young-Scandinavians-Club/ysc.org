@@ -77,6 +77,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 81 (MEDIUM)   Apple Wallet cover-image fetch had no UrlFetchGuard and followed redirects (SSRF if a media path were poisoned)
   Finding 82 (HIGH)     Admin user notification panel rendered SMS/email bodies in an unsandboxed same-origin srcdoc iframe; SMS bodies embed user-controlled first_name / event titles as plain text, so a crafted name became stored XSS against the admin session
   Finding 83 (HIGH)     Family sub-accounts with their own lifetime/family membership could mint nested invites (UI hidden, LiveView/context ungated). Accept walked has_active_membership?/1 to the real primary and counted the 10-seat cap on the nested id, granting unpaid membership and bypassing the household limit. Leftover: a household holder with existing dependents could still join another family via link/admin and bring a nested tree.
+  Finding 84 (HIGH)     After Family→Single (scheduled downgrade or stale invite), linked sub-accounts still inherited membership via has_active_membership?/1 because any valid primary subscription counted. Accept also did not re-check that the primary still hosts Family/Lifetime.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -5401,6 +5402,71 @@ defmodule YscWeb.SecurityAuditTest do
                )
 
       assert is_nil(Repo.get!(User, holder.id).primary_user_id)
+    end
+  end
+
+  # Finding 84 (HIGH): Family→Single must not leave unpaid nested access
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 84: Family→Single cannot leave unpaid nested members" do
+    test "accept and has_active_membership? refuse Single-plan hosts" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      assert single_plan
+
+      primary = user_fixture(%{state: :active})
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: primary.id,
+          stripe_id: "sub_finding84_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Single Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id:
+            "prod_finding84_#{System.unique_integer([:positive])}",
+          stripe_id: "si_finding84_#{System.unique_integer([:positive])}",
+          quantity: 1
+        })
+
+      primary = Accounts.get_user!(primary.id, [:subscriptions])
+      email = "finding84_#{System.unique_integer([:positive])}@example.com"
+
+      invite =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: primary.id,
+          created_by_user_id: primary.id,
+          relationship: :child
+        })
+        |> Repo.insert!()
+
+      assert {:error, :invalid_membership_type} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: email,
+                 password: "password1234",
+                 first_name: "Unpaid",
+                 last_name: "Nested",
+                 phone_number: unique_user_phone(),
+                 date_of_birth: Date.shift(Date.utc_today(), year: -10)
+               })
+
+      linked =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      MembershipCache.invalidate_user(linked.id)
+      refute Accounts.has_active_membership?(linked)
+      assert MembershipCache.get_active_membership(linked) == nil
     end
   end
 

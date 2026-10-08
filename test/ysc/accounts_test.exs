@@ -4099,35 +4099,41 @@ defmodule Ysc.AccountsTest do
       assert Accounts.has_active_membership?(sub)
     end
 
-    test "has_active_membership?/1 is true for sub-account when primary has active subscription" do
-      primary = user_fixture(%{phone_number: unique_user_phone()})
+    test "has_active_membership?/1 is true for sub-account when primary has family subscription" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
 
-      {:ok, subscription} =
-        Subscriptions.create_subscription(%{
-          user_id: primary.id,
-          stripe_id:
-            "sub_primary_subacct_#{System.unique_integer([:positive])}",
-          stripe_status: "active",
-          name: "Membership",
-          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
-        })
+      if family_plan do
+        primary =
+          user_with_family_subscription(%{phone_number: unique_user_phone()})
 
-      assert {:ok, _} =
-               Subscriptions.create_subscription_item(%{
-                 subscription_id: subscription.id,
-                 stripe_price_id: "price_primary_subacct",
-                 stripe_product_id: "prod_primary_subacct",
-                 stripe_id:
-                   "si_primary_subacct_#{System.unique_integer([:positive])}",
-                 quantity: 1
-               })
+        sub =
+          user_fixture(%{phone_number: unique_user_phone()})
+          |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+          |> Repo.update!()
 
-      sub =
-        user_fixture(%{phone_number: unique_user_phone()})
-        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
-        |> Repo.update!()
+        assert Accounts.has_active_membership?(sub)
+      end
+    end
 
-      assert Accounts.has_active_membership?(sub)
+    test "has_active_membership?/1 is false for sub-account when primary only has single subscription" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      if single_plan do
+        primary =
+          user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+        sub =
+          user_fixture(%{phone_number: unique_user_phone()})
+          |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+          |> Repo.update!()
+
+        # Family→Single leftover: dependents may still be linked, but must not
+        # inherit unpaid membership from a Single plan.
+        refute Accounts.has_active_membership?(sub)
+        refute Accounts.family_membership_host?(primary)
+      end
     end
 
     test "get_primary_user/1 returns nil for a primary account" do

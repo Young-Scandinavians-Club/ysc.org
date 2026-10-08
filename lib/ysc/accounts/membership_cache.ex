@@ -310,6 +310,7 @@ defmodule Ysc.Accounts.MembershipCache do
       |> Enum.uniq()
 
     subs_by_user_id = load_subscriptions_by_user_id(check_ids)
+    users_by_orig_id = Map.new(users, &{&1.id, &1})
 
     subscription_memberships =
       Map.new(subscription_pairs, fn {orig_id, check} ->
@@ -317,11 +318,38 @@ defmodule Ysc.Accounts.MembershipCache do
           subs_by_user_id
           |> Map.get(check.id, [])
           |> Enum.filter(&Subscriptions.valid?/1)
+          |> maybe_restrict_to_family_for_sub_account(
+            Map.get(users_by_orig_id, orig_id)
+          )
 
         {orig_id, pick_active_subscription(valid)}
       end)
 
     Map.merge(lifetime_memberships, subscription_memberships)
+  end
+
+  # Sub-accounts inherit only Family (or lifetime, handled above). A Single
+  # plan on the primary must not grant linked members access.
+  defp maybe_restrict_to_family_for_sub_account(subscriptions, user) do
+    if user && Accounts.sub_account?(user) do
+      Enum.filter(subscriptions, &family_plan_subscription?/1)
+    else
+      subscriptions
+    end
+  end
+
+  defp family_plan_subscription?(subscription) do
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case subscription.subscription_items do
+      [item | _] ->
+        Enum.any?(membership_plans, fn plan ->
+          plan.stripe_price_id == item.stripe_price_id and plan.id == :family
+        end)
+
+      _ ->
+        false
+    end
   end
 
   defp user_to_check_for_membership(user, users_by_id, primaries_by_id) do
@@ -379,24 +407,33 @@ defmodule Ysc.Accounts.MembershipCache do
   # Database lookup functions (duplicated from UserAuth to avoid circular dependency)
 
   defp get_active_membership_db(user) do
-    # For sub-accounts, check the primary user's membership
-    user_to_check =
-      if Accounts.sub_account?(user) do
-        Accounts.get_primary_user(user) || user
+    # Sub-accounts inherit only when the primary hosts Family or Lifetime.
+    # Single-plan primaries must not grant linked-member access.
+    if Accounts.sub_account?(user) do
+      case Accounts.get_primary_user(user) do
+        nil ->
+          nil
+
+        primary ->
+          if Accounts.has_lifetime_membership?(primary) do
+            lifetime_membership(primary)
+          else
+            primary
+            |> loaded_subscriptions()
+            |> Enum.filter(&Subscriptions.valid?/1)
+            |> Enum.filter(&family_plan_subscription?/1)
+            |> pick_active_subscription()
+          end
+      end
+    else
+      if Accounts.has_lifetime_membership?(user) do
+        lifetime_membership(user)
       else
         user
-      end
-
-    # Check for lifetime membership first (highest priority)
-    if Accounts.has_lifetime_membership?(user_to_check) do
-      lifetime_membership(user_to_check)
-    else
-      subscriptions =
-        user_to_check
         |> loaded_subscriptions()
         |> Enum.filter(&Subscriptions.valid?/1)
-
-      pick_active_subscription(subscriptions)
+        |> pick_active_subscription()
+      end
     end
   end
 
