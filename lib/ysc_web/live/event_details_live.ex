@@ -4363,12 +4363,14 @@ defmodule YscWeb.EventDetailsLive do
                  "reprice_to_complimentary"
                ) do
             {:cancel, _} ->
+              # Keep the original "review your order" path. Jumping straight to
+              # the free-ticket modal skips checkout_step "free" assigns
+              # (attendee forms / family picks) and can confirm with empty names.
               socket
               |> assign(:show_payment_modal, false)
               |> assign(:payment_intent, nil)
               |> assign(:stripe_payment_element_ready, false)
               |> assign(:ticket_order, synced_order)
-              |> assign(:show_free_ticket_confirmation, true)
               |> YscWeb.Flash.put_toast(
                 :info,
                 "Ticket prices were updated. Please review your order before continuing.",
