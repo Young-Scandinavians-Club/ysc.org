@@ -1947,6 +1947,89 @@ defmodule YscWeb.UserSettingsLiveTest do
     end
   end
 
+  describe "membership plan change banner copy" do
+    test "selecting Single says Switch to, not Downgrade", %{conn: conn} do
+      user = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_switchcopy_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(plans, &(&1.id == :family))
+      assert family_plan
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_switchcopy_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_switchcopy_#{System.unique_integer()}",
+          stripe_product_id: "prod_family",
+          stripe_price_id: family_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      {:ok, _} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_switchcopy_default",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      MembershipCache.invalidate_user(user.id)
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      assert has_element?(view, "#membership_form")
+
+      html = render(view)
+
+      assert html =~
+               "You can switch between Single and Family. Switching to Family starts right away"
+
+      render_change(view, "validate_membership", %{
+        "membership_type" => "single"
+      })
+
+      assert has_element?(view, "#plan-change-info-banner")
+      assert has_element?(view, "#plan-change-banner-heading")
+
+      heading =
+        view
+        |> element("#plan-change-banner-heading")
+        |> render()
+
+      assert heading =~ "Switch to Single Membership"
+      refute heading =~ "Downgrade"
+
+      banner =
+        view
+        |> element("#plan-change-info-banner")
+        |> render()
+
+      assert banner =~ "Your membership will switch at your next renewal date"
+      assert banner =~ "No immediate charges or credits will apply"
+    end
+  end
+
   describe "settings page — email validation and payment method UI" do
     test "validate_email updates email form", %{conn: conn} do
       user = user_fixture(%{state: :active})
