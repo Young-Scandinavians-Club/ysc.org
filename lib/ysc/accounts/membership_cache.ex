@@ -420,8 +420,9 @@ defmodule Ysc.Accounts.MembershipCache do
           else
             primary
             |> loaded_subscriptions()
-            |> Enum.filter(&Subscriptions.valid?/1)
-            |> Enum.filter(&family_plan_subscription?/1)
+            |> Enum.filter(
+              &(Subscriptions.valid?(&1) and family_plan_subscription?(&1))
+            )
             |> pick_active_subscription()
           end
       end
