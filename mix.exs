@@ -380,7 +380,12 @@ defmodule Ysc.MixProject do
       {:plug_cowboy, "~> 2.9"},
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
-      {:req, "~> 0.7"},
+      # 0.7.5: put_aws_sigv4 drops generated Authorization / x-amz-* headers
+      # before re-signing a retry; 303 See Other becomes GET except HEAD.
+      # We do not pass :aws_sigv4 (S3 is ExAws). Stripe uses Req.request with
+      # redirect: false. Other callers are GET or POST (303 POST already
+      # became GET). Pin the patched floor.
+      {:req, "~> 0.7.5"},
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing
       # span/parent fixes. We do not enable Sentry.Integrations.Oban or OpenTelemetry.
