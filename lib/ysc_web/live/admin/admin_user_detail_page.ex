@@ -2243,7 +2243,10 @@ defmodule YscWeb.AdminUserDetailsLive do
               </.simple_form>
             </div>
 
-            <div class="bg-white border border-zinc-200 rounded-lg p-6">
+            <div
+              id="admin-user-notes-timeline"
+              class="bg-white border border-zinc-200 rounded-lg p-6"
+            >
               <h3 class="text-lg font-semibold text-zinc-800 mb-4">Timeline</h3>
               <div :if={length(@user_notes) == 0} class="text-center py-12">
                 <p class="text-zinc-500">
@@ -2521,7 +2524,9 @@ defmodule YscWeb.AdminUserDetailsLive do
             :membership ->
               selected_user = socket.assigns.selected_user
 
-              start_async(socket, :load_family, fn ->
+              socket
+              |> maybe_assign_membership_tab_data()
+              |> start_async(:load_family, fn ->
                 fetch_family_assigns(selected_user)
               end)
 
@@ -2531,7 +2536,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               end)
 
             :application ->
-              start_async(socket, :load_rejection_notes, fn ->
+              socket
+              |> maybe_assign_application_tab_data()
+              |> start_async(:load_rejection_notes, fn ->
                 Accounts.list_user_notes_by_category(user_id, :rejection)
               end)
 
@@ -2810,7 +2817,9 @@ defmodule YscWeb.AdminUserDetailsLive do
   def handle_event("save", %{"user" => user_params}, socket) do
     current_user = socket.assigns[:current_user]
     assigned = socket.assigns[:selected_user]
-    application = socket.assigns[:selected_user_application]
+
+    application =
+      application_for_activation(socket, assigned, user_params, current_user)
 
     activating_rejected_user? =
       user_params["state"] == "active" &&
@@ -4202,10 +4211,122 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
-  defp fetch_application(user_id, current_user) do
+  defp maybe_assign_membership_tab_data(socket) do
+    if socket.assigns[:membership_data_loaded?] ||
+         is_nil(socket.assigns[:selected_user]) do
+      socket
+    else
+      assign_membership_tab_data(socket)
+    end
+  end
+
+  defp assign_membership_tab_data(socket) do
+    selected_user = socket.assigns.selected_user
+
+    [sub_result, board_member, default_payment_method] =
+      [
+        fn -> fetch_subscription_data(selected_user) end,
+        fn -> Accounts.household_board_member(selected_user) end,
+        fn -> Payments.get_default_payment_method(selected_user) end
+      ]
+      |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    {active_subscription, subscription_payments} = sub_result
+    has_lifetime = Accounts.has_lifetime_membership?(selected_user)
+
+    membership_cs =
+      %{
+        period_end_date:
+          active_subscription && active_subscription.current_period_end
+      }
+      |> membership_changeset()
+
+    lifetime_cs =
+      %{
+        has_lifetime: has_lifetime,
+        awarded_at:
+          selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
+      }
+      |> lifetime_membership_changeset()
+
+    membership_type_cs =
+      %{
+        membership_type:
+          get_current_membership_type_from_subscription(active_subscription)
+      }
+      |> membership_type_changeset()
+
+    socket =
+      socket
+      |> assign(:membership_data_loaded?, true)
+      |> assign(:active_subscription, active_subscription)
+      |> assign(:subscription_payments, subscription_payments)
+      |> assign(
+        :cancel_refund_preview,
+        cancel_refund_preview(subscription_payments)
+      )
+      |> assign(:default_payment_method, default_payment_method)
+      |> assign(:has_lifetime_membership, has_lifetime)
+      |> assign(:membership_paused_by_board, board_member)
+      |> assign(:membership_form, to_form(membership_cs, as: "membership"))
+      |> assign(
+        :membership_type_form,
+        to_form(membership_type_cs, as: "membership_type")
+      )
+      |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
+
+    if active_subscription do
+      start_async(socket, :load_downgrade_info, fn ->
+        Subscriptions.get_scheduled_downgrade_info(active_subscription)
+      end)
+    else
+      socket
+    end
+  end
+
+  defp maybe_assign_application_tab_data(socket) do
+    if socket.assigns[:application_loaded?] do
+      socket
+    else
+      assign_application_tab_data(socket)
+    end
+  end
+
+  defp assign_application_tab_data(socket) do
+    application =
+      fetch_application(socket.assigns.user_id, socket.assigns.current_user)
+
+    socket
+    |> assign(:application_loaded?, true)
+    |> assign(:selected_user_application, application)
+  end
+
+  # Profile save needs review_outcome only when activating a rejected user.
+  # Don't preload the reviewer card on that rare path.
+  defp application_for_activation(socket, assigned, user_params, current_user) do
+    cond do
+      socket.assigns[:application_loaded?] ->
+        socket.assigns.selected_user_application
+
+      assigned.state == :rejected && user_params["state"] == "active" ->
+        fetch_application(assigned.id, current_user, [])
+
+      true ->
+        socket.assigns[:selected_user_application]
+    end
+  end
+
+  defp fetch_application(
+         user_id,
+         current_user,
+         preloads \\ [reviewed_by: :current_avatar]
+       ) do
     try do
-      Accounts.get_signup_application_from_user_id!(user_id, current_user,
-        reviewed_by: :current_avatar
+      Accounts.get_signup_application_from_user_id!(
+        user_id,
+        current_user,
+        preloads
       )
     rescue
       Ecto.NoResultsError -> nil
@@ -4715,6 +4836,8 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:active_page, :members)
     |> assign(:selected_user, nil)
     |> assign(:selected_user_application, nil)
+    |> assign(:application_loaded?, false)
+    |> assign(:membership_data_loaded?, false)
     |> assign(:active_subscription, nil)
     |> assign(:subscription_payments, [])
     |> assign(:cancel_refund_preview, nil)
@@ -4798,13 +4921,13 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:last_activity_at, nil)
   end
 
-  defp load_user_detail(socket, id, current_user) do
+  defp load_user_detail(socket, id, _current_user) do
+    # Profile header + form only need the user row, billing address, and
+    # avatar. Family, membership, and application data are loaded when those
+    # tabs are opened so profile/notifications/tickets don't pay for them.
     selected_user =
       Accounts.get_user!(id, [
-        :family_members,
         :billing_address,
-        {:primary_user, [:current_avatar, :family_members, :sub_accounts]},
-        {:sub_accounts, :current_avatar},
         :current_avatar
       ])
 
@@ -4814,87 +4937,19 @@ defmodule YscWeb.AdminUserDetailsLive do
     user_form = to_form(user_changeset, as: "user")
     original_form_data = extract_form_data(user_form)
 
-    socket =
-      socket
-      |> assign(:loading_user_detail?, false)
-      |> assign(:first_name, selected_user.first_name)
-      |> assign(:last_name, selected_user.last_name)
-      |> assign(:role, selected_user.role)
-      |> assign(:selected_user, selected_user)
-      |> assign(:original_form_data, original_form_data)
-      |> assign(:form, user_form)
+    {last_login_at, last_activity_at} =
+      Accounts.get_user_login_activity_datetimes(selected_user)
 
-    [
-      sub_result,
-      has_lifetime,
-      application,
-      board_member,
-      {last_login_at, last_activity_at},
-      default_payment_method
-    ] =
-      [
-        fn -> fetch_subscription_data(selected_user) end,
-        fn -> Accounts.has_lifetime_membership?(selected_user) end,
-        fn -> fetch_application(id, current_user) end,
-        fn -> Accounts.household_board_member(selected_user) end,
-        fn -> Accounts.get_user_login_activity_datetimes(selected_user) end,
-        fn -> Payments.get_default_payment_method(selected_user) end
-      ]
-      |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
-      |> Enum.map(fn {:ok, result} -> result end)
-
-    {active_subscription, subscription_payments} = sub_result
-
-    membership_cs =
-      %{
-        period_end_date:
-          active_subscription && active_subscription.current_period_end
-      }
-      |> membership_changeset()
-
-    lifetime_cs =
-      %{
-        has_lifetime: has_lifetime,
-        awarded_at:
-          selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
-      }
-      |> lifetime_membership_changeset()
-
-    membership_type_cs =
-      %{
-        membership_type:
-          get_current_membership_type_from_subscription(active_subscription)
-      }
-      |> membership_type_changeset()
-
-    socket =
-      socket
-      |> assign(:selected_user_application, application)
-      |> assign(:active_subscription, active_subscription)
-      |> assign(:subscription_payments, subscription_payments)
-      |> assign(
-        :cancel_refund_preview,
-        cancel_refund_preview(subscription_payments)
-      )
-      |> assign(:default_payment_method, default_payment_method)
-      |> assign(:has_lifetime_membership, has_lifetime)
-      |> assign(:membership_paused_by_board, board_member)
-      |> assign(:membership_form, to_form(membership_cs, as: "membership"))
-      |> assign(
-        :membership_type_form,
-        to_form(membership_type_cs, as: "membership_type")
-      )
-      |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
-      |> assign(:last_login_at, last_login_at)
-      |> assign(:last_activity_at, last_activity_at)
-
-    if active_subscription do
-      start_async(socket, :load_downgrade_info, fn ->
-        Subscriptions.get_scheduled_downgrade_info(active_subscription)
-      end)
-    else
-      socket
-    end
+    socket
+    |> assign(:loading_user_detail?, false)
+    |> assign(:first_name, selected_user.first_name)
+    |> assign(:last_name, selected_user.last_name)
+    |> assign(:role, selected_user.role)
+    |> assign(:selected_user, selected_user)
+    |> assign(:original_form_data, original_form_data)
+    |> assign(:form, user_form)
+    |> assign(:last_login_at, last_login_at)
+    |> assign(:last_activity_at, last_activity_at)
   rescue
     Ecto.NoResultsError ->
       socket

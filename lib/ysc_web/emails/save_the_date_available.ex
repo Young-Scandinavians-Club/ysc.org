@@ -8,17 +8,10 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [
-      event_cover_image_url: 1,
-      event_url: 1,
-      format_event_start_datetime: 2,
-      member_greeting_name: 1,
-      notification_settings_url: 0,
-      plain_text_from_html: 1,
-      preload_event_associations: 1
-    ]
+    only: [member_greeting_name: 1, notification_settings_url: 0]
 
   alias Ysc.Events.Event
+  alias YscWeb.Emails.EventHelpers
 
   def get_template_name(), do: "save_the_date_available"
 
@@ -54,30 +47,8 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
   so we do not re-render dates, URLs, and cover images for every opt-in.
   """
   def prepare_shared_email_data(event) do
-    if is_nil(event), do: raise(ArgumentError, "Event cannot be nil")
-
-    event = preload_event_associations(event)
-
-    event_map = %{
-      id: event.id,
-      title: event.title,
-      description: plain_text_from_html(event.description),
-      start_date: event.start_date,
-      start_time: event.start_time,
-      end_date: event.end_date,
-      end_time: event.end_time,
-      location_name: event.location_name,
-      address: event.address,
-      age_restriction: event.age_restriction
-    }
-
-    %{
-      event: event_map,
-      event_date_time:
-        format_event_start_datetime(event.start_date, event.start_time),
-      event_url: event_url(event.id),
-      event_image_url: event_cover_image_url(event),
-      notification_settings_url: notification_settings_url()
-    }
+    event
+    |> EventHelpers.event_display()
+    |> Map.put(:notification_settings_url, notification_settings_url())
   end
 end

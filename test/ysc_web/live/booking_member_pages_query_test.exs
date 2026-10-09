@@ -68,10 +68,10 @@ defmodule YscWeb.BookingMemberPagesQueryTest do
       {{:ok, view, html}, category_queries} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
-            {:ok, view, html} =
+            {:ok, view, _html} =
               live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-            render(view)
+            html = render(view)
             {:ok, view, html}
           end,
           pattern: category_pattern
@@ -80,10 +80,10 @@ defmodule YscWeb.BookingMemberPagesQueryTest do
       {{:ok, _view, _html}, family_queries} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
-            {:ok, view, html} =
+            {:ok, view, _html} =
               live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-            render(view)
+            html = render(view)
             {:ok, view, html}
           end,
           pattern: family_pattern

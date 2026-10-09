@@ -10,14 +10,11 @@ defmodule YscWeb.Emails.EventNotification do
 
   import YscWeb.Emails.Helpers,
     only: [
-      event_cover_image_url: 1,
       event_notification_unsubscribe_url: 1,
-      event_url: 1,
-      format_event_start_datetime: 2,
-      member_greeting_name: 1,
-      plain_text_from_html: 1,
-      preload_event_associations: 1
+      member_greeting_name: 1
     ]
+
+  alias YscWeb.Emails.EventHelpers
 
   def get_template_name() do
     "event_notification"
@@ -94,41 +91,6 @@ defmodule YscWeb.Emails.EventNotification do
   we do not re-render dates, URLs, and organizer data for every member.
   """
   def prepare_shared_email_data(event) do
-    if is_nil(event) do
-      raise ArgumentError, "Event cannot be nil"
-    end
-
-    event = preload_event_associations(event)
-
-    event_date_time =
-      format_event_start_datetime(event.start_date, event.start_time)
-
-    event_map = %{
-      id: event.id,
-      title: event.title,
-      description: plain_text_from_html(event.description),
-      start_date: event.start_date,
-      start_time: event.start_time,
-      end_date: event.end_date,
-      end_time: event.end_time,
-      location_name: event.location_name,
-      address: event.address,
-      age_restriction: event.age_restriction,
-      organizer:
-        if(Ecto.assoc_loaded?(event.organizer) && event.organizer,
-          do: %{
-            first_name: event.organizer.first_name,
-            last_name: event.organizer.last_name
-          },
-          else: nil
-        )
-    }
-
-    %{
-      event: event_map,
-      event_date_time: event_date_time,
-      event_url: event_url(event.id),
-      event_image_url: event_cover_image_url(event)
-    }
+    EventHelpers.event_display(event, organizer: true)
   end
 end

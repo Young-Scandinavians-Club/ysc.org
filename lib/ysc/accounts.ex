@@ -766,10 +766,24 @@ defmodule Ysc.Accounts do
     reviewed_at review_outcome reviewed_by_user_id
   )a
 
+  # Public membership applications never collect a password. The UI sets one
+  # later in account setup. Drop client-supplied password fields so they cannot
+  # be hashed onto a pending account and used after OAuth auto-verifies email
+  # (Finding 85).
+  @registration_user_client_drop_keys ~w(
+    password password_confirmation hashed_password
+  )a
+
   defp sanitize_registration_attrs(attrs) when is_map(attrs) do
     attrs
+    |> drop_registration_user_client_keys()
     |> sanitize_registration_form_attrs()
     |> sanitize_family_members_attrs()
+  end
+
+  defp drop_registration_user_client_keys(attrs) do
+    string_keys = Enum.map(@registration_user_client_drop_keys, &to_string/1)
+    Map.drop(attrs, @registration_user_client_drop_keys ++ string_keys)
   end
 
   defp sanitize_registration_form_attrs(attrs) do
@@ -3595,6 +3609,31 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Removes a password that was stored before the owner completed password setup.
+
+  Public registration must not persist a password. If `hashed_password` is
+  present but `password_set_at` is nil, the credential never went through
+  account setup and must not survive OAuth auto-verification (Finding 85).
+  """
+  def drop_unconfirmed_password(
+        %User{hashed_password: hash, password_set_at: nil} = user
+      )
+      when is_binary(hash) do
+    case user
+         |> Ecto.Changeset.change(%{hashed_password: nil})
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
+  end
+
+  def drop_unconfirmed_password(%User{} = user), do: {:ok, user}
+
+  @doc """
   Marks a user's email as verified by setting the email_verified_at timestamp.
   """
   def mark_email_verified(user) do
@@ -5263,6 +5302,11 @@ defmodule Ysc.Accounts do
 
   ## User Notes
 
+  # Notes UI only shows the author's name and email — skip hashed_password,
+  # bios, Stripe ids, and other User columns that `preload([:created_by])`
+  # would SELECT.
+  @user_note_author_fields [:id, :first_name, :last_name, :email]
+
   @doc """
   Creates a new note for a user.
 
@@ -5288,7 +5332,8 @@ defmodule Ysc.Accounts do
   @doc """
   Lists all notes for a user, ordered by most recent first.
 
-  Preloads the `created_by` association to show which admin created each note.
+  Preloads a slim `created_by` (name + email) to show which admin created
+  each note.
 
   ## Examples
 
@@ -5296,26 +5341,39 @@ defmodule Ysc.Accounts do
       [%UserNote{...}, ...]
   """
   def list_user_notes(user_id) do
+    list_user_notes_query(user_id) |> Repo.all()
+  end
+
+  @doc false
+  def list_user_notes_query(user_id) do
     from(n in UserNote,
       where: n.user_id == ^user_id,
       order_by: [desc: n.inserted_at],
-      preload: [:created_by]
+      preload: [created_by: ^user_note_author_query()]
     )
-    |> Repo.all()
   end
 
   @doc """
   Lists user notes filtered by category (e.g. :rejection).
 
-  Returns notes ordered by most recent first, with created_by preloaded.
+  Returns notes ordered by most recent first, with a slim `created_by`
+  preloaded.
   """
   def list_user_notes_by_category(user_id, category) do
+    list_user_notes_by_category_query(user_id, category) |> Repo.all()
+  end
+
+  @doc false
+  def list_user_notes_by_category_query(user_id, category) do
     from(n in UserNote,
       where: n.user_id == ^user_id and n.category == ^category,
       order_by: [desc: n.inserted_at],
-      preload: [:created_by]
+      preload: [created_by: ^user_note_author_query()]
     )
-    |> Repo.all()
+  end
+
+  defp user_note_author_query do
+    from(u in User, select: struct(u, ^@user_note_author_fields))
   end
 
   ## Post-migration onboarding
@@ -5574,6 +5632,24 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_pending_approval_users_query do
     pending_approval_users_query()
+  end
+
+  @doc false
+  def ci_query_explain_list_user_notes_query do
+    list_user_notes_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_list_user_notes_by_category_query do
+    list_user_notes_by_category_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id,
+      :rejection
+    )
+  end
+
+  @doc false
+  def ci_query_explain_user_note_author_query do
+    user_note_author_query()
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do

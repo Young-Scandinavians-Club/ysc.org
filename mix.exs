@@ -17,12 +17,14 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe],
         list_unused_filters: true
       ],
-      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-11-06.
-      # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
+      # cowlib 2.21.0 still reports EEF-CVE-2026-43966 (structured-fields
+      # encoder). Cowboy 2.16+ rejects CR/LF in response headers
+      # (invalid_response_headers). EEF-CVE-2026-43969 is patched in 2.21.0.
+      # Revisit by 2026-11-06. Requires Hex >= 2.5.1-dev for ignore_advisories
+      # (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-43966",
-          "EEF-CVE-2026-43969",
           # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
           # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
           "EEF-CVE-2026-95105",
@@ -211,14 +213,15 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
-      # Official Hex cowlib 2.20.0 (cowboy 2.19 needs >= 2.20). Cowboy 2.19
-      # requires OTP 27+ (we run OTP 27/28). HPACK only indexes known-safe
-      # field names (HTTP/2 messages may be larger). Number parsing in
-      # protocol components is stricter; digit limit 17 → 20.
-      # EEF-CVE-2026-43969/43966/43971: still unpatched on Hex cowlib 2.20.0
-      # — ignored until 2026-10-04 (see mix.exs hex config).
-      {:cowboy, "~> 2.19", override: true},
-      {:cowlib, "~> 2.20", override: true},
+      # Official Hex cowlib 2.21.0 (cowboy 2.20 needs >= 2.21). Cowboy 2.20
+      # requires OTP 27+ (we run OTP 27/28). Maintenance release: Cowlib
+      # 2.21 cookie encoder validates Cookie names/values (EEF-CVE-2026-43969),
+      # RFC6265bis cookies, no obsolete Set-Cookie Expires, HPACK decode after
+      # RST_STREAM, stricter HTTP dates, and ignore x-webkit-deflate-frame
+      # (permessage-deflate is unchanged). We serve HTTP via
+      # Phoenix.Endpoint.Cowboy2Adapter and do not call Cowboy/Cowlib APIs.
+      {:cowboy, "~> 2.20", override: true},
+      {:cowlib, "~> 2.21", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
@@ -380,7 +383,12 @@ defmodule Ysc.MixProject do
       {:plug_cowboy, "~> 2.9"},
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
-      {:req, "~> 0.7"},
+      # 0.7.5: put_aws_sigv4 drops generated Authorization / x-amz-* headers
+      # before re-signing a retry; 303 See Other becomes GET except HEAD.
+      # We do not pass :aws_sigv4 (S3 is ExAws). Stripe uses Req.request with
+      # redirect: false. Other callers are GET or POST (303 POST already
+      # became GET). Pin the patched floor.
+      {:req, "~> 0.7.5"},
       {:retry_on, "~> 0.1"},
       # 13.5.0: optional Oban cron should_report_error_check_in_callback; tracing
       # span/parent fixes. We do not enable Sentry.Integrations.Oban or OpenTelemetry.

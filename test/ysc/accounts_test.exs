@@ -1669,15 +1669,14 @@ defmodule Ysc.AccountsTest do
              } = errors_on(changeset)
     end
 
-    test "validates maximum values for email and password for security" do
+    test "validates maximum values for email for security" do
       too_long = String.duplicate("db", 100)
 
       {:error, changeset} =
         Accounts.register_user(%{email: too_long, password: too_long})
 
       assert "should be at most 160 character(s)" in errors_on(changeset).email
-
-      assert "should be at most 72 character(s)" in errors_on(changeset).password
+      refute Map.has_key?(errors_on(changeset), :password)
     end
 
     test "validates email uniqueness" do
@@ -1833,21 +1832,27 @@ defmodule Ysc.AccountsTest do
       assert user.email == "john.doe+test@example.com"
     end
 
-    test "registers users with a hashed password" do
+    test "does not persist a client-supplied password (Finding 85)" do
       email = unique_user_email()
 
       {:ok, user} =
         Accounts.register_user(
           valid_user_attributes(%{
             email: email,
-            phone_number: "+14159098268"
+            phone_number: "+14159098268",
+            password: "attacker-chosen-password"
           })
         )
 
       assert user.email == email
-      assert is_binary(user.hashed_password)
+      assert is_nil(user.hashed_password)
       assert is_nil(user.confirmed_at)
       assert is_nil(user.password)
+
+      refute Accounts.get_user_by_email_and_password(
+               email,
+               "attacker-chosen-password"
+             )
     end
   end
 
@@ -2915,6 +2920,25 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "drop_unconfirmed_password/1" do
+    test "clears hashed_password when password_set_at is nil" do
+      user = user_fixture(%{phone_number: "+14159098319"})
+      assert is_binary(user.hashed_password)
+      assert is_nil(user.password_set_at)
+
+      assert {:ok, updated} = Accounts.drop_unconfirmed_password(user)
+      assert is_nil(updated.hashed_password)
+    end
+
+    test "keeps hashed_password when password_set_at is set" do
+      user = user_fixture(%{phone_number: "+14159098320"})
+      {:ok, user} = Accounts.mark_password_set(user)
+
+      assert {:ok, updated} = Accounts.drop_unconfirmed_password(user)
+      assert is_binary(updated.hashed_password)
+    end
+  end
+
   describe "mark_email_verified/1, mark_phone_verified/1, mark_password_set/1" do
     test "sets verification and password timestamps" do
       user = user_fixture(%{phone_number: "+14159098309"})
@@ -3037,6 +3061,13 @@ defmodule Ysc.AccountsTest do
       notes = Accounts.list_user_notes(subject.id)
       assert length(notes) == 1
       assert hd(notes).id == note.id
+
+      author = hd(notes).created_by
+      assert author.id == admin.id
+      assert author.first_name == admin.first_name
+      assert author.last_name == admin.last_name
+      assert author.email == admin.email
+      assert is_nil(author.hashed_password)
 
       assert {:ok, _} =
                Accounts.create_user_note(

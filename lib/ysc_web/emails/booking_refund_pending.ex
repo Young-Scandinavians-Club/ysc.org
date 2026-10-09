@@ -13,13 +13,11 @@ defmodule YscWeb.Emails.BookingRefundPending do
     only: [
       booking_receipt_url: 1,
       ensure_booking: 1,
-      member_greeting_name: 1,
-      format_date: 1,
       format_datetime: 1,
       format_money: 1
     ]
 
-  alias Ysc.Bookings.PropertyDisplay
+  alias YscWeb.Emails.BookingHelpers
 
   def get_template_name() do
     "booking_refund_pending"
@@ -48,59 +46,38 @@ defmodule YscWeb.Emails.BookingRefundPending do
     end
 
     booking = ensure_booking(booking)
-
-    # Format dates
-    checkin_date = format_date(booking.checkin_date)
-    checkout_date = format_date(booking.checkout_date)
     request_date = format_datetime(pending_refund.inserted_at)
-
-    # Format money amounts
     policy_refund_amount = format_money(pending_refund.policy_refund_amount)
-    original_amount = if payment, do: format_money(payment.amount), else: "N/A"
 
-    # Get property name
-    property_name = PropertyDisplay.short_name(booking.property)
-
-    # Calculate refund percentage
-    refund_percentage =
-      if payment && Money.positive?(payment.amount) &&
-           Money.positive?(pending_refund.policy_refund_amount) do
-        Decimal.div(
-          pending_refund.policy_refund_amount.amount,
-          payment.amount.amount
-        )
-        |> Decimal.mult(Decimal.new(100))
-        |> Decimal.round(1)
-        |> Decimal.to_float()
-      else
-        nil
-      end
-
-    %{
-      first_name: member_greeting_name(booking.user),
-      booking: %{
-        reference_id: booking.reference_id,
-        property: property_name,
-        checkin_date: checkin_date,
-        checkout_date: checkout_date,
-        guests_count: booking.guests_count,
-        children_count: booking.children_count || 0
-      },
+    booking
+    |> BookingHelpers.member_links()
+    |> Map.merge(%{
+      booking: BookingHelpers.booking_summary(booking),
       pending_refund: %{
         policy_refund_amount: policy_refund_amount,
         cancellation_reason:
           pending_refund.cancellation_reason || "Booking cancelled",
         request_date: request_date,
-        refund_percentage: refund_percentage
+        refund_percentage: refund_percentage(pending_refund, payment)
       },
-      payment: %{
-        reference_id: if(payment, do: payment.reference_id, else: "N/A"),
-        amount: original_amount
-      },
+      payment: BookingHelpers.payment_summary(payment),
       request_date: request_date,
-      policy_refund_amount: policy_refund_amount,
-      booking_url: booking_url(booking.id),
-      cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
-    }
+      policy_refund_amount: policy_refund_amount
+    })
+  end
+
+  defp refund_percentage(_pending_refund, nil), do: nil
+
+  defp refund_percentage(pending_refund, payment) do
+    if Money.positive?(payment.amount) &&
+         Money.positive?(pending_refund.policy_refund_amount) do
+      pending_refund.policy_refund_amount.amount
+      |> Decimal.div(payment.amount.amount)
+      |> Decimal.mult(Decimal.new(100))
+      |> Decimal.round(1)
+      |> Decimal.to_float()
+    else
+      nil
+    end
   end
 end

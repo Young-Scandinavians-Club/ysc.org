@@ -48,6 +48,28 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   @doc """
+  Copy shown when the invited person is already a linked family member on
+  another membership and must leave before joining this one.
+
+  Membership (`/users/membership`) is the top item in the signed-in name menu
+  and already has a **Leave family membership** button for linked members.
+  """
+  def already_on_family_message do
+    "You can only be on one family membership at a time. Open Membership and choose Leave family membership. Then return here to accept this invitation."
+  end
+
+  @doc """
+  Copy shown when a family membership holder tries to join another family
+  while they still have linked members on their own account.
+
+  Linked members are removed on the Family page
+  (`/users/settings/family`), labeled **Family** in Account Settings.
+  """
+  def has_dependent_family_members_message do
+    "You already manage linked family members on your own account. Open Family and remove each linked member before joining another family membership."
+  end
+
+  @doc """
   Returns true when someone born on `birth_date` is #{@adult_age} or older on `today`.
 
   Children who are adults cannot join a family membership; they need their own

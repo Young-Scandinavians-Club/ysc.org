@@ -481,6 +481,31 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
     end
   end
 
+  describe "mount/3 — already on a family membership" do
+    test "stays on the invite page and explains how to leave", %{conn: conn} do
+      {invite, _primary} = create_family_invite()
+      other_primary = user_fixture()
+
+      invited_user =
+        user_fixture(%{email: invite.email})
+        |> Ecto.Changeset.change(%{primary_user_id: other_primary.id})
+        |> Repo.update!()
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert has_element?(view, "#already-on-family-notice")
+      assert has_element?(view, "#open-membership-from-invite")
+      refute has_element?(view, "#link-existing-button")
+      refute has_element?(view, "#accept-invite-form")
+      assert html =~ "Leave family membership"
+      assert html =~ "Open Membership"
+      refute html =~ "Settings &gt; Family"
+      refute html =~ "signed in as a different account"
+    end
+  end
+
   describe "mount/3 — existing account, not logged in" do
     test "prompts sign in when invite email already has an account", %{
       conn: conn
@@ -620,8 +645,49 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
                  socket
                )
 
-      assert Phoenix.Flash.get(socket.assigns.flash, :error) =~
-               "one family membership at a time"
+      assert Phoenix.Flash.get(socket.assigns.flash, :error) ==
+               FamilyInvites.already_on_family_message()
+
+      assert socket.assigns.already_on_family?
+    end
+
+    test "shows Family directions when the invitee already manages members", %{
+      conn: conn
+    } do
+      {invite, _primary} = create_family_invite(%{relationship: :spouse})
+
+      holder = user_fixture(%{email: invite.email})
+
+      %User{}
+      |> User.sub_account_registration_changeset(
+        %{
+          email: unique_user_email(),
+          password: "password1234",
+          first_name: "Dep",
+          last_name: "Child",
+          phone_number: "+14159098268",
+          date_of_birth: child_birth_date()
+        },
+        holder.id,
+        hash_password: true,
+        validate_email: true
+      )
+      |> Repo.insert!()
+
+      conn = log_in_user(conn, holder)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      html =
+        view
+        |> element("#link-existing-button")
+        |> render_click()
+
+      assert has_element?(view, "#has-dependent-family-notice")
+      assert has_element?(view, "#open-family-from-invite")
+      refute has_element?(view, "#link-existing-button")
+      assert html =~ "Open Family"
+      refute html =~ "Settings &gt; Family"
     end
 
     test "asks an account with no date of birth for one before linking", %{

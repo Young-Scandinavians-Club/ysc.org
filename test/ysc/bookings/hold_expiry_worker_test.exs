@@ -632,6 +632,48 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
       assert still_active.status == :active
     end
 
+    test "releases the hold when Stripe cancel reveals a succeeded but fully refunded payment",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {booking, payment_intent_id, entitlement} =
+        expired_hold_with_entitlement(user, 509)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+      expect_cancel_refused(payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           latest_charge: %Stripe.Charge{
+             id: "ch_#{payment_intent_id}",
+             amount: amount_cents,
+             amount_refunded: amount_cents,
+             refunded: true
+           },
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => user.id
+           }
+         }}
+      end)
+
+      HoldExpiryWorker.expire_expired_holds()
+
+      released = Repo.get!(Booking, booking.id)
+      assert released.status == :canceled
+      assert is_nil(released.applied_booking_entitlement_id)
+
+      still_active = Entitlements.get_entitlement(entitlement.id)
+      assert still_active.status == :active
+      refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+    end
+
     test "refunds and releases when succeeded payment amount does not match the hold",
          %{user: user} do
       alias Ysc.Bookings.Entitlements

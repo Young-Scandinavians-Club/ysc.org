@@ -50,13 +50,48 @@ defmodule Ysc.AccountsFixtures do
     state = Map.get(attrs, :state, :active)
     board_position = Map.get(attrs, :board_position)
 
+    password =
+      Map.get(attrs, :password) ||
+        Map.get(attrs, "password") ||
+        valid_user_password()
+
     {:ok, user} =
       attrs
-      |> Map.drop([:role, :state, :board_position])
+      |> Map.drop([
+        :role,
+        :state,
+        :board_position,
+        :password,
+        :hashed_password,
+        :password_set_at
+      ])
       |> valid_user_attributes()
+      |> Map.drop([:password, "password"])
       |> Ysc.Accounts.register_user()
 
+    user = apply_fixture_password(user, attrs, password)
     apply_fixture_role_state(user, role, state, board_position)
+  end
+
+  # `register_user/1` ignores client passwords (Finding 85). Tests that need a
+  # login credential hash it here after insert.
+  defp apply_fixture_password(user, attrs, password) do
+    cond do
+      Map.has_key?(attrs, :hashed_password) and is_nil(attrs.hashed_password) ->
+        user
+
+      Map.has_key?(attrs, :hashed_password) ->
+        user
+        |> Ecto.Changeset.change(%{hashed_password: attrs.hashed_password})
+        |> Ysc.Repo.update!()
+
+      true ->
+        user
+        |> Ecto.Changeset.change(%{
+          hashed_password: Argon2.hash_pwd_salt(password)
+        })
+        |> Ysc.Repo.update!()
+    end
   end
 
   defp apply_fixture_role_state(user, role, state, board_position) do

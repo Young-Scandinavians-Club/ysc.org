@@ -7,6 +7,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.AuthEvent
+  alias Ysc.Accounts.FamilyInvites
   alias Ysc.Ledgers
   alias Ysc.Newsletter
   alias Ysc.Repo
@@ -275,6 +276,49 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
         |> render_click()
 
       assert application_html =~ "Application"
+    end
+
+    test "application tab loads signup data after a profile-only first paint",
+         %{conn: conn} do
+      user = user_fixture()
+      signup_application_fixture(user, %{occupation: "Cartographer"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      view
+      |> element("a[href$='/details/application']")
+      |> render_click()
+
+      html = render(view)
+      refute html =~ "No application found"
+      assert html =~ "Cartographer"
+    end
+
+    test "notes tab shows the author's name and email", %{
+      conn: conn,
+      user: admin
+    } do
+      subject = user_fixture()
+
+      {:ok, _} =
+        Accounts.create_user_note(
+          subject,
+          %{"note" => "Called about dues", "category" => "general"},
+          admin
+        )
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{subject.id}/details/logs")
+
+      render_async(view)
+
+      assert has_element?(view, "#admin-user-notes-timeline", admin.email)
+
+      assert has_element?(
+               view,
+               "#admin-user-notes-timeline",
+               "Called about dues"
+             )
     end
   end
 
@@ -1385,16 +1429,17 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   end
 
   describe "family tab" do
-    test "loads family management UI for lifetime primary users", %{conn: conn} do
-      user = user_fixture()
+    defp lifetime_member(attrs \\ %{}) do
+      user_fixture(attrs)
+      |> Ecto.Changeset.change(%{
+        lifetime_membership_awarded_at:
+          DateTime.utc_now() |> DateTime.truncate(:second)
+      })
+      |> Repo.update!()
+    end
 
-      user =
-        user
-        |> Ecto.Changeset.change(%{
-          lifetime_membership_awarded_at:
-            DateTime.utc_now() |> DateTime.truncate(:second)
-        })
-        |> Repo.update!()
+    test "loads family management UI for lifetime primary users", %{conn: conn} do
+      user = lifetime_member()
 
       {:ok, view, _html} =
         live(conn, ~p"/admin/users/#{user.id}/details/family")
@@ -1403,6 +1448,133 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       assert render(view) =~ "Associated Users"
       assert has_element?(view, "#add-family-user-search-form")
+    end
+
+    test "sends a family invite after the deferred family tab load", %{
+      conn: conn
+    } do
+      user = lifetime_member()
+      email = unique_user_email()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{user.id}/details/family")
+
+      render_async(view)
+
+      view
+      |> form("#add-family-user-search-form", %{query: email})
+      |> render_change()
+
+      html =
+        view
+        |> element("button[phx-click='admin_invite_family_user']")
+        |> render_click()
+
+      assert html =~ "Invitation sent to #{email}."
+      assert [invite] = FamilyInvites.list_invites(user)
+      assert invite.email == email
+      assert invite.primary_user_id == user.id
+    end
+
+    test "invite from a sub-account family tab attaches to the primary holder",
+         %{conn: conn} do
+      primary = lifetime_member()
+      sub = lifetime_member()
+
+      assert {:ok, sub} =
+               Accounts.admin_link_user_to_family(primary, sub,
+                 relationship: :spouse
+               )
+
+      email = unique_user_email()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{sub.id}/details/family")
+
+      render_async(view)
+
+      html =
+        render_click(view, "admin_invite_family_user", %{
+          "email" => email,
+          "relationship" => "child"
+        })
+
+      assert html =~ "Invitation sent to #{email}."
+      assert [invite] = FamilyInvites.list_invites(primary)
+      assert invite.email == email
+      assert invite.primary_user_id == primary.id
+      assert FamilyInvites.list_invites(sub) == []
+    end
+
+    test "refuses nested invite when family data is not loaded for a sub-account",
+         %{conn: conn} do
+      primary = lifetime_member()
+      sub = lifetime_member()
+
+      assert {:ok, sub} =
+               Accounts.admin_link_user_to_family(primary, sub,
+                 relationship: :spouse
+               )
+
+      email = unique_user_email()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{sub.id}/details")
+
+      html = render_click(view, "admin_invite_family_user", %{"email" => email})
+
+      assert html =~ "Only the family membership holder can send invites."
+      assert FamilyInvites.list_invites(sub) == []
+      assert FamilyInvites.list_invites(primary) == []
+    end
+
+    test "refuses linking when family data is not loaded for a sub-account", %{
+      conn: conn
+    } do
+      primary = lifetime_member()
+      sub = lifetime_member()
+
+      assert {:ok, sub} =
+               Accounts.admin_link_user_to_family(primary, sub,
+                 relationship: :spouse
+               )
+
+      victim = user_fixture()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{sub.id}/details")
+
+      html =
+        render_click(view, "admin_link_family_user", %{"user_id" => victim.id})
+
+      assert html =~ "Primary user must not be a sub-account."
+      assert is_nil(Accounts.get_user!(victim.id).primary_user_id)
+    end
+
+    test "refuses linking a user who already has dependents", %{conn: conn} do
+      primary = lifetime_member()
+      holder = lifetime_member()
+
+      _dependent =
+        user_fixture()
+        |> Ecto.Changeset.change(%{
+          primary_user_id: holder.id,
+          family_relationship: :child
+        })
+        |> Repo.update!()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      html =
+        render_click(view, "admin_link_family_user", %{"user_id" => holder.id})
+
+      assert html =~
+               "That user already has linked family members. Remove them first, or link each member individually."
+
+      assert is_nil(Accounts.get_user!(holder.id).primary_user_id)
     end
   end
 

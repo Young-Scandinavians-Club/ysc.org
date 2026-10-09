@@ -906,6 +906,27 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
     end
   end
 
+  describe "already_on_family_message/0" do
+    test "points people to Membership and Leave family membership" do
+      message = FamilyInvites.already_on_family_message()
+
+      assert message =~ "one family membership at a time"
+      assert message =~ "Open Membership"
+      assert message =~ "Leave family membership"
+      refute message =~ "Settings > Family"
+    end
+  end
+
+  describe "has_dependent_family_members_message/0" do
+    test "points people to Family rather than Settings > Family" do
+      message = FamilyInvites.has_dependent_family_members_message()
+
+      assert message =~ "linked family members"
+      assert message =~ "Open Family"
+      refute message =~ "Settings > Family"
+    end
+  end
+
   describe "revoke_invite/2" do
     test "revokes a pending invite" do
       primary_user = create_user_with_lifetime_membership()
