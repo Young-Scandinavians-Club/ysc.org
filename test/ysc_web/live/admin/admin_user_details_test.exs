@@ -443,7 +443,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
       assert html =~ "Alice Johnson"
-      assert html =~ "text-2xl font-semibold"
+      assert html =~ "text-2xl text-zinc-800 type-display"
     end
   end
 

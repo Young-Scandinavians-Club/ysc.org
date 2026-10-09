@@ -16,7 +16,7 @@ defmodule YscWeb.ModalTitleComponentsTest do
         """)
 
       assert html =~ "<h2"
-      assert html =~ "text-2xl font-semibold leading-8 text-zinc-800 mb-6"
+      assert html =~ "text-2xl text-zinc-800 mb-6 type-title"
       assert html =~ "Verify Your Phone Number"
     end
 
@@ -39,7 +39,7 @@ defmodule YscWeb.ModalTitleComponentsTest do
         <.modal_title class="mb-4">Custom spacing</.modal_title>
         """)
 
-      assert html =~ "text-2xl font-semibold leading-8 text-zinc-800 mb-6"
+      assert html =~ "text-2xl text-zinc-800 mb-6 type-title"
       assert html =~ "mb-4"
     end
   end
