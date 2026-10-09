@@ -98,9 +98,7 @@ defmodule Ysc.Stripe.PaymentIntentHelpers do
          amount_refunded >= amount)
   end
 
-  defp charge_get(charge, key) when is_map(charge) do
+  defp charge_get(charge, key) do
     Map.get(charge, key) || Map.get(charge, Atom.to_string(key))
   end
-
-  defp charge_get(_charge, _key), do: nil
 end
