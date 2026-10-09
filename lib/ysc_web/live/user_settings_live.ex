@@ -4206,7 +4206,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You already manage linked family members on your own account. Remove them from Family settings before joining another family membership.",
+           "You already manage linked family members on your own account. Open Family in the sidebar and remove each linked member before joining another family membership.",
            title: "Membership"
          )}
 

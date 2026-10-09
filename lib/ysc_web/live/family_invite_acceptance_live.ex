@@ -33,15 +33,36 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         existing_user = Ysc.Accounts.get_user_by_email(invite.email)
         current_user = socket.assigns[:current_user]
 
-        # Can link if: user is logged in, email matches invite, and they're not already linked
-        can_link_existing =
+        invite_email_matches_current_user? =
           current_user &&
             String.downcase(String.trim(current_user.email)) ==
-              String.downcase(String.trim(invite.email)) &&
-            not Ysc.Accounts.sub_account?(current_user)
+              String.downcase(String.trim(invite.email))
 
-        # Block access if logged in but cannot link (wrong account or invite is for new user)
-        if current_user && !can_link_existing do
+        already_on_family? =
+          case current_user do
+            %User{} = user ->
+              invite_email_matches_current_user? &&
+                Ysc.Accounts.sub_account?(user)
+
+            _ ->
+              false
+          end
+
+        # Can link if: user is logged in, email matches invite, and they're not already linked
+        can_link_existing =
+          case current_user do
+            %User{} = user ->
+              invite_email_matches_current_user? &&
+                not Ysc.Accounts.sub_account?(user)
+
+            _ ->
+              false
+          end
+
+        # Wrong account (or invite is for a new user): sign out first.
+        # Already-linked members stay here so we can tell them how to leave
+        # their current family — they are signed in as the invited email.
+        if current_user && !can_link_existing && !already_on_family? do
           {:ok,
            socket
            |> push_navigate(
@@ -81,6 +102,8 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
            |> assign(:form, form)
            |> assign(:existing_user, existing_user)
            |> assign(:can_link_existing, can_link_existing)
+           |> assign(:already_on_family?, already_on_family? == true)
+           |> assign(:has_dependent_family_members?, false)
            |> assign(
              :adult_child_blocked,
              can_link_existing &&
@@ -188,18 +211,20 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
       {:error, :already_linked_to_family} ->
         {:noreply,
          socket
+         |> assign(:already_on_family?, true)
          |> YscWeb.Flash.put_toast(
            :error,
-           "You can only be on one family membership at a time. Leave your current family first (go to Settings > Family > Leave family membership), then come back and accept this invitation.",
+           FamilyInvites.already_on_family_message(),
            title: "Invitation"
          )}
 
       {:error, :has_dependent_family_members} ->
         {:noreply,
          socket
+         |> assign(:has_dependent_family_members?, true)
          |> YscWeb.Flash.put_toast(
            :error,
-           "You already manage linked family members on your own account. Remove them from Settings > Family before joining another family membership.",
+           FamilyInvites.has_dependent_family_members_message(),
            title: "Invitation"
          )}
 
@@ -313,6 +338,35 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
           application and does not need board approval.
         </p>
 
+        <%!-- Logged in with matching email, already on another family --%>
+        <div :if={@already_on_family?} class="mt-8">
+          <.callout type="error" class="p-6" id="already-on-family-notice">
+            <p class="mb-4">{FamilyInvites.already_on_family_message()}</p>
+            <.button
+              id="open-membership-from-invite"
+              navigate={~p"/users/membership"}
+              class="w-full"
+            >
+              Open Membership
+            </.button>
+          </.callout>
+        </div>
+
+        <div :if={@has_dependent_family_members?} class="mt-8">
+          <.callout type="error" class="p-6" id="has-dependent-family-notice">
+            <p class="mb-4">
+              {FamilyInvites.has_dependent_family_members_message()}
+            </p>
+            <.button
+              id="open-family-from-invite"
+              navigate={~p"/users/settings/family"}
+              class="w-full"
+            >
+              Open Family
+            </.button>
+          </.callout>
+        </div>
+
         <%!-- Logged in with matching email: show Join button --%>
         <div :if={@can_link_existing && @adult_child_blocked} class="mt-8">
           <.callout type="error" class="p-6" id="adult-child-blocked-notice">
@@ -320,7 +374,13 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
           </.callout>
         </div>
 
-        <div :if={@can_link_existing && !@adult_child_blocked} class="mt-8">
+        <div
+          :if={
+            @can_link_existing && !@adult_child_blocked &&
+              !@has_dependent_family_members?
+          }
+          class="mt-8"
+        >
           <.callout type="info" class="p-6">
             <p class="text-blue-800 mb-4">
               You're signed in as <strong>{@current_user.email}</strong>. Click below to join <strong>{@invite.primary_user.first_name}</strong>'s family membership.
@@ -384,7 +444,10 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         </div>
 
         <%!-- Create new account form (when email doesn't exist, or user not logged in) --%>
-        <div :if={!@can_link_existing && !@existing_user} class="mt-8">
+        <div
+          :if={!@can_link_existing && !@existing_user && !@already_on_family?}
+          class="mt-8"
+        >
           <.simple_form
             for={@form}
             id="accept-invite-form"
@@ -437,7 +500,10 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
 
         <%!-- When existing user but logged in with different account --%>
         <div
-          :if={@existing_user && @current_user && !@can_link_existing}
+          :if={
+            @existing_user && @current_user && !@can_link_existing &&
+              !@already_on_family?
+          }
           class="mt-8"
         >
           <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-4">
