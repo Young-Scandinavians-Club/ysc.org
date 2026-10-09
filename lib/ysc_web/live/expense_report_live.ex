@@ -3317,7 +3317,7 @@ defmodule YscWeb.ExpenseReportLive do
                       aria-label="Readiness checklist progress"
                     >
                       <div
-                        class="h-full rounded-full bg-blue-600 transition-all duration-300"
+                        class="h-full rounded-full bg-blue-600 transition-[width] duration-300"
                         style={"width: #{checklist_pct}%"}
                       >
                       </div>
@@ -3382,7 +3382,7 @@ defmodule YscWeb.ExpenseReportLive do
               </span>
 
               <div
-                class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
                 phx-click-away="close-bank-account-modal"
                 phx-click="noop"
               >
@@ -4107,7 +4107,7 @@ defmodule YscWeb.ExpenseReportLive do
               <.icon name="hero-check" class="w-5 h-5 text-white" />
             </div>
           <% :active -> %>
-            <div class="w-8 h-8 rounded-full bg-blue-100 border-2 border-blue-400 flex items-center justify-center animate-pulse">
+            <div class="w-8 h-8 rounded-full bg-blue-100 border-2 border-blue-400 flex items-center justify-center">
               <.icon name={@icon} class="w-5 h-5 text-blue-600" />
             </div>
           <% :rejected -> %>

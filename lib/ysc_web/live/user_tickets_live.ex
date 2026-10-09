@@ -14,10 +14,10 @@ defmodule YscWeb.UserTicketsLive do
       <div class="max-w-(--breakpoint-xl) mx-auto px-4">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
-            <p class="text-teal-600 text-xs font-bold uppercase tracking-[0.2em] mb-2">
+            <p class="text-teal-600 text-xs font-bold uppercase tracking-wider mb-2">
               Your account
             </p>
-            <h1 class="text-4xl lg:text-5xl font-black text-zinc-900 tracking-tight">
+            <h1 class="text-4xl lg:text-5xl font-bold text-zinc-900 tracking-tight">
               Your Tickets
             </h1>
           </div>
@@ -54,7 +54,7 @@ defmodule YscWeb.UserTicketsLive do
             <div class="text-zinc-400 mb-4">
               <.icon name="hero-ticket" class="w-16 h-16 mx-auto" />
             </div>
-            <h3 class="text-lg font-black text-zinc-900 mb-2">No tickets yet</h3>
+            <h3 class="text-lg font-bold text-zinc-900 mb-2">No tickets yet</h3>
             <p class="text-zinc-600 mb-6">
               You haven't purchased any event tickets yet.
             </p>
@@ -69,14 +69,14 @@ defmodule YscWeb.UserTicketsLive do
           <%= for {id, ticket_order} <- @streams.ticket_orders do %>
             <div
               id={id}
-              class="relative group bg-white border border-zinc-200 rounded-2xl hover:ring-2 hover:ring-zinc-300 transition-all duration-200"
+              class="relative group bg-white border border-zinc-200 rounded-2xl hover:ring-2 hover:ring-zinc-300 transition duration-200"
             >
               <%!-- Event Header Section --%>
               <div class="p-8">
                 <div class="flex justify-between items-start mb-6">
                   <.status_badge status={ticket_order.status} />
                   <p
-                    class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] leading-none text-right"
+                    class="text-xs font-bold text-zinc-400 uppercase tracking-wider leading-none text-right"
                     title="Use this order number if you contact us about this purchase"
                   >
                     Order {ticket_order.reference_id}
@@ -87,7 +87,7 @@ defmodule YscWeb.UserTicketsLive do
                   href={~p"/events/#{ticket_order.event_id}"}
                   class="block group-hover:text-teal-600 transition-colors"
                 >
-                  <h2 class="text-3xl font-black text-zinc-900 tracking-tighter mb-2">
+                  <h2 class="text-3xl font-bold text-zinc-900 tracking-tighter mb-2">
                     {ticket_order.event.title}
                   </h2>
                 </.link>
@@ -155,7 +155,7 @@ defmodule YscWeb.UserTicketsLive do
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <%= for ticket <- ticket_order.tickets do %>
                       <div class="bg-white p-4 rounded-2xl border border-zinc-200">
-                        <p class="text-xs font-black text-zinc-900">
+                        <p class="text-xs font-bold text-zinc-900">
                           {ticket.ticket_tier.name}
                         </p>
                         <p class="text-xs font-mono text-zinc-400 mt-1">
@@ -184,10 +184,10 @@ defmodule YscWeb.UserTicketsLive do
 
                   <div class="mt-8 flex justify-between items-center">
                     <div class="text-right">
-                      <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] leading-none">
+                      <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider leading-none">
                         Total Paid
                       </p>
-                      <p class="text-2xl font-black text-zinc-900">
+                      <p class="text-2xl font-bold text-zinc-900">
                         {format_price(ticket_order.total_amount)}
                       </p>
                     </div>
@@ -226,27 +226,27 @@ defmodule YscWeb.UserTicketsLive do
           <section class="mt-24 border-t border-zinc-200 pt-16">
             <div class="flex items-center justify-between mb-10">
               <div>
-                <h3 class="text-2xl font-black text-zinc-400 tracking-tight italic">
+                <h3 class="text-2xl font-bold text-zinc-400 tracking-tight italic">
                   Memory Gallery
                 </h3>
                 <p class="text-sm text-zinc-400">Your past events with YSC</p>
               </div>
-              <span class="px-3 py-1 bg-zinc-100 text-zinc-400 text-xs font-bold rounded-full uppercase tracking-widest">
+              <span class="px-3 py-1 bg-zinc-100 text-zinc-400 text-xs font-bold rounded-full uppercase tracking-wider">
                 Archived
               </span>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <%= for item <- @past_items do %>
-                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
+                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
                   <div class="flex justify-between items-start mb-4">
-                    <span class="text-xs font-black text-zinc-400 uppercase tracking-widest border border-zinc-200 px-2 py-0.5 rounded-sm">
+                    <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider border border-zinc-200 px-2 py-0.5 rounded-sm">
                       {format_visited_date(item)}
                     </span>
                     <.icon name="hero-check-badge" class="w-5 h-5 text-zinc-300" />
                   </div>
 
-                  <h4 class="text-xl font-black text-zinc-900 tracking-tight mb-1">
+                  <h4 class="text-xl font-bold text-zinc-900 tracking-tight mb-1">
                     {item.title}
                   </h4>
                   <p class="text-xs font-medium text-zinc-400 flex items-center gap-1 mb-4">
@@ -260,7 +260,7 @@ defmodule YscWeb.UserTicketsLive do
                     </p>
                     <.link
                       navigate={item.receipt_path}
-                      class="text-xs font-bold text-zinc-400 hover:text-teal-600 underline uppercase tracking-widest"
+                      class="text-xs font-bold text-zinc-400 hover:text-teal-600 underline uppercase tracking-wider"
                     >
                       View Receipt
                     </.link>
@@ -443,7 +443,7 @@ defmodule YscWeb.UserTicketsLive do
   defp status_badge(assigns) do
     ~H"""
     <span class={[
-      "px-3 py-1 text-xs font-black rounded-full uppercase tracking-widest ring-1",
+      "px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider ring-1",
       case @status do
         :pending -> "bg-amber-50 text-amber-700 ring-amber-100"
         :completed -> "bg-green-50 text-green-700 ring-green-100"

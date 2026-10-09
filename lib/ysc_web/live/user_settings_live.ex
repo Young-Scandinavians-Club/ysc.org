@@ -211,7 +211,7 @@ defmodule YscWeb.UserSettingsLive do
                     @deleting_payment_method_id == payment_method.id %>
                   <% busy? = @selecting_payment_method || deleting_this? %>
                   <div class={[
-                    "border rounded-lg p-4 transition-all duration-200 flex items-center gap-2",
+                    "border rounded-lg p-4 transition duration-200 flex items-center gap-2",
                     busy? && "opacity-50",
                     @default_payment_method &&
                       payment_method.id == @default_payment_method.id &&
@@ -488,7 +488,7 @@ defmodule YscWeb.UserSettingsLive do
                     <div class="flex items-center gap-3">
                       <div class="w-full bg-zinc-200 rounded-full h-2">
                         <div
-                          class="bg-blue-600 h-2 rounded-full transition-all"
+                          class="bg-blue-600 h-2 rounded-full transition-[width]"
                           style={"width: #{entry.progress}%"}
                         >
                         </div>
@@ -540,7 +540,7 @@ defmodule YscWeb.UserSettingsLive do
                             id={"avatar-#{avatar.id}"}
                             disabled={@selecting_avatar_id == avatar.id}
                             class={[
-                              "w-14 h-14 rounded-full border-2 transition-all hover:scale-105 cursor-pointer overflow-hidden",
+                              "w-14 h-14 rounded-full border-2 transition hover:scale-105 cursor-pointer overflow-hidden",
                               if(@user.current_avatar_id == avatar.id,
                                 do: "border-blue-600 ring-2 ring-blue-200",
                                 else: "border-zinc-200 hover:border-zinc-400"
@@ -1186,7 +1186,7 @@ defmodule YscWeb.UserSettingsLive do
                         !@loading_payment_methods && @default_payment_method == nil
                       }
                       navigate={~p"/users/membership/payment-method"}
-                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition group"
                     >
                       <div class="flex items-center gap-3">
                         <.icon
@@ -1636,7 +1636,7 @@ defmodule YscWeb.UserSettingsLive do
                         !@loading_payment_methods && @default_payment_method == nil
                       }
                       navigate={~p"/users/membership/payment-method"}
-                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition group"
                     >
                       <div class="flex items-center gap-3">
                         <.icon
@@ -2141,7 +2141,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="all"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition",
                       if(@payment_filter == :all,
                         do: "bg-blue-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2154,7 +2154,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="tahoe"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :tahoe,
                         do: "bg-blue-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2176,7 +2176,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="clear_lake"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :clear_lake,
                         do: "bg-emerald-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2198,7 +2198,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="events"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :events,
                         do: "bg-purple-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2220,7 +2220,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="donations"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :donations,
                         do: "bg-yellow-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2242,7 +2242,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="membership"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :membership,
                         do: "bg-teal-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -4210,6 +4210,19 @@ defmodule YscWeb.UserSettingsLive do
            title: "Membership"
          )}
 
+      {:error, :invalid_membership_type} ->
+        {:noreply,
+         socket
+         |> assign(
+           :pending_family_invites,
+           FamilyInvites.list_pending_invites_for_email(user.email)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This family invitation is no longer valid because the membership is not a family or lifetime plan. Ask the person who invited you to upgrade to a family membership, then request a new invite.",
+           title: "Membership"
+         )}
+
       {:error, :date_of_birth_required} ->
         # The acceptance page collects the date of birth before linking.
         {:noreply,
@@ -5657,14 +5670,14 @@ defmodule YscWeb.UserSettingsLive do
         phx-click={@row_navigate}
         aria-label={@row_navigate_label}
         class={[
-          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition-all bg-white cursor-pointer w-full text-left font-normal",
+          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition bg-white cursor-pointer w-full text-left font-normal",
           "appearance-none m-0"
         ]}
       >
         {render_payment_card_body(assigns)}
       </button>
     <% else %>
-      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition-all bg-white">
+      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition bg-white">
         {render_payment_card_body(assigns)}
       </div>
     <% end %>
@@ -5736,14 +5749,14 @@ defmodule YscWeb.UserSettingsLive do
 
     <div class="flex items-center justify-between pt-4 border-t border-zinc-200">
       <div class="text-right">
-        <p class="text-lg font-black text-zinc-900">
+        <p class="text-lg font-bold text-zinc-900">
           {if @payment_info.payment do
             Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
           else
             "Free"
           end}
         </p>
-        <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
+        <p class="text-xs text-zinc-400 uppercase tracking-wider font-bold">
           Paid on {if @payment_info.payment do
             if @payment_info.payment.payment_date do
               format_payment_date(@payment_info.payment.payment_date, @timezone)
@@ -5847,7 +5860,7 @@ defmodule YscWeb.UserSettingsLive do
         </div>
       </td>
       <td class="px-6 py-4 whitespace-nowrap text-right">
-        <p class="text-base font-black text-zinc-900">
+        <p class="text-base font-bold text-zinc-900">
           {if @payment_info.payment do
             Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
           else

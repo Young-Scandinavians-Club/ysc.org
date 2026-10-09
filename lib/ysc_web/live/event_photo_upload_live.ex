@@ -230,7 +230,7 @@ defmodule YscWeb.EventPhotoUploadLive do
                       <% true -> %>
                         <div class="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
                           <div
-                            class="h-full rounded-full bg-blue-400 transition-all duration-150"
+                            class="h-full rounded-full bg-blue-400 transition-[width] duration-150"
                             style={"width: #{entry.progress}%"}
                           />
                         </div>

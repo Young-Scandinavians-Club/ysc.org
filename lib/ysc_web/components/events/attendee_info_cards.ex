@@ -112,7 +112,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
     <div
       id={"attendee-card-#{@ticket.id}"}
       class={[
-        "relative rounded-xl p-4 space-y-4 transition-all duration-200",
+        "relative rounded-xl p-4 space-y-4 transition duration-200",
         if(@complete?,
           do: "border-2 border-green-500 bg-green-50/30",
           else: "border border-zinc-200"

@@ -128,13 +128,11 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
           payment_intent_id: payment_intent.id
         )
 
-        Bookings.maybe_refund_unfulfilled_modification_payment(
+        Bookings.release_after_unfulfilled_modification_refund(
           booking,
           payment_intent,
           :modification_hold_expired
         )
-
-        :release
 
       true ->
         apply_verified_modification_payment(
@@ -200,13 +198,11 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
           error: inspect(reason)
         )
 
-        Bookings.maybe_refund_unfulfilled_modification_payment(
+        Bookings.release_after_unfulfilled_modification_refund(
           booking,
           payment_intent,
           reason
         )
-
-        :release
     end
   end
 

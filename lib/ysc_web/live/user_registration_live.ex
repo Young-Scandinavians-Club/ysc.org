@@ -246,7 +246,7 @@ defmodule YscWeb.UserRegistrationLive do
                         />
                         <.icon
                           name="hero-x-circle"
-                          class="w-6 h-6 text-red-400 transition-all duration-150 hover:text-red-600 hover:scale-125 active:scale-95"
+                          class="w-6 h-6 text-red-400 transition duration-150 hover:text-red-600 hover:scale-125 active:scale-95"
                         />
                       </label>
                     </div>

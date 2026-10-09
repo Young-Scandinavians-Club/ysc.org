@@ -85,7 +85,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <%= for ticket_tier <- @ticket_tiers do %>
             <% is_donation =
               ticket_tier.type == "donation" || ticket_tier.type == :donation %>
-            <div class="group border border-zinc-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-xs transition-all bg-white">
+            <div class="group border border-zinc-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-xs transition bg-white">
               <div class="flex flex-col lg:flex-row lg:items-center gap-4">
                 <div class="flex-1">
                   <div class="flex items-center gap-3 mb-1">
@@ -164,7 +164,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         >
                           <div
                             class={[
-                              "h-full rounded-full transition-all",
+                              "h-full rounded-full transition-[width]",
                               tier_progress_bar_classes(ticket_tier)
                             ]}
                             style={"width: #{tier_progress_percentage(ticket_tier)}%"}

@@ -1193,10 +1193,10 @@ defmodule YscWeb.AdminEventsNewLive do
                 id="stat-donations"
                 class="bg-purple-50 shadow-xs border border-purple-100 rounded-lg p-6"
               >
-                <p class="text-xs font-black text-purple-400 uppercase tracking-[0.2em] mb-3">
+                <p class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-3">
                   Donations Collected
                 </p>
-                <p class="text-3xl font-black text-purple-900">
+                <p class="text-3xl font-bold text-purple-900">
                   {money_display(@donations_total)}
                 </p>
                 <p class="text-xs text-purple-700 mt-1 font-medium">

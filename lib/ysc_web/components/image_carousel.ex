@@ -120,9 +120,33 @@ defmodule YscWeb.Components.ImageCarousel do
     ~H"""
     <div class={["image-carousel-container", @class]}>
       <style>
-        /* Hide radio buttons */
+        /* The radios drive the slides, but must stay focusable: display:none would
+           remove them from the tab order and make the carousel mouse-only. Hide
+           them visually instead. Tab lands on the checked radio and the arrow keys
+           move between slides natively (that is how a radio group works). */
+        .image-carousel-container {
+          position: relative;
+        }
+
         .image-carousel-container input[type="radio"] {
-          display: none;
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          margin: -1px;
+          padding: 0;
+          border: 0;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          white-space: nowrap;
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        /* Keyboard focus ring (inset so the wrapper's overflow:hidden cannot clip it) */
+        .image-carousel-container input[type="radio"]:focus-visible ~ .carousel-wrapper {
+          outline: 3px solid #fff;
+          outline-offset: -6px;
+          box-shadow: inset 0 0 0 6px rgba(20, 73, 147, 0.9);
         }
 
         /* Carousel wrapper */
@@ -314,9 +338,20 @@ defmodule YscWeb.Components.ImageCarousel do
         }
       </style>
 
-      <input type="radio" name={"carousel-#{@id}"} id={"slide-#{@id}-0"} checked />
+      <input
+        type="radio"
+        name={"carousel-#{@id}"}
+        aria-label="Go to slide 1"
+        id={"slide-#{@id}-0"}
+        checked
+      />
       <%= for i <- 1..(@image_count - 1)//1 do %>
-        <input type="radio" name={"carousel-#{@id}"} id={"slide-#{@id}-#{i}"} />
+        <input
+          type="radio"
+          name={"carousel-#{@id}"}
+          aria-label={"Go to slide #{i + 1}"}
+          id={"slide-#{@id}-#{i}"}
+        />
       <% end %>
 
       <div class="carousel-wrapper">

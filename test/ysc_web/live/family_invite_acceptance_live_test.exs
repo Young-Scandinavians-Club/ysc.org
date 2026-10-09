@@ -19,16 +19,48 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts
   alias Ysc.Accounts.FamilyInvite
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.User
   alias Ysc.Repo
+  alias Ysc.Subscriptions
 
   defp child_birth_date, do: Date.shift(Date.utc_today(), year: -10)
 
+  defp create_user_with_family_membership(attrs \\ %{}) do
+    user = user_fixture(attrs)
+
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+    family_plan = Enum.find(membership_plans, &(&1.id == :family))
+
+    assert family_plan,
+           "membership_plans must include :family (another test may have cleared Application env)"
+
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_test_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Family Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    {:ok, _subscription_item} =
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_price_id: family_plan.stripe_price_id,
+        stripe_product_id: "prod_test_#{System.unique_integer()}",
+        stripe_id: "si_test_#{System.unique_integer()}",
+        quantity: 1
+      })
+
+    Accounts.get_user!(user.id, [:subscriptions])
+  end
+
   # Helper to create a valid family invite
   defp create_family_invite(attrs \\ %{}) do
-    primary_user = user_fixture()
+    primary_user = create_user_with_family_membership()
     token = FamilyInvite.build_token()
 
     invite_attrs =
@@ -517,6 +549,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       |> render_click()
 
       assert_redirected(view, "/")
+
+      assert Repo.get!(User, invited_user.id).primary_user_id ==
+               invite.primary_user_id
     end
 
     test "shows error when invite was deleted before link", %{conn: conn} do
@@ -718,6 +753,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
       |> render_click()
 
       assert_redirected(view, "/")
+
+      assert Repo.get!(User, invited_user.id).primary_user_id ==
+               invite.primary_user_id
     end
   end
 

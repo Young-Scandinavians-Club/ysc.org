@@ -1134,18 +1134,65 @@ defmodule Ysc.Bookings do
       when is_binary(payment_intent_id) do
     previous_id = booking.payment_intent_id
 
-    result =
-      booking
-      |> Booking.payment_changeset(%{payment_intent_id: payment_intent_id})
-      |> Repo.update()
+    case reconcile_previous_hold_payment_intent(
+           previous_id,
+           payment_intent_id,
+           booking.id
+         ) do
+      :ok ->
+        booking
+        |> Booking.payment_changeset(%{payment_intent_id: payment_intent_id})
+        |> Repo.update()
 
-    if match?({:ok, _}, result) and is_binary(previous_id) and
-         previous_id != payment_intent_id do
-      Ysc.Tickets.StripeService.cancel_payment_intent(previous_id)
+      {:error, _} = error ->
+        error
     end
-
-    result
   end
+
+  # Same Stripe-first replace as `attach_modification_payment_intent/2`. Blind
+  # overwrite + StripeService.cancel (succeeds-as-ok) orphaned a captured hold
+  # charge when checkout reminted a PI after the previous Intent had already
+  # succeeded.
+  defp reconcile_previous_hold_payment_intent(
+         previous_id,
+         payment_intent_id,
+         booking_id
+       )
+       when is_binary(previous_id) and previous_id != "" and
+              previous_id != payment_intent_id do
+    case Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           previous_id,
+           "attach_payment_intent"
+         ) do
+      {:cancel, _payment_intent} ->
+        :ok
+
+      {:already_succeeded, _payment_intent} ->
+        {:error, {:hold_payment_already_succeeded, previous_id}}
+
+      {:in_progress, _payment_intent} ->
+        require Ysc.Logging
+
+        Ysc.Logging.info(
+          "Skipped replacing hold PaymentIntent while payment is in flight",
+          booking_id: booking_id,
+          previous_payment_intent_id: previous_id,
+          new_payment_intent_id: payment_intent_id
+        )
+
+        {:error, :hold_payment_in_progress}
+
+      {:error, reason} ->
+        {:error, {:stripe_reconcile_failed, reason}}
+    end
+  end
+
+  defp reconcile_previous_hold_payment_intent(
+         _previous_id,
+         _payment_intent_id,
+         _booking_id
+       ),
+       do: :ok
 
   @doc """
   Stores the Stripe PaymentIntent id created for a paid booking modification
@@ -1699,6 +1746,48 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @doc """
+  After an unfulfillable succeeded checkout PaymentIntent, refund then decide
+  whether inventory may be released.
+
+  Same invariant as ticket `#1503`: never release while the Stripe refund still
+  failed — HoldExpiry / member cancel would otherwise drop the hold (and clear
+  `applied_booking_entitlement_id`) with money still captured and no cron retry
+  path left (`status != :hold`). A successful or skipped refund is safe to
+  release; a refund error returns `:skip` so the next expiry/cancel attempt can
+  retry the idempotent refund.
+  """
+  def release_after_unfulfilled_checkout_refund(
+        %Booking{} = booking,
+        %Stripe.PaymentIntent{} = payment_intent,
+        reason
+      ) do
+    require Ysc.Logging
+
+    case maybe_refund_unfulfilled_checkout_payment(
+           booking,
+           payment_intent,
+           reason
+         ) do
+      {:ok, _refund} ->
+        :release
+
+      :skipped ->
+        :release
+
+      {:error, refund_error} ->
+        Ysc.Logging.error(
+          "Not releasing booking hold after unfulfilled checkout payment; Stripe refund failed and will be retried",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          reason: normalize_checkout_failure_reason(reason),
+          refund_error: inspect(refund_error)
+        )
+
+        :skip
+    end
+  end
+
   defp refund_unfulfilled_checkout_payment?(
          %Booking{} = booking,
          %Stripe.PaymentIntent{} = payment_intent,
@@ -1821,6 +1910,43 @@ defmodule Ysc.Bookings do
       end
     else
       :skipped
+    end
+  end
+
+  @doc """
+  After an unfulfillable succeeded modification PaymentIntent, refund then
+  decide whether the modification hold may be released.
+
+  Mirror of `release_after_unfulfilled_checkout_refund/3`: do not clear
+  `modification_hold_attrs` while the captured charge is still unrefunded.
+  """
+  def release_after_unfulfilled_modification_refund(
+        %Booking{} = booking,
+        payment_intent_or_id,
+        reason
+      ) do
+    require Ysc.Logging
+
+    case maybe_refund_unfulfilled_modification_payment(
+           booking,
+           payment_intent_or_id,
+           reason
+         ) do
+      {:ok, _refund} ->
+        :release
+
+      :skipped ->
+        :release
+
+      {:error, refund_error} ->
+        Ysc.Logging.error(
+          "Not releasing modification hold after unfulfilled payment; Stripe refund failed and will be retried",
+          booking_id: booking.id,
+          reason: normalize_modification_failure_reason(reason),
+          refund_error: inspect(refund_error)
+        )
+
+        :skip
     end
   end
 

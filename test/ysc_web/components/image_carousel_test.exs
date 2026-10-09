@@ -384,6 +384,48 @@ defmodule YscWeb.Components.ImageCarouselTest do
       assert html =~ ~s(aria-label="Go to slide 2")
     end
 
+    test "the slide radios are focusable, not display:none, so keyboard users can reach the carousel" do
+      html =
+        render_carousel(%{
+          id: "test-carousel",
+          images: [
+            %{src: "/images/test1.jpg", alt: "Test 1"},
+            %{src: "/images/test2.jpg", alt: "Test 2"}
+          ]
+        })
+
+      # display:none removes an input from the tab order entirely
+      refute html =~ ~r/input\[type="radio"\]\s*\{[^}]*display:\s*none/
+      # ...so they are hidden visually instead
+      assert html =~ ~r/input\[type="radio"\]\s*\{[^}]*clip:\s*rect/
+    end
+
+    test "each slide radio has its own accessible name" do
+      html =
+        render_carousel(%{
+          id: "test-carousel",
+          images: [
+            %{src: "/images/test1.jpg", alt: "Test 1"},
+            %{src: "/images/test2.jpg", alt: "Test 2"}
+          ]
+        })
+
+      for n <- 1..2 do
+        assert html =~
+                 ~r/<input[^>]*type="radio"[^>]*aria-label="Go to slide #{n}"|<input[^>]*aria-label="Go to slide #{n}"[^>]*type="radio"/s
+      end
+    end
+
+    test "keyboard focus is made visible on the carousel" do
+      html =
+        render_carousel(%{
+          id: "test-carousel",
+          images: [%{src: "/images/test.jpg", alt: "Test"}]
+        })
+
+      assert html =~ ~s(input[type="radio"]:focus-visible ~ .carousel-wrapper)
+    end
+
     test "includes alt text for all images" do
       html =
         render_carousel(%{

@@ -29,7 +29,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
         <p class="history-serif text-zinc-500 italic text-sm mt-4 tracking-wide">
           Established 1950
         </p>
-        <p class="text-zinc-400 uppercase tracking-[0.25em] text-xs mt-2">
+        <p class="text-zinc-400 uppercase tracking-wider text-xs mt-2">
           San Francisco, California
         </p>
       </.page_masthead>

@@ -198,7 +198,7 @@ defmodule YscWeb.AdminMembershipReportLive do
                 <.icon name="hero-arrow-left" class="w-4 h-4" /> Memberships
               </.link>
             </div>
-            <h1 class="text-3xl font-black text-zinc-900 tracking-tight">
+            <h1 class="text-3xl font-bold text-zinc-900 tracking-tight">
               Membership Report
             </h1>
             <p class="text-sm text-zinc-500 mt-1">

@@ -278,7 +278,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      assert has_element?(view, "p.font-black.text-xl", "Sat, Jul 18")
+      assert has_element?(view, "p.font-bold.text-xl", "Sat, Jul 18")
     end
 
     test "shows weekday date range for multi-day events in the same year", %{
@@ -295,7 +295,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert has_element?(
                view,
-               "p.font-black.text-xl",
+               "p.font-bold.text-xl",
                "Sat, Jul 18 – Mon, Jul 20"
              )
     end
@@ -315,7 +315,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert has_element?(
                view,
-               "p.font-black.text-xl",
+               "p.font-bold.text-xl",
                "Tue, Dec 30, 2025 – Fri, Jan 2, 2026"
              )
     end
@@ -332,7 +332,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
 
-      assert has_element?(view, "p.font-black.text-xl", "TBD")
+      assert has_element?(view, "p.font-bold.text-xl", "TBD")
     end
 
     test "shows start and end times in the When section", %{conn: conn} do
@@ -386,11 +386,11 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert has_element?(
                view,
-               "p.text-xs.font-black.text-zinc-400",
+               "p.text-xs.font-bold.text-zinc-400",
                "Duration"
              )
 
-      assert has_element?(view, "p.font-black.text-xl", "3 Hours")
+      assert has_element?(view, "p.font-bold.text-xl", "3 Hours")
     end
 
     test "hides duration for multi-day events even when times are set", %{
@@ -409,7 +409,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       refute has_element?(
                view,
-               "p.text-xs.font-black.text-zinc-400",
+               "p.text-xs.font-bold.text-zinc-400",
                "Duration"
              )
     end

@@ -638,7 +638,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 if assigns[:show_price_details], do: "true", else: "false"
               }
             >
-              <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+              <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-wider">
                 Price Details
               </h3>
               <.icon
@@ -651,7 +651,7 @@ defmodule YscWeb.BookingCheckoutLive do
               />
             </button>
             <%!-- Desktop Header --%>
-            <h3 class="hidden lg:block text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">
+            <h3 class="hidden lg:block text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4">
               Price Details
             </h3>
             <div class={[
@@ -663,7 +663,7 @@ defmodule YscWeb.BookingCheckoutLive do
               <% end %>
               <div class="pt-4 border-t border-zinc-700 flex justify-between items-baseline">
                 <span class="text-lg font-bold">Total</span>
-                <span class="text-3xl font-black text-blue-400">
+                <span class="text-3xl font-bold text-blue-400">
                   {MoneyHelper.format_money!(@total_price)}
                 </span>
               </div>
@@ -719,7 +719,7 @@ defmodule YscWeb.BookingCheckoutLive do
         <div class="max-w-(--breakpoint-xl) mx-auto flex items-center justify-between gap-4">
           <div>
             <p class="text-xs text-zinc-500 uppercase tracking-wide">Total</p>
-            <p class="text-2xl font-black text-blue-600">
+            <p class="text-2xl font-bold text-blue-600">
               {MoneyHelper.format_money!(@total_price)}
             </p>
           </div>

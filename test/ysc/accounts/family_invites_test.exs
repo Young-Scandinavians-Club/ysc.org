@@ -1141,6 +1141,114 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
     end
   end
 
+  describe "Family→Single leftover: unpaid nested members" do
+    defp create_user_with_single_membership(attrs \\ %{}) do
+      user = user_fixture(attrs)
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      assert single_plan,
+             "membership_plans must include :single"
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_single_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id: "prod_single_#{System.unique_integer()}",
+          stripe_id: "si_single_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      Accounts.get_user!(user.id, [:subscriptions])
+    end
+
+    test "accept_invite refuses when primary only has a Single plan" do
+      primary = create_user_with_single_membership()
+      email = unique_user_email()
+
+      # Stale invite from when primary was still on Family
+      invite =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: primary.id,
+          created_by_user_id: primary.id,
+          relationship: :child
+        })
+        |> Repo.insert!()
+
+      assert {:error, :invalid_membership_type} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: email,
+                 password: "password1234",
+                 first_name: "Orphan",
+                 last_name: "Invitee",
+                 phone_number: unique_user_phone(),
+                 date_of_birth: child_birth_date()
+               })
+    end
+
+    test "link_existing_user refuses when primary only has a Single plan" do
+      primary = create_user_with_single_membership()
+      invitee = user_fixture(%{date_of_birth: child_birth_date()})
+
+      invite =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: invitee.email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: primary.id,
+          created_by_user_id: primary.id,
+          relationship: :child
+        })
+        |> Repo.insert!()
+
+      assert {:error, :invalid_membership_type} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+    end
+
+    test "linked sub-account loses access after primary Family plan becomes Single" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      assert family_plan && single_plan
+
+      primary = create_user_with_family_membership()
+
+      sub =
+        user_fixture(%{date_of_birth: child_birth_date()})
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update!()
+
+      assert Accounts.has_active_membership?(sub)
+
+      # Simulate scheduled Family→Single taking effect: replace family item
+      # with single item on the same subscription.
+      [subscription] = Subscriptions.list_subscriptions(primary)
+      subscription = Repo.preload(subscription, :subscription_items)
+      [family_item] = subscription.subscription_items
+
+      family_item
+      |> Ecto.Changeset.change(%{stripe_price_id: single_plan.stripe_price_id})
+      |> Repo.update!()
+
+      primary = Accounts.get_user!(primary.id, [:subscriptions])
+      refute Accounts.family_membership_host?(primary)
+      refute Accounts.has_active_membership?(sub)
+    end
+  end
+
   describe "can_send_family_invite?/1" do
     test "returns true for eligible user" do
       user = create_user_with_lifetime_membership()

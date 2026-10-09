@@ -208,7 +208,7 @@ defmodule YscWeb.OrderConfirmationLive do
           <% end %>
         </div>
         <div class="text-left md:text-right">
-          <p class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+          <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider">
             Order number
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
@@ -561,7 +561,7 @@ defmodule YscWeb.OrderConfirmationLive do
             )
           ]}>
             <h3 class={[
-              "text-xs font-bold uppercase tracking-widest mb-6",
+              "text-xs font-bold uppercase tracking-wider mb-6",
               if(
                 @ticket_order.status == :cancelled ||
                   (@refund_data && @refund_data.total_refunded),

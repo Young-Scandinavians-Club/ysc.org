@@ -228,6 +228,16 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
            title: "Invitation"
          )}
 
+      {:error, :invalid_membership_type} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This family invitation is no longer valid because the membership is not a family or lifetime plan. Ask the person who invited you to upgrade to a family membership, then request a new invite.",
+           title: "Invitation"
+         )
+         |> redirect(to: ~p"/")}
+
       {:error, :child_is_adult} ->
         {:noreply,
          socket
@@ -304,7 +314,17 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
            title: "Invitation"
          )}
 
-      {:error, changeset} ->
+      {:error, :invalid_membership_type} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This family invitation is no longer valid because the membership is not a family or lifetime plan. Ask the person who invited you to upgrade to a family membership, then request a new invite.",
+           title: "Invitation"
+         )
+         |> redirect(to: ~p"/")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, form: to_form(changeset, as: "user"))}
     end
   end
