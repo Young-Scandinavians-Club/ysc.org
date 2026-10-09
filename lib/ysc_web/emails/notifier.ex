@@ -423,11 +423,24 @@ defmodule YscWeb.Emails.Notifier do
       |> subject(subject)
       |> maybe_reply_to(reply_to)
       |> add_cc_recipients(cc)
+      |> maybe_otp_token(template, variables)
       |> html_body(rendered)
       |> text_body(text_body)
 
     Ysc.Messages.run_send_message_idempotent(email, attrs)
   end
+
+  # Verification-code emails also carry the machine-readable, origin-bound
+  # `OTP-Token` header (draft-goto-otp-token) so mail clients can autofill it.
+  defp maybe_otp_token(
+         email,
+         YscWeb.Emails.AccountSetupVerification,
+         %{verification_code: code}
+       )
+       when is_binary(code),
+       do: YscWeb.Emails.OtpToken.put_header(email, code)
+
+  defp maybe_otp_token(email, _template, _variables), do: email
 
   defp maybe_reply_to(email, nil), do: email
 
