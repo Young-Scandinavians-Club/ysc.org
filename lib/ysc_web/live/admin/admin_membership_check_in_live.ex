@@ -21,7 +21,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           <.back navigate={~p"/admin/scanner"}>Back</.back>
           <span class="text-zinc-300 select-none hidden sm:inline">/</span>
           <div class="min-w-0 hidden sm:block">
-            <h1 class="text-base font-semibold text-zinc-900 truncate">
+            <h1 class="text-base text-zinc-900 truncate type-subhead">
               {@session.name}
             </h1>
             <p

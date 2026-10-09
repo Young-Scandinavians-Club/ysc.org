@@ -634,7 +634,7 @@ defmodule YscWeb.AdminComponents do
   def admin_section_heading(assigns) do
     ~H"""
     <h2 class={[
-      "text-sm font-semibold uppercase tracking-wide text-zinc-500",
+      "text-sm text-zinc-500 type-eyebrow",
       @class
     ]}>
       {render_slot(@inner_block)}
@@ -691,7 +691,7 @@ defmodule YscWeb.AdminComponents do
         phx-value-section={@section}
         class="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors"
       >
-        <h2 class="text-xl font-semibold text-zinc-800">{@title}</h2>
+        <h2 class="text-xl text-zinc-800 type-subhead">{@title}</h2>
         <.icon
           name={
             if @collapsed?,
@@ -1126,7 +1126,7 @@ defmodule YscWeb.AdminComponents do
   """
   def admin_event_check_in_table_header(assigns) do
     ~H"""
-    <div class="grid grid-cols-12 gap-4 px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+    <div class="grid grid-cols-12 gap-4 px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 text-xs text-zinc-500 type-eyebrow">
       <div class="col-span-1"></div>
       <div class="col-span-3">Attendee</div>
       <div class="col-span-2">Email</div>
@@ -1996,7 +1996,7 @@ defmodule YscWeb.AdminComponents do
 
     ~H"""
     <div id={@id} class="border border-zinc-200 rounded-lg p-4 bg-white">
-      <h2 class="text-lg font-semibold text-zinc-800 mb-2">
+      <h2 class="text-lg text-zinc-800 mb-2 type-subhead">
         {@title}
       </h2>
       <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
@@ -2062,7 +2062,7 @@ defmodule YscWeb.AdminComponents do
         :if={@selected_count > 0 && @loaded?}
         class="mt-3 pt-3 border-t border-zinc-100 flex flex-col gap-1.5"
       >
-        <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+        <p class="text-xs text-zinc-500 type-eyebrow">
           Selected ({@selected_count})
         </p>
         <div
@@ -2292,7 +2292,7 @@ defmodule YscWeb.AdminComponents do
           clickable
           phx-click={JS.navigate(~p"/admin/posts/\#{post.id}")}
         >
-          <h3 class="text-base font-semibold text-zinc-900 truncate">{post.title}</h3>
+          <h3 class="text-base text-zinc-900 truncate type-subhead">{post.title}</h3>
         </.admin_mobile_list_card>
       </.admin_mobile_list>
   """
@@ -2329,7 +2329,7 @@ defmodule YscWeb.AdminComponents do
   ## Examples
 
       <.admin_mobile_list_card id="edition-1">
-        <h3 class="text-base font-semibold text-zinc-900 truncate">{@edition.title}</h3>
+        <h3 class="text-base text-zinc-900 truncate type-subhead">{@edition.title}</h3>
         <:footer>
           <.edition_actions_dropdown edition={@edition} menu_id="edition-actions-mob-1" />
         </:footer>
@@ -2728,10 +2728,10 @@ defmodule YscWeb.AdminComponents do
         @class
       ]}
     >
-      <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">
+      <p class="text-xs text-zinc-400 mb-3 type-eyebrow">
         {@label}
       </p>
-      <p class={["text-3xl font-bold", @value_class || "text-zinc-900"]}>
+      <p class={["text-3xl type-title", @value_class || "text-zinc-900"]}>
         {@value}
       </p>
       <p :if={@subtitle} class="text-xs text-zinc-500 mt-1 font-medium">
@@ -2759,7 +2759,7 @@ defmodule YscWeb.AdminComponents do
         navigate={~p"/admin/events"}
         action="Manage events →"
       >
-        <p class="text-3xl font-bold text-zinc-900">3</p>
+        <p class="text-3xl text-zinc-900 type-title">3</p>
       </.admin_dashboard_link_card>
   """
   attr :id, :string, default: nil
@@ -2886,7 +2886,7 @@ defmodule YscWeb.AdminComponents do
       <div>
         <div class="flex items-center justify-between mb-2">
           <p class={[
-            "flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider",
+            "flex items-center gap-1.5 text-xs type-eyebrow",
             @label_class
           ]}>
             <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> {@label}
@@ -2896,7 +2896,7 @@ defmodule YscWeb.AdminComponents do
               "w-1.5 h-1.5 rounded-full",
               if(@occupied?, do: "bg-emerald-500", else: "bg-zinc-300")
             ]}></span>
-            <span class="text-[10px] font-bold text-zinc-400 uppercase">
+            <span class="text-[10px] text-zinc-400 type-eyebrow">
               {if(@occupied?, do: "Active", else: "Empty")}
             </span>
           </span>
@@ -2917,7 +2917,7 @@ defmodule YscWeb.AdminComponents do
               class="w-6 h-6 text-emerald-500 shrink-0"
             />
             <div>
-              <p class="font-bold text-emerald-700 uppercase text-[10px] leading-none">
+              <p class="text-emerald-700 text-[10px] type-eyebrow">
                 Checking in
               </p>
               <p class="font-bold font-mono text-emerald-800 text-lg leading-tight">
@@ -2931,7 +2931,7 @@ defmodule YscWeb.AdminComponents do
               class="w-6 h-6 text-amber-500 shrink-0"
             />
             <div>
-              <p class="font-bold text-amber-700 uppercase text-[10px] leading-none">
+              <p class="text-amber-700 text-[10px] type-eyebrow">
                 Checking out
               </p>
               <p class="font-bold font-mono text-amber-800 text-lg leading-tight">
@@ -2943,7 +2943,7 @@ defmodule YscWeb.AdminComponents do
       </div>
       <div class="mt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3 text-xs">
         <div>
-          <p class="font-bold text-zinc-400 uppercase text-[10px]">
+          <p class="text-zinc-400 text-[10px] type-eyebrow">
             Next 14 days
           </p>
           <p class="font-bold font-mono text-zinc-800 mt-0.5">
@@ -2951,7 +2951,7 @@ defmodule YscWeb.AdminComponents do
           </p>
         </div>
         <div>
-          <p class="font-bold text-zinc-400 uppercase text-[10px]">
+          <p class="text-zinc-400 text-[10px] type-eyebrow">
             Expected guests
           </p>
           <p class="font-bold font-mono text-zinc-800 mt-0.5">
@@ -4189,7 +4189,7 @@ defmodule YscWeb.AdminComponents do
   def admin_magic_search_section(assigns) do
     ~H"""
     <div :if={@show?} class="p-2">
-      <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+      <div class="px-3 py-2 text-xs text-zinc-500 type-eyebrow">
         {@title}
       </div>
       <div class="space-y-1">
@@ -4603,7 +4603,7 @@ defmodule YscWeb.AdminComponents do
 
   defp application_review_heading(assigns) do
     ~H"""
-    <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+    <h3 class="text-sm text-zinc-400 mb-3 type-eyebrow">
       {render_slot(@inner_block)}
     </h3>
     """

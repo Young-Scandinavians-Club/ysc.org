@@ -22,7 +22,7 @@ defmodule YscWeb.AgendaEditComponent do
             <.icon name="hero-exclamation-triangle" class="h-5 w-5 text-amber-400" />
           </div>
           <div class="ml-3">
-            <h3 class="text-sm font-medium text-amber-800">
+            <h3 class="text-sm text-amber-800 type-subhead">
               Chronological Warning
             </h3>
             <div class="mt-1 text-sm text-amber-700">

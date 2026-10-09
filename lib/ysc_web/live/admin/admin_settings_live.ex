@@ -59,7 +59,7 @@ defmodule YscWeb.AdminSettingsLive do
         >
           <.form for={@form} id="admin-settings-form" phx-submit="update-settings">
             <div :for={scope <- @scopes}>
-              <h2 class="text-lg leading-8 font-semibold text-zinc-800">
+              <h2 class="text-lg text-zinc-800 type-subhead">
                 {String.capitalize(scope)}
               </h2>
               <div>
@@ -108,7 +108,7 @@ defmodule YscWeb.AdminSettingsLive do
           id="google-photos-integration"
           class="w-full py-4 max-w-(--breakpoint-md)"
         >
-          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-3">
+          <h2 class="text-lg text-zinc-800 mb-3 type-subhead">
             Google Photos
           </h2>
           <div
@@ -217,7 +217,7 @@ defmodule YscWeb.AdminSettingsLive do
         </div>
 
         <div class="w-full py-4">
-          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-3">Misc</h2>
+          <h2 class="text-lg text-zinc-800 mb-3 type-subhead">Misc</h2>
           <.link
             class="rounded-sm px-4 py-3 bg-blue-700 hover:bg-blue-800 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-100"
             navigate={~p"/admin/dashboard"}
@@ -230,7 +230,7 @@ defmodule YscWeb.AdminSettingsLive do
         </div>
         <!-- Reported Outages -->
         <div class="w-full py-4">
-          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-4">
+          <h2 class="text-lg text-zinc-800 mb-4 type-subhead">
             Reported Outages
           </h2>
           <div
@@ -256,22 +256,22 @@ defmodule YscWeb.AdminSettingsLive do
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Property
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Type
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Company
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Description
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Incident Date
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Reported
                   </th>
                 </tr>
@@ -325,7 +325,7 @@ defmodule YscWeb.AdminSettingsLive do
         </div>
         <!-- Queue Statistics -->
         <div class="w-full py-4">
-          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-4">
+          <h2 class="text-lg text-zinc-800 mb-4 type-subhead">
             Queue Statistics
           </h2>
           <div
@@ -352,7 +352,7 @@ defmodule YscWeb.AdminSettingsLive do
           >
             <%= for {queue, stats} <- @queue_stats do %>
               <div class="bg-white shadow-sm rounded-lg p-4">
-                <h3 class="font-semibold text-zinc-900 mb-3">{queue}</h3>
+                <h3 class="text-zinc-900 mb-3 type-subhead">{queue}</h3>
                 <div class="space-y-2 text-sm">
                   <div class="flex justify-between items-center gap-2">
                     <span class="text-zinc-600">Available</span>
@@ -397,7 +397,7 @@ defmodule YscWeb.AdminSettingsLive do
         </div>
         <!-- Recent Oban Jobs -->
         <div class="w-full py-4">
-          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-4">
+          <h2 class="text-lg text-zinc-800 mb-4 type-subhead">
             Recent Oban Jobs
           </h2>
           <div
@@ -421,28 +421,28 @@ defmodule YscWeb.AdminSettingsLive do
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Job ID
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Worker
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Queue
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     State
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Processed At
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Execution
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Attempts
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Actions
                   </th>
                 </tr>
@@ -570,29 +570,29 @@ defmodule YscWeb.AdminSettingsLive do
           on_cancel={JS.push("close_job_modal")}
         >
           <div :if={@selected_job} class="space-y-4">
-            <h2 class="text-xl font-semibold text-zinc-900">Job Details</h2>
+            <h2 class="text-xl text-zinc-900 type-subhead">Job Details</h2>
             <div>
-              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Worker</h3>
+              <h3 class="text-sm text-zinc-700 mb-2 type-subhead">Worker</h3>
               <p class="text-sm text-zinc-900 font-mono">
                 {@selected_job.worker}
               </p>
             </div>
             <div>
-              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Arguments</h3>
+              <h3 class="text-sm text-zinc-700 mb-2 type-subhead">Arguments</h3>
               <pre
                 phx-no-curly-interpolation
                 class="text-xs bg-zinc-50 p-3 rounded-sm border border-zinc-200 overflow-x-auto"
               ><%= Jason.encode!(@selected_job.args, pretty: true) %></pre>
             </div>
             <div :if={@selected_job.meta != %{} && @selected_job.meta != nil}>
-              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Metadata</h3>
+              <h3 class="text-sm text-zinc-700 mb-2 type-subhead">Metadata</h3>
               <pre
                 phx-no-curly-interpolation
                 class="text-xs bg-zinc-50 p-3 rounded-sm border border-zinc-200 overflow-x-auto"
               ><%= Jason.encode!(@selected_job.meta, pretty: true) %></pre>
             </div>
             <div :if={@selected_job.errors != [] && @selected_job.errors != nil}>
-              <h3 class="text-sm font-semibold text-zinc-700 mb-2">Errors</h3>
+              <h3 class="text-sm text-zinc-700 mb-2 type-subhead">Errors</h3>
               <div class="space-y-2">
                 <%= for error <- @selected_job.errors do %>
                   <div class="bg-red-50 p-3 rounded-sm border border-red-200">

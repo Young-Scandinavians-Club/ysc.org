@@ -1252,7 +1252,7 @@ defmodule YscWeb.HomeLive do
                             )}
                           </p>
                           <span class={[
-                            "inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-sm uppercase tracking-widerer",
+                            "inline-flex items-center px-2.5 py-0.5 text-xs rounded-sm type-eyebrow",
                             case days_until_this_booking do
                               :started ->
                                 "bg-green-50 text-green-700 ring-1 ring-green-200/50"
@@ -1278,7 +1278,7 @@ defmodule YscWeb.HomeLive do
                             end}
                           </span>
                           <%= if booking.booking_mode == :buyout do %>
-                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-bold rounded-sm uppercase tracking-widerer">
+                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs rounded-sm type-eyebrow">
                               {BookingModeDisplay.stay_type_label(:buyout)}
                             </span>
                           <% end %>

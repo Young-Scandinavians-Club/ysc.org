@@ -68,7 +68,7 @@ defmodule YscWeb.AdminDashboardLive do
           accent={if(@pending_reviews_count > 0, do: :warning, else: :default)}
         >
           <div>
-            <p class="flex items-center gap-1.5 text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            <p class="flex items-center gap-1.5 text-xs text-zinc-400 mb-2 type-eyebrow">
               <.icon name="hero-clipboard-document-list" class="w-3.5 h-3.5" />
               Applications
             </p>
@@ -87,7 +87,7 @@ defmodule YscWeb.AdminDashboardLive do
           </div>
           <div class="mt-4 pt-3 rounded-lg bg-zinc-50 p-3 grid grid-cols-2 gap-3">
             <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">This Month</p>
+              <p class="text-xs text-zinc-400 type-eyebrow">This Month</p>
               <p class="text-sm font-bold font-mono text-zinc-700">
                 {@applications_this_month}
               </p>
@@ -107,7 +107,7 @@ defmodule YscWeb.AdminDashboardLive do
               </p>
             </div>
             <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">YTD</p>
+              <p class="text-xs text-zinc-400 type-eyebrow">YTD</p>
               <p class="text-sm font-bold font-mono text-zinc-700">
                 {@applications_this_year}
               </p>
@@ -127,7 +127,7 @@ defmodule YscWeb.AdminDashboardLive do
               </p>
             </div>
             <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">
+              <p class="text-xs text-zinc-400 type-eyebrow">
                 Approved (YTD)
               </p>
               <p class="text-sm font-bold font-mono text-zinc-700">
@@ -135,7 +135,7 @@ defmodule YscWeb.AdminDashboardLive do
               </p>
             </div>
             <div>
-              <p class="text-xs font-bold text-zinc-400 uppercase">
+              <p class="text-xs text-zinc-400 type-eyebrow">
                 Rejected (YTD)
               </p>
               <p class="text-sm font-bold font-mono text-zinc-700">
@@ -150,7 +150,7 @@ defmodule YscWeb.AdminDashboardLive do
           action="View all memberships →"
         >
           <div>
-            <p class="flex items-center gap-1.5 text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            <p class="flex items-center gap-1.5 text-xs text-zinc-400 mb-2 type-eyebrow">
               <.icon name="hero-identification" class="w-3.5 h-3.5" />
               Active memberships
             </p>
@@ -164,7 +164,7 @@ defmodule YscWeb.AdminDashboardLive do
           <div class="mt-3 pt-3 rounded-lg bg-zinc-50 p-3">
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                   Net new (YTD)
                 </p>
                 <div class="flex items-end gap-2">
@@ -196,7 +196,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </p>
               </div>
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                   Renewals (YTD)
                 </p>
                 <p class="text-xl font-bold font-mono text-zinc-900 tabular-nums leading-none">
@@ -208,7 +208,7 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
             </div>
             <div class="mt-3 pt-3 border-t border-zinc-200">
-              <p class="text-xs font-bold text-zinc-400 uppercase mb-1.5">
+              <p class="text-xs text-zinc-400 mb-1.5 type-eyebrow">
                 Plan mix
               </p>
               <div class="flex h-2 w-full overflow-hidden rounded-full bg-zinc-200">
@@ -245,7 +245,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
             <div class="mt-3 pt-3 border-t border-zinc-200 grid grid-cols-3 gap-2 text-center">
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">
+                <p class="text-xs text-zinc-400 type-eyebrow">
                   Primary
                 </p>
                 <p class="text-sm font-bold font-mono text-zinc-700">
@@ -253,7 +253,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </p>
               </div>
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">
+                <p class="text-xs text-zinc-400 type-eyebrow">
                   Family
                 </p>
                 <p class="text-sm font-bold font-mono text-zinc-700">
@@ -261,7 +261,7 @@ defmodule YscWeb.AdminDashboardLive do
                 </p>
               </div>
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase">
+                <p class="text-xs text-zinc-400 type-eyebrow">
                   Renew ≤30d
                 </p>
                 <p class="text-sm font-bold font-mono text-zinc-700">
@@ -283,7 +283,7 @@ defmodule YscWeb.AdminDashboardLive do
         >
           <%= if @pending_refunds_summary.total > 0 do %>
             <div>
-              <p class="flex items-center gap-1.5 text-xs font-bold text-rose-600 uppercase tracking-wider mb-2">
+              <p class="flex items-center gap-1.5 text-xs text-rose-600 mb-2 type-eyebrow">
                 <.icon name="hero-exclamation-triangle" class="w-3.5 h-3.5" />
                 Refunds to review
               </p>
@@ -310,7 +310,7 @@ defmodule YscWeb.AdminDashboardLive do
               <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
                 <.icon name="hero-check-circle" class="w-7 h-7 text-emerald-600" />
               </div>
-              <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+              <p class="text-xs text-zinc-400 type-eyebrow">
                 Pending Refunds
               </p>
               <p class="text-sm font-bold text-emerald-700 mt-1">All caught up</p>
@@ -364,10 +364,10 @@ defmodule YscWeb.AdminDashboardLive do
           action="Manage events →"
         >
           <div>
-            <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
               Upcoming Events
             </p>
-            <p class="text-3xl font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
+            <p class="text-3xl text-zinc-900 group-hover:text-blue-600 transition-colors type-title">
               {@upcoming_events_count}
             </p>
             <%= if @events_with_tickets != [] do %>
@@ -388,10 +388,10 @@ defmodule YscWeb.AdminDashboardLive do
           action="Manage posts →"
         >
           <div>
-            <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
               News &amp; Posts
             </p>
-            <p class="text-3xl font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
+            <p class="text-3xl text-zinc-900 group-hover:text-blue-600 transition-colors type-title">
               {@published_posts_count}
             </p>
             <p class="text-xs text-zinc-500 mt-1 font-medium">
@@ -414,10 +414,10 @@ defmodule YscWeb.AdminDashboardLive do
           action="Manage newsletters →"
         >
           <div>
-            <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+            <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
               Newsletters
             </p>
-            <p class="text-3xl font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
+            <p class="text-3xl text-zinc-900 group-hover:text-blue-600 transition-colors type-title">
               {@newsletter_editions_count}
             </p>
             <p class="text-xs text-zinc-500 mt-1 font-medium">
@@ -446,7 +446,7 @@ defmodule YscWeb.AdminDashboardLive do
             class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs"
           >
             <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-3">
-              <h2 class="text-lg font-bold text-zinc-900 tracking-tight">
+              <h2 class="text-lg text-zinc-900 type-subhead">
                 Upcoming events
               </h2>
               <.link
@@ -499,7 +499,7 @@ defmodule YscWeb.AdminDashboardLive do
                 ]}>
                   <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div class="min-w-0 flex-1">
-                      <p class="text-xs font-bold text-blue-600 uppercase tracking-wide">
+                      <p class="text-xs text-blue-600 type-eyebrow">
                         {event_start_pst_label(event)}
                       </p>
                       <p class="text-base font-bold text-zinc-900 mt-1 truncate">
@@ -587,13 +587,13 @@ defmodule YscWeb.AdminDashboardLive do
             id="dashboard-financials"
             class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs space-y-5"
           >
-            <h2 class="text-sm font-bold text-zinc-900 uppercase tracking-wider border-b border-zinc-100 pb-2">
+            <h2 class="text-sm text-zinc-900 border-b border-zinc-100 pb-2 type-eyebrow">
               Financials
             </h2>
             <div>
               <div class="flex items-start justify-between gap-3">
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-bold text-zinc-400 uppercase">
+                  <p class="text-xs text-zinc-400 type-eyebrow">
                     Total revenue ({@current_period_label})
                   </p>
                   <p class="text-2xl font-bold font-mono text-emerald-600 mt-1 tabular-nums">
@@ -645,7 +645,7 @@ defmodule YscWeb.AdminDashboardLive do
                   /> YoY {@revenue_yoy_change_text}
                 </span>
               </div>
-              <p class="text-xs font-bold text-zinc-400 uppercase mt-3 pt-2 border-t border-zinc-100">
+              <p class="text-xs text-zinc-400 mt-3 pt-2 border-t border-zinc-100 type-eyebrow">
                 YTD ({@ytd_revenue_label})
                 <span class="text-zinc-700 font-mono normal-case ml-1">
                   {format_money(@ytd_revenue)}
@@ -654,7 +654,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
 
             <div>
-              <p class="text-xs font-bold text-zinc-500 uppercase mb-2">
+              <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                 Revenue mix · this month
               </p>
               <div class="w-full bg-zinc-100 h-2.5 rounded-full overflow-hidden flex mb-2">
@@ -706,7 +706,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
 
             <div>
-              <p class="text-xs font-bold text-zinc-500 uppercase mb-2">
+              <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                 Cabin booking revenue
               </p>
               <div class="w-full bg-zinc-100 h-2.5 rounded-full overflow-hidden flex mb-2">
@@ -740,7 +740,7 @@ defmodule YscWeb.AdminDashboardLive do
           >
             <div class="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
               <div>
-                <h2 class="text-sm font-bold text-zinc-900 uppercase tracking-wider">
+                <h2 class="text-sm text-zinc-900 type-eyebrow">
                   Recent newsletters
                 </h2>
                 <p class="text-xs text-zinc-500 mt-0.5">
@@ -826,7 +826,7 @@ defmodule YscWeb.AdminDashboardLive do
             <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
               <.icon name="hero-users" class="w-5 h-5 text-amber-600" />
             </div>
-            <h2 class="text-lg font-bold text-zinc-900 tracking-tight">
+            <h2 class="text-lg text-zinc-900 type-subhead">
               Review applications
             </h2>
             <.badge :if={@pending_reviews_count > 0} type="yellow">
@@ -885,7 +885,7 @@ defmodule YscWeb.AdminDashboardLive do
               />
             </div>
             <div class="flex-1 min-w-0 pl-1">
-              <h4 class="font-bold text-zinc-900 truncate text-sm">
+              <h4 class="text-zinc-900 truncate text-sm type-subhead">
                 {"#{user.first_name} #{user.last_name}"}
               </h4>
               <div class="flex flex-wrap items-center gap-2 mt-0.5">
@@ -899,7 +899,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
             <div class="flex items-center gap-3 pl-1 sm:pl-0">
               <div class="hidden md:block text-right text-xs">
-                <p class="font-bold text-zinc-400 uppercase tracking-wider">
+                <p class="text-zinc-400 type-eyebrow">
                   Plan
                 </p>
                 <p class="font-bold text-zinc-700">
@@ -924,7 +924,7 @@ defmodule YscWeb.AdminDashboardLive do
         class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs mb-8"
       >
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-bold text-zinc-900 uppercase tracking-wider">
+          <h3 class="text-sm text-zinc-900 type-eyebrow">
             Recent discussions
           </h3>
           <.link
