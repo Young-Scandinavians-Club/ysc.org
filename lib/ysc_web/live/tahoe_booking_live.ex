@@ -234,6 +234,8 @@ defmodule YscWeb.TahoeBookingLive do
         property_rooms_snapshot: property_rooms_snapshot,
         selected_room_id: nil,
         selected_room_ids: [],
+        preferred_room_id: nil,
+        preferred_room_name: nil,
         selected_booking_mode: booking_mode || :room,
         guests_count: guests_count,
         children_count: children_count,
@@ -1530,6 +1532,44 @@ defmodule YscWeb.TahoeBookingLive do
               </div>
               <!-- Step 2a: Room Booking Details (shown when room mode selected) -->
               <div :if={@selected_booking_mode == :room}>
+                <!-- Preferred room (picked from the Rooms info tab) -->
+                <div
+                  :if={@preferred_room_id}
+                  id="preferred-room-banner"
+                  class="mb-6 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl"
+                >
+                  <.icon
+                    name="hero-magnifying-glass"
+                    class="w-5 h-5 text-blue-600 shrink-0 mt-0.5"
+                  />
+                  <div class="flex-1 text-sm text-blue-900">
+                    <% preferred_status = preferred_room_status(assigns) %>
+                    <%= cond do %>
+                      <% preferred_status == :selected -> %>
+                        <strong>{@preferred_room_name}</strong>
+                        is available for your dates and has been selected.
+                      <% preferred_status == :dates_invalid -> %>
+                        Fix the dates below and we'll check <strong>{@preferred_room_name}</strong>.
+                      <% preferred_status == :unavailable -> %>
+                        <strong>{@preferred_room_name}</strong>
+                        isn't available for these dates. {preferred_room_unavailable_reason(
+                          assigns
+                        )} Pick other dates, or choose another room below.
+                      <% true -> %>
+                        Checking availability for <strong>{@preferred_room_name}</strong>.
+                        Choose your dates below and we'll select it for you if it's open.
+                    <% end %>
+                  </div>
+                  <button
+                    type="button"
+                    id="clear-preferred-room"
+                    phx-click="clear-preferred-room"
+                    class="text-blue-700 hover:text-blue-900"
+                    aria-label="Stop searching for this room"
+                  >
+                    <.icon name="hero-x-mark" class="w-5 h-5" />
+                  </button>
+                </div>
                 <!-- Section 1: Stay Details -->
                 <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
                   <.step_heading
@@ -3255,6 +3295,12 @@ defmodule YscWeb.TahoeBookingLive do
             id="information-section"
             class="mt-12 max-w-(--breakpoint-xl) mx-auto"
           >
+            <% browse_rooms = YscWeb.Components.RoomBrowser.browsable_rooms(:tahoe) %>
+            <% info_tab =
+              effective_info_tab(
+                Map.get(assigns, :info_tab, :general),
+                browse_rooms
+              ) %>
             <!-- Tab Navigation (Sticky) -->
             <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-zinc-200 mb-8 -mx-4 px-4 py-2">
               <nav class="flex gap-2 overflow-x-auto" role="tablist">
@@ -3263,7 +3309,7 @@ defmodule YscWeb.TahoeBookingLive do
                   phx-value-tab="general"
                   class={[
                     "px-4 py-2 text-sm font-bold rounded-md transition whitespace-nowrap",
-                    if(Map.get(assigns, :info_tab, :general) == :general,
+                    if(info_tab == :general,
                       do: "bg-blue-50 text-blue-600 border border-blue-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
                     )
@@ -3276,7 +3322,7 @@ defmodule YscWeb.TahoeBookingLive do
                   phx-value-tab="rules"
                   class={[
                     "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
-                    if(Map.get(assigns, :info_tab, :general) == :rules,
+                    if(info_tab == :rules,
                       do: "bg-blue-50 text-blue-600 border border-blue-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
                     )
@@ -3284,13 +3330,28 @@ defmodule YscWeb.TahoeBookingLive do
                 >
                   📜 Cabin & Booking Rules
                 </button>
+                <button
+                  :if={browse_rooms != []}
+                  id="info-tab-rooms"
+                  phx-click="switch-info-tab"
+                  phx-value-tab="rooms"
+                  class={[
+                    "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
+                    if(info_tab == :rooms,
+                      do: "bg-blue-50 text-blue-600 border border-blue-100",
+                      else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                    )
+                  ]}
+                >
+                  🛏️ Rooms
+                </button>
               </nav>
             </div>
             <!-- Tab Content -->
             <div class="space-y-16">
               <!-- General Information Tab -->
               <div
-                :if={Map.get(assigns, :info_tab, :general) == :general}
+                :if={info_tab == :general}
                 class="space-y-16"
               >
                 <!-- Welcome Header -->
@@ -3784,9 +3845,19 @@ defmodule YscWeb.TahoeBookingLive do
                   </div>
                 </section>
               </div>
+              <!-- Rooms Tab -->
+              <div :if={info_tab == :rooms and browse_rooms != []}>
+                <YscWeb.Components.RoomBrowser.room_browser
+                  id="property-room-browser"
+                  rooms={browse_rooms}
+                  property_name="YSC Tahoe Cabin"
+                  accent={:blue}
+                  pick_event={if @can_book, do: "browse-room-pick"}
+                />
+              </div>
               <!-- Cabin and Booking Rules Tab -->
               <div
-                :if={Map.get(assigns, :info_tab, :general) == :rules}
+                :if={info_tab == :rules}
                 id="cabin-rules"
               >
                 <!-- Golden Rules Banner -->
@@ -4741,6 +4812,7 @@ defmodule YscWeb.TahoeBookingLive do
         form_errors: %{}
       )
       |> update_available_rooms()
+      |> maybe_select_preferred_room()
       |> calculate_price_if_ready()
 
     {:noreply, socket}
@@ -4769,6 +4841,7 @@ defmodule YscWeb.TahoeBookingLive do
         form_errors: %{}
       )
       |> update_available_rooms()
+      |> maybe_select_preferred_room()
       |> calculate_price_if_ready()
 
     {:noreply, socket}
@@ -4796,37 +4869,14 @@ defmodule YscWeb.TahoeBookingLive do
         form_errors: %{}
       )
       |> update_available_rooms()
+      |> maybe_select_preferred_room()
       |> calculate_price_if_ready()
 
     {:noreply, socket}
   end
 
   def handle_event("booking-mode-changed", %{"booking_mode" => "room"}, socket) do
-    socket =
-      socket
-      |> assign(
-        selected_booking_mode: :room,
-        guests_count: 1,
-        children_count: 0,
-        calculated_price: nil,
-        price_error: nil
-      )
-      |> update_available_rooms()
-      # Validate availability immediately
-      |> validate_dates()
-      |> calculate_price_if_ready()
-      |> then(fn s ->
-        update_url_with_search_params(
-          s,
-          s.assigns.checkin_date,
-          s.assigns.checkout_date,
-          s.assigns.guests_count,
-          s.assigns.children_count,
-          :room
-        )
-      end)
-
-    {:noreply, socket}
+    {:noreply, switch_to_room_mode(socket)}
   end
 
   def handle_event(
@@ -4884,6 +4934,24 @@ defmodule YscWeb.TahoeBookingLive do
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_event("browse-room-pick", %{"room-id" => room_id}, socket) do
+    room =
+      Enum.find(
+        YscWeb.Components.RoomBrowser.browsable_rooms(socket.assigns.property),
+        &(&1.id == room_id)
+      )
+
+    if room && socket.assigns.can_book do
+      {:noreply, start_room_availability_search(socket, room)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("clear-preferred-room", _params, socket) do
+    {:noreply, assign(socket, preferred_room_id: nil, preferred_room_name: nil)}
   end
 
   def handle_event("remove-room", %{"room-id" => room_id}, socket) do
@@ -5387,6 +5455,7 @@ defmodule YscWeb.TahoeBookingLive do
       case tab do
         "general" -> :general
         "rules" -> :rules
+        "rooms" -> :rooms
         _ -> :general
       end
 
@@ -5586,6 +5655,101 @@ defmodule YscWeb.TahoeBookingLive do
       |> calculate_price_if_ready()
 
     {:noreply, socket}
+  end
+
+  defp switch_to_room_mode(socket) do
+    socket
+    |> assign(
+      selected_booking_mode: :room,
+      guests_count: 1,
+      children_count: 0,
+      calculated_price: nil,
+      price_error: nil
+    )
+    |> update_available_rooms()
+    # Validate availability immediately
+    |> validate_dates()
+    |> calculate_price_if_ready()
+    |> then(fn s ->
+      update_url_with_search_params(
+        s,
+        s.assigns.checkin_date,
+        s.assigns.checkout_date,
+        s.assigns.guests_count,
+        s.assigns.children_count,
+        :room
+      )
+    end)
+  end
+
+  # Starts an availability search from the Rooms info tab: switches to room
+  # booking, remembers the member's room of interest, selects it right away
+  # when dates are already chosen, and scrolls to the next booking step.
+  defp start_room_availability_search(socket, room) do
+    socket =
+      if socket.assigns.selected_booking_mode == :room do
+        socket
+      else
+        switch_to_room_mode(socket)
+      end
+
+    socket =
+      socket
+      |> assign(
+        booking_step: :details,
+        preferred_room_id: room.id,
+        preferred_room_name: room.name
+      )
+      |> maybe_select_preferred_room()
+      |> calculate_price_if_ready()
+
+    target =
+      if socket.assigns.checkin_date && socket.assigns.checkout_date do
+        "booking-step-rooms"
+      else
+        "preferred-room-banner"
+      end
+
+    push_event(socket, "scroll-to-element", %{id: target})
+  end
+
+  # Selects the room the member picked in the Rooms info tab once dates are
+  # known and nothing else has been selected yet.
+  defp maybe_select_preferred_room(socket) do
+    room_id = socket.assigns.preferred_room_id
+
+    with true <- is_binary(room_id),
+         [] <- socket.assigns.selected_room_ids || [],
+         {:available, _reason} <- get_room_availability(socket, room_id),
+         {:noreply, selected} <- handle_room_selection(socket, room_id) do
+      selected
+    else
+      _ -> socket
+    end
+  end
+
+  # Describes how the preferred room fits the currently chosen dates.
+  defp preferred_room_status(assigns) do
+    room_id = assigns.preferred_room_id
+    room = Enum.find(assigns.available_rooms || [], &(&1.id == room_id))
+
+    cond do
+      map_size(assigns[:date_validation_errors] || %{}) > 0 -> :dates_invalid
+      room_id in (assigns.selected_room_ids || []) -> :selected
+      is_nil(room) -> :pending
+      match?({:unavailable, _}, room.availability_status) -> :unavailable
+      true -> :available
+    end
+  end
+
+  defp preferred_room_unavailable_reason(assigns) do
+    case Enum.find(
+           assigns.available_rooms || [],
+           &(&1.id == assigns.preferred_room_id)
+         ) do
+      %{availability_status: {:unavailable, reason}} -> reason
+      _ -> nil
+    end
   end
 
   defp get_single_selected_room_id(selected_room_ids) do
@@ -6511,10 +6675,15 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
+  # The Rooms tab only exists for properties with individually bookable rooms.
+  defp effective_info_tab(:rooms, []), do: :general
+  defp effective_info_tab(info_tab, _browse_rooms), do: info_tab
+
   defp parse_info_tab_from_params(params) do
     case Map.get(params, "info_tab") do
       "general" -> :general
       "rules" -> :rules
+      "rooms" -> :rooms
       _ -> nil
     end
   end

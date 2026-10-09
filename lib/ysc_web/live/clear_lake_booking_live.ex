@@ -1564,6 +1564,13 @@ defmodule YscWeb.ClearLakeBookingLive do
             id="information-section"
             class="mt-12 max-w-(--breakpoint-xl) mx-auto"
           >
+            <% browse_rooms =
+              YscWeb.Components.RoomBrowser.browsable_rooms(:clear_lake) %>
+            <% info_tab =
+              effective_info_tab(
+                Map.get(assigns, :info_tab, :general),
+                browse_rooms
+              ) %>
             <!-- Tab Navigation (Sticky) -->
             <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-zinc-200 mb-8 -mx-4 px-4 py-2">
               <nav class="flex gap-2 overflow-x-auto" role="tablist">
@@ -1572,7 +1579,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   phx-value-tab="general"
                   class={[
                     "px-4 py-2 text-sm font-bold rounded-md transition whitespace-nowrap",
-                    if(Map.get(assigns, :info_tab, :general) == :general,
+                    if(info_tab == :general,
                       do: "bg-teal-50 text-teal-600 border border-teal-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
                     )
@@ -1585,7 +1592,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   phx-value-tab="rules"
                   class={[
                     "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
-                    if(Map.get(assigns, :info_tab, :general) == :rules,
+                    if(info_tab == :rules,
                       do: "bg-teal-50 text-teal-600 border border-teal-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
                     )
@@ -1593,13 +1600,28 @@ defmodule YscWeb.ClearLakeBookingLive do
                 >
                   📜 Cabin & Booking Rules
                 </button>
+                <button
+                  :if={browse_rooms != []}
+                  id="info-tab-rooms"
+                  phx-click="switch-info-tab"
+                  phx-value-tab="rooms"
+                  class={[
+                    "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
+                    if(info_tab == :rooms,
+                      do: "bg-teal-50 text-teal-600 border border-teal-100",
+                      else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                    )
+                  ]}
+                >
+                  🛏️ Rooms
+                </button>
               </nav>
             </div>
             <!-- Tab Content -->
             <div class="space-y-16">
               <!-- General Information Tab -->
               <div
-                :if={Map.get(assigns, :info_tab, :general) == :general}
+                :if={info_tab == :general}
                 class="space-y-16"
               >
                 <!-- Welcome Header -->
@@ -2268,9 +2290,19 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </p>
                 </div>
               </div>
+              <!-- Rooms Tab -->
+              <div :if={info_tab == :rooms and browse_rooms != []}>
+                <YscWeb.Components.RoomBrowser.room_browser
+                  id="property-room-browser"
+                  rooms={browse_rooms}
+                  property_name="YSC Clear Lake Cabin"
+                  accent={:teal}
+                  pick_event={if @can_book, do: "browse-room-pick"}
+                />
+              </div>
               <!-- Tab Content: Cabin & Booking Rules -->
               <div
-                :if={Map.get(assigns, :info_tab, :general) == :rules}
+                :if={info_tab == :rules}
                 id="cabin-rules"
                 class="flex flex-col gap-16"
               >
@@ -3144,6 +3176,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       case tab do
         "general" -> :general
         "rules" -> :rules
+        "rooms" -> :rooms
         _ -> :general
       end
 
@@ -3166,6 +3199,17 @@ defmodule YscWeb.ClearLakeBookingLive do
            ~p"/bookings/clear-lake"
          end
      )}
+  end
+
+  def handle_event("browse-room-pick", %{"room-id" => room_id}, socket) do
+    rooms = YscWeb.Components.RoomBrowser.browsable_rooms(:clear_lake)
+
+    if socket.assigns.can_book && Enum.any?(rooms, &(&1.id == room_id)) do
+      {:noreply,
+       push_event(socket, "scroll-to-element", %{id: "booking-step-mode"})}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("switch-tab", %{"tab" => tab}, socket) do
@@ -3682,10 +3726,15 @@ defmodule YscWeb.ClearLakeBookingLive do
     end
   end
 
+  # The Rooms tab only exists for properties with individually bookable rooms.
+  defp effective_info_tab(:rooms, []), do: :general
+  defp effective_info_tab(info_tab, _browse_rooms), do: info_tab
+
   defp parse_info_tab_from_params(params) do
     case Map.get(params, "info_tab") do
       "general" -> :general
       "rules" -> :rules
+      "rooms" -> :rooms
       _ -> nil
     end
   end
