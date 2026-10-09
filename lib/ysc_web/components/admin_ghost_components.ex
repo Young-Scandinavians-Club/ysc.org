@@ -204,10 +204,10 @@ defmodule YscWeb.AdminGhostComponents do
       >
         <.admin_dashboard_link_card action="Manage events →">
           <div>
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+            <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
               Upcoming Events
             </p>
-            <p class="text-3xl font-black text-zinc-900">3</p>
+            <p class="text-3xl font-bold text-zinc-900">3</p>
             <p class="text-xs font-semibold text-zinc-700 mt-2 truncate">
               Summer Cabin Weekend
             </p>
@@ -218,10 +218,10 @@ defmodule YscWeb.AdminGhostComponents do
         </.admin_dashboard_link_card>
         <.admin_dashboard_link_card action="Manage posts →">
           <div>
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+            <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
               News &amp; Posts
             </p>
-            <p class="text-3xl font-black text-zinc-900">24</p>
+            <p class="text-3xl font-bold text-zinc-900">24</p>
             <p class="text-xs text-zinc-500 mt-1 font-medium">
               published
               <span class="text-amber-600 font-bold ml-1">· 2 drafts</span>
@@ -230,10 +230,10 @@ defmodule YscWeb.AdminGhostComponents do
         </.admin_dashboard_link_card>
         <.admin_dashboard_link_card action="Manage newsletters →">
           <div>
-            <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+            <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
               Newsletters
             </p>
-            <p class="text-3xl font-black text-zinc-900">18</p>
+            <p class="text-3xl font-bold text-zinc-900">18</p>
             <p class="text-xs text-zinc-500 mt-1 font-medium">
               editions sent
               <span class="text-amber-600 font-bold ml-1">· 1 draft</span>
@@ -247,10 +247,10 @@ defmodule YscWeb.AdminGhostComponents do
         class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs mb-8"
       >
         <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-3">
-          <h2 class="text-lg font-black text-zinc-900 tracking-tight">
+          <h2 class="text-lg font-bold text-zinc-900 tracking-tight">
             Upcoming events
           </h2>
-          <span class="text-xs font-black text-blue-600">View all</span>
+          <span class="text-xs font-bold text-blue-600">View all</span>
         </div>
         <ul class="relative border-l-2 border-zinc-200 ml-2.5 sm:ml-3 space-y-0">
           <li
@@ -265,7 +265,7 @@ defmodule YscWeb.AdminGhostComponents do
                   <p class="text-xs font-bold text-blue-600 uppercase tracking-wide">
                     {event.date}
                   </p>
-                  <p class="text-base font-black text-zinc-900 mt-1">
+                  <p class="text-base font-bold text-zinc-900 mt-1">
                     {event.title}
                   </p>
                 </div>
@@ -314,7 +314,7 @@ defmodule YscWeb.AdminGhostComponents do
         class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs mb-4"
       >
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-black text-zinc-900 uppercase tracking-widest">
+          <h3 class="text-sm font-bold text-zinc-900 uppercase tracking-wider">
             Recent discussions
           </h3>
           <span class="text-xs font-bold text-blue-600">View all posts</span>
@@ -968,7 +968,7 @@ defmodule YscWeb.AdminGhostComponents do
                           />
                         </div>
                         <div class="min-w-0">
-                          <p class="text-[10px] font-semibold uppercase tracking-widest text-emerald-200 mb-0.5">
+                          <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-200 mb-0.5">
                             Checked In
                           </p>
                           <p class="text-sm font-bold leading-tight truncate">
@@ -1432,10 +1432,10 @@ defmodule YscWeb.AdminGhostComponents do
       ]}
     >
       <div class="p-6 sm:p-8 text-center bg-zinc-50/50 shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)]">
-        <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] mb-2">
+        <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
           Tickets
         </p>
-        <p class="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tighter">
+        <p class="text-3xl sm:text-4xl font-bold text-zinc-900 tracking-tighter">
           {if @tickets_tbd?, do: "Tickets coming soon", else: @pricing_text}
         </p>
         <p :if={!@tickets_tbd?} class="text-sm text-zinc-500 mt-2">{@date_line}</p>
@@ -1465,7 +1465,7 @@ defmodule YscWeb.AdminGhostComponents do
         <.button
           :if={!@tickets_tbd?}
           id="ghost-public-get-tickets"
-          class="w-full py-3.5 uppercase tracking-widest text-sm"
+          class="w-full py-3.5 uppercase tracking-wider text-sm"
         >
           <.icon name="hero-ticket" class="w-5 h-5" /> Get Tickets
         </.button>
@@ -1525,7 +1525,7 @@ defmodule YscWeb.AdminGhostComponents do
               </div>
             </div>
           </div>
-          <.button class="w-full py-3 uppercase tracking-widest text-sm">
+          <.button class="w-full py-3 uppercase tracking-wider text-sm">
             Continue to checkout
           </.button>
         </div>
@@ -1544,7 +1544,7 @@ defmodule YscWeb.AdminGhostComponents do
   def admin_ghost_public_event_updates_section(assigns) do
     ~H"""
     <section id={@id} class={["space-y-6", @class]}>
-      <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
+      <h3 class="text-2xl font-bold text-zinc-900 tracking-tight mb-6 flex items-center gap-3">
         <span class="w-8 h-px bg-zinc-200"></span> Updates
       </h3>
       <div class="space-y-6">
@@ -1594,7 +1594,7 @@ defmodule YscWeb.AdminGhostComponents do
   def admin_ghost_public_attendees_section(assigns) do
     ~H"""
     <section id={@id} class={["space-y-5", @class]}>
-      <h3 class="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+      <h3 class="text-xl font-bold text-zinc-900 tracking-tight flex items-center gap-3">
         <span class="w-8 h-px bg-zinc-200"></span> Attendees
       </h3>
       <div class="flex flex-wrap gap-5">
@@ -1645,7 +1645,7 @@ defmodule YscWeb.AdminGhostComponents do
 
     ~H"""
     <section id="ghost-public-event-agenda" class={["space-y-8", @class]}>
-      <h3 class="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+      <h3 class="text-xl font-bold text-zinc-900 tracking-tight flex items-center gap-3">
         <span class="w-8 h-px bg-zinc-200"></span> Agenda
       </h3>
       <div class="relative pl-8 space-y-10">
@@ -1663,12 +1663,12 @@ defmodule YscWeb.AdminGhostComponents do
           </div>
           <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
             <div class="w-36 shrink-0">
-              <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm uppercase tracking-widest whitespace-nowrap">
+              <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm uppercase tracking-wider whitespace-nowrap">
                 {item.time}
               </span>
             </div>
             <div class="flex-1 min-w-0">
-              <h4 class="text-lg font-black text-zinc-900 tracking-tight leading-none">
+              <h4 class="text-lg font-bold text-zinc-900 tracking-tight leading-none">
                 {item.title}
               </h4>
               <p :if={idx == 0} class="text-sm text-zinc-500 mt-2 leading-relaxed">

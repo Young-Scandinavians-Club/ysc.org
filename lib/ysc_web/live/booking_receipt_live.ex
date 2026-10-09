@@ -278,7 +278,7 @@ defmodule YscWeb.BookingReceiptLive do
           <% end %>
         </div>
         <div class="text-left md:text-right">
-          <p class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+          <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider">
             Booking Reference
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
@@ -329,7 +329,7 @@ defmodule YscWeb.BookingReceiptLive do
             <div class="shrink-0">
               <div class="bg-white/20 backdrop-blur-xs rounded-lg px-8 py-6 border-2 border-white/30">
                 <p class={[
-                  "text-xs font-bold uppercase tracking-widest mb-2 text-center",
+                  "text-xs font-bold uppercase tracking-wider mb-2 text-center",
                   if(@booking.property == :clear_lake,
                     do: "text-teal-200",
                     else: "text-blue-200"
@@ -337,7 +337,7 @@ defmodule YscWeb.BookingReceiptLive do
                 ]}>
                   Door Code
                 </p>
-                <p class="text-5xl font-mono font-black text-white text-center tracking-wider">
+                <p class="text-5xl font-mono font-bold text-white text-center tracking-wider">
                   {@door_code.code}
                 </p>
               </div>
@@ -392,7 +392,7 @@ defmodule YscWeb.BookingReceiptLive do
               <%= if @booking.status == :canceled do %>
                 <div class="absolute inset-0 bg-red-500/20 flex items-center justify-center">
                   <div class="bg-white/90 rounded-lg px-6 py-3 shadow-lg">
-                    <p class="text-red-700 font-bold text-lg uppercase tracking-wider">
+                    <p class="text-red-700 font-bold text-lg uppercase tracking-wide">
                       Cancelled
                     </p>
                   </div>
@@ -690,7 +690,7 @@ defmodule YscWeb.BookingReceiptLive do
               )
             ]}>
               <h3 class={[
-                "text-xs font-bold uppercase tracking-widest mb-6",
+                "text-xs font-bold uppercase tracking-wider mb-6",
                 if(@booking.status == :canceled,
                   do: "text-red-700",
                   else: "text-zinc-400"

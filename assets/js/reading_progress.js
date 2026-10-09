@@ -1,3 +1,6 @@
+// Scroll-linked progress bar. It tracks the scroll position 1:1, so it has no
+// transition (any easing would lag the content under the user's finger) and it
+// animates `transform` rather than `width` so no layout work happens per frame.
 export default {
   mounted() {
     this.updateProgress = () => {
@@ -8,13 +11,18 @@ export default {
       const documentHeight = document.documentElement.scrollHeight;
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const scrollableHeight = documentHeight - windowHeight;
-      const progress = scrollableHeight > 0 ? (scrollTop / scrollableHeight) * 100 : 0;
+      const progress = scrollableHeight > 0 ? scrollTop / scrollableHeight : 0;
 
-      progressBar.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+      progressBar.style.transform = `scaleX(${Math.min(1, Math.max(0, progress))})`;
     };
 
     this.updateProgress();
-    window.addEventListener("scroll", this.updateProgress);
+    window.addEventListener("scroll", this.updateProgress, { passive: true });
+  },
+
+  // A LiveView patch resets the inline style to the server's initial value.
+  updated() {
+    this.updateProgress();
   },
 
   destroyed() {
@@ -23,4 +31,3 @@ export default {
     }
   }
 };
-

@@ -61,7 +61,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         >
           <.admin_ghost_image class="rounded-lg mb-4" ratio="aspect-16/10" />
           <div class="px-3 pb-4 space-y-2">
-            <p class="text-xs font-black text-blue-600 uppercase tracking-widest">
+            <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">
               New
             </p>
             <.admin_ghost_bar width="w-4/5" height="h-4" />
@@ -91,7 +91,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/30 to-transparent">
         </div>
         <div class="absolute bottom-0 left-0 right-0 p-6 lg:p-10 space-y-3">
-          <span class="inline-flex items-center gap-1 rounded-sm bg-amber-50/90 px-2.5 py-1 text-xs font-black uppercase tracking-widest text-amber-700 border border-amber-200">
+          <span class="inline-flex items-center gap-1 rounded-sm bg-amber-50/90 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-amber-700 border border-amber-200">
             <.icon name="hero-star-solid" class="w-3 h-3" /> Pinned News
           </span>
           <.admin_ghost_bar width="w-2/3" height="h-6" class="bg-zinc-300/80!" />
@@ -114,7 +114,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
     ~H"""
     <.public_page_shell label="Club News">
       <div class="max-w-2xl mx-auto text-center mb-8 space-y-4">
-        <p class="text-xs font-black text-blue-600 uppercase tracking-[0.3em]">
+        <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">
           Club News
         </p>
         <.admin_ghost_bar width="w-4/5" height="h-8" class="mx-auto" />
@@ -170,7 +170,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         </div>
         <aside class="lg:col-span-3 hidden lg:block">
           <div class="rounded-xl border border-zinc-100 bg-zinc-50 p-5 space-y-2">
-            <p class="text-xs font-black text-zinc-500 uppercase tracking-widest">
+            <p class="text-xs font-bold text-zinc-500 uppercase tracking-wider">
               Upcoming Events
             </p>
             <.admin_ghost_bar width="w-full" height="h-3" />
@@ -191,10 +191,10 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         </div>
         <div class="relative -mt-12 mx-2 lg:-mt-16 lg:mx-4 z-10">
           <div class="bg-white rounded-xl shadow-md border border-zinc-100 p-6 lg:p-8 space-y-3">
-            <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
+            <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">
               Sat, Jun 21 · 5:00 PM
             </p>
-            <h2 class="text-2xl lg:text-3xl font-black text-zinc-900 tracking-tight">
+            <h2 class="text-2xl lg:text-3xl font-bold text-zinc-900 tracking-tight">
               Summer Cabin Weekend
             </h2>
             <div class="flex items-center gap-2 text-sm text-zinc-500">
@@ -210,7 +210,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
           <.admin_ghost_public_agenda_timeline />
 
           <section id="ghost-public-event-details" class="space-y-3">
-            <h3 class="text-xl font-black text-zinc-900 flex items-center gap-3">
+            <h3 class="text-xl font-bold text-zinc-900 flex items-center gap-3">
               <span class="w-8 h-px bg-zinc-200"></span> Details
             </h3>
             <.admin_ghost_bar width="w-full" height="h-3" />
@@ -310,10 +310,10 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
         </div>
         <div class="relative -mt-10 mx-2 lg:-mt-14 lg:mx-4 z-10">
           <div class="bg-white rounded-xl shadow-md border border-zinc-100 p-5 lg:p-7 space-y-2">
-            <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
+            <p class="text-xs font-bold text-blue-600 uppercase tracking-wider">
               Sat, Jun 21 · 5:00 PM
             </p>
-            <h2 class="text-xl lg:text-2xl font-black text-zinc-900 tracking-tight">
+            <h2 class="text-xl lg:text-2xl font-bold text-zinc-900 tracking-tight">
               Summer Cabin Weekend
             </h2>
             <div class="flex items-center gap-2 text-sm text-zinc-500">
@@ -331,7 +331,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
           <.admin_ghost_public_event_updates_section />
 
           <section class="space-y-3 opacity-60">
-            <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+            <h3 class="text-2xl font-bold text-zinc-900 tracking-tight flex items-center gap-3">
               <span class="w-8 h-px bg-zinc-200"></span> Details
             </h3>
             <.admin_ghost_bar width="w-full" height="h-3" />
@@ -361,7 +361,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
           id="ghost-new-newsletter-edition"
           class="py-6 border-l-4 border-blue-500 pl-4 -ml-4"
         >
-          <p class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">
+          <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">
             Just sent
           </p>
           <.admin_ghost_bar width="w-2/3" height="h-5" />
@@ -384,7 +384,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
     ~H"""
     <.public_page_shell label="Newsletter">
       <div class="max-w-2xl mx-auto mb-6">
-        <p class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">
+        <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">
           Jun 9, 2026
         </p>
         <.admin_ghost_bar width="w-3/4" height="h-6" />
@@ -395,7 +395,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
           <.admin_ghost_bar width="w-full" height="h-3" />
           <.admin_ghost_bar width="w-[92%]" height="h-3" />
           <div class="border-t border-zinc-100 pt-4 space-y-3">
-            <p class="text-xs font-black text-zinc-500 uppercase tracking-widest">
+            <p class="text-xs font-bold text-zinc-500 uppercase tracking-wider">
               From the club
             </p>
             <div
@@ -448,11 +448,11 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
       >
         <p
           :if={@subtitle}
-          class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-2"
+          class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-2"
         >
           {@subtitle}
         </p>
-        <h1 class="text-4xl md:text-5xl font-black text-zinc-900 tracking-tighter">
+        <h1 class="text-4xl md:text-5xl font-bold text-zinc-900 tracking-tighter">
           {@label}
         </h1>
       </header>

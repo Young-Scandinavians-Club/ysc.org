@@ -30,8 +30,10 @@ export default {
             }
         };
 
-        // Start autoplay
+        // Start autoplay (never for users who asked for reduced motion; they
+        // can still step through slides with the controls)
         const startAutoplay = () => {
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
             if (autoplayInterval) return; // Already running
             autoplayInterval = setInterval(nextSlide, autoplayDelay);
         };

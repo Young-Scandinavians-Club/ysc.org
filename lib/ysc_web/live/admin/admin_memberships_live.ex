@@ -121,7 +121,7 @@ defmodule YscWeb.AdminMembershipsLive do
       <div class="bg-zinc-50/80 min-h-screen -mx-4 lg:-mx-10 px-4 lg:px-10 py-8">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-8 border-b border-zinc-100 mb-8">
           <div>
-            <h1 class="text-3xl font-black text-zinc-900 tracking-tight">
+            <h1 class="text-3xl font-bold text-zinc-900 tracking-tight">
               Memberships
             </h1>
             <p class="text-sm text-zinc-500 mt-1">

@@ -337,7 +337,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <div class="flex items-center gap-3">
                 <div class="w-full bg-zinc-200 rounded-full h-2">
                   <div
-                    class="bg-blue-600 h-2 rounded-full transition-all"
+                    class="bg-blue-600 h-2 rounded-full transition-[width]"
                     style={"width: #{entry.progress}%"}
                   >
                   </div>
@@ -387,7 +387,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                       id={"onboarding-avatar-#{avatar.id}"}
                       disabled={@selecting_avatar_id == avatar.id}
                       class={[
-                        "w-12 h-12 rounded-full border-2 transition-all hover:scale-105 cursor-pointer overflow-hidden",
+                        "w-12 h-12 rounded-full border-2 transition hover:scale-105 cursor-pointer overflow-hidden",
                         if(@user.current_avatar_id == avatar.id,
                           do: "border-blue-600 ring-2 ring-blue-200",
                           else: "border-zinc-200 hover:border-zinc-400"

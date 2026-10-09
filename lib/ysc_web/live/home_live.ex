@@ -335,7 +335,7 @@ defmodule YscWeb.HomeLive do
             Celebrating {div(Date.utc_today().year - 1950, 5) * 5} Years
           </span>
 
-          <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white tracking-tight leading-[1.1] drop-shadow-lg">
+          <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white drop-shadow-lg type-display">
             Young Scandinavians Club
           </h1>
         </div>
@@ -347,7 +347,7 @@ defmodule YscWeb.HomeLive do
         <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md sm:max-w-none">
           <.link
             navigate={~p"/users/register"}
-            class="group flex items-center justify-center px-8 py-4 text-base font-semibold text-zinc-900 bg-white rounded-sm hover:bg-zinc-100 transition-all duration-200 w-full sm:w-auto shadow-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            class="group flex items-center justify-center px-8 py-4 text-base font-semibold text-zinc-900 bg-white rounded-sm hover:bg-zinc-100 active:bg-zinc-200 active:scale-[0.98] active:transition-none transition duration-200 w-full sm:w-auto shadow-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             Apply for Membership
             <.icon
@@ -357,7 +357,7 @@ defmodule YscWeb.HomeLive do
           </.link>
           <.link
             navigate={~p"/events"}
-            class="flex items-center justify-center px-8 py-4 text-base font-medium text-white border border-white/60 rounded-sm hover:bg-white/10 hover:border-white transition-all duration-200 backdrop-blur-xs w-full sm:w-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            class="flex items-center justify-center px-8 py-4 text-base font-medium text-white border border-white/60 rounded-sm hover:bg-white/10 hover:border-white active:bg-white/20 active:scale-[0.98] active:transition-none transition duration-200 backdrop-blur-xs w-full sm:w-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             Explore Our Events
           </.link>
@@ -375,11 +375,11 @@ defmodule YscWeb.HomeLive do
           <div class="lg:col-span-5 min-w-0">
             <span
               id="home-community-eyebrow"
-              class="text-blue-700 font-semibold text-sm uppercase tracking-widest"
+              class="text-blue-700 text-sm type-eyebrow"
             >
               Velkommen (Welcome)
             </span>
-            <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight leading-[1.05] wrap-break-word">
+            <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl text-zinc-900 wrap-break-word type-display">
               A home for Nordic spirits in the Bay.
             </h2>
             <p class="mt-6 sm:mt-8 text-base sm:text-lg text-zinc-600 leading-relaxed pr-0 sm:pr-4">
@@ -444,10 +444,10 @@ defmodule YscWeb.HomeLive do
     <section :if={@current_user == nil} class="py-12 sm:py-16 lg:py-24 bg-zinc-50">
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
-          <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
+          <span class="text-blue-700 text-sm type-eyebrow">
             Nordic Living
           </span>
-          <h2 class="mt-3 text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 wrap-break-word leading-snug">
+          <h2 class="mt-3 text-2xl sm:text-3xl lg:text-4xl text-zinc-900 wrap-break-word type-title">
             Don't Let the Name Fool You – YSC is for Everyone!
           </h2>
           <p class="mt-4 text-base sm:text-lg text-zinc-600">
@@ -469,7 +469,7 @@ defmodule YscWeb.HomeLive do
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
               <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
-                <h3 class="text-xl sm:text-2xl font-bold text-white mb-1.5 sm:mb-2">
+                <h3 class="text-xl sm:text-2xl text-white mb-1.5 sm:mb-2 type-subhead">
                   All Ages Welcome
                 </h3>
                 <p class="text-zinc-200 text-sm sm:text-base">
@@ -492,7 +492,7 @@ defmodule YscWeb.HomeLive do
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
               <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-4 sm:p-6">
-                <h3 class="text-lg sm:text-xl font-bold text-white mb-1.5 sm:mb-2">
+                <h3 class="text-lg sm:text-xl text-white mb-1.5 sm:mb-2 type-subhead">
                   Events Year-Round
                 </h3>
                 <p class="text-sm text-zinc-200">
@@ -531,14 +531,14 @@ defmodule YscWeb.HomeLive do
             <div class="text-3xl sm:text-4xl font-extrabold text-white mb-1.5 sm:mb-2">
               500+
             </div>
-            <div class="text-sm text-blue-100 uppercase tracking-widest font-semibold">
+            <div class="text-sm text-blue-100 type-eyebrow">
               Active Members
             </div>
             <div class="mt-4 pt-4 border-t border-blue-700/30 w-full">
               <div class="text-2xl font-extrabold text-white mb-1">
                 {div(Date.utc_today().year - 1950, 5) * 5}+
               </div>
-              <div class="text-xs text-blue-100 uppercase tracking-widest">
+              <div class="text-xs text-blue-100 type-eyebrow">
                 Years of Community
               </div>
             </div>
@@ -555,10 +555,10 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20">
           <div class="max-w-2xl min-w-0">
-            <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
+            <span class="text-blue-700 text-sm type-eyebrow">
               Exclusive Retreats
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight wrap-break-word leading-tight">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl text-zinc-900 wrap-break-word type-display">
               The Cabin Legacy.
             </h2>
           </div>
@@ -625,8 +625,8 @@ defmodule YscWeb.HomeLive do
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div class="flex items-center gap-3 flex-wrap">
             <div class="flex items-center gap-2">
-              <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span class="text-sm font-bold uppercase tracking-widest">
+              <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+              <span class="text-sm type-eyebrow">
                 Happening Soon
               </span>
             </div>
@@ -641,7 +641,7 @@ defmodule YscWeb.HomeLive do
           <div class="flex items-center gap-4">
             <.link
               navigate={~p"/events"}
-              class="text-xs font-bold uppercase tracking-widest hover:text-blue-100 transition-colors"
+              class="text-xs hover:text-blue-100 transition-colors type-eyebrow"
             >
               View Events
             </.link>
@@ -661,10 +661,10 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 relative z-10">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-10 sm:mb-16">
           <div class="min-w-0">
-            <span class="text-blue-300 font-semibold text-sm uppercase tracking-widest">
+            <span class="text-blue-300 text-sm type-eyebrow">
               Upcoming Events
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-white tracking-tight leading-none wrap-break-word">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl text-white wrap-break-word type-display">
               The Pulse of the Club.
             </h2>
           </div>
@@ -703,7 +703,7 @@ defmodule YscWeb.HomeLive do
           class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
         >
           <%= for event <- @upcoming_events do %>
-            <div class="group flex flex-col bg-white/5 backdrop-blur-xs rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition-all duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
+            <div class="group flex flex-col bg-white/5 backdrop-blur-xs rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
               <.link
                 navigate={~p"/events/#{event.id}"}
                 class="block relative aspect-16/11 overflow-hidden"
@@ -717,12 +717,12 @@ defmodule YscWeb.HomeLive do
                 />
                 <div class="absolute top-6 left-6 flex gap-2 z-2 flex-wrap">
                   <%= if days_since_inserted(event.inserted_at) <= 7 do %>
-                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-bold uppercase tracking-widest rounded-sm shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs rounded-sm shadow-lg type-eyebrow">
                       Just Added
                     </span>
                   <% end %>
                   <%= if EventHelpers.event_sold_out?(event) do %>
-                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-bold uppercase tracking-widest rounded-sm shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs rounded-sm shadow-lg type-eyebrow">
                       Sold Out
                     </span>
                   <% end %>
@@ -738,18 +738,18 @@ defmodule YscWeb.HomeLive do
 
               <div class="p-6 sm:p-8 flex flex-col flex-1">
                 <div class="flex items-center gap-3 mb-3 sm:mb-4">
-                  <span class="text-blue-300 font-semibold text-sm tracking-widest uppercase">
+                  <span class="text-blue-300 text-sm type-eyebrow">
                     {DateDisplay.format_date_short(event.start_date)}
                   </span>
                   <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span>
                   <%= if event.start_time && event.start_time != "" do %>
-                    <span class="text-zinc-300 text-sm font-bold uppercase tracking-widest">
+                    <span class="text-zinc-300 text-sm type-eyebrow">
                       {format_event_time(event.start_date, event.start_time)}
                     </span>
                   <% end %>
                 </div>
                 <.link navigate={~p"/events/#{event.id}"} class="block">
-                  <h3 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight group-hover:text-blue-300 transition-colors leading-tight">
+                  <h3 class="text-xl sm:text-2xl text-white group-hover:text-blue-300 transition-colors type-subhead">
                     {event.title}
                   </h3>
                 </.link>
@@ -770,7 +770,7 @@ defmodule YscWeb.HomeLive do
                   <% end %>
                   <.icon
                     name="hero-arrow-right"
-                    class="w-5 h-5 text-zinc-500 group-hover:text-blue-300 group-hover:translate-x-1 transition-all duration-150"
+                    class="w-5 h-5 text-zinc-500 group-hover:text-blue-300 group-hover:translate-x-1 transition duration-150"
                   />
                 </div>
               </div>
@@ -791,10 +791,10 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20 border-b border-zinc-200 pb-8 sm:pb-10">
           <div class="max-w-2xl min-w-0">
-            <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
+            <span class="text-blue-700 text-sm type-eyebrow">
               Club News
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight wrap-break-word">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl text-zinc-900 wrap-break-word type-display">
               Stay Informed.
             </h2>
           </div>
@@ -830,7 +830,7 @@ defmodule YscWeb.HomeLive do
             <.link
               navigate={~p"/posts/#{post.url_name}"}
               class={[
-                "group block transition-all duration-500",
+                "group block transition duration-500",
                 if(rem(index, 2) == 1, do: "md:mt-20", else: "")
               ]}
             >
@@ -845,14 +845,14 @@ defmodule YscWeb.HomeLive do
               </div>
               <time
                 id={"home-news-reading-time-#{post.id}"}
-                class="text-xs font-semibold text-blue-700 uppercase tracking-widest"
+                class="text-xs text-blue-700 type-eyebrow"
               >
                 {DateDisplay.format_date_short_in_zone(
                   post.published_on,
                   @timezone
                 )} · {ReadingTime.minutes(post)} min read
               </time>
-              <h3 class="text-2xl font-extrabold text-zinc-900 tracking-tight mt-3 group-hover:text-blue-700 transition-colors leading-snug">
+              <h3 class="text-2xl text-zinc-900 mt-3 group-hover:text-blue-700 transition-colors type-subhead">
                 {post.title}
               </h3>
               <%= if post.preview_text || post.rendered_body do %>
@@ -879,7 +879,7 @@ defmodule YscWeb.HomeLive do
         <div class="max-w-2xl mx-auto text-center">
           <h2
             id="membership-heading"
-            class="text-3xl sm:text-4xl font-bold text-white tracking-tight"
+            class="text-3xl sm:text-4xl text-white type-title"
           >
             Membership
           </h2>
@@ -891,7 +891,7 @@ defmodule YscWeb.HomeLive do
         <dl class="mt-12 grid gap-6 sm:grid-cols-2 lg:max-w-4xl mx-auto text-left">
           <div
             id="membership-single"
-            class="p-8 rounded-lg bg-blue-800 border border-transparent transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:border-blue-400/20 cursor-default"
+            class="p-8 rounded-lg bg-blue-800 border border-transparent transition duration-300 ease-out hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:border-blue-400/20 cursor-default"
           >
             <dt>
               <span class="block text-lg font-medium text-blue-200">Single</span>
@@ -906,7 +906,7 @@ defmodule YscWeb.HomeLive do
 
           <div
             id="membership-family"
-            class="p-8 rounded-lg bg-blue-800 border border-transparent transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:border-blue-400/20 cursor-default"
+            class="p-8 rounded-lg bg-blue-800 border border-transparent transition duration-300 ease-out hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:border-blue-400/20 cursor-default"
           >
             <dt>
               <span class="block text-lg font-medium text-blue-200">Family</span>
@@ -939,7 +939,7 @@ defmodule YscWeb.HomeLive do
     <%!-- Heritage Pride Footer --%>
     <div
       :if={@current_user == nil}
-      class="flex justify-center gap-6 py-10 opacity-30 grayscale hover:grayscale-0 transition-all"
+      class="flex justify-center gap-6 py-10 opacity-30 grayscale hover:grayscale-0 transition"
     >
       <.flag country="fi-dk" class="h-8 w-12 rounded-xs" />
       <.flag country="fi-fi" class="h-8 w-12 rounded-xs" />
@@ -957,7 +957,7 @@ defmodule YscWeb.HomeLive do
         <div class="max-w-2xl mx-auto text-center">
           <h2
             id="newsletter-heading"
-            class="text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 wrap-break-word"
+            class="text-2xl sm:text-3xl lg:text-4xl text-zinc-900 wrap-break-word type-title"
           >
             Stay in the Loop
           </h2>
@@ -1071,10 +1071,10 @@ defmodule YscWeb.HomeLive do
         <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 py-10 lg:py-16">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div class="space-y-1 min-w-0">
-              <p class="text-blue-600 text-xs font-bold uppercase tracking-[0.2em]">
+              <p class="text-blue-600 text-xs type-eyebrow">
                 Member Dashboard
               </p>
-              <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-zinc-900 tracking-tight wrap-break-word">
+              <h1 class="text-3xl sm:text-4xl lg:text-5xl text-zinc-900 wrap-break-word type-display">
                 {greeting_for_country(@current_user.most_connected_country)}, {String.capitalize(
                   @current_user.first_name
                 )}
@@ -1232,10 +1232,10 @@ defmodule YscWeb.HomeLive do
                       </div>
                       <div class="p-8 flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                         <div class="space-y-1 md:border-r border-zinc-100 pr-6">
-                          <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
+                          <p class="text-xs text-zinc-400 type-eyebrow">
                             Destination
                           </p>
-                          <p class="font-black text-2xl text-zinc-900 tracking-tight">
+                          <p class="font-bold text-2xl text-zinc-900 tracking-tight">
                             {PropertyDisplay.medium_name(booking.property)}
                           </p>
                           <p class="text-xs font-mono text-zinc-400">
@@ -1243,7 +1243,7 @@ defmodule YscWeb.HomeLive do
                           </p>
                         </div>
                         <div class="space-y-2">
-                          <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em]">
+                          <p class="text-xs text-zinc-400 type-eyebrow">
                             Dates
                           </p>
                           <p class="font-bold text-zinc-800">
@@ -1252,13 +1252,13 @@ defmodule YscWeb.HomeLive do
                             )}
                           </p>
                           <span class={[
-                            "inline-flex items-center px-2.5 py-0.5 text-xs font-black rounded-sm uppercase tracking-tighter",
+                            "inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-sm uppercase tracking-widerer",
                             case days_until_this_booking do
                               :started ->
-                                "bg-green-50 text-green-700 ring-1 ring-green-200/50 animate-pulse"
+                                "bg-green-50 text-green-700 ring-1 ring-green-200/50"
 
                               0 ->
-                                "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 animate-pulse"
+                                "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50"
 
                               1 ->
                                 "bg-blue-50 text-blue-700 ring-1 ring-blue-200/50"
@@ -1278,7 +1278,7 @@ defmodule YscWeb.HomeLive do
                             end}
                           </span>
                           <%= if booking.booking_mode == :buyout do %>
-                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-black rounded-sm uppercase tracking-tighter">
+                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs font-bold rounded-sm uppercase tracking-widerer">
                               {BookingModeDisplay.stay_type_label(:buyout)}
                             </span>
                           <% end %>
@@ -1371,7 +1371,7 @@ defmodule YscWeb.HomeLive do
                         <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
                       </div>
                       <.link navigate={~p"/events/#{event.id}"} class="block group">
-                        <h3 class="font-black text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
+                        <h3 class="font-bold text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
                           {event.title}
                         </h3>
                       </.link>
@@ -1561,7 +1561,7 @@ defmodule YscWeb.HomeLive do
                     />
                   </div>
 
-                  <h2 class="text-xl lg:text-2xl font-black tracking-tight mb-2">
+                  <h2 class="text-xl lg:text-2xl mb-2 type-title">
                     <%= cond do %>
                       <% @current_user.state == :pending_approval -> %>
                         Application Under Review
@@ -1622,7 +1622,7 @@ defmodule YscWeb.HomeLive do
                           if(@active_membership?,
                             do: "bg-blue-700 text-white hover:bg-blue-800",
                             else:
-                              "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
+                              "bg-white text-amber-900 hover:bg-amber-50 shadow-lg"
                           )
                         ]}
                       >
@@ -1692,7 +1692,7 @@ defmodule YscWeb.HomeLive do
 
               <%!-- Notifications --%>
               <section>
-                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+                <h2 class="text-sm text-zinc-400 mb-6 type-eyebrow">
                   Notifications
                 </h2>
 
@@ -1783,7 +1783,7 @@ defmodule YscWeb.HomeLive do
                 id="home-family"
               >
                 <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+                  <h2 class="text-sm text-zinc-400 type-eyebrow">
                     Your Family
                   </h2>
                   <.link
@@ -1816,7 +1816,7 @@ defmodule YscWeb.HomeLive do
 
               <%!-- Latest Updates Section --%>
               <section>
-                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+                <h2 class="text-sm text-zinc-400 mb-6 type-eyebrow">
                   Latest Updates
                 </h2>
 

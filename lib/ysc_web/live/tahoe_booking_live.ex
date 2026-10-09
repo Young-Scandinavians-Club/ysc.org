@@ -1136,10 +1136,10 @@ defmodule YscWeb.TahoeBookingLive do
         <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-16 pointer-events-none">
           <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
             <div class="flex items-center gap-4 px-4">
-              <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-lg">
+              <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
                 Tahoe Cabin
               </h1>
-              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-black uppercase tracking-[0.2em] rounded-sm backdrop-blur-xs">
+              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-bold uppercase tracking-wider rounded-sm backdrop-blur-xs">
                 Member Access
               </span>
             </div>
@@ -1183,10 +1183,10 @@ defmodule YscWeb.TahoeBookingLive do
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-20 pointer-events-none">
           <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
-            <p class="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-3 md:mb-4 drop-shadow-md">
+            <p class="text-sm font-bold text-blue-400 uppercase tracking-wider mb-3 md:mb-4 drop-shadow-md">
               A Year-Round Retreat
             </p>
-            <h1 class="text-4xl md:text-7xl font-black text-white drop-shadow-lg mb-4">
+            <h1 class="text-4xl md:text-7xl font-bold text-white drop-shadow-lg mb-4">
               Tahoe Cabin
             </h1>
             <p class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md">
@@ -1203,7 +1203,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl shrink-0">🧺</span>
               <div>
-                <p class="text-xs font-black text-blue-400 uppercase">
+                <p class="text-xs font-bold text-blue-400 uppercase">
                   Linens
                 </p>
                 <p class="text-xs font-bold leading-tight">
@@ -1214,7 +1214,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl shrink-0">🚫</span>
               <div>
-                <p class="text-xs font-black text-zinc-400 uppercase">
+                <p class="text-xs font-bold text-zinc-400 uppercase">
                   House rules
                 </p>
                 <p class="text-xs font-bold leading-tight">No pets or smoking</p>
@@ -1223,7 +1223,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl shrink-0">❄️</span>
               <div>
-                <p class="text-xs font-black text-amber-400 uppercase">
+                <p class="text-xs font-bold text-amber-400 uppercase">
                   Safety
                 </p>
                 <p class="text-xs font-bold leading-tight">
@@ -1234,7 +1234,7 @@ defmodule YscWeb.TahoeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl shrink-0">🧹</span>
               <div>
-                <p class="text-xs font-black text-zinc-400 uppercase">
+                <p class="text-xs font-bold text-zinc-400 uppercase">
                   Community
                 </p>
                 <p class="text-xs font-bold leading-tight">
@@ -1245,7 +1245,7 @@ defmodule YscWeb.TahoeBookingLive do
           </div>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
-            <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+            <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-wider">
               <%= if Accounts.sub_account?(@user) || Accounts.primary_user?(@user) do %>
                 Your family's bookings
               <% else %>
@@ -1330,7 +1330,7 @@ defmodule YscWeb.TahoeBookingLive do
                       role="radiogroup"
                     >
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition-all",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
                         if(
                           @selected_booking_mode == :room ||
                             @selected_booking_mode == nil,
@@ -1385,7 +1385,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </p>
                       </label>
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition-all",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
                         if(@selected_booking_mode == :buyout,
                           do: "border-blue-600 bg-blue-50 shadow-xs",
                           else:
@@ -1652,7 +1652,7 @@ defmodule YscWeb.TahoeBookingLive do
                                   }
                                   aria-label="Increase number of adults"
                                   class={[
-                                    "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
+                                    "w-10 h-10 rounded-full border-2 flex items-center justify-center transition duration-200 font-semibold",
                                     if(
                                       parse_guests_count(@guests_count) +
                                         parse_children_count(@children_count) >=
@@ -1719,7 +1719,7 @@ defmodule YscWeb.TahoeBookingLive do
                                   }
                                   aria-label="Increase number of children"
                                   class={[
-                                    "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
+                                    "w-10 h-10 rounded-full border-2 flex items-center justify-center transition duration-200 font-semibold",
                                     if(
                                       parse_guests_count(@guests_count) +
                                         parse_children_count(@children_count) >=
@@ -1977,7 +1977,7 @@ defmodule YscWeb.TahoeBookingLive do
                           (max_rooms_reached && !room_already_selected) ||
                           cannot_add_second_room %>
                       <div class={[
-                        "border-2 rounded-lg overflow-hidden flex flex-col h-full transition-all",
+                        "border-2 rounded-lg overflow-hidden flex flex-col h-full transition",
                         if(is_disabled,
                           do:
                             "border-zinc-200 bg-zinc-50 cursor-not-allowed opacity-60",
@@ -2697,7 +2697,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <div class="flex justify-between items-end">
                       <span class="text-lg font-bold text-zinc-900">Total</span>
                       <div class="text-right">
-                        <span class="text-2xl font-black text-blue-600">
+                        <span class="text-2xl font-bold text-blue-600">
                           {MoneyHelper.format_money!(@calculated_price)}
                         </span>
                       </div>
@@ -2825,7 +2825,7 @@ defmodule YscWeb.TahoeBookingLive do
                 &#8203;
               </span>
               <div
-                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
                 phx-click="ignore"
                 phx-click-stop
               >
@@ -2987,7 +2987,7 @@ defmodule YscWeb.TahoeBookingLive do
                 &#8203;
               </span>
               <div
-                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
                 phx-click-away="close-terms-modal"
               >
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
@@ -3262,7 +3262,7 @@ defmodule YscWeb.TahoeBookingLive do
                   phx-click="switch-info-tab"
                   phx-value-tab="general"
                   class={[
-                    "px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap",
+                    "px-4 py-2 text-sm font-bold rounded-md transition whitespace-nowrap",
                     if(Map.get(assigns, :info_tab, :general) == :general,
                       do: "bg-blue-50 text-blue-600 border border-blue-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
@@ -3275,7 +3275,7 @@ defmodule YscWeb.TahoeBookingLive do
                   phx-click="switch-info-tab"
                   phx-value-tab="rules"
                   class={[
-                    "px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap",
+                    "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
                     if(Map.get(assigns, :info_tab, :general) == :rules,
                       do: "bg-blue-50 text-blue-600 border border-blue-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
@@ -3296,7 +3296,7 @@ defmodule YscWeb.TahoeBookingLive do
                 <!-- Welcome Header -->
                 <section>
                   <div class="prose prose-zinc max-w-none mb-10">
-                    <h1 class="text-3xl font-black tracking-tight text-zinc-900 mb-4">
+                    <h1 class="text-3xl font-bold tracking-tight text-zinc-900 mb-4">
                       Welcome to the YSC Tahoe Cabin
                     </h1>
                     <p class="text-lg text-zinc-600 leading-relaxed">
@@ -3472,7 +3472,7 @@ defmodule YscWeb.TahoeBookingLive do
                   <div class="grid md:grid-cols-2 gap-8 items-start">
                     <div>
                       <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-6">
-                        <p class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-2">
+                        <p class="text-xs uppercase tracking-wider text-zinc-500 font-bold mb-2">
                           Address
                         </p>
                         <p class="text-xl font-medium text-zinc-900 mb-6">
@@ -4614,7 +4614,7 @@ defmodule YscWeb.TahoeBookingLive do
               <div class="flex-1 min-w-0">
                 <div :if={@calculated_price} class="text-left">
                   <p class="text-xs text-zinc-500 uppercase">Total</p>
-                  <p class="text-xl font-black text-blue-600">
+                  <p class="text-xl font-bold text-blue-600">
                     {MoneyHelper.format_money!(@calculated_price)}
                   </p>
                 </div>

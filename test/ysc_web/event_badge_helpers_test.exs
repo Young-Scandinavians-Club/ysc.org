@@ -166,7 +166,12 @@ defmodule YscWeb.EventBadgeHelpersTest do
 
   describe "formatters" do
     test "to_card_badges/1 maps kinds to card badge maps" do
-      assert [%{text: "Today", class: "bg-rose-600 animate-pulse text-white"}] =
+      assert [
+               %{
+                 text: "Today",
+                 class: "bg-rose-600 animate-attention-once text-white"
+               }
+             ] =
                EventBadgeHelpers.to_card_badges([:today])
     end
 

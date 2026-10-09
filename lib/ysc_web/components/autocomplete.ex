@@ -186,7 +186,7 @@ defmodule YscWeb.Components.Autocomplete do
           role="listbox"
           class={[
             "absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg max-h-60 overflow-auto",
-            "transition-all duration-150 ease-out origin-top",
+            "transition duration-150 ease-out origin-top",
             if(length(@results) > 0,
               do: "opacity-100 scale-y-100 translate-y-0",
               else: "opacity-0 scale-y-95 -translate-y-1 pointer-events-none"
@@ -216,7 +216,7 @@ defmodule YscWeb.Components.Autocomplete do
         <%!-- No results message --%>
         <div class={[
           "absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg",
-          "transition-all duration-150 ease-out origin-top",
+          "transition duration-150 ease-out origin-top",
           if(
             @search_value != "" && String.length(@search_value) >= @min_chars &&
               length(@results) == 0,
@@ -232,7 +232,7 @@ defmodule YscWeb.Components.Autocomplete do
         <%!-- Typing hint --%>
         <div class={[
           "absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg",
-          "transition-all duration-150 ease-out origin-top",
+          "transition duration-150 ease-out origin-top",
           if(@search_value != "" && String.length(@search_value) < @min_chars,
             do: "opacity-100 scale-y-100 translate-y-0",
             else: "opacity-0 scale-y-95 -translate-y-1 pointer-events-none"
