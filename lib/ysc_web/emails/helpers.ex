@@ -2,7 +2,12 @@ defmodule YscWeb.Emails.Helpers do
   @moduledoc """
   Shared helpers for MJML email modules: public URLs, salutation names,
   event cover images / association preloading, booking payload loading,
-  and display formatting for money and dates.
+  display formatting for money and dates, and membership email assigns.
+
+  Membership payment, renewal, and ended emails share a nil-user guard plus
+  greeting / type-name / renewal-date maps. Call `require_user!/1` when you
+  still need the user after the check, or `membership_member_assigns/2` /
+  `membership_renewal_assigns/2` when the template only needs those fields.
   """
 
   import Ecto.Query, warn: false
@@ -13,6 +18,7 @@ defmodule YscWeb.Emails.Helpers do
   alias Ysc.Events.Event
   alias Ysc.Media.Image
   alias Ysc.Repo
+  alias YscWeb.MembershipHelpers
 
   @event_email_organizer_fields [:id, :first_name, :last_name]
 
@@ -244,18 +250,79 @@ defmodule YscWeb.Emails.Helpers do
   def home_url, do: absolute_url("/")
 
   @doc """
+  Raises when `user` is nil so member-facing `prepare_email_data/n` fails
+  with a clear error. Accepts maps and structs (greeting helpers read
+  `:first_name` from either).
+  """
+  def require_user!(nil) do
+    raise ArgumentError, "User cannot be nil"
+  end
+
+  def require_user!(user), do: user
+
+  @doc """
+  Raises when `subscription` is nil. Accepts maps and structs.
+  """
+  def require_subscription!(nil) do
+    raise ArgumentError, "Subscription cannot be nil"
+  end
+
+  def require_subscription!(subscription), do: subscription
+
+  @doc """
+  Greeting assign after the nil-user guard.
+
+  ## Examples
+
+      membership_greeting_assigns(user)
+      #=> %{first_name: "Anna"}
+  """
+  def membership_greeting_assigns(user) do
+    %{first_name: member_greeting_name(require_user!(user))}
+  end
+
+  @doc """
+  Greeting plus membership type name for payment, receipt, and failure emails.
+
+  ## Examples
+
+      membership_member_assigns(user, :family)
+      #=> %{first_name: "Anna", membership_type: "Family"}
+  """
+  def membership_member_assigns(user, membership_type) do
+    user
+    |> membership_greeting_assigns()
+    |> Map.put(
+      :membership_type,
+      MembershipHelpers.membership_type_name(membership_type)
+    )
+  end
+
+  @doc """
+  Greeting, formatted renewal date, and membership URL for renewal reminder
+  emails. Raises when `user` or `subscription` is nil.
+  """
+  def membership_renewal_assigns(user, subscription) do
+    subscription = require_subscription!(subscription)
+
+    user
+    |> membership_greeting_assigns()
+    |> Map.merge(%{
+      renewal_date: format_date(subscription.current_period_end),
+      membership_url: membership_url()
+    })
+  end
+
+  @doc """
   Shared assign map for membership payment reminder emails (7-day and 30-day).
   """
   def membership_payment_reminder_data(user) do
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
-
-    %{
-      first_name: member_greeting_name(user),
+    user
+    |> membership_greeting_assigns()
+    |> Map.merge(%{
       pay_membership_url: membership_url(),
       upcoming_events_url: upcoming_events_url()
-    }
+    })
   end
 
   @doc """

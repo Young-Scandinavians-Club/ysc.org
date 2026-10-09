@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [member_greeting_name: 1, notification_settings_url: 0]
+    only: [membership_greeting_assigns: 1, notification_settings_url: 0]
 
   alias Ysc.Events.Event
   alias YscWeb.Emails.EventHelpers
@@ -33,11 +33,9 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
   def get_subject(nil), do: "[YSC] An event you saved is now available"
 
   def prepare_email_data(event, user) do
-    if is_nil(user), do: raise(ArgumentError, "User cannot be nil")
-
     event
     |> prepare_shared_email_data()
-    |> Map.put(:first_name, member_greeting_name(user))
+    |> Map.merge(membership_greeting_assigns(user))
   end
 
   @doc """
