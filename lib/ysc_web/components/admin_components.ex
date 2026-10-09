@@ -1340,7 +1340,7 @@ defmodule YscWeb.AdminComponents do
           class={[
             "relative grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0",
             @interactive &&
-              "hover:bg-zinc-50/60 transition-all duration-100 ease-out"
+              "hover:bg-zinc-50/60 transition duration-100 ease-out"
           ]}
         >
           <div class="col-span-1 flex items-center justify-center">
@@ -1405,7 +1405,7 @@ defmodule YscWeb.AdminComponents do
       <% :mobile -> %>
         <div
           data-checkin-row
-          class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0 transition-all duration-100 ease-out"
+          class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0 transition duration-100 ease-out"
         >
           <div class="min-w-0 flex-1 mr-3">
             <p class="text-sm font-medium text-zinc-900">{@name}</p>
@@ -2020,7 +2020,7 @@ defmodule YscWeb.AdminComponents do
             phx-click={@toggle_event}
             phx-value-id={tile.item.id}
             class={[
-              "group text-left transition-all focus:outline-hidden rounded-xl",
+              "group text-left transition focus:outline-hidden rounded-xl",
               if(tile.selected?,
                 do: "ring-2 ring-blue-500 ring-offset-2",
                 else: "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
@@ -2728,10 +2728,10 @@ defmodule YscWeb.AdminComponents do
         @class
       ]}
     >
-      <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
+      <p class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">
         {@label}
       </p>
-      <p class={["text-3xl font-black", @value_class || "text-zinc-900"]}>
+      <p class={["text-3xl font-bold", @value_class || "text-zinc-900"]}>
         {@value}
       </p>
       <p :if={@subtitle} class="text-xs text-zinc-500 mt-1 font-medium">
@@ -2759,7 +2759,7 @@ defmodule YscWeb.AdminComponents do
         navigate={~p"/admin/events"}
         action="Manage events →"
       >
-        <p class="text-3xl font-black text-zinc-900">3</p>
+        <p class="text-3xl font-bold text-zinc-900">3</p>
       </.admin_dashboard_link_card>
   """
   attr :id, :string, default: nil
@@ -2811,7 +2811,7 @@ defmodule YscWeb.AdminComponents do
 
   defp dashboard_link_card_class(accent, interactive?) do
     [
-      "p-5 rounded-sm border flex flex-col justify-between transition-all",
+      "p-5 rounded-sm border flex flex-col justify-between transition",
       interactive? && "group",
       dashboard_link_card_accent_class(accent, interactive?)
     ]
@@ -2886,7 +2886,7 @@ defmodule YscWeb.AdminComponents do
       <div>
         <div class="flex items-center justify-between mb-2">
           <p class={[
-            "flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.2em]",
+            "flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider",
             @label_class
           ]}>
             <.icon name="hero-map-pin" class="w-3.5 h-3.5" /> {@label}
@@ -2903,7 +2903,7 @@ defmodule YscWeb.AdminComponents do
         </div>
         <div class="flex items-baseline gap-2">
           <p class={[
-            "text-3xl font-black font-mono text-zinc-900 transition-colors",
+            "text-3xl font-bold font-mono text-zinc-900 transition-colors",
             @value_hover_class
           ]}>
             {@stats.staying}
@@ -2920,7 +2920,7 @@ defmodule YscWeb.AdminComponents do
               <p class="font-bold text-emerald-700 uppercase text-[10px] leading-none">
                 Checking in
               </p>
-              <p class="font-black font-mono text-emerald-800 text-lg leading-tight">
+              <p class="font-bold font-mono text-emerald-800 text-lg leading-tight">
                 {@stats.checkins_today}
               </p>
             </div>
@@ -2934,7 +2934,7 @@ defmodule YscWeb.AdminComponents do
               <p class="font-bold text-amber-700 uppercase text-[10px] leading-none">
                 Checking out
               </p>
-              <p class="font-black font-mono text-amber-800 text-lg leading-tight">
+              <p class="font-bold font-mono text-amber-800 text-lg leading-tight">
                 {@stats.checkouts_today}
               </p>
             </div>
@@ -2946,7 +2946,7 @@ defmodule YscWeb.AdminComponents do
           <p class="font-bold text-zinc-400 uppercase text-[10px]">
             Next 14 days
           </p>
-          <p class="font-black font-mono text-zinc-800 mt-0.5">
+          <p class="font-bold font-mono text-zinc-800 mt-0.5">
             {upcoming_bookings_label(@stats.upcoming_bookings)}
           </p>
         </div>
@@ -2954,7 +2954,7 @@ defmodule YscWeb.AdminComponents do
           <p class="font-bold text-zinc-400 uppercase text-[10px]">
             Expected guests
           </p>
-          <p class="font-black font-mono text-zinc-800 mt-0.5">
+          <p class="font-bold font-mono text-zinc-800 mt-0.5">
             {@stats.upcoming_guests}
           </p>
         </div>
@@ -3289,7 +3289,7 @@ defmodule YscWeb.AdminComponents do
             <.link navigate="/" class="items-center group ps-2.5 inline-block">
               <div class="flex items-center gap-2">
                 <.ysc_logo class="h-20 me-3" width={80} height={80} decorative />
-                <span class="text-xs font-black bg-blue-600 text-blue-50 px-2 py-0.5 rounded-sm">
+                <span class="text-xs font-bold bg-blue-600 text-blue-50 px-2 py-0.5 rounded-sm">
                   ADMIN
                 </span>
               </div>
@@ -3862,7 +3862,7 @@ defmodule YscWeb.AdminComponents do
     ~H"""
     <div class="w-full bg-zinc-200 rounded-sm h-2">
       <div
-        class="animate-pulse transition duration-100 ease-in-out bg-blue-600 h-2 rounded-sm "
+        class="transition duration-100 ease-in-out bg-blue-600 h-2 rounded-sm"
         style={"width: #{@progress}%"}
       >
       </div>

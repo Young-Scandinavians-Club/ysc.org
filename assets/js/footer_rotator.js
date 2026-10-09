@@ -6,8 +6,14 @@
  * from bottom and exits upward. Messages are shuffled on mount for variety.
  */
 
+import { prefersReducedMotion } from "./spring";
+
+const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+
 const FooterRotator = {
   mounted() {
+    this.animationToken = 0;
+    this.animation = null;
     // Array of rotating message suffixes (only the part after "The Young Scandinavians Club.")
     const baseMessages = [
       "Made with ❤️ by the YSC WebTech Team.",
@@ -41,7 +47,7 @@ const FooterRotator = {
     this.updateDOM(this.messages[0], false); // false = no animation on initial load
     
     // Start the rotation after a short delay
-    setTimeout(() => {
+    this.startTimeout = setTimeout(() => {
       this.startRotation();
     }, 5000); // Wait 5 seconds before first rotation
     
@@ -111,38 +117,51 @@ const FooterRotator = {
    * Update the DOM with new message text
    * @param {string} message - The message to display
    * @param {boolean} animate - Whether to animate the change (default: true)
+   *
+   * The old message slides up and fades out, the text is swapped, and the new
+   * message slides in from below. Web Animations keep this off the inline
+   * styles (so LiveView patches can't strand it mid-transition), and a newer
+   * rotation cancels one that is still running instead of racing it.
    */
-  updateDOM(message, animate = true) {
-    if (animate) {
-      // Start slide up animation (exit)
-      this.el.style.transform = "translateY(-100%)";
-      this.el.style.opacity = "0";
-      
-      // After exit animation completes, change text and slide in from bottom
-      setTimeout(() => {
-        this.el.textContent = message;
-        
-        // Reset position to bottom (ready to slide in)
-        this.el.style.transform = "translateY(100%)";
-        this.el.style.opacity = "0";
-        
-        // Small delay before starting entry animation
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            // Slide in from bottom to center
-            this.el.style.transform = "translateY(0)";
-            this.el.style.opacity = "1";
-          });
-        });
-      }, 400); // Match exit animation duration
-    } else {
-      // No animation - just set the text immediately
+  async updateDOM(message, animate = true) {
+    this.animation?.cancel();
+    this.animation = null;
+    const token = ++this.animationToken;
+
+    // First paint, or reduced motion: swap the text in place.
+    if (!animate || prefersReducedMotion()) {
       this.el.textContent = message;
-      this.el.style.transform = "translateY(0)";
-      this.el.style.opacity = "1";
+      return;
     }
+
+    const exit = this.el.animate(
+      [
+        { transform: "translateY(0)", opacity: 1 },
+        { transform: "translateY(-100%)", opacity: 0 },
+      ],
+      { duration: 250, easing: EASE, fill: "forwards" },
+    );
+    this.animation = exit;
+
+    try {
+      await exit.finished;
+    } catch (_) {
+      return; // cancelled by a newer rotation
+    }
+    if (token !== this.animationToken || !this.el.isConnected) return;
+
+    this.el.textContent = message;
+    const enter = this.el.animate(
+      [
+        { transform: "translateY(100%)", opacity: 0 },
+        { transform: "translateY(0)", opacity: 1 },
+      ],
+      { duration: 300, easing: EASE },
+    );
+    exit.cancel(); // release the exit's forwards fill now that enter is running
+    this.animation = enter;
   },
-  
+
   /**
    * Rotate to the next message with vertical slide effect
    * Current message slides up and out, new message slides in from bottom
@@ -159,9 +178,11 @@ const FooterRotator = {
      * Clean up when the component is removed
      */
     destroyed() {
+        clearTimeout(this.startTimeout);
         if (this.rotationInterval) {
             clearInterval(this.rotationInterval);
         }
+        this.animation?.cancel();
     }
 };
 

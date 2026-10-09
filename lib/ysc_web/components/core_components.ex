@@ -64,6 +64,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div
       id={@id}
+      phx-hook="ModalSheet"
       phx-mounted={@show && show_modal(@id)}
       phx-remove={hide_modal(@id)}
       data-cancel={JS.exec(@on_cancel, "phx-remove")}
@@ -107,7 +108,7 @@ defmodule YscWeb.CoreComponents do
               phx-key="escape"
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
               class={[
-                "relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1",
+                "modal-panel relative hidden transition bg-white shadow-lg shadow-zinc-700/10 ring-zinc-700/10 ring-1",
                 if(@fill_viewport,
                   do:
                     "h-full min-h-0 max-h-full overflow-hidden p-0 sm:rounded-none",
@@ -120,12 +121,12 @@ defmodule YscWeb.CoreComponents do
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
-                  class="group inline-flex flex-none items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-xs shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 transition-all duration-200 ease-out hover:scale-110"
+                  class="group inline-flex flex-none items-center justify-center w-10 h-10 rounded-full bg-white/90 shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 transition duration-200 ease-out hover:scale-110"
                   aria-label={gettext("close")}
                 >
                   <.icon
                     name="hero-x-mark-solid"
-                    class="w-5 h-5 text-zinc-700 group-hover:text-zinc-900 group-hover:rotate-90 transition-all duration-200 ease-out"
+                    class="w-5 h-5 text-zinc-700 group-hover:text-zinc-900 group-hover:rotate-90 transition duration-200 ease-out"
                   />
                 </button>
               </div>
@@ -621,19 +622,19 @@ defmodule YscWeb.CoreComponents do
   defp button_outline_color_classes do
     %{
       "blue" =>
-        "border border-blue-200 hover:bg-blue-50 text-blue-700 active:text-blue-700 bg-transparent",
+        "border border-blue-200 hover:bg-blue-50 text-blue-700 active:bg-blue-100 active:scale-[0.98] active:transition-none bg-transparent",
       "red" =>
-        "border border-red-200 hover:bg-red-50 text-red-700 active:text-red-700 bg-transparent",
+        "border border-red-200 hover:bg-red-50 text-red-700 active:bg-red-100 active:scale-[0.98] active:transition-none bg-transparent",
       "green" =>
-        "border border-green-200 hover:bg-green-50 text-green-700 active:text-green-700 bg-transparent",
+        "border border-green-200 hover:bg-green-50 text-green-700 active:bg-green-100 active:scale-[0.98] active:transition-none bg-transparent",
       "amber" =>
-        "border border-amber-200 hover:bg-amber-100 text-amber-700 active:text-amber-700 bg-transparent",
+        "border border-amber-200 hover:bg-amber-100 text-amber-700 active:bg-amber-200 active:scale-[0.98] active:transition-none bg-transparent",
       "zinc" =>
-        "border border-zinc-200 hover:bg-zinc-50 text-zinc-700 active:text-zinc-700 bg-transparent",
+        "border border-zinc-200 hover:bg-zinc-50 text-zinc-700 active:bg-zinc-100 active:scale-[0.98] active:transition-none bg-transparent",
       "teal" =>
-        "border border-teal-200 hover:bg-teal-50 text-teal-700 active:text-teal-700 bg-transparent",
+        "border border-teal-200 hover:bg-teal-50 text-teal-700 active:bg-teal-100 active:scale-[0.98] active:transition-none bg-transparent",
       "purple" =>
-        "border border-purple-200 hover:bg-purple-50 text-purple-700 active:text-purple-700 bg-transparent"
+        "border border-purple-200 hover:bg-purple-50 text-purple-700 active:bg-purple-100 active:scale-[0.98] active:transition-none bg-transparent"
     }
   end
 
@@ -2100,7 +2101,7 @@ defmodule YscWeb.CoreComponents do
       <div
         id={@id}
         class={[
-          "hidden font-normal",
+          "dropdown-panel hidden font-normal",
           @mobile && "dropdown-content",
           !@mobile &&
             "absolute z-110 bg-white divide-y rounded-sm divide-zinc-100 shadow-sm w-52 wide:w-72",
@@ -2108,6 +2109,7 @@ defmodule YscWeb.CoreComponents do
           !@mobile && !@drop_up && "mt-1",
           !@mobile && @right && "right-0",
           !@mobile && !@right && "left-0",
+          !@mobile && dropdown_origin(@drop_up, @right),
           !@mobile && @wide && "wide"
         ]}
       >
@@ -2116,6 +2118,13 @@ defmodule YscWeb.CoreComponents do
     </div>
     """
   end
+
+  # Scale from the corner nearest the trigger, so the menu appears to grow out of
+  # its button rather than from its own centre.
+  defp dropdown_origin(true, true), do: "origin-bottom-right"
+  defp dropdown_origin(true, _right), do: "origin-bottom-left"
+  defp dropdown_origin(_drop_up, true), do: "origin-top-right"
+  defp dropdown_origin(_drop_up, _right), do: "origin-top-left"
 
   @doc """
   Ellipsis menu for per-row actions in tables and card lists.
@@ -2462,7 +2471,7 @@ defmodule YscWeb.CoreComponents do
       <!-- Dropdown menu -->
       <div
         id="avatar-menu"
-        class="absolute z-110 hidden w-60 mt-0 font-normal bg-white divide-y rounded-sm shadow-sm divide-zinc-100 right-4 mt-1"
+        class="dropdown-panel absolute z-110 hidden w-60 mt-0 font-normal bg-white divide-y rounded-sm shadow-sm divide-zinc-100 right-4 mt-1 origin-top-right"
       >
         {render_slot(@inner_block)}
       </div>
@@ -2483,6 +2492,7 @@ defmodule YscWeb.CoreComponents do
       <button
         type="button"
         class="hamburger-btn nav-link inline-flex items-center justify-center h-10 p-2 transition ease-in-out rounded-sm lg:hidden focus:outline-hidden duration-400 text-zinc-900 hover:bg-zinc-200"
+        id={"#{@toggle_id}-button"}
         aria-controls={@toggle_id}
         aria-expanded="false"
         phx-click={show_mobile_menu(@toggle_id)}
@@ -2512,7 +2522,7 @@ defmodule YscWeb.CoreComponents do
     <%!-- Mobile: Slide-in menu overlay --%>
     <div
       id={"#{@toggle_id}-overlay"}
-      class="mobile-menu-overlay fixed inset-0 bg-black/50 z-9998 hidden lg:hidden"
+      class="mobile-menu-overlay fixed inset-0 bg-black/50 z-9998 lg:hidden touch-none opacity-0 invisible pointer-events-none transition-[opacity,visibility] duration-300 ease-out"
       phx-click={hide_mobile_menu(@toggle_id)}
       aria-hidden="true"
     />
@@ -2520,7 +2530,11 @@ defmodule YscWeb.CoreComponents do
     <%!-- Mobile: Slide-in menu panel --%>
     <div
       id={@toggle_id}
-      class="mobile-menu-panel fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-9999 transform -translate-x-full transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto shadow-2xl"
+      phx-hook="SwipeSheet"
+      data-open={show_mobile_menu(@toggle_id)}
+      data-close={hide_mobile_menu(@toggle_id)}
+      inert
+      class="mobile-menu-panel fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-9999 transform -translate-x-full transition-transform duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden overflow-y-auto overscroll-contain touch-pan-y shadow-2xl"
     >
       <%!-- Menu header with logo and close button --%>
       <div class="flex items-center justify-between p-4 border-b border-zinc-200">
@@ -2558,9 +2572,14 @@ defmodule YscWeb.CoreComponents do
 
   defp show_mobile_menu(id) do
     JS.add_class("open", to: "##{id}-hamburger")
-    |> JS.remove_class("hidden", to: "##{id}-overlay")
+    |> JS.remove_class("opacity-0 invisible pointer-events-none",
+      to: "##{id}-overlay"
+    )
+    |> JS.add_class("opacity-100 visible", to: "##{id}-overlay")
     |> JS.remove_class("-translate-x-full", to: "##{id}")
     |> JS.add_class("translate-x-0", to: "##{id}")
+    |> JS.remove_attribute("inert", to: "##{id}")
+    |> JS.set_attribute({"aria-expanded", "true"}, to: "##{id}-button")
     |> JS.add_class("overflow-hidden", to: "body")
   end
 
@@ -2572,9 +2591,14 @@ defmodule YscWeb.CoreComponents do
   """
   def hide_mobile_menu(id) when is_binary(id) do
     JS.remove_class("open", to: "##{id}-hamburger")
-    |> JS.add_class("hidden", to: "##{id}-overlay")
+    |> JS.remove_class("opacity-100 visible", to: "##{id}-overlay")
+    |> JS.add_class("opacity-0 invisible pointer-events-none",
+      to: "##{id}-overlay"
+    )
     |> JS.add_class("-translate-x-full", to: "##{id}")
     |> JS.remove_class("translate-x-0", to: "##{id}")
+    |> JS.set_attribute({"inert", ""}, to: "##{id}")
+    |> JS.set_attribute({"aria-expanded", "false"}, to: "##{id}-button")
     |> JS.remove_class("overflow-hidden", to: "body")
   end
 
@@ -4094,7 +4118,7 @@ defmodule YscWeb.CoreComponents do
     >
       <p
         :if={@eyebrow}
-        class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4"
+        class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-3 md:mb-4"
       >
         {@eyebrow}
       </p>
@@ -4119,10 +4143,10 @@ defmodule YscWeb.CoreComponents do
   defp page_masthead_padding_class(:large), do: "py-12"
 
   defp page_masthead_title_class(:default),
-    do: "text-4xl md:text-7xl font-black text-zinc-900"
+    do: "text-4xl md:text-7xl font-bold text-zinc-900"
 
   defp page_masthead_title_class(:large),
-    do: "text-6xl md:text-8xl font-black text-zinc-900 tracking-tighter"
+    do: "text-6xl md:text-8xl font-bold text-zinc-900 tracking-tighter"
 
   @doc """
   Rounded feature card with an uppercase eyebrow title and a body slot.
@@ -4175,12 +4199,10 @@ defmodule YscWeb.CoreComponents do
     do: "bg-blue-50/40 border-blue-200"
 
   defp feature_card_title_class(:muted),
-    do:
-      "text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6"
+    do: "text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4 md:mb-6"
 
   defp feature_card_title_class(:accent),
-    do:
-      "text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4"
+    do: "text-sm font-bold text-blue-600 uppercase tracking-wider mb-3 md:mb-4"
 
   @doc """
   Responsive grid wrapper for `at_glance_stat/1` tiles on booking landing pages.
@@ -4246,7 +4268,7 @@ defmodule YscWeb.CoreComponents do
       ]}>
         {@icon}
       </div>
-      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
+      <div class="text-xs uppercase tracking-wider text-zinc-500 font-bold mb-1 text-center">
         {@label}
       </div>
       <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
@@ -4472,7 +4494,7 @@ defmodule YscWeb.CoreComponents do
         @image_side == :right && "lg:order-1"
       ]}>
         <div class={[
-          "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6",
+          "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 sm:mb-6",
           cabin_showcase_badge_class(@accent)
         ]}>
           <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> {@location}
@@ -4548,7 +4570,7 @@ defmodule YscWeb.CoreComponents do
     <.link
       id={@id}
       navigate={@navigate}
-      class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+      class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition duration-150 group"
     >
       <div class={[
         "w-8 h-8 lg:w-10 lg:h-10 rounded-md flex items-center justify-center mb-2 lg:mb-4",
@@ -4885,7 +4907,7 @@ defmodule YscWeb.CoreComponents do
       id={@id}
       href={"mailto:#{@email}"}
       class={[
-        "p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition-all duration-200",
+        "p-5 border border-zinc-200 rounded-xl hover:bg-zinc-50 hover:border-blue-300 transition duration-200",
         @class
       ]}
     >
@@ -4952,7 +4974,7 @@ defmodule YscWeb.CoreComponents do
     <label
       for={@id}
       class={[
-        "relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 transition-all border-zinc-200 has-checked:border-blue-600 has-checked:bg-blue-50/50 has-checked:scale-[1.02] group",
+        "relative flex flex-col p-5 border-2 rounded-xl cursor-pointer hover:bg-zinc-50 transition border-zinc-200 has-checked:border-blue-600 has-checked:bg-blue-50/50 has-checked:scale-[1.02] group",
         @hover_class
       ]}
     >
@@ -4969,7 +4991,7 @@ defmodule YscWeb.CoreComponents do
       />
       <.icon
         name={@icon}
-        class="w-8 h-8 text-zinc-400 group-has-checked:text-blue-600 mb-3 transition-all duration-200 group-has-checked:animate-bounce"
+        class="w-8 h-8 text-zinc-400 group-has-checked:text-blue-600 mb-3 transition duration-200 group-has-checked:animate-bounce"
       />
       <span class="font-bold text-zinc-900 leading-tight mb-1">
         {@label}
@@ -5085,7 +5107,7 @@ defmodule YscWeb.CoreComponents do
     <article
       id={@id}
       class={[
-        "p-6 bg-zinc-50/50 rounded-xl border border-zinc-100 mb-4 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300",
+        "p-6 bg-zinc-50/50 rounded-xl border border-zinc-100 mb-4 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition duration-300",
         @reply && "mb-3 ml-6"
       ]}
       phx-mounted={
@@ -5105,10 +5127,10 @@ defmodule YscWeb.CoreComponents do
             class="w-8 h-8 rounded-full ring-2 ring-white shadow-xs"
           />
           <div>
-            <p class="text-sm font-black text-zinc-900 leading-none">
+            <p class="text-sm font-bold text-zinc-900 leading-none">
               {@author}
             </p>
-            <p class="text-xs text-zinc-400 font-bold uppercase tracking-widest mt-1">
+            <p class="text-xs text-zinc-400 font-bold uppercase tracking-wider mt-1">
               <time
                 pubdate
                 datetime={Timex.format!(@date, "%Y-%m-%d", :strftime)}
@@ -5183,7 +5205,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div
       id={@id}
-      class="max-w-0 sm:min-h-0 md:min-h-0 min-h-0 border border-orange-500 hover:border-orange-500 transition-all duration-300"
+      class="max-w-0 sm:min-h-0 md:min-h-0 min-h-0 border border-orange-500 hover:border-orange-500 transition duration-300"
     >
       <p>Dummy component</p>
     </div>
@@ -5192,24 +5214,42 @@ defmodule YscWeb.CoreComponents do
 
   ## JS Commands
 
+  # Shared motion for show/1, hide/1 and the modal helpers below: one duration
+  # for enter and exit, and mirrored start/end states, so appearing and
+  # disappearing are the same motion played forwards and backwards.
+  #
+  # Enter decelerates (ease-out), exit accelerates (ease-in). The exit curve is
+  # deliberately NOT the strict time-reversal of the enter curve: reversing a
+  # strong ease-out gives a curve that barely moves for most of its duration and
+  # then snaps in the last few milliseconds, which reads as a delay followed by a
+  # hard cut (measured: still at 70% opacity when the element was hidden).
+  #
+  # `time` on every JS.show/JS.hide must exceed the CSS duration, because
+  # LiveView hides the element and strips the transition classes `time` after the
+  # call, but the CSS transition only starts about two animation frames later
+  # (LiveView applies the start and run classes over two requestAnimationFrames).
+  # With time == duration the last ~35ms is cut off; measured, an exit was hidden
+  # while still at 49% opacity. LiveView's default (200ms) cuts a 250ms one short.
+  @motion_ms 250
+  @motion_time @motion_ms + 50
+  @motion_in "transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)]"
+  @motion_out "transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.32,0,0.67,0)]"
+  @motion_away "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+  @motion_here "opacity-100 translate-y-0 sm:scale-100"
+
   def show(js \\ %JS{}, selector) do
     JS.show(js,
       to: selector,
-      transition:
-        {"transition-all transform ease-out duration-300",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95",
-         "opacity-100 translate-y-0 sm:scale-100"}
+      time: @motion_time,
+      transition: {@motion_in, @motion_away, @motion_here}
     )
   end
 
   def hide(js \\ %JS{}, selector) do
     JS.hide(js,
       to: selector,
-      time: 200,
-      transition:
-        {"transition-all transform ease-in duration-200",
-         "opacity-100 translate-y-0 sm:scale-100",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"}
+      time: @motion_time,
+      transition: {@motion_out, @motion_here, @motion_away}
     )
   end
 
@@ -5239,30 +5279,56 @@ defmodule YscWeb.CoreComponents do
     hide_expanded(js, id)
   end
 
+  # Modal motion. Uses the shared @motion_* constants (one duration, ease-out in,
+  # ease-in out) for both the panel and its backdrop, so the layers never desync.
+  #
+  # On phones the panel is a full-height sheet that slides up from the bottom
+  # (and can be dragged back down: see the ModalSheet hook). From `sm` up it
+  # scales from the point that opened it (see modal_origin.js).
+  @modal_time @motion_time
+  @modal_enter @motion_in
+  @modal_exit @motion_out
+  @modal_away "opacity-0 translate-y-full sm:translate-y-0 sm:scale-[0.92]"
+  @modal_here "opacity-100 translate-y-0 sm:scale-100"
+
   def show_modal(js \\ %JS{}, id) when is_binary(id) do
     js
+    |> JS.dispatch("ysc:modal-opening", to: "##{id}-container")
     |> JS.show(to: "##{id}")
     |> JS.show(
       to: "##{id}-bg",
+      time: @modal_time,
       transition:
-        {"transition-all transform ease-out duration-100", "opacity-0",
-         "opacity-100"}
+        {"transition-opacity duration-250 ease-out", "opacity-0", "opacity-100"}
     )
-    |> show("##{id}-container")
+    |> JS.show(
+      to: "##{id}-container",
+      time: @modal_time,
+      transition: {@modal_enter, @modal_away, @modal_here}
+    )
     |> JS.add_class("overflow-hidden", to: "body")
     |> JS.focus_first(to: "##{id}-content")
   end
 
   def hide_modal(js \\ %JS{}, id) do
     js
+    |> JS.dispatch("ysc:modal-closing", to: "##{id}-container")
     |> JS.hide(
       to: "##{id}-bg",
+      time: @modal_time,
       transition:
-        {"transition-all transform ease-in duration-50", "opacity-100",
-         "opacity-0"}
+        {"transition-opacity duration-250 ease-in", "opacity-100", "opacity-0"}
     )
-    |> hide("##{id}-container")
-    |> JS.hide(to: "##{id}", transition: {"block", "block", "hidden"})
+    |> JS.hide(
+      to: "##{id}-container",
+      time: @modal_time,
+      transition: {@modal_exit, @modal_here, @modal_away}
+    )
+    |> JS.hide(
+      to: "##{id}",
+      time: @modal_time,
+      transition: {"block", "block", "hidden"}
+    )
     |> JS.remove_class("overflow-hidden", to: "body")
     |> JS.pop_focus()
   end
@@ -5920,7 +5986,7 @@ defmodule YscWeb.CoreComponents do
               type="button"
               data-hero-video-toggle
               aria-label="Pause video"
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-hidden focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+              class="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/40 border border-white/30 text-white shadow-lg hover:bg-zinc-900/55 hover:border-white/50 transition-colors focus:outline-hidden focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
             >
               <span class="pause-icon inline-flex in-[.paused]:hidden">
                 <.icon name="hero-pause" class="w-6 h-6" />
@@ -6407,7 +6473,7 @@ defmodule YscWeb.CoreComponents do
   defp membership_qr_detail_row(assigns) do
     ~H"""
     <div class="flex items-center justify-between px-4 py-3">
-      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
         {@label}
       </span>
       <span class={@value_class}>

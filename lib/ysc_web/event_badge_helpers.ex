@@ -133,7 +133,7 @@ defmodule YscWeb.EventBadgeHelpers do
     sold_out: {"bg-red-600", "hero-no-symbol"},
     save_the_date: {"bg-blue-600", "hero-ticket"},
     just_added: {"bg-violet-600", "hero-sparkles-solid"},
-    today: {"bg-rose-600 animate-pulse", "hero-bolt-solid"},
+    today: {"bg-rose-600 animate-attention-once", "hero-bolt-solid"},
     tomorrow: {"bg-orange-600", "hero-calendar-solid"},
     days_left: {"bg-sky-600", "hero-clock"},
     going_fast: {"bg-emerald-600", "hero-fire-solid"}

@@ -585,7 +585,7 @@ defmodule YscWeb.AdminScannerLive do
                     phx-click="select_mode"
                     phx-value-mode="membership"
                     class={[
-                      "flex flex-col items-center p-4 rounded-lg border-2 transition-all",
+                      "flex flex-col items-center p-4 rounded-lg border-2 transition",
                       if(@selected_mode == "membership",
                         do: "border-emerald-500 bg-emerald-50",
                         else: "border-zinc-200 hover:border-zinc-300"
@@ -621,7 +621,7 @@ defmodule YscWeb.AdminScannerLive do
                     phx-click="select_mode"
                     phx-value-mode="event"
                     class={[
-                      "flex flex-col items-center p-4 rounded-lg border-2 transition-all",
+                      "flex flex-col items-center p-4 rounded-lg border-2 transition",
                       if(@selected_mode == "event",
                         do: "border-blue-500 bg-blue-50",
                         else: "border-zinc-200 hover:border-zinc-300"
@@ -657,7 +657,7 @@ defmodule YscWeb.AdminScannerLive do
                     phx-click="select_mode"
                     phx-value-mode="event_membership"
                     class={[
-                      "flex flex-col items-center p-4 rounded-lg border-2 transition-all",
+                      "flex flex-col items-center p-4 rounded-lg border-2 transition",
                       if(@selected_mode == "event_membership",
                         do: "border-violet-500 bg-violet-50",
                         else: "border-zinc-200 hover:border-zinc-300"
@@ -1070,7 +1070,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-check-badge" class="w-9 h-9 text-white" />
         </div>
         <div class="min-w-0">
-          <p class="text-xs font-semibold uppercase tracking-widest text-emerald-200 mb-0.5">
+          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-200 mb-0.5">
             Active Member
           </p>
           <p class="text-2xl font-bold leading-tight truncate">
@@ -1136,7 +1136,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-x-circle" class="w-9 h-9 text-white" />
         </div>
         <div class="min-w-0">
-          <p class="text-xs font-semibold uppercase tracking-widest text-red-200 mb-0.5">
+          <p class="text-xs font-semibold uppercase tracking-wider text-red-200 mb-0.5">
             Inactive / Expired
           </p>
           <p class="text-2xl font-bold leading-tight truncate">
@@ -1176,7 +1176,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-check-circle" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-widest text-emerald-200 mb-0.5">
+          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-200 mb-0.5">
             Checked In
           </p>
           <p class="text-xl font-bold">{@scan_result.message}</p>
@@ -1203,7 +1203,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-user-group" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-widest text-emerald-200 mb-0.5">
+          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-200 mb-0.5">
             Group Checked In
           </p>
           <p class="text-2xl font-bold">{@scan_result.count} guests</p>
@@ -1228,7 +1228,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-exclamation-triangle" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-widest text-amber-200 mb-0.5">
+          <p class="text-xs font-semibold uppercase tracking-wider text-amber-200 mb-0.5">
             Already Scanned
           </p>
           <p class="text-xl font-bold">Duplicate Check-in</p>
@@ -1276,7 +1276,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-x-mark" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-0.5">
+          <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-0.5">
             Error
           </p>
           <p class="text-lg font-bold leading-snug">{@scan_result.message}</p>

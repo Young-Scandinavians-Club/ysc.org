@@ -71,6 +71,9 @@ import StopClick from "./stop_click";
 import DisableOnSubmit from "./disable_on_submit";
 import ExpenseReceiptKeys from "./expense_receipt_keys";
 import MediaLoadState from "./media_load_state";
+import SwipeSheet from "./swipe_sheet";
+import ModalSheet from "./modal_sheet";
+import "./modal_origin";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
 const TOAST_DURATION_MS = 6000;
@@ -118,6 +121,8 @@ let Hooks = {
     DisableOnSubmit,
     ExpenseReceiptKeys,
     MediaLoadState,
+    SwipeSheet,
+    ModalSheet,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
     ToastFlashBridge,
 };

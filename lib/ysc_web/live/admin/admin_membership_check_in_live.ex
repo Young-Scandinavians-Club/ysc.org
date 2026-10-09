@@ -224,7 +224,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
     ~H"""
     <div class={[
-      "flex items-center gap-4 px-4 py-3 transition-all duration-100 ease-out",
+      "flex items-center gap-4 px-4 py-3 transition duration-100 ease-out",
       if(@result.membership_status == :inactive,
         do: "bg-red-50/30",
         else: "hover:bg-zinc-50/60"
